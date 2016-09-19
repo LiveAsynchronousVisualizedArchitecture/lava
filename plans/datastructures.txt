@@ -1,0 +1,16 @@
+
+Every data structure is flat linear memory throughout the dataflow
+  -Ideally they can be read from without any sort of deserialization
+  -Represented as a single pointer?
+    -Use upper bits to track references? Should allow for 64-48=16 bits for the reference count
+    -The first 64 bits pointed to is always the total number of bytes (including the size bits) of the memory being pointed to
+      -Though this takes a dereference, it will pull in the next 120 bytes which are likely to be read from anyway
+    -The next 64 bits are a pointer to the function to deallocate the memory?
+      -Can this be done purely through types?  Does unique_ptr do it purely through types?
+  -Need a static sizeBytes function that takes constructor arguments and returns the amount of memory needed to store them
+  -SizeBytes can cast any pointer to a ui64*, dereference it and return the size in bytes 
+  -operators can still be overloaded since the single pointer data on the stack will still have a type
+
+
+
+
