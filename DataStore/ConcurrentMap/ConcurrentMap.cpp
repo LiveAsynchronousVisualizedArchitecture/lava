@@ -356,7 +356,7 @@ int main()
       uint64_t      val  :  28;
     };
 
-  ConcurrentHash ch(8);
+  ConcurrentHash ch(64);
 
   Println("kv size: ",   sizeof(ConcurrentHash::kv) );
   Println("kv size: ",   sizeof(keyval) );
