@@ -19,6 +19,10 @@
 // idea: put atomic reader counter into each ConcurrentStore entry as a signed integer
 // idea: figure out how to make ConcurrentHash a flat data structure so it can sit in shared memory
 
+// todo: make bitwise compare function? 
+// todo: deal with memory / allocate from  shared memory
+
+
 #ifndef __CONCURRENTMAP_HEADER_GUARD__
 #define __CONCURRENTMAP_HEADER_GUARD__
 
@@ -568,7 +572,6 @@ public:
       cur  =  nxtBlock(cur);
     }    
   }
-
 };
 
 class SharedMemory
@@ -579,8 +582,6 @@ class SimDB
 private:
   ConcurrentStore   m_cs;     // store data in blocks and get back indices
   ConcurrentHash    m_ch;     // store the indices of keys and values - contains a ConcurrentList
-
-  // todo: deal with memory / allocate from  shared memory
 
 public:
   SimDB(){}
@@ -595,14 +596,17 @@ public:
 
     return m_ch.put(kidx, vidx);
   }
-  void  getKey(i32 idx, void* buf, i32 len)
+  void  get(void* kbuf, i32 len)
   {
-    m_cs.put(idx, buf, len);
+    m_
+    m_cs.get(idx, buf, len);
   }
   void  getVal(i32 idx, void* buf, i32 len)
   {
     m_cs.put(idx, buf, len);
   }
+
+
 
 
 };
