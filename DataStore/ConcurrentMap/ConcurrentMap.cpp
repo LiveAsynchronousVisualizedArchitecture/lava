@@ -5,13 +5,19 @@
 #include <mutex>
 #include <vector>
 #include <string>
-
-#include <SIM/SIM_GeneralTemplateUtil.hpp>
-#include <SIM/SIM_Concurrency.hpp>
-
-//#include "ConcurrentMap.hpp"
+#include <random>
+#include <iostream>
+#include <sstream>
 
 #include "ConcurrentMap.hpp"
+
+#ifndef PAUSE
+  #define PAUSE std::cout << "Paused at line " << __LINE__ << std::endl; int VAR##__LINE__; std::cin >> VAR##__LINE__;
+#endif
+
+#ifndef TO
+  #define TO(to, var)      for(std::remove_const<decltype(to)>::type var = 0; var < to; ++var)
+#endif
 
 ui32       intHash(ui32    h)
 {
@@ -34,6 +40,145 @@ ui32  nextPowerOf2(ui32    v)
   v++;
 
   return v;
+}
+
+template <typename T> struct RngInt
+{
+  std::mt19937                       m_gen;
+  std::uniform_int_distribution<T>   m_dis;
+  
+  RngInt(T lo = 0, T hi = 1, int seed = 16807)
+   : m_gen(seed), m_dis(lo, hi)
+  { }
+
+  inline T operator()()
+  { return m_dis(m_gen); }
+
+  inline T operator()(T lo, T hi)
+  {
+    std::uniform_int_distribution<T>  dis(lo, hi); 
+    return dis(m_gen);
+  }
+};
+
+template<class STR>
+STR keepAlphaNumeric(STR const& s)
+{
+  using namespace std;
+
+  regex            alphaNumeric("[a-zA-Z\\d]+");
+  sregex_iterator  iter( ALL(s), alphaNumeric );
+  sregex_iterator  iter_end;
+
+  STR out;
+  while( iter != iter_end )
+    out += iter++->str();      // ...
+
+  return out;
+}
+
+template<class STR1, class STR2>
+STR1 subNonFilename(STR1 const& s, STR2 const& substr)
+{
+  using namespace std;
+
+  //string    patStr("[#%&\\{\\}\\\\<>\\*\\?/\\w\\$!'\":@\\+`\\|=\\.]+");
+  //string    patStr("#|%|&|\\{|\\}|\\\\|<|>|\\*|\\?|/|\\w|\\$|!|'|\"|:|@|\\+|`|\\||=|\\.");
+
+  STR1      patStr(":|\\*|\\.|\\?|\\\\|/|\\||>|<");
+  regex     pattern(patStr);
+  return regex_replace(s, pattern, substr);
+}
+
+
+template<class T> inline auto
+Concat(const T& a) -> T
+{ return a; }
+template<class T1, class... T> inline auto
+Concat(const T1& a, const T&... args) -> T1
+{
+  //T1 ret;
+  //ret.append( ALL(a) );
+  //ret.append( ALL(Concat(args...)) );
+  return a + Concat(args...);
+}
+
+inline std::string 
+toString(std::vector<std::string> const& v)
+{
+  using namespace std;
+  
+  ostringstream convert;
+  TO(v.size(),i) convert << v[i] << " ";
+  convert << endl;
+  return convert.str();
+}
+
+template<class T> inline std::string 
+toString(T const& x)
+{
+  std::ostringstream convert;
+  convert << x;
+  return convert.str();
+}
+
+template<class T1, class... T> inline std::string
+toString(const T1& a, const T&... args)
+{
+  return toString(a) + toString(args...) ;
+}
+
+template< template<class...> class L, class... T, int IDX = 0> std::string 
+toString(const std::tuple<T...>& tpl)
+{
+  using namespace std;
+  
+  const auto len = mp_len<T...>::value;
+  
+  string ret;
+  ret  +=  toString(get<IDX>(tpl), " ");
+  if(IDX < len-1) ret  += toString(get<IDX+1>(tpl));
+  return ret;
+}
+
+inline std::ostream&  Print(std::ostream& o) { return o; }
+template<class... T> inline std::ostream&
+ Print(std::ostream& o, const T&... args)
+{
+  o << toString(args ...);
+  o.flush();
+  return o;
+}
+template<class... T> inline std::ostream&
+ Println(std::ostream& o, const T&... args)
+{
+  //o << toString(args...) << std::endl;
+  Print(o, args..., "\n");
+  return o;
+}
+template<class... T> inline void
+ Print(const T&... args)
+{
+  Print(std::cout, args...);
+  //std::cout << toString(args...);
+}
+template<class... T> inline void
+ Println(const T&... args)
+{
+  Println(std::cout, args...);
+  //std::cout << toString(args...) << std::endl;
+}
+template<class T> inline void
+ PrintSpaceln(const T& a)
+{
+  Print(std::cout, a);
+}
+template<class T1, class... T> inline void
+ PrintSpaceln(const T1& a, const T&... args)
+{
+  Print(std::cout, a, " ");
+  PrintSpaceln(args...);
+  Println();
 }
 
 
@@ -198,18 +343,17 @@ int main()
   //
   //}
 
-    struct keyval
+  struct keyval
     {
       uint64_t  readers  :   4;
       uint64_t      key  :  28;
       uint64_t      val  :  28;
     };
 
-
   ConcurrentHash ch(8);
 
-  Println("kv size: ", sizeof(ConcurrentHash::kv) );
-  Println("kv size: ", sizeof(keyval) );
+  Println("kv size: ",   sizeof(ConcurrentHash::kv) );
+  Println("kv size: ",   sizeof(keyval) );
   Println("ui64 size: ", sizeof(ui64) );
   TO(8,h)
   {

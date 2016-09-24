@@ -29,16 +29,28 @@
 #include <vector>
 
 
+using  ui8       =   uint8_t;
+using  i64       =   int64_t;
+using  ui64      =   uint64_t;
+using  i32       =   int32_t;
+using  ui32      =   uint32_t;
+using  f32       =   float;
+using  f64       =   double;
+using  aui64     =   std::atomic<ui64>;
+using  ai32      =   std::atomic<i64>;
+using  cstr      =   const char*;
+using  str       =   std::string;
+
 class ConcurrentHash
 {
 private:
-  using Aui64  =  std::atomic<ui64>;
+  //using Aui64  =  std::atomic<ui64>;
 
 public:
-  static const ui8  INIT_READERS  =     1;
-  static const ui8  FREE_READY    =     0;
-  static const ui8  MAX_READERS   =  0xFF;
-  static const ui32 EMPTY_KEY     =  0x0FFFFFFF;      // 28 bits set 
+  static const ui8   INIT_READERS  =     1;
+  static const ui8   FREE_READY    =     0;
+  static const ui8   MAX_READERS   =  0xFF;
+  static const ui32  EMPTY_KEY     =  0x0FFFFFFF;      // 28 bits set 
 
   union kv
   {
@@ -422,7 +434,7 @@ public:
   ui8*                    m_addr;
   ui32               m_blockSize;
   ui32              m_blockCount;
-  Ai32              m_blocksUsed;
+  ai32              m_blocksUsed;
   ConcurrentList            m_cl;
 
   i32*            stPtr(i32 blkIdx)
