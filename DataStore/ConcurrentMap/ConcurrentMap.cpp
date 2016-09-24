@@ -8,8 +8,11 @@
 #include <random>
 #include <iostream>
 #include <sstream>
+#include <thread>
 
 #include "ConcurrentMap.hpp"
+
+//#include <SIM/SIM_GeneralTemplateUtil.hpp>
 
 #ifndef PAUSE
   #define PAUSE std::cout << "Paused at line " << __LINE__ << std::endl; int VAR##__LINE__; std::cin >> VAR##__LINE__;
@@ -182,6 +185,11 @@ template<class T1, class... T> inline void
 }
 
 
+      template<class T, class _Alloc=std::allocator<T> > 
+using vec        =  std::vector<T, _Alloc>;
+
+using std::thread;
+
 int main()
 {
   using namespace std;
@@ -305,8 +313,6 @@ int main()
   //Println();
   //Println("\nLinks: ", cl.lnkCnt(), " ");
 
-
-
   //i32 blkSz  = 5;
   //i32 blocks = 2;
   //vec<ui8> mem(blocks*blkSz, 0);
@@ -355,11 +361,22 @@ int main()
   Println("kv size: ",   sizeof(ConcurrentHash::kv) );
   Println("kv size: ",   sizeof(keyval) );
   Println("ui64 size: ", sizeof(ui64) );
-  TO(8,h)
+
+  vec<thread> thrds;
+  TO(24,tid)
   {
-    Println(h,": ", ch.put(h, h*h) );
-    Println(h,": ", ch.get(h) );
+    thrds.push_back( thread([&ch, &rng, tid]()
+    {
+      TO(64,h)
+      {
+        Println(h,": ", ch.put(h, h*h) );
+        Println(h,": ", ch.get(h) );
+      }
+    } ));
+    thrds.back().detach();
   }
+  //TO(5,tid) thrds[tid].detach();
+  //TO(5,tid) thrds[tid].join();
 
   PAUSE
 

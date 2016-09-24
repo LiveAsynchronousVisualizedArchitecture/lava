@@ -28,7 +28,6 @@
 #include <memory>
 #include <vector>
 
-
 using  ui8       =   uint8_t;
 using  i64       =   int64_t;
 using  ui64      =   uint64_t;
@@ -47,7 +46,7 @@ private:
   //using Aui64  =  std::atomic<ui64>;
 
 public:
-  static const ui8   INIT_READERS  =     1;
+  static const ui8   INIT_READERS  =     0;
   static const ui8   FREE_READY    =     0;
   static const ui8   MAX_READERS   =  0xFF;
   static const ui32  EMPTY_KEY     =  0x0FFFFFFF;      // 28 bits set 
@@ -94,7 +93,7 @@ private:
   kv           empty_kv()                  const
   {
     kv empty;
-    empty.readers  =  0;
+    empty.readers  =  INIT_READERS;
     empty.key      =  EMPTY_KEY;
     empty.val      =  EMPTY_KEY;
     return empty;
@@ -196,14 +195,17 @@ public:
   {
     using namespace std;
     
-    m_sz           =  nextPowerOf2(sz);
+    m_sz      =  nextPowerOf2(sz);
 
-    kv defKv;
-    defKv.asInt    =  0;
-    defKv.key      =  EMPTY_KEY;
-    defKv.val      =  0;
-    defKv.readers  =  INIT_READERS;
+    kv defKv  =  empty_kv();
+    // defKv.asInt    =  0;
+    //defKv.key      =  EMPTY_KEY;
+    //defKv.val      =  0;
+    //defKv.readers  =  INIT_READERS;
+
     m_kvs.resize(m_sz, defKv);
+    
+    //for(ui32 i=0; i<m_sz; ++i) m_kvs[i] = defKv;
 
     //m_keys.reset(new Aui32[m_sz]);
     //m_vals.reset(new Aui32[m_sz]);
@@ -235,9 +237,9 @@ public:
       {
         if(probedKv.key != EMPTY_KEY) continue;                                               // The entry was either free, or contains another key.  // Usually, it contains another key. Keep probing.
                 
-        kv   expected;
-        expected.asInt  =  0;
-        expected.key    =  EMPTY_KEY;
+        kv   expected   =  empty_kv();
+        //expected.asInt  =  0;
+        //expected.key    =  EMPTY_KEY;
 
         bool   success  =  compexchange_kv(i, &expected.asInt, desired.asInt);
         //bool   success  =  m_keys.get()[i].compare_exchange_strong(desired, key);           // The entry was free. Now let's try to take it using a CAS. 
