@@ -502,7 +502,7 @@ public:
     assert(blockSize > sizeof(IDX));
   }
 
-  i32   alloc(i32    size, i32* out_blocks)
+  i32   alloc(i32    size, i32* out_blocks=nullptr)
   {
     i32 byteRem = 0;
     i32 blocks  = blocksNeeded(size, &byteRem);
@@ -571,12 +571,39 @@ public:
 
 };
 
+class SharedMemory
+{};
+
 class SimDB
 {
 private:
+  ConcurrentStore   m_cs;     // store data in blocks and get back indices
+  ConcurrentHash    m_ch;     // store the indices of keys and values - contains a ConcurrentList
+
+  // todo: deal with memory / allocate from  shared memory
 
 public:
   SimDB(){}
+
+  ui32  put(void* key, i32 klen, void* val, i32 vlen)
+  {
+    i32 kidx = m_cs.alloc(klen);                      // kidx is key index
+    i32 vidx = m_cs.alloc(vlen);
+    
+    m_cs.put(kidx, key, klen);
+    m_cs.put(vidx, val, vlen);
+
+    return m_ch.put(kidx, vidx);
+  }
+  void  getKey(i32 idx, void* buf, i32 len)
+  {
+    m_cs.put(idx, buf, len);
+  }
+  void  getVal(i32 idx, void* buf, i32 len)
+  {
+    m_cs.put(idx, buf, len);
+  }
+
 
 };
 

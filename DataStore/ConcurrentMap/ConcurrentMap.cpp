@@ -358,9 +358,9 @@ int main()
 
   ConcurrentHash ch(64);
 
-  Println("kv size: ",   sizeof(ConcurrentHash::kv) );
-  Println("kv size: ",   sizeof(keyval) );
-  Println("ui64 size: ", sizeof(ui64) );
+  //Println("kv size: ",   sizeof(ConcurrentHash::kv) );
+  //Println("kv size: ",   sizeof(keyval) );
+  //Println("ui64 size: ", sizeof(ui64) );
 
   vec<thread> thrds;
   TO(24,tid)
@@ -369,8 +369,9 @@ int main()
     {
       TO(64,h)
       {
-        Println(h,": ", ch.put(h, h*h) );
-        Println(h,": ", ch.get(h) );
+        ch.put(h, h*h);
+        //Print(h,": ", ch.put(h, h*h) );
+        Print(h,":", ch.get(h)==h*h, " ");
       }
     } ));
     thrds.back().detach();
