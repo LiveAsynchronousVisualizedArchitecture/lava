@@ -370,10 +370,10 @@ int main()
   str wat      =      "wat";
   str skidoosh = "skidoosh"; 
   str kablam   =   "kablam";
-  db.put( (void*)wat.data(), (ui32)wat.length(), (void*)skidoosh.data(), (ui32)skidoosh.length() );
-  db.put( (void*)wat.data(), (ui32)wat.length(), (void*)kablam.data(), (ui32)kablam.length() );
+  Println("put: ", db.put( (void*)wat.data(), (ui32)wat.length(), (void*)skidoosh.data(), (ui32)skidoosh.length()) );
+  Println("put: ", db.put( (void*)wat.data(), (ui32)wat.length(), (void*)kablam.data(),   (ui32)kablam.length())   ); 
 
-  Println("idx: ", db.get((void*)wat.data(), (ui32)wat.length()) );
+  Println("get: ", db.get((void*)wat.data(), (ui32)wat.length()) );
 
   PAUSE
 

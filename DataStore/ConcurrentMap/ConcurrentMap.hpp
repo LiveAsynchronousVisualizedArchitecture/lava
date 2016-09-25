@@ -645,7 +645,7 @@ public:
         if(curlen < blksz){ return false; }
         else if( memcmp(curbuf, p, blksz)!=0 ){ return false; }
       }else if(-nxt != curlen){ return false; }
-      else{ return memcmp(curbuf, p, blksz)==0; }
+      else{ return memcmp(curbuf, p, curlen)==0; }
 
       curbuf  +=  blksz;
       curlen  -=  blksz;
