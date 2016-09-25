@@ -21,6 +21,9 @@
 
 // todo: make bitwise compare function? 
 // todo: deal with memory / allocate from  shared memory
+// todo: hash key data instead of the block index of the key
+//       --create function to hash arbitrary bytes 
+//       create function to put into a hashmap with a pre-hashed value
 
 
 #ifndef __CONCURRENTMAP_HEADER_GUARD__
@@ -50,6 +53,8 @@ private:
   //using Aui64  =  std::atomic<ui64>;
 
 public:
+  //using COMPARE_FUNC  =  decltype( [](ui32 key){} );
+
   static const ui8   INIT_READERS  =     0;
   static const ui8   FREE_READY    =     0;
   static const ui8   MAX_READERS   =  0xFF;
@@ -94,7 +99,12 @@ private:
   //  return probedKey;
   //}
 
-  kv           empty_kv()                  const
+  static bool DefaultKeyCompare(ui32 a, ui32 b)
+  {
+    return a == b;
+  }
+
+  kv           empty_kv()                   const
   {
     kv empty;
     empty.readers  =  INIT_READERS;
@@ -102,7 +112,7 @@ private:
     empty.val      =  EMPTY_KEY;
     return empty;
   }
-  ui32          intHash(ui32  h)           const
+  ui32          intHash(ui32  h)            const
   {
     h ^= h >> 16;
     h *= 0x85ebca6b;
@@ -111,7 +121,7 @@ private:
     h ^= h >> 16;
     return h;
   }
-  ui32     nextPowerOf2(ui32  v)           const
+  ui32     nextPowerOf2(ui32  v)            const
   {
     v--;
     v |= v >> 1;
@@ -123,7 +133,7 @@ private:
 
     return v;
   }
-  kv            load_kv(ui32  i)           const
+  kv            load_kv(ui32  i)            const
   {
     using namespace std;
     
@@ -131,7 +141,7 @@ private:
     keyval.asInt   =  atomic_load<ui64>( (Aui64*)&m_kvs.data()[i].asInt );              // Load the key that was there.
     return keyval;
   }
-  void         store_kv(ui32  i, kv _kv)   const
+  void         store_kv(ui32  i, kv _kv)    const
   {
     using namespace std;
     
@@ -195,7 +205,39 @@ public:
   ConcurrentHash& operator=(ConcurrentHash const& lval) = delete;
   ConcurrentHash& operator=(ConcurrentHash&&      rval) = delete;
 
-  bool      init(ui32   sz)
+  template<class COMP_FUNC> 
+  ui32 putHashed(ui32 hash, ui32 key, ui32 val, COMP_FUNC f) const
+  {
+    using namespace std;
+  
+    kv desired;
+    desired.key  =  key;
+    desired.val  =  val;
+    ui32      i  =  hash; // intHash(key);
+    for(;; ++i)
+    {
+      i  &=  m_sz-1;
+  
+      kv probedKv = load_kv(i);
+
+      //if(probedKv.key != key)
+      if( f(probedKv.key, key)==false )
+      {
+        if(probedKv.key != EMPTY_KEY) continue;                                               // The entry was either free, or contains another key.  // Usually, it contains another key. Keep probing.
+                
+        kv   expected   =  empty_kv();
+  
+        bool   success  =  compexchange_kv(i, &expected.asInt, desired.asInt);
+        if( !success && (expected.key!=key) ) continue;                                       // Another thread just stole it from underneath us.
+      }                                                                                       // Either we just added the key, or another thread did.
+  
+      store_kv(i, desired);
+      return i;
+    }
+    return i;
+  }
+
+  bool       init(ui32   sz)
   {
     using namespace std;
     
@@ -223,40 +265,11 @@ public:
 
     return true;
   }
-  ui32       put(ui32  key, ui32 val) const
+  ui32        put(ui32  key, ui32 val)           const
   {
-    using namespace std;
-
-    kv desired;
-    desired.key  =  key;
-    desired.val  =  val;
-    ui32      i  =  intHash(key);
-    for(;; ++i)
-    {
-      i  &=  m_sz-1;
-
-      //ui32 probedKey = load_key(i);
-      kv probedKv = load_kv(i);
-      if(probedKv.key != key)
-      {
-        if(probedKv.key != EMPTY_KEY) continue;                                               // The entry was either free, or contains another key.  // Usually, it contains another key. Keep probing.
-                
-        kv   expected   =  empty_kv();
-        //expected.asInt  =  0;
-        //expected.key    =  EMPTY_KEY;
-
-        bool   success  =  compexchange_kv(i, &expected.asInt, desired.asInt);
-        //bool   success  =  m_keys.get()[i].compare_exchange_strong(desired, key);           // The entry was free. Now let's try to take it using a CAS. 
-        if( !success && (expected.key!=key) ) continue;                                       // Another thread just stole it from underneath us.
-      }                                                                                       // Either we just added the key, or another thread did.
-
-      //m_vals.get()[i].store(val);
-      store_kv(i, desired);
-      return i;
-    }
-    return i;
+    return putHashed(intHash(key), key, val, DefaultKeyCompare);
   }
-  ui32       get(ui32  key)           const
+  ui32        get(ui32  key)                     const
   {
     ui32 i = intHash(key);
     for(;; ++i)
@@ -276,7 +289,7 @@ public:
 
     return EMPTY_KEY;
   }
-  kv        read(ui32  key)           const
+  kv         read(ui32  key)                     const
   {
     ui32 i = intHash(key);
     for(;; ++i)
@@ -292,7 +305,7 @@ public:
 
     return empty_kv();
   }
-  kv     endRead(ui32  key)           const
+  kv      endRead(ui32  key)                     const
   {
     ui32 i = intHash(key);
     for(;; ++i)
@@ -309,7 +322,7 @@ public:
     }
     return empty_kv();
   }
-  bool       del(ui32  key)           const
+  bool        del(ui32  key)                     const
   {
     ui32 i = intHash(key);
     for(;; ++i)
@@ -324,10 +337,28 @@ public:
     }
     return false;
   }
-  ui32      size()                    const
+  ui32       size()                              const
   {
     return m_sz;
   }
+  ui32  hashBytes(void* buf, ui32 len)           const
+  {
+    ui32  rethash  =  0;
+    ui32* cur      =  (ui32*)buf;
+    ui32  loops    =  len/sizeof(ui32);
+    ui32* end      =  cur + loops + 1;
+    for(; cur!=end; ++cur){ rethash ^= intHash(*cur); }
+
+    ui32  rem      =  len - loops;
+    ui32  lst      =  0;
+    ui8*  end8     =  (ui8*)end;
+    for(ui8 i=0; i<rem; ++i){ lst ^= *end8 << (rem-1-i); }
+    
+    rethash ^= intHash(lst);
+
+    return rethash;
+  }
+
 
   //bool     lock()                    const
   //{
@@ -586,21 +617,23 @@ private:
 public:
   SimDB(){}
 
-  ui32  put(void* key, i32 klen, void* val, i32 vlen)
+  ui32  put(void* key, ui32 klen, void* val, ui32 vlen)
   {
-    i32 kidx = m_cs.alloc(klen);                      // kidx is key index
-    i32 vidx = m_cs.alloc(vlen);
-    
+    i32      kidx = m_cs.alloc(klen);                      // kidx is key index
+    i32      vidx = m_cs.alloc(vlen);
+
     m_cs.put(kidx, key, klen);
     m_cs.put(vidx, val, vlen);
 
+    ui32  keyhash = m_ch.hashBytes(key, klen);
+    m_ch.putHashed(keyhash, kidx, vidx, [](ui32 a, ui32 b){ return a == b; /* comparison function here */ }  );
+
     return m_ch.put(kidx, vidx);
   }
-  void  get(void* kbuf, i32 len)
-  {
-    m_
-    m_cs.get(idx, buf, len);
-  }
+  //void  get(void* kbuf, i32 len)
+  //{
+  //  m_cs.get(idx, buf, len);
+  //}
   void  getVal(i32 idx, void* buf, i32 len)
   {
     m_cs.put(idx, buf, len);
@@ -612,4 +645,39 @@ public:
 };
 
 #endif
+
+
+  //ui32         put(ui32  key, ui32 val) const
+  //{
+  //  using namespace std;
+
+  //  kv desired;
+  //  desired.key  =  key;
+  //  desired.val  =  val;
+  //  ui32      i  =  intHash(key);
+  //  for(;; ++i)
+  //  {
+  //    i  &=  m_sz-1;
+
+  //    //ui32 probedKey = load_key(i);
+  //    kv probedKv = load_kv(i);
+  //    if(probedKv.key != key)
+  //    {
+  //      if(probedKv.key != EMPTY_KEY) continue;                                               // The entry was either free, or contains another key.  // Usually, it contains another key. Keep probing.
+  //              
+  //      kv   expected   =  empty_kv();
+  //      //expected.asInt  =  0;
+  //      //expected.key    =  EMPTY_KEY;
+
+  //      bool   success  =  compexchange_kv(i, &expected.asInt, desired.asInt);
+  //      //bool   success  =  m_keys.get()[i].compare_exchange_strong(desired, key);           // The entry was free. Now let's try to take it using a CAS. 
+  //      if( !success && (expected.key!=key) ) continue;                                       // Another thread just stole it from underneath us.
+  //    }                                                                                       // Either we just added the key, or another thread did.
+
+  //    //m_vals.get()[i].store(val);
+  //    store_kv(i, desired);
+  //    return i;
+  //  }
+  //  return i;
+  //}
 
