@@ -10,6 +10,7 @@
 // todo: Make block size for keys different than data?
 // todo: mark free cells as negative numbers so double free is caught?
 // todo: store lengths and check key lengths before trying bitwise comparison as an optimization? - would only make a difference for long keys that are larger than one block
+// todo: make a membuf class that encapsulates a shared memory buffer / memory mapped file on windows or linux
 
 //Block based allocation
 //-Checking if the head has been touched means either incrementing a counter every time it is written, or putting in a thread id every time it is read or written
@@ -191,19 +192,28 @@ public:
   
       kv probedKv = load_kv(i);
 
+      //if(probedKv.key != EMPTY_KEY) continue;
+      //if(probedKv.key == EMPTY_KEY){
+      //  store_kv(i, desired); 
+      //  return i;
+      //}
+
       //if(probedKv.key != key)
-      if( f(probedKv.key, key)==false )
+      if(probedKv.key == EMPTY_KEY)
       {
-        if(probedKv.key != EMPTY_KEY) continue;                                               // The entry was either free, or contains another key.  // Usually, it contains another key. Keep probing.
+        //if(probedKv.key != EMPTY_KEY) continue;                                               // The entry was either free, or contains another key.  // Usually, it contains another key. Keep probing.
                 
         kv   expected   =  empty_kv();
   
         bool   success  =  compexchange_kv(i, &expected.asInt, desired.asInt);
         if( !success && (expected.key!=key) ) continue;                                       // Another thread just stole it from underneath us.
+        else                                  return i;
       }                                                                                       // Either we just added the key, or another thread did.
-  
-      store_kv(i, desired);
-      return i;
+      
+      if( f(probedKv.key, key) ){
+        store_kv(i, desired);
+        return i;
+      }
     }
     return i;
   }
@@ -619,7 +629,7 @@ private:
 
 public:
   SimDB(){}
-  SimDB(size_t blockSize, size_t blockCount) : 
+  SimDB(ui32 blockSize, ui32 blockCount) : 
     m_mem( malloc(blockSize*blockCount) ),
      m_cs( (ui8*)m_mem, blockSize, blockCount),      // todo: change this to a void*
      m_ch( blockCount )

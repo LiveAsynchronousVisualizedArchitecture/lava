@@ -349,38 +349,29 @@ int main()
   //
   //}
 
-  struct keyval
-    {
-      uint64_t  readers  :   4;
-      uint64_t      key  :  28;
-      uint64_t      val  :  28;
-    };
+  //ConcurrentHash ch(64);
+  //vec<thread> thrds;
+  //TO(24,tid)
+  //{
+  //  thrds.push_back( thread([&ch, &rng, tid]()
+  //  {
+  //    TO(64,h)
+  //    {
+  //      ch.put(h, h*h);
+  //      //Print(h,": ", ch.put(h, h*h) );
+  //      Print(h,":", ch.get(h)==h*h, " ");
+  //    }
+  //  } ));
+  //  thrds.back().detach();
+  //}
 
-  ConcurrentHash ch(64);
+  SimDB db(16, 4);
 
-  //Println("kv size: ",   sizeof(ConcurrentHash::kv) );
-  //Println("kv size: ",   sizeof(keyval) );
-  //Println("ui64 size: ", sizeof(ui64) );
-
-  vec<thread> thrds;
-  TO(24,tid)
-  {
-    thrds.push_back( thread([&ch, &rng, tid]()
-    {
-      TO(64,h)
-      {
-        ch.put(h, h*h);
-        //Print(h,": ", ch.put(h, h*h) );
-        Print(h,":", ch.get(h)==h*h, " ");
-      }
-    } ));
-    thrds.back().detach();
-  }
-  //TO(5,tid) thrds[tid].detach();
-  //TO(5,tid) thrds[tid].join();
-
-
-
+  str wat      =      "wat";
+  str skidoosh = "skidoosh"; 
+  str kablam   =   "kablam";
+  db.put( (void*)wat.data(), (ui32)wat.length(), (void*)skidoosh.data(), (ui32)skidoosh.length() );
+  db.put( (void*)wat.data(), (ui32)wat.length(), (void*)kablam.data(), (ui32)kablam.length() );
 
   PAUSE
 
@@ -401,6 +392,16 @@ int main()
 
 
 
+
+//struct keyval
+//{
+//  uint64_t  readers  :   4;
+//  uint64_t      key  :  28;
+//  uint64_t      val  :  28;
+//};
+//Println("kv size: ",   sizeof(ConcurrentHash::kv) );
+//Println("kv size: ",   sizeof(keyval) );
+//Println("ui64 size: ", sizeof(ui64) );
 
 //Aui32*  key_addr  =  (Aui32*)(&m_keys.get()[i]);
 //ui32   probedKey  =  atomic_load( key_addr );                                 
