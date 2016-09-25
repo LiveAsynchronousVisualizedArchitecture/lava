@@ -1,7 +1,15 @@
 
 
-// todo: lock init with mutex
-// todo: implement locking resize
+// todo: make bitwise compare function? 
+// todo: deal with memory / allocate from  shared memory
+// todo: hash key data instead of the block index of the key
+//       --create function to hash arbitrary bytes 
+//       create function to put into a hashmap with a pre-hashed value
+// todo: lock init with mutex?
+// todo: implement locking resize?
+// todo: Make block size for keys different than data?
+// todo: mark free cells as negative numbers so double free is caught?
+// todo: store lengths and check key lengths before trying bitwise comparison as an optimization? - would only make a difference for long keys that are larger than one block
 
 //Block based allocation
 //-Checking if the head has been touched means either incrementing a counter every time it is written, or putting in a thread id every time it is read or written
@@ -9,9 +17,8 @@
 //-Alloc checks the head to read the next free position and puts it in head if head hasn't been touched. 
 //-Free checks the head to read the next free position, stores the head value in the free position, then moves head to the just written new free position if head hasn't been touched
 
-// Make block size for keys different than data
-// Make frees happen from the last block to the first
-// mark free cells as negative numbers so double free is caught?
+//
+// Make frees happen from the last block to the first - don't remember what this means
 
 // idea: use max_waste as a recipricol power of two giving the percentage of waste allowed for an allocation
 // - 2 would be 25%, 3 would be 12.5% 
@@ -19,17 +26,12 @@
 // idea: put atomic reader counter into each ConcurrentStore entry as a signed integer
 // idea: figure out how to make ConcurrentHash a flat data structure so it can sit in shared memory
 
-// todo: make bitwise compare function? 
-// todo: deal with memory / allocate from  shared memory
-// todo: hash key data instead of the block index of the key
-//       --create function to hash arbitrary bytes 
-//       create function to put into a hashmap with a pre-hashed value
-
 
 #ifndef __CONCURRENTMAP_HEADER_GUARD__
 #define __CONCURRENTMAP_HEADER_GUARD__
 
 #include <cstdint>
+#include <cstring>
 #include <atomic>
 #include <mutex>
 #include <memory>
@@ -50,15 +52,9 @@ using  str       =   std::string;
 class ConcurrentHash
 {
 private:
-  //using Aui64  =  std::atomic<ui64>;
 
 public:
   //using COMPARE_FUNC  =  decltype( [](ui32 key){} );
-
-  static const ui8   INIT_READERS  =     0;
-  static const ui8   FREE_READY    =     0;
-  static const ui8   MAX_READERS   =  0xFF;
-  static const ui32  EMPTY_KEY     =  0x0FFFFFFF;      // 28 bits set 
 
   union kv
   {
@@ -68,8 +64,20 @@ public:
       uint64_t      key  : 28;
       uint64_t      val  : 28;
     };
-    ui64 asInt;
+    uint64_t asInt;
   };
+
+  static const ui8   INIT_READERS  =     0;            // eventually make this 1 again? - to catch when readers has dropped to 0
+  static const ui8   FREE_READY    =     0;
+  static const ui8   MAX_READERS   =  0xFF;
+  static const ui32  EMPTY_KEY     =  0x0FFFFFFF;      // 28 bits set 
+  
+  static bool DefaultKeyCompare(ui32 a, ui32 b)
+  {
+    return a == b;
+  }
+
+  //const static ui32 EMPTY_KEY = 0xFFFFFFFF;
 
 private:
   using i8        =  int8_t;
@@ -81,28 +89,8 @@ private:
   using Mut       =  std::mutex;
   using UnqLock   =  std::unique_lock<Mut>;
 
-  //const static ui32 EMPTY_KEY = 0xFFFFFFFF;
-
-  ui32               m_sz;
-
-  mutable KVs       m_kvs;
-  //mutable Mut        m_mut;
-
-  //ui32         load_key(ui32  i)          const
-  //{
-  //  using namespace std;
-  //  
-  //  kv keyval;
-  //  keyval.asInt    =  atomic_load<ui64>( (Aui64*)&m_kvs.data()[i].asInt );              // Load the key that was there.
-  //  ui32 probedKey  =  keyval.key;
-  //
-  //  return probedKey;
-  //}
-
-  static bool DefaultKeyCompare(ui32 a, ui32 b)
-  {
-    return a == b;
-  }
+         ui32   m_sz;
+  mutable KVs   m_kvs;
 
   kv           empty_kv()                   const
   {
@@ -175,23 +163,6 @@ private:
 
     return curKv;
   }
-
-  //kv         incReaders(ui32  i, kv curKv) const                                     // increment the readers by one and return the previous kv from the successful swap 
-  //{
-  //  return addReaders(i, curKv, 1);
-  //}
-  //kv         decReaders(ui32  i, kv curKv) const                                     // increment the readers by one and return the previous kv from the successful swap 
-  //{
-  //  return addReaders(i, curKv, -1);
-  //}
-
-  //void         resize(size_t sz) const
-  //{
-  //  //UnqLock lock;
-  //  //  m_keys.resize(sz);
-  //  //  m_vals.resize(sz);
-  //  //lock.unlock();
-  //}
 
 public:
   ConcurrentHash(){}
@@ -358,16 +329,6 @@ public:
 
     return rethash;
   }
-
-
-  //bool     lock()                    const
-  //{
-  //  m_mut.lock();
-  //}
-  //bool   unlock()                    const
-  //{
-  //  m_mut.unlock();
-  //}
 };
 
 class ConcurrentList
@@ -474,11 +435,11 @@ public:
   ai32              m_blocksUsed;
   ConcurrentList            m_cl;
 
-  i32*            stPtr(i32 blkIdx)
+  i32*            stPtr(i32  blkIdx)
   {
     return (i32*)( ((ui8*)m_addr) + blkIdx*m_blockSize );
   }
-  i32          nxtBlock(i32 blkIdx)
+  i32          nxtBlock(i32  blkIdx)
   {
     return *(stPtr(blkIdx));
   }
@@ -486,11 +447,11 @@ public:
   {
     return m_blockSize - sizeof(IDX);
   }
-  ui8*     blockFreePtr(i32 blkIdx)
+  ui8*     blockFreePtr(i32  blkIdx)
   {
     return ((ui8*)stPtr(blkIdx)) + sizeof(IDX);
   }
-  i32      blocksNeeded(i32    len, i32* out_rem=nullptr)
+  i32      blocksNeeded(i32     len, i32* out_rem=nullptr)
   {
     i32  freeSz   = blockFreeSize();
     i32  byteRem  = len % freeSz;
@@ -500,7 +461,14 @@ public:
 
     return blocks;
   }
-  size_t     writeBlock(i32 blkIdx, void* bytes) // i64 len = -1)
+  size_t       blockLen(i32  blkIdx)
+  {
+    IDX nxt = nxtBlock(blkIdx);
+    if(nxt < 0) return nxt;
+
+    return blockFreeSize();
+  }
+  size_t     writeBlock(i32  blkIdx, void* bytes) // i64 len = -1)
   {
     i32   blkFree  =  blockFreeSize();
     ui8*        p  =  blockFreePtr(blkIdx);
@@ -513,7 +481,7 @@ public:
     //bool     fill = len < -1 || blkFree < len;
     //size_t cpyLen = fill? blkFree : len;
   }
-  size_t      readBlock(i32 blkIdx, void* bytes)
+  size_t      readBlock(i32  blkIdx, void* bytes)
   {
     i32   blkFree  =  blockFreeSize();
     ui8*        p  =  blockFreePtr(blkIdx);
@@ -522,6 +490,18 @@ public:
     memcpy(bytes, p, cpyLen);
 
     return cpyLen;
+  }
+  bool     blockCompare(i32 blkIdxA, i32 blkIdxB, size_t* out_alen=nullptr, size_t* out_blen=nullptr)
+  {
+    auto alen = blockLen(blkIdxA);
+    auto blen = blockLen(blkIdxB);
+    if(out_alen) *out_alen = alen;
+    if(out_blen) *out_blen = blen;
+    if(alen != blen) return false;         // if their lengths aren't even the same, they can't be the same
+
+    ui8* pa  =  blockFreePtr(blkIdxA);
+    ui8* pb  =  blockFreePtr(blkIdxB);
+    return memcmp(pa, pb, alen)==0;
   }
 
 
@@ -537,7 +517,7 @@ public:
     assert(blockSize > sizeof(IDX));
   }
 
-  i32   alloc(i32    size, i32* out_blocks=nullptr)
+  i32        alloc(i32    size, i32* out_blocks=nullptr)
   {
     i32 byteRem = 0;
     i32 blocks  = blocksNeeded(size, &byteRem);
@@ -557,7 +537,7 @@ public:
 
     return st;
   }
-  void   free(i32     idx)
+  void        free(i32     idx)
   {
     i32   cur   =  idx;                // cur is the current block index
     i32    nxt  =  *stPtr(cur);        // nxt is the next block index
@@ -578,7 +558,7 @@ public:
     //}
     //m_cl.free(cur);
   }
-  void    put(i32  blkIdx, void* bytes, i32 len)
+  void         put(i32  blkIdx, void* bytes, i32 len)
   {
     ui8*       b   = (ui8*)bytes;
     i32    blocks  =  blocksNeeded(len);
@@ -592,7 +572,7 @@ public:
     //i32  remBytes  =  0;
     //i32    blocks  =  blocksNeeded(len, &remBytes);
   }
-  void    get(i32  blkIdx, void* bytes, i32 len)
+  void         get(i32  blkIdx, void* bytes, i32 len)
   {
     ui8*      b = (ui8*)bytes;
     i32  blocks = blocksNeeded(len);
@@ -602,6 +582,26 @@ public:
       b   +=  readBlock(cur, b);
       cur  =  nxtBlock(cur);
     }    
+  }
+  bool     compare(IDX blkIdxA, IDX blkIdxB)
+  {
+    // && (nxtA=nxtBlock(nxtA))>=0
+    // && (nxtB=nxtBlock(nxtB))>=0 )
+    // if(nxtA < 0) break;
+    // if(nxtB < 0) break;
+
+    size_t alen=0; size_t blen=0; IDX nxtA=blkIdxA; IDX nxtB=blkIdxB; bool blkcmp=false;
+    while( blockCompare(nxtA, nxtB, &alen, &blen) )
+    {      
+      nxtA = nxtBlock(nxtA);
+      nxtB = nxtBlock(nxtB);
+      bool lastA = nxtA<0;
+      bool lastB = nxtB<0;
+      if(lastA ^  lastB) return false;  // if one is on their last block but the other is not, return false - not actually needed? - it is needed because the blocks could be the same while one is the last and the other is not?
+      if(lastA && lastB) return  true;
+    }
+
+    return true;
   }
 };
 
@@ -646,6 +646,50 @@ public:
 
 #endif
 
+
+
+
+
+//
+//mutable Mut        m_mut;
+
+//ui32         load_key(ui32  i)          const
+//{
+//  using namespace std;
+//  
+//  kv keyval;
+//  keyval.asInt    =  atomic_load<ui64>( (Aui64*)&m_kvs.data()[i].asInt );              // Load the key that was there.
+//  ui32 probedKey  =  keyval.key;
+//
+//  return probedKey;
+//}
+
+//kv         incReaders(ui32  i, kv curKv) const                                     // increment the readers by one and return the previous kv from the successful swap 
+//{
+//  return addReaders(i, curKv, 1);
+//}
+//kv         decReaders(ui32  i, kv curKv) const                                     // increment the readers by one and return the previous kv from the successful swap 
+//{
+//  return addReaders(i, curKv, -1);
+//}
+
+//void         resize(size_t sz) const
+//{
+//  //UnqLock lock;
+//  //  m_keys.resize(sz);
+//  //  m_vals.resize(sz);
+//  //lock.unlock();
+//}
+
+
+//bool     lock()                    const
+//{
+//  m_mut.lock();
+//}
+//bool   unlock()                    const
+//{
+//  m_mut.unlock();
+//}
 
   //ui32         put(ui32  key, ui32 val) const
   //{
