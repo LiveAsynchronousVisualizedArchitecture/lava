@@ -611,6 +611,7 @@ class SharedMemory
 class SimDB
 {
 private:
+  void*            m_mem;     // todo: make this a unique_ptr
   ConcurrentStore   m_cs;     // store data in blocks and get back indices
   ConcurrentHash    m_ch;     // store the indices of keys and values - contains a ConcurrentList
 
@@ -618,6 +619,11 @@ private:
 
 public:
   SimDB(){}
+  SimDB(size_t blockSize, size_t blockCount) : 
+    m_mem( malloc(blockSize*blockCount) ),
+     m_cs( (ui8*)m_mem, blockSize, blockCount),      // todo: change this to a void*
+     m_ch( blockCount )
+  {}
 
   ui32  put(void* key, ui32 klen, void* val, ui32 vlen)
   {
