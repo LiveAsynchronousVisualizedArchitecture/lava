@@ -1,16 +1,19 @@
 
 
-// todo: make bitwise compare function? 
+// todo: make a function to compare a block to an arbitrary byte buffer
 // todo: deal with memory / allocate from  shared memory
-// todo: hash key data instead of the block index of the key
-//       --create function to hash arbitrary bytes 
-//       create function to put into a hashmap with a pre-hashed value
 // todo: lock init with mutex?
 // todo: implement locking resize?
 // todo: Make block size for keys different than data?
 // todo: mark free cells as negative numbers so double free is caught?
-// todo: store lengths and check key lengths before trying bitwise comparison as an optimization? - would only make a difference for long keys that are larger than one block
+// todo: store lengths and check key lengths before trying bitwise comparison as an optimization? - would only make a difference for long keys that are larger than one block? no it would make a difference on every get?
 // todo: make a membuf class that encapsulates a shared memory buffer / memory mapped file on windows or linux
+
+
+// -todo: hash key data instead of the block index of the key
+//       --create function to hash arbitrary bytes 
+//       --create function to put into a hashmap with a pre-hashed value
+// -todo: make bitwise compare function between blocks
 
 //Block based allocation
 //-Checking if the head has been touched means either incrementing a counter every time it is written, or putting in a thread id every time it is read or written
@@ -218,6 +221,21 @@ public:
     return i;
   }
 
+  template<class MATCH_FUNC> 
+  ui32 getHashed(ui32 hash, MATCH_FUNC match) const
+  {
+    ui32 i = hash;
+    for(;; ++i)
+    {
+      i &= m_sz - 1;
+      kv probedKv = load_kv(i);
+      if(probedKv.key==EMPTY_KEY) return EMPTY_KEY;
+      if( match(probedKv.key) )     return probedKv.val;
+    }
+
+    //return EMPTY_KEY;
+  }
+
   bool       init(ui32   sz)
   {
     using namespace std;
@@ -341,7 +359,7 @@ public:
   }
 };
 
-class ConcurrentList
+class  ConcurrentList
 {
 public:
   union HeadUnion
@@ -431,7 +449,6 @@ public:
     return cnt;
   }
 };
- 
 class ConcurrentStore
 {
 public:
@@ -613,12 +630,35 @@ public:
 
     return true;
   }
-};
+  bool     compare(void* buf, size_t len, IDX blkIdx)
+  {
+    // size_t alen=0; size_t blen=0; IDX nxtA=blkIdxA; IDX nxtB=blkIdxB; bool blkcmp=false;
 
-class SharedMemory
+    i32      nxt  =  nxtBlock(blkIdx);
+    auto   blksz  =  blockFreeSize();
+    ui8*  curbuf  =  (ui8*)buf;
+    auto  curlen  =  len;  
+    while(true)
+    {
+      auto p = blockFreePtr(blkIdx);
+      if(nxt >= 0){
+        if(curlen < blksz){ return false; }
+        else if( memcmp(curbuf, p, blksz)!=0 ){ return false; }
+      }else if(-nxt != curlen){ return false; }
+      else{ return memcmp(curbuf, p, blksz)==0; }
+
+      curbuf  +=  blksz;
+      curlen  -=  blksz;
+      nxt      =  nxtBlock(blkIdx);
+    }
+
+    return true;     
+  }
+};
+class    SharedMemory
 {};
 
-class SimDB
+class           SimDB
 {
 private:
   void*            m_mem;     // todo: make this a unique_ptr
@@ -626,6 +666,10 @@ private:
   ConcurrentHash    m_ch;     // store the indices of keys and values - contains a ConcurrentList
 
   static bool CompareBlocks(SimDB* ths, i32 a, i32 b){ return ths->m_cs.compare(a,b); }
+  static bool  CompareBlock(SimDB* ths, void* buf, size_t len, i32 blkIdx)
+  { 
+    return ths->m_cs.compare(buf, len, blkIdx);
+  }
 
 public:
   SimDB(){}
@@ -645,14 +689,16 @@ public:
 
     ui32  keyhash = m_ch.hashBytes(key, klen);
     auto  ths     = this;                                          // this silly song and dance is because the this pointer can't be passed to a lambda
-    return m_ch.putHashed(keyhash, kidx, vidx, [ths](ui32 a, ui32 b){return CompareBlocks(ths,a,b);} ); // [](ui32 a, ui32 b){ return a == b; /* comparison function here */ }  );
-
-    // return m_ch.put(kidx, vidx);
+    return m_ch.putHashed(keyhash, kidx, vidx, 
+      [ths](ui32 a, ui32 b){return CompareBlocks(ths,a,b); });
   }
-  //void  get(void* kbuf, i32 len)
-  //{
-  //  m_cs.get(idx, buf, len);
-  //}
+  i32 get(void* key, i32 len)
+  {
+    ui32 keyhash  =  m_ch.hashBytes(key, len);
+    auto     ths  =  this;
+    return m_ch.getHashed(keyhash, 
+      [ths, key, len](ui32 blkidx){ return CompareBlock(ths,key,len,blkidx); });
+  }
   void  getVal(i32 idx, void* buf, i32 len)
   {
     m_cs.put(idx, buf, len);

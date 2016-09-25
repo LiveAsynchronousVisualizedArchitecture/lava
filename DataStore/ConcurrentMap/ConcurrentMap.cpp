@@ -373,6 +373,8 @@ int main()
   db.put( (void*)wat.data(), (ui32)wat.length(), (void*)skidoosh.data(), (ui32)skidoosh.length() );
   db.put( (void*)wat.data(), (ui32)wat.length(), (void*)kablam.data(), (ui32)kablam.length() );
 
+  Println("idx: ", db.get((void*)wat.data(), (ui32)wat.length()) );
+
   PAUSE
 
   return 0;
