@@ -614,6 +614,8 @@ private:
   ConcurrentStore   m_cs;     // store data in blocks and get back indices
   ConcurrentHash    m_ch;     // store the indices of keys and values - contains a ConcurrentList
 
+  static bool CompareBlocks(SimDB* ths, i32 a, i32 b){ return ths->m_cs.compare(a,b); }
+
 public:
   SimDB(){}
 
@@ -626,9 +628,10 @@ public:
     m_cs.put(vidx, val, vlen);
 
     ui32  keyhash = m_ch.hashBytes(key, klen);
-    m_ch.putHashed(keyhash, kidx, vidx, [](ui32 a, ui32 b){ return a == b; /* comparison function here */ }  );
+    auto  ths     = this;                                          // this silly song and dance is because the this pointer can't be passed to a lambda
+    return m_ch.putHashed(keyhash, kidx, vidx, [ths](ui32 a, ui32 b){return CompareBlocks(ths,a,b);} ); // [](ui32 a, ui32 b){ return a == b; /* comparison function here */ }  );
 
-    return m_ch.put(kidx, vidx);
+    // return m_ch.put(kidx, vidx);
   }
   //void  get(void* kbuf, i32 len)
   //{
