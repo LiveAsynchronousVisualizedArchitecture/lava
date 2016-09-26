@@ -51,6 +51,8 @@
 #include <memory>
 #include <vector>
 
+#include <windows.h>
+
 using   ui8   =   uint8_t;
 using   i64   =   int64_t;
 using  ui64   =   uint64_t;
@@ -691,12 +693,54 @@ public:
   }
 };
 class     SharedMemory
-{};
+{
+private:
+  //std::unique_ptr<void*> ptr;
+  void*          ptr;
+  HANDLE  fileHandle;
+
+public:
+  static void FreeMem(void* p)
+  {
+  }
+
+  SharedMemory(){}
+  SharedMemory(ui64 sz)
+  {
+    auto fileHndl = CreateFileMapping(
+      INVALID_HANDLE_VALUE,
+      NULL,
+      PAGE_READWRITE,
+      0,
+      (DWORD)sz,
+      "Global\\simdb_15");
+
+    if(fileHndl==NULL){/*error*/}
+
+    auto mapmem = MapViewOfFile(fileHndl,   // handle to map object
+      FILE_MAP_ALL_ACCESS,   // read/write permission
+      0,
+      0,
+      sz);
+  }
+
+  ~SharedMemory()
+  {
+    UnmapViewOfFile(ptr);
+    CloseHandle(fileHandle);
+  }
+
+  auto data() -> void*
+  {
+    return ptr;
+  }
+};
 
 class            SimDB
 {
 private:
-  void*            m_mem;     // todo: make this a unique_ptr
+  //void*            m_mem;     // todo: make this a unique_ptr
+  SharedMemory     m_mem;
   ConcurrentStore   m_cs;     // store data in blocks and get back indices
   ConcurrentHash    m_ch;     // store the indices of keys and values - contains a ConcurrentList
 
@@ -711,10 +755,15 @@ private:
 public:
   SimDB(){}
   SimDB(ui32 blockSize, ui32 blockCount) : 
-    m_mem( malloc(blockSize*blockCount) ),
-     m_cs( (ui8*)m_mem, blockSize, blockCount),      // todo: change this to a void*
-     m_ch( blockCount )
+    m_mem(blockSize*blockCount),
+    m_cs( (ui8*)m_mem.data(), blockSize, blockCount),               // todo: change this to a void*
+    m_ch( blockCount )
   {}
+  //SimDB(ui32 blockSize, ui32 blockCount) : 
+  //  m_mem( malloc(blockSize*blockCount) ),
+  //   m_cs( (ui8*)m_mem, blockSize, blockCount),            // todo: change this to a void*
+  //   m_ch( blockCount )
+  //{}
 
   i32      put(void*   key, ui32  klen, void* val, ui32 vlen)
   {
