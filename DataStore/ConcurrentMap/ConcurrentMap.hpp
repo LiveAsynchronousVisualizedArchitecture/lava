@@ -5,6 +5,8 @@
 // -todo: make bitwise compare function between blocks
 // -todo: make a function to compare a block to an arbitrary byte buffer
 
+// todo: change store_kv to use compare exchange and return previous kv ?
+// todo: make remove function for ConcurrentStore? - just use free
 // todo: remove overwritten indices from the ConcurrentStore
 // todo: redo concurrent store get to not need a length argument
 // todo: deal with memory / allocate from  shared memory
@@ -181,7 +183,7 @@ public:
   ConcurrentHash& operator=(ConcurrentHash&&      rval) = delete;
 
   template<class COMP_FUNC> 
-  ui32 putHashed(ui32 hash, ui32 key, ui32 val, COMP_FUNC comp) const
+  kv putHashed(ui32 hash, ui32 key, ui32 val, COMP_FUNC comp) const
   {
     using namespace std;
   
@@ -210,7 +212,7 @@ public:
   
         bool   success  =  compexchange_kv(i, &expected.asInt, desired.asInt);
         if( !success && (expected.key!=key) ) continue;                                       // Another thread just stole it from underneath us.
-        else                                  return i;
+        else                                  return expected;
       }                                                                                       // Either we just added the key, or another thread did.
       
       if( comp(probedKv.key, key) ){
@@ -264,7 +266,7 @@ public:
 
     return true;
   }
-  ui32        put(ui32  key, ui32 val)           const
+  kv          put(ui32  key, ui32 val)           const
   {
     return putHashed(intHash(key), key, val, DefaultKeyCompare);
   }
@@ -691,11 +693,12 @@ public:
     m_cs.put(kidx, key, klen);
     m_cs.put(vidx, val, vlen);
 
-    ui32  keyhash = m_ch.hashBytes(key, klen);
-    auto  ths     = this;                                          // this silly song and dance is because the this pointer can't be passed to a lambda
-    return m_ch.putHashed(keyhash, kidx, vidx, 
-       [ths](ui32 a, ui32 b){return CompareBlocks(ths,a,b); });
-      //[ths, key, klen](ui32 blkidx){ return CompareBlock(ths,key,klen,blkidx); });
+    ui32 keyhash = m_ch.hashBytes(key, klen);
+    auto ths = this;                                          // this silly song and dance is because the this pointer can't be passed to a lambda
+    auto  kv = m_ch.putHashed(keyhash, kidx, vidx, 
+       [ths](ui32 a, ui32 b){return CompareBlocks(ths,a,b); });       //[ths, key, klen](ui32 blkidx){ return CompareBlock(ths,key,klen,blkidx); });
+
+    if(kv.key != ConcurrentHash::EMPTY_KEY){ m_cs.free(kv.val); m_cs.free(kv.key); }
   }
   i32     get(void*   key, i32    len)
   {
