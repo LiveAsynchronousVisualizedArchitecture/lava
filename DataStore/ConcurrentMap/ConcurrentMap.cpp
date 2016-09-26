@@ -12,6 +12,8 @@
 
 #include "ConcurrentMap.hpp"
 
+#include <windows.h>
+
 //#include <SIM/SIM_GeneralTemplateUtil.hpp>
 
 #ifndef PAUSE
@@ -390,6 +392,9 @@ int main()
   Println("get \"kablam\": ", clear);
 
   Println("\nmem: ", (char*)db.data(), "\n\n" );
+
+
+
 
   PAUSE
 
