@@ -707,7 +707,7 @@ public:
   SharedMemory(){}
   SharedMemory(ui64 sz)
   {
-    auto fileHndl = CreateFileMapping(
+    fileHandle = CreateFileMapping(
       INVALID_HANDLE_VALUE,
       NULL,
       PAGE_READWRITE,
@@ -715,9 +715,9 @@ public:
       (DWORD)sz,
       "Global\\simdb_15");
 
-    if(fileHndl==NULL){/*error*/}
+    if(fileHandle==NULL){/*error*/}
 
-    auto mapmem = MapViewOfFile(fileHndl,   // handle to map object
+    ptr = MapViewOfFile(fileHandle,   // handle to map object
       FILE_MAP_ALL_ACCESS,   // read/write permission
       0,
       0,
