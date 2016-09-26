@@ -367,13 +367,18 @@ int main()
 
   SimDB db(16, 4);
 
-  str wat      =      "wat";
-  str skidoosh = "skidoosh"; 
-  str kablam   =   "kablam";
+  str      wat  =       "wat";
+  str skidoosh  =  "skidoosh"; 
+  str   kablam  =    "kablam";
   Println("put: ", db.put( (void*)wat.data(), (ui32)wat.length(), (void*)skidoosh.data(), (ui32)skidoosh.length()) );
   Println("put: ", db.put( (void*)wat.data(), (ui32)wat.length(), (void*)kablam.data(),   (ui32)kablam.length())   ); 
 
-  Println("get: ", db.get((void*)wat.data(), (ui32)wat.length()) );
+  auto idx = db.get((void*)wat.data(), (ui32)wat.length());
+  Println("get: ", idx);
+
+  str clear = "                ";
+  db.get(idx, (void*)clear.data() );
+  Println("get: ", clear);
 
   PAUSE
 

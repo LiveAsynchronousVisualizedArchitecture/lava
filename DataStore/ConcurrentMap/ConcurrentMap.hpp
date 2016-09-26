@@ -1,6 +1,11 @@
 
+// -todo: hash key data instead of the block index of the key
+//       --create function to hash arbitrary bytes 
+//       --create function to put into a hashmap with a pre-hashed value
+// -todo: make bitwise compare function between blocks
+// -todo: make a function to compare a block to an arbitrary byte buffer
 
-// todo: make a function to compare a block to an arbitrary byte buffer
+// todo: redo concurrent store get to not need a length argument
 // todo: deal with memory / allocate from  shared memory
 // todo: lock init with mutex?
 // todo: implement locking resize?
@@ -9,11 +14,6 @@
 // todo: store lengths and check key lengths before trying bitwise comparison as an optimization? - would only make a difference for long keys that are larger than one block? no it would make a difference on every get?
 // todo: make a membuf class that encapsulates a shared memory buffer / memory mapped file on windows or linux
 
-
-// -todo: hash key data instead of the block index of the key
-//       --create function to hash arbitrary bytes 
-//       --create function to put into a hashmap with a pre-hashed value
-// -todo: make bitwise compare function between blocks
 
 //Block based allocation
 //-Checking if the head has been touched means either incrementing a counter every time it is written, or putting in a thread id every time it is read or written
@@ -41,19 +41,19 @@
 #include <memory>
 #include <vector>
 
-using  ui8       =   uint8_t;
-using  i64       =   int64_t;
-using  ui64      =   uint64_t;
-using  i32       =   int32_t;
-using  ui32      =   uint32_t;
-using  f32       =   float;
-using  f64       =   double;
-using  aui64     =   std::atomic<ui64>;
-using  ai32      =   std::atomic<i64>;
-using  cstr      =   const char*;
-using  str       =   std::string;
+using   ui8   =   uint8_t;
+using   i64   =   int64_t;
+using  ui64   =   uint64_t;
+using   i32   =   int32_t;
+using  ui32   =   uint32_t;
+using   f32   =   float;
+using   f64   =   double;
+using aui64   =   std::atomic<ui64>;
+using  ai32   =   std::atomic<i64>;
+using  cstr   =   const char*;
+using   str   =   std::string;
 
-class ConcurrentHash
+class   ConcurrentHash
 {
 private:
 
@@ -358,8 +358,7 @@ public:
     return rethash;
   }
 };
-
-class  ConcurrentList
+class   ConcurrentList
 {
 public:
   union HeadUnion
@@ -449,7 +448,7 @@ public:
     return cnt;
   }
 };
-class ConcurrentStore
+class  ConcurrentStore
 {
 public:
 
@@ -531,7 +530,6 @@ public:
     return memcmp(pa, pb, alen)==0;
   }
 
-
 public:
   ConcurrentStore(){}
   ConcurrentStore(ui8* addr, ui32 blockSize, ui32 blockCount) :
@@ -599,16 +597,24 @@ public:
     //i32  remBytes  =  0;
     //i32    blocks  =  blocksNeeded(len, &remBytes);
   }
-  void         get(i32  blkIdx, void* bytes, i32 len)
+  size_t       get(i32  blkIdx, void* bytes)
   {
-    ui8*      b = (ui8*)bytes;
-    i32  blocks = blocksNeeded(len);
-    i32     cur = blkIdx;
-    for(i32 i=0; i<blocks; ++i)
+    size_t    len = 0;
+    size_t  rdLen = 0;
+    ui8*        b = (ui8*)bytes;
+    i32       cur = blkIdx;
+    i32       nxt;
+    while(true)
     {
-      b   +=  readBlock(cur, b);
-      cur  =  nxtBlock(cur);
-    }    
+      nxt    =  nxtBlock(cur);
+      rdLen  =  readBlock(cur, b);                         // rdLen is read length
+      b     +=  rdLen;
+      len   +=  rdLen;
+      if(nxt<0) break;
+
+      cur    =  nxt;
+    }
+    return len;
   }
   bool     compare(IDX blkIdxA, IDX blkIdxB)
   {
@@ -632,8 +638,6 @@ public:
   }
   bool     compare(void* buf, size_t len, IDX blkIdx)
   {
-    // size_t alen=0; size_t blen=0; IDX nxtA=blkIdxA; IDX nxtB=blkIdxB; bool blkcmp=false;
-
     i32      nxt  =  nxtBlock(blkIdx);
     auto   blksz  =  blockFreeSize();
     ui8*  curbuf  =  (ui8*)buf;
@@ -665,8 +669,8 @@ private:
   ConcurrentStore   m_cs;     // store data in blocks and get back indices
   ConcurrentHash    m_ch;     // store the indices of keys and values - contains a ConcurrentList
 
-  static bool CompareBlocks(SimDB* ths, i32 a, i32 b){ return ths->m_cs.compare(a,b); }
-  static bool  CompareBlock(SimDB* ths, void* buf, size_t len, i32 blkIdx)
+  static bool  CompareBlocks(SimDB* ths, i32 a, i32 b){ return ths->m_cs.compare(a,b); }
+  static bool   CompareBlock(SimDB* ths, void* buf, size_t len, i32 blkIdx)
   { 
     return ths->m_cs.compare(buf, len, blkIdx);
   }
@@ -679,9 +683,9 @@ public:
      m_ch( blockCount )
   {}
 
-  ui32  put(void* key, ui32 klen, void* val, ui32 vlen)
+  ui32    put(void*   key, ui32  klen, void* val, ui32 vlen)
   {
-    i32      kidx = m_cs.alloc(klen);                      // kidx is key index
+    i32      kidx = m_cs.alloc(klen);                              // kidx is key index
     i32      vidx = m_cs.alloc(vlen);
 
     m_cs.put(kidx, key, klen);
@@ -692,16 +696,16 @@ public:
     return m_ch.putHashed(keyhash, kidx, vidx, 
       [ths](ui32 a, ui32 b){return CompareBlocks(ths,a,b); });
   }
-  i32 get(void* key, i32 len)
+  i32     get(void*   key, i32    len)
   {
     ui32 keyhash  =  m_ch.hashBytes(key, len);
     auto     ths  =  this;
     return m_ch.getHashed(keyhash, 
       [ths, key, len](ui32 blkidx){ return CompareBlock(ths,key,len,blkidx); });
   }
-  void  getVal(i32 idx, void* buf, i32 len)
+  size_t  get(ui32 blkIdx, void*  buf)
   {
-    m_cs.put(idx, buf, len);
+    return m_cs.get(blkIdx, buf);           // copy into the buf starting at the blkidx
   }
 
 
@@ -714,6 +718,23 @@ public:
 
 
 
+
+
+//i32  blocks = blocksNeeded(len);
+//for(i32 i=0; i<blocks; ++i)
+//i32 nxt;
+
+//void         get(i32  blkIdx, void* bytes, i32 len)
+//{
+//  ui8*      b = (ui8*)bytes;
+//  i32  blocks = blocksNeeded(len);
+//  i32     cur = blkIdx;
+//  for(i32 i=0; i<blocks; ++i)
+//  {
+//    b   +=  readBlock(cur, b);
+//    cur  =  nxtBlock(cur);
+//  }
+//}
 
 //
 //mutable Mut        m_mut;
@@ -746,7 +767,6 @@ public:
 //  //lock.unlock();
 //}
 
-
 //bool     lock()                    const
 //{
 //  m_mut.lock();
@@ -756,37 +776,37 @@ public:
 //  m_mut.unlock();
 //}
 
-  //ui32         put(ui32  key, ui32 val) const
-  //{
-  //  using namespace std;
+//ui32         put(ui32  key, ui32 val) const
+//{
+//  using namespace std;
 
-  //  kv desired;
-  //  desired.key  =  key;
-  //  desired.val  =  val;
-  //  ui32      i  =  intHash(key);
-  //  for(;; ++i)
-  //  {
-  //    i  &=  m_sz-1;
+//  kv desired;
+//  desired.key  =  key;
+//  desired.val  =  val;
+//  ui32      i  =  intHash(key);
+//  for(;; ++i)
+//  {
+//    i  &=  m_sz-1;
 
-  //    //ui32 probedKey = load_key(i);
-  //    kv probedKv = load_kv(i);
-  //    if(probedKv.key != key)
-  //    {
-  //      if(probedKv.key != EMPTY_KEY) continue;                                               // The entry was either free, or contains another key.  // Usually, it contains another key. Keep probing.
-  //              
-  //      kv   expected   =  empty_kv();
-  //      //expected.asInt  =  0;
-  //      //expected.key    =  EMPTY_KEY;
+//    //ui32 probedKey = load_key(i);
+//    kv probedKv = load_kv(i);
+//    if(probedKv.key != key)
+//    {
+//      if(probedKv.key != EMPTY_KEY) continue;                                               // The entry was either free, or contains another key.  // Usually, it contains another key. Keep probing.
+//              
+//      kv   expected   =  empty_kv();
+//      //expected.asInt  =  0;
+//      //expected.key    =  EMPTY_KEY;
 
-  //      bool   success  =  compexchange_kv(i, &expected.asInt, desired.asInt);
-  //      //bool   success  =  m_keys.get()[i].compare_exchange_strong(desired, key);           // The entry was free. Now let's try to take it using a CAS. 
-  //      if( !success && (expected.key!=key) ) continue;                                       // Another thread just stole it from underneath us.
-  //    }                                                                                       // Either we just added the key, or another thread did.
+//      bool   success  =  compexchange_kv(i, &expected.asInt, desired.asInt);
+//      //bool   success  =  m_keys.get()[i].compare_exchange_strong(desired, key);           // The entry was free. Now let's try to take it using a CAS. 
+//      if( !success && (expected.key!=key) ) continue;                                       // Another thread just stole it from underneath us.
+//    }                                                                                       // Either we just added the key, or another thread did.
 
-  //    //m_vals.get()[i].store(val);
-  //    store_kv(i, desired);
-  //    return i;
-  //  }
-  //  return i;
-  //}
+//    //m_vals.get()[i].store(val);
+//    store_kv(i, desired);
+//    return i;
+//  }
+//  return i;
+//}
 
