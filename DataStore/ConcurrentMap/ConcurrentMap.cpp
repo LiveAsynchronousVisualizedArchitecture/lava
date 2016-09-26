@@ -216,10 +216,11 @@ int main()
   //  Println("i: ",i," ", nextPowerOf2(i));
   //}
 
-
+  //
   //ui32 loopSz  =  (ui32)( double(cm.size()) / 1.5);
 
-  RngInt<int> rng(1, 2);
+  //
+  //RngInt<int> rng(1, 2);
 
   //vec<thread> thrds;
   //TO(5,tid)
@@ -365,30 +366,30 @@ int main()
   //  thrds.back().detach();
   //}
 
-  SimDB db(16, 8);
+  SimDB db(16, 16);
 
   str       wat  =       "wat";
+  str       wut  =       "wut";
   str  skidoosh  =  "skidoosh";
   str    kablam  =    "kablam";
-  Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(), (void*)skidoosh.data(), (ui32)skidoosh.length()) );
-  Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(), (void*)kablam.data(),   (ui32)kablam.length())   ); 
+  Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
+  Println("put: ", db.put( (void*)wut.data(),   (ui32)wut.length(),    (void*)kablam.data(),   (ui32)kablam.length())   ); 
   Println("put: ", db.put( (void*)kablam.data(),(ui32)kablam.length(), (void*)skidoosh.data(), (ui32)skidoosh.length()) ); 
-
-  //auto idx = db.get((void*)wat.data(), (ui32)wat.length());
-  //Println("get: ", idx);
-
+  Println();
 
   str clear = "                ";
-  //db.get(idx, (void*)clear.data() );
-  db.get("wat", (void*)clear.data() );
-  Println("get: ", clear);
+  auto watlen = db.get("wat", (void*)clear.data() );
+  Println("watlen: ", watlen);
+  Println("get \"wat\": ", clear);
 
-  auto idx2 = db.get((void*)kablam.data(), (ui32)kablam.length());
-  Println("get: ", idx2);
+  //auto idx2 = db.get((void*)kablam.data(), (ui32)kablam.length());
+  //Println("get \"kablam\": ", idx2);
 
-  db.get(idx2, (void*)clear.data() );
-  Println("get: ", clear);
+  clear = "                ";
+  db.get("kablam", (void*)clear.data() );
+  Println("get \"kablam\": ", clear);
 
+  Println("\nmem: ", (char*)db.data(), "\n\n" );
 
   PAUSE
 
@@ -409,6 +410,10 @@ int main()
 
 
 
+
+//auto idx = db.get((void*)wat.data(), (ui32)wat.length());
+//Println("get: ", idx);
+//db.get(idx, (void*)clear.data() );
 
 //struct keyval
 //{

@@ -4,11 +4,18 @@
 //       --create function to put into a hashmap with a pre-hashed value
 // -todo: make bitwise compare function between blocks
 // -todo: make a function to compare a block to an arbitrary byte buffer
+// -todo: change store_kv to use compare exchange and return previous kv ?
+// -todo: make remove function for ConcurrentStore? - just use free
+// -todo: remove overwritten indices from the ConcurrentStore
+// -todo: figure out why "wat" and "wut" match - 3 bugs: unsigned size_t in the blockcompare function, not flipping the signs of the next index when it is negative (for length), default value of true when while loop ends from the blocks comparing as false
+// -todo: figure out why second insert is putting EMPTY_KEY for key and value in the hash map - comp returns true even though strings are different?
+// -todo: use match function instead of block comparison for everything? better for continguous memory anyway?
+// -todo: fix not finding a key too long to fit in block - wasn't updating the current block index in the loop
+// -todo: return an error on running out of blocks - done with a negative blockcount if not enough blocks are available
+// -todo: free blocks if not enough block are allocated
+// -todo: fix infinite loop on free - last block wasn't getting next block index set when reaching LIST_END 
 
-// todo: change store_kv to use compare exchange and return previous kv ?
-// todo: make remove function for ConcurrentStore? - just use free
-// todo: remove overwritten indices from the ConcurrentStore
-// todo: redo concurrent store get to not need a length argument
+// todo: redo concurrent store get to store length so that buffer can be returned
 // todo: deal with memory / allocate from  shared memory
 // todo: lock init with mutex?
 // todo: implement locking resize?
@@ -16,6 +23,7 @@
 // todo: mark free cells as negative numbers so double free is caught?
 // todo: store lengths and check key lengths before trying bitwise comparison as an optimization? - would only make a difference for long keys that are larger than one block? no it would make a difference on every get?
 // todo: make a membuf class that encapsulates a shared memory buffer / memory mapped file on windows or linux
+// todo: make -1 an error instead of returning a length of 0? - distinguising a key with length 0 and no key could be useful
 
 //Block based allocation
 //-Checking if the head has been touched means either incrementing a counter every time it is written, or putting in a thread id every time it is read or written
@@ -135,11 +143,15 @@ private:
     keyval.asInt   =  atomic_load<ui64>( (Aui64*)&m_kvs.data()[i].asInt );              // Load the key that was there.
     return keyval;
   }
-  void         store_kv(ui32  i, kv _kv)    const
+  kv           store_kv(ui32  i, kv keyval) const
   {
     using namespace std;
     
-    atomic_store<ui64>( (Aui64*)&m_kvs[i].asInt, _kv.asInt );
+    //atomic_store<ui64>( (Aui64*)&m_kvs[i].asInt, _kv.asInt );
+
+    kv ret;
+    ret.asInt = atomic_exchange<ui64>( (Aui64*)&m_kvs[i].asInt, keyval.asInt);
+    return ret;
   }
   bool  compexchange_kv(ui32  i, ui64* expected, ui64 desired) const
   {
@@ -215,12 +227,14 @@ public:
         else                                  return expected;
       }                                                                                       // Either we just added the key, or another thread did.
       
-      if( comp(probedKv.key, key) ){
-        store_kv(i, desired);
-        return i;
+      //if( comp(probedKv.key, key) ){
+      if( comp(probedKv.key) ){
+        return store_kv(i, desired);
+        //return i;
       }
     }
-    return i;
+
+    return empty_kv();  // should never be reached
   }
 
   template<class MATCH_FUNC> 
@@ -232,7 +246,7 @@ public:
       i &= m_sz - 1;
       kv probedKv = load_kv(i);
       if(probedKv.key==EMPTY_KEY) return EMPTY_KEY;
-      if( match(probedKv.key) )     return probedKv.val;
+      if( match(probedKv.key) )   return probedKv.val;
     }
 
     //return EMPTY_KEY;
@@ -266,10 +280,10 @@ public:
 
     return true;
   }
-  kv          put(ui32  key, ui32 val)           const
-  {
-    return putHashed(intHash(key), key, val, DefaultKeyCompare);
-  }
+  //kv          put(ui32  key, ui32 val)           const
+  //{
+  //  return putHashed(intHash(key), key, val, DefaultKeyCompare);
+  //}
   ui32        get(ui32  key)                     const
   {
     ui32 i = intHash(key);
@@ -369,7 +383,7 @@ public:
     uint64_t asInt;
   };
   
-  using    ui32  =  uint32_t;
+  using    ui32  =  uint32_t;  // need to be i32 instead for the ConcurrentStore indices?
   using    ui64  =  uint64_t;
   using ListVec  =  std::vector< std::atomic<ui32> >;  // does this need to be atomic? all the contention should be over the head
   using HeadInt  =  ui64;
@@ -453,10 +467,11 @@ public:
 class  ConcurrentStore
 {
 public:
+  using IDX  =  i32;
 
-//private:
-  using IDX = i32;
+  const static ui32 LIST_END = ConcurrentList::LIST_END;
 
+private:
   ui8*                    m_addr;
   ui32               m_blockSize;
   ui32              m_blockCount;
@@ -489,10 +504,10 @@ public:
 
     return blocks;
   }
-  size_t       blockLen(i32  blkIdx)
+  i32          blockLen(i32  blkIdx)
   {
     IDX nxt = nxtBlock(blkIdx);
-    if(nxt < 0) return nxt;
+    if(nxt < 0) return -nxt;
 
     return blockFreeSize();
   }
@@ -519,18 +534,6 @@ public:
 
     return cpyLen;
   }
-  bool     blockCompare(i32 blkIdxA, i32 blkIdxB, size_t* out_alen=nullptr, size_t* out_blen=nullptr)
-  {
-    auto alen = blockLen(blkIdxA);
-    auto blen = blockLen(blkIdxB);
-    if(out_alen) *out_alen = alen;
-    if(out_blen) *out_blen = blen;
-    if(alen != blen) return false;         // if their lengths aren't even the same, they can't be the same
-
-    ui8* pa  =  blockFreePtr(blkIdxA);
-    ui8* pb  =  blockFreePtr(blkIdxB);
-    return memcmp(pa, pb, alen)==0;
-  }
 
 public:
   ConcurrentStore(){}
@@ -548,23 +551,37 @@ public:
   {
     i32 byteRem = 0;
     i32 blocks  = blocksNeeded(size, &byteRem);
-    if(out_blocks) *out_blocks = blocks;
+    //if(out_blocks) *out_blocks = blocks;
 
     i32   st = m_cl.nxt();                                     // stBlk  is starting block
+    if(st==LIST_END){
+      if(out_blocks) *out_blocks = 0; 
+      return LIST_END; 
+    }
     i32  cur = st;                                             // curBlk is current  block
+    i32  cnt = 0;
+    i32  nxt = 0;   // m_cl.nxt();
     for(i32 i=0; i<blocks-1; ++i)
     {
-      i32* p  =  stPtr(cur);
-      cur     =  m_cl.nxt();
+      i32* p = stPtr(cur);
+      nxt    = m_cl.nxt();
+      if(nxt==LIST_END){ 
+        //if(out_blocks) *out_blocks = -cnt;                     // negative count if the full amount of blocks can't be allocated
+        break;
+      }
+
+      cur     =  nxt;        // m_cl.nxt();
+      ++cnt;
       m_blocksUsed.fetch_add(1);
       *p      =  cur;
     }
     i32* p  =  (i32*)stPtr(cur);
     *p      =  byteRem? -byteRem : -blockFreeSize();
+    if(out_blocks){ *out_blocks = nxt==LIST_END? -cnt : cnt; } 
 
     return st;
   }
-  void        free(i32     idx)
+  void        free(i32     idx)        // frees a list/chain of blocks
   {
     i32   cur   =  idx;                // cur is the current block index
     i32    nxt  =  *stPtr(cur);        // nxt is the next block index
@@ -601,6 +618,8 @@ public:
   }
   size_t       get(i32  blkIdx, void* bytes)
   {
+    if(blkIdx == LIST_END){ return 0; }
+
     size_t    len = 0;
     size_t  rdLen = 0;
     ui8*        b = (ui8*)bytes;
@@ -612,41 +631,42 @@ public:
       rdLen  =  readBlock(cur, b);                         // rdLen is read length
       b     +=  rdLen;
       len   +=  rdLen;
-      if(nxt<0) break;
+      if(nxt<0 || nxt==LIST_END) break;
 
       cur    =  nxt;
     }
     return len;
   }
-  bool     compare(IDX blkIdxA, IDX blkIdxB)
-  {
-    // && (nxtA=nxtBlock(nxtA))>=0
-    // && (nxtB=nxtBlock(nxtB))>=0 )
-    // if(nxtA < 0) break;
-    // if(nxtB < 0) break;
-
-    size_t alen=0; size_t blen=0; IDX nxtA=blkIdxA; IDX nxtB=blkIdxB; bool blkcmp=false;
-    while( blockCompare(nxtA, nxtB, &alen, &blen) )
-    {      
-      nxtA = nxtBlock(nxtA);
-      nxtB = nxtBlock(nxtB);
-      bool lastA = nxtA<0;
-      bool lastB = nxtB<0;
-      if(lastA ^  lastB) return false;  // if one is on their last block but the other is not, return false - not actually needed? - it is needed because the blocks could be the same while one is the last and the other is not?
-      if(lastA && lastB) return  true;
-    }
-
-    return true;
-  }
+  //bool     compare(IDX blkIdxA, IDX blkIdxB)
+  //{
+  //  // && (nxtA=nxtBlock(nxtA))>=0
+  //  // && (nxtB=nxtBlock(nxtB))>=0 )
+  //  // if(nxtA < 0) break;
+  //  // if(nxtB < 0) break;
+  //
+  //  size_t alen=0; size_t blen=0; IDX nxtA=blkIdxA; IDX nxtB=blkIdxB; bool blkcmp=false;
+  //  while( blockCompare(nxtA, nxtB, &alen, &blen) )
+  //  {      
+  //    nxtA = nxtBlock(nxtA);
+  //    nxtB = nxtBlock(nxtB);
+  //    bool lastA = nxtA<0;
+  //    bool lastB = nxtB<0;
+  //    if(lastA ^  lastB) return false;  // if one is on their last block but the other is not, return false - not actually needed? - it is needed because the blocks could be the same while one is the last and the other is not?
+  //    if(lastA && lastB) return  true;
+  //  }
+  //
+  //  return false;
+  //}
   bool     compare(void* buf, size_t len, IDX blkIdx)
   {
-    i32      nxt  =  nxtBlock(blkIdx);
+    IDX   curidx  =  blkIdx;
+    i32      nxt  =  nxtBlock(curidx);
     auto   blksz  =  blockFreeSize();
     ui8*  curbuf  =  (ui8*)buf;
-    auto  curlen  =  len;  
+    auto  curlen  =  len;
     while(true)
     {
-      auto p = blockFreePtr(blkIdx);
+      auto p = blockFreePtr(curidx);
       if(nxt >= 0){
         if(curlen < blksz){ return false; }
         else if( memcmp(curbuf, p, blksz)!=0 ){ return false; }
@@ -655,10 +675,19 @@ public:
 
       curbuf  +=  blksz;
       curlen  -=  blksz;
-      nxt      =  nxtBlock(blkIdx);
+      curidx   =  nxt;
+      nxt      =  nxtBlock(curidx);
     }
 
     return true;     
+  }
+  auto        list() const -> ConcurrentList const&
+  {
+    return m_cl;
+  }
+  auto        data() const -> const void*
+  {
+    return (void*)m_addr;
   }
 };
 class     SharedMemory
@@ -671,7 +700,9 @@ private:
   ConcurrentStore   m_cs;     // store data in blocks and get back indices
   ConcurrentHash    m_ch;     // store the indices of keys and values - contains a ConcurrentList
 
-  static bool  CompareBlocks(SimDB* ths, i32 a, i32 b){ return ths->m_cs.compare(a,b); }
+  static const ui32  EMPTY_KEY = ConcurrentHash::EMPTY_KEY;      // 28 bits set 
+  //static bool  CompareBlocks(SimDB* ths, i32 a, i32 b){ return ths->m_cs.compare(a,b); }
+  static const ui32   LIST_END = ConcurrentStore::LIST_END;
   static bool   CompareBlock(SimDB* ths, void* buf, size_t len, i32 blkIdx)
   { 
     return ths->m_cs.compare(buf, len, blkIdx);
@@ -685,10 +716,22 @@ public:
      m_ch( blockCount )
   {}
 
-  ui32    put(void*   key, ui32  klen, void* val, ui32 vlen)
+  i32      put(void*   key, ui32  klen, void* val, ui32 vlen)
   {
-    i32      kidx = m_cs.alloc(klen);                              // kidx is key index
-    i32      vidx = m_cs.alloc(vlen);
+    // todo: need to clean up the allocation 
+    i32 blkcnt = 0;
+    i32   kidx = m_cs.alloc(klen, &blkcnt);    // kidx is key index
+    if(kidx==LIST_END) return EMPTY_KEY;
+    if(blkcnt<0){
+      m_cs.free(kidx);
+      return EMPTY_KEY;
+    }
+    i32   vidx = m_cs.alloc(vlen, &blkcnt);
+    if(vidx==LIST_END) return EMPTY_KEY;   // vidx is value index
+    if(blkcnt<0){
+      m_cs.free(vidx);
+      return EMPTY_KEY;
+    }
 
     m_cs.put(kidx, key, klen);
     m_cs.put(vidx, val, vlen);
@@ -696,25 +739,35 @@ public:
     ui32 keyhash = m_ch.hashBytes(key, klen);
     auto ths = this;                                          // this silly song and dance is because the this pointer can't be passed to a lambda
     auto  kv = m_ch.putHashed(keyhash, kidx, vidx, 
-       [ths](ui32 a, ui32 b){return CompareBlocks(ths,a,b); });       //[ths, key, klen](ui32 blkidx){ return CompareBlock(ths,key,klen,blkidx); });
+       // [ths](ui32 a, ui32 b){return CompareBlocks(ths,a,b); }); 
+      [ths, key, klen](ui32 blkidx){ return CompareBlock(ths,key,klen,blkidx); });
 
     if(kv.key != ConcurrentHash::EMPTY_KEY){ m_cs.free(kv.val); m_cs.free(kv.key); }
+
+    return kidx;
   }
-  i32     get(void*   key, i32    len)
+  i32      get(void*   key, i32    len)
   {
     ui32 keyhash  =  m_ch.hashBytes(key, len);
     auto     ths  =  this;
     return m_ch.getHashed(keyhash, 
       [ths, key, len](ui32 blkidx){ return CompareBlock(ths,key,len,blkidx); });
   }
-  size_t  get(i32  blkIdx, void*  out_buf)
+  auto     get(i32  blkIdx, void*  out_buf) -> size_t
   {
+    if(blkIdx==EMPTY_KEY) return 0;
+
     return m_cs.get(blkIdx, out_buf);           // copy into the buf starting at the blkidx
   } 
-  size_t  get(const std::string key, void* out_buf)
+  auto     get(const std::string key, void* out_buf) -> size_t
   {
-    auto idx = get( (void*)key.data(), (ui32)key.length() );
+    ui32 idx = get( (void*)key.data(), (ui32)key.length() );
+    
     return get(idx, out_buf);
+  }
+  auto    data() const -> const void*
+  {
+    return m_cs.data();
   }
 };
 
@@ -724,6 +777,19 @@ public:
 
 
 
+
+//bool     blockCompare(i32 blkIdxA, i32 blkIdxB, size_t* out_alen=nullptr, size_t* out_blen=nullptr)
+//{
+//  i32 alen = blockLen(blkIdxA);
+//  i32 blen = blockLen(blkIdxB);
+//  if(out_alen) *out_alen = alen;
+//  if(out_blen) *out_blen = blen;
+//  if(alen != blen) return false;         // if their lengths aren't even the same, they can't be the same
+//
+//  ui8* pa  =  blockFreePtr(blkIdxA);
+//  ui8* pb  =  blockFreePtr(blkIdxB);
+//  return memcmp(pa, pb, alen)==0;
+//}
 
 //i32  blocks = blocksNeeded(len);
 //for(i32 i=0; i<blocks; ++i)
