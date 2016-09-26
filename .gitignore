@@ -30,3 +30,16 @@
 *.exe
 *.out
 *.app
+
+# visual studio nonsense
+*.sdf
+*.pdb
+*.idb
+*.tlog
+*.log
+*.ilk
+*.user
+*.filters
+*.opensdf
+*.suo
+
