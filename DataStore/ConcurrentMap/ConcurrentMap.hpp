@@ -7,13 +7,13 @@
 
 // todo: redo concurrent store get to not need a length argument
 // todo: deal with memory / allocate from  shared memory
+// todo: remove overwritten indices from the ConcurrentStore
 // todo: lock init with mutex?
 // todo: implement locking resize?
 // todo: Make block size for keys different than data?
 // todo: mark free cells as negative numbers so double free is caught?
 // todo: store lengths and check key lengths before trying bitwise comparison as an optimization? - would only make a difference for long keys that are larger than one block? no it would make a difference on every get?
 // todo: make a membuf class that encapsulates a shared memory buffer / memory mapped file on windows or linux
-
 
 //Block based allocation
 //-Checking if the head has been touched means either incrementing a counter every time it is written, or putting in a thread id every time it is read or written
@@ -181,7 +181,7 @@ public:
   ConcurrentHash& operator=(ConcurrentHash&&      rval) = delete;
 
   template<class COMP_FUNC> 
-  ui32 putHashed(ui32 hash, ui32 key, ui32 val, COMP_FUNC f) const
+  ui32 putHashed(ui32 hash, ui32 key, ui32 val, COMP_FUNC comp) const
   {
     using namespace std;
   
@@ -213,7 +213,7 @@ public:
         else                                  return i;
       }                                                                                       // Either we just added the key, or another thread did.
       
-      if( f(probedKv.key, key) ){
+      if( comp(probedKv.key, key) ){
         store_kv(i, desired);
         return i;
       }
@@ -659,10 +659,10 @@ public:
     return true;     
   }
 };
-class    SharedMemory
+class     SharedMemory
 {};
 
-class           SimDB
+class            SimDB
 {
 private:
   void*            m_mem;     // todo: make this a unique_ptr
@@ -694,7 +694,8 @@ public:
     ui32  keyhash = m_ch.hashBytes(key, klen);
     auto  ths     = this;                                          // this silly song and dance is because the this pointer can't be passed to a lambda
     return m_ch.putHashed(keyhash, kidx, vidx, 
-      [ths](ui32 a, ui32 b){return CompareBlocks(ths,a,b); });
+       [ths](ui32 a, ui32 b){return CompareBlocks(ths,a,b); });
+      //[ths, key, klen](ui32 blkidx){ return CompareBlock(ths,key,klen,blkidx); });
   }
   i32     get(void*   key, i32    len)
   {
@@ -703,14 +704,15 @@ public:
     return m_ch.getHashed(keyhash, 
       [ths, key, len](ui32 blkidx){ return CompareBlock(ths,key,len,blkidx); });
   }
-  size_t  get(ui32 blkIdx, void*  buf)
+  size_t  get(i32  blkIdx, void*  out_buf)
   {
-    return m_cs.get(blkIdx, buf);           // copy into the buf starting at the blkidx
+    return m_cs.get(blkIdx, out_buf);           // copy into the buf starting at the blkidx
+  } 
+  size_t  get(const std::string key, void* out_buf)
+  {
+    auto idx = get( (void*)key.data(), (ui32)key.length() );
+    return get(idx, out_buf);
   }
-
-
-
-
 };
 
 #endif
