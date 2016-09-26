@@ -5,9 +5,9 @@
 // -todo: make bitwise compare function between blocks
 // -todo: make a function to compare a block to an arbitrary byte buffer
 
+// todo: remove overwritten indices from the ConcurrentStore
 // todo: redo concurrent store get to not need a length argument
 // todo: deal with memory / allocate from  shared memory
-// todo: remove overwritten indices from the ConcurrentStore
 // todo: lock init with mutex?
 // todo: implement locking resize?
 // todo: Make block size for keys different than data?
