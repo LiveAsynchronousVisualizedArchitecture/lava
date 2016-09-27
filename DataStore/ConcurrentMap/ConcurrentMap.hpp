@@ -14,16 +14,20 @@
 // -todo: return an error on running out of blocks - done with a negative blockcount if not enough blocks are available
 // -todo: free blocks if not enough block are allocated
 // -todo: fix infinite loop on free - last block wasn't getting next block index set when reaching LIST_END 
+// -todo: deal with memory / allocate from  shared memory
+// -todo: make a membuf class that encapsulates a shared memory buffer / memory mapped file on windows or linux
+// -todo: make remove function
 
+// todo: make remove function concurrent and account for the number of readers
+// todo: remove decremented the readers but didn't actually delete, so that the last reader out would delete, maybe just make a flag as mark for deletion?
+// todo: make take function the combines get and remove
+// todo: Make block size for keys different than data?
 // todo: redo concurrent store get to store length so that buffer can be returned
-// todo: deal with memory / allocate from  shared memory
+// todo: store lengths and check key lengths before trying bitwise comparison as an optimization? - would only make a difference for long keys that are larger than one block? no it would make a difference on every get?
+// todo: make -1 an error instead of returning a length of 0? - distinguising a key with length 0 and no key could be useful
+// todo: mark free cells as negative numbers so double free is caught?
 // todo: lock init with mutex?
 // todo: implement locking resize?
-// todo: Make block size for keys different than data?
-// todo: mark free cells as negative numbers so double free is caught?
-// todo: store lengths and check key lengths before trying bitwise comparison as an optimization? - would only make a difference for long keys that are larger than one block? no it would make a difference on every get?
-// todo: make a membuf class that encapsulates a shared memory buffer / memory mapped file on windows or linux
-// todo: make -1 an error instead of returning a length of 0? - distinguising a key with length 0 and no key could be useful
 
 //Block based allocation
 //-Checking if the head has been touched means either incrementing a counter every time it is written, or putting in a thread id every time it is read or written
@@ -253,6 +257,22 @@ public:
 
     //return EMPTY_KEY;
   }
+  
+  template<class MATCH_FUNC> 
+  ui32 findHashed(ui32 hash, MATCH_FUNC match) const
+  {
+    ui32 i = hash;
+    for(;; ++i)
+    {
+      i &= m_sz - 1;
+      kv probedKv = load_kv(i);
+      if(probedKv.key==EMPTY_KEY) return EMPTY_KEY;
+      if( match(probedKv.key) )   return i; // probedKv.val;
+    }
+
+    //return EMPTY_KEY;
+  }
+
 
   bool       init(ui32   sz)
   {
@@ -286,26 +306,26 @@ public:
   //{
   //  return putHashed(intHash(key), key, val, DefaultKeyCompare);
   //}
-  ui32        get(ui32  key)                     const
-  {
-    ui32 i = intHash(key);
-    for(;; ++i)
-    {
-      i  &=  m_sz - 1;
-
-      //ui32 probedKey =  m_keys.get()[i].load();        // atomic_load( (Aui32*)(&m_keys.get()[i]) );   //    // mint_load_32_relaxed(&m_entries[idx].key);
-
-      kv probedKv = load_kv(i);
-      if(probedKv.key==key) return probedKv.val;         // m_vals.get()[i].load();                 // atomic_load( (Aui32*)(&m_keys.get()[i]) );         // mint_load_32_relaxed(&m_entries[idx].value);
-
-      //return m_vals.get()[i].load();                   // atomic_load( (Aui32*)(&m_keys.get()[i]) );         // mint_load_32_relaxed(&m_entries[idx].value);
-
-      if(probedKv.key==EMPTY_KEY)
-        return EMPTY_KEY;
-    }
-
-    return EMPTY_KEY;
-  }
+  //ui32        get(ui32  key)                     const
+  //{
+  //  ui32 i = intHash(key);
+  //  for(;; ++i)
+  //  {
+  //    i  &=  m_sz - 1;
+  //
+  //    //ui32 probedKey =  m_keys.get()[i].load();        // atomic_load( (Aui32*)(&m_keys.get()[i]) );   //    // mint_load_32_relaxed(&m_entries[idx].key);
+  //
+  //    kv probedKv = load_kv(i);
+  //    if(probedKv.key==key) return probedKv.val;         // m_vals.get()[i].load();                 // atomic_load( (Aui32*)(&m_keys.get()[i]) );         // mint_load_32_relaxed(&m_entries[idx].value);
+  //
+  //    //return m_vals.get()[i].load();                   // atomic_load( (Aui32*)(&m_keys.get()[i]) );         // mint_load_32_relaxed(&m_entries[idx].value);
+  //
+  //    if(probedKv.key==EMPTY_KEY)
+  //      return EMPTY_KEY;
+  //  }
+  //
+  //  return EMPTY_KEY;
+  //}
   kv         read(ui32  key)                     const
   {
     ui32 i = intHash(key);
@@ -338,6 +358,10 @@ public:
         return empty_kv();
     }
     return empty_kv();
+  }
+  kv           rm(ui32  idx)                     const
+  {
+    return store_kv(idx, empty_kv());
   }
   bool        del(ui32  key)                     const
   {
@@ -741,30 +765,32 @@ public:
     return m_sz;
   }
 };
-class            SimDB
+class            simdb
 {
 private:
+  using kv = ConcurrentHash::kv;
+
   //void*            m_mem;     // todo: make this a unique_ptr
   SharedMemory     m_mem;
   ConcurrentStore   m_cs;     // store data in blocks and get back indices
   ConcurrentHash    m_ch;     // store the indices of keys and values - contains a ConcurrentList
 
   static const ui32  EMPTY_KEY = ConcurrentHash::EMPTY_KEY;      // 28 bits set 
-  //static bool  CompareBlocks(SimDB* ths, i32 a, i32 b){ return ths->m_cs.compare(a,b); }
+  //static bool  CompareBlocks(simdb* ths, i32 a, i32 b){ return ths->m_cs.compare(a,b); }
   static const ui32   LIST_END = ConcurrentStore::LIST_END;
-  static bool   CompareBlock(SimDB* ths, void* buf, size_t len, i32 blkIdx)
+  static bool   CompareBlock(simdb* ths, void* buf, size_t len, i32 blkIdx)
   { 
     return ths->m_cs.compare(buf, len, blkIdx);
   }
 
 public:
-  SimDB(){}
-  SimDB(ui32 blockSize, ui32 blockCount) : 
+  simdb(){}
+  simdb(ui32 blockSize, ui32 blockCount) : 
     m_mem(blockSize*blockCount),
     m_cs( (ui8*)m_mem.data(), blockSize, blockCount),               // todo: change this to a void*
     m_ch( blockCount )
   {}
-  //SimDB(ui32 blockSize, ui32 blockCount) : 
+  //simdb(ui32 blockSize, ui32 blockCount) : 
   //  m_mem( malloc(blockSize*blockCount) ),
   //   m_cs( (ui8*)m_mem, blockSize, blockCount),            // todo: change this to a void*
   //   m_ch( blockCount )
@@ -818,6 +844,19 @@ public:
     ui32 idx = get( (void*)key.data(), (ui32)key.length() );
     
     return get(idx, out_buf);
+  }
+  void      rm(const std::string key)
+  {
+    auto  len = (ui32)key.length();
+    auto  ths = this;
+    auto kbuf = (void*)key.data();
+    auto hash = m_ch.hashBytes(kbuf, len);
+    ui32  idx = m_ch.findHashed(hash,
+      [ths, kbuf, len](ui32 blkidx){ return CompareBlock(ths,kbuf,len,blkidx); });
+        
+    kv  prev = m_ch.rm(idx);
+    if(prev.key!=EMPTY_KEY) m_cs.free(prev.key);
+    if(prev.val!=EMPTY_KEY) m_cs.free(prev.val);
   }
   auto    data() const -> const void*
   {
