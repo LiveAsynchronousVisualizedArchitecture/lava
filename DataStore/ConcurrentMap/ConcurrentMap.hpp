@@ -17,9 +17,16 @@
 // -todo: deal with memory / allocate from  shared memory
 // -todo: make a membuf class that encapsulates a shared memory buffer / memory mapped file on windows or linux
 // -todo: make remove function
+// -todo: add const to thread safe functions
+// -todo: figure out why readers is so high - uninitialized KV struct in a put function
+// -todo: do KV structs need versions? can an identical KV struct ever be inserted? only if the List somehow gave up identical indices, which shouldn't happen?
+// -todo: test deletion from db
 
+// todo: make erase function that 0s out bytes?
+// todo: check when reading if something is marked for deletion and return 0 / EMPTY_KEY if it is
+// todo: figure out how to deal with deletion when there is a concurrent write - reset the readers and hash?
 // todo: make remove function concurrent and account for the number of readers
-// todo: remove decremented the readers but didn't actually delete, so that the last reader out would delete, maybe just make a flag as mark for deletion?
+// todo: make remove decremented the readers but didn't actually delete, so that the last reader out would delete, maybe just make a flag as mark for deletion?
 // todo: make take function the combines get and remove
 // todo: Make block size for keys different than data?
 // todo: redo concurrent store get to store length so that buffer can be returned
@@ -28,6 +35,8 @@
 // todo: mark free cells as negative numbers so double free is caught?
 // todo: lock init with mutex?
 // todo: implement locking resize?
+// todo: make SharedMemory take an address and destructor, or make simdb take an address and destructor to use arbitrary memory?
+// todo: store size and/or readers in the ConcurrentList ?
 
 //Block based allocation
 //-Checking if the head has been touched means either incrementing a counter every time it is written, or putting in a thread id every time it is read or written
@@ -76,21 +85,67 @@ private:
 public:
   //using COMPARE_FUNC  =  decltype( [](ui32 key){} );
 
-  union kv
-  {
-    struct
-    {
-      uint64_t  readers  :  8;
-      uint64_t      key  : 28;
-      uint64_t      val  : 28;
-    };
-    uint64_t asInt;
-  };
-
+  static const ui8   LAST_READER   =     0;            // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
   static const ui8   INIT_READERS  =     0;            // eventually make this 1 again? - to catch when readers has dropped to 0
   static const ui8   FREE_READY    =     0;
   static const ui8   MAX_READERS   =  0xFF;
   static const ui32  EMPTY_KEY     =  0x0FFFFFFF;      // 28 bits set 
+
+  union      KV
+  {
+    struct
+    {
+      uint64_t   remove  :  1;
+      uint64_t  readers  :  7;
+      uint64_t      key  : 28;
+      uint64_t      val  : 28;
+    };
+    uint64_t asInt;
+
+    // after the switch to 128 bit atomics:
+    // ui64 ubits;
+    // ui64 lbits;
+  };
+  struct Reader
+  {
+  //private:
+  //public:
+    bool                     doEnd;       //  8 bits?
+    ui32                  hash_idx;       // 32 bits
+    KV                          kv;       // 64 bits
+    ConcurrentHash const*       ch;       // 64 bits
+
+    Reader(){}
+    Reader(Reader const& lval) = delete;
+    Reader(Reader&& rval)
+    {
+      doEnd     =  rval.doEnd;
+      hash_idx  =  rval.hash_idx;
+      kv        =  rval.kv;
+      ch        =  rval.ch;
+
+      rval.doEnd    = false;
+      rval.hash_idx = EMPTY_KEY;
+      rval.ch       = nullptr;
+    }
+
+    bool doRm() // doRm is do remove 
+    {
+      if(doEnd && ch){
+        KV kv = ch->endRead(hash_idx);
+        if(kv.readers==LAST_READER && kv.remove){
+          doEnd = false;
+          return true;
+        }
+      }
+
+      return false;
+    }
+    ~Reader()
+    {
+      if(doEnd && ch) ch->endRead(hash_idx);              // checks the ConcurrentHash pointer for nullptr, not sure if this is neccesary but it probably doesn't hurt much
+    }
+  };
   
   static bool DefaultKeyCompare(ui32 a, ui32 b)
   {
@@ -103,22 +158,35 @@ private:
   using i8        =  int8_t;
   using ui32      =  uint32_t;
   using ui64      =  uint64_t;
-  using Aui32     =  std::atomic<ui32>;  
+  using Aui32     =  std::atomic<ui32>;
   using Aui64     =  std::atomic<ui64>;  
-  using KVs       =  std::vector<kv>;
+  using KVs       =  std::vector<KV>;
   using Mut       =  std::mutex;
   using UnqLock   =  std::unique_lock<Mut>;
 
          ui32   m_sz;
   mutable KVs   m_kvs;
 
-  kv           empty_kv()                   const
+  KV           empty_kv()                   const
   {
-    kv empty;
+    KV empty;
+    empty.remove   =  0;
     empty.readers  =  INIT_READERS;
+    empty.key      =  0;
+    empty.val      =  0;
     empty.key      =  EMPTY_KEY;
     empty.val      =  EMPTY_KEY;
     return empty;
+  }
+  auto     empty_reader()                   const -> Reader        
+  {
+    Reader r;
+    r.kv       = empty_kv();
+    r.ch       = nullptr;                    // this;
+    r.doEnd    = false;
+    r.hash_idx = EMPTY_KEY;                  // EMPTY_KEY is used for actual keys and values, but this is an index into the KV vector
+
+    return r;
   }
   ui32          intHash(ui32  h)            const
   {
@@ -141,22 +209,22 @@ private:
 
     return v;
   }
-  kv            load_kv(ui32  i)            const
+  KV            load_kv(ui32  i)            const
   {
     using namespace std;
     
-    kv keyval;
-    keyval.asInt   =  atomic_load<ui64>( (Aui64*)&m_kvs.data()[i].asInt );              // Load the key that was there.
+    KV keyval;
+    keyval.asInt   =  atomic_load<ui64>( (Aui64*)(&(m_kvs.data()[i].asInt)) );              // Load the key that was there.
     return keyval;
   }
-  kv           store_kv(ui32  i, kv keyval) const
+  KV           store_kv(ui32  i, KV keyval) const
   {
     using namespace std;
     
     //atomic_store<ui64>( (Aui64*)&m_kvs[i].asInt, _kv.asInt );
 
-    kv ret;
-    ret.asInt = atomic_exchange<ui64>( (Aui64*)&m_kvs[i].asInt, keyval.asInt);
+    KV ret;
+    ret.asInt = atomic_exchange<ui64>( (Aui64*)(&(m_kvs[i].asInt)), keyval.asInt);
     return ret;
   }
   bool  compexchange_kv(ui32  i, ui64* expected, ui64 desired) const
@@ -171,9 +239,9 @@ private:
 
     return atomic_compare_exchange_strong( (Aui64*)&m_kvs.data()[i].asInt, expected, desired);                      // The entry was free. Now let's try to take it using a CAS. 
   }
-  kv         addReaders(ui32  i, kv curKv, i8 readers)         const                         // increment the readers by one and return the previous kv from the successful swap 
+  KV         addReaders(ui32  i, KV curKv, i8 readers)         const                         // increment the readers by one and return the previous kv from the successful swap 
   {
-    kv readKv = curKv;
+    KV readKv = curKv;
     do
     {
       if(curKv.key     == EMPTY_KEY  ||
@@ -200,79 +268,115 @@ public:
   ConcurrentHash& operator=(ConcurrentHash const& lval) = delete;
   ConcurrentHash& operator=(ConcurrentHash&&      rval) = delete;
 
-  template<class COMP_FUNC> 
-  kv putHashed(ui32 hash, ui32 key, ui32 val, COMP_FUNC comp) const
+  KV operator[](ui32 idx) const
+  {
+    return m_kvs[idx];
+  }
+
+  template<class MATCH_FUNC> 
+  KV       putHashed(ui32 hash, ui32 key, ui32 val, MATCH_FUNC match) const
   {
     using namespace std;
   
-    kv desired;
+    KV desired = empty_kv();
     desired.key  =  key;
     desired.val  =  val;
-    ui32      i  =  hash; // intHash(key);
+    ui32      i  =  hash;
     for(;; ++i)
     {
       i  &=  m_sz-1;
-  
-      kv probedKv = load_kv(i);
-
-      //if(probedKv.key != EMPTY_KEY) continue;
-      //if(probedKv.key == EMPTY_KEY){
-      //  store_kv(i, desired); 
-      //  return i;
-      //}
-
-      //if(probedKv.key != key)
+      KV probedKv = load_kv(i);
       if(probedKv.key == EMPTY_KEY)
-      {
-        //if(probedKv.key != EMPTY_KEY) continue;                                               // The entry was either free, or contains another key.  // Usually, it contains another key. Keep probing.
-                
-        kv   expected   =  empty_kv();
-  
+      {          
+        KV   expected   =  empty_kv();
         bool   success  =  compexchange_kv(i, &expected.asInt, desired.asInt);
-        if( !success && (expected.key!=key) ) continue;                                       // Another thread just stole it from underneath us.
+        if( !success && (expected.key!=key) ) continue;                                       // WRONG!? // Another thread just stole it from underneath us.
         else                                  return expected;
       }                                                                                       // Either we just added the key, or another thread did.
       
-      //if( comp(probedKv.key, key) ){
-      if( comp(probedKv.key) ){
+      if( match(probedKv.key) ){
         return store_kv(i, desired);
-        //return i;
       }
     }
 
     return empty_kv();  // should never be reached
   }
-
   template<class MATCH_FUNC> 
-  ui32 getHashed(ui32 hash, MATCH_FUNC match) const
+  ui32     getHashed(ui32 hash, MATCH_FUNC match) const
   {
     ui32 i = hash;
     for(;; ++i)
     {
       i &= m_sz - 1;
-      kv probedKv = load_kv(i);
+      KV probedKv = load_kv(i);
       if(probedKv.key==EMPTY_KEY) return EMPTY_KEY;
       if( match(probedKv.key) )   return probedKv.val;
     }
-
-    //return EMPTY_KEY;
   }
-  
   template<class MATCH_FUNC> 
-  ui32 findHashed(ui32 hash, MATCH_FUNC match) const
+  ui32    findHashed(ui32 hash, MATCH_FUNC match) const
   {
     ui32 i = hash;
     for(;; ++i)
     {
       i &= m_sz - 1;
-      kv probedKv = load_kv(i);
+      KV probedKv = load_kv(i);
       if(probedKv.key==EMPTY_KEY) return EMPTY_KEY;
       if( match(probedKv.key) )   return i; // probedKv.val;
     }
-
-    //return EMPTY_KEY;
   }
+  template<class MATCH_FUNC> 
+  auto      rmHashed(ui32 hash, MATCH_FUNC match) const -> Reader
+  {
+    using namespace std;
+  
+    ui32      i  =  hash;
+    for(;; ++i)
+    {
+      i  &=  m_sz-1;
+  
+      KV probedKv = load_kv(i);
 
+      if(probedKv.key==EMPTY_KEY) return empty_reader();
+      if(match(probedKv.key))
+      {          
+        KV   expected   =  probedKv;
+        KV   desired    =  expected;
+        desired.remove  =  1; 
+  
+        bool   success  =  compexchange_kv(i, &expected.asInt, desired.asInt);
+        if(success){
+          Reader r   = empty_reader();  // todo: don't need the initialization - comment it out once working
+          r.ch       = this;
+          r.hash_idx = i;
+          r.kv       = desired;
+          r.doEnd    = true;
+          return r;
+        }else continue;
+      }                                                                                       // Either we just added the key, or another thread did.      
+    }
+
+    return empty_reader(); // false; // empty_kv();  // should never be reached
+  }
+  template<class MATCH_FUNC> 
+  auto    readHashed(ui32 hash, MATCH_FUNC match) const -> Reader
+  {
+    ui32 i = hash;
+    for(;; ++i)
+    {
+      i &= m_sz - 1;
+      KV probedKv = load_kv(i);
+      if(probedKv.key==EMPTY_KEY) return empty_reader();         // empty_kv();
+      if( match(probedKv.key) ){
+        Reader r;
+        r.kv        =  addReaders(i, probedKv, 1);
+        r.hash_idx  =  i;
+        r.doEnd     =  true;
+        r.ch        =  this;
+        return r; // addReaders(i, probedKv, 1);
+      }
+    }
+  }
 
   bool       init(ui32   sz)
   {
@@ -280,7 +384,7 @@ public:
     
     m_sz      =  nextPowerOf2(sz);
 
-    kv defKv  =  empty_kv();
+    KV defKv  =  empty_kv();
     // defKv.asInt    =  0;
     //defKv.key      =  EMPTY_KEY;
     //defKv.val      =  0;
@@ -302,38 +406,14 @@ public:
 
     return true;
   }
-  //kv          put(ui32  key, ui32 val)           const
-  //{
-  //  return putHashed(intHash(key), key, val, DefaultKeyCompare);
-  //}
-  //ui32        get(ui32  key)                     const
-  //{
-  //  ui32 i = intHash(key);
-  //  for(;; ++i)
-  //  {
-  //    i  &=  m_sz - 1;
-  //
-  //    //ui32 probedKey =  m_keys.get()[i].load();        // atomic_load( (Aui32*)(&m_keys.get()[i]) );   //    // mint_load_32_relaxed(&m_entries[idx].key);
-  //
-  //    kv probedKv = load_kv(i);
-  //    if(probedKv.key==key) return probedKv.val;         // m_vals.get()[i].load();                 // atomic_load( (Aui32*)(&m_keys.get()[i]) );         // mint_load_32_relaxed(&m_entries[idx].value);
-  //
-  //    //return m_vals.get()[i].load();                   // atomic_load( (Aui32*)(&m_keys.get()[i]) );         // mint_load_32_relaxed(&m_entries[idx].value);
-  //
-  //    if(probedKv.key==EMPTY_KEY)
-  //      return EMPTY_KEY;
-  //  }
-  //
-  //  return EMPTY_KEY;
-  //}
-  kv         read(ui32  key)                     const
+  KV         read(ui32  key)                      const
   {
     ui32 i = intHash(key);
     for(;; ++i)
     {
       i  &=  m_sz - 1;
 
-      kv probedKv = load_kv(i);
+      KV probedKv = load_kv(i);
       if(probedKv.key == key) return addReaders(i, probedKv, 1);
              
       if(probedKv.key == EMPTY_KEY)                                 // needs to be taken out when deleting is implemented
@@ -342,35 +422,21 @@ public:
 
     return empty_kv();
   }
-  kv      endRead(ui32  key)                     const
+  KV      endRead(ui32  idx)                      const
+  {
+    KV probedKv = load_kv(idx);
+    if(probedKv.key == EMPTY_KEY) return empty_kv();
+
+    return addReaders(idx, probedKv, -1);
+  }
+  bool        del(ui32  key)                      const
   {
     ui32 i = intHash(key);
     for(;; ++i)
     {
       i  &=  m_sz - 1;
 
-      kv probedKv = load_kv(i);
-      if(probedKv.key == key){
-        return addReaders(i, probedKv, -1);
-      }
-             
-      if(probedKv.key == EMPTY_KEY)                                 // needs to be taken out when deleting is implemented
-        return empty_kv();
-    }
-    return empty_kv();
-  }
-  kv           rm(ui32  idx)                     const
-  {
-    return store_kv(idx, empty_kv());
-  }
-  bool        del(ui32  key)                     const
-  {
-    ui32 i = intHash(key);
-    for(;; ++i)
-    {
-      i  &=  m_sz - 1;
-
-      kv probedKv = load_kv(i);
+      KV probedKv = load_kv(i);
       if(probedKv.key == key) return compexchange_kv(i, &probedKv.asInt, empty_kv().asInt);
              
       if(probedKv.key == EMPTY_KEY)                                 // needs to be taken out when deleting is implemented
@@ -378,11 +444,19 @@ public:
     }
     return false;
   }
-  ui32       size()                              const
+  KV           rm(ui32  idx)                      const    // doesn't keep track of readers
+  {
+    return store_kv(idx, empty_kv());
+  }
+  KV           at(ui32  idx)                      const
+  {
+    return m_kvs[idx];
+  }
+  ui32       size()                               const
   {
     return m_sz;
   }
-  ui32  hashBytes(void* buf, ui32 len)           const
+  ui32  hashBytes(void* buf, ui32 len)            const
   {
     ui32  rethash  =  0;
     ui32* cur      =  (ui32*)buf;
@@ -504,19 +578,19 @@ private:
   ai32              m_blocksUsed;
   ConcurrentList            m_cl;
 
-  i32*            stPtr(i32  blkIdx)
+  i32*            stPtr(i32  blkIdx)  const
   {
     return (i32*)( ((ui8*)m_addr) + blkIdx*m_blockSize );
   }
-  i32          nxtBlock(i32  blkIdx)
+  i32          nxtBlock(i32  blkIdx)  const
   {
     return *(stPtr(blkIdx));
   }
-  i32     blockFreeSize()
+  i32     blockFreeSize()             const
   {
     return m_blockSize - sizeof(IDX);
   }
-  ui8*     blockFreePtr(i32  blkIdx)
+  ui8*     blockFreePtr(i32  blkIdx)  const
   {
     return ((ui8*)stPtr(blkIdx)) + sizeof(IDX);
   }
@@ -617,16 +691,6 @@ public:
       cur  =  nxt;
     }
     m_cl.free(cur);
-
-    //i32*    p   =  stPtr(cur);         // p is the pointer to the first bytes of the block
-    //i32    nxt  =  *p;                 // nxt is the next block index
-    //for(; *p>0; p=stPtr(cur) )    
-    //{ 
-    //  nxt  =  *p;
-    //  m_cl.free(cur);
-    //  cur  =  nxt;
-    //}
-    //m_cl.free(cur);
   }
   void         put(i32  blkIdx, void* bytes, i32 len)
   {
@@ -661,29 +725,11 @@ public:
 
       cur    =  nxt;
     }
-    return len;
+
+
+    return len;                                           // only one return after the top to make sure readers can be decremented - maybe it should be wrapped in a struct with a destructor
   }
-  //bool     compare(IDX blkIdxA, IDX blkIdxB)
-  //{
-  //  // && (nxtA=nxtBlock(nxtA))>=0
-  //  // && (nxtB=nxtBlock(nxtB))>=0 )
-  //  // if(nxtA < 0) break;
-  //  // if(nxtB < 0) break;
-  //
-  //  size_t alen=0; size_t blen=0; IDX nxtA=blkIdxA; IDX nxtB=blkIdxB; bool blkcmp=false;
-  //  while( blockCompare(nxtA, nxtB, &alen, &blen) )
-  //  {      
-  //    nxtA = nxtBlock(nxtA);
-  //    nxtB = nxtBlock(nxtB);
-  //    bool lastA = nxtA<0;
-  //    bool lastB = nxtB<0;
-  //    if(lastA ^  lastB) return false;  // if one is on their last block but the other is not, return false - not actually needed? - it is needed because the blocks could be the same while one is the last and the other is not?
-  //    if(lastA && lastB) return  true;
-  //  }
-  //
-  //  return false;
-  //}
-  bool     compare(void* buf, size_t len, IDX blkIdx)
+  bool     compare(void* buf, size_t len, IDX blkIdx) const
   {
     IDX   curidx  =  blkIdx;
     i32      nxt  =  nxtBlock(curidx);
@@ -768,17 +814,17 @@ public:
 class            simdb
 {
 private:
-  using kv = ConcurrentHash::kv;
+  using     KV = ConcurrentHash::KV;
+  using Reader = ConcurrentHash::Reader; 
 
-  //void*            m_mem;     // todo: make this a unique_ptr
+  //void*            m_mem;
   SharedMemory     m_mem;
   ConcurrentStore   m_cs;     // store data in blocks and get back indices
   ConcurrentHash    m_ch;     // store the indices of keys and values - contains a ConcurrentList
 
   static const ui32  EMPTY_KEY = ConcurrentHash::EMPTY_KEY;      // 28 bits set 
-  //static bool  CompareBlocks(simdb* ths, i32 a, i32 b){ return ths->m_cs.compare(a,b); }
   static const ui32   LIST_END = ConcurrentStore::LIST_END;
-  static bool   CompareBlock(simdb* ths, void* buf, size_t len, i32 blkIdx)
+  static bool   CompareBlock(simdb const* const ths, void* buf, size_t len, i32 blkIdx)
   { 
     return ths->m_cs.compare(buf, len, blkIdx);
   }
@@ -790,11 +836,6 @@ public:
     m_cs( (ui8*)m_mem.data(), blockSize, blockCount),               // todo: change this to a void*
     m_ch( blockCount )
   {}
-  //simdb(ui32 blockSize, ui32 blockCount) : 
-  //  m_mem( malloc(blockSize*blockCount) ),
-  //   m_cs( (ui8*)m_mem, blockSize, blockCount),            // todo: change this to a void*
-  //   m_ch( blockCount )
-  //{}
 
   i32      put(void*   key, ui32  klen, void* val, ui32 vlen)
   {
@@ -833,6 +874,13 @@ public:
     return m_ch.getHashed(keyhash, 
       [ths, key, len](ui32 blkidx){ return CompareBlock(ths,key,len,blkidx); });
   }
+  auto    read(void*   key, i32    len) const -> Reader
+  {
+    ui32 keyhash  =  m_ch.hashBytes(key, len);
+    auto     ths  =  this;
+    return m_ch.readHashed(keyhash, 
+      [ths, key, len](ui32 blkidx){ return CompareBlock(ths,key,len,blkidx); });
+  }
   auto     get(i32  blkIdx, void*  out_buf) -> size_t
   {
     if(blkIdx==EMPTY_KEY) return 0;
@@ -841,22 +889,48 @@ public:
   } 
   auto     get(const std::string key, void* out_buf) -> size_t
   {
-    ui32 idx = get( (void*)key.data(), (ui32)key.length() );
-    
-    return get(idx, out_buf);
+    //ui32 idx = get( (void*)key.data(), (ui32)key.length() );
+    //KV    kv = read( (void*)key.data(), (ui32)key.length() );
+
+    Reader r = read( (void*)key.data(), (ui32)key.length() );
+    if(r.kv.key==EMPTY_KEY) return 0;
+
+    ui64 len = get(r.kv.val, out_buf);
+    if(r.doRm()){ m_cs.free(r.kv.key); m_cs.free(r.kv.val); }
+  
+    return len;
   }
+  //void      rm(const std::string key)
+  //{
+  //  auto  len = (ui32)key.length();
+  //  auto  ths = this;
+  //  auto kbuf = (void*)key.data();
+  //  auto hash = m_ch.hashBytes(kbuf, len);
+  //  ui32  idx = m_ch.findHashed(hash,
+  //    [ths, kbuf, len](ui32 blkidx){ return CompareBlock(ths,kbuf,len,blkidx); });
+  //      
+  //  KV  prev = m_ch.rm(idx);
+  //  if(prev.key!=EMPTY_KEY) m_cs.free(prev.key);
+  //  if(prev.val!=EMPTY_KEY) m_cs.free(prev.val);
+  //}
   void      rm(const std::string key)
   {
     auto  len = (ui32)key.length();
     auto  ths = this;
     auto kbuf = (void*)key.data();
     auto hash = m_ch.hashBytes(kbuf, len);
-    ui32  idx = m_ch.findHashed(hash,
+    //ui32  idx = m_ch.rmHashed(hash,
+    Reader  r = m_ch.rmHashed(hash,                          // need to get a reader back
       [ths, kbuf, len](ui32 blkidx){ return CompareBlock(ths,kbuf,len,blkidx); });
+    
+    if(r.doRm()){                                            // need to check doRm
+      if(r.kv.key!=EMPTY_KEY) m_cs.free(r.kv.key);           // need to remove the block index lists if true
+      if(r.kv.val!=EMPTY_KEY) m_cs.free(r.kv.val);
+    }
         
-    kv  prev = m_ch.rm(idx);
-    if(prev.key!=EMPTY_KEY) m_cs.free(prev.key);
-    if(prev.val!=EMPTY_KEY) m_cs.free(prev.val);
+    //KV  prev = m_ch.rm(idx);
+    //if(prev.key!=EMPTY_KEY) m_cs.free(prev.key);
+    //if(prev.val!=EMPTY_KEY) m_cs.free(prev.val);
   }
   auto    data() const -> const void*
   {
@@ -874,6 +948,123 @@ public:
 
 
 
+
+
+
+
+
+
+
+
+//if( comp(probedKv.key, key) ){
+//if( match(probedKv.key) ){
+//  return store_kv(i, desired);
+//  //return i;
+//}
+
+//if(probedKv.key == EMPTY_KEY){
+//  store_kv(i, desired); 
+//  return i;
+//}
+
+//if(probedKv.key != key)
+//if(probedKv.key == EMPTY_KEY)
+//{
+  //if(probedKv.key != EMPTY_KEY) continue;                                               // The entry was either free, or contains another key.  // Usually, it contains another key. Keep probing.
+
+//KV desired = empty_kv();
+//desired.key  =  key;
+//desired.val  =  val;
+
+//if(probedKv.key != EMPTY_KEY) continue;
+//if(probedKv.key == EMPTY_KEY){
+//  store_kv(i, desired); 
+//  return i;
+//}
+//if(probedKv.key != key)
+//if(probedKv.key != EMPTY_KEY) continue;                                               // The entry was either free, or contains another key.  // Usually, it contains another key. Keep probing.
+
+//kv      endRead(ui32  key)                     const
+//{
+//  ui32 i = intHash(key);
+//  for(;; ++i)
+//  {
+//    i  &=  m_sz - 1;
+//
+//    kv probedKv = load_kv(i);
+//    if(probedKv.key == key){
+//      return addReaders(i, probedKv, -1);
+//    }
+//           
+//    if(probedKv.key == EMPTY_KEY)                                 // needs to be taken out when deleting is implemented
+//      return empty_kv();
+//  }
+//  return empty_kv();
+//}
+
+//i32*    p   =  stPtr(cur);         // p is the pointer to the first bytes of the block
+//i32    nxt  =  *p;                 // nxt is the next block index
+//for(; *p>0; p=stPtr(cur) )    
+//{ 
+//  nxt  =  *p;
+//  m_cl.free(cur);
+//  cur  =  nxt;
+//}
+//m_cl.free(cur);
+
+//kv          put(ui32  key, ui32 val)           const
+//{
+//  return putHashed(intHash(key), key, val, DefaultKeyCompare);
+//}
+//ui32        get(ui32  key)                     const
+//{
+//  ui32 i = intHash(key);
+//  for(;; ++i)
+//  {
+//    i  &=  m_sz - 1;
+//
+//    //ui32 probedKey =  m_keys.get()[i].load();        // atomic_load( (Aui32*)(&m_keys.get()[i]) );   //    // mint_load_32_relaxed(&m_entries[idx].key);
+//
+//    kv probedKv = load_kv(i);
+//    if(probedKv.key==key) return probedKv.val;         // m_vals.get()[i].load();                 // atomic_load( (Aui32*)(&m_keys.get()[i]) );         // mint_load_32_relaxed(&m_entries[idx].value);
+//
+//    //return m_vals.get()[i].load();                   // atomic_load( (Aui32*)(&m_keys.get()[i]) );         // mint_load_32_relaxed(&m_entries[idx].value);
+//
+//    if(probedKv.key==EMPTY_KEY)
+//      return EMPTY_KEY;
+//  }
+//
+//  return EMPTY_KEY;
+//}
+
+//static bool  CompareBlocks(simdb* ths, i32 a, i32 b){ return ths->m_cs.compare(a,b); }
+//
+//bool     compare(IDX blkIdxA, IDX blkIdxB)
+//{
+//  // && (nxtA=nxtBlock(nxtA))>=0
+//  // && (nxtB=nxtBlock(nxtB))>=0 )
+//  // if(nxtA < 0) break;
+//  // if(nxtB < 0) break;
+//
+//  size_t alen=0; size_t blen=0; IDX nxtA=blkIdxA; IDX nxtB=blkIdxB; bool blkcmp=false;
+//  while( blockCompare(nxtA, nxtB, &alen, &blen) )
+//  {      
+//    nxtA = nxtBlock(nxtA);
+//    nxtB = nxtBlock(nxtB);
+//    bool lastA = nxtA<0;
+//    bool lastB = nxtB<0;
+//    if(lastA ^  lastB) return false;  // if one is on their last block but the other is not, return false - not actually needed? - it is needed because the blocks could be the same while one is the last and the other is not?
+//    if(lastA && lastB) return  true;
+//  }
+//
+//  return false;
+//}
+
+//simdb(ui32 blockSize, ui32 blockCount) : 
+//  m_mem( malloc(blockSize*blockCount) ),
+//   m_cs( (ui8*)m_mem, blockSize, blockCount),            // todo: change this to a void*
+//   m_ch( blockCount )
+//{}
 
 //bool     blockCompare(i32 blkIdxA, i32 blkIdxB, size_t* out_alen=nullptr, size_t* out_blen=nullptr)
 //{
