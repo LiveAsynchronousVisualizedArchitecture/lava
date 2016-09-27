@@ -696,8 +696,9 @@ class     SharedMemory
 {
 private:
   //std::unique_ptr<void*> ptr;
-  void*          ptr;
-  HANDLE  fileHandle;
+  ui64            m_sz;
+  void*          m_ptr;
+  HANDLE  m_fileHandle;
 
 public:
   static void FreeMem(void* p)
@@ -705,34 +706,39 @@ public:
   }
 
   SharedMemory(){}
-  SharedMemory(ui64 sz)
+  SharedMemory(ui64 sz) :
+    m_sz(sz)
   {
-    fileHandle = CreateFileMapping(
+    m_fileHandle = CreateFileMapping(
       INVALID_HANDLE_VALUE,
       NULL,
       PAGE_READWRITE,
       0,
-      (DWORD)sz,
+      (DWORD)m_sz,
       "Global\\simdb_15");
 
-    if(fileHandle==NULL){/*error*/}
+    if(m_fileHandle==NULL){/*error*/}
 
-    ptr = MapViewOfFile(fileHandle,   // handle to map object
+    m_ptr = MapViewOfFile(m_fileHandle,   // handle to map object
       FILE_MAP_ALL_ACCESS,   // read/write permission
       0,
       0,
-      sz);
+      m_sz);
   }
 
   ~SharedMemory()
   {
-    UnmapViewOfFile(ptr);
-    CloseHandle(fileHandle);
+    UnmapViewOfFile(m_ptr);
+    CloseHandle(m_fileHandle);
   }
 
   auto data() -> void*
   {
-    return ptr;
+    return m_ptr;
+  }
+  ui64 size() const
+  {
+    return m_sz;
   }
 };
 class            SimDB
@@ -816,6 +822,10 @@ public:
   auto    data() const -> const void*
   {
     return m_cs.data();
+  }
+  ui64    size() const
+  {
+    return m_mem.size();
   }
 };
 

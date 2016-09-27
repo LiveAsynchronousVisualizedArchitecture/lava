@@ -368,29 +368,28 @@ int main()
   //  thrds.back().detach();
   //}
 
-  auto fileHndl = CreateFileMapping(
-    INVALID_HANDLE_VALUE,
-    NULL,
-    PAGE_READWRITE,
-    0,
-    0x0000FFFF,
-    "Global\\simdb_15");
-
-  if(fileHndl==NULL){/*error*/}
-
-  i32  memSz  = 256;
-  auto mapmem = MapViewOfFile(fileHndl,   // handle to map object
-    FILE_MAP_ALL_ACCESS,   // read/write permission
-    0,
-    0,
-    memSz);
+  //auto fileHndl = CreateFileMapping(
+  //  INVALID_HANDLE_VALUE,
+  //  NULL,
+  //  PAGE_READWRITE,
+  //  0,
+  //  0x0000FFFF,
+  //  "Global\\simdb_15");
+  //
+  //if(fileHndl==NULL){/*error*/}
+  //
+  //i32  memSz  = 256;
+  //auto mapmem = MapViewOfFile(fileHndl,   // handle to map object
+  //  FILE_MAP_ALL_ACCESS,   // read/write permission
+  //  0,
+  //  0,
+  //  memSz);
 
   // OpenFileMapping if the file exists
   
-  Println(fileHndl);
-  Println("\n\n");
-  Println(mapmem);
-
+  //Println(fileHndl);
+  //Println("\n\n");
+  //Println(mapmem);
 
   SimDB db(16, 16);
 
@@ -415,12 +414,12 @@ int main()
   db.get("kablam", (void*)clear.data() );
   Println("get \"kablam\": ", clear);
 
-  str memstr( (const char*)db.data(), (const char*)db.data() + memSz);
+  Println("size: ", db.size());
+  str memstr( (const char*)db.data(), (const char*)db.data() + db.size());
   Println("\nmem: ", memstr, "\n\n" );
 
-
-  UnmapViewOfFile(mapmem);
-  CloseHandle(fileHndl);
+  //UnmapViewOfFile(mapmem);
+  //CloseHandle(fileHndl);
 
   PAUSE
 
