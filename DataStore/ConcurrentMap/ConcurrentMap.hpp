@@ -735,7 +735,6 @@ public:
     return ptr;
   }
 };
-
 class            SimDB
 {
 private:
