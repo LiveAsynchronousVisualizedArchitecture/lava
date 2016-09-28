@@ -393,7 +393,7 @@ int main()
 
   Println("kv sz: ", sizeof(simdb::KV) );
 
-  simdb db(16, 16);
+  simdb db("test", 16, 16);
 
   str       wat  =       "wat";
   str       wut  =       "wut";
@@ -404,7 +404,7 @@ int main()
   Println("put: ", db.put( (void*)wut.data(),   (ui32)wut.length(),    (void*)kablam.data(),   (ui32)kablam.length())   ); 
   db.rm("wut");
   Println("put: ", db.put( (void*)kablam.data(),(ui32)kablam.length(), (void*)skidoosh.data(), (ui32)skidoosh.length()) ); 
-  db.rm("kablam");
+  //db.rm("kablam");
   Println();
 
 

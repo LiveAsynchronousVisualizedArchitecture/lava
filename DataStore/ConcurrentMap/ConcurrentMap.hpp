@@ -29,11 +29,16 @@
 // -todo: make -1 an error instead of returning a length of 0? - distinguising a key with length 0 and no key could be useful 
 // -todo: is only the key being deleted? - no, but vals should be removed before keys to keep the order more consistent, all other things being equal
 // -todo: need to fix ConcurrentList free? it writes to the list before the compare_swap has gone through? - no, because writing to taken indices in the list doesn't matter + only one thread should be freeing a specific index at a time - if two threads were freeing the same index on top of each other, a problem bigger than atomics would be that even if both operations went through, there would be a double free
+// -todo: change public get methods to use read - took out one get and changed the other to being private getFromBlkIdx
+// -todo: fix shared memory aligned allocation
+// -todo: make SharedMem check if the mem file already exists
 
 // todo: store size in the ConcurrentList?
+// todo: test using the db from multiple processes
+// todo: test with multiple threads in a loop
 // todo: redo concurrent store get to store length so that buffer can be returned
-// todo: make SharedMemory take an address and destructor, or make simdb take an address and destructor to use arbitrary memory?
 // todo: store lengths and check key lengths before trying bitwise comparison as an optimization? - would only make a difference for long keys that are larger than one block? no it would make a difference on every get?
+// todo: prefetch memory for next block when looping through blocks
 
 // todo: lock init with mutex?
 // todo: implement locking resize?
@@ -42,6 +47,7 @@
 // todo: Make block size for keys different than data?
 // todo: mark free cells as negative numbers so double free is caught?
 // todo: should the readers be integrated with the list also? 
+// todo: make SharedMemory take an address and destructor, or make simdb take an address and destructor to use arbitrary memory?
 
 //Block based allocation
 //-Checking if the head has been touched means either incrementing a counter every time it is written, or putting in a thread id every time it is read or written
@@ -612,7 +618,7 @@ private:
     //bool     fill = len < -1 || blkFree < len;
     //size_t cpyLen = fill? blkFree : len;
   }
-  size_t      readBlock(i32  blkIdx, void* bytes)
+  size_t      readBlock(i32  blkIdx, void* bytes) const
   {
     i32   blkFree  =  blockFreeSize();
     ui8*        p  =  blockFreePtr(blkIdx);
@@ -694,7 +700,7 @@ public:
     //i32  remBytes  =  0;
     //i32    blocks  =  blocksNeeded(len, &remBytes);
   }
-  size_t       get(i32  blkIdx, void* bytes)
+  size_t       get(i32  blkIdx, void* bytes) const
   {
     if(blkIdx == LIST_END){ return 0; }
 
@@ -750,53 +756,85 @@ public:
     return (void*)m_addr;
   }
 };
-class     SharedMemory
+struct       SharedMem       // in a halfway state right now - will need to use arbitrary memory and have other OS implementations for shared memory eventually
 {
-private:
-  //std::unique_ptr<void*> ptr;
-  ui64            m_sz;
-  void*          m_ptr;
-  HANDLE  m_fileHandle;
+  void*      fileHndl;
+  void*       hndlPtr;
+  void*           ptr;
+  ui64           size;
+  bool          owner;
 
 public:
-  static void FreeMem(void* p)
+  static void        FreeAnon(SharedMem& sm)
   {
+    if(sm.hndlPtr)  UnmapViewOfFile(sm.hndlPtr);
+    if(sm.fileHndl) CloseHandle(sm.fileHndl);
+    sm.clear();
   }
-
-  SharedMemory(){}
-  SharedMemory(ui64 sz) :
-    m_sz(sz)
+  static SharedMem  AllocAnon(const char* name, ui64 size)
   {
-    m_fileHandle = CreateFileMapping(
-      INVALID_HANDLE_VALUE,
-      NULL,
-      PAGE_READWRITE,
-      0,
-      (DWORD)m_sz,
-      "Global\\simdb_15");
+    using namespace std;
+    
+    // windows
+    char path[512] = "Global\\simdb_15_";
+    strcat_s(path, sizeof(path), name);
 
-    if(m_fileHandle==NULL){/*error*/}
+    SharedMem sm;
+    sm.size = size;
 
-    m_ptr = MapViewOfFile(m_fileHandle,   // handle to map object
+    sm.fileHndl = OpenFileMapping(NULL, TRUE, path);
+    if(sm.fileHndl==NULL)
+    {
+      sm.fileHndl = CreateFileMapping(
+        INVALID_HANDLE_VALUE,
+        NULL,
+        PAGE_READWRITE,
+        0,
+        (DWORD)size,
+        path);
+    }
+    
+    if(sm.fileHndl==NULL){return sm;}
+
+    sm.hndlPtr = MapViewOfFile(sm.fileHndl,   // handle to map object
       FILE_MAP_ALL_ACCESS,   // read/write permission
       0,
       0,
-      m_sz);
+      size);
+    // END windows
+
+    ui64      addr = (ui64)(sm.hndlPtr);
+    ui64 alignAddr = (addr + ((64-addr%64)%64));
+    sm.ptr    = (void*)(alignAddr);
+
+    return sm;
   }
 
-  ~SharedMemory()
+  SharedMem(){}
+  SharedMem(SharedMem&& rval)
   {
-    UnmapViewOfFile(m_ptr);
-    CloseHandle(m_fileHandle);
-  }
+    fileHndl       =  rval.fileHndl;
+    hndlPtr        =  rval.hndlPtr;
+    ptr            =  rval.ptr;
+    size           =  rval.size;
 
+    rval.clear();
+  }
+  ~SharedMem()
+  {
+    SharedMem::FreeAnon(*this);
+  }
+  void clear()
+  {
+    fileHndl  =  nullptr;
+    hndlPtr   =  nullptr;
+    ptr       =  nullptr;
+    size      =  0;
+    owner     =  false;
+  }
   auto data() -> void*
   {
-    return m_ptr;
-  }
-  ui64 size() const
-  {
-    return m_sz;
+    return ptr;
   }
 };
 class            simdb
@@ -808,21 +846,35 @@ private:
   using Reader = ConcurrentHash::Reader;
 
   //void*            m_mem;
-  SharedMemory     m_mem;
+  SharedMem        m_mem;
   ConcurrentStore   m_cs;     // store data in blocks and get back indices
   ConcurrentHash    m_ch;     // store the indices of keys and values - contains a ConcurrentList
 
-  static const ui32  EMPTY_KEY = ConcurrentHash::EMPTY_KEY;      // 28 bits set 
+  static const ui32  EMPTY_KEY = ConcurrentHash::EMPTY_KEY;          // 28 bits set 
   static const ui32   LIST_END = ConcurrentStore::LIST_END;
   static bool   CompareBlock(simdb const* const ths, void* buf, size_t len, i32 blkIdx)
   { 
     return ths->m_cs.compare(buf, len, blkIdx);
   }
 
+  auto  getFromBlkIdx(i32  blkIdx, void*  out_buf) const -> ui64        // getFromBlkIdx is get from block index
+  {
+    if(blkIdx==EMPTY_KEY) return 0;
+
+    return m_cs.get(blkIdx, out_buf);           // copy into the buf starting at the blkidx
+  } 
+  auto           read(void*   key, i32    len) const -> Reader
+  {
+    ui32 keyhash  =  m_ch.hashBytes(key, len);
+    auto     ths  =  this;
+    return m_ch.readHashed(keyhash, 
+      [ths, key, len](ui32 blkidx){ return CompareBlock(ths,key,len,blkidx); });
+  }
+
 public:
   simdb(){}
-  simdb(ui32 blockSize, ui32 blockCount) : 
-    m_mem(blockSize*blockCount),
+  simdb(const char* name, ui32 blockSize, ui32 blockCount) : 
+    m_mem( SharedMem::AllocAnon(name, blockSize*blockCount) ),
     m_cs( (ui8*)m_mem.data(), blockSize, blockCount),               // todo: change this to a void*
     m_ch( blockCount )
   {}
@@ -855,35 +907,12 @@ public:
 
     return kidx;
   }
-  i32      get(void*   key, i32    len)
+  i64      get(const std::string key, void* out_buf)
   {
-    ui32 keyhash  =  m_ch.hashBytes(key, len);
-    auto     ths  =  this;
-    return m_ch.getHashed(keyhash, 
-      [ths, key, len](ui32 blkidx){ return CompareBlock(ths,key,len,blkidx); });
-  }
-  auto    read(void*   key, i32    len) const -> Reader
-  {
-    ui32 keyhash  =  m_ch.hashBytes(key, len);
-    auto     ths  =  this;
-    return m_ch.readHashed(keyhash, 
-      [ths, key, len](ui32 blkidx){ return CompareBlock(ths,key,len,blkidx); });
-  }
-  auto     get(i32  blkIdx, void*  out_buf) -> size_t
-  {
-    if(blkIdx==EMPTY_KEY) return 0;
-
-    return m_cs.get(blkIdx, out_buf);           // copy into the buf starting at the blkidx
-  } 
-  auto     get(const std::string key, void* out_buf) -> i64
-  {
-    //ui32 idx = get( (void*)key.data(), (ui32)key.length() );
-    //KV    kv = read( (void*)key.data(), (ui32)key.length() );
-
     Reader r = read( (void*)key.data(), (ui32)key.length() );
     if(r.kv.key==EMPTY_KEY || r.kv.readers<=0) return -1;   // after the read, the readers should be at least 1  /*|| r.kv.remove*/
 
-    ui64 len = get(r.kv.val, out_buf);
+    ui64 len = getFromBlkIdx(r.kv.val, out_buf);
     if(r.doRm()){ m_cs.free(r.kv.val); m_cs.free(r.kv.key); }
   
     return len;
@@ -913,7 +942,7 @@ public:
   }
   ui64    size() const
   {
-    return m_mem.size();
+    return m_mem.size;
   }
 };
 
@@ -930,6 +959,49 @@ public:
 
 
 
+//private:
+//std::unique_ptr<void*> ptr;
+//HANDLE     fileHndl;
+
+//SharedMem(SharedMem const&) = delete;
+//SharedMem(const char* name, ui64 size) :
+//  m_sz(size)
+//{
+//  char path[512] = "Global\\simdb_15_";
+//  strcat_s(path, sizeof(path), name);
+//
+//  m_fileHandle = CreateFileMapping(
+//    INVALID_HANDLE_VALUE,
+//    NULL,
+//    PAGE_READWRITE,
+//    0,
+//    (DWORD)m_sz,
+//    path);
+//
+//  if(m_fileHandle==NULL){/*error*/}
+//
+//  m_ptr = MapViewOfFile(m_fileHandle,   // handle to map object
+//    FILE_MAP_ALL_ACCESS,   // read/write permission
+//    0,
+//    0,
+//    m_sz);
+//}
+//
+//ui64 size() const
+//{
+//  return size;
+//}
+
+//i32      get(void*   key, i32    len)
+//{
+//  ui32 keyhash  =  m_ch.hashBytes(key, len);
+//  auto     ths  =  this;
+//  return m_ch.getHashed(keyhash, 
+//    [ths, key, len](ui32 blkidx){ return CompareBlock(ths,key,len,blkidx); });
+//}
+
+//ui32 idx = get( (void*)key.data(), (ui32)key.length() );
+//KV    kv = read( (void*)key.data(), (ui32)key.length() );
 
 //using COMPARE_FUNC  =  decltype( [](ui32 key){} );
 //union      KV
