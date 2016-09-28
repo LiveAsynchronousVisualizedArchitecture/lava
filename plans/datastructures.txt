@@ -30,5 +30,7 @@ Three or four neccesary data structures to begin:
 | - combines the vec, hash, and list into one type for plenty of convenience
 | - how to handle list? - advantage of list is to be O(1) append, but with fragmented memory
 | - same design issues as lava_list
+- lava_str
+| - is a separate string neccesary? can lava_vec just be used instead? need to read, many people have likely confronted this issue
 
 
