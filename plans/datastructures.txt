@@ -12,5 +12,23 @@ Every data structure is flat linear memory throughout the dataflow
   -operators can still be overloaded since the single pointer data on the stack will still have a type
 
 
+Three or four neccesary data structures to begin:
+- lava_vec
+| - ui64 sizeBytes, ui64 size?, ui64 capacity, ui64 type enum?, bytes of actual data
+| - if sizeBytes must be there, and capacity is there, does size need to be there? yes, because size*sizeof(type) can be arbitrarily less than the total size in bytes
+| - does capacity need to be there? it can be derived from (sizeBytes - overhead) / sizeof(type)
+- lava_hash
+| - simple hash map in flat memory 
+| - ui64 sizeBytes, ui64 count
+- lava_list
+| - made to be a list of arbitrarily sized elements in flat memory
+| - ui64 sizeBytes, then first 'node', where the node is just an offset to the next node then the node's bytes until that offset 
+| - would need to either be a normal linked list that gets flattened or constructed with number of elements and each of their sizes ahead of time
+| - might need to be constructed with a buffer of sizes
+| - normal list + flattening might be the best way to go - track the number of elements and total size during appends so that the list does not need to be traversed twice - once for sizes and count, once for copying the data into the flat version
+- lava_tbl
+| - combines the vec, hash, and list into one type for plenty of convenience
+| - how to handle list? - advantage of list is to be O(1) append, but with fragmented memory
+| - same design issues as lava_list
 
 
