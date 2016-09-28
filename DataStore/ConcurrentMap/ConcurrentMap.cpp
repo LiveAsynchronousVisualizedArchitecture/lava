@@ -412,10 +412,19 @@ int main()
   auto watlen = db.get("wat", (void*)clear.data() );
   Println("watlen: ", watlen);
   Println("get \"wat\": ", clear);
+  Println();
 
   clear = "                ";
-  db.get("kablam", (void*)clear.data() );
+  auto wutlen = db.get("wut", (void*)clear.data() );
+  Println("wutlen: ", wutlen);
+  Println("get \"wut\": ", clear);
+  Println();
+
+  clear = "                ";
+  auto kablamlen = db.get("kablam", (void*)clear.data() );
+  Println("kablamlen: ", kablamlen);
   Println("get \"kablam\": ", clear);
+  Println();
 
   Println("size: ", db.size());
   str memstr( (const char*)db.data(), (const char*)db.data() + db.size());

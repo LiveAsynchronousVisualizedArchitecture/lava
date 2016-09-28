@@ -27,9 +27,10 @@
 // -todo: make addReaders not add any readers below zero
 // -todo: figure out how to deal with deletion when there is a concurrent write - reset the readers and hash?
 // -todo: make -1 an error instead of returning a length of 0? - distinguising a key with length 0 and no key could be useful 
+// -todo: is only the key being deleted? - no, but vals should be removed before keys to keep the order more consistent, all other things being equal
+// -todo: need to fix ConcurrentList free? it writes to the list before the compare_swap has gone through? - no, because writing to taken indices in the list doesn't matter + only one thread should be freeing a specific index at a time - if two threads were freeing the same index on top of each other, a problem bigger than atomics would be that even if both operations went through, there would be a double free
 
-// todo: store size in the ConcurrentList
-// todo: store readers in the ConcurrentList
+// todo: store size in the ConcurrentList?
 // todo: redo concurrent store get to store length so that buffer can be returned
 // todo: make SharedMemory take an address and destructor, or make simdb take an address and destructor to use arbitrary memory?
 // todo: store lengths and check key lengths before trying bitwise comparison as an optimization? - would only make a difference for long keys that are larger than one block? no it would make a difference on every get?
@@ -883,7 +884,7 @@ public:
     if(r.kv.key==EMPTY_KEY || r.kv.readers<=0) return -1;   // after the read, the readers should be at least 1  /*|| r.kv.remove*/
 
     ui64 len = get(r.kv.val, out_buf);
-    if(r.doRm()){ m_cs.free(r.kv.key); m_cs.free(r.kv.val); }
+    if(r.doRm()){ m_cs.free(r.kv.val); m_cs.free(r.kv.key); }
   
     return len;
   }
@@ -898,8 +899,8 @@ public:
       [ths, kbuf, len](ui32 blkidx){ return CompareBlock(ths,kbuf,len,blkidx); });
     
     if(r.doRm()){                                            // need to check doRm
-      if(r.kv.key!=EMPTY_KEY) m_cs.free(r.kv.key);           // need to remove the block index lists if true
       if(r.kv.val!=EMPTY_KEY) m_cs.free(r.kv.val);
+      if(r.kv.key!=EMPTY_KEY) m_cs.free(r.kv.key);           // need to remove the block index lists if true
     }
         
     //KV  prev = m_ch.rm(idx);
