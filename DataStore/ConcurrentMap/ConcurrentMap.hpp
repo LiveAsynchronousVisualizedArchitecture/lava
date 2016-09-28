@@ -24,20 +24,23 @@
 // -todo: check when reading if something is marked for deletion and return 0 / EMPTY_KEY if it is
 // -todo: make remove function concurrent and account for the number of readers
 // -todo: make remove decremented the readers but don't actually delete, so that the last reader out would delete, maybe just make a flag as mark for deletion?
+// -todo: make addReaders not add any readers below zero
+// -todo: figure out how to deal with deletion when there is a concurrent write - reset the readers and hash?
+// -todo: make -1 an error instead of returning a length of 0? - distinguising a key with length 0 and no key could be useful 
 
-// todo: should the readers be integrated with the list also? 
-// todo: figure out how to deal with deletion when there is a concurrent write - reset the readers and hash?
+// todo: store size in the ConcurrentList
+// todo: store readers in the ConcurrentList
 // todo: redo concurrent store get to store length so that buffer can be returned
-// todo: store size and/or readers in the ConcurrentList ?
 // todo: make SharedMemory take an address and destructor, or make simdb take an address and destructor to use arbitrary memory?
 // todo: store lengths and check key lengths before trying bitwise comparison as an optimization? - would only make a difference for long keys that are larger than one block? no it would make a difference on every get?
-// todo: make -1 an error instead of returning a length of 0? - distinguising a key with length 0 and no key could be useful
+
 // todo: lock init with mutex?
 // todo: implement locking resize?
 // todo: make erase function that 0s out bytes?
 // todo: make take function the combines get and remove?
 // todo: Make block size for keys different than data?
 // todo: mark free cells as negative numbers so double free is caught?
+// todo: should the readers be integrated with the list also? 
 
 //Block based allocation
 //-Checking if the head has been touched means either incrementing a counter every time it is written, or putting in a thread id every time it is read or written
@@ -85,30 +88,12 @@ class   ConcurrentHash
 private:
 
 public:
-  //using COMPARE_FUNC  =  decltype( [](ui32 key){} );
-
   static const  i8   RM_OWNER      =    -1;            // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
   static const ui8   LAST_READER   =     0;            // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
   static const ui8   INIT_READERS  =     0;            // eventually make this 1 again? - to catch when readers has dropped to 0
   static const ui8   FREE_READY    =     0;
   static const ui8   MAX_READERS   =  0xFF;
   static const ui32  EMPTY_KEY     =  0x0FFFFFFF;      // 28 bits set 
-
-  //union      KV
-  //{
-  //  struct
-  //  {
-  //    uint64_t   remove  :  1;
-  //    uint64_t  readers  :  7;
-  //    uint64_t      key  : 28;
-  //    uint64_t      val  : 28;
-  //  };
-  //  uint64_t asInt;
-  //
-  //  // after the switch to 128 bit atomics:
-  //  // ui64 ubits;
-  //  // ui64 lbits;
-  //};
 
   union      KV
   {
@@ -126,9 +111,6 @@ public:
   };
   struct Reader
   {
-    //private:
-    //public:
-
     bool                     doEnd;       //  8 bits?
     ui32                  hash_idx;       // 32 bits
     KV                          kv;       // 64 bits
@@ -266,10 +248,10 @@ private:
     KV readKv = curKv;
     do
     {
-      if(curKv.key == EMPTY_KEY)//  ||
+      if(curKv.key==EMPTY_KEY || readKv.readers<0)//  ||
+        return curKv;                                                                // not successful if the key is empty and not successful if readers is below the starting point - the last free function or last reader should be freeing this slot - this relies on nothing incrementing readers once it has reached FREE_READY
          //curKv.readers == FREE_READY) // || 
          //curKv.readers == MAX_READERS) 
-        return curKv;                                                                // not successful if the key is empty and not successful if readers is below the starting point - the last free function or last reader should be freeing this slot - this relies on nothing incrementing readers once it has reached FREE_READY
     
       readKv           =  curKv;
       readKv.readers  +=  readers;
@@ -892,13 +874,13 @@ public:
 
     return m_cs.get(blkIdx, out_buf);           // copy into the buf starting at the blkidx
   } 
-  auto     get(const std::string key, void* out_buf) -> size_t
+  auto     get(const std::string key, void* out_buf) -> i64
   {
     //ui32 idx = get( (void*)key.data(), (ui32)key.length() );
     //KV    kv = read( (void*)key.data(), (ui32)key.length() );
 
     Reader r = read( (void*)key.data(), (ui32)key.length() );
-    if(r.kv.key==EMPTY_KEY || r.kv.readers<=0) return 0;   // after the read, the readers should be at least 1  /*|| r.kv.remove*/
+    if(r.kv.key==EMPTY_KEY || r.kv.readers<=0) return -1;   // after the read, the readers should be at least 1  /*|| r.kv.remove*/
 
     ui64 len = get(r.kv.val, out_buf);
     if(r.doRm()){ m_cs.free(r.kv.key); m_cs.free(r.kv.val); }
@@ -947,6 +929,23 @@ public:
 
 
 
+
+//using COMPARE_FUNC  =  decltype( [](ui32 key){} );
+//union      KV
+//{
+//  struct
+//  {
+//    uint64_t   remove  :  1;
+//    uint64_t  readers  :  7;
+//    uint64_t      key  : 28;
+//    uint64_t      val  : 28;
+//  };
+//  uint64_t asInt;
+//
+//  // after the switch to 128 bit atomics:
+//  // ui64 ubits;
+//  // ui64 lbits;
+//};
 
 //
 // [ths](ui32 a, ui32 b){return CompareBlocks(ths,a,b); }); 

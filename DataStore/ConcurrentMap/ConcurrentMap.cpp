@@ -413,9 +413,6 @@ int main()
   Println("watlen: ", watlen);
   Println("get \"wat\": ", clear);
 
-  //auto idx2 = db.get((void*)kablam.data(), (ui32)kablam.length());
-  //Println("get \"kablam\": ", idx2);
-
   clear = "                ";
   db.get("kablam", (void*)clear.data() );
   Println("get \"kablam\": ", clear);
@@ -423,9 +420,6 @@ int main()
   Println("size: ", db.size());
   str memstr( (const char*)db.data(), (const char*)db.data() + db.size());
   Println("\nmem: ", memstr, "\n\n" );
-
-  //UnmapViewOfFile(mapmem);
-  //CloseHandle(fileHndl);
 
   PAUSE
 
@@ -446,6 +440,11 @@ int main()
 
 
 
+//auto idx2 = db.get((void*)kablam.data(), (ui32)kablam.length());
+//Println("get \"kablam\": ", idx2);
+
+//UnmapViewOfFile(mapmem);
+//CloseHandle(fileHndl);
 
 //DWORD                 dwMaximumSizeHigh,
 //DWORD                 dwMaximumSizeLow,
