@@ -92,10 +92,11 @@ using  ai32   =   std::atomic<i64>;
 using  cstr   =   const char*;
 using   str   =   std::string;
 
+template<class T, class Allocator=std::allocator<T>, class Deleter=std::default_delete<T>>
 class lava_vec
 {
 private:
-  using T = i32;
+  //using T = i32;
 
   void* p;
 
@@ -109,7 +110,7 @@ private:
   } 
 
 public:
-  static const ui64 data_offset = sizeof(ui64) * 2;
+  //static const ui64 data_offset = sizeof(ui64) * 2;
 
   static ui64 sizeBytes(ui64 count)
   {
@@ -120,7 +121,7 @@ public:
   lava_vec(ui64 count)
   {
     ui64 sb = lava_vec::sizeBytes(count);
-    p       = malloc(sb);
+    p       = Allocator().allocate(sb); // malloc(sb);
     set_size(count);
     set_sizeBytes(sb);
   }
@@ -138,7 +139,10 @@ public:
   }
   ~lava_vec()
   {
-    //free(p);
+    if(p){
+      Deleter().operator()((T*)p);  //free(p);
+      p = nullptr;
+    }
   }
 
   T& operator[](ui64 i)

@@ -432,10 +432,12 @@ int main()
 
   Println("owner: ", db.isOwner(), "\n\n");
 
-  lava_vec lv(16);
+  lava_vec<i32> lv(16);
   //memset(lv.data(), 0, 16*sizeof(ui32) );
   TO((i32)lv.size(), i) lv[i] = i;
   TO((i32)lv.size(), i) Print(" ",i,":",lv[i]);
+
+  lv.~lava_vec();
 
   Println("\n");
   PAUSE
