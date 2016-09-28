@@ -430,8 +430,14 @@ int main()
   str memstr( (const char*)db.data(), (const char*)db.data() + db.size());
   Println("\nmem: ", memstr, "\n" );
 
-  Println("owner: ", db.isOwner(), "\n");
+  Println("owner: ", db.isOwner(), "\n\n");
 
+  lava_vec lv(16);
+  //memset(lv.data(), 0, 16*sizeof(ui32) );
+  TO((i32)lv.size(), i) lv[i] = i;
+  TO((i32)lv.size(), i) Print(" ",i,":",lv[i]);
+
+  Println("\n");
   PAUSE
 
   return 0;

@@ -32,6 +32,7 @@
 // -todo: change public get methods to use read - took out one get and changed the other to being private getFromBlkIdx
 // -todo: fix shared memory aligned allocation
 // -todo: make SharedMem check if the mem file already exists
+// -todo: test opening the db from multiple processes - didn't work at first, likely because the copy constructor was not deleted and the destructor was run early
 
 // todo: need to make ConcurrentList a flat data structure so it can be store at the start of the memory mapped file
 // todo: store size in the ConcurrentList?
@@ -90,6 +91,80 @@ using aui64   =   std::atomic<ui64>;
 using  ai32   =   std::atomic<i64>;
 using  cstr   =   const char*;
 using   str   =   std::string;
+
+class lava_vec
+{
+private:
+  using T = i32;
+
+  void* p;
+
+  void       set_size(ui64 s)
+  { 
+    *((ui64*)p + 1) = s;
+  }
+  void  set_sizeBytes(ui64 sb)
+  {
+    *((ui64*)p) = sb;      // first 8 bytes should be the total size of the buffer in bytes
+  } 
+
+public:
+  static const ui64 data_offset = sizeof(ui64) * 2;
+
+  static ui64 sizeBytes(ui64 count)
+  {
+    return  sizeof(ui64)*2 + count*sizeof(T);
+  }
+
+  lava_vec(){}
+  lava_vec(ui64 count)
+  {
+    ui64 sb = lava_vec::sizeBytes(count);
+    p       = malloc(sb);
+    set_size(count);
+    set_sizeBytes(sb);
+  }
+  lava_vec(void* addr, ui64 count)
+  {
+    ui64 sb = lava_vec::sizeBytes(count);
+    p       = addr;
+    set_size(count);
+    set_sizeBytes(sb);
+  }
+  lava_vec(lava_vec&& rval)
+  {
+    p      = rval.p;
+    rval.p = nullptr;
+  }
+  ~lava_vec()
+  {
+    //free(p);
+  }
+
+  T& operator[](ui64 i)
+  {
+    //((ui64*)((i8*)p+data_offset))[i];
+    T* ofst = (T*)((ui64*)p+2);
+    return ofst[i];
+  }
+
+  auto       data() -> void*
+  {
+    return (void*)((ui64*)p+2);
+  }
+  ui64   capacity() const
+  {
+    return (sizeBytes() - sizeof(ui64)*2) / sizeof(T);
+  }
+  ui64       size() const
+  {
+    return *((ui64*)p + 1);   // second 8 bytes should be the number of elements
+  } 
+  ui64  sizeBytes() const
+  {
+    return *((ui64*)p);   // first 8 bytes should be the total size of the buffer in bytes
+  } 
+};
 
 class   ConcurrentHash
 {
