@@ -33,6 +33,7 @@
 // -todo: fix shared memory aligned allocation
 // -todo: make SharedMem check if the mem file already exists
 
+// todo: need to make ConcurrentList a flat data structure so it can be store at the start of the memory mapped file
 // todo: store size in the ConcurrentList?
 // todo: test using the db from multiple processes
 // todo: test with multiple threads in a loop
@@ -775,48 +776,53 @@ public:
   {
     using namespace std;
     
-    // windows
-    char path[512] = "Global\\simdb_15_";
-    strcat_s(path, sizeof(path), name);
+    #ifdef _WIN32      // windows
+      char path[512] = "Global\\simdb_15_";
+      strcat_s(path, sizeof(path), name);
 
-    SharedMem sm;
-    sm.size = size;
+      SharedMem sm;
+      sm.owner = false;
+      sm.size  = size;
 
-    sm.fileHndl = OpenFileMapping(NULL, TRUE, path);
-    if(sm.fileHndl==NULL)
-    {
-      sm.fileHndl = CreateFileMapping(
-        INVALID_HANDLE_VALUE,
-        NULL,
-        PAGE_READWRITE,
-        0,
-        (DWORD)size,
-        path);
-    }
+      sm.fileHndl = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, path);
+      if(sm.fileHndl==NULL)
+      {
+        sm.fileHndl = CreateFileMapping(
+          INVALID_HANDLE_VALUE,
+          NULL,
+          PAGE_READWRITE,
+          0,
+          (DWORD)size,
+          path);
+        if(sm.fileHndl!=NULL) sm.owner=true;
+      }
     
-    if(sm.fileHndl==NULL){return sm;}
+      if(sm.fileHndl==NULL){return move(sm);}
 
-    sm.hndlPtr = MapViewOfFile(sm.fileHndl,   // handle to map object
-      FILE_MAP_ALL_ACCESS,   // read/write permission
-      0,
-      0,
-      size);
-    // END windows
-
+      sm.hndlPtr = MapViewOfFile(sm.fileHndl,   // handle to map object
+        FILE_MAP_ALL_ACCESS,   // read/write permission
+        0,
+        0,
+        size);
+      if(sm.hndlPtr==nullptr){ CloseHandle(sm.fileHndl); sm.clear(); return move(sm); }
+    #endif       // END windows
+  
     ui64      addr = (ui64)(sm.hndlPtr);
     ui64 alignAddr = (addr + ((64-addr%64)%64));
     sm.ptr    = (void*)(alignAddr);
 
-    return sm;
+    return move(sm);
   }
 
   SharedMem(){}
+  SharedMem(SharedMem const&) = delete;
   SharedMem(SharedMem&& rval)
   {
     fileHndl       =  rval.fileHndl;
     hndlPtr        =  rval.hndlPtr;
     ptr            =  rval.ptr;
     size           =  rval.size;
+    owner          =  rval.owner;
 
     rval.clear();
   }
@@ -910,7 +916,7 @@ public:
   i64      get(const std::string key, void* out_buf)
   {
     Reader r = read( (void*)key.data(), (ui32)key.length() );
-    if(r.kv.key==EMPTY_KEY || r.kv.readers<=0) return -1;   // after the read, the readers should be at least 1  /*|| r.kv.remove*/
+    if(r.kv.key==EMPTY_KEY || r.kv.readers<=0) return -1;            // after the read, the readers should be at least 1  /*|| r.kv.remove*/
 
     ui64 len = getFromBlkIdx(r.kv.val, out_buf);
     if(r.doRm()){ m_cs.free(r.kv.val); m_cs.free(r.kv.key); }
@@ -944,6 +950,11 @@ public:
   {
     return m_mem.size;
   }
+  bool isOwner() const
+  {
+    return m_mem.owner;
+  }
+
 };
 
 #endif

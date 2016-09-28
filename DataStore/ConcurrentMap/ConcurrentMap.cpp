@@ -428,7 +428,9 @@ int main()
 
   Println("size: ", db.size());
   str memstr( (const char*)db.data(), (const char*)db.data() + db.size());
-  Println("\nmem: ", memstr, "\n\n" );
+  Println("\nmem: ", memstr, "\n" );
+
+  Println("owner: ", db.isOwner(), "\n");
 
   PAUSE
 
