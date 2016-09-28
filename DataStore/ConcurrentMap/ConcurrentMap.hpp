@@ -21,22 +21,23 @@
 // -todo: figure out why readers is so high - uninitialized KV struct in a put function
 // -todo: do KV structs need versions? can an identical KV struct ever be inserted? only if the List somehow gave up identical indices, which shouldn't happen?
 // -todo: test deletion from db
+// -todo: check when reading if something is marked for deletion and return 0 / EMPTY_KEY if it is
+// -todo: make remove function concurrent and account for the number of readers
+// -todo: make remove decremented the readers but don't actually delete, so that the last reader out would delete, maybe just make a flag as mark for deletion?
 
-// todo: make erase function that 0s out bytes?
-// todo: check when reading if something is marked for deletion and return 0 / EMPTY_KEY if it is
+// todo: should the readers be integrated with the list also? 
 // todo: figure out how to deal with deletion when there is a concurrent write - reset the readers and hash?
-// todo: make remove function concurrent and account for the number of readers
-// todo: make remove decremented the readers but didn't actually delete, so that the last reader out would delete, maybe just make a flag as mark for deletion?
-// todo: make take function the combines get and remove
-// todo: Make block size for keys different than data?
 // todo: redo concurrent store get to store length so that buffer can be returned
+// todo: store size and/or readers in the ConcurrentList ?
+// todo: make SharedMemory take an address and destructor, or make simdb take an address and destructor to use arbitrary memory?
 // todo: store lengths and check key lengths before trying bitwise comparison as an optimization? - would only make a difference for long keys that are larger than one block? no it would make a difference on every get?
 // todo: make -1 an error instead of returning a length of 0? - distinguising a key with length 0 and no key could be useful
-// todo: mark free cells as negative numbers so double free is caught?
 // todo: lock init with mutex?
 // todo: implement locking resize?
-// todo: make SharedMemory take an address and destructor, or make simdb take an address and destructor to use arbitrary memory?
-// todo: store size and/or readers in the ConcurrentList ?
+// todo: make erase function that 0s out bytes?
+// todo: make take function the combines get and remove?
+// todo: Make block size for keys different than data?
+// todo: mark free cells as negative numbers so double free is caught?
 
 //Block based allocation
 //-Checking if the head has been touched means either incrementing a counter every time it is written, or putting in a thread id every time it is read or written
@@ -66,6 +67,7 @@
 
 #include <windows.h>
 
+using    i8   =   int8_t;
 using   ui8   =   uint8_t;
 using   i64   =   int64_t;
 using  ui64   =   uint64_t;
@@ -85,20 +87,36 @@ private:
 public:
   //using COMPARE_FUNC  =  decltype( [](ui32 key){} );
 
+  static const  i8   RM_OWNER      =    -1;            // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
   static const ui8   LAST_READER   =     0;            // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
   static const ui8   INIT_READERS  =     0;            // eventually make this 1 again? - to catch when readers has dropped to 0
   static const ui8   FREE_READY    =     0;
   static const ui8   MAX_READERS   =  0xFF;
   static const ui32  EMPTY_KEY     =  0x0FFFFFFF;      // 28 bits set 
 
+  //union      KV
+  //{
+  //  struct
+  //  {
+  //    uint64_t   remove  :  1;
+  //    uint64_t  readers  :  7;
+  //    uint64_t      key  : 28;
+  //    uint64_t      val  : 28;
+  //  };
+  //  uint64_t asInt;
+  //
+  //  // after the switch to 128 bit atomics:
+  //  // ui64 ubits;
+  //  // ui64 lbits;
+  //};
+
   union      KV
   {
     struct
     {
-      uint64_t   remove  :  1;
-      uint64_t  readers  :  7;
-      uint64_t      key  : 28;
-      uint64_t      val  : 28;
+      signed   long long readers  :  8;
+      unsigned long long     key  : 28;
+      unsigned long long     val  : 28;
     };
     uint64_t asInt;
 
@@ -108,8 +126,9 @@ public:
   };
   struct Reader
   {
-  //private:
-  //public:
+    //private:
+    //public:
+
     bool                     doEnd;       //  8 bits?
     ui32                  hash_idx;       // 32 bits
     KV                          kv;       // 64 bits
@@ -131,9 +150,11 @@ public:
 
     bool doRm() // doRm is do remove 
     {
-      if(doEnd && ch){
-        KV kv = ch->endRead(hash_idx);
-        if(kv.readers==LAST_READER && kv.remove){
+      //if(doEnd && ch){
+      if(ch){
+        //KV kv = ch->endRead(hash_idx);
+        if(kv.readers == RM_OWNER){ // && kv.remove){
+          //ch->endRead(hash_idx);
           doEnd = false;
           return true;
         }
@@ -143,7 +164,8 @@ public:
     }
     ~Reader()
     {
-      if(doEnd && ch) ch->endRead(hash_idx);              // checks the ConcurrentHash pointer for nullptr, not sure if this is neccesary but it probably doesn't hurt much
+      //if(doEnd && ch) ch->endRead(hash_idx);              // checks the ConcurrentHash pointer for nullptr, not sure if this is neccesary but it probably doesn't hurt much
+      if(ch) ch->endRead(hash_idx);              // checks the ConcurrentHash pointer for nullptr, not sure if this is neccesary but it probably doesn't hurt much
     }
   };
   
@@ -170,7 +192,7 @@ private:
   KV           empty_kv()                   const
   {
     KV empty;
-    empty.remove   =  0;
+//    empty.remove   =  0;
     empty.readers  =  INIT_READERS;
     empty.key      =  0;
     empty.val      =  0;
@@ -244,16 +266,16 @@ private:
     KV readKv = curKv;
     do
     {
-      if(curKv.key     == EMPTY_KEY  ||
-         curKv.readers == FREE_READY || 
-         curKv.readers == MAX_READERS) 
+      if(curKv.key == EMPTY_KEY)//  ||
+         //curKv.readers == FREE_READY) // || 
+         //curKv.readers == MAX_READERS) 
         return curKv;                                                                // not successful if the key is empty and not successful if readers is below the starting point - the last free function or last reader should be freeing this slot - this relies on nothing incrementing readers once it has reached FREE_READY
     
       readKv           =  curKv;
       readKv.readers  +=  readers;
     } while( !compexchange_kv(i, &curKv.asInt, readKv.asInt) );
 
-    return curKv;
+    return readKv; // curKv;
   }
 
 public:
@@ -334,25 +356,24 @@ public:
     for(;; ++i)
     {
       i  &=  m_sz-1;
-  
       KV probedKv = load_kv(i);
-
       if(probedKv.key==EMPTY_KEY) return empty_reader();
       if(match(probedKv.key))
       {          
-        KV   expected   =  probedKv;
-        KV   desired    =  expected;
-        desired.remove  =  1; 
-  
-        bool   success  =  compexchange_kv(i, &expected.asInt, desired.asInt);
-        if(success){
-          Reader r   = empty_reader();  // todo: don't need the initialization - comment it out once working
-          r.ch       = this;
-          r.hash_idx = i;
-          r.kv       = desired;
-          r.doEnd    = true;
-          return r;
-        }else continue;
+        //KV    expected  =  probedKv;
+        //KV     desired  =  expected;
+//        desired.remove  =  1;
+        //bool   success  =  compexchange_kv(i, &expected.asInt, desired.asInt);
+        KV kv = addReaders(i, probedKv, -1);
+        //if(probedKv.readers==RM_OWNER){
+          Reader r    =  empty_reader();       // todo: don't need the initialization - comment it out once working
+          r.ch        =  this;
+          r.hash_idx  =  i;
+          r.kv        =  kv;
+          //r.kv        =  desired;
+          r.doEnd     =  true;
+          return move(r);
+        //}else continue;
       }                                                                                       // Either we just added the key, or another thread did.      
     }
 
@@ -361,6 +382,8 @@ public:
   template<class MATCH_FUNC> 
   auto    readHashed(ui32 hash, MATCH_FUNC match) const -> Reader
   {
+    using namespace std;
+
     ui32 i = hash;
     for(;; ++i)
     {
@@ -373,7 +396,7 @@ public:
         r.hash_idx  =  i;
         r.doEnd     =  true;
         r.ch        =  this;
-        return r; // addReaders(i, probedKv, 1);
+        return move(r); // addReaders(i, probedKv, 1);
       }
     }
   }
@@ -383,27 +406,9 @@ public:
     using namespace std;
     
     m_sz      =  nextPowerOf2(sz);
-
     KV defKv  =  empty_kv();
-    // defKv.asInt    =  0;
-    //defKv.key      =  EMPTY_KEY;
-    //defKv.val      =  0;
-    //defKv.readers  =  INIT_READERS;
-
     m_kvs.resize(m_sz, defKv);
     
-    //for(ui32 i=0; i<m_sz; ++i) m_kvs[i] = defKv;
-
-    //m_keys.reset(new Aui32[m_sz]);
-    //m_vals.reset(new Aui32[m_sz]);
-    //
-    //ui32* keys = (ui32*)m_keys.get();
-    //ui32* vals = (ui32*)m_vals.get();
-    //TO(m_sz,i) {
-    //  keys[i] = EMPTY_KEY;
-    //}
-    //memset(vals,0,m_sz);
-
     return true;
   }
   KV         read(ui32  key)                      const
@@ -813,9 +818,11 @@ public:
 };
 class            simdb
 {
+public:
+  using KV = ConcurrentHash::KV;
+
 private:
-  using     KV = ConcurrentHash::KV;
-  using Reader = ConcurrentHash::Reader; 
+  using Reader = ConcurrentHash::Reader;
 
   //void*            m_mem;
   SharedMemory     m_mem;
@@ -839,7 +846,6 @@ public:
 
   i32      put(void*   key, ui32  klen, void* val, ui32 vlen)
   {
-    // todo: need to clean up the allocation 
     i32 blkcnt = 0;
     i32   kidx = m_cs.alloc(klen, &blkcnt);    // kidx is key index
     if(kidx==LIST_END) return EMPTY_KEY;
@@ -848,7 +854,7 @@ public:
       return EMPTY_KEY;
     }
     i32   vidx = m_cs.alloc(vlen, &blkcnt);
-    if(vidx==LIST_END) return EMPTY_KEY;   // vidx is value index
+    if(vidx==LIST_END) return EMPTY_KEY;       // vidx is value index
     if(blkcnt<0){
       m_cs.free(vidx);
       return EMPTY_KEY;
@@ -858,9 +864,8 @@ public:
     m_cs.put(vidx, val, vlen);
 
     ui32 keyhash = m_ch.hashBytes(key, klen);
-    auto ths = this;                                          // this silly song and dance is because the this pointer can't be passed to a lambda
-    auto  kv = m_ch.putHashed(keyhash, kidx, vidx, 
-       // [ths](ui32 a, ui32 b){return CompareBlocks(ths,a,b); }); 
+    auto     ths = this;                                          // this silly song and dance is because the this pointer can't be passed to a lambda
+    KV        kv = m_ch.putHashed(keyhash, kidx, vidx, 
       [ths, key, klen](ui32 blkidx){ return CompareBlock(ths,key,klen,blkidx); });
 
     if(kv.key != ConcurrentHash::EMPTY_KEY){ m_cs.free(kv.val); m_cs.free(kv.key); }
@@ -893,26 +898,13 @@ public:
     //KV    kv = read( (void*)key.data(), (ui32)key.length() );
 
     Reader r = read( (void*)key.data(), (ui32)key.length() );
-    if(r.kv.key==EMPTY_KEY) return 0;
+    if(r.kv.key==EMPTY_KEY || r.kv.readers<=0) return 0;   // after the read, the readers should be at least 1  /*|| r.kv.remove*/
 
     ui64 len = get(r.kv.val, out_buf);
     if(r.doRm()){ m_cs.free(r.kv.key); m_cs.free(r.kv.val); }
   
     return len;
   }
-  //void      rm(const std::string key)
-  //{
-  //  auto  len = (ui32)key.length();
-  //  auto  ths = this;
-  //  auto kbuf = (void*)key.data();
-  //  auto hash = m_ch.hashBytes(kbuf, len);
-  //  ui32  idx = m_ch.findHashed(hash,
-  //    [ths, kbuf, len](ui32 blkidx){ return CompareBlock(ths,kbuf,len,blkidx); });
-  //      
-  //  KV  prev = m_ch.rm(idx);
-  //  if(prev.key!=EMPTY_KEY) m_cs.free(prev.key);
-  //  if(prev.val!=EMPTY_KEY) m_cs.free(prev.val);
-  //}
   void      rm(const std::string key)
   {
     auto  len = (ui32)key.length();
@@ -955,6 +947,40 @@ public:
 
 
 
+
+//
+// [ths](ui32 a, ui32 b){return CompareBlocks(ths,a,b); }); 
+
+// defKv.asInt    =  0;
+//defKv.key      =  EMPTY_KEY;
+//defKv.val      =  0;
+//defKv.readers  =  INIT_READERS;
+//
+//for(ui32 i=0; i<m_sz; ++i) m_kvs[i] = defKv;
+//
+//m_keys.reset(new Aui32[m_sz]);
+//m_vals.reset(new Aui32[m_sz]);
+//
+//ui32* keys = (ui32*)m_keys.get();
+//ui32* vals = (ui32*)m_vals.get();
+//TO(m_sz,i) {
+//  keys[i] = EMPTY_KEY;
+//}
+//memset(vals,0,m_sz);
+
+//void      rm(const std::string key)
+//{
+//  auto  len = (ui32)key.length();
+//  auto  ths = this;
+//  auto kbuf = (void*)key.data();
+//  auto hash = m_ch.hashBytes(kbuf, len);
+//  ui32  idx = m_ch.findHashed(hash,
+//    [ths, kbuf, len](ui32 blkidx){ return CompareBlock(ths,kbuf,len,blkidx); });
+//      
+//  KV  prev = m_ch.rm(idx);
+//  if(prev.key!=EMPTY_KEY) m_cs.free(prev.key);
+//  if(prev.val!=EMPTY_KEY) m_cs.free(prev.val);
+//}
 
 //if( comp(probedKv.key, key) ){
 //if( match(probedKv.key) ){

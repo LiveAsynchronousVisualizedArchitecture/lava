@@ -391,6 +391,8 @@ int main()
   //Println("\n\n");
   //Println(mapmem);
 
+  Println("kv sz: ", sizeof(simdb::KV) );
+
   simdb db(16, 16);
 
   str       wat  =       "wat";
