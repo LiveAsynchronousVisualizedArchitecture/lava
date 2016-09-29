@@ -45,10 +45,13 @@
 // -todo: fix hash function hashing string() different from const char* - off by one error was hashing an extra 32 bits
 // -todo: fix block memory being written but get() not working (ConcurrentList not correct yet?) - hash problem, not ConcurrentList problem
 // -todo: need to make ConcurrentList a flat data structure so it can be store at the start of the memory mapped file
+// -todo: make ConcurrentHash flat using lava_vec
 
-// todo: store size in the ConcurrentList?
+// todo: make Store and Hash both take bool for ownership to decide whether or not to init
+// todo: make flag to see if the db has been initialized yet to mitigate race conditions on creating and opening the memory mapping
 // todo: test using the db from multiple processes
 // todo: test with multiple threads in a loop
+// todo: store size in the ConcurrentList?
 // todo: redo concurrent store get to store length so that buffer can be returned
 // todo: store lengths and check key lengths before trying bitwise comparison as an optimization? - would only make a difference for long keys that are larger than one block? no it would make a difference on every get?
 // todo: prefetch memory for next block when looping through blocks
@@ -113,8 +116,6 @@ template<class T, class Deleter=std::default_delete<T>, class Allocator=std::all
 class lava_vec
 {
 private:
-  //using T = i32;
-
   void* p;
 
   void       set_size(ui64  s)
@@ -127,8 +128,6 @@ private:
   } 
 
 public:
-  //static const ui64 data_offset = sizeof(ui64) * 2;
-
   static void*  setDestructorBit(void* p)
   {
     //return (void*)((ui64)p ^ (((ui64)1l)<<63));
@@ -173,6 +172,7 @@ public:
     //
     //p = addr;
   }
+  lava_vec(lava_vec const&) = delete;
   lava_vec(lava_vec&& rval)
   {
     p      = rval.p;
@@ -214,10 +214,6 @@ public:
   {
     return p;
   }
-
-  //((ui64*)((i8*)p+data_offset))[i];
-  //T* ofst = (T*)((ui64*)p+2);
-  //return ofst[i];
 };
 
 class   ConcurrentHash
@@ -288,6 +284,22 @@ public:
     }
   };
   
+  static ui32 nextPowerOf2(ui32  v)
+  {
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v++;
+
+    return v;
+  }
+  static ui64 sizeBytes(ui32 size)
+  {
+    return lava_vec<KV>::sizeBytes( nextPowerOf2(size) );
+  }
   static bool DefaultKeyCompare(ui32 a, ui32 b)
   {
     return a == b;
@@ -301,7 +313,8 @@ private:
   using ui64      =  uint64_t;
   using Aui32     =  std::atomic<ui32>;
   using Aui64     =  std::atomic<ui64>;  
-  using KVs       =  std::vector<KV>;
+  //using KVs       =  std::vector<KV>;
+  using KVs       =  lava_vec<KV>;
   using Mut       =  std::mutex;
   using UnqLock   =  std::unique_lock<Mut>;
 
@@ -337,18 +350,6 @@ private:
     h *= 0xc2b2ae35;
     h ^= h >> 16;
     return h;
-  }
-  ui32     nextPowerOf2(ui32  v)            const
-  {
-    v--;
-    v |= v >> 1;
-    v |= v >> 2;
-    v |= v >> 4;
-    v |= v >> 8;
-    v |= v >> 16;
-    v++;
-
-    return v;
   }
   KV            load_kv(ui32  i)            const
   {
@@ -399,9 +400,19 @@ private:
 
 public:
   ConcurrentHash(){}
-  ConcurrentHash(ui32 sz)
+  ConcurrentHash(ui32 size)
   {
-    init(sz);
+    init(size);
+  }
+  ConcurrentHash(void* addr, ui32 size, bool owner=true) :
+    m_sz(nextPowerOf2(size)),
+    m_kvs(addr, m_sz)
+  {
+    if(owner){
+      KV defKv = empty_kv();
+      for(ui64 i=0; i<m_kvs.size(); ++i)
+        m_kvs[i] = defKv;
+    }
   }
   ConcurrentHash(ConcurrentHash const& lval) = delete;
   ConcurrentHash(ConcurrentHash&&      rval) = delete;
@@ -525,10 +536,13 @@ public:
     using namespace std;
     
     m_sz      =  nextPowerOf2(sz);
+    m_kvs     =  lava_vec<KV>(m_sz);
     KV defKv  =  empty_kv();
-    m_kvs.resize(m_sz, defKv);
+    for(ui64 i=0; i<m_kvs.size(); ++i) m_kvs[i] = defKv;
     
     return true;
+
+    //m_kvs.resize(m_sz, defKv);
   }
   KV         read(ui32  key)                      const
   {
@@ -596,6 +610,10 @@ public:
     rethash ^= intHash(lst);
 
     return rethash;
+  }  // todo: make static
+  ui64  sizeBytes()                               const
+  {
+    return m_kvs.sizeBytes();
   }
 };
 class   ConcurrentList
@@ -619,7 +637,7 @@ public:
 private:
   ListVec     m_lv;
   aui64*       m_h;
-  ui64   m_szBytes;
+  //ui64   m_szBytes;
 
 public:
   static ui64 sizeBytes(ui32 size)
@@ -636,11 +654,13 @@ public:
   //
   //  m_h = 0;
   //}
-  ConcurrentList(void* addr, ui32 size) :   // this constructor is for when the memory is owned an needs to be initialized
+  ConcurrentList(void* addr, ui32 size, bool owner=true) :           // this constructor is for when the memory is owned an needs to be initialized
     m_lv(addr, size)
   {
-    for(uint32_t i=0; i<(size-1); ++i) m_lv[i]=i+1;
-    m_lv[size-1] = LIST_END;
+    if(owner){
+      for(uint32_t i=0; i<(size-1); ++i) m_lv[i]=i+1;
+      m_lv[size-1] = LIST_END;
+    }
 
     m_h = (aui64*)addr;  // uses the first 8 bytes that would normally store sizeBytes as the 64 bits of memory for the Head structure
     ((Head*)m_h)->idx = 0;
@@ -794,13 +814,13 @@ public:
   }
 
   ConcurrentStore(){}
-  ConcurrentStore(void* addr, ui32 blockSize, ui32 blockCount) :
+  ConcurrentStore(void* addr, ui32 blockSize, ui32 blockCount, bool owner=true) :
     m_addr( (ui8*)addr + ConcurrentList::sizeBytes(blockCount) ),
     m_blockSize(blockSize),
     m_blockCount(blockCount),
     m_blocksUsed(0),
     //m_cl(m_blockCount)
-    m_cl(addr, blockCount)
+    m_cl(addr, blockCount, owner)
   {
     assert(blockSize > sizeof(IDX));
   }
@@ -1043,9 +1063,10 @@ private:
 public:
   simdb(){}
   simdb(const char* name, ui32 blockSize, ui32 blockCount) : 
-    m_mem( SharedMem::AllocAnon(name, ConcurrentStore::sizeBytes(blockSize,blockCount)) ),
-    m_cs( (ui8*)m_mem.data(), blockSize, blockCount),                 // todo: change this to a void*
-    m_ch( blockCount )
+    m_mem( SharedMem::AllocAnon(name, ConcurrentHash::sizeBytes(blockCount)+ConcurrentStore::sizeBytes(blockSize,blockCount)) ),
+    m_ch( m_mem.data(), blockCount, m_mem.owner),
+    m_cs( ((ui8*)m_mem.data())+m_ch.sizeBytes(blockCount), blockSize, blockCount, m_mem.owner)                 // todo: change this to a void*
+    //m_cs( ((ui8*)m_mem.data())+ConcurrentHash::sizeBytes(blockCount), blockSize, blockCount)                 // todo: change this to a void*
   {
     //m_cs( (ui8*)m_mem.data(), blockSize, blockCount),               // todo: change this to a void*
   }
@@ -1136,6 +1157,11 @@ public:
 
 
 
+
+
+//((ui64*)((i8*)p+data_offset))[i];
+//T* ofst = (T*)((ui64*)p+2);
+//return ofst[i];
 
 //auto lv = *(m_cl.list());
 //for(ui64 i=0; i<lv.size(); ++i) std::cout << lv[i] << " ";
