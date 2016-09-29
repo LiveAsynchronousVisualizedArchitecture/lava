@@ -46,12 +46,12 @@
 // -todo: fix block memory being written but get() not working (ConcurrentList not correct yet?) - hash problem, not ConcurrentList problem
 // -todo: need to make ConcurrentList a flat data structure so it can be store at the start of the memory mapped file
 // -todo: make ConcurrentHash flat using lava_vec
+// -todo: make Store and Hash both take bool for ownership to decide whether or not to init
+// -todo: test using the db from multiple processes
 
-// todo: make Store and Hash both take bool for ownership to decide whether or not to init
 // todo: make flag to see if the db has been initialized yet to mitigate race conditions on creating and opening the memory mapping
-// todo: test using the db from multiple processes
 // todo: test with multiple threads in a loop
-// todo: store size in the ConcurrentList?
+// todo: store size in the ConcurrentList? list isn't atomic so it should work well?
 // todo: redo concurrent store get to store length so that buffer can be returned
 // todo: store lengths and check key lengths before trying bitwise comparison as an optimization? - would only make a difference for long keys that are larger than one block? no it would make a difference on every get?
 // todo: prefetch memory for next block when looping through blocks
