@@ -108,17 +108,30 @@ private:
 
   void       set_size(ui64 s)
   { 
-    *((ui64*)p + 1) = s;
+    *((ui64*)clearBits(p) + 1) = s;
   }
   void  set_sizeBytes(ui64 sb)
   {
-    *((ui64*)p) = sb;      // first 8 bytes should be the total size of the buffer in bytes
+    *((ui64*)clearBits(p)) = sb;      // first 8 bytes should be the total size of the buffer in bytes
   } 
 
 public:
   //static const ui64 data_offset = sizeof(ui64) * 2;
 
-  static ui64 sizeBytes(ui64 count)
+  static void*  setDestructorBit(void* p)
+  {
+    //return (void*)((ui64)p ^ (((ui64)1l)<<63));
+    return (void*)((ui64)p | (1llu<<63));
+  }
+  static bool   getDestructorBit(void* p)
+  {
+    return (((ui64)p)>>63)!=0;
+  }
+  static void*         clearBits(void* p)
+  {
+    return (void*)( ((ui64)p) & 0x0000FFFFFFFFFFFF);
+  }
+  static ui64          sizeBytes(ui64 count)
   {
     return  sizeof(ui64)*2 + count*sizeof(T);
   }
@@ -129,6 +142,7 @@ public:
     ui64 sb = lava_vec::sizeBytes(count);
     p       = Allocator().allocate(sb); // malloc(sb);
     //p       = (void*)( (ui64)p ^ ( ((ui64)1)<<63 ) );
+    p       = setDestructorBit(p);
     set_size(count);
     set_sizeBytes(sb);
   }
@@ -146,8 +160,8 @@ public:
   }
   ~lava_vec()
   {
-    if(p){
-      Deleter().operator()((T*)p);  //free(p);
+    if(getDestructorBit(p)){
+      Deleter().operator()((T*)clearBits(p));  //free(p);
       p = nullptr;
     }
   }
@@ -155,13 +169,17 @@ public:
   T& operator[](ui64 i)
   {
     //((ui64*)((i8*)p+data_offset))[i];
-    T* ofst = (T*)((ui64*)p+2);
-    return ofst[i];
+    //T* ofst = (T*)((ui64*)p+2);
+    //return ofst[i];
+    return data()[i];
   }
 
-  auto       data() -> void*
+  T*       data()
   {
-    return (void*)((ui64*)p+2);
+    //ui64 pnum = 
+    ui64* maskptr = (ui64*)clearBits(p); // (ui64*)( ((ui64)p) & 0x0000FFFFFFFFFFFF);
+    return (T*)(maskptr+2);
+    //return (void*)((ui64*)p+2);
   }
   ui64   capacity() const
   {
@@ -169,7 +187,7 @@ public:
   }
   ui64       size() const
   {
-    return *((ui64*)p + 1);   // second 8 bytes should be the number of elements
+    return *((ui64*)clearBits(p) + 1);   // second 8 bytes should be the number of elements
   } 
   ui64  sizeBytes() const
   {
