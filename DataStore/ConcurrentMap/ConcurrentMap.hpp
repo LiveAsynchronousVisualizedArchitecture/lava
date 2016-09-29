@@ -802,12 +802,6 @@ public:
     //m_cl(m_blockCount)
     m_cl(addr, blockCount)
   {
-        auto lv = *(m_cl.list());
-    for(ui64 i=0; i<lv.size(); ++i) std::cout << lv[i] << " ";
-    //std::cout << "\n" << ((ConcurrentList::Head*)&lv[-4])->idx << "\n" << std::endl;
-    std::cout << "\n" << ((ConcurrentList::Head*)lv.addr())->idx << "\n" << std::endl;
-
-
     assert(blockSize > sizeof(IDX));
   }
 
@@ -842,11 +836,6 @@ public:
     i32* p  =  (i32*)stPtr(cur);
     *p      =  byteRem? -byteRem : -blockFreeSize();
     if(out_blocks){ *out_blocks = nxt==LIST_END? -cnt : cnt; } 
-
-    auto lv = *(m_cl.list());
-    for(ui64 i=0; i<lv.size(); ++i) std::cout << lv[i] << " ";
-    std::cout << "\n" << ((ConcurrentList::Head*)lv.addr())->idx << "\n" << std::endl;
-    std::cout << "\n" << ((ConcurrentList::Head*)lv.addr())->ver << "\n" << std::endl;
 
     return st;
   }
@@ -1148,12 +1137,8 @@ public:
 
 
 
-
-
-
-
-
-
-
-
+//auto lv = *(m_cl.list());
+//for(ui64 i=0; i<lv.size(); ++i) std::cout << lv[i] << " ";
+////std::cout << "\n" << ((ConcurrentList::Head*)&lv[-4])->idx << "\n" << std::endl;
+//std::cout << "\n" << ((ConcurrentList::Head*)lv.addr())->idx << "\n" << std::endl;
 
