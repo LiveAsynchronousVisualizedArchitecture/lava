@@ -42,12 +42,12 @@
 // todo: store lengths and check key lengths before trying bitwise comparison as an optimization? - would only make a difference for long keys that are larger than one block? no it would make a difference on every get?
 // todo: prefetch memory for next block when looping through blocks
 
+// todo: combine key and value storage so they are packed together in the same block list?
+// todo: mark free cells as negative numbers so double free is caught? - do it only in debug mode?
+// todo: make erase function that 0s out bytes? - only in debug mode?
+// todo: Make block size for keys different than data?
 // todo: lock init with mutex?
 // todo: implement locking resize?
-// todo: make erase function that 0s out bytes?
-// todo: make take function the combines get and remove?
-// todo: Make block size for keys different than data?
-// todo: mark free cells as negative numbers so double free is caught?
 // todo: should the readers be integrated with the list also? 
 // todo: make SharedMemory take an address and destructor, or make simdb take an address and destructor to use arbitrary memory?
 
@@ -92,7 +92,13 @@ using  ai32   =   std::atomic<i64>;
 using  cstr   =   const char*;
 using   str   =   std::string;
 
-template<class T, class Allocator=std::allocator<T>, class Deleter=std::default_delete<T>>
+template<class T>
+class lava_noop
+{
+  void operator()(){}
+};
+
+template<class T, class Deleter=std::default_delete<T>, class Allocator=std::allocator<T> >
 class lava_vec
 {
 private:
@@ -118,14 +124,15 @@ public:
   }
 
   lava_vec(){}
-  lava_vec(ui64 count)
+  lava_vec(ui64  count)
   {
     ui64 sb = lava_vec::sizeBytes(count);
     p       = Allocator().allocate(sb); // malloc(sb);
+    p       = (void*)( (ui64)p ^ ( ((ui64)1)<<63 ) );
     set_size(count);
     set_sizeBytes(sb);
   }
-  lava_vec(void* addr, ui64 count)
+  lava_vec(void*  addr, ui64 count)
   {
     ui64 sb = lava_vec::sizeBytes(count);
     p       = addr;
