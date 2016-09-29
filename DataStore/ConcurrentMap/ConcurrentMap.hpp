@@ -1,4 +1,11 @@
 
+// plan: 
+// - ConcurrentHash is a lava_vec and is at the start of the memory
+// - ConcurrentStore takes up the rest of the memory
+// | - ConcurrentStore is made up of ConcurrentList at the start of its memory
+// | - block memory is everything after ConcurrentList
+// - The order ends up being ConcurentHash, ConcurrentList, then block storage
+
 // -todo: hash key data instead of the block index of the key
 //       --create function to hash arbitrary bytes 
 //       --create function to put into a hashmap with a pre-hashed value
@@ -34,9 +41,11 @@
 // -todo: make SharedMem check if the mem file already exists
 // -todo: test opening the db from multiple processes - didn't work at first, likely because the copy constructor was not deleted and the destructor was run early
 // -todo: test lava_vec with external memory
+// -todo: convert ConcurrenList to use lava_vec
+// -todo: fix hash function hashing string() different from const char* - off by one error was hashing an extra 32 bits
+// -todo: fix block memory being written but get() not working (ConcurrentList not correct yet?) - hash problem, not ConcurrentList problem
+// -todo: need to make ConcurrentList a flat data structure so it can be store at the start of the memory mapped file
 
-// todo: convert ConcurrenList to use lava_vec
-// todo: need to make ConcurrentList a flat data structure so it can be store at the start of the memory mapped file
 // todo: store size in the ConcurrentList?
 // todo: test using the db from multiple processes
 // todo: test with multiple threads in a loop
@@ -108,7 +117,7 @@ private:
 
   void* p;
 
-  void       set_size(ui64 s)
+  void       set_size(ui64  s)
   { 
     *((ui64*)clearBits(p) + 1) = s;
   }
@@ -147,12 +156,22 @@ public:
     set_size(count);
     set_sizeBytes(sb);
   }
-  lava_vec(void*  addr, ui64 count)
+  lava_vec(void*  addr, ui64 count) :
+    p(addr)
   {
-    ui64 sb = lava_vec::sizeBytes(count);
-    p       = addr;
+    //ui64 sb = lava_vec::sizeBytes(count);
+    //p       = addr;
+    set_sizeBytes( lava_vec::sizeBytes(count) );
     set_size(count);
-    set_sizeBytes(sb);
+  }
+  lava_vec(void*  addr) :
+    p(addr)
+  {
+    //ui64 sb = lava_vec::sizeBytes(count);
+    //set_size(count);
+    //set_sizeBytes(sb);
+    //
+    //p = addr;
   }
   lava_vec(lava_vec&& rval)
   {
@@ -191,6 +210,10 @@ public:
   {
     return *((ui64*)p);   // first 8 bytes should be the total size of the buffer in bytes
   } 
+  auto       addr() const -> void*
+  {
+    return p;
+  }
 
   //((ui64*)((i8*)p+data_offset))[i];
   //T* ofst = (T*)((ui64*)p+2);
@@ -562,7 +585,7 @@ public:
     ui32  rethash  =  0;
     ui32* cur      =  (ui32*)buf;
     ui32  loops    =  len/sizeof(ui32);
-    ui32* end      =  cur + loops + 1;
+    ui32* end      =  cur + loops;
     for(; cur!=end; ++cur){ rethash ^= intHash(*cur); }
 
     ui32  rem      =  len - loops;
@@ -578,76 +601,103 @@ public:
 class   ConcurrentList
 {
 public:
-  union HeadUnion
+  union Head
   {
-    struct { uint32_t cnt; uint32_t idx; };
-    uint64_t asInt;
+    struct { ui32 ver; ui32 idx; };   // ver is version, idx is index // todo: change cnt to version
+    ui64 asInt;
   };
   
-  using    ui32  =  uint32_t;                          // need to be i32 instead for the ConcurrentStore indices?
+  using    ui32  =  uint32_t;                            // need to be i32 instead for the ConcurrentStore indices?
   using    ui64  =  uint64_t;
   //using ListVec  =  std::vector< std::atomic<ui32> >;  // does this need to be atomic? all the contention should be over the head
   using ListVec  =  lava_vec<ui32>;
   //using HeadInt  =  ui64;
-  using    Head  =  std::atomic<ui64>;
+  //using    Head  =  std::atomic<ui64>;
 
   const static ui32 LIST_END = 0xFFFFFFFF;
 
 private:
-  ListVec   m_lv;
-  Head       m_h;
+  ListVec     m_lv;
+  aui64*       m_h;
+  ui64   m_szBytes;
 
 public:
+  static ui64 sizeBytes(ui32 size)
+  {
+    return ListVec::sizeBytes(size);
+  }
+
   ConcurrentList(){}
-  ConcurrentList(ui32 size) : 
-    m_lv(size)
+  //ConcurrentList(ui32 size) : 
+  //  m_lv(size)
+  //{
+  //  for(uint32_t i=0; i<(size-1); ++i) m_lv[i]=i+1;
+  //  m_lv[size-1] = LIST_END;
+  //
+  //  m_h = 0;
+  //}
+  ConcurrentList(void* addr, ui32 size) :   // this constructor is for when the memory is owned an needs to be initialized
+    m_lv(addr, size)
   {
     for(uint32_t i=0; i<(size-1); ++i) m_lv[i]=i+1;
     m_lv[size-1] = LIST_END;
 
-    m_h = 0;
+    m_h = (aui64*)addr;  // uses the first 8 bytes that would normally store sizeBytes as the 64 bits of memory for the Head structure
+    ((Head*)m_h)->idx = 0;
+    ((Head*)m_h)->ver = 255;
   }
+  //ConcurrentList(void* addr) :           // this constructor is for memory that is not owned and so does not need to be initialized, just used
+  //  m_lv(addr)
+  //{
+  //  m_h = (aui64*)addr;
+  //  //m_h->asInt = 0;
+  //}
 
   auto     nxt() -> uint32_t    // moves forward in the list and return the previous index
   {
-    HeadUnion  curHead;
-    HeadUnion  nxtHead;
+    //HeadUnion  curHead;
+    //HeadUnion  nxtHead;
+    Head curHead;
+    Head nxtHead;
 
-    curHead.asInt  =  m_h.load();
+    curHead.asInt  =  m_h->load(); // std::atomic_load(m_h);  // m_h.load();
     do 
     {
       if(curHead.idx==LIST_END) return LIST_END;
 
       nxtHead.idx  =  m_lv[curHead.idx];
-      nxtHead.cnt  =  curHead.cnt + 1;
-    } while( !m_h.compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
+      nxtHead.ver  =  curHead.ver + 1;
+    } while( !m_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
 
     //return nxtHead.idx;
     return curHead.idx;
   }
   auto    free(ui32 idx) -> uint32_t   // not thread safe yet when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway?
   {
-    HeadUnion  curHead;
-    HeadUnion  nxtHead;
+    Head curHead;
+    Head nxtHead;
     uint32_t    retIdx;
 
-    curHead.asInt = m_h.load();
+    curHead.asInt = m_h->load();
     do 
     {
       retIdx = m_lv[idx] = curHead.idx;
       nxtHead.idx  =  idx;
-      nxtHead.cnt  =  curHead.cnt + 1;
-    } while( !m_h.compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
+      nxtHead.ver  =  curHead.ver + 1;
+    } while( !m_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
 
     return retIdx;
   }
-  auto   count() const -> uint32_t
+  auto   count() const -> ui32
   {
-    return ((HeadUnion*)(&m_h))->cnt;
+    //return ((HeadUnion*)(&m_h))->cnt;
+    //return ((Head*)(&m_h))->ver;
+    return ((Head*)m_h)->ver;
   }
-  auto     idx() -> uint32_t
+  auto     idx() -> ui32
   {
-    return ((HeadUnion*)(&m_h))->idx;
+    //return ((Head*)(&m_h))->idx;
+    return ((Head*)m_h)->idx;
   }            // not thread safe
   auto    list() -> ListVec const* 
   {
@@ -656,13 +706,13 @@ public:
   ui32  lnkCnt()                     // not thread safe
   {
     ui32    cnt = 0;
-    auto      l = list();
+    //auto      l = list();
     ui32 curIdx = idx();
     while( curIdx != LIST_END ){
-      curIdx = l->at(curIdx).load();
+      //curIdx = l->at(curIdx).load();
+      curIdx = m_lv[curIdx];   //  l->at(curIdx).load();
       ++cnt;
     }
-    
     return cnt;
   }
 };
@@ -674,7 +724,7 @@ public:
   const static ui32 LIST_END = ConcurrentList::LIST_END;
 
 private:
-  ui8*                    m_addr;
+  void*                   m_addr;
   ui32               m_blockSize;
   ui32              m_blockCount;
   ai32              m_blocksUsed;
@@ -738,14 +788,26 @@ private:
   }
 
 public:
+  static ui64 sizeBytes(ui32 blockSize, ui32 blockCount)
+  {
+    return ConcurrentList::sizeBytes(blockCount) + blockSize*blockCount;
+  }
+
   ConcurrentStore(){}
-  ConcurrentStore(ui8* addr, ui32 blockSize, ui32 blockCount) :
-    m_addr(addr),
+  ConcurrentStore(void* addr, ui32 blockSize, ui32 blockCount) :
+    m_addr( (ui8*)addr + ConcurrentList::sizeBytes(blockCount) ),
     m_blockSize(blockSize),
     m_blockCount(blockCount),
     m_blocksUsed(0),
-    m_cl(m_blockCount)
+    //m_cl(m_blockCount)
+    m_cl(addr, blockCount)
   {
+        auto lv = *(m_cl.list());
+    for(ui64 i=0; i<lv.size(); ++i) std::cout << lv[i] << " ";
+    //std::cout << "\n" << ((ConcurrentList::Head*)&lv[-4])->idx << "\n" << std::endl;
+    std::cout << "\n" << ((ConcurrentList::Head*)lv.addr())->idx << "\n" << std::endl;
+
+
     assert(blockSize > sizeof(IDX));
   }
 
@@ -780,6 +842,11 @@ public:
     i32* p  =  (i32*)stPtr(cur);
     *p      =  byteRem? -byteRem : -blockFreeSize();
     if(out_blocks){ *out_blocks = nxt==LIST_END? -cnt : cnt; } 
+
+    auto lv = *(m_cl.list());
+    for(ui64 i=0; i<lv.size(); ++i) std::cout << lv[i] << " ";
+    std::cout << "\n" << ((ConcurrentList::Head*)lv.addr())->idx << "\n" << std::endl;
+    std::cout << "\n" << ((ConcurrentList::Head*)lv.addr())->ver << "\n" << std::endl;
 
     return st;
   }
@@ -976,7 +1043,7 @@ private:
 
     return m_cs.get(blkIdx, out_buf);           // copy into the buf starting at the blkidx
   } 
-  auto           read(void*   key, i32    len) const -> Reader
+  auto           read(void*   key, i32        len) const -> Reader
   {
     ui32 keyhash  =  m_ch.hashBytes(key, len);
     auto     ths  =  this;
@@ -987,12 +1054,14 @@ private:
 public:
   simdb(){}
   simdb(const char* name, ui32 blockSize, ui32 blockCount) : 
-    m_mem( SharedMem::AllocAnon(name, blockSize*blockCount) ),
-    m_cs( (ui8*)m_mem.data(), blockSize, blockCount),               // todo: change this to a void*
+    m_mem( SharedMem::AllocAnon(name, ConcurrentStore::sizeBytes(blockSize,blockCount)) ),
+    m_cs( (ui8*)m_mem.data(), blockSize, blockCount),                 // todo: change this to a void*
     m_ch( blockCount )
-  {}
+  {
+    //m_cs( (ui8*)m_mem.data(), blockSize, blockCount),               // todo: change this to a void*
+  }
 
-  i32      put(void*   key, ui32  klen, void* val, ui32 vlen)
+  i32       put(void*   key, ui32  klen, void* val, ui32 vlen)
   {
     i32 blkcnt = 0;
     i32   kidx = m_cs.alloc(klen, &blkcnt);    // kidx is key index
@@ -1001,7 +1070,7 @@ public:
       m_cs.free(kidx);
       return EMPTY_KEY;
     }
-    i32   vidx = m_cs.alloc(vlen, &blkcnt);
+    i32   vidx = m_cs.alloc(vlen, &blkcnt);    // if there aren't enough blocks, the blkCnt wil be the amount of blocks that got allocated anyway * -1.  
     if(vidx==LIST_END) return EMPTY_KEY;       // vidx is value index
     if(blkcnt<0){
       m_cs.free(vidx);
@@ -1020,7 +1089,7 @@ public:
 
     return kidx;
   }
-  i64      get(const std::string key, void* out_buf)
+  i64       get(const std::string key, void* out_buf)
   {
     Reader r = read( (void*)key.data(), (ui32)key.length() );
     if(r.kv.key==EMPTY_KEY || r.kv.readers<=0) return -1;            // after the read, the readers should be at least 1  /*|| r.kv.remove*/
@@ -1030,19 +1099,17 @@ public:
   
     return len;
   }
-  i64      get(const char *key, void* out_buf)
+  i64       get(const char *key, void* out_buf)
   {
     Reader r = read( (void*)key, (ui32)strlen(key));
-    if (r.kv.key == EMPTY_KEY || r.kv.readers <= 0) {
-      return -1;
-    }
+    if(r.kv.key==EMPTY_KEY || r.kv.readers<=0){ return -1; }
 
     ui64 len = getFromBlkIdx(r.kv.val, out_buf);
     if (r.doRm()){ m_cs.free(r.kv.val); m_cs.free(r.kv.key); }
 
     return len;
   }
-  void      rm(const std::string key)
+  void       rm(const std::string key)
   {
     auto  len = (ui32)key.length();
     auto  ths = this;
@@ -1061,15 +1128,15 @@ public:
     //if(prev.key!=EMPTY_KEY) m_cs.free(prev.key);
     //if(prev.val!=EMPTY_KEY) m_cs.free(prev.val);
   }
-  auto    data() const -> const void*
+  auto     data() const -> const void*
   {
     return m_cs.data();
   }
-  ui64    size() const
+  ui64     size() const
   {
     return m_mem.size;
   }
-  bool isOwner() const
+  bool  isOwner() const
   {
     return m_mem.owner;
   }

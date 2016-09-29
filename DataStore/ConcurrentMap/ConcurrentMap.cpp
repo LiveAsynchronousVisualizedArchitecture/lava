@@ -400,16 +400,17 @@ int main()
   str  skidoosh  =  "skidoosh";
   str    kablam  =    "kablam";
   Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
-  db.rm("wat");
+  //db.rm("wat");
   Println("put: ", db.put( (void*)wut.data(),   (ui32)wut.length(),    (void*)kablam.data(),   (ui32)kablam.length())   ); 
-  db.rm("wut");
+  //db.rm("wut");
   Println("put: ", db.put( (void*)kablam.data(),(ui32)kablam.length(), (void*)skidoosh.data(), (ui32)skidoosh.length()) ); 
   //db.rm("kablam");
   Println();
 
 
   str clear = "                ";
-  auto watlen = db.get("wat", (void*)clear.data() );
+  auto watlen = db.get("wat",      (void*)clear.data() );
+  //auto watslen = db.get(str("w"), (void*)clear.data() );
   Println("watlen: ", watlen);
   Println("get \"wat\": ", clear);
   Println();
