@@ -128,7 +128,7 @@ public:
   {
     ui64 sb = lava_vec::sizeBytes(count);
     p       = Allocator().allocate(sb); // malloc(sb);
-    p       = (void*)( (ui64)p ^ ( ((ui64)1)<<63 ) );
+    //p       = (void*)( (ui64)p ^ ( ((ui64)1)<<63 ) );
     set_size(count);
     set_sizeBytes(sb);
   }
