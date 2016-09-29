@@ -33,7 +33,9 @@
 // -todo: fix shared memory aligned allocation
 // -todo: make SharedMem check if the mem file already exists
 // -todo: test opening the db from multiple processes - didn't work at first, likely because the copy constructor was not deleted and the destructor was run early
+// -todo: test lava_vec with external memory
 
+// todo: convert ConcurrenList to use lava_vec
 // todo: need to make ConcurrentList a flat data structure so it can be store at the start of the memory mapped file
 // todo: store size in the ConcurrentList?
 // todo: test using the db from multiple processes
@@ -131,17 +133,16 @@ public:
   {
     return (void*)( ((ui64)p) & 0x0000FFFFFFFFFFFF);
   }
-  static ui64          sizeBytes(ui64 count)
+  static ui64          sizeBytes(ui64 count)  // sizeBytes is meant to take the same arguments as a constructor and return the total number of bytes to hold the entire stucture given those arguments 
   {
-    return  sizeof(ui64)*2 + count*sizeof(T);
+    return sizeof(ui64)*2 + count*sizeof(T);
   }
 
   lava_vec(){}
   lava_vec(ui64  count)
   {
     ui64 sb = lava_vec::sizeBytes(count);
-    p       = Allocator().allocate(sb); // malloc(sb);
-    //p       = (void*)( (ui64)p ^ ( ((ui64)1)<<63 ) );
+    p       = Allocator().allocate(sb);
     p       = setDestructorBit(p);
     set_size(count);
     set_sizeBytes(sb);
@@ -160,7 +161,7 @@ public:
   }
   ~lava_vec()
   {
-    if(getDestructorBit(p)){
+    if(p && getDestructorBit(p)){
       Deleter().operator()((T*)clearBits(p));  //free(p);
       p = nullptr;
     }
@@ -168,13 +169,10 @@ public:
 
   T& operator[](ui64 i)
   {
-    //((ui64*)((i8*)p+data_offset))[i];
-    //T* ofst = (T*)((ui64*)p+2);
-    //return ofst[i];
     return data()[i];
   }
 
-  T*       data()
+  T*         data()
   {
     //ui64 pnum = 
     ui64* maskptr = (ui64*)clearBits(p); // (ui64*)( ((ui64)p) & 0x0000FFFFFFFFFFFF);
@@ -193,6 +191,10 @@ public:
   {
     return *((ui64*)p);   // first 8 bytes should be the total size of the buffer in bytes
   } 
+
+  //((ui64*)((i8*)p+data_offset))[i];
+  //T* ofst = (T*)((ui64*)p+2);
+  //return ofst[i];
 };
 
 class   ConcurrentHash
@@ -582,17 +584,18 @@ public:
     uint64_t asInt;
   };
   
-  using    ui32  =  uint32_t;  // need to be i32 instead for the ConcurrentStore indices?
+  using    ui32  =  uint32_t;                          // need to be i32 instead for the ConcurrentStore indices?
   using    ui64  =  uint64_t;
-  using ListVec  =  std::vector< std::atomic<ui32> >;  // does this need to be atomic? all the contention should be over the head
-  using HeadInt  =  ui64;
+  //using ListVec  =  std::vector< std::atomic<ui32> >;  // does this need to be atomic? all the contention should be over the head
+  using ListVec  =  lava_vec<ui32>;
+  //using HeadInt  =  ui64;
   using    Head  =  std::atomic<ui64>;
 
   const static ui32 LIST_END = 0xFFFFFFFF;
 
 private:
-  ListVec  m_lv;
-  Head      m_h;
+  ListVec   m_lv;
+  Head       m_h;
 
 public:
   ConcurrentList(){}
@@ -1027,7 +1030,7 @@ public:
   
     return len;
   }
-  auto     get(const char *key, void* out_buf) -> size_t
+  i64      get(const char *key, void* out_buf)
   {
     Reader r = read( (void*)key, (ui32)strlen(key));
     if (r.kv.key == EMPTY_KEY || r.kv.readers <= 0) {
