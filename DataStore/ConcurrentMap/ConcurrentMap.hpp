@@ -1027,6 +1027,18 @@ public:
   
     return len;
   }
+  auto     get(const char *key, void* out_buf) -> size_t
+  {
+    Reader r = read( (void*)key, (ui32)strlen(key));
+    if (r.kv.key == EMPTY_KEY || r.kv.readers <= 0) {
+      return -1;
+    }
+
+    ui64 len = getFromBlkIdx(r.kv.val, out_buf);
+    if (r.doRm()){ m_cs.free(r.kv.val); m_cs.free(r.kv.key); }
+
+    return len;
+  }
   void      rm(const std::string key)
   {
     auto  len = (ui32)key.length();

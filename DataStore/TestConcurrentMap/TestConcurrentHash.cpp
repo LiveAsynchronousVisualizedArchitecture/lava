@@ -13,7 +13,7 @@ TEST_CASE("Test ConcurrentHash.size()", "[ConcurrentHash]") {
 TEST_CASE("Test ConcurrentHash.put()", "[ConcurrentHash]") {
     ConcurrentHash ch(8);
     for (uint32_t i = 0; i < ch.size(); i++) {
-        ch.put(i, i * i);
+        ch.putHashed(i, i * i);
     }
     for (uint32_t i = 0; i < ch.size(); i++) {
         REQUIRE(ch.get(i) == i * i);
