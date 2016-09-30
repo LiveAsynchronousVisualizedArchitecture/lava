@@ -50,8 +50,9 @@
 // -todo: test using the db from multiple processes
 // -todo: make simdb read the sizes from the the database - if the Store uses the size as the head and the hashmap is sized larger than the number of blocks, how to get the number of elements? - made 12 bytes at the start of the shared memory
 
-// todo: store blockSize and blockCount and flags in the starting three ui64 slots
-// todo: make flag to see if the db has been initialized yet to mitigate race conditions on creating and opening the memory mapping
+// -todo: store blockSize and blockCount and flags in the starting three ui64 slots
+// -todo: make flag to see if the db has been initialized yet to mitigate race conditions on creating and opening the memory mapping
+// -todo: make post build run a copy command for an extra .exe that can be run while the primary exe is overwritten by the compiler
 // todo: test with multiple threads in a loop
 // todo: store size in the ConcurrentList? list isn't atomic so it should work well?
 // todo: redo concurrent store get to store length so that buffer can be returned
@@ -1054,6 +1055,8 @@ private:
   //void*            m_mem;
   SharedMem        m_mem;
   aui64*         m_flags;
+  aui64*     m_blockSize;
+  aui64*    m_blockCount;
   ConcurrentStore   m_cs;     // store data in blocks and get back indices
   ConcurrentHash    m_ch;     // store the indices of keys and values - contains a ConcurrentList
 
@@ -1093,9 +1096,19 @@ public:
   simdb(const char* name, ui32 blockSize, ui32 blockCount) : 
     m_mem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount)) ),
     m_ch( ((i8*)m_mem.data())+OffsetBytes(), blockCount, m_mem.owner),
-    m_cs( ((i8*)m_mem.data())+m_ch.sizeBytes(blockCount)+OffsetBytes(), blockSize, blockCount, m_mem.owner)                 // todo: change this to a void*
+    m_cs( ((i8*)m_mem.data())+m_ch.sizeBytes(blockCount)+OffsetBytes(), blockSize, blockCount, m_mem.owner),                 // todo: change this to a void*
+    m_blockCount( ((aui64*)m_mem.data())+2 ),
+    m_blockSize(  ((aui64*)m_mem.data())+1 ),
+    m_flags(       (aui64*)m_mem.data() )
   {
-
+    if(isOwner()){
+      m_blockCount->store(blockCount);
+      m_blockSize->store(blockSize);
+      m_flags->store(1);                                        // set to 1 to signal construction is done
+    }
+    else{                                                       // need to spin until ready
+      while(m_flags->load()==false){}
+    }
   }
 
   i32       put(void*   key, ui32  klen, void* val, ui32 vlen)
