@@ -400,7 +400,7 @@ int main()
   str  skidoosh  =  "skidoosh";
   str    kablam  =    "kablam";
 
-  if( db.isOwner() ){
+  //if( db.isOwner() ){
     Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
     //db.rm("wat");
     Println("put: ", db.put( (void*)wut.data(),   (ui32)wut.length(),    (void*)kablam.data(),   (ui32)kablam.length())   ); 
@@ -408,7 +408,7 @@ int main()
     Println("put: ", db.put( (void*)kablam.data(),(ui32)kablam.length(), (void*)skidoosh.data(), (ui32)skidoosh.length()) ); 
     //db.rm("kablam");
     Println();
-  }
+  //}
 
 
   str clear = "                ";
