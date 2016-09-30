@@ -49,13 +49,15 @@
 // -todo: make Store and Hash both take bool for ownership to decide whether or not to init
 // -todo: test using the db from multiple processes
 // -todo: make simdb read the sizes from the the database - if the Store uses the size as the head and the hashmap is sized larger than the number of blocks, how to get the number of elements? - made 12 bytes at the start of the shared memory
-
 // -todo: store blockSize and blockCount and flags in the starting three ui64 slots
 // -todo: make flag to see if the db has been initialized yet to mitigate race conditions on creating and opening the memory mapping
 // -todo: make post build run a copy command for an extra .exe that can be run while the primary exe is overwritten by the compiler
-// todo: test with multiple threads in a loop
+// -todo: figure out why memory is different on second run - why does "wat" get inserted again? - working as intended?
+// -todo: try zeroing memory of each block on free - works, just needs two memset() calls just as there are two free() calls to the list
+
 // todo: store size in the ConcurrentList? list isn't atomic so it should work well?
 // todo: redo concurrent store get to store length so that buffer can be returned
+// todo: test with multiple threads in a loop
 // todo: store lengths and check key lengths before trying bitwise comparison as an optimization? - would only make a difference for long keys that are larger than one block? no it would make a difference on every get?
 // todo: prefetch memory for next block when looping through blocks
 
@@ -875,13 +877,15 @@ public:
   }
   void        free(i32     idx)        // frees a list/chain of blocks
   {
-    i32   cur   =  idx;                // cur is the current block index
-    i32    nxt  =  *stPtr(cur);        // nxt is the next block index
+    i32   cur  =  idx;                // cur is the current block index
+    i32   nxt  =  *stPtr(cur);        // nxt is the next block index
     for(; nxt>0; nxt=*stPtr(cur) ){ 
+      memset(stPtr(cur), 0, m_blockSize);       // 0 out memory on free, 
       m_cl.free(cur);
       m_blocksUsed.fetch_add(-1);
       cur  =  nxt;
     }
+    memset(stPtr(cur), 0, m_blockSize);       // 0 out memory on free, 
     m_cl.free(cur);
   }
   void         put(i32  blkIdx, void* bytes, i32 len)
@@ -1062,17 +1066,20 @@ private:
 
   static const ui32  EMPTY_KEY = ConcurrentHash::EMPTY_KEY;          // 28 bits set 
   static const ui32   LIST_END = ConcurrentStore::LIST_END;
-  static ui64    OffsetBytes()
+  static aui64*  SpinWhileFalse(aui64* ptr)
+  {
+  }
+  static ui64       OffsetBytes()
   {
     return sizeof(aui64)*3;
   }
-  static ui64        MemSize(ui64 blockSize, ui64 blockCount)
+  static ui64           MemSize(ui64 blockSize, ui64 blockCount)
   {
     auto  hashbytes = ConcurrentHash::sizeBytes((ui32)blockCount);
     auto storebytes = ConcurrentStore::sizeBytes((ui32)blockSize, (ui32)blockCount);
     return  hashbytes + storebytes + OffsetBytes();
   }
-  static bool   CompareBlock(simdb const* const ths, void* buf, size_t len, i32 blkIdx)
+  static bool      CompareBlock(simdb const* const ths, void* buf, size_t len, i32 blkIdx)
   { 
     return ths->m_cs.compare(buf, len, blkIdx);
   }
@@ -1108,6 +1115,8 @@ public:
     }
     else{                                                       // need to spin until ready
       while(m_flags->load()==false){}
+      new (&m_ch) ConcurrentHash( ((i8*)m_mem.data())+OffsetBytes(), blockCount, m_mem.owner);
+      new (&m_cs) ConcurrentStore( ((i8*)m_mem.data())+m_ch.sizeBytes(blockCount)+OffsetBytes(), blockSize, blockCount, m_mem.owner);                 // todo: change this to a void*
     }
   }
 

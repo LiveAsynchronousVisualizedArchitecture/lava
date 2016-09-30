@@ -68,6 +68,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <CustomBuildAfterTargets>
     </CustomBuildAfterTargets>
+    <PostBuildEventUseInBuild>false</PostBuildEventUseInBuild>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -98,7 +99,7 @@
       </Outputs>
     </CustomBuildStep>
     <PostBuildEvent>
-      <Command>cp $(SolutionDir)$(Platform)\$(Configuration)\$(ProjectName).exe $(SolutionDir)$(Platform)\$(Configuration)\$(ProjectName)_copy.exe</Command>
+      <Command>cp --force $(SolutionDir)$(Platform)\$(Configuration)\$(ProjectName).exe $(SolutionDir)$(Platform)\$(Configuration)\$(ProjectName)_copy.exe</Command>
     </PostBuildEvent>
     <PostBuildEvent>
       <Message>Making exe copy</Message>
