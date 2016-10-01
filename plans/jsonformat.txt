@@ -1,0 +1,14 @@
+
+{ 
+ 'type' : 'STORE', 
+ 'name' : 'TwoDistintOutputs', 
+ 'scalar_in' : {'A_and_B' : 'ab'}
+ 'def' : [
+          { 'SplitToTwoArgs'  : {'-ArgToSplit': 'ab',  'NamedOutA-': 'spltA', 'NamedOutB-': 'spltB'}}
+          { 'CombineTwoArgs'  : {'-A': 'spltA', '-B': 'spltB', 'result-': 'CombineTwoArgs_combined'}}
+          { 'SimpleTransform' : {'-in': 'CombineTwoArgs_combined', 'out-': 'SimpleTransform_ret'}}
+          { 'RETURN': 'SimpleTransform_ret' }
+         ]
+} ; // STORE TwoDistintOutput
+
+

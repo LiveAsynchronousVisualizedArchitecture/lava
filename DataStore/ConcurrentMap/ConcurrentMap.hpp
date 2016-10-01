@@ -217,7 +217,7 @@ public:
   } 
   ui64  sizeBytes() const
   {
-    return *((ui64*)p);   // first 8 bytes should be the total size of the buffer in bytes
+    return *((ui64*)clearBits(p));   // first 8 bytes should be the total size of the buffer in bytes
   } 
   auto       addr() const -> void*
   {
@@ -259,7 +259,8 @@ public:
     ConcurrentHash const*       ch;       // 64 bits
 
     Reader(){}
-    Reader(Reader const& lval) = delete;
+    //Reader(Reader const& lval) = delete;
+    Reader(Reader&) = delete;
     Reader(Reader&& rval)
     {
       doEnd     =  rval.doEnd;
@@ -343,13 +344,15 @@ private:
   }
   auto     empty_reader()                   const -> Reader        
   {
+    using namespace std;
+    
     Reader r;
     r.kv       = empty_kv();
     r.ch       = nullptr;                    // this;
     r.doEnd    = false;
     r.hash_idx = EMPTY_KEY;                  // EMPTY_KEY is used for actual keys and values, but this is an index into the KV vector
 
-    return r;
+    return move(r);
   }
   ui32          intHash(ui32  h)            const
   {
@@ -395,7 +398,7 @@ private:
     KV readKv = curKv;
     do
     {
-      if(curKv.key==EMPTY_KEY || readKv.readers<0)//  ||
+      if(curKv.key==EMPTY_KEY || (readers>0 && readKv.readers<0) )//  ||
         return curKv;                                                                // not successful if the key is empty and not successful if readers is below the starting point - the last free function or last reader should be freeing this slot - this relies on nothing incrementing readers once it has reached FREE_READY
          //curKv.readers == FREE_READY) // || 
          //curKv.readers == MAX_READERS) 
@@ -1038,7 +1041,7 @@ public:
   }
 
   SharedMem(){}
-  SharedMem(SharedMem const&) = delete;
+  SharedMem(SharedMem&)       = delete;
   SharedMem(SharedMem&& rval)
   {
     fileHndl       =  rval.fileHndl;
@@ -1110,10 +1113,12 @@ private:
   } 
   auto           read(void*   key, i32        len) const -> Reader
   {
+    using namespace std;
+    
     ui32 keyhash  =  m_ch.hashBytes(key, len);
     auto     ths  =  this;
-    return m_ch.readHashed(keyhash, 
-      [ths, key, len](ui32 blkidx){ return CompareBlock(ths,key,len,blkidx); });
+    return move(m_ch.readHashed(keyhash, 
+      [ths, key, len](ui32 blkidx){ return CompareBlock(ths,key,len,blkidx); }));
   }
 
 public:
@@ -1132,6 +1137,7 @@ public:
       m_flags->store(1);                                        // set to 1 to signal construction is done
     }
     else{                                                       // need to spin until ready
+      // todo: need to read the blockCount and blockSize values - not use the constructor
       while(m_flags->load()==false){}
       new (&m_ch) ConcurrentHash( ((i8*)m_mem.data())+OffsetBytes(), blockCount, m_mem.owner);
       new (&m_cs) ConcurrentStore( ((i8*)m_mem.data())+m_ch.sizeBytes(blockCount)+OffsetBytes(), blockSize, blockCount, m_mem.owner);                 // todo: change this to a void*
@@ -1182,7 +1188,8 @@ public:
     if(r.kv.key==EMPTY_KEY || r.kv.readers<=0){ return -1; }
 
     ui64 len = getFromBlkIdx(r.kv.val, out_buf);
-    if (r.doRm()){ m_cs.free(r.kv.val); m_cs.free(r.kv.key); }
+
+    if(r.doRm()){ m_cs.free(r.kv.val); m_cs.free(r.kv.key); }
 
     return len;
   }

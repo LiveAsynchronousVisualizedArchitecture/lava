@@ -393,7 +393,7 @@ int main()
 
   Println("kv sz: ", sizeof(simdb::KV) );
 
-  simdb db("test", 16, 32);
+  simdb db("test", 8, 8);
 
   str       wat  =       "wat";
   str       wut  =       "wut";
@@ -439,6 +439,9 @@ int main()
 
   Println("owner: ", db.isOwner(), "\n\n");
 
+  //std::vector<i64>::value_type v;
+  //Println("v size: ", sizeof(v));
+  
   ui64    cnt = 16;
   ui64  bytes = lava_vec<i32>::sizeBytes(cnt);
   void*   mem = malloc( bytes ); 
