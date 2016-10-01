@@ -754,33 +754,40 @@ public:
 class  ConcurrentStore
 {
 public:
-  using IDX  =  i32;
+  using IDX         =  i32;
+  using BlockLists  =  lava_vec<IDX>;
 
   const static ui32 LIST_END = ConcurrentList::LIST_END;
 
 private:
-  void*                   m_addr;
+  ConcurrentList            m_cl;       // flat data structure - pointer to memory 
+  mutable BlockLists       m_bls;       // flat data structure - pointer to memory - bl is Block Lists
+
+  void*               m_blksAddr;
   ui32               m_blockSize;
   ui32              m_blockCount;
   ai32              m_blocksUsed;
-  ConcurrentList            m_cl;
   ui64                 m_szBytes;
 
   i32*            stPtr(i32  blkIdx)  const
   {
-    return (i32*)( ((ui8*)m_addr) + blkIdx*m_blockSize );
+    //return (i32*)( ((i8*)m_blksAddr) + blkIdx*m_blockSize );
+    return (i32*)&(m_bls.data()[blkIdx]);
   }
   i32          nxtBlock(i32  blkIdx)  const
   {
-    return *(stPtr(blkIdx));
+    //return *(stPtr(blkIdx));
+    return m_bls[blkIdx];
   }
   i32     blockFreeSize()             const
   {
-    return m_blockSize - sizeof(IDX);
+    //return m_blockSize - sizeof(IDX);
+    return m_blockSize;
   }
   ui8*     blockFreePtr(i32  blkIdx)  const
   {
-    return ((ui8*)stPtr(blkIdx)) + sizeof(IDX);
+    //return ((ui8*)stPtr(blkIdx)) + sizeof(IDX);
+    return ((ui8*)m_blksAddr) + blkIdx*m_blockSize;
   }
   i32      blocksNeeded(i32     len, i32* out_rem=nullptr)
   {
@@ -824,19 +831,28 @@ private:
   }
 
 public:
-  static ui64 sizeBytes(ui32 blockSize, ui32 blockCount)
+  static ui64     BlksOfst(ui32 blockSize, ui32 blockCount)
   {
-    return ConcurrentList::sizeBytes(blockCount) + blockSize*blockCount;
+    return ConcurrentList::sizeBytes(blockCount) + BlockLists::sizeBytes(blockCount);
+  }
+  static ui64    CListOfst(ui32 blockCount)
+  {
+    return BlockLists::sizeBytes(blockCount);
+  }
+  static ui64    sizeBytes(ui32 blockSize, ui32 blockCount)
+  {
+    return ConcurrentList::sizeBytes(blockCount) + BlockLists::sizeBytes(blockCount) + blockSize*blockCount;
   }
 
   ConcurrentStore(){}
   ConcurrentStore(void* addr, ui32 blockSize, ui32 blockCount, bool owner=true) :
-    m_addr( (ui8*)addr + ConcurrentList::sizeBytes(blockCount) ),
+    m_blksAddr( (i8*)addr + BlksOfst(blockSize,blockCount) ),
     m_blockSize(blockSize),
     m_blockCount(blockCount),
     m_blocksUsed(0),
     //m_cl(m_blockCount)
-    m_cl(addr, blockCount, owner),
+    m_cl( (i8*)addr + CListOfst(blockCount), blockCount, owner),
+    m_bls( addr, blockCount, owner),
     m_szBytes( *((ui64*)addr) )
   {
     //if(owner) *((ui64*)addr) = blockCount;
@@ -957,7 +973,7 @@ public:
   }
   auto        data() const -> const void*
   {
-    return (void*)m_addr;
+    return (void*)m_blksAddr;
   }
   ui64  blockCount() const
   {
