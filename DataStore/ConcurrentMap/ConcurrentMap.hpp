@@ -55,11 +55,13 @@
 // -todo: figure out why memory is different on second run - why does "wat" get inserted again? - working as intended?
 // -todo: try zeroing memory of each block on free - works, just needs two memset() calls just as there are two free() calls to the list
 
-// todo: store size in the ConcurrentList? list isn't atomic so it should work well?
+// todo: move block lists to a lava_vec
+// todo: store size in the ConcurrentList? list isn't atomic so it should work well? should block lists, key sizes, and val sizes all be in their own lava_vecs ? 
 // todo: redo concurrent store get to store length so that buffer can be returned
 // todo: test with multiple threads in a loop
 // todo: store lengths and check key lengths before trying bitwise comparison as an optimization? - would only make a difference for long keys that are larger than one block? no it would make a difference on every get?
 // todo: prefetch memory for next block when looping through blocks
+// todo: move to using packed key value in one block list
 
 // todo: combine key and value storage so they are packed together in the same block list?
 // todo: mark free cells as negative numbers so double free is caught? - do it only in debug mode?
