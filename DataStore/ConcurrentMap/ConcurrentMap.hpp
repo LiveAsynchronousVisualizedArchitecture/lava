@@ -54,8 +54,10 @@
 // -todo: make post build run a copy command for an extra .exe that can be run while the primary exe is overwritten by the compiler
 // -todo: figure out why memory is different on second run - why does "wat" get inserted again? - working as intended?
 // -todo: try zeroing memory of each block on free - works, just needs two memset() calls just as there are two free() calls to the list
+// -todo: move block lists to a lava_vec
 
-// todo: move block lists to a lava_vec
+// todo: move readers to the ConcurrentStore
+// todo: make comparison function in ConcurrentHash that increments and decrements reader
 // todo: store size in the ConcurrentList? list isn't atomic so it should work well? should block lists, key sizes, and val sizes all be in their own lava_vecs ? 
 // todo: redo concurrent store get to store length so that buffer can be returned
 // todo: test with multiple threads in a loop
@@ -318,6 +320,8 @@ public:
   //const static ui32 EMPTY_KEY = 0xFFFFFFFF;
 
 private:
+  enum Match { MATCH_FALSE=0, MATCH_TRUE=1, MATCH_REMOVED=-1  };
+
   using i8        =  int8_t;
   using ui32      =  uint32_t;
   using ui64      =  uint64_t;
@@ -330,6 +334,17 @@ private:
 
          ui32   m_sz;
   mutable KVs   m_kvs;
+
+  template<class MATCH_FUNC>
+  Match readAndMatch(ui32 kvIdx, KV* inout_curKv, MATCH_FUNC match) const
+  {
+    Match ret = MATCH_FALSE;
+    *inout_curKv = addReaders(kvIdx, inout_curKv,  1);
+    if(match(key)) ret=MATCH_TRUE;
+    *inout_curKv = addReaders(kvIdx, inout_curKv, -1);
+
+    return ret;
+  }
 
   KV           empty_kv()                   const
   {
@@ -393,22 +408,25 @@ private:
 
     return atomic_compare_exchange_strong( (Aui64*)&m_kvs.data()[i].asInt, expected, desired);                      // The entry was free. Now let's try to take it using a CAS. 
   }
-  KV         addReaders(ui32  i, KV curKv, i8 readers)         const                         // increment the readers by one and return the previous kv from the successful swap 
+  KV         addReaders(ui32  i, KV* curKv, i8 readers)         const                         // increment the readers by one and return the previous kv from the successful swap 
   {
-    KV readKv = curKv;
+  // todo: does curKv need to be a pointer?
+    KV readKv = *curKv;     // todo: does this need to be in the loop? - no it is assigned inside
     do
     {
-      if(curKv.key==EMPTY_KEY || (readers>0 && readKv.readers<0) )//  ||
-        return curKv;                                                                // not successful if the key is empty and not successful if readers is below the starting point - the last free function or last reader should be freeing this slot - this relies on nothing incrementing readers once it has reached FREE_READY
+      if(curKv->key==EMPTY_KEY || (readers>0 && readKv.readers<0) )//  ||
+        return *curKv;                                                                // not successful if the key is empty and not successful if readers is below the starting point - the last free function or last reader should be freeing this slot - this relies on nothing incrementing readers once it has reached FREE_READY
          //curKv.readers == FREE_READY) // || 
          //curKv.readers == MAX_READERS) 
     
-      readKv           =  curKv;
-      readKv.readers  +=  readers;
-    } while( !compexchange_kv(i, &curKv.asInt, readKv.asInt) );
+      readKv           =  *curKv;
+      readKv.readers  +=   readers;
+    } while( !compexchange_kv(i, (ui64*)curKv, readKv.asInt) );
+    //} while( !compexchange_kv(i, &curKv.asInt, readKv.asInt) );
 
     return readKv; // curKv;
   }
+
 
 public:
   ConcurrentHash(){}
@@ -436,6 +454,8 @@ public:
   {
     return m_kvs[idx];
   }
+
+  
 
   template<class MATCH_FUNC> 
   KV       putHashed(ui32 hash, ui32 key, ui32 val, MATCH_FUNC match) const
@@ -757,8 +777,28 @@ public:
 class  ConcurrentStore
 {
 public:
+  //union BlkIdx
+  //{
+  //  struct
+  //  {
+  //    signed   long long readers  : 12;     // 2^11 is 2048, so 2048 maximum threads can read this one block index
+  //    unsigned long long     idx  : 52;     // 4 quadrillion indices should be enough for anybody
+  //  };
+  //  ui64 asInt;
+  //};
+  union BlkIdx
+  {
+    struct
+    {
+      signed   int  readers  :  8;     // 2^7 is 128, so 128 maximum threads can read this one block index
+      unsigned int      idx  : 24;     // 16 million indices
+    };
+    ui32 asInt;
+  };
+
   using IDX         =  i32;
-  using BlockLists  =  lava_vec<IDX>;
+  using BlockLists  =  lava_vec<BlkIdx>;
+  //using BlockLists  =  lava_vec<IDX>;
 
   const static ui32 LIST_END = ConcurrentList::LIST_END;
 
@@ -772,15 +812,17 @@ private:
   ai32              m_blocksUsed;
   ui64                 m_szBytes;
 
-  i32*            stPtr(i32  blkIdx)  const
+  //i32*            stPtr(i32  blkIdx)  const
+  i32              stPtr(i32  blkIdx)  const
   {
     //return (i32*)( ((i8*)m_blksAddr) + blkIdx*m_blockSize );
-    return (i32*)&(m_bls.data()[blkIdx]);
+    //return (i32*)&(m_bls.data()[blkIdx]);
+    return m_bls[blkIdx].idx;
   }
-  i32          nxtBlock(i32  blkIdx)  const
+  IDX          nxtBlock(i32  blkIdx)  const
   {
     //return *(stPtr(blkIdx));
-    return m_bls[blkIdx];
+    return m_bls[blkIdx].idx;
   }
   i32     blockFreeSize()             const
   {
