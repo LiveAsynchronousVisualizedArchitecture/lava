@@ -69,6 +69,8 @@
 // -todo: figure out why put after rm doesn't show up with get - readers not being reset on allocation? - forgot to take out the free-ing in put() 
 // -todo: make both free and read give back a block with last one out strategy
 // -todo: test again with multiple processes after redoing rm() technique - without put deleting old elements, how to get rid of overwritten elements? - needed to put back deleting in put(), but make sure rm() swaps in EMPTY_KEY
+// -todo: make rmHashed return EMPTY_KEY on MATCH_REMOVED
+// -todo: take readers out of hash struct 
 
 // todo: store size in the ConcurrentList? list isn't atomic so it should work well? should block lists, key sizes, and val sizes all be in their own lava_vecs ? 
 // todo: redo concurrent store get to store length so that buffer can be returned
@@ -131,13 +133,13 @@ using   str   =   std::string;
 
 namespace {
   enum Match { MATCH_FALSE=0, MATCH_TRUE=1, MATCH_REMOVED=-1  };
-}
 
-template<class T>
-class lava_noop
-{
-  void operator()(){}
-};
+  template<class T>
+  class lava_noop
+  {
+    void operator()(){}
+  };
+}
 
 template<class T, class Deleter=std::default_delete<T>, class Allocator=std::allocator<T> >
 class lava_vec
@@ -739,58 +741,10 @@ public:
   {
     struct
     {
-      signed   long long readers  :  8;
-      unsigned long long     key  : 28;
-      unsigned long long     val  : 28;
+      ui32 key;
+      ui32 val;
     };
-    uint64_t asInt;
-
-    // after the switch to 128 bit atomics:
-    // ui64 ubits;
-    // ui64 lbits;
-  };
-  struct Reader
-  {
-    bool                     doEnd;       //  8 bits?
-    ui32                  hash_idx;       // 32 bits
-    KV                          kv;       // 64 bits
-    ConcurrentHash const*       ch;       // 64 bits
-
-    Reader(){}
-    //Reader(Reader const& lval) = delete;
-    Reader(Reader&) = delete;
-    Reader(Reader&& rval)
-    {
-      doEnd     =  rval.doEnd;
-      hash_idx  =  rval.hash_idx;
-      kv        =  rval.kv;
-      ch        =  rval.ch;
-
-      rval.doEnd    = false;
-      rval.hash_idx = EMPTY_KEY;
-      rval.ch       = nullptr;
-    }
-
-    bool doRm() // doRm is do remove 
-    {
-      //if(doEnd && ch){
-      if(ch){
-        //KV kv = ch->endRead(hash_idx);
-        if(kv.readers == RM_OWNER){ // && kv.remove){
-          //ch->endRead(hash_idx);
-          doEnd = false;
-          return true;
-        }
-      }
-
-      return false;
-    }
-    ~Reader()
-    {
-      //if(doEnd && ch) ch->endRead(hash_idx);              // checks the ConcurrentHash pointer for nullptr, not sure if this is neccesary but it probably doesn't hurt much
-
-      //if(ch) ch->endRead(hash_idx);              // checks the ConcurrentHash pointer for nullptr, not sure if this is neccesary but it probably doesn't hurt much
-    }
+    ui64 asInt;
   };
   
   static ui32 nextPowerOf2(ui32  v)
@@ -846,25 +800,25 @@ private:
   {
     KV empty;
 //    empty.remove   =  0;
-    empty.readers  =  INIT_READERS;
-    empty.key      =  0;
-    empty.val      =  0;
+    //empty.readers  =  INIT_READERS;
+    //empty.key      =  0;
+    //empty.val      =  0;
     empty.key      =  EMPTY_KEY;
     empty.val      =  EMPTY_KEY;
     return empty;
   }
-  auto     empty_reader()                   const -> Reader        
-  {
-    using namespace std;
-    
-    Reader r;
-    r.kv       = empty_kv();
-    r.ch       = nullptr;                    // this;
-    r.doEnd    = false;
-    r.hash_idx = EMPTY_KEY;                  // EMPTY_KEY is used for actual keys and values, but this is an index into the KV vector
-
-    return move(r);
-  }
+  //auto     empty_reader()                   const -> Reader        
+  //{
+  //  using namespace std;
+  //  
+  //  Reader r;
+  //  r.kv       = empty_kv();
+  //  r.ch       = nullptr;                    // this;
+  //  r.doEnd    = false;
+  //  r.hash_idx = EMPTY_KEY;                  // EMPTY_KEY is used for actual keys and values, but this is an index into the KV vector
+  //
+  //  return move(r);
+  //}
   ui32          intHash(ui32  h)            const
   {
     h ^= h >> 16;
@@ -904,24 +858,24 @@ private:
 
     return atomic_compare_exchange_strong( (Aui64*)&(m_kvs.data()[i].asInt), expected, desired);                      // The entry was free. Now let's try to take it using a CAS. 
   }
-  KV         addReaders(ui32  i, KV* curKv, i8 readers)        const                         // increment the readers by one and return the previous kv from the successful swap 
-  {
-  // todo: does curKv need to be a pointer?
-    KV readKv = *curKv;     // todo: does this need to be in the loop? - no it is assigned inside
-    do
-    {
-      if(curKv->key==EMPTY_KEY || (readers>0 && readKv.readers<0) )//  ||
-        return *curKv;                                                                // not successful if the key is empty and not successful if readers is below the starting point - the last free function or last reader should be freeing this slot - this relies on nothing incrementing readers once it has reached FREE_READY
-         //curKv.readers == FREE_READY) // || 
-         //curKv.readers == MAX_READERS) 
-    
-      readKv           =  *curKv;
-      readKv.readers  +=   readers;
-    } while( !compexchange_kv(i, (ui64*)curKv, readKv.asInt) );
-    //} while( !compexchange_kv(i, &curKv.asInt, readKv.asInt) );
-
-    return readKv; // curKv;
-  }
+  //KV         addReaders(ui32  i, KV* curKv, i8 readers)        const                         // increment the readers by one and return the previous kv from the successful swap 
+  //{
+  //// todo: does curKv need to be a pointer?
+  //  KV readKv = *curKv;     // todo: does this need to be in the loop? - no it is assigned inside
+  //  do
+  //  {
+  //    if(curKv->key==EMPTY_KEY || (readers>0 && readKv.readers<0) )//  ||
+  //      return *curKv;                                                                // not successful if the key is empty and not successful if readers is below the starting point - the last free function or last reader should be freeing this slot - this relies on nothing incrementing readers once it has reached FREE_READY
+  //       //curKv.readers == FREE_READY) // || 
+  //       //curKv.readers == MAX_READERS) 
+  //  
+  //    readKv           =  *curKv;
+  //    readKv.readers  +=   readers;
+  //  } while( !compexchange_kv(i, (ui64*)curKv, readKv.asInt) );
+  //  //} while( !compexchange_kv(i, &curKv.asInt, readKv.asInt) );
+  //
+  //  return readKv; // curKv;
+  //}
 
 
 public:
@@ -1007,9 +961,7 @@ public:
   }
   template<class MATCH_FUNC> 
   KV      rmHashed(ui32 hash, MATCH_FUNC match) const // -> Reader
-  {
-    //using namespace std;
-  
+  {  
     ui32 i = hash;
     for(;; ++i)
     {
@@ -1022,32 +974,10 @@ public:
         if( compexchange_kv(i, &probedKv.asInt, empty.asInt) ) return probedKv;
         else --i;                                     // run the same loop iteration again if there was a match, but the key-value changed
       }
-
-//      {          
-//        //KV    expected  =  probedKv;
-//        //KV     desired  =  expected;
-////        desired.remove  =  1;
-//        //bool   success  =  compexchange_kv(i, &expected.asInt, desired.asInt);
-//
-//        //probedKv.key;
-//        //probedKv.val;
-//
-//        KV kv = probedKv; //addReaders(i, probedKv, -1);
-//        //if(probedKv.readers==RM_OWNER){
-//          Reader r    =  empty_reader();       // todo: don't need the initialization - comment it out once working
-//          r.ch        =  this;
-//          r.hash_idx  =  i;
-//          r.kv        =  kv;
-//          //r.kv        =  desired;
-//          r.doEnd     =  true;
-//          return move(r);
-//        //}else continue;
-//      }                                                                                       // Either we just added the key, or another thread did.      
+      if(m==MATCH_REMOVED) return empty_kv();
     }
 
-    return empty_kv();
-    
-    // return empty_reader(); // false; // empty_kv();  // should never be reached
+    return empty_kv();    
   }
   template<class MATCH_FUNC> 
   KV    readHashed(ui32 hash, MATCH_FUNC match) const // -> Reader
@@ -1090,29 +1020,6 @@ public:
 
     //m_kvs.resize(m_sz, defKv);
   }
-  //KV         read(ui32  key)                      const
-  //{
-  //  ui32 i = intHash(key);
-  //  for(;; ++i)
-  //  {
-  //    i  &=  m_sz - 1;
-  //
-  //    KV probedKv = load_kv(i);
-  //    //if(probedKv.key == key) return addReaders(i, probedKv, 1);
-  //           
-  //    if(probedKv.key == EMPTY_KEY)                                 // needs to be taken out when deleting is implemented
-  //      return empty_kv();
-  //  }
-  //
-  //  return empty_kv();
-  //}
-  //KV      endRead(ui32  idx)                      const
-  //{
-  //  KV probedKv = load_kv(idx);
-  //  if(probedKv.key == EMPTY_KEY) return empty_kv();
-  //
-  //  return addReaders(idx, probedKv, -1);
-  //}
   bool        del(ui32  key)                      const
   {
     ui32 i = intHash(key);
@@ -1128,10 +1035,6 @@ public:
     }
     return false;
   }
-  //KV           rm(ui32  idx)                      const    // doesn't keep track of readers
-  //{
-  //  return store_kv(idx, empty_kv());
-  //}
   KV           at(ui32  idx)                      const
   {
     return m_kvs[idx];
@@ -1251,13 +1154,11 @@ public:
 class            simdb
 {
 public:
-  //using Match = ConcurrentStore::Match; 
   using KV    = ConcurrentHash::KV;
 
 private:
-  using Reader = ConcurrentHash::Reader;
+  //using Reader = ConcurrentHash::Reader;
 
-  //void*            m_mem;
   SharedMem          m_mem;
   aui64*           m_flags;
   aui64*       m_blockSize;
@@ -1385,29 +1286,20 @@ public:
 
     return len;
   }
-  void       rm(const std::string key)
+  bool       rm(const std::string key)
   {
     auto  len = (ui32)key.length();
     auto  ths = this;
     auto kbuf = (void*)key.data();
     auto hash = m_ch.hashBytes(kbuf, len);
-    //ui32  idx = m_ch.rmHashed(hash,
-    //Reader  r = m_ch.rmHashed(hash,
-    //  [ths, kbuf, len](ui32 blkidx){ return CompareBlock(ths,kbuf,len,blkidx); });
+
     KV kv = m_ch.rmHashed(hash,
       [ths, kbuf, len](ui32 blkidx){ return CompareBlock(ths,kbuf,len,blkidx); });
 
     if(kv.val!=EMPTY_KEY) m_cs.free(kv.val);
     if(kv.key!=EMPTY_KEY) m_cs.free(kv.key);
-    
-    //if(r.doRm()){                                            // need to check doRm
-    //  if(r.kv.val!=EMPTY_KEY) m_cs.free(r.kv.val);
-    //  if(r.kv.key!=EMPTY_KEY) m_cs.free(r.kv.key);           // need to remove the block index lists if true
-    //}
-        
-    //KV  prev = m_ch.rm(idx);
-    //if(prev.key!=EMPTY_KEY) m_cs.free(prev.key);
-    //if(prev.val!=EMPTY_KEY) m_cs.free(prev.val);
+
+    return kv.key!=EMPTY_KEY;
   }
   auto     data() const -> const void*
   {
@@ -1431,7 +1323,127 @@ public:
 
 
 
+//union      KV
+//{
+//  struct
+//  {
+//    signed   long long readers  :  8;
+//    unsigned long long     key  : 28;
+//    unsigned long long     val  : 28;
+//  };
+//  uint64_t asInt;
+//
+//  // after the switch to 128 bit atomics:
+//  // ui64 ubits;
+//  // ui64 lbits;
+//};
+//struct Reader
+//{
+//  bool                     doEnd;       //  8 bits?
+//  ui32                  hash_idx;       // 32 bits
+//  KV                          kv;       // 64 bits
+//  ConcurrentHash const*       ch;       // 64 bits
+//
+//  Reader(){}
+//  //Reader(Reader const& lval) = delete;
+//  Reader(Reader&) = delete;
+//  Reader(Reader&& rval)
+//  {
+//    doEnd     =  rval.doEnd;
+//    hash_idx  =  rval.hash_idx;
+//    kv        =  rval.kv;
+//    ch        =  rval.ch;
+//
+//    rval.doEnd    = false;
+//    rval.hash_idx = EMPTY_KEY;
+//    rval.ch       = nullptr;
+//  }
+//
+//  bool doRm() // doRm is do remove 
+//  {
+//    //if(doEnd && ch){
+//    if(ch){
+//      //KV kv = ch->endRead(hash_idx);
+//      if(kv.readers == RM_OWNER){ // && kv.remove){
+//        //ch->endRead(hash_idx);
+//        doEnd = false;
+//        return true;
+//      }
+//    }
+//
+//    return false;
+//  }
+//  ~Reader()
+//  {
+//    //if(doEnd && ch) ch->endRead(hash_idx);              // checks the ConcurrentHash pointer for nullptr, not sure if this is neccesary but it probably doesn't hurt much
+//
+//    //if(ch) ch->endRead(hash_idx);              // checks the ConcurrentHash pointer for nullptr, not sure if this is neccesary but it probably doesn't hurt much
+//  }
+//};
 
+//KV         read(ui32  key)                      const
+  //{
+  //  ui32 i = intHash(key);
+  //  for(;; ++i)
+  //  {
+  //    i  &=  m_sz - 1;
+  //
+  //    KV probedKv = load_kv(i);
+  //    //if(probedKv.key == key) return addReaders(i, probedKv, 1);
+  //           
+  //    if(probedKv.key == EMPTY_KEY)                                 // needs to be taken out when deleting is implemented
+  //      return empty_kv();
+  //  }
+  //
+  //  return empty_kv();
+  //}
+  //KV      endRead(ui32  idx)                      const
+  //{
+  //  KV probedKv = load_kv(idx);
+  //  if(probedKv.key == EMPTY_KEY) return empty_kv();
+  //
+  //  return addReaders(idx, probedKv, -1);
+  //}
+  //KV           rm(ui32  idx)                      const    // doesn't keep track of readers
+  //{
+  //  return store_kv(idx, empty_kv());
+  //}
+
+//ui32  idx = m_ch.rmHashed(hash,
+//Reader  r = m_ch.rmHashed(hash,
+//  [ths, kbuf, len](ui32 blkidx){ return CompareBlock(ths,kbuf,len,blkidx); });
+    
+//if(r.doRm()){                                            // need to check doRm
+//  if(r.kv.val!=EMPTY_KEY) m_cs.free(r.kv.val);
+//  if(r.kv.key!=EMPTY_KEY) m_cs.free(r.kv.key);           // need to remove the block index lists if true
+//}
+        
+//KV  prev = m_ch.rm(idx);
+//if(prev.key!=EMPTY_KEY) m_cs.free(prev.key);
+//if(prev.val!=EMPTY_KEY) m_cs.free(prev.val);
+
+//      {          
+//        //KV    expected  =  probedKv;
+//        //KV     desired  =  expected;
+////        desired.remove  =  1;
+//        //bool   success  =  compexchange_kv(i, &expected.asInt, desired.asInt);
+//
+//        //probedKv.key;
+//        //probedKv.val;
+//
+//        KV kv = probedKv; //addReaders(i, probedKv, -1);
+//        //if(probedKv.readers==RM_OWNER){
+//          Reader r    =  empty_reader();       // todo: don't need the initialization - comment it out once working
+//          r.ch        =  this;
+//          r.hash_idx  =  i;
+//          r.kv        =  kv;
+//          //r.kv        =  desired;
+//          r.doEnd     =  true;
+//          return move(r);
+//        //}else continue;
+//      }                                                                                       // Either we just added the key, or another thread did.      
+//  }
+// return empty_reader(); // false; // empty_kv();  // should never be reached
 
 //union BlkIdx
 //{
