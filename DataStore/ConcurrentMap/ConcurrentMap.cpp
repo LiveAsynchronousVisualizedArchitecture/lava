@@ -391,7 +391,7 @@ int main()
   //Println("\n\n");
   //Println(mapmem);
 
-  Println("kv sz: ", sizeof(simdb::KV) );
+  //Println("kv sz: ", sizeof(simdb::KV) );
 
   simdb db("test", 8, 8);
 
@@ -442,16 +442,16 @@ int main()
   //std::vector<i64>::value_type v;
   //Println("v size: ", sizeof(v));
   
-  ui64    cnt = 16;
-  ui64  bytes = lava_vec<i32>::sizeBytes(cnt);
-  void*   mem = malloc( bytes ); 
-  lava_vec<i32> lv(mem, cnt);
-  //memset(lv.data(), 0, 16*sizeof(ui32) );
-  Println("capacity: ",  lv.capacity() );
-  Println("size: ",      lv.size() );
-  Println("sizeBytes: ", lv.sizeBytes() );
-  TO((i32)lv.size(), i) lv[i] = i;
-  TO((i32)lv.size(), i) Print(" ",i,":",lv[i]);
+  //ui64    cnt = 16;
+  //ui64  bytes = lava_vec<i32>::sizeBytes(cnt);
+  //void*   mem = malloc( bytes ); 
+  //lava_vec<i32> lv(mem, cnt);
+  ////memset(lv.data(), 0, 16*sizeof(ui32) );
+  //Println("capacity: ",  lv.capacity() );
+  //Println("size: ",      lv.size() );
+  //Println("sizeBytes: ", lv.sizeBytes() );
+  //TO((i32)lv.size(), i) lv[i] = i;
+  //TO((i32)lv.size(), i) Print(" ",i,":",lv[i]);
 
   //lv.~lava_vec();  // running the destructor explicitly tests double destrucion since it will be destructed at the end of the function also
 
