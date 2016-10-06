@@ -71,7 +71,12 @@
 // -todo: test again with multiple processes after redoing rm() technique - without put deleting old elements, how to get rid of overwritten elements? - needed to put back deleting in put(), but make sure rm() swaps in EMPTY_KEY
 // -todo: make rmHashed return EMPTY_KEY on MATCH_REMOVED
 // -todo: take readers out of hash struct 
+// -todo: move hash functions to be static instead of member functions
+// -todo: look up better hash function - fnv
+// -todo: clean up fnv
 
+// todo: take out power of 2 size restriction and use modulo
+// todo: use blockSize and blockCount from the already created shared mem if not the owner
 // todo: store size in the ConcurrentList? list isn't atomic so it should work well? should block lists, key sizes, and val sizes all be in their own lava_vecs ? 
 // todo: redo concurrent store get to store length so that buffer can be returned
 // todo: test with multiple threads in a loop
@@ -139,6 +144,25 @@ namespace {
   {
     void operator()(){}
   };
+
+  ui64 fnv_64a_buf(void *buf, size_t len)
+  {
+    // const ui64 FNV_64_PRIME = 0x100000001b3;
+    ui64 hval = 0xcbf29ce484222325;    // FNV1_64_INIT;  // ((Fnv64_t)0xcbf29ce484222325ULL)
+    ui8*   bp = (ui8*)buf;	           /* start of buffer */
+    ui8*   be = bp + len;		           /* beyond end of buffer */
+
+    while(bp < be)                     // FNV-1a hash each octet of the buffer
+    {
+      hval ^= (ui64)*bp++;             /* xor the bottom with the current octet */
+
+      //hval *= FNV_64_PRIME; // does this do the same thing?  /* multiply by the 64 bit FNV magic prime mod 2^64 */
+      hval += (hval << 1) + (hval << 4) + (hval << 5) +
+              (hval << 7) + (hval << 8) + (hval << 40);
+    }
+    return hval;
+  }
+
 }
 
 template<class T, class Deleter=std::default_delete<T>, class Allocator=std::allocator<T> >
@@ -735,17 +759,8 @@ public:
   static const ui8   INIT_READERS  =     0;            // eventually make this 1 again? - to catch when readers has dropped to 0
   static const ui8   FREE_READY    =     0;
   static const ui8   MAX_READERS   =  0xFF;
-  static const ui32  EMPTY_KEY     =  0x0FFFFFFF;      // 28 bits set 
-
-  union      KV
-  {
-    struct
-    {
-      ui32 key;
-      ui32 val;
-    };
-    ui64 asInt;
-  };
+  //static const ui32  EMPTY_KEY     =  0x0FFFFFFF;      // 28 bits set 
+  static const ui32  EMPTY_KEY     =  0xFFFFFFFF;      // full 32 bits set again 
   
   static ui32 nextPowerOf2(ui32  v)
   {
@@ -767,8 +782,48 @@ public:
   {
     return a == b;
   }
+  static ui32 IntHash(ui32  h)
+  {
+    h ^= h >> 16;
+    h *= 0x85ebca6b;
+    h ^= h >> 13;
+    h *= 0xc2b2ae35;
+    h ^= h >> 16;
+    return h;
+  }
+  //static ui32 HashBytes(void* buf, ui32 len)
+  //{
+  //  ui32  rethash  =  0;
+  //  ui32* cur      =  (ui32*)buf;
+  //  ui32  loops    =  len/sizeof(ui32);
+  //  ui32* end      =  cur + loops;
+  //  for(; cur!=end; ++cur){ rethash ^= IntHash(*cur); }
+  //
+  //  ui32  rem      =  len - loops;
+  //  ui32  lst      =  0;
+  //  ui8*  end8     =  (ui8*)end;
+  //  for(ui8 i=0; i<rem; ++i){ lst ^= *end8 << (rem-1-i); }
+  //  
+  //  rethash ^= IntHash(lst);
+  //
+  //  return rethash;
+  //}
+  static ui32 HashBytes(void* buf, ui32 len)
+  {
+    ui64 hsh = fnv_64a_buf(buf, len);
 
-  //const static ui32 EMPTY_KEY = 0xFFFFFFFF;
+    return (ui32)( (hsh>>32) ^ ((ui32)hsh));
+  }
+
+  union      KV
+  {
+    struct
+    {
+      ui32 key;
+      ui32 val;
+    };
+    ui64 asInt;
+  };
 
 private:
   using i8        =  int8_t;
@@ -785,17 +840,6 @@ private:
          ui32   m_sz;
   mutable KVs   m_kvs;
 
-  //template<class MATCH_FUNC>
-  //Match readAndMatch(ui32 kvIdx, KV* inout_curKv, MATCH_FUNC match) const
-  //{
-  //  Match ret = MATCH_FALSE;
-  //  *inout_curKv = addReaders(kvIdx, inout_curKv,  1);
-  //  if(match(key)) ret=MATCH_TRUE;
-  //  *inout_curKv = addReaders(kvIdx, inout_curKv, -1);
-  //
-  //  return ret;
-  //}
-
   KV           empty_kv()                   const
   {
     KV empty;
@@ -806,27 +850,6 @@ private:
     empty.key      =  EMPTY_KEY;
     empty.val      =  EMPTY_KEY;
     return empty;
-  }
-  //auto     empty_reader()                   const -> Reader        
-  //{
-  //  using namespace std;
-  //  
-  //  Reader r;
-  //  r.kv       = empty_kv();
-  //  r.ch       = nullptr;                    // this;
-  //  r.doEnd    = false;
-  //  r.hash_idx = EMPTY_KEY;                  // EMPTY_KEY is used for actual keys and values, but this is an index into the KV vector
-  //
-  //  return move(r);
-  //}
-  ui32          intHash(ui32  h)            const
-  {
-    h ^= h >> 16;
-    h *= 0x85ebca6b;
-    h ^= h >> 13;
-    h *= 0xc2b2ae35;
-    h ^= h >> 16;
-    return h;
   }
   KV            load_kv(ui32  i)            const
   {
@@ -858,24 +881,6 @@ private:
 
     return atomic_compare_exchange_strong( (Aui64*)&(m_kvs.data()[i].asInt), expected, desired);                      // The entry was free. Now let's try to take it using a CAS. 
   }
-  //KV         addReaders(ui32  i, KV* curKv, i8 readers)        const                         // increment the readers by one and return the previous kv from the successful swap 
-  //{
-  //// todo: does curKv need to be a pointer?
-  //  KV readKv = *curKv;     // todo: does this need to be in the loop? - no it is assigned inside
-  //  do
-  //  {
-  //    if(curKv->key==EMPTY_KEY || (readers>0 && readKv.readers<0) )//  ||
-  //      return *curKv;                                                                // not successful if the key is empty and not successful if readers is below the starting point - the last free function or last reader should be freeing this slot - this relies on nothing incrementing readers once it has reached FREE_READY
-  //       //curKv.readers == FREE_READY) // || 
-  //       //curKv.readers == MAX_READERS) 
-  //  
-  //    readKv           =  *curKv;
-  //    readKv.readers  +=   readers;
-  //  } while( !compexchange_kv(i, (ui64*)curKv, readKv.asInt) );
-  //  //} while( !compexchange_kv(i, &curKv.asInt, readKv.asInt) );
-  //
-  //  return readKv; // curKv;
-  //}
 
 
 public:
@@ -1022,7 +1027,7 @@ public:
   }
   bool        del(ui32  key)                      const
   {
-    ui32 i = intHash(key);
+    ui32 i = IntHash(key);
     for(;; ++i)
     {
       i  &=  m_sz - 1;
@@ -1043,23 +1048,6 @@ public:
   {
     return m_sz;
   }
-  ui32  hashBytes(void* buf, ui32 len)            const
-  {
-    ui32  rethash  =  0;
-    ui32* cur      =  (ui32*)buf;
-    ui32  loops    =  len/sizeof(ui32);
-    ui32* end      =  cur + loops;
-    for(; cur!=end; ++cur){ rethash ^= intHash(*cur); }
-
-    ui32  rem      =  len - loops;
-    ui32  lst      =  0;
-    ui8*  end8     =  (ui8*)end;
-    for(ui8 i=0; i<rem; ++i){ lst ^= *end8 << (rem-1-i); }
-    
-    rethash ^= intHash(lst);
-
-    return rethash;
-  }  // todo: make static
   ui64  sizeBytes()                               const
   {
     return m_kvs.sizeBytes();
@@ -1196,7 +1184,8 @@ private:
   {
     using namespace std;
     
-    ui32 keyhash  =  m_ch.hashBytes(key, len);
+    //ui32 keyhash  =  m_ch.hashBytes(key, len);
+    ui32 keyhash  =  ConcurrentHash::HashBytes(key, len);
     auto     ths  =  this;
     return m_ch.readHashed(keyhash, 
       [ths, key, len](ui32 blkidx){ return CompareBlock(ths,key,len,blkidx); });
@@ -1244,7 +1233,8 @@ public:
     m_cs.put(kidx, key, klen);
     m_cs.put(vidx, val, vlen);
 
-    ui32 keyhash = m_ch.hashBytes(key, klen);
+    //ui32 keyhash = m_ch.hashBytes(key, klen);
+    ui32 keyhash = ConcurrentHash::HashBytes(key, klen);
     auto     ths = this;                                          // this silly song and dance is because the this pointer can't be passed to a lambda
     KV        kv = m_ch.putHashed(keyhash, kidx, vidx, 
       [ths, key, klen](ui32 blkidx){ return CompareBlock(ths,key,klen,blkidx); });
@@ -1291,7 +1281,8 @@ public:
     auto  len = (ui32)key.length();
     auto  ths = this;
     auto kbuf = (void*)key.data();
-    auto hash = m_ch.hashBytes(kbuf, len);
+    //auto hash = m_ch.hashBytes(kbuf, len);
+    auto hash = ConcurrentHash::HashBytes(kbuf, len);
 
     KV kv = m_ch.rmHashed(hash,
       [ths, kbuf, len](ui32 blkidx){ return CompareBlock(ths,kbuf,len,blkidx); });
@@ -1322,6 +1313,134 @@ public:
 
 
 
+
+
+//#define HAVE_64BIT_LONG_LONG
+//using Fnv64_t = ui64;
+//
+//#define FNV1_64_INIT ((Fnv64_t)0xcbf29ce484222325ULL)
+//#define FNV_64_PRIME ((Fnv64_t)0x100000001b3ULL)
+//#if defined(HAVE_64BIT_LONG_LONG)
+//#else /* HAVE_64BIT_LONG_LONG */
+//  #define FNV_64_PRIME_LOW ((unsigned long)0x1b3)	/* lower bits of FNV prime */
+//  #define FNV_64_PRIME_SHIFT (8)		/* top FNV prime shift above 2^32 */
+//#endif /* HAVE_64BIT_LONG_LONG */
+//
+//Fnv64_t  fnv_64a_buf(void *buf, size_t len)    // Fnv64_t hval)
+//Fnv64_t hval = FNV1_64_INIT;
+//unsigned char *bp = (unsigned char *)buf;	 /* start of buffer */
+//unsigned char *be = bp + len;		           /* beyond end of buffer */
+//hval ^= (Fnv64_t)*bp++;   /* xor the bottom with the current octet */
+//#if defined(HAVE_64BIT_LONG_LONG)
+//
+  //#if defined(NO_FNV_GCC_OPTIMIZATION)
+  //#else /* NO_FNV_GCC_OPTIMIZATION */
+  //#endif /* NO_FNV_GCC_OPTIMIZATION */
+
+//#else /* HAVE_64BIT_LONG_LONG */
+//
+//unsigned long val[4];			/* hash value in base 2^16 */
+//unsigned long tmp[4];			/* tmp 64 bit value */
+//
+// /*
+//  * Convert Fnv64_t hval into a base 2^16 array
+//  */
+//val[0] = hval.w32[0];
+//val[1] = (val[0] >> 16);
+//val[0] &= 0xffff;
+//val[2] = hval.w32[1];
+//val[3] = (val[2] >> 16);
+//val[2] &= 0xffff;
+//
+// /*
+//  * FNV-1a hash each octet of the buffer
+//  */
+//while (bp < be) {
+//
+// /* xor the bottom with the current octet */
+//val[0] ^= (unsigned long)*bp++;
+//
+// /*
+// /* multiply by the 64 bit FNV magic prime mod 2^64
+// /*
+// /* Using 0x100000001b3 we have the following digits base 2^16:
+// /*
+// /*	0x0	0x100	0x0	0x1b3
+// /*
+// /* which is the same as:
+// /*
+// /*	0x0	1<<FNV_64_PRIME_SHIFT	0x0	FNV_64_PRIME_LOW
+// */
+// /* multiply by the lowest order digit base 2^16 */
+//tmp[0] = val[0] * FNV_64_PRIME_LOW;
+//tmp[1] = val[1] * FNV_64_PRIME_LOW;
+//tmp[2] = val[2] * FNV_64_PRIME_LOW;
+//tmp[3] = val[3] * FNV_64_PRIME_LOW;
+// /* multiply by the other non-zero digit */
+//tmp[2] += val[0] << FNV_64_PRIME_SHIFT;	/* tmp[2] += val[0] * 0x100 */
+//tmp[3] += val[1] << FNV_64_PRIME_SHIFT;	/* tmp[3] += val[1] * 0x100 */
+// /* propagate carries */
+//tmp[1] += (tmp[0] >> 16);
+//val[0] = tmp[0] & 0xffff;
+//tmp[2] += (tmp[1] >> 16);
+//val[1] = tmp[1] & 0xffff;
+//val[3] = tmp[3] + (tmp[2] >> 16);
+//val[2] = tmp[2] & 0xffff;
+// /*
+//* Doing a val[3] &= 0xffff; is not really needed since it simply
+//* removes multiples of 2^64.  We can discard these excess bits
+//* outside of the loop when we convert to Fnv64_t.
+//*/
+//}
+//
+// /*
+//  * Convert base 2^16 array back into an Fnv64_t
+//  */
+//hval.w32[1] = ((val[3]<<16) | val[2]);
+//hval.w32[0] = ((val[1]<<16) | val[0]);
+//
+//#endif /* HAVE_64BIT_LONG_LONG */
+
+//template<class MATCH_FUNC>
+//Match readAndMatch(ui32 kvIdx, KV* inout_curKv, MATCH_FUNC match) const
+//{
+//  Match ret = MATCH_FALSE;
+//  *inout_curKv = addReaders(kvIdx, inout_curKv,  1);
+//  if(match(key)) ret=MATCH_TRUE;
+//  *inout_curKv = addReaders(kvIdx, inout_curKv, -1);
+//
+//  return ret;
+//}
+//auto     empty_reader()                   const -> Reader        
+//{
+//  using namespace std;
+//  
+//  Reader r;
+//  r.kv       = empty_kv();
+//  r.ch       = nullptr;                    // this;
+//  r.doEnd    = false;
+//  r.hash_idx = EMPTY_KEY;                  // EMPTY_KEY is used for actual keys and values, but this is an index into the KV vector
+//
+//  return move(r);
+//}
+//KV         addReaders(ui32  i, KV* curKv, i8 readers)        const                         // increment the readers by one and return the previous kv from the successful swap 
+//{
+//// todo: does curKv need to be a pointer?
+//  KV readKv = *curKv;     // todo: does this need to be in the loop? - no it is assigned inside
+//  do
+//  {
+//    if(curKv->key==EMPTY_KEY || (readers>0 && readKv.readers<0) )//  ||
+//      return *curKv;                                                                // not successful if the key is empty and not successful if readers is below the starting point - the last free function or last reader should be freeing this slot - this relies on nothing incrementing readers once it has reached FREE_READY
+//       //curKv.readers == FREE_READY) // || 
+//       //curKv.readers == MAX_READERS) 
+//  
+//    readKv           =  *curKv;
+//    readKv.readers  +=   readers;
+//  } while( !compexchange_kv(i, (ui64*)curKv, readKv.asInt) );
+//  //} while( !compexchange_kv(i, &curKv.asInt, readKv.asInt) );
+//
+//  return readKv; // curKv;
+//}
 
 //union      KV
 //{

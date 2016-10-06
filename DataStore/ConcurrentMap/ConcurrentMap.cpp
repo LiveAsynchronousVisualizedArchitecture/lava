@@ -393,7 +393,7 @@ int main()
 
   //Println("kv sz: ", sizeof(simdb::KV) );
 
-  simdb db("test", 8, 8);
+  simdb db("test", 8, 16);
 
   str       wat  =       "wat";
   str       wut  =       "wut";
