@@ -759,7 +759,6 @@ public:
   static const ui8   INIT_READERS  =     0;            // eventually make this 1 again? - to catch when readers has dropped to 0
   static const ui8   FREE_READY    =     0;
   static const ui8   MAX_READERS   =  0xFF;
-  //static const ui32  EMPTY_KEY     =  0x0FFFFFFF;      // 28 bits set 
   static const ui32  EMPTY_KEY     =  0xFFFFFFFF;      // full 32 bits set again 
   
   static ui32 nextPowerOf2(ui32  v)
@@ -782,32 +781,6 @@ public:
   {
     return a == b;
   }
-  static ui32 IntHash(ui32  h)
-  {
-    h ^= h >> 16;
-    h *= 0x85ebca6b;
-    h ^= h >> 13;
-    h *= 0xc2b2ae35;
-    h ^= h >> 16;
-    return h;
-  }
-  //static ui32 HashBytes(void* buf, ui32 len)
-  //{
-  //  ui32  rethash  =  0;
-  //  ui32* cur      =  (ui32*)buf;
-  //  ui32  loops    =  len/sizeof(ui32);
-  //  ui32* end      =  cur + loops;
-  //  for(; cur!=end; ++cur){ rethash ^= IntHash(*cur); }
-  //
-  //  ui32  rem      =  len - loops;
-  //  ui32  lst      =  0;
-  //  ui8*  end8     =  (ui8*)end;
-  //  for(ui8 i=0; i<rem; ++i){ lst ^= *end8 << (rem-1-i); }
-  //  
-  //  rethash ^= IntHash(lst);
-  //
-  //  return rethash;
-  //}
   static ui32 HashBytes(void* buf, ui32 len)
   {
     ui64 hsh = fnv_64a_buf(buf, len);
@@ -831,11 +804,9 @@ private:
   using ui64      =  uint64_t;
   using Aui32     =  std::atomic<ui32>;
   using Aui64     =  std::atomic<ui64>;  
-  //using KVs       =  std::vector<KV>;
   using KVs       =  lava_vec<KV>;
   using Mut       =  std::mutex;
   using UnqLock   =  std::unique_lock<Mut>;
-  //using Match     =  ConcurrentStore::Match; 
 
          ui32   m_sz;
   mutable KVs   m_kvs;
@@ -881,7 +852,6 @@ private:
 
     return atomic_compare_exchange_strong( (Aui64*)&(m_kvs.data()[i].asInt), expected, desired);                      // The entry was free. Now let's try to take it using a CAS. 
   }
-
 
 public:
   ConcurrentHash(){}
@@ -1024,21 +994,6 @@ public:
     return true;
 
     //m_kvs.resize(m_sz, defKv);
-  }
-  bool        del(ui32  key)                      const
-  {
-    ui32 i = IntHash(key);
-    for(;; ++i)
-    {
-      i  &=  m_sz - 1;
-
-      KV probedKv = load_kv(i);
-      if(probedKv.key == key) return compexchange_kv(i, &probedKv.asInt, empty_kv().asInt);
-             
-      if(probedKv.key == EMPTY_KEY)                                 // needs to be taken out when deleting is implemented
-        return false;
-    }
-    return false;
   }
   KV           at(ui32  idx)                      const
   {
@@ -1314,6 +1269,58 @@ public:
 
 
 
+
+
+
+
+
+
+//static const ui32  EMPTY_KEY     =  0x0FFFFFFF;      // 28 bits set 
+//using KVs       =  std::vector<KV>;
+//using Match     =  ConcurrentStore::Match; 
+
+//static ui32 IntHash(ui32  h)
+//{
+//  h ^= h >> 16;
+//  h *= 0x85ebca6b;
+//  h ^= h >> 13;
+//  h *= 0xc2b2ae35;
+//  h ^= h >> 16;
+//  return h;
+//}
+//static ui32 HashBytes(void* buf, ui32 len)
+//{
+//  ui32  rethash  =  0;
+//  ui32* cur      =  (ui32*)buf;
+//  ui32  loops    =  len/sizeof(ui32);
+//  ui32* end      =  cur + loops;
+//  for(; cur!=end; ++cur){ rethash ^= IntHash(*cur); }
+//
+//  ui32  rem      =  len - loops;
+//  ui32  lst      =  0;
+//  ui8*  end8     =  (ui8*)end;
+//  for(ui8 i=0; i<rem; ++i){ lst ^= *end8 << (rem-1-i); }
+//  
+//  rethash ^= IntHash(lst);
+//
+//  return rethash;
+//}
+
+//bool        del(ui32  key)                      const
+//{
+//  ui32 i = IntHash(key);
+//  for(;; ++i)
+//  {
+//    i  &=  m_sz - 1;
+//
+//    KV probedKv = load_kv(i);
+//    if(probedKv.key == key) return compexchange_kv(i, &probedKv.asInt, empty_kv().asInt);
+//           
+//    if(probedKv.key == EMPTY_KEY)                                 // needs to be taken out when deleting is implemented
+//      return false;
+//  }
+//  return false;
+//}
 
 //#define HAVE_64BIT_LONG_LONG
 //using Fnv64_t = ui64;
