@@ -1229,7 +1229,18 @@ public:
 
     return len;
   }
-  bool       rm(const std::string key)
+  template<class T>
+  i64       get(const std::vector<T> &key, void* out_buf)
+  {
+    Reader r = read((void*)key.data(), (ui32)(key.size() * sizeof(T)));
+    if (r.kv.key == EMPTY_KEY || r.kv.readers <= 0){ return -1; }
+
+    ui64 len = getFromBlkIdx(r.kv.val, out_buf);
+    if (r.doRm()){ m_cs.free(r.kv.val); m_cs.free(r.kv.key); }
+
+    return len;
+  }
+  void       rm(const std::string key)
   {
     auto  len = (ui32)key.length();
     auto  ths = this;
