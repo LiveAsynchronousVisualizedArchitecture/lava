@@ -75,6 +75,7 @@
 // -todo: look up better hash function - fnv
 // -todo: clean up fnv
 
+// todo: change string to pass through to c_str() and const char* overload
 // todo: take out power of 2 size restriction and use modulo
 // todo: use blockSize and blockCount from the already created shared mem if not the owner
 // todo: store size in the ConcurrentList? list isn't atomic so it should work well? should block lists, key sizes, and val sizes all be in their own lava_vecs ? 
@@ -162,7 +163,6 @@ namespace {
     }
     return hval;
   }
-
 }
 
 template<class T, class Deleter=std::default_delete<T>, class Allocator=std::allocator<T> >
@@ -1100,8 +1100,6 @@ public:
   using KV    = ConcurrentHash::KV;
 
 private:
-  //using Reader = ConcurrentHash::Reader;
-
   SharedMem          m_mem;
   aui64*           m_flags;
   aui64*       m_blockSize;
@@ -1274,6 +1272,8 @@ public:
 
 
 
+//
+//using Reader = ConcurrentHash::Reader;
 
 //static const ui32  EMPTY_KEY     =  0x0FFFFFFF;      // 28 bits set 
 //using KVs       =  std::vector<KV>;
