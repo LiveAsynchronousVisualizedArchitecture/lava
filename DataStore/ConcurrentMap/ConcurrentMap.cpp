@@ -442,17 +442,21 @@ int main()
   //std::vector<i64>::value_type v;
   //Println("v size: ", sizeof(v));
   
-  //ui64    cnt = 16;
+  //ui64    cnt = (ui64)((1<<17)*1.5);
+  ui64    cnt = (1<<16);
   //ui64  bytes = lava_vec<i32>::sizeBytes(cnt);
   //void*   mem = malloc( bytes ); 
   //lava_vec<i32> lv(mem, cnt);
-  ////memset(lv.data(), 0, 16*sizeof(ui32) );
-  //Println("capacity: ",  lv.capacity() );
-  //Println("size: ",      lv.size() );
-  //Println("sizeBytes: ", lv.sizeBytes() );
-  //TO((i32)lv.size(), i) lv[i] = i;
-  //TO((i32)lv.size(), i) Print(" ",i,":",lv[i]);
 
+  auto lv = STACK_VEC(i64, cnt);
+  //memset(lv.data(), 0, 16*sizeof(ui32) );
+  Println("capacity: ",  lv.capacity() );
+  Println("size: ",      lv.size() );
+  Println("sizeBytes: ", lv.sizeBytes() );
+  TO(lv.size(), i) lv[i] = i;
+  cout << lv[lv.size()-1] << " ";
+  //TO((i32)lv.size(), i) Print(" ",i,":",lv[i]);
+  //TO(lv.size(), i) cout << lv[i] << " ";
   //lv.~lava_vec();  // running the destructor explicitly tests double destrucion since it will be destructed at the end of the function also
 
   Println("\n");

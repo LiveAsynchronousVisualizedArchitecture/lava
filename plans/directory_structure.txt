@@ -1,0 +1,19 @@
+
+<project name top directory>
+|- shared/
+| |- include/              -header or .hpp files included by multiple nodes 
+| |- src/                  -any .cpp files that are used by multiple nodes
+| |- lib/
+|- nodes/
+| |- <node name>/
+| | |- include/            -header or hpp files included by this node
+| | |- src/                -source files used by this node
+| | |- <node name>.cpp
+| | |- build_0             -command line to compile the shared libarary for the most debuggable / fastest compiling version
+| | |- build_3             -compile command line for the best performing version 
+| |- main/                 -the entry point which will set up the nodes and their connections?
+|- <project name>.json     -the connections of nodes, probably output from the gui 
+|- layout.json             -the gui options including where the nodes are placed in the visual graph 
+
+
+

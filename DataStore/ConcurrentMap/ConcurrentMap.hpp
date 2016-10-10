@@ -74,6 +74,7 @@
 // -todo: move hash functions to be static instead of member functions
 // -todo: look up better hash function - fnv
 // -todo: clean up fnv
+// -todo: try making macro with ALLOCA to create a stack based lava_vec
 
 // todo: change string to pass through to c_str() and const char* overload
 // todo: take out power of 2 size restriction and use modulo
@@ -85,7 +86,7 @@
 // todo: prefetch memory for next block when looping through blocks
 // todo: move to using packed key value in one block list
 // todo: can block sync be done with a removed flag instead of just using readers?
-
+// todo: change lava_vec name to flat_vec?
 
 // todo: combine key and value storage so they are packed together in the same block list?
 // todo: mark free cells as negative numbers so double free is caught? - do it only in debug mode?
@@ -270,6 +271,15 @@ public:
     return p;
   }
 };
+
+#ifdef _WIN32
+  // use _malloca ? - would need to use _freea and also know that _malloca always allocates on the heap in debug mode for some crazy reason
+  #define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);
+#else
+  // gcc/clang/linux ?
+  #include <alloca.h>
+  #define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);  
+#endif
 
 class   ConcurrentList
 {
@@ -1167,6 +1177,17 @@ public:
     }
   }
 
+  template<class T>
+  i64       get(std::vector<T> const& key, void* out_buf)
+  {
+    Reader r = read((void*)key.data(), (ui32)(key.size() * sizeof(T)));
+    if(r.kv.key == EMPTY_KEY || r.kv.readers <= 0){ return -1; }
+
+    ui64 len = getFromBlkIdx(r.kv.val, out_buf);
+    if(r.doRm()){ m_cs.free(r.kv.val); m_cs.free(r.kv.key); }
+
+    return len;
+  }
   i32       put(void*   key, ui32  klen, void* val, ui32 vlen)
   {
     i32 blkcnt = 0;
@@ -1199,7 +1220,7 @@ public:
 
     return kidx;
   }
-  i64       get(const std::string key, void* out_buf)
+  i64       get(std::string const& key, void* out_buf)
   {
     //Reader r = read( (void*)key.data(), (ui32)key.length() );
     //if(r.kv.key==EMPTY_KEY || r.kv.readers<=0) return -1;            // after the read, the readers should be at least 1  /*|| r.kv.remove*/
@@ -1229,18 +1250,7 @@ public:
 
     return len;
   }
-  template<class T>
-  i64       get(const std::vector<T> &key, void* out_buf)
-  {
-    Reader r = read((void*)key.data(), (ui32)(key.size() * sizeof(T)));
-    if (r.kv.key == EMPTY_KEY || r.kv.readers <= 0){ return -1; }
-
-    ui64 len = getFromBlkIdx(r.kv.val, out_buf);
-    if (r.doRm()){ m_cs.free(r.kv.val); m_cs.free(r.kv.key); }
-
-    return len;
-  }
-  void       rm(const std::string key)
+  bool       rm(std::string const& key)
   {
     auto  len = (ui32)key.length();
     auto  ths = this;
