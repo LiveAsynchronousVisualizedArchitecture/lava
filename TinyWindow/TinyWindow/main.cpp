@@ -14,13 +14,19 @@ void HandleKeyPresses(tWindow* window, int key, keyState_t keyState)
 
 	if(keyState == keyState_t::down && key == spacebar)
 	{
-		printf("spacebar has been pressed \n");
+		//printf("spacebar has been pressed \n");
 	}
   else if(key==del || key== ('q'-32) ){
     wm->ShutDown(); 
   }
 }
 
+//int __stdcall WinMain(
+//  _In_ HINSTANCE hInstance,
+//  _In_ HINSTANCE hPrevInstance,
+//  _In_ LPSTR     lpCmdLine,
+//  _In_ int       nCmdShow
+//  )
 int main()
 {  
   auto wm = new windowManager();
