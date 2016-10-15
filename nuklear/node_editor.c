@@ -203,7 +203,7 @@ node_editor(struct nk_context *ctx)
 
                     /* ================= NODE CONTENT =====================*/
                     nk_layout_row_dynamic(ctx, 25, 1);
-                    nk_button_color(ctx, it->color, NK_BUTTON_DEFAULT);
+                    nk_button_color(ctx, it->color);
                     it->color.r = (nk_byte)nk_propertyi(ctx, "#R:", 0, it->color.r, 255, 1,1);
                     it->color.g = (nk_byte)nk_propertyi(ctx, "#G:", 0, it->color.g, 255, 1,1);
                     it->color.b = (nk_byte)nk_propertyi(ctx, "#B:", 0, it->color.b, 255, 1,1);
@@ -216,11 +216,8 @@ node_editor(struct nk_context *ctx)
                     float space;
                     struct nk_rect bounds;
                     bounds = nk_layout_space_rect_to_local(ctx, node.bounds);
-                    bounds.x += nodedit->scrolling.x - ctx->style.window.border;
-                    bounds.y += nodedit->scrolling.y - ctx->style.window.border;
-                    bounds.w += 2*ctx->style.window.border;
-                    bounds.h += 2*ctx->style.window.border;
-
+                    bounds.x += nodedit->scrolling.x;
+                    bounds.y += nodedit->scrolling.y;
                     it->bounds = bounds;
 
                     /* output connector */
