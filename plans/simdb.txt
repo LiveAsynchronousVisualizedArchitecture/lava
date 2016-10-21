@@ -1,0 +1,8 @@
+
+- need to take the block count and block size from the existing database on
+  creation when shared memory already exists
+
+- make a separate file for atomic pointers?
+
+
+
