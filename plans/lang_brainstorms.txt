@@ -1,0 +1,95 @@
+
+<< basic idea is to compile to be able to compile to C >>
+<< tables are a combination of vector of type A, hashmap/unsorted_map/dictionary of type B, and a linked list of boxed variants? >>
+<< tables are the only data structure not copied by value and are a single ui64 address pointing to contiguous memory which contains the vecotr and hashmap portion >>
+<< tables contain sizebytes, size, and an ownership flag so have at least 24 bytes over overhead - ownership flag is on the pointer's highest bit? >>  
+<< <> is a compile time expression, <<>> is a line independant comment >>
+<< should be able to call C nativly >>
+<< compile time expressions are used to express any meta programming or function overloading >>
+<< compile time expressions take strings and a context and return strings >>
+<< CTEs have compiler functions exposed to them and can parse the incoming string into an ast >>
+<< variables at compile time are a dictionary containing their symbol string and any other key value pairs given to them (such as type) >> 
+<< all compilation must be able to be performed by compiling the file with the entry point. there must be exactly one global expression with the key 'entry' mapped to 'true' ? >>
+
+<mod 'io' 'str' 'net'>                 << include io string and network modules using the compile time function mod >>
+
+mainCRTStartup :: entry:t = {          << make the entry point for the executable _CRT_main >> 
+  io_out('hello world');               << ';' marks the end of an expression if it is not contained by {} >>
+  0;                                   << last value is the return value if 'ret' keyword is not used     >>
+};                                     << } is the end of an expression, but the whole expression is the assignment to mainCRTStartup and so needs to end with ';' >> 
+
+{cp mainCRTStartup::entry:t {io_out('hello world'); 0;} }  << alternate syntax without using any infix operators >>
+
+
+{x les y|io_out('x is less than y')}   << branching with basic conditional execution >>
+{x les y | t | f}                      << branching >>
+{x les y
+| 'less'
+| {x eq y|'equal'|'more'}}             << if elseif else >>
+
+std = { add={x,y| x + y} };            << effectively a namespace since the expression takes no arguments >>
+{io_out {std_add 1 2}}                 << prints 3 >>
+std_add(1,2) :> io_out;                << prints 3 >>
+{|io_out('wat')} <: {x les y};         << expression conditionally evaluated - passing a boolean to a lazy expression dictates if it is evaluated  >>
+imgbuf!{x|x/2}                         << divides each element in the table 'imgbuf' by 2  >>
+loop { io_out('hello world\n'); }      << prints 'hello world' lines forever >>
+loop io_out('hello world\n');          << does the same since loop is a unary operator >>
+<to 10 {x|io_out('line ',x,'\n')}>     << prints 10 lines using the compile time function 'to' >>
+
+sizeof   operator giving the size in bytes of a type - same as C
+addr     operator giving the address of a variable as a ui64 - like & in C
+deref    operator giving the value at an ui64 address - like * in C
+mv       operator that returns a table but sets the old table address to have the ownership flag set to false
+
+{x=0,y=0,z=0;|}                                                   << closures and structs are the same thing and have 8 bytes of overhead for the attached function address - this closure's (or struct's) function would have its address as 0 and return 0 >>
+a_vec = {x=0.0f,y=0.0f,z=0.0f; | {x*x + y*y + z*z} :> sqrt}       << closure that returns length - this function would be ran without arguments >>
+
+
+----------------
+Older ideas
+----------------
+Variables have any number of :metadata symbols after them
+
+<>    means compile time expression - use this to declare cdecl expressions ? 
+{}    means expression  - {|} means closure / delayed expression 
+[]    means data declaration
+()    means alternate syntax for argument passing
+=     copies data and declaration?
+<-    moves  data or copies a declaration
+!     means mutate?
+.     looks up from the struct part of a table if used as a value - tbl.{expr}
+.     becomes a binary operator to make the left side be the first value to a function when used as a function a.b becomes {b a}
+->    looks up from the map part of a table
+~     means next in linked list - pass an expression to loop over the whole list
+&     means reference / pointer
+@     means copy
+$     means atomic reference counted shared pointer
+:>    means forward to first parameter of next function
+:>>   means forward to first parameter of function after next
+::>>  means forward to second parameter of function after next
+,     means separation of data
+;     means separation of expressions
+|     means separation of sections in a data declaration or expression
+[]    means look up from the array of a table while [|] means data declaration?
+
+:     means compile time symbol? - can <> be used to return compile time tables instead?
+``    means external function declaration
+:>    means move ?
+<=    copies data and a declaration ? not needed?
+
+< [| compile_time_symbol="wat", compile_time_flag=true |] >        // a compile time table instead of less flexible :symbol declarations
+<cdecl "i32" "func_name" "f32" "ui32" "ui64">                      // ui64 is used where a 64 bit pointer would be 
+
+#img ||>> {flip img} |> {a,b|{over a b}}
+
+{flip img} :>> {blur img} ::> {over} :> flipOverBlur
+  -OR-
+flipOverBlur = {over {flip img} {blur img}}
+  -OR-
+blurred = blur(img);
+flipped = flip(img);
+flipOverBlur = over(flipped, blurred);
+
+{LoadImg file} |> img |> {blur} |> {sub _ img} |> {abs} |> {luminance _ AVG} |> {ChanImg} |> edges
+{LoadImg file} :> ::>> {blur} :> {sub} :> {abs} :> {luminance _ AVG} :> {ChanImg} :> edges
+
