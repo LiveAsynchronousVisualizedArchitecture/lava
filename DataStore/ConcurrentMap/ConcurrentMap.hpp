@@ -1170,10 +1170,9 @@ public:
       m_flags->store(1);                                        // set to 1 to signal construction is done
     }
     else{                                                       // need to spin until ready
-      // todo: need to read the blockCount and blockSize values - not use the constructor
       while(m_flags->load()==false){}
-      new (&m_ch) ConcurrentHash( ((i8*)m_mem.data())+OffsetBytes(), blockCount, m_mem.owner);
-      new (&m_cs) ConcurrentStore( ((i8*)m_mem.data())+m_ch.sizeBytes(blockCount)+OffsetBytes(), blockSize, blockCount, m_mem.owner);                 // todo: change this to a void*
+      new (&m_ch) ConcurrentHash( ((i8*)m_mem.data())+OffsetBytes(), m_blockCount->load(), m_mem.owner);
+      new (&m_cs) ConcurrentStore( ((i8*)m_mem.data())+m_ch.sizeBytes(m_blockCount->load())+OffsetBytes(), m_blockSize->load(), m_blockCount->load(), m_mem.owner);                 // todo: change this to a void*
     }
   }
 
