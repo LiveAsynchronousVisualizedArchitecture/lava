@@ -38,6 +38,7 @@
 #define MAX(a,b) ((a) < (b) ? (b) : (a))
 #define LEN(a) (sizeof(a)/sizeof(a)[0])
 
+
 /* ===============================================================
  *
  *                          EXAMPLE
@@ -46,9 +47,9 @@
 /* This are some code examples to provide a small overview of what can be
  * done with this library. To try out an example uncomment the include
  * and the corresponding function. */
-#include "style.c"
-#include "calculator.c"
-#include "overview.c"
+// #include "style.c"
+// #include "calculator.c"
+// #include "overview.c"
 #include "node_editor.c"
 
 /* ===============================================================
@@ -79,9 +80,6 @@ int main(void)
         fprintf(stdout, "[GFLW] failed to init!\n");
         exit(1);
     }
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 #ifdef __APPLE__
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
@@ -147,6 +145,7 @@ int main(void)
         glfwPollEvents();
         nk_glfw3_new_frame();
 
+
         /* GUI */
         {struct nk_panel layout;
         if (nk_begin(ctx, &layout, "Demo", nk_rect(50, 50, 230, 250),
@@ -195,26 +194,15 @@ int main(void)
         nk_color_fv(bg, background);
         glfwGetWindowSize(win, &width, &height);
         glViewport(0, 0, width, height);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClearColor(bg[0], bg[1], bg[2], bg[3]);
 
-
-        /* Draw opneGL triangle */
-        // 1rst attribute buffer : vertices
         glEnableVertexAttribArray(0);
         glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-        glVertexAttribPointer(
-            0,                  // attribute 0. No particular reason for 0, but must match the layout in the shader.
-            3,                  // size
-            GL_FLOAT,           // type
-            GL_FALSE,           // normalized?
-            0,                  // stride
-            (void*)0            // array buffer offset
-            );
-        // Draw the triangle !
-        glDrawArrays(GL_TRIANGLES, 0, 3); // Starting from vertex 0; 3 vertices total -> 1 triangle
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*)0);
+        glDrawArrays(GL_TRIANGLES, 0, 3);
         glDisableVertexAttribArray(0);
 
-        glClear(GL_COLOR_BUFFER_BIT);
-        glClearColor(bg[0], bg[1], bg[2], bg[3]);
         /* IMPORTANT: `nk_glfw_render` modifies some global OpenGL state
          * with blending, scissor, face culling, depth test and viewport and
          * defaults everything back into a default state.
