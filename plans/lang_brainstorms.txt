@@ -93,3 +93,51 @@ flipOverBlur = over(flipped, blurred);
 {LoadImg file} |> img |> {blur} |> {sub _ img} |> {abs} |> {luminance _ AVG} |> {ChanImg} |> edges
 {LoadImg file} :> ::>> {blur} :> {sub} :> {abs} :> {luminance _ AVG} :> {ChanImg} :> edges
 
+
+
+
+
+<mod 'io' 'str' 'net'>            << include io string and network modules >>
+{x les y | t | f}                 << branching >>
+{x les y
+| 'less'
+| {x eq y|'equal'|'more'}}        << if elseif else >>
+
+<< all branching expressions must be the same type >>
+{ x les y -> 'less'               << same as above >>
+| x eq  y -> 'equal'              << passing a boolean into an expression that takes no arguments selectivly executes the expression >>
+| 'more'}                         << an expression executes segments until one does not return null, or false >> 
+
+<< all branching expressions must be the same type >>
+  x les y -> 'less'               << same as above >>
+| x eq  y -> 'equal'              << passing a boolean into an expression that takes no arguments selectivly executes the expression >>
+| 'more';                         << an expression executes segments until one does not return null, or false >> 
+
+std = { add={x,y| x + y} };       << effectively a namespace since the expression takes no arguments >>
+{io_out {std_add 1 2}}            << prints 3 >>
+std_add(1,2) -> io_out;           << prints 3 - equivilent to io_out(std_add(1,2)) >>
+{|io_out('wat')} if x les y;      << if operator combines an expression and another expression that evaluates to a boolean >>
+
+<< take an idea from klong an use label::{expression} for declarations and/or anything that will go into the binary? >>
+main::{ "hello world" -> out }
+add::{x,y|x+y}
+std::{ add::{x,y|x+y} sub::{x,y|x-y} }           << expression without arguments attached to a label acts as a namespace, but just uses '_' as a delimiter >>
+addsub::{x,y| std_add(x,y) -> std_sub(x,y) }     << last expression doesn't need ';' to end >>
+dataseg::(10; {x|x*x})            << creates a vector of length 10 of the the squares of 0..9 embedded in the initialized data segment of the .exe >> 
+SQR::<x|x*x>                      << SQR(8f32)  evaluates to 64f32 at compile time >>
+
+<| structs, closures, and deconstructors are all together >
+<| a lazy compile time function doesn't exist because a normal expression could be used, so instead it is a comment >
+v3f::{x=0f32, y=0f32, z=0f32 | null | out('vector deconstructed') }         << a struct/closure with a pointless deconstructor  
+main::{ stk pt=v3f; pt.x=1; pt.y=1; pt.z=1; pt ~= null; 0; }                << make a v3f on the stack, set all its values to 1, set its destructor to null, and finally return 0 
+v2f::{x=0f32, y=0f32; _x,_y | stk r=v2f; r.x=_x; r.y=_y; r; | null }        << a struct/closure with its function acting as a constructor and no destructor 
+main::{ stk pt=v2f(1,1); out("pt: " <- pt.x <- " " <- pt.y <- "\n"); 0; }   << a v2f on the stack using its function as a constructor, then output the value using the <- concatenation operator
+
+<< stk is value based and runs the destructor on scope exit if 1. the destructor has not already ran, and 2. the mv operator has not been applied
+<< instead of mv operator use <= ? use  <=>  for creating another shared reference? stk is always a move unless & is used in front to denote a reference or @ is used to denote a copy?
+<< glbl is a pointer to the global heap and uses atomic reference counted memory - because it is only a pointer it is always just a copy? copying between threads increments the atomic reference, but copying within threads increments a separate, non-atomic reference count?
+<< thrd is a pointer to a thread local heap and uses non-atomic reference counted memory
+
+
+
+
