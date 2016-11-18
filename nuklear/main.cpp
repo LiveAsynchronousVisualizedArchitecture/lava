@@ -107,6 +107,60 @@ extern "C"
 
 } // IndexedVerts.h
 
+void* makeTriangle(float leftX, float rightX, size_t& byteLen);
+
+struct Drawables {
+    size_t activeIndx = 0;
+    std::vector<IndexedVerts*> shapesVec{2};
+    std::vector<void*> bytesVecIn;
+    std::vector<size_t> bytesLenVecIn;
+
+    void init(size_t numShapes, float* data) {
+
+        for(int i = 0; i < numShapes; i++) {
+            size_t bytesLen;
+            void* bytes = makeTriangle(data[i * 2], data[i * 2 + 1], bytesLen);
+            bytesVecIn.push_back(bytes);
+            bytesLenVecIn.push_back(bytesLen);
+        }
+    }
+
+    void put(std::string key, simdb* db, size_t index) {
+        db->put((void*)key.data(), (uint32_t)key.length(), bytesVecIn[index], (uint32_t)bytesLenVecIn[index]);
+    }
+
+    void* get(std::string key, simdb* db, size_t index, size_t& length) {
+        void* bytes = malloc(bytesLenVecIn[index]);
+        length = db->get(key, bytes);
+        return bytes;
+    }
+
+    void deserialize(size_t index, void* bytes, size_t size) {
+        IndexedVerts* iv = (IndexedVerts*)IndexedVertsLoad(bytes, (size_t)size);
+        shapesVec.insert(shapesVec.begin() + index, iv);
+    }
+
+    IndexedVerts* getActive() {
+        return shapesVec[activeIndx];
+    }
+
+    void setActive(size_t index) {
+        activeIndx = index;
+    }
+
+    void destroy() {
+        for(auto* p : shapesVec) {
+            delete p;
+        }
+        shapesVec.clear();
+        for(auto* p : bytesVecIn) {
+            delete p;
+        }
+        bytesVecIn.clear();
+        bytesLenVecIn.clear();
+    }
+};
+
 /* ===============================================================
  *
  *                          EXAMPLE
@@ -118,7 +172,9 @@ extern "C"
 // #include "overview.c"
 // #include "node_editor.c"
 
-void nuklearDemo(struct nk_context* ctx, nk_color& background);
+void nuklearDemo(struct nk_context* ctx, Drawables* drawables, GLuint& vertexbuffer);
+
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
 /* ===============================================================
  *
@@ -161,60 +217,30 @@ int main(void)
         exit(1);
     }
 
+    glfwSetKeyCallback(win, key_callback);
+
     /* Vertex Array Object */
     GLuint VertexArrayID;
     glGenVertexArrays(1, &VertexArrayID);
     glBindVertexArray(VertexArrayID);
 
-    // Create Vertex data
-    Vertex* verts[3];
-    verts[0] = new Vertex{
-        {-1.0f, -1.0f, 0.0f},     //pos
-        {0.0f, 0.0f, -1.0f},      //norm
-        {1.0f, 1.0f, 1.0f, 1.0f}, //color
-        {0.0f, 0.0f}              //texCoord
-    };
-    verts[1] = new Vertex{
-        {1.0f, -1.0f, 0.0f},      //pos
-        {0.0f, 0.0f, -1.0f},      //norm
-        {1.0f, 1.0f, 1.0f, 1.0f}, //color
-        {0.0f, 0.0f}              //texCoord
-    };
-    verts[2] = new Vertex{
-        {0.0f, 1.0f, 0.0f},       //pos
-        {0.0f, 0.0f, -1.0f},      //norm
-        {1.0f, 1.0f, 1.0f, 1.0f}, //color
-        {0.0f, 0.0f}              //texCoord
-    };
-
-    IndexedVerts* iv = (IndexedVerts*)IndexedVertsCreate(0, 6, IV_TRIANGLES, 3, 0, 0, 0, 0);
-
-    // Copy Vertex data into IndexedVerts
-    for(int i = 0; i < 3; i++) {
-        memcpy(&iv->verts[i], verts[i], 12 * sizeof(float));
-        delete verts[i];
-        verts[i] = nullptr;
-    }
-
-    // Create space for serialized IndexedVerts
-    void* bytes = malloc(sizeof(IndexedVerts) + sizeof(Vertex) * 3);
-    size_t byteLen = sizeof(IndexedVerts) + sizeof(Vertex) * 3;
-
-    // Serialize IndexedVerts
-    IndexedVertsSave(iv, bytes, &byteLen);
-
     // Create the DB
     simdb db("test", 200, 200);
 
-    // Put the serialized data in the db (here, or in another process)
-    std::string key = "whiteTriangle";
-    db.put((void*)key.data(), (uint32_t)key.length(), bytes, (uint32_t)byteLen);
+    Drawables drawables;
+    float shapeData[4] = {-1.0f, 1.0f, -0.25f, 0.25f};
+    drawables.init(2, shapeData);
 
-    void* bytesFromDB = malloc(byteLen);
-    auto byteLenFromDB = db.get("whiteTriangle", bytesFromDB);
+    drawables.put("bigTriangle", &db, (size_t)0);
+    drawables.put("skinnyTriangle", &db, (size_t)1);
+
+    size_t sizeBig, sizeSkinny;
+    void* bytesFromDBBig = drawables.get("bigTriangle", &db, (size_t)0, sizeBig);
+    void* bytesFromDBSkinny = drawables.get("skinnyTriangle", &db, (size_t)1, sizeSkinny);
 
     // Deserialize IndexedVerts
-    IndexedVerts* loadedIv = (IndexedVerts*)IndexedVertsLoad(bytesFromDB, (size_t)byteLenFromDB);
+    drawables.deserialize((size_t)0, bytesFromDBBig, sizeBig);
+    drawables.deserialize((size_t)1, bytesFromDBSkinny, sizeSkinny);
 
     // This will identify our vertex buffer
     GLuint vertexbuffer;
@@ -224,7 +250,7 @@ int main(void)
     glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
     // Give our vertices to OpenGL.
     //glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * iv->vertsLen, &iv->verts[0], GL_STATIC_DRAW);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex)* loadedIv->vertsLen, &loadedIv->verts[0], GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex)* drawables.getActive()->vertsLen, &drawables.getActive()->verts[0], GL_STATIC_DRAW);
 
     /* nuklear */
     ctx = nk_glfw3_init(win, NK_GLFW3_INSTALL_CALLBACKS);
@@ -241,7 +267,7 @@ int main(void)
         glfwPollEvents();
         nk_glfw3_new_frame();
 
-        nuklearDemo(ctx, background);
+        nuklearDemo(ctx, &drawables, vertexbuffer);
 
         /* -------------- EXAMPLES ---------------- */
         /*overview(ctx);*/
@@ -259,7 +285,7 @@ int main(void)
         glEnableVertexAttribArray(0);
         glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float) * 12, (void*)0);
-        glDrawArrays(loadedIv->mode, 0, 3);
+        glDrawArrays(drawables.getActive()->mode, 0, 3);
         glDisableVertexAttribArray(0);
 
         /* IMPORTANT: `nk_glfw_render` modifies some global OpenGL state
@@ -270,51 +296,91 @@ int main(void)
         nk_glfw3_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_BUFFER, MAX_ELEMENT_BUFFER);
         glfwSwapBuffers(win);}
     }
-    IndexedVertsDestroy(iv);
-    IndexedVertsDestroy(loadedIv);
+    free(bytesFromDBBig);
+    free(bytesFromDBSkinny);
     nk_glfw3_shutdown();
     glfwTerminate();
     return 0;
 }
 
-void nuklearDemo(struct nk_context* ctx, nk_color& background)
+void nuklearDemo(struct nk_context* ctx, Drawables* drawables, GLuint& vertexbuffer)
 {
     /* GUI */
     {struct nk_panel layout;
-    if(nk_begin(ctx, &layout, "Demo", nk_rect(50, 50, 230, 250),
+    if(nk_begin(ctx, &layout, "Visualizer", nk_rect(50, 50, 230, 250),
         NK_WINDOW_BORDER | NK_WINDOW_MOVABLE | NK_WINDOW_SCALABLE |
         NK_WINDOW_MINIMIZABLE | NK_WINDOW_TITLE))
     {
-        enum { EASY, HARD };
-        static int op = EASY;
+        enum { FAT, SKINNY };
+        static int op = FAT;
         static int property = 20;
         nk_layout_row_static(ctx, 30, 80, 1);
-        if(nk_button_label(ctx, "button"))
-            fprintf(stdout, "button pressed\n");
 
         nk_layout_row_dynamic(ctx, 30, 2);
-        if(nk_option_label(ctx, "easy", op == EASY)) op = EASY;
-        if(nk_option_label(ctx, "hard", op == HARD)) op = HARD;
-
-        nk_layout_row_dynamic(ctx, 25, 1);
-        nk_property_int(ctx, "Compression:", 0, &property, 100, 10, 1);
-
-        {struct nk_panel combo;
-        nk_layout_row_dynamic(ctx, 20, 1);
-        nk_label(ctx, "background:", NK_TEXT_LEFT);
-        nk_layout_row_dynamic(ctx, 25, 1);
-        if(nk_combo_begin_color(ctx, &combo, background, nk_vec2(nk_widget_width(ctx), 400))) {
-            nk_layout_row_dynamic(ctx, 120, 1);
-            background = nk_color_picker(ctx, background, NK_RGBA);
-            nk_layout_row_dynamic(ctx, 25, 1);
-            background.r = (nk_byte)nk_propertyi(ctx, "#R:", 0, background.r, 255, 1, 1);
-            background.g = (nk_byte)nk_propertyi(ctx, "#G:", 0, background.g, 255, 1, 1);
-            background.b = (nk_byte)nk_propertyi(ctx, "#B:", 0, background.b, 255, 1, 1);
-            background.a = (nk_byte)nk_propertyi(ctx, "#A:", 0, background.a, 255, 1, 1);
-            nk_combo_end(ctx);
-        }}
+        if(nk_option_label(ctx, "Fat", op == FAT)) {
+            op = FAT;
+            drawables->setActive((size_t)0);
+            glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex)* drawables->getActive()->vertsLen, &drawables->getActive()->verts[0], GL_STATIC_DRAW);
+        }
+        if(nk_option_label(ctx, "Skinny", op == SKINNY)) {
+            op = SKINNY;
+            drawables->setActive((size_t)1);
+            glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex)* drawables->getActive()->vertsLen, &drawables->getActive()->verts[0], GL_STATIC_DRAW);
+        }
     }
     nk_end(ctx); }
+}
+
+void* makeTriangle(float leftX, float rightX, size_t& byteLen) {
+    // Create big triangle Vertex data
+    const unsigned int NUM_VERTICES = 3;
+
+    Vertex* verts[NUM_VERTICES];
+    verts[0] = new Vertex{
+        {leftX, -1.0f, 0.0f},     //pos
+        {0.0f, 0.0f, -1.0f},      //norm
+        {1.0f, 1.0f, 1.0f, 1.0f}, //color
+        {0.0f, 0.0f}              //texCoord
+    };
+    verts[1] = new Vertex{
+        {rightX, -1.0f, 0.0f},      //pos
+        {0.0f, 0.0f, -1.0f},      //norm
+        {1.0f, 1.0f, 1.0f, 1.0f}, //color
+        {0.0f, 0.0f}              //texCoord
+    };
+    verts[2] = new Vertex{
+        {0.0f, 1.0f, 0.0f},       //pos
+        {0.0f, 0.0f, -1.0f},      //norm
+        {1.0f, 1.0f, 1.0f, 1.0f}, //color
+        {0.0f, 0.0f}              //texCoord
+    };
+
+    IndexedVerts* iv = (IndexedVerts*)IndexedVertsCreate(0, 6, IV_TRIANGLES, NUM_VERTICES, 0, 0, 0, 0);
+
+    // Copy Vertex data into IndexedVerts
+    for(int i = 0; i < NUM_VERTICES; i++) {
+        memcpy(&iv->verts[i], verts[i], 12 * sizeof(float));
+        delete verts[i];
+        verts[i] = nullptr;
+    }
+
+    // Create space for serialized IndexedVerts
+    void* bytes = malloc(sizeof(IndexedVerts) + sizeof(Vertex) * NUM_VERTICES);
+    byteLen = sizeof(IndexedVerts) + sizeof(Vertex) * NUM_VERTICES;
+
+    // Serialize IndexedVerts
+    IndexedVertsSave(iv, bytes, &byteLen);
+    IndexedVertsDestroy(iv);
+
+    return bytes;
+}
+
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
 // IndexedVerts.cpp
