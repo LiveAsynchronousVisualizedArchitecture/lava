@@ -136,8 +136,10 @@ main::{ stk pt=v2f(1,1); out("pt: " <- pt.x <- " " <- pt.y <- "\n"); 0; }   << a
 << stk is value based and runs the destructor on scope exit if 1. the destructor has not already ran, and 2. the mv operator has not been applied
 << instead of mv operator use <= ? use  <=>  for creating another shared reference? stk is always a move unless & is used in front to denote a reference or @ is used to denote a copy?
 << glbl is a pointer to the global heap and uses atomic reference counted memory - because it is only a pointer it is always just a copy? copying between threads increments the atomic reference, but copying within threads increments a separate, non-atomic reference count?
-<< thrd is a pointer to a thread local heap and uses non-atomic reference counted memory
+<< thrd is a pointer to a thread local heap and uses non-atomic reference counted memory? this would mean that the tbl structure would always be reference counted if not on the stack? is this a problem if the reference count is not atomic and the increment and decrement can be skipped with mv ?
+<< = always copies numbers and structs but moves tbls? functions are pointers to memory maps and never deallocated, so they are copied as well
+<< reference counting has a thread local reference, an atomic reference count for multiple cores, and a numa reference count for multiple nodes? 
 
 
-
-
+<< code completion in an ide could be done in reverse, with arguments, then functions that would be valid with those arguments
+<< tables can have vectors of structs by declaring the struct as the vector type?
