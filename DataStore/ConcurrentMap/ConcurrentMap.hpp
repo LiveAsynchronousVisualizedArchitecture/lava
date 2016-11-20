@@ -75,6 +75,14 @@
 // -todo: look up better hash function - fnv
 // -todo: clean up fnv
 // -todo: try making macro with ALLOCA to create a stack based lava_vec
+// -todo: load blockSize and blockLength from existing shared memory
+// -todo: make function to query size - simb.len(key)
+
+// todo: make indexed list of keys
+//       -create a bitset in the ConcurrentHash?
+//       -bitset has to be atomic?
+// todo: combine keys and data into one block run
+// todo: make len be a direct lookup
 
 // todo: change string to pass through to c_str() and const char* overload
 // todo: take out power of 2 size restriction and use modulo
@@ -746,6 +754,19 @@ public:
 
     // return MATCH_TRUE; // never reached
   }
+  ui32          len(i32 blkIdx)
+  {
+    IDX  nxt;
+    IDX  cur = blkIdx;
+    ui32 ret = blockLen(cur);
+
+    while( (nxt = nxtBlock(cur)) >= 0 ){        // todo: change this to LIST_END, initialize the BlkLst to LIST_END and use ui32 for indices
+      ret += blockLen(nxt);
+      cur  = nxt;
+    }
+
+    return ret;
+  }
   auto        list() const -> ConcurrentList const&
   {
     return m_cl;
@@ -1064,7 +1085,7 @@ public:
         FILE_MAP_ALL_ACCESS,   // read/write permission
         0,
         0,
-        size);
+        0);
       if(sm.hndlPtr==nullptr){ CloseHandle(sm.fileHndl); sm.clear(); return move(sm); }
     #endif       // END windows
   
@@ -1156,24 +1177,44 @@ private:
 
 public:
   simdb(){}
-  simdb(const char* name, ui32 blockSize, ui32 blockCount) : 
-    m_mem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount)) ),
-    m_ch( ((i8*)m_mem.data())+OffsetBytes(), blockCount, m_mem.owner),
-    m_cs( ((i8*)m_mem.data())+m_ch.sizeBytes(blockCount)+OffsetBytes(), blockSize, blockCount, m_mem.owner),                 // todo: change this to a void*
-    m_blockCount( ((aui64*)m_mem.data())+2 ),
-    m_blockSize(  ((aui64*)m_mem.data())+1 ),
-    m_flags(       (aui64*)m_mem.data() )
+  simdb(const char* name, ui32 blockSize, ui32 blockCount) // : 
+    //m_mem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount)) ),
+    //m_ch( ((i8*)m_mem.data())+OffsetBytes(), blockCount, m_mem.owner),
+    //m_cs( ((i8*)m_mem.data())+m_ch.sizeBytes(blockCount)+OffsetBytes(), blockSize, blockCount, m_mem.owner),                 // todo: change this to a void*
+    //m_blockCount( ((aui64*)m_mem.data())+2 ),
+    //m_blockSize(  ((aui64*)m_mem.data())+1 ),
+    //m_flags(       (aui64*)m_mem.data() )
   {
+    new (&m_mem) SharedMem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount)) );
+
+    m_blockCount =  ((aui64*)m_mem.data())+2;
+    m_blockSize  =  ((aui64*)m_mem.data())+1;
+    m_flags      =   (aui64*)m_mem.data();
+
     if(isOwner()){
       m_blockCount->store(blockCount);
       m_blockSize->store(blockSize);
-      m_flags->store(1);                                        // set to 1 to signal construction is done
     }
     else{                                                       // need to spin until ready
       while(m_flags->load()==false){}
-      new (&m_ch) ConcurrentHash( ((i8*)m_mem.data())+OffsetBytes(), m_blockCount->load(), m_mem.owner);
-      new (&m_cs) ConcurrentStore( ((i8*)m_mem.data())+m_ch.sizeBytes(m_blockCount->load())+OffsetBytes(), m_blockSize->load(), m_blockCount->load(), m_mem.owner);                 // todo: change this to a void*
+      m_mem.size = MemSize(m_blockSize->load(), m_blockCount->load());
+      //new (&m_ch) ConcurrentHash( ((i8*)m_mem.data())+OffsetBytes(), m_blockCount->load(), m_mem.owner);
+      //new (&m_cs) ConcurrentStore( ((i8*)m_mem.data())+m_ch.sizeBytes(m_blockCount->load())+OffsetBytes(), m_blockSize->load(), m_blockCount->load(), m_mem.owner);                 // todo: change this to a void*
     }
+
+    //new (&m_mem) SharedMem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount)) );
+    //new (&m_ch) ConcurrentHash( ( ((i8*)m_mem.data())+OffsetBytes(), blockCount, m_mem.owner) );
+    //new (&m_cs) ConcurrentStore(  ((i8*)m_mem.data())+m_ch.sizeBytes(blockCount)+OffsetBytes(), blockSize, blockCount, m_mem.owner);                 // todo: change this to a void*
+    new (&m_ch) ConcurrentHash( ((i8*)m_mem.data())+OffsetBytes(), 
+                                       (ui32)m_blockCount->load(), 
+                                                      m_mem.owner);
+    auto chSz = m_ch.sizeBytes();
+    new (&m_cs) ConcurrentStore( ((i8*)m_mem.data())+chSz+OffsetBytes(), 
+                                              (ui32)m_blockSize->load(), 
+                                             (ui32)m_blockCount->load(), 
+                                                           m_mem.owner);                 // todo: change this to a void*
+
+    if(isOwner()) m_flags->store(1);                                        // set to 1 to signal construction is done
   }
 
   template<class T>
@@ -1249,6 +1290,12 @@ public:
 
     return len;
   }
+  ui32      len(std::string const& key)
+  {
+    KV kv = read( (void*)key.data(), (ui32)key.length() );
+
+    return m_cs.len(kv.val);
+  }
   bool       rm(std::string const& key)
   {
     auto  len = (ui32)key.length();
@@ -1271,7 +1318,8 @@ public:
   }
   ui64     size() const
   {
-    return m_mem.size;
+    //return m_mem.size;
+    return m_cs.sizeBytes( (ui32)m_blockSize->load(), (ui32)m_blockCount->load());
   }
   bool  isOwner() const
   {

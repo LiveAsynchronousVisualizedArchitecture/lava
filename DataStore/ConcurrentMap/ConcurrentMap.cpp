@@ -413,6 +413,9 @@ int main()
   //  Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
   //}
 
+  Println("wat data len: ",    db.len(wat)    );
+  Println("wut data len: ",    db.len(wut)    );
+  Println("kablam data len: ", db.len(kablam) );
 
   str clear = "                ";
   auto watlen = db.get("wat",      (void*)clear.data() );
