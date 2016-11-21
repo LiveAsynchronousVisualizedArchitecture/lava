@@ -81,9 +81,13 @@
 // todo: make indexed list of keys
 //       -create a bitset in the ConcurrentHash? - can't use ConcurrentHash because blocks could change after query
 //       -bitset has to be atomic? - can't create bitset because the key flag, reader count, and index all have to be together?
-//       -use key flag in Block Index struct, treat the entire thing as a 64 bit atomic
+// done  -use key flag in Block Index struct, treat the entire thing as a 64 bit atomic
+//       -iterate through BlkLst vector to find the next key
+//       -after a key is found, get the length of that block index
+//         -when getting the length, check if the block is a key, if not, return an error
+//       -after getting the length, read from the block index, again checking if the block index is a key and if not, returning an error 
 // todo: combine keys and data into one block run
-// todo: make len be a direct lookup
+// todo: make len be a direct lookup 
 
 // todo: change string to pass through to c_str() and const char* overload
 // todo: take out power of 2 size restriction and use modulo
