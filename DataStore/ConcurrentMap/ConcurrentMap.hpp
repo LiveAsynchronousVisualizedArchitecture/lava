@@ -79,8 +79,9 @@
 // -todo: make function to query size - simb.len(key)
 
 // todo: make indexed list of keys
-//       -create a bitset in the ConcurrentHash?
-//       -bitset has to be atomic?
+//       -create a bitset in the ConcurrentHash? - can't use ConcurrentHash because blocks could change after query
+//       -bitset has to be atomic? - can't create bitset because the key flag, reader count, and index all have to be together?
+//       -use key flag in Block Index struct, treat the entire thing as a 64 bit atomic
 // todo: combine keys and data into one block run
 // todo: make len be a direct lookup
 
@@ -294,7 +295,7 @@ class   ConcurrentList
 public:
   union Head
   {
-    struct { ui32 ver; ui32 idx; };   // ver is version, idx is index // todo: change cnt to version
+    struct { ui32 ver; ui32 idx; };                      // ver is version, idx is index // todo: change cnt to version
     ui64 asInt;
   };
   
@@ -428,37 +429,75 @@ public:
   //  ui64 asInt;
   //};
   
-  struct BlkLst
+  //struct BlkLst
+  //{
+  //  i32   readers;
+  //  ui32      idx;
+  //};
+
+  union KeyAndReaders
   {
-    i32   readers;
-    ui32      idx;
+    struct{ ui32    isKey :  1; i32   readers : 31; };
+    ui32 asInt;
+  };
+  union BlkLst
+  {
+    struct { KeyAndReaders kr; ui32 idx; };
+    ui64 asInt;
   };
 
   using IDX         =  i32;
   using ai32        =  std::atomic<i32>;
-  using BlockLists  =  lava_vec<BlkLst>;
+  using BlockLists  =  lava_vec<BlkLst>;   // only the indices returned from the concurrent list are altered, and only one thread will deal with any single index at a time 
   //using BlockLists  =  lava_vec<IDX>;
 
   const static ui32 LIST_END = ConcurrentList::LIST_END;
 
+  static BlkLst    make_BlkLst(bool isKey, i32 readers, ui32 idx)
+  {
+    BlkLst bl;
+    bl.kr.isKey   = isKey;
+    bl.kr.readers = readers;
+    bl.idx        = idx;
+    return bl;
+  }
+
   bool      incReaders(ui32 blkIdx)        const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
-    ai32* aidx = (ai32*)&(m_bls[blkIdx].readers);
-    i32    cur = aidx->load();
-    i32    nxt;
+    //ai32* aidx = (ai32*)&(m_bls[blkIdx].readers);
+    //i32    cur = aidx->load();
+    //i32    nxt;
+    
+    BlkLst cur, nxt;
+    aui64* aidx = (aui64*)&(m_bls[blkIdx].asInt);
+    cur.asInt   = aidx->load();
+    //nxtBl.asInt = curBl.asInt;
     do{
-      if(cur<0) return false;
-      nxt = cur + 1;
-    }while( !aidx->compare_exchange_strong(cur, nxt) );
+      if(cur.kr.readers<0) return false;
+      nxt = cur;
+      nxt.kr.readers += 1;
+    }while( !aidx->compare_exchange_strong(cur.asInt, nxt.asInt) );
     
     return true;
   }
   bool      decReaders(ui32 blkIdx)        const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
-    ai32* aidx = (ai32*)&(m_bls[blkIdx].readers);
-    auto prev = aidx->fetch_add(-1);
-    if(prev==0){ doFree(blkIdx); return false; }
+    //ai32* aidx = (ai32*)&(m_bls[blkIdx].readers);
+    //
+    //auto prev = aidx->fetch_add(-1);
+    //if(prev==0){ doFree(blkIdx); return false; }
+
+    BlkLst cur, nxt;
+    aui64* aidx = (aui64*)&(m_bls[blkIdx].asInt);
+    cur.asInt   = aidx->load();
+    do{
+      //if(cur.kr.readers<0) return false;
+      nxt = cur;
+      nxt.kr.readers -= 1;
+    }while( !aidx->compare_exchange_strong(cur.asInt, nxt.asInt) );
     
+    if(cur.kr.readers==0){ doFree(blkIdx); return false; }
+
     return true;
   }
 
@@ -541,16 +580,18 @@ private:
   void           doFree(i32  blkIdx)  const        // frees a list/chain of blocks
   {
     i32   cur  =             blkIdx;          // cur is the current block index
-    i32   nxt  =   m_bls[cur].idx;         //*stPtr(cur);              // nxt is the next block index
+    i32   nxt  =   m_bls[cur].idx;            //*stPtr(cur);              // nxt is the next block index
     for(; nxt>0; nxt=m_bls[cur].idx){ 
       memset(blkPtr(cur), 0, m_blockSize);    // zero out memory on free, 
-      m_bls[cur].readers = 0;              // reset the reader count
+      //m_bls[cur].readers = 0;               // reset the reader count
+      m_bls[cur].kr.readers = 0;              // reset the reader count
       m_cl.free(cur);
       m_blocksUsed.fetch_add(-1);
       cur  =  nxt;
     }
     memset(blkPtr(cur), 0, m_blockSize);       // 0 out memory on free, 
-    m_bls[cur].readers = 0;              // reset the reader count
+    //m_bls[cur].readers = 0;                  // reset the reader count
+    m_bls[cur].kr.readers = 0;                 // reset the reader count
     m_cl.free(cur);
   }
 
@@ -643,8 +684,12 @@ public:
         break;
       }
 
-      m_bls[cur] = { 0, nxt };   // { readers, index }
-      cur        =  nxt;         // m_cl.nxt();
+      //m_bls[cur] = { 0, nxt };                  // { readers, index }
+      m_bls[cur].kr.isKey   = i==0 ? 1 : 0;
+      m_bls[cur].kr.readers = 0;
+      m_bls[cur].idx        = nxt;
+      m_bls[cur] = make_BlkLst(i==0, 0, nxt);
+      cur        =  nxt;                        // m_cl.nxt();
       ++cnt;
       m_blocksUsed.fetch_add(1);
       //*p      =  cur;
@@ -652,7 +697,9 @@ public:
     //i32* p  =  (i32*)stPtr(cur);
     //*p      =  byteRem? -byteRem : -blockFreeSize();
 
-    BlkLst bl  = { 0, byteRem? -byteRem : -blockFreeSize() };
+    //BlkLst bl  = { 0, byteRem? -byteRem : -blockFreeSize() };
+    BlkLst bl  = make_BlkLst(false, 0, byteRem? -byteRem : -blockFreeSize() );
+
     m_bls[cur] = bl;
     //m_bls[cur].readers =  0;
     //m_bls[cur].idx     =  byteRem? -byteRem : -blockFreeSize();
@@ -754,7 +801,7 @@ public:
 
     // return MATCH_TRUE; // never reached
   }
-  ui32          len(i32 blkIdx)
+  ui32         len(i32 blkIdx)
   {
     IDX  nxt;
     IDX  cur = blkIdx;
@@ -790,7 +837,8 @@ public:
   static const ui8   INIT_READERS  =     0;            // eventually make this 1 again? - to catch when readers has dropped to 0
   static const ui8   FREE_READY    =     0;
   static const ui8   MAX_READERS   =  0xFF;
-  static const ui32  EMPTY_KEY     =  0xFFFFFFFF;      // full 32 bits set again 
+  static const ui32  EMPTY_KEY     =  0xFFFFFFFF;          // full 32 bits set again 
+  static const ui64  EMPTY_KV      =  0xFFFFFFFFFFFFFFFF;  // full 64 bits set again 
   
   static ui32 nextPowerOf2(ui32  v)
   {
@@ -842,17 +890,6 @@ private:
          ui32   m_sz;
   mutable KVs   m_kvs;
 
-  KV           empty_kv()                   const
-  {
-    KV empty;
-//    empty.remove   =  0;
-    //empty.readers  =  INIT_READERS;
-    //empty.key      =  0;
-    //empty.val      =  0;
-    empty.key      =  EMPTY_KEY;
-    empty.val      =  EMPTY_KEY;
-    return empty;
-  }
   KV            load_kv(ui32  i)            const
   {
     using namespace std;
@@ -1030,6 +1067,22 @@ public:
   {
     return m_kvs[idx];
   }
+  ui32        nxt(ui32  idx)                      const
+  {
+    while( load_kv(idx).asInt == empty_kv().asInt ) ++idx;
+    return idx;
+  }
+  KV     empty_kv()                               const
+  {
+    KV empty;
+//    empty.remove   =  0;
+    //empty.readers  =  INIT_READERS;
+    //empty.key      =  0;
+    //empty.val      =  0;
+    empty.key      =  EMPTY_KEY;
+    empty.val      =  EMPTY_KEY;
+    return empty;
+  }
   ui32       size()                               const
   {
     return m_sz;
@@ -1138,6 +1191,8 @@ private:
   ConcurrentStore     m_cs;     // store data in blocks and get back indices
   ConcurrentHash      m_ch;     // store the indices of keys and values - contains a ConcurrentList
 
+  mutable ui32  m_curChIdx;     // this variable is local to the stack where simdb lives, unlike the others, it is not simply a pointer into the shared memory 
+
   static const ui32  EMPTY_KEY = ConcurrentHash::EMPTY_KEY;          // 28 bits set 
   static const ui32   LIST_END = ConcurrentStore::LIST_END;
   static aui64*  SpinWhileFalse(aui64* ptr)
@@ -1177,7 +1232,8 @@ private:
 
 public:
   simdb(){}
-  simdb(const char* name, ui32 blockSize, ui32 blockCount) // : 
+  simdb(const char* name, ui32 blockSize, ui32 blockCount) : 
+    m_curChIdx(0)
     //m_mem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount)) ),
     //m_ch( ((i8*)m_mem.data())+OffsetBytes(), blockCount, m_mem.owner),
     //m_cs( ((i8*)m_mem.data())+m_ch.sizeBytes(blockCount)+OffsetBytes(), blockSize, blockCount, m_mem.owner),                 // todo: change this to a void*
@@ -1311,6 +1367,17 @@ public:
     if(kv.key!=EMPTY_KEY) m_cs.free(kv.key);
 
     return kv.key!=EMPTY_KEY;
+  }
+  ui32      nxt() const
+  {
+    KV kv;
+    do{
+      auto chNxt = m_ch.nxt(m_curChIdx);           // can return the same index - it does not do the iteration after finding a non empty key
+              kv = m_ch.at(chNxt);
+      m_curChIdx = chNxt + 1;
+    }while( kv.asInt == m_ch.empty_kv().asInt );
+
+    return kv.key;
   }
   auto     data() const -> const void*
   {

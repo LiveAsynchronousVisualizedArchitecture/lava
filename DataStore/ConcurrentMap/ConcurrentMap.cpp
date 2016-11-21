@@ -192,6 +192,8 @@ using vec        =  std::vector<T, _Alloc>;
 
 using std::thread;
 
+
+
 int main()
 {
   using namespace std;
@@ -392,6 +394,23 @@ int main()
   //Println(mapmem);
 
   //Println("kv sz: ", sizeof(simdb::KV) );
+
+  //ui32    isKey :  1;
+  //i32   readers : 31;
+
+  union KeyAndReaders
+  {
+    struct{ ui32    isKey :  1; i32   readers : 31; };
+    ui32 asInt;
+  };
+  union BlkLst
+  {
+    struct { KeyAndReaders kr; ui32 idx; };
+    ui64 asInt;
+  };
+
+  Println("KeyAndReaders sz: ", sizeof(KeyAndReaders) );
+  Println("BlkLst sz: ",        sizeof(BlkLst) );
 
   simdb db("test", 8, 16);
 
