@@ -192,8 +192,6 @@ using vec        =  std::vector<T, _Alloc>;
 
 using std::thread;
 
-
-
 int main()
 {
   using namespace std;
@@ -449,56 +447,66 @@ int main()
   //  Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
   //}
 
-  TO(db.blocks()*2,i) Println("nxt key len: ", db.len(db.nxt()) );
+  TO(db.blocks(),i){
+    str key( db.len(db.nxt()), '\0');
+    auto len = db.getKey(db.cur(), (void*)key.data(), (ui32)key.length());
+    str val(16, '\0');
+    db.get(key, (void*)val.data() );
+    val.resize( strlen(val.c_str()) );
+    Println("len: ", len, 
+            " str len: ", 
+            key.length(), "  nxt key: [", key, 
+            "]  val: [", val,"] val len: ", val.length() );
+  }
 
-  Println("wat data len: ",    db.len(wat)    );
-  Println("wut data len: ",    db.len(wut)    );
-  Println("kablam data len: ", db.len(kablam) );
-
-  str clear = "                ";
-  auto watlen = db.get("wat",      (void*)clear.data() );
-  //auto watslen = db.get(str("w"), (void*)clear.data() );
-  Println("watlen: ", watlen);
-  Println("get \"wat\": ", clear);
-  Println();
-
-  clear = "                ";
-  auto wutlen = db.get("wut", (void*)clear.data() );
-  Println("wutlen: ", wutlen);
-  Println("get \"wut\": ", clear);
-  Println();
-
-  clear = "                ";
-  auto kablamlen = db.get("kablam", (void*)clear.data() );
-  Println("kablamlen: ", kablamlen);
-  Println("get \"kablam\": ", clear);
-  Println();
-
-  Println("size: ", db.size());
-  str memstr( (const char*)db.data(), (const char*)db.data() + db.size());
-  Println("\nmem: ", memstr, "\n" );
-
-  Println("owner: ", db.isOwner(), "\n\n");
-
-  //std::vector<i64>::value_type v;
-  //Println("v size: ", sizeof(v));
-  
-  //ui64    cnt = (ui64)((1<<17)*1.5);
-  ui64    cnt = (1<<16);
-  //ui64  bytes = lava_vec<i32>::sizeBytes(cnt);
-  //void*   mem = malloc( bytes ); 
-  //lava_vec<i32> lv(mem, cnt);
-
-  auto lv = STACK_VEC(i64, cnt);
-  //memset(lv.data(), 0, 16*sizeof(ui32) );
-  Println("capacity: ",  lv.capacity() );
-  Println("size: ",      lv.size() );
-  Println("sizeBytes: ", lv.sizeBytes() );
-  TO(lv.size(), i) lv[i] = i;
-  cout << lv[lv.size()-1] << " ";
-  //TO((i32)lv.size(), i) Print(" ",i,":",lv[i]);
-  //TO(lv.size(), i) cout << lv[i] << " ";
-  //lv.~lava_vec();  // running the destructor explicitly tests double destrucion since it will be destructed at the end of the function also
+  //Println("wat data len: ",    db.len(wat)    );
+  //Println("wut data len: ",    db.len(wut)    );
+  //Println("kablam data len: ", db.len(kablam) );
+  //
+  //str clear = "                ";
+  //auto watlen = db.get("wat",      (void*)clear.data() );
+  ////auto watslen = db.get(str("w"), (void*)clear.data() );
+  //Println("watlen: ", watlen);
+  //Println("get \"wat\": ", clear);
+  //Println();
+  //
+  //clear = "                ";
+  //auto wutlen = db.get("wut", (void*)clear.data() );
+  //Println("wutlen: ", wutlen);
+  //Println("get \"wut\": ", clear);
+  //Println();
+  //
+  //clear = "                ";
+  //auto kablamlen = db.get("kablam", (void*)clear.data() );
+  //Println("kablamlen: ", kablamlen);
+  //Println("get \"kablam\": ", clear);
+  //Println();
+  //
+  //Println("size: ", db.size());
+  //str memstr( (const char*)db.data(), (const char*)db.data() + db.size());
+  //Println("\nmem: ", memstr, "\n" );
+  //
+  //Println("owner: ", db.isOwner(), "\n\n");
+  //
+  ////std::vector<i64>::value_type v;
+  ////Println("v size: ", sizeof(v));
+  //
+  ////ui64    cnt = (ui64)((1<<17)*1.5);
+  //ui64    cnt = (1<<16);
+  ////ui64  bytes = lava_vec<i32>::sizeBytes(cnt);
+  ////void*   mem = malloc( bytes ); 
+  ////lava_vec<i32> lv(mem, cnt);
+  //
+  //auto lv = STACK_VEC(i64, cnt);
+  ////memset(lv.data(), 0, 16*sizeof(ui32) );
+  //Println("capacity: ",  lv.capacity() );
+  //Println("size: ",      lv.size() );
+  //Println("sizeBytes: ", lv.sizeBytes() );
+  //TO(lv.size(), i) lv[i] = i;
+  //cout << lv[lv.size()-1] << " ";
+  ////TO((i32)lv.size(), i) Print(" ",i,":",lv[i]);
+  ////TO(lv.size(), i) cout << lv[i] << " ";
+  ////lv.~lava_vec();  // running the destructor explicitly tests double destrucion since it will be destructed at the end of the function also
 
   Println("\n");
   PAUSE
@@ -509,16 +517,9 @@ int main()
 
 
 
-
-
-
-
-
-
-
-
-
-
+//auto idx = db.nxt();
+//str key( db.len(idx), '\0');
+//auto len = db.getKey(idx, (void*)key.data(), (ui32)key.length());
 
 //auto idx2 = db.get((void*)kablam.data(), (ui32)kablam.length());
 //Println("get \"kablam\": ", idx2);
