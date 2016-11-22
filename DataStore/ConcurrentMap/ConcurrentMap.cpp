@@ -427,7 +427,7 @@ int main()
   Println("empty kv: ", ConcurrentHash::EMPTY_KEY );
 
 
-  simdb db("test", 8, 4);
+  simdb db("test", 8, 8);
 
   str       wat  =       "wat";
   str       wut  =       "wut";
@@ -437,7 +437,7 @@ int main()
   //if( db.isOwner() ){
     Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
     //db.rm("wat");
-    //Println("put: ", db.put( (void*)wut.data(),   (ui32)wut.length(),    (void*)kablam.data(),   (ui32)kablam.length())   ); 
+    Println("put: ", db.put( (void*)wut.data(),   (ui32)wut.length(),    (void*)kablam.data(),   (ui32)kablam.length())   ); 
     //db.rm("wut");
     Println("put: ", db.put( (void*)kablam.data(),(ui32)kablam.length(), (void*)skidoosh.data(), (ui32)skidoosh.length()) ); 
     //db.rm("kablam");
