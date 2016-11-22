@@ -95,6 +95,9 @@
 // done    -check if the readers is not less than 0
 //       -after getting the length, read from the block index, again checking if the block index is a key and if not, returning an error 
 
+// todo: need more data with BlkIdx so that blocks read are known to be from the correct key value pair
+// todo: need to have a version with each block and store it with each non head BlkIdx as well as the key value pair of ConcurrentHash - how many bits for the version? 32 bits to start? - just needs to be enough so that a so many blocks can't be gotten while a thread is stalled that the version wraps back around
+// todo: have to put version in concurrent hash so that an overwrite from a new write won't cause an ABA problem with another thread reading from it, then decrementing readers?
 // todo: make ConcurrentStore.get take a length that it won't exceed
 // todo: do a write up on if linear search is neccesary because a hash could land on a KV that has readers as -1 ?  - no different than any other hash map? - search stops on an empty key, but it shouldn't stop on readers<0 ? what happens if a key is inserted a few slots from where the hash lands, then the original landing place is removed? does the empty key stop the search?
 // todo: work out how doFree from ConcurrentHash connects to removing blocks 
