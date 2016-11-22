@@ -1,3 +1,9 @@
+// TODO: Make a 3d object
+// TODO: Use element buffer (indexed) draws
+// TODO: Add shaders
+// TODO: Add all attributes
+// TODO: Camera
+
 #include "../DataStore/ConcurrentMap/ConcurrentMap.hpp"
 #include "IndexedVerts.h"
 #include "no_rt_util.h"
