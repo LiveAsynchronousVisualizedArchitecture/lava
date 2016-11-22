@@ -84,17 +84,6 @@
 // -todo: have to make hash the authority, give KV struct a reader count
 // -todo: put incReaders and decReaders around match function call in ConcurrentHash functions
 // -todo: make setting the key flag be the first thing when freeing - actually done in decReaders
-
-// todo: do a write up on if linear search is neccesary because a hash could land on a KV that has readers as -1 ?  - no different than any other hash map? - search stops on an empty key, but it shouldn't stop on readers<0 ? what happens if a key is inserted a few slots from where the hash lands, then the original landing place is removed? does the empty key stop the search?
-// todo: work out how doFree from ConcurrentHash connects to removing blocks 
-// todo: redo simdb functions to use runRead
-// todo: test looking up values from the iterated keys
-// todo: give put() return type a BLKIDX type
-// todo: take out size_t from ConcurrentStore
-// todo: organize all C++ functions separate from C functions so that they can be #ifdef out if used as a C library
-// todo: implement get that takes an index into ConcurrentHash - 0 length does nothing, length must be inout, if key is empty or readers is < 0, make length 0 and do nothing 
-// todo: make sure when looping through keys, that readers is not negative? all reads must be atomic? all BlkLst must have their original index embedded? ConcurrentHash does need readers after all?
-// todo: make alloc give back blocks if allocation fails
 // todo: make indexed list of keys
 //       -create a bitset in the ConcurrentHash? - can't use ConcurrentHash because blocks could change after query
 //       -bitset has to be atomic? - can't create bitset because the key flag, reader count, and index all have to be together?
@@ -105,6 +94,18 @@
 // done    -check if the key is not empty
 // done    -check if the readers is not less than 0
 //       -after getting the length, read from the block index, again checking if the block index is a key and if not, returning an error 
+
+// todo: make ConcurrentStore.get take a length that it won't exceed
+// todo: do a write up on if linear search is neccesary because a hash could land on a KV that has readers as -1 ?  - no different than any other hash map? - search stops on an empty key, but it shouldn't stop on readers<0 ? what happens if a key is inserted a few slots from where the hash lands, then the original landing place is removed? does the empty key stop the search?
+// todo: work out how doFree from ConcurrentHash connects to removing blocks 
+// todo: redo simdb functions to use runRead
+// todo: test looking up values from the iterated keys
+// todo: give put() return type a BLKIDX type
+// todo: take out size_t from ConcurrentStore
+// todo: organize all C++ functions separate from C functions so that they can be #ifdef out if used as a C library
+// todo: implement get that takes an index into ConcurrentHash - 0 length does nothing, length must be inout, if key is empty or readers is < 0, make length 0 and do nothing 
+// todo: make sure when looping through keys, that readers is not negative? all reads must be atomic? all BlkLst must have their original index embedded? ConcurrentHash does need readers after all?
+// todo: make alloc give back blocks if allocation fails
 // todo: flip decReaders return value
 // todo: can make a bitmap for filled hash indices if the bit is set after the KV is set, and the bit is unset before unsetting the KV
 // todo: combine keys and data into one block run
@@ -1119,7 +1120,6 @@ public:
     return ret;
   }
 
-
   bool          init(ui32   sz)
   {
     using namespace std;
@@ -1420,15 +1420,32 @@ public:
   {
     if(klen<1) return 0;
     
-    auto    ths = this;
-    auto retLen = m_ch.runRead(idx, [ths, out_buf](KV kv)
-    {
-      //if(kv.key==EMPTY_KEY || kv.readers<0) return 0ull;
-      //if(isEmpty(kv)) return 0ull;
+    auto     ths = this;
+    auto runFunc = [ths, out_buf](KV kv){
       return IsEmpty(kv)?  0ull  :  ths->m_cs.get(kv.key, out_buf);
-    });
+    };
+    auto  retLen = m_ch.runRead(idx, runFunc);
 
     return retLen;
+  }
+  i64       len(void* key, ui32 klen)
+  {
+    if(klen<1) return 0;
+
+    auto       ths = this;
+    void*   keyptr = key;
+    auto       hsh = ConcurrentHash::HashBytes( keyptr, klen );
+    
+    auto   runFunc = [ths](KV kv)
+    { return IsEmpty(kv)?  0ull  :  ths->m_cs.len(kv.key); };
+
+    auto matchFunc = [ths, key, klen](ui32 blkidx){
+      return CompareBlock(ths, key, klen, blkidx);
+    };
+    
+    auto    retlen = m_ch.runMatch(hsh,  matchFunc, runFunc);
+  
+    return retlen;
   }
   ui32      len(ui32 idx)
   {
@@ -1482,15 +1499,16 @@ public:
   }
 
   // separated C++ functions - these won't need to exist if compiled for a C interface
-  ui32   keylen(std::string const& key)
-  {
-    KV kv = read( (void*)key.data(), (ui32)key.length() );
+  //ui32   keyLen(std::string const& key)
+  //{
+    //KV kv = read( (void*)key.data(), (ui32)key.length() );
+    //
+    //if(kv.key==EMPTY_KEY) return 0;
+    //else                  return m_cs.len(kv.val);
+  //}
 
-    if(kv.key==EMPTY_KEY) return 0;
-    else                  return m_cs.len(kv.val);
-  }
   template<class T>
-  i64       get(std::vector<T> const& key, void* out_buf)
+  i64          get(std::vector<T> const& key, void* out_buf)
   {
     Reader r = read((void*)key.data(), (ui32)(key.size() * sizeof(T)));
     if(isEmpty(r.kv)) return -1;
@@ -1501,37 +1519,87 @@ public:
 
     return len;
   }
-  i64       get(std::string    const& key, void* out_buf)
-  {
-    //Reader r = read( (void*)key.data(), (ui32)key.length() );
-    //if(r.kv.key==EMPTY_KEY || r.kv.readers<=0) return -1;                // after the read, the readers should be at least 1  /*|| r.kv.remove*/
-    //
-    //if(kv.val!=EMPTY_KEY) m_cs.free(kv.val);
-    //if(kv.key!=EMPTY_KEY) m_cs.free(kv.key);
-    //
-    //if(r.doRm()){ m_cs.free(kv.val); m_cs.free(kv.key); }
-    
-    //KV       kv = read( (void*)key.data(), (ui32)key.length() );
-    //if(kv.key==EMPTY_KEY) return -1;                                      // || r.kv.readers<=0) return -1;     // after the read, the readers should be at least 1  /*|| r.kv.remove*/
-    //ui64    len = getFromBlkIdx(kv.val, out_buf);
 
-    auto       ths = this;
-    void*   keyptr = (void*)key.c_str();
-    auto    keylen = key.length();
-    auto       hsh = ConcurrentHash::HashBytes( keyptr, (ui32)keylen );
-    
-    auto   runFunc = [ths, out_buf](KV kv)
-    { return IsEmpty(kv)?  0ull  :  ths->m_cs.get(kv.key, out_buf); };
+  auto   getKeyStr(ui32 idx) -> std::string
+  {    
+    using namespace std;
 
-    auto matchFunc = [ths, keyptr, keylen](ui32 blkidx)
-    { return CompareBlock(ths,keyptr,keylen,blkidx); };
-    
-    auto    retlen = m_ch.runMatch(hsh,  matchFunc, runFunc);
+    string s;
+    i64 retlen = 0;
+    i64 strlen = 0;
+    auto   ths = this;
+    do{
+      strlen = len(idx);
+      if(strlen<0) return string();
+      s = string(strlen, 0);
 
-    //auto klen = keylen(key);  
-  
-    return retlen;
+      auto runFunc = [ths, &s](KV kv){
+        return IsEmpty(kv)?  0ull  :  ths->m_cs.get(kv.key, (void*)s.data() /* add length here */);
+      };
+
+      retlen = m_ch.runRead(idx, runFunc);
+    }while(retlen != strlen);
+
+    return s;
   }
+
+  //auto   getStr(std::string    const& key) -> std::string
+  //{
+  //  using namespace std;
+  //  
+  //  auto      ths = this;
+  //  void*  keyptr = (void*)key.c_str();
+  //  auto   keylen = key.length();
+  //  i64    retlen = 0;
+  //  auto      hsh = ConcurrentHash::HashBytes( keyptr, (ui32)keylen );
+  //  do
+  //  {
+  //    string s();
+  //    auto   valbuf = s.data();
+  //    auto   vallen = s.
+  //    auto  runFunc = [ths, out_buf](KV kv)
+  //    { return IsEmpty(kv)?  0ull  :  ths->m_cs.get(kv.key, out_buf); };
+  //
+  //    auto matchFunc = [ths, keyptr, keylen](ui32 blkidx)
+  //    { return CompareBlock(ths,keyptr,keylen,blkidx); };
+  //  
+  //    auto    retlen = m_ch.runMatch(hsh,  matchFunc, runFunc);
+  //  }while(retlen != keylen);
+  //
+  //  //auto klen = keylen(key);  
+  //
+  //  return retlen;
+  //}
+
+  //auto   getStr(std::string    const& key) -> std::string
+  //{
+  //  using namespace std;
+  //  
+  //  auto      ths = this;
+  //  void*  keyptr = (void*)key.c_str();
+  //  auto   keylen = key.length();
+  //  i64    retlen = 0;
+  //  auto      hsh = ConcurrentHash::HashBytes( keyptr, (ui32)keylen );
+  //  do
+  //  {
+  //    
+  //    string s();
+  //    auto   valbuf = s.data();
+  //    auto   vallen = s.
+  //    auto  runFunc = [ths, out_buf](KV kv)
+  //    { return IsEmpty(kv)?  0ull  :  ths->m_cs.get(kv.key, out_buf); };
+  //
+  //    auto matchFunc = [ths, keyptr, keylen](ui32 blkidx)
+  //    { return CompareBlock(ths,keyptr,keylen,blkidx); };
+  //  
+  //    auto    retlen = m_ch.runMatch(hsh,  matchFunc, runFunc);
+  //  }while(retlen != keylen);
+  //
+  //  //auto klen = keylen(key);  
+  //
+  //  return retlen;
+  //}
+
   bool       rm(std::string const& key)
   {
     auto  len = (ui32)key.length();
@@ -1556,6 +1624,34 @@ public:
 
 
 
+
+//if(klen<1) return 0;
+//
+//auto     ths = this;
+//auto runFunc = [ths, key](KV kv){
+//  return IsEmpty(kv)?  0ull  :  ths->m_cs.len(kv.key);
+//};
+//
+//auto  retLen = m_ch.runMatch(idx, runFunc);
+//
+//return retLen;
+//
+//auto    keylen = key.length();
+
+//Reader r = read( (void*)key.data(), (ui32)key.length() );
+//if(r.kv.key==EMPTY_KEY || r.kv.readers<=0) return -1;                // after the read, the readers should be at least 1  /*|| r.kv.remove*/
+//
+//if(kv.val!=EMPTY_KEY) m_cs.free(kv.val);
+//if(kv.key!=EMPTY_KEY) m_cs.free(kv.key);
+//
+//if(r.doRm()){ m_cs.free(kv.val); m_cs.free(kv.key); }
+//
+//KV       kv = read( (void*)key.data(), (ui32)key.length() );
+//if(kv.key==EMPTY_KEY) return -1;                                      // || r.kv.readers<=0) return -1;     // after the read, the readers should be at least 1  /*|| r.kv.remove*/
+//ui64    len = getFromBlkIdx(kv.val, out_buf);
+
+//if(kv.key==EMPTY_KEY || kv.readers<0) return 0ull;
+//if(isEmpty(kv)) return 0ull;
 
 //static const ui32  EMPTY_KEY     =  0xFFFFFFFF;          // full 32 bits set 
 //static const ui64  EMPTY_KEY     =  0x00000000FFFFFFFF;    // test

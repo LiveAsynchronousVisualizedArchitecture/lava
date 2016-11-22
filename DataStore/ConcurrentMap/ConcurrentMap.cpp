@@ -420,9 +420,9 @@ int main()
   //  ui64 asInt;
   //};
 
-  Println("KV sz: ", sizeof(ConcurrentHash::KV) );
-  Println("empty kv: ", ConcurrentHash::empty_kv().key == ConcurrentHash::EMPTY_KEY );
-  Println("empty kv: ", ConcurrentHash::EMPTY_KEY );
+  //Println("KV sz: ", sizeof(ConcurrentHash::KV) );
+  //Println("empty kv: ", ConcurrentHash::empty_kv().key == ConcurrentHash::EMPTY_KEY );
+  //Println("empty kv: ", ConcurrentHash::EMPTY_KEY );
 
 
   simdb db("test", 8, 8);
@@ -447,14 +447,25 @@ int main()
   //  Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
   //}
 
-  TO(db.blocks(),i){
-    str key( db.len(db.nxt()), '\0');
-    auto len = db.getKey(db.cur(), (void*)key.data(), (ui32)key.length());
-    str val(16, '\0');
-    db.get(key, (void*)val.data() );
+  TO(6,i)
+  {
+    //str  key( db.len(db.nxt()), '\0');
+    //auto len = db.getKey(db.cur(), (void*)key.data(), (ui32)key.length());
+    //str  val(16, '\0');
+    //db.get(key, (void*)val.data() );
+    //val.resize( strlen(val.c_str()) );
+    //
+    //Println("len: ", len, 
+    //    " str len: ", 
+    //    key.length(), "  nxt key: [", key, 
+    //    "]  val: [", val,"] val len: ", val.length() );    
+
+    str  key = db.getKeyStr(db.nxt());
+    str  val(16, '\0');
+    db.get(key.c_str(), (void*)val.data() );
     val.resize( strlen(val.c_str()) );
-    Println("len: ", len, 
-            " str len: ", 
+
+    Println(" str len: ", 
             key.length(), "  nxt key: [", key, 
             "]  val: [", val,"] val len: ", val.length() );
   }
@@ -482,9 +493,11 @@ int main()
   //Println("get \"kablam\": ", clear);
   //Println();
   //
-  //Println("size: ", db.size());
-  //str memstr( (const char*)db.data(), (const char*)db.data() + db.size());
-  //Println("\nmem: ", memstr, "\n" );
+
+  Println("size: ", db.size());
+  str memstr( (const char*)db.data(), (const char*)db.data() + db.size());
+  Println("\nmem: ", memstr, "\n" );
+
   //
   //Println("owner: ", db.isOwner(), "\n\n");
   //
