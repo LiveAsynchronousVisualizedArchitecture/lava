@@ -398,21 +398,36 @@ int main()
   //ui32    isKey :  1;
   //i32   readers : 31;
 
-  union KeyAndReaders
-  {
-    struct{ ui32    isKey :  1; i32   readers : 31; };
-    ui32 asInt;
-  };
-  union BlkLst
-  {
-    struct { KeyAndReaders kr; ui32 idx; };
-    ui64 asInt;
-  };
+  //union KeyAndReaders
+  //{
+  //  struct{ ui32    isKey :  1; i32   readers : 31; };
+  //  ui32 asInt;
+  //};
+  //union BlkLst
+  //{
+  //  struct { KeyAndReaders kr; ui32 idx; };
+  //  ui64 asInt;
+  //};
+  //Println("KeyAndReaders sz: ", sizeof(KeyAndReaders) );
+  //Println("BlkLst sz: ",        sizeof(BlkLst) );
 
-  Println("KeyAndReaders sz: ", sizeof(KeyAndReaders) );
-  Println("BlkLst sz: ",        sizeof(BlkLst) );
+  //union      KV         // 256 million keys (28 bits), 256 million values (28 bit),  255 readers (8 bits)
+  //{
+  //  struct
+  //  {
+  //    ui64     key : 28;
+  //    ui64     val : 28;
+  //    ui64 readers :  8;
+  //  };
+  //  ui64 asInt;
+  //};
 
-  simdb db("test", 8, 16);
+  Println("KV sz: ", sizeof(ConcurrentHash::KV) );
+  Println("empty kv: ", ConcurrentHash::empty_kv().key == ConcurrentHash::EMPTY_KEY );
+  Println("empty kv: ", ConcurrentHash::EMPTY_KEY );
+
+
+  simdb db("test", 8, 4);
 
   str       wat  =       "wat";
   str       wut  =       "wut";
@@ -422,15 +437,19 @@ int main()
   //if( db.isOwner() ){
     Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
     //db.rm("wat");
-    Println("put: ", db.put( (void*)wut.data(),   (ui32)wut.length(),    (void*)kablam.data(),   (ui32)kablam.length())   ); 
+    //Println("put: ", db.put( (void*)wut.data(),   (ui32)wut.length(),    (void*)kablam.data(),   (ui32)kablam.length())   ); 
     //db.rm("wut");
     Println("put: ", db.put( (void*)kablam.data(),(ui32)kablam.length(), (void*)skidoosh.data(), (ui32)skidoosh.length()) ); 
     //db.rm("kablam");
+    //Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
+    //db.rm("wat");
     Println();
   //}
   //else{
   //  Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
   //}
+
+  TO(db.blocks()*2,i) Println("nxt key len: ", db.len(db.nxt()) );
 
   Println("wat data len: ",    db.len(wat)    );
   Println("wut data len: ",    db.len(wut)    );
