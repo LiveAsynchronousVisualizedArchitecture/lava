@@ -94,7 +94,10 @@
 // done    -check if the key is not empty
 // done    -check if the readers is not less than 0
 //       -after getting the length, read from the block index, again checking if the block index is a key and if not, returning an error 
+// -todo: can cleanup be done by checking the CH entry after read and setting a flag to delete the old version? - no, because this would only shield one overlap, if more threads were swapping CH entries, they would have to wait/spinlock
 
+// todo: make readers for blocks only exist on the head of the list?
+// todo: make sure that a block isn't read from if readers<0
 // todo: do a write up on overall structure
 // todo: need more data with BlkIdx so that blocks read are known to be from the correct key value pair
 // todo: need to have a version with each block and store it with each non head BlkIdx as well as the key value pair of ConcurrentHash - how many bits for the version? 32 bits to start? - just needs to be enough so that a so many blocks can't be gotten while a thread is stalled that the version wraps back around
@@ -152,13 +155,18 @@
 // idea: put atomic reader counter into each ConcurrentStore entry as a signed integer
 // idea: figure out how to make ConcurrentHash a flat data structure so it can sit in shared memory
 
+// q: can cleanup be done by a ring buffer of block lists? would the ring buffer only need to be as long as the number of threads if each thread helps clear out the ring buffer after every free()? Probably not, because delayed deallocation would be useful only when there is a reader/ref count, which would mean many more reads than writes could stall the ability to free? But each thread can really only hold one reference at a time so maybe it would work? 
+// q: if using a ring buffer, indices might be freed in between non-freed indices, in which case the pointer to beginning and end would not be able to shift, and therefore would need space for more indices than just the number of threads
+// q: if using a ring buffer for frees, could a thread freeing the index then bubble sort backwards and move the begin pointer forwards until the begin and end pointers have only non freed indices between them 
+// q: does the main program even need a key value store? can't it just use the block list indices directly?
+
 /*
  SimDB
 
  What it does:
- | SimDB is a key value store that uses arbitrary byte data as both the key and the value. 
- | It additionally uses shared memory, which allows processes to communicate with each other quickly.  
- | It is lock free and scales well with multiple threads writing, reading, and removing concurrently.  
+ |  SimDB is a key value store that uses arbitrary byte data as both the key and the value. 
+ |  It additionally uses shared memory, which allows processes to communicate with each other quickly.  
+ |  It is lock free and scales well with multiple threads writing, reading, and removing concurrently.  
 
  How it works:
  |-simdb:
@@ -174,6 +182,36 @@
    |  |  It is an array of one integer per block with the integer at a given index representing the index of the next block.  
    |  |-BlockStore:
    |  |-BlockList (lava_vec):
+
+ Terms:
+ |-Block List: 
+ |  A sequence of block indices.  The entry in ConcurrentHash gives the position in the block list array where the list starts.  
+ |  The value at each index in the array contains the index of the next block.  
+ |  The list end is know when a special value of LIST_END is found as the value in the array.
+ |-Block List Version:
+ |  This is a version number given to each block list on allocation (not each block). 
+ |  It is used to link a ConcurrentHash value to the block list. 
+ |  If the versions are the same, it is known that the block list at the index read from ConcurrentHash has not changed.
+ |  This change could happen if:
+ |  |  1. Thread ONE reads the entry in ConcurrentHash but has not accessed the block list index in the entry yet. Pretend that thread one stalls and nothing more happens until further down.
+ |  |  2. Thread TWO has already allocated a block list and swaps its new entry for the old entry which is still carried by thread one. 
+ |  |  3. Thread TWO now must free the block list given by the old entry, which it does, because no thread is reading it since thread one is still stalled.
+ |  |  4. Thread TWO allocates another block list, which ends up using the blocks it just deallocated.
+ |  |  5. Thread ONE wakes up and reads from the block index it found in the ConcurrentHash entry, which is no longer the same and may not even be the head of the list.
+ |  |  If the index is used purely for matching the binary key, this wouldn't be a problem. 
+ |  |  When the index is used to find a binary value however, this is a problem, since the length of a different value could be the same, and there would be no data to be able to tell that they are different.
+
+ How it achieves lock free concurrency:
+ |  ConcurrentHash is treated as the authority of what is stored in the database. 
+ |  It has an array of 64 bit integers. Each 64 bit integer is dealt with atomically.
+ |  Its individual bits are used as a bitfied struct containing an index into ConcurrentStore's block list as well as the version number of that list.
+ |-Finding a matching index: 
+ |  |  1. Use the hash of the key bytes to jump to an index.
+ |  |  2. Load the integer atomically from that index and cast to the bitfield struct.
+ |  |  3. Use the index from that struct to read the bytes from the list of blocks in BlkLst. 
+ |  |  4. Use version from that struct to verify that each block is part of the list given by the ConcurrenHash entry.
+ |  |  5. If there is a match, keep reading the list of blocks to fill the output buffer with the value section of the block list.
+
 */
 
 #ifndef __CONCURRENTMAP_HEADER_GUARD__
