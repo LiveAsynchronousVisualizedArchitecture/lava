@@ -95,6 +95,7 @@
 // done    -check if the readers is not less than 0
 //       -after getting the length, read from the block index, again checking if the block index is a key and if not, returning an error 
 
+// todo: do a write up on overall structure
 // todo: need more data with BlkIdx so that blocks read are known to be from the correct key value pair
 // todo: need to have a version with each block and store it with each non head BlkIdx as well as the key value pair of ConcurrentHash - how many bits for the version? 32 bits to start? - just needs to be enough so that a so many blocks can't be gotten while a thread is stalled that the version wraps back around
 // todo: have to put version in concurrent hash so that an overwrite from a new write won't cause an ABA problem with another thread reading from it, then decrementing readers?
@@ -151,6 +152,29 @@
 // idea: put atomic reader counter into each ConcurrentStore entry as a signed integer
 // idea: figure out how to make ConcurrentHash a flat data structure so it can sit in shared memory
 
+/*
+ SimDB
+
+ What it does:
+ | SimDB is a key value store that uses arbitrary byte data as both the key and the value. 
+ | It additionally uses shared memory, which allows processes to communicate with each other quickly.  
+ | It is lock free and scales well with multiple threads writing, reading, and removing concurrently.  
+
+ How it works:
+ |-simdb:
+   | This contains the interface as well as ConcurrentHash, ConcurentStore, and SharedMem classes.
+   |-SharedMem:
+   |  |  Interface to OS specific shared memory functions.
+   |-ConcurrentHash:
+   |  |  Hash map that uses atomics along with 64 bit values to make sure that reading and writing is lock free.
+   |-ConcurrentStore:
+   |  |  Keeps track of block lists.  This exposes an alloc() function and a free() function. 
+   |  |  alloc() gets the number of blocks from the BlockStore.
+   |  |  The BlkLst lava_vec is used to make linked lists of block indices. 
+   |  |  It is an array of one integer per block with the integer at a given index representing the index of the next block.  
+   |  |-BlockStore:
+   |  |-BlockList (lava_vec):
+*/
 
 #ifndef __CONCURRENTMAP_HEADER_GUARD__
 #define __CONCURRENTMAP_HEADER_GUARD__
