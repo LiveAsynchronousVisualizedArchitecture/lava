@@ -1,3 +1,6 @@
+#ifndef LAVA_INDEXED_VERTS_H
+#define LAVA_INDEXED_VERTS_H
+
 #include <stdint.h>
 
 extern "C"
@@ -63,3 +66,5 @@ extern "C"
         return iv->pixels + ofst;
     }
 }
+
+#endif

@@ -1,8 +1,7 @@
-// TODO: Make a 3d object
-// TODO: Use element buffer (indexed) draws
-// TODO: Add shaders
 // TODO: Add all attributes
-// TODO: Camera
+// TODO: Control camera with mouse
+#include <fstream>
+#include <sstream>
 
 #include "../DataStore/ConcurrentMap/ConcurrentMap.hpp"
 #include "IndexedVerts.h"
@@ -10,6 +9,7 @@
 
 #include <GL/glew.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "glfw3.h"
 
@@ -37,6 +37,10 @@
 #define LEN(a) (sizeof(a)/sizeof(a)[0])
 
 void* makeTriangle(size_t& byteLen, bool left);
+void* makeCube(size_t& byteLen);
+
+// TODO(Chris): Remove global
+static GLuint shaderProgramId;
 
 struct Key {
     int active;
@@ -44,6 +48,7 @@ struct Key {
     void* bytes;
     GLuint vertexBuffer;
     GLuint vertexArray;
+    GLuint indexBuffer;
     IndexedVerts* iv;
 
     void render() {
@@ -54,15 +59,36 @@ struct Key {
 
             glGenVertexArrays(1, &vertexArray);
             glGenBuffers(1, &vertexBuffer);
+            glGenBuffers(1, &indexBuffer);
+
             glBindVertexArray(vertexArray);
+
             glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex)* iv->vertsLen, &iv->verts[0], GL_STATIC_DRAW);
+            glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex)* iv->vertsLen, iv->verts, GL_STATIC_DRAW);
+
+            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t)* 36, iv->indices, GL_STATIC_DRAW);
+
             glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(float)* 12, (void*)0);
+            glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(float)* 12, (void*)(sizeof(float) * 6));
+
             glEnableVertexAttribArray(0);
+            glEnableVertexAttribArray(1);
+
             glBindVertexArray(0);
         }
+        // Camera/View transformation
+        glUseProgram(shaderProgramId);
+        glm::mat4 transform;
+        transform = glm::rotate(transform, (GLfloat)glfwGetTime() * 50.0f, glm::vec3(0.2f, 0.5f, 1.0f));
+        GLint transformLoc = glGetUniformLocation(shaderProgramId, "transform");
+        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transform));
+
+        // Render
+        int size;
         glBindVertexArray(vertexArray);
-        glDrawArrays(GL_TRIANGLES, 0, 3);
+        glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
+        glDrawElements(GL_TRIANGLES, size/sizeof(uint32_t), GL_UNSIGNED_INT, 0);
         glBindVertexArray(0);
     }
 
@@ -101,6 +127,9 @@ static void error_callback(int e, const char *d) {
 //  _In_ LPSTR     lpCmdLine,
 //  _In_ int       nCmdShow
 //)
+
+
+
 int main(void)
 {
     /* Platform */
@@ -130,47 +159,123 @@ int main(void)
 
     glfwSetKeyCallback(win, key_callback);
 
-    std::vector<Key*> keys;
+    // Shaders
+    std::string vertexCode;
+    std::string fragmentCode;
+    std::ifstream vShaderFile;
+    std::ifstream fShaderFile;
+
+    vShaderFile.exceptions(std::ifstream::badbit);
+    fShaderFile.exceptions(std::ifstream::badbit);
+    try
+    {
+        vShaderFile.open("../vertexShader.vert");
+        fShaderFile.open("../fragmentShader.frag");
+        std::stringstream vShaderStream, fShaderStream;
+        vShaderStream << vShaderFile.rdbuf();
+        fShaderStream << fShaderFile.rdbuf();
+        vShaderFile.close();
+        fShaderFile.close();
+        vertexCode = vShaderStream.str();
+        fragmentCode = fShaderStream.str();
+    }
+    catch(std::ifstream::failure e)
+    {
+        printf("ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ\n");
+    }
+
+    GLuint vertexShader;
+    vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    const GLchar* vShaderSource = vertexCode.c_str();
+    glShaderSource(vertexShader, 1, &vShaderSource, NULL);
+    glCompileShader(vertexShader);
+    GLint success;
+    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+    if(!success) {
+        GLchar infoLog[1024];
+        glGetShaderInfoLog(vertexShader, 1024, NULL, infoLog);
+        printf("Compiling vertex shader failed: %s\n", infoLog);
+    }
+
+    GLuint fragmentShader;
+    fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+    const GLchar* fShaderSource = fragmentCode.c_str();
+    glShaderSource(fragmentShader, 1, &fShaderSource, NULL);
+    glCompileShader(fragmentShader);
+    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+    if(!success) {
+        GLchar infoLog[1024];
+        glGetShaderInfoLog(fragmentShader, 1024, NULL, infoLog);
+        printf("Compiling fragment shader failed: %s\n", infoLog);
+    }
+
+    shaderProgramId = glCreateProgram();
+    glAttachShader(shaderProgramId, vertexShader);
+    glAttachShader(shaderProgramId, fragmentShader);
+    glLinkProgram(shaderProgramId);
+    glGetShaderiv(fragmentShader, GL_LINK_STATUS, &success);
+    if(!success) {
+        GLchar infoLog[1024];
+        glGetProgramInfoLog(shaderProgramId, 1024, NULL, infoLog);
+        printf("Linking failed: %s\n", infoLog);
+    }
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
 
     // Create the DB
     simdb db("test", 512 * 1024, 4 * 1024);
 
-    // Create serailized IndexedVerts
-    size_t leftLen, rightLen;
-    void* leftData = makeTriangle(leftLen, true);
-    void* rightData = makeTriangle(rightLen, false);
+    // Create serialized IndexedVerts
+    size_t leftLen, rightLen, cubeLen;
+    // void* leftData = makeTriangle(leftLen, true);
+    // void* rightData = makeTriangle(rightLen, false);
+    void* cubeData = makeCube(cubeLen);
 
     // Store serialized IndexedVerts in the db
-    std::string leftTriangle = "leftTriangle";
-    std::string rightTriangle = "rightTriangle";
-    db.put((void*)leftTriangle.c_str(), (ui32)leftTriangle.length(), leftData, (ui32)leftLen);
-    db.put((void*)rightTriangle.c_str(), (ui32)rightTriangle.length(), rightData, (ui32)rightLen);
+    // std::string leftTriangle = "leftTriangle";
+    // std::string rightTriangle = "rightTriangle";
+    std::string cube = "cube";
+    // db.put((void*)leftTriangle.c_str(), (ui32)leftTriangle.length(), leftData, (ui32)leftLen);
+    // db.put((void*)rightTriangle.c_str(), (ui32)rightTriangle.length(), rightData, (ui32)rightLen);
+    db.put((void*)cube.c_str(), (ui32)cube.length(), cubeData, (ui32)cubeLen);
 
     // Retrieve data from the db and create new Keys with it
-    size_t leftSize = db.len(leftTriangle);
-    size_t rightSize = db.len(rightTriangle);
+    // size_t leftSize = db.len(leftTriangle);
+    // size_t rightSize = db.len(rightTriangle);
+    size_t cubeSize = db.len(cube);
 
-    leftData = malloc(sizeof(ui8) * leftSize);
-    rightData = malloc(sizeof(ui8) * rightSize);
+    // leftData = malloc(sizeof(ui8) * leftSize);
+    // rightData = malloc(sizeof(ui8) * rightSize);
+    cubeData = malloc(sizeof(ui8) * cubeSize);
 
-    if(db.get(leftTriangle, leftData) < 0) {
+    /*if(db.get(leftTriangle, leftData) < 0) {
         printf("Error reading from db. Key %s does not exist.\n", leftTriangle);
     }
     if(db.get(rightTriangle, rightData) < 0) {
         printf("Error reading from db. Key %s does not exist.\n", rightTriangle);
+    }*/
+    if(db.get(cube, cubeData) < 0) {
+        printf("Error reading from db. Key %s does not exist.\n", cube);
     }
 
     // Create the Keys
-    Key* k1 = createKey(leftTriangle, leftData);
-    Key* k2 = createKey(rightTriangle, rightData);
-    keys.push_back(k1);
-    keys.push_back(k2);
+    // Key* k1 = createKey(leftTriangle, leftData);
+    // Key* k2 = createKey(rightTriangle, rightData);
+    Key* k3 = createKey(cube, cubeData);
+
+    std::vector<Key*> keys;
+    // keys.push_back(k1);
+    // keys.push_back(k2);
+    keys.push_back(k3);
 
     /* nuklear */
     ctx = nk_glfw3_init(win, NK_GLFW3_INSTALL_CALLBACKS);
     struct nk_font_atlas *atlas;
     nk_glfw3_font_stash_begin(&atlas);
     nk_glfw3_font_stash_end();
+
+    glEnable(GL_DEPTH_TEST);
+    //glDepthFunc(GL_LESS);
 
     background = nk_rgb(28,48,62);
     while (!glfwWindowShouldClose(win))
@@ -206,6 +311,104 @@ int main(void)
     nk_glfw3_shutdown();
     glfwTerminate();
     return 0;
+}
+
+void* makeCube(size_t& byteLen) {
+    const unsigned int NUM_VERTICES = 8;
+    const unsigned int NUM_INDICES = 36;
+    Vertex* verts[NUM_VERTICES];
+
+    verts[0] = new Vertex{
+        {-0.5f, -0.5f, 0.5f},     //pos
+        {0.0f, 0.0f, -1.0f},      //norm
+        {1.0f, 0.0f, 0.0f, 1.0f}, //color
+        {0.0f, 0.0f}              //texCoord
+    };
+    verts[1] = new Vertex{
+        {0.5f, -0.5f, 0.5f},      //pos
+        {0.0f, 0.0f, -1.0f},      //norm
+        {0.0f, 1.0f, 0.0f, 1.0f}, //color
+        {0.0f, 0.0f}              //texCoord
+    };
+    verts[2] = new Vertex{
+        {0.5f, 0.5f, 0.5f},       //pos
+        {0.0f, 0.0f, -1.0f},      //norm
+        {0.0f, 0.0f, 1.0f, 1.0f}, //color
+        {0.0f, 0.0f}              //texCoord
+    };
+    verts[3] = new Vertex{
+        {-0.5f, 0.5f, 0.5f},      //pos
+        {0.0f, 0.0f, -1.0f},      //norm
+        {1.0f, 0.5f, 0.25f, 1.0f}, //color
+        {0.0f, 0.0f}              //texCoord
+    };
+    verts[4] = new Vertex{
+        {-0.5f, -0.5f, -0.5f},    //pos
+        {0.0f, 0.0f, -1.0f},      //norm
+        {1.0f, 0.0f, 0.0f, 1.0f}, //color
+        {0.0f, 0.0f}              //texCoord
+    };
+    verts[5] = new Vertex{
+        {0.5f, -0.5f, -0.5f},     //pos
+        {0.0f, 0.0f, -1.0f},      //norm
+        {0.0f, 1.0f, 0.0f, 1.0f}, //color
+        {0.0f, 0.0f}              //texCoord
+    };
+    verts[6] = new Vertex{
+        {0.5f, 0.5f, -0.5f},      //pos
+        {0.0f, 0.0f, -1.0f},      //norm
+        {0.0f, 0.0f, 1.0f, 1.0f}, //color
+        {0.0f, 0.0f}              //texCoord
+    };
+    verts[7] = new Vertex{
+        {-0.5f, 0.5f, -0.5f},     //pos
+        {0.0f, 0.0f, -1.0f},      //norm
+        {1.0f, 0.5f, 0.25f, 1.0f}, //color
+        {0.0f, 0.0f}              //texCoord
+    };
+
+    uint32_t* cubeIndices = new GLuint[NUM_INDICES]{
+        // front
+        0, 1, 2,
+        2, 3, 0,
+        // top
+        1, 5, 6,
+        6, 2, 1,
+        // back
+        7, 6, 5,
+        5, 4, 7,
+        // bottom
+        4, 0, 3,
+        3, 7, 4,
+        // left
+        4, 5, 1,
+        1, 0, 4,
+        // right
+        3, 2, 6,
+        6, 7, 3,
+    };
+
+    IndexedVerts* iv = (IndexedVerts*)IndexedVertsCreate(0, 6, IV_TRIANGLES, NUM_VERTICES, NUM_INDICES, 0, 0, 0);
+
+    // Copy Vertex data into IndexedVerts
+    for(int i = 0; i < NUM_VERTICES; i++) {
+        memcpy(&iv->verts[i], verts[i], 12 * sizeof(float));
+        verts[i] = nullptr;
+    }
+
+    // Copy index data into IndexedVerts.indices
+    memcpy(iv->indices, cubeIndices, sizeof(GLuint) * NUM_INDICES);
+    cubeIndices = nullptr;
+
+    // Create space for serialized IndexedVerts
+    byteLen = sizeof(IndexedVerts)+sizeof(Vertex)* NUM_VERTICES + sizeof(uint32_t)* NUM_INDICES;
+    void* bytes = malloc(byteLen);
+
+    // Serialize IndexedVerts
+    IndexedVertsSave(iv, bytes, &byteLen);
+    // IndexedVertsDestroy(iv);
+
+    return bytes;
 }
 
 void* makeTriangle(size_t& byteLen, bool left) {
@@ -570,133 +773,3 @@ int sidebar(struct nk_context *ctx, int width, int height, std::vector<Key*>& ke
 //    bool visible() const { return m_visible; }
 //};
 //
-//struct Shader {
-//    GLuint id;
-//
-//    Shader() {}
-//    Shader& Shader::use()
-//    {
-//        glUseProgram(id);
-//        return *this;
-//    }
-//
-//    void Shader::compile(const GLchar* vertexSource, const GLchar* fragmentSource, const GLchar* geometrySource)
-//    {
-//        GLuint sVertex, sFragment, gShader;
-//
-//        sVertex = glCreateShader(GL_VERTEX_SHADER);
-//        glShaderSource(sVertex, 1, &vertexSource, NULL);
-//        glCompileShader(sVertex);
-//        checkCompileErrors(sVertex, "VERTEX");
-//
-//        sFragment = glCreateShader(GL_FRAGMENT_SHADER);
-//        glShaderSource(sFragment, 1, &fragmentSource, NULL);
-//        glCompileShader(sFragment);
-//        checkCompileErrors(sFragment, "FRAGMENT");
-//
-//        if(geometrySource != nullptr)
-//        {
-//            gShader = glCreateShader(GL_GEOMETRY_SHADER);
-//            glShaderSource(gShader, 1, &geometrySource, NULL);
-//            glCompileShader(gShader);
-//            checkCompileErrors(gShader, "GEOMETRY");
-//        }
-//
-//        this->id = glCreateProgram();
-//        glAttachShader(this->id, sVertex);
-//        glAttachShader(this->id, sFragment);
-//        if(geometrySource != nullptr)
-//            glAttachShader(this->id, gShader);
-//        glLinkProgram(this->id);
-//        checkCompileErrors(this->id, "PROGRAM");
-//
-//        glDeleteShader(sVertex);
-//        glDeleteShader(sFragment);
-//        if(geometrySource != nullptr)
-//            glDeleteShader(gShader);
-//    }
-//
-//    void Shader::setFloat(const GLchar *name, GLfloat value, GLboolean useShader)
-//    {
-//        if(useShader)
-//            this->use();
-//        glUniform1f(glGetUniformLocation(this->id, name), value);
-//    }
-//    void Shader::setInteger(const GLchar *name, GLint value, GLboolean useShader)
-//    {
-//        if(useShader)
-//            this->use();
-//        glUniform1i(glGetUniformLocation(this->id, name), value);
-//    }
-//    void Shader::setVector2f(const GLchar *name, GLfloat x, GLfloat y, GLboolean useShader)
-//    {
-//        if(useShader)
-//            this->use();
-//        glUniform2f(glGetUniformLocation(this->id, name), x, y);
-//    }
-//    void Shader::setVector2f(const GLchar *name, const glm::vec2 &value, GLboolean useShader)
-//    {
-//        if(useShader)
-//            this->use();
-//        glUniform2f(glGetUniformLocation(this->id, name), value.x, value.y);
-//    }
-//    void Shader::setVector3f(const GLchar *name, GLfloat x, GLfloat y, GLfloat z, GLboolean useShader)
-//    {
-//        if(useShader)
-//            this->use();
-//        glUniform3f(glGetUniformLocation(this->id, name), x, y, z);
-//    }
-//    void Shader::setVector3f(const GLchar *name, const glm::vec3 &value, GLboolean useShader)
-//    {
-//        if(useShader)
-//            this->use();
-//        glUniform3f(glGetUniformLocation(this->id, name), value.x, value.y, value.z);
-//    }
-//    void Shader::setVector4f(const GLchar *name, GLfloat x, GLfloat y, GLfloat z, GLfloat w, GLboolean useShader)
-//    {
-//        if(useShader)
-//            this->use();
-//        glUniform4f(glGetUniformLocation(this->id, name), x, y, z, w);
-//    }
-//    void Shader::setVector4f(const GLchar *name, const glm::vec4 &value, GLboolean useShader)
-//    {
-//        if(useShader)
-//            this->use();
-//        glUniform4f(glGetUniformLocation(this->id, name), value.x, value.y, value.z, value.w);
-//    }
-//    void Shader::setMatrix4(const GLchar *name, const glm::mat4 &matrix, GLboolean useShader)
-//    {
-//        if(useShader)
-//            this->use();
-//        glUniformMatrix4fv(glGetUniformLocation(this->id, name), 1, GL_FALSE, glm::value_ptr(matrix));
-//    }
-//
-//
-//    void Shader::checkCompileErrors(GLuint object, std::string type)
-//    {
-//        GLint success;
-//        GLchar infoLog[1024];
-//        if(type != "PROGRAM")
-//        {
-//            glGetShaderiv(object, GL_COMPILE_STATUS, &success);
-//            if(!success)
-//            {
-//                glGetShaderInfoLog(object, 1024, NULL, infoLog);
-//                std::cout << "| ERROR::SHADER: Compile-time error: Type: " << type << "\n"
-//                    << infoLog << "\n -- --------------------------------------------------- -- "
-//                    << std::endl;
-//            }
-//        }
-//        else
-//        {
-//            glGetProgramiv(object, GL_LINK_STATUS, &success);
-//            if(!success)
-//            {
-//                glGetProgramInfoLog(object, 1024, NULL, infoLog);
-//                std::cout << "| ERROR::Shader: Link-time error: Type: " << type << "\n"
-//                    << infoLog << "\n -- --------------------------------------------------- -- "
-//                    << std::endl;
-//            }
-//        }
-//    }
-//};

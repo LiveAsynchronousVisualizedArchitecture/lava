@@ -101,7 +101,7 @@ extern "C"
         auto inLen = *byteLen;
         auto iv = (IndexedVerts*)ivPtr;
         size_t vertSz = iv->vertsLen   * sizeof(Vertex);
-        size_t idxSz = iv->indicesLen * sizeof(int);
+        size_t idxSz = iv->indicesLen * sizeof(uint32_t);
         size_t pxSz = iv->imgWidth*iv->imgHeight*iv->imgChans * sizeof(float);
         size_t needs = params*sizeof(uint32_t)+vertSz + idxSz + pxSz;
 
