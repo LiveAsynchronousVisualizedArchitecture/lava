@@ -1,0 +1,7 @@
+
+
+Should data flow nodes have a separate function from the main that runs first?
+ - Gives the number of allocations along with each of their sizes
+ - Then one thread local allocation could be done
+ - Would be difficult for larger nodes to give the maximum amount of memory needed if they had the potential to re-use memory.
+
