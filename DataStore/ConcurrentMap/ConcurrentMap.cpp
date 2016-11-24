@@ -1,4 +1,6 @@
 
+// todo: test 128 bit atomic with native C++
+// todo: look into 128 bit atomic with windows
 
 #include <stdint.h>
 #include <atomic>

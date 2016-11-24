@@ -160,6 +160,10 @@
 // q: if using a ring buffer for frees, could a thread freeing the index then bubble sort backwards and move the begin pointer forwards until the begin and end pointers have only non freed indices between them 
 // q: what is the benefit of a ring buffer? does it prevent the need for a spinlock anywhere?
 // q: does the main program even need a key value store? can't it just use the block list indices directly?
+// q: should maximum probe length be used here?
+// q: should use a separate 'tombstone' value for a deleted value?
+// q: should store hash to be able to know probe length and as a short circuit for false matches?
+// q: should 
 
 /*
  SimDB
