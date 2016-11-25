@@ -107,9 +107,11 @@
 // -todo: make LIST_END constant
 // -todo: need to have a version with each block and store it with each non head BlkIdx as well as the key value pair of ConcurrentHash - how many bits for the version? 32 bits to start? - just needs to be enough so that a so many blocks can't be gotten while a thread is stalled that the version wraps back around
 // -todo: have to put version in concurrent hash so that an overwrite from a new write won't cause an ABA problem with another thread reading from it, then decrementing readers?
+// -todo: make writeBlock have an optional start and end
+// -todo: add length and key length to ConcurrentStore
+// -todo: change to single block index key value pairs
 
-// todo: add length and key lenght to ConcurrentStore
-// todo: change to single block index key value pairs
+// todo: test with more inserts and different blockSizes
 // todo: need more data with BlkIdx so that blocks read are known to be from the correct key value pair - do with versions
 // todo: make ConcurrentStore.get take a length that it won't exceed
 // todo: combine keys and data into one block run
@@ -187,6 +189,17 @@
 //    - when reading from a ConcurrentHash value, increment the readers by 1, increment the block idx by 1, then decrement the ConcurrentHash
 //    - does this destroy the ability to do robinhood hashing without spinlocking?
 // q: on removal, follow DELETED entries forward until hitting a key entry, and if the removed entry was inside its probe span, bring the found entry up by copying, then remove the found entry, then loop forward, trying to set DELETED entries to EMPTY if they are after EMPTY or after the end of a probe span
+// q: can part of the version be put on one side of a struct and part on the other side? maybe even interleave bits?
+// q: just have a flag bit on each side? this would allow signaling that only one thread at a time is doing the removal cleanup and allow cleanup concurrently with insertion? 
+//    1. flip bits in between two entries
+//    ////2. consider the opposite bits to be 'changed' bits and flip them only if an insert sees either of the bits flipped
+//    ///////3. if the removal process detects a 'changed' bit, ... 
+//    //////4. is it needed if versions are involved, and even so would it work?
+//    2. what is the problem? - need to be able to tell if previous entry is the same when changing the next entry 
+//    3. keep index first and version second so that it is possible to loop forward and look at the previous version and the current index - if a high bit is used as a flag for empty, then the low bits of the version and the high bits of the index could be change atomically, meaning 32 bit precision for versions only in one brief moment 
+//       !- if only the upper bit is needed, can the 64 bit atomic operation happen with 56 bits for the version and only 8 bits for the index?
+//    4. then check the whole version and do some sort of error handling and recovery if the version is not the same - although 56 bits should be a year's worth of cpu cycles, so having 72 quadrillion allocations between a few instructions on another thread seems unlikely 
+//    5. in theory a mutex could be used and the entire range of versions could be remapped and the master version atomic could be set to the new max+1
 
 /*
  SimDB
@@ -617,11 +630,8 @@ public:
     //}while( !aidx->compare_exchange_strong(cur.asInt, nxt.asInt) );
 
     KeyAndReaders cur, nxt;
-
-    aui32* areaders = (aui32*)&(s_bls[blkIdx].kr.asInt);
-    
+    aui32* areaders = (aui32*)&(s_bls[blkIdx].kr.asInt);    
     cur.asInt = areaders->load();
-
     do{
       if(cur.readers<0) return false;
       nxt = cur;
@@ -637,15 +647,26 @@ public:
     //auto prev = aidx->fetch_add(-1);
     //if(prev==0){ doFree(blkIdx); return false; }
 
-    BlkLst cur, nxt;
-    aui64* aidx = (aui64*)&(s_bls[blkIdx].asInt);
-    cur.asInt   = aidx->load();
+    //BlkLst cur, nxt;
+    //aui64* aidx = (aui64*)&(s_bls[blkIdx].asInt);
+    //cur.asInt   = aidx->load();
+    //do{
+    //  nxt = cur;
+    //  nxt.kr.readers -= 1;
+    //}while( !aidx->compare_exchange_strong(cur.asInt, nxt.asInt) );
+    //
+    //if(cur.kr.readers==0){ doFree(blkIdx); return false; }
+
+
+    KeyAndReaders cur, nxt;
+    aui32* areaders = (aui32*)&(s_bls[blkIdx].kr.asInt);    
+    cur.asInt = areaders->load();
     do{
       nxt = cur;
-      nxt.kr.readers -= 1;
-    }while( !aidx->compare_exchange_strong(cur.asInt, nxt.asInt) );
+      nxt.readers -= 1;
+    }while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
     
-    if(cur.kr.readers==0){ doFree(blkIdx); return false; }
+    if(cur.readers==0){ doFree(blkIdx); return false; }
 
     return true;
   }
@@ -672,7 +693,7 @@ private:
   IDX          nxtBlock(i32  blkIdx)  const
   {
     //return *(stPtr(blkIdx));
-    return s_bls[blkIdx].idx;
+    return s_bls[blkIdx].vi.idx;
   }
   i32     blockFreeSize()             const
   {
@@ -709,8 +730,8 @@ private:
   void           doFree(i32  blkIdx)  const        // frees a list/chain of blocks
   {
     i32   cur  =             blkIdx;          // cur is the current block index
-    i32   nxt  =   s_bls[cur].idx;            //*stPtr(cur);              // nxt is the next block index
-    for(; nxt>0; nxt=s_bls[cur].idx)
+    i32   nxt  =   s_bls[cur].vi.idx;         //*stPtr(cur);              // nxt is the next block index
+    for(; nxt>0; nxt=s_bls[cur].vi.idx)
     { 
       memset(blkPtr(cur), 0, m_blockSize);    // zero out memory on free, 
       //m_bls[cur].readers = 0;               // reset the reader count
@@ -728,12 +749,15 @@ private:
     s_cl.free(cur);
   }
 
-  size_t     writeBlock(i32  blkIdx, void* bytes)      // don't need to increment readers since write should be done before the block is exposed to any other threads
+  size_t     writeBlock(i32  blkIdx, void* bytes, ui32 len=0, ui32 ofst=0)      // don't need to increment readers since write should be done before the block is exposed to any other threads
   {
     i32   blkFree  =  blockFreeSize();
     ui8*        p  =  blockFreePtr(blkIdx);
     i32       nxt  =  nxtBlock(blkIdx);
-    size_t cpyLen  =  nxt<0? -nxt : blkFree;           // if next is negative, then it will be the length of the bytes in that block
+    //size_t cpyLen  =  nxt<0? -nxt : blkFree;           // if next is negative, then it will be the length of the bytes in that block
+    size_t cpyLen  =  len==0? blkFree : len;             // if next is negative, then it will be the length of the bytes in that block
+    p      += ofst;
+    //cpyLen -= ofst;
     memcpy(p, bytes, cpyLen);
 
     return cpyLen;
@@ -917,19 +941,52 @@ public:
     //  return true;
     //}else return false;
   }
-  void          put(i32  blkIdx, void* bytes, i32 len)
+  //void          put(i32  blkIdx, void* bytes, i32 len)
+  //{
+  //  ui8*       b   = (ui8*)bytes;
+  //  i32    blocks  =  blocksNeeded(len);
+  //  i32       cur  =  blkIdx;
+  //  for(i32 i=0; i<blocks; ++i)
+  //  {
+  //    b   +=  writeBlock(cur, b);
+  //    cur  =  nxtBlock(cur);
+  //  }
+  //
+  //  //i32  remBytes  =  0;
+  //  //i32    blocks  =  blocksNeeded(len, &remBytes);
+  //}
+  void          put(i32  blkIdx, void* kbytes, i32 klen, void* vbytes, i32 vlen)
   {
-    ui8*       b   = (ui8*)bytes;
-    i32    blocks  =  blocksNeeded(len);
+    ui8*         b  =  (ui8*)kbytes;
+    bool   kjagged  =  (klen % blockFreeSize()) != 0;
+    i32    kblocks  =  kjagged? blocksNeeded(klen)-1 : blocksNeeded(klen);
+    ui32   remklen  =  klen - (kblocks*blockFreeSize());
+    
+    ui32  fillvlen  =  blockFreeSize() - remklen;
+    bool   vjagged  =  (vlen-fillvlen % blockFreeSize()) != 0;
+    i32    vblocks  =  vjagged? blocksNeeded(vlen)-1 : blocksNeeded(vlen);
+    ui32   remvlen  =  (vlen-fillvlen) - (vblocks*blockFreeSize()); 
+
     i32       cur  =  blkIdx;
-    for(i32 i=0; i<blocks; ++i)
-    {
+    for(i32 i=0; i<kblocks; ++i){
       b   +=  writeBlock(cur, b);
       cur  =  nxtBlock(cur);
     }
+    if(kjagged){
+      writeBlock(cur, b, remklen);
+      b    =  (ui8*)vbytes;
+      b   +=  writeBlock(cur, b, fillvlen, remklen);
+      cur  =  nxtBlock(cur);
+    }
+    for(i32 i=0; i<vblocks; ++i){
+      b   +=  writeBlock(cur, b);
+      cur  =  nxtBlock(cur);
+    }
+    if(vjagged && remvlen>0){
+      b   +=  writeBlock(cur, b, remvlen);
+    }
 
-    //i32  remBytes  =  0;
-    //i32    blocks  =  blocksNeeded(len, &remBytes);
+
   }
   size_t        get(i32  blkIdx, void* bytes)            const
   {
@@ -1224,13 +1281,14 @@ public:
   }
 
   template<class MATCH_FUNC> 
-  KV       putHashed(ui32 hash, ui32 key, ui32 val, MATCH_FUNC match) const
+  //KV       putHashed(ui32 hash, ui32 key, ui32 val, MATCH_FUNC match) const
+  KV       putHashed(ui32 hash, ui32 key, MATCH_FUNC match) const
   {
     using namespace std;
   
     KV desired   =  empty_kv();
     desired.key  =  key;
-    desired.val  =  val;
+    //desired.val  =  val;
     ui32      i  =  hash;
     for(;; ++i)
     {
@@ -1610,18 +1668,21 @@ public:
     //s_cs.put(kidx.idx, key, klen);
     //s_cs.put(vidx.idx, val, vlen);
     
-    auto  kidx = s_cs.alloc(klen+vlen, &blkcnt);    // todo: use the VersionIdx struct // kidx is key index
+    auto  kidx = s_cs.alloc(klen+vlen, klen, &blkcnt);    // todo: use the VersionIdx struct // kidx is key index
     if(kidx.idx==LIST_END) return EMPTY_KEY;
     if(blkcnt<0){
       s_cs.free(kidx.idx);
       return EMPTY_KEY;
     }    
     s_cs.put(kidx.idx, key, klen, val, vlen);
+    //s_cs.put(kidx.idx, key,);
 
     //ui32 keyhash = m_ch.hashBytes(key, klen);
     ui32 keyhash = ConcurrentHash::HashBytes(key, klen);
-    auto     ths = this;                                                            // this silly song and dance is because the this pointer can't be passed to a lambda
-    KV        kv = s_ch.putHashed(keyhash, kidx.idx, vidx.idx,                      // this returns the previous KV at the position
+    auto     ths = this;                                                              // this silly song and dance is because the this pointer can't be passed to a lambda
+    //KV        kv = s_ch.putHashed(keyhash, kidx.idx, vidx.idx,                      // this returns the previous KV at the position
+    //  [ths, key, klen](ui32 blkidx){ return CompareBlock(ths,key,klen,blkidx); });
+    KV        kv = s_ch.putHashed(keyhash, kidx.idx,                                  // this returns the previous KV at the position
       [ths, key, klen](ui32 blkidx){ return CompareBlock(ths,key,klen,blkidx); });
 
     //if(kv.val!=EMPTY_KEY) s_cs.free(kv.val);
