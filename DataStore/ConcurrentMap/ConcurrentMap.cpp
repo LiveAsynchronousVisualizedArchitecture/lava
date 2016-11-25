@@ -426,6 +426,14 @@ int main()
   //Println("empty kv: ", ConcurrentHash::empty_kv().key == ConcurrentHash::EMPTY_KEY );
   //Println("empty kv: ", ConcurrentHash::EMPTY_KEY );
 
+  auto sz = sizeof(ConcurrentStore::BlkLst);
+  Println("sz: ", sz);
+
+  struct ui128_t { uint64_t low, high; };
+  //struct ui128_t { uint64_t low; };
+
+  bool lkFree = atomic<ui128_t>{}.is_lock_free();
+  Println("is lock free 128: ",  lkFree );
 
   simdb db("test", 8, 8);
 
@@ -449,28 +457,28 @@ int main()
   //  Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
   //}
 
-  TO(6,i)
-  {
-    //str  key( db.len(db.nxt()), '\0');
-    //auto len = db.getKey(db.cur(), (void*)key.data(), (ui32)key.length());
-    //str  val(16, '\0');
-    //db.get(key, (void*)val.data() );
-    //val.resize( strlen(val.c_str()) );
-    //
-    //Println("len: ", len, 
-    //    " str len: ", 
-    //    key.length(), "  nxt key: [", key, 
-    //    "]  val: [", val,"] val len: ", val.length() );    
-
-    str  key = db.getKeyStr(db.nxt());
-    str  val(16, '\0');
-    db.get(key.c_str(), (void*)val.data() );
-    val.resize( strlen(val.c_str()) );
-
-    Println(" str len: ", 
-            key.length(), "  nxt key: [", key, 
-            "]  val: [", val,"] val len: ", val.length() );
-  }
+  //TO(6,i)
+  //{
+  //  //str  key( db.len(db.nxt()), '\0');
+  //  //auto len = db.getKey(db.cur(), (void*)key.data(), (ui32)key.length());
+  //  //str  val(16, '\0');
+  //  //db.get(key, (void*)val.data() );
+  //  //val.resize( strlen(val.c_str()) );
+  //  //
+  //  //Println("len: ", len, 
+  //  //    " str len: ", 
+  //  //    key.length(), "  nxt key: [", key, 
+  //  //    "]  val: [", val,"] val len: ", val.length() );    
+  //
+  //  str  key = db.getKeyStr(db.nxt());
+  //  str  val(16, '\0');
+  //  db.get(key.c_str(), (void*)val.data() );
+  //  val.resize( strlen(val.c_str()) );
+  //
+  //  Println(" str len: ", 
+  //          key.length(), "  nxt key: [", key, 
+  //          "]  val: [", val,"] val len: ", val.length() );
+  //}
 
   //Println("wat data len: ",    db.len(wat)    );
   //Println("wut data len: ",    db.len(wut)    );
