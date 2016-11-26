@@ -427,7 +427,9 @@ int main()
   //Println("empty kv: ", ConcurrentHash::EMPTY_KEY );
 
   auto sz = sizeof(ConcurrentStore::BlkLst);
-  Println("sz: ", sz);
+  Println("Blklst sz: ", sz);
+
+  Println("simdb sz: ", sizeof(simdb) );
 
   struct ui128_t { uint64_t low, high; };
   //struct ui128_t { uint64_t low; };
