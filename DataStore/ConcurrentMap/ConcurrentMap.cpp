@@ -457,8 +457,8 @@ int main()
   //  Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
   //}
 
-  ui32 len, klen;
-  bool ok = db.len( (void*)wat.data(), (ui32)wat.length(), &len, &klen );
+  ui32 klen=0;
+  auto len = db.len( (void*)wat.data(), (ui32)wat.length(), &klen);
   Println("wat total len: ", len, " wat key len: ", klen, "\n");
 
   //TO(6,i)
