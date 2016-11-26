@@ -116,11 +116,13 @@
 // -todo: make memcmpBlk take a length parameter - already there
 // -todo: redo compare to only compare key
 // -todo: fix total len in BlkLst - runMatch returned boolean
+// -todo: first pass of changing void* to void const* const so that STL pointers can be used directly
+// -todo: change put to use constant void* buffers
+// -todo: make version make it into ConcurrentHash KV
+// -todo: make writeBlock only take a length parameter since the input pointer can be offset by the caller - no! the offest is about where to write in the block, not about the incoming buffer 
+// -todo: redo ConcurrentStore.len() to take a version and output an optional klen
+// -todo: re-implement simdb.len to output len and keylen
 
-// todo: make version make it into ConcurrentHash KV
-// todo: make writeBlock only take a length parameter since the input pointer can be offset by the caller  
-// todo: redo ConcurrentStore.len() to take a version and output an optional klen
-// todo: re-implement simdb.len to output len and keylen
 // todo: redo matching with version checking 
 // todo: make matching take a length that it won't exceed
 // todo: make ConcurrentStore.get take a length that it won't exceed
@@ -306,7 +308,7 @@ namespace {
     void operator()(){}
   };
 
-  ui64 fnv_64a_buf(void *buf, size_t len)
+  ui64 fnv_64a_buf(void const *const buf, size_t len)
   {
     // const ui64 FNV_64_PRIME = 0x100000001b3;
     ui64 hval = 0xcbf29ce484222325;    // FNV1_64_INIT;  // ((Fnv64_t)0xcbf29ce484222325ULL)
@@ -579,13 +581,20 @@ public:
   };
   union KeyAndReaders
   {
-    struct{ ui32    isKey :  1; i32   readers : 31; };
-    ui32 asInt;
+    struct{ ui32    isKey :  1; i32   readers : 31; ui32 version; };
+    ui64 asInt;
+
+    //ui32 asInt;
   };
+  //union BlkLst                            // need to do anything special to guarantee that readers is aligned so it is atomic?
+  //{
+  //  struct { KeyAndReaders kr; VerIdx vi; ui32 len; ui32 klen; };
+  //  //ui64 asInt;
+  //};
   union BlkLst                            // need to do anything special to guarantee that readers is aligned so it is atomic?
   {
-    struct { KeyAndReaders kr; VerIdx vi; ui32 len; ui32 klen; };
-    //ui64 asInt;
+    //struct { KeyAndReaders kr; ui32 version; i32 idx; ui32 len, klen; };
+    struct { KeyAndReaders kr; i32 idx; ui32 len, klen; };
   };
 
   using IDX         =  i32;
@@ -600,8 +609,8 @@ public:
     BlkLst bl;
     bl.kr.isKey    = isKey;
     bl.kr.readers  = readers;
-    bl.vi.idx      = idx;
-    bl.vi.version  = ver;
+    bl.idx      = idx;
+    bl.kr.version  = ver;
 
     if(isKey){
       bl.len  = len;
@@ -626,7 +635,7 @@ public:
     return empty.asInt == vi.asInt;
   }
 
-  bool      incReaders(ui32 blkIdx)        const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
+  bool      incReaders(ui32 blkIdx, ui32 version)        const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
     //ai32* aidx = (ai32*)&(m_bls[blkIdx].readers);
     //i32    cur = aidx->load();
@@ -642,11 +651,22 @@ public:
     //  nxt.kr.readers += 1;
     //}while( !aidx->compare_exchange_strong(cur.asInt, nxt.asInt) );
 
+    //KeyAndReaders cur, nxt;
+    //aui32* areaders = (aui32*)&(s_bls[blkIdx].kr.asInt);    
+    //cur.asInt       = areaders->load();
+    //do{
+    //  if(cur.readers<0) return false;
+    //  nxt = cur;
+    //  nxt.readers += 1;
+    //}while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
+    //
+    //return true;
+
     KeyAndReaders cur, nxt;
-    aui32* areaders = (aui32*)&(s_bls[blkIdx].kr.asInt);    
-    cur.asInt = areaders->load();
+    aui64* areaders = (aui64*)&(s_bls[blkIdx].kr.asInt);    
+    cur.asInt       = areaders->load();
     do{
-      if(cur.readers<0) return false;
+      if(cur.version!=version || cur.readers<0) return false;
       nxt = cur;
       nxt.readers += 1;
     }while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
@@ -672,7 +692,7 @@ public:
 
 
     KeyAndReaders cur, nxt;
-    aui32* areaders = (aui32*)&(s_bls[blkIdx].kr.asInt);    
+    aui64* areaders = (aui64*)&(s_bls[blkIdx].kr.asInt);    
     cur.asInt = areaders->load();
     do{
       nxt = cur;
@@ -706,7 +726,7 @@ private:
   IDX          nxtBlock(i32  blkIdx)  const
   {
     //return *(stPtr(blkIdx));
-    return s_bls[blkIdx].vi.idx;
+    return s_bls[blkIdx].idx;
   }
   i32     blockFreeSize()             const
   {
@@ -743,8 +763,8 @@ private:
   void           doFree(i32  blkIdx)  const        // frees a list/chain of blocks
   {
     i32   cur  =             blkIdx;          // cur is the current block index
-    i32   nxt  =   s_bls[cur].vi.idx;         //*stPtr(cur);              // nxt is the next block index
-    for(; nxt>0; nxt=s_bls[cur].vi.idx)
+    i32   nxt  =   s_bls[cur].idx;         //*stPtr(cur);              // nxt is the next block index
+    for(; nxt>0; nxt=s_bls[cur].idx)
     { 
       memset(blkPtr(cur), 0, m_blockSize);    // zero out memory on free, 
       //m_bls[cur].readers = 0;               // reset the reader count
@@ -762,7 +782,7 @@ private:
     s_cl.free(cur);
   }
 
-  size_t     writeBlock(i32  blkIdx, void* bytes, ui32 len=0, ui32 ofst=0)      // don't need to increment readers since write should be done before the block is exposed to any other threads
+  size_t     writeBlock(i32  blkIdx, void const* const bytes, ui32 len=0, ui32 ofst=0)      // don't need to increment readers since write should be done before the block is exposed to any other threads
   {
     i32   blkFree  =  blockFreeSize();
     ui8*        p  =  blockFreePtr(blkIdx);
@@ -778,9 +798,9 @@ private:
     //bool     fill = len < -1 || blkFree < len;
     //size_t cpyLen = fill? blkFree : len;
   }
-  size_t      readBlock(i32  blkIdx, void* bytes) const
+  size_t      readBlock(i32  blkIdx, ui32 version, void* bytes) const
   {
-    if(!incReaders(blkIdx)) return 0;
+    if(!incReaders(blkIdx, version)) return 0;
       i32   blkFree  =  blockFreeSize();
       ui8*        p  =  blockFreePtr(blkIdx);
       i32       nxt  =  nxtBlock(blkIdx);
@@ -967,7 +987,7 @@ public:
   //  //i32  remBytes  =  0;
   //  //i32    blocks  =  blocksNeeded(len, &remBytes);
   //}
-  void          put(i32  blkIdx, void* kbytes, i32 klen, void* vbytes, i32 vlen)
+  void          put(i32  blkIdx, void const *const kbytes, i32 klen, void const *const vbytes, i32 vlen)
   {
     using namespace std;
     
@@ -1001,7 +1021,7 @@ public:
       b   +=  writeBlock(cur, b, remvlen);
     }
   }
-  size_t        get(i32  blkIdx, void* bytes)            const
+  size_t        get(i32  blkIdx, ui32 version, void const *const bytes, ui32 maxlen)            const
   {
     if(blkIdx == LIST_END){ return 0; }
 
@@ -1013,7 +1033,7 @@ public:
     while(true)
     {
       nxt    =  nxtBlock(cur);
-      rdLen  =  readBlock(cur, b);                         // rdLen is read length
+      rdLen  =  readBlock(cur, version, b);                         // rdLen is read length
       b     +=  rdLen;
       len   +=  rdLen;
       if(nxt<0 || nxt==LIST_END) break;
@@ -1021,12 +1041,13 @@ public:
       cur    =  nxt;
     }
 
-
     return len;                                           // only one return after the top to make sure readers can be decremented - maybe it should be wrapped in a struct with a destructor
   }
-  Match   memcmpBlk(i32  blkIdx, const void* buf1, const void* buf2, size_t size) const
+  Match   memcmpBlk(i32  blkIdx, ui32 version, void const *const buf1, void const *const buf2, size_t size) const  // todo: eventually take out the inc and dec readers and only do them when dealing with the whole chain of blocks
   {
-    if(!incReaders(blkIdx)) return MATCH_REMOVED;
+    if(!incReaders(blkIdx, version)) return MATCH_REMOVED;
+      //if(!s_bls[blkIdx].vi.version == version) return MATCH_REMOVED;
+
       auto ret = memcmp(buf1, buf2, size);
     decReaders(blkIdx);
 
@@ -1063,7 +1084,7 @@ public:
   //
   //  // return MATCH_TRUE; // never reached
   //}
-  Match     compare(void*   buf, ui32 len, IDX blkIdx) const
+  Match     compare(ui32 version, void const *const buf, ui32 len, IDX blkIdx) const
   {
     using namespace std;
     
@@ -1077,9 +1098,9 @@ public:
     {
       auto p = blockFreePtr(curidx);
       if(blksz > curlen){
-        return memcmpBlk(curidx, curbuf, p, curlen);
+        return memcmpBlk(curidx, version, curbuf, p, curlen);
       }else{
-        Match cmp = memcmpBlk(curidx, curbuf, p, blksz); if(cmp!=MATCH_TRUE){ return cmp; }
+        Match cmp = memcmpBlk(curidx, version, curbuf, p, blksz); if(cmp!=MATCH_TRUE){ return cmp; }
       }
 
       curbuf  +=  blksz;
@@ -1097,7 +1118,7 @@ public:
   ui32          len(i32  blkIdx, ui32 version, ui32* out_klen)
   {
     BlkLst bl = s_bls[blkIdx];
-    if(version == bl.vi.version){
+    if(version == bl.kr.version){
       *out_klen = bl.klen;
       return bl.len;
     }else 
@@ -1164,7 +1185,7 @@ public:
   {
     return a == b;
   }
-  static ui32          HashBytes(void* buf, ui32 len)
+  static ui32          HashBytes(const void *const buf, ui32 len)
   {
     ui64 hsh = fnv_64a_buf(buf, len);
 
@@ -1235,20 +1256,20 @@ private:
   }
 
   template<class MATCH_FUNC> 
-  auto       checkMatch(ui32 i, ui32 key, MATCH_FUNC match) const -> Match //  decltype(match(empty_kv()))
+  auto       checkMatch(ui32 i, ui32 version, ui32 key, MATCH_FUNC match) const -> Match //  decltype(match(empty_kv()))
   {
     //incReaders(i);  // todo: have incReaders return a KV?
-      Match ret = match(key);
+      Match ret = match(key, version);
     //decReaders(i);
     
     return ret;
   }
 
   template<class MATCH_FUNC, class FUNC> 
-  bool       runIfMatch(ui32 i, ui32 key, MATCH_FUNC match, FUNC f) const // const -> bool
+  bool       runIfMatch(ui32 i, ui32 version, ui32 key, MATCH_FUNC match, FUNC f) const // const -> bool
   {
     //KV kv = incReaders(i);    
-      Match      m = match(key);
+      Match      m = match(key, version);
       bool matched = false;                                       // not inside a scope
       if(m==MATCH_TRUE){ matched=true; f(load_kv(i)); }          
     //decReaders(i);
@@ -1310,7 +1331,7 @@ public:
       }                                                                                       // Either we just added the key, or another thread did.
       
       // if( match(probedKv.key)==MATCH_TRUE ){
-      if( checkMatch(i, probedKv.key, match)==MATCH_TRUE ){
+      if( checkMatch(i, probedKv.version, probedKv.key, match)==MATCH_TRUE ){
         return store_kv(i, desired);
       }
     }
@@ -1353,7 +1374,7 @@ public:
       KV probedKv = load_kv(i);
       if(probedKv.key==EMPTY_KEY) return empty_kv(); //{ return false; } //  // probedKv; // MATCH_FALSE; // empty_reader();
       //Match m = match(probedKv.key);
-      Match m = checkMatch(i, probedKv.key, match);
+      Match m = checkMatch(i, probedKv.version, probedKv.key, match);
       if(m==MATCH_TRUE){
         return probedKv;
         
@@ -1380,7 +1401,7 @@ public:
       KV probedKv = load_kv(i);
       if(probedKv.key==EMPTY_KEY) return empty_kv();
       //if( match(probedKv.key)==MATCH_TRUE ) return probedKv;
-      if( checkMatch(i, probedKv.key, match)==MATCH_TRUE ) return probedKv;
+      if( checkMatch(i, probedKv.version, probedKv.key, match)==MATCH_TRUE ) return probedKv;
 
       //if(probedKv.key==EMPTY_KEY) return empty_reader();         // empty_kv();
       //if( match(probedKv.key)==MATCH_TRUE ){
@@ -1406,7 +1427,7 @@ public:
       i &= m_sz - 1;
       KV probedKv = load_kv(i);
       if( probedKv.key==EMPTY_KEY )               return false;     // todo: this conflates and assumes that EMPTY_KEY is both the ConcurrentStore block index EMPTY_KEY and the ConcurrentHash EMPTY_KEY
-      if( runIfMatch(i, probedKv.key, match, f) ) return  true;
+      if( runIfMatch(i, probedKv.version, probedKv.key, match, f) ) return  true;
     }
   }
   
@@ -1582,20 +1603,20 @@ private:
     auto storebytes = ConcurrentStore::sizeBytes((ui32)blockSize, (ui32)blockCount);
     return  hashbytes + storebytes + OffsetBytes();
   }
-  static Match     CompareBlock(simdb const* const ths, void* buf, ui32 len, i32 blkIdx)
+  static Match     CompareBlock(simdb const *const ths, ui32 version, void const *const buf, ui32 len, i32 blkIdx)
   { 
-    return ths->s_cs.compare(buf, len, blkIdx);
+    return ths->s_cs.compare(version, buf, len, blkIdx);
   }
   static bool           IsEmpty(KV kv){return ConcurrentHash::IsEmpty(kv);}           // special value for ConcurrentHash
   static bool         IsListEnd(VerIdx vi){return ConcurrentStore::IsListEnd(vi); }   // special value for ConcurrentStore
 
   // todo: obsoleted by m_ch.runRead() ?
-  auto  getFromBlkIdx(i32  blkIdx, void*  out_buf) const -> ui64        // getFromBlkIdx is get from block index
-  {
-    if(blkIdx==EMPTY_KEY) return 0;
-
-    return s_cs.get(blkIdx, out_buf);           // copy into the buf starting at the blkidx
-  } 
+  //auto  getFromBlkIdx(i32  blkIdx, void*  out_buf) const -> ui64        // getFromBlkIdx is get from block index
+  //{
+  //  if(blkIdx==EMPTY_KEY) return 0;
+  //
+  //  return s_cs.get(blkIdx, out_buf);           // copy into the buf starting at the blkidx
+  //} 
   KV             read(void*   key, i32        len) const
   {
     using namespace std;
@@ -1604,7 +1625,7 @@ private:
     ui32 keyhash  =  ConcurrentHash::HashBytes(key, len);
     auto     ths  =  this;
     return s_ch.readHashed(keyhash, 
-      [ths, key, len](ui32 blkidx){ return CompareBlock(ths,key,len,blkidx); });
+      [ths, key, len](ui32 blkidx, ui32 ver){ return CompareBlock(ths,ver,key,len,blkidx); });
   }
 
 public:
@@ -1653,7 +1674,7 @@ public:
     if(isOwner()) s_flags->store(1);                                        // set to 1 to signal construction is done
   }
 
-  i32       put(void*       key, ui32  klen, void* val, ui32 vlen)
+  i32       put(void const *const key, ui32  klen, void const *const val, ui32 vlen)
   {
     i32 blkcnt = 0;
     //i32   kidx = s_cs.alloc(klen, &blkcnt).idx;    // todo: use the VersionIdx struct // kidx is key index
@@ -1688,7 +1709,7 @@ public:
     //KV        kv = s_ch.putHashed(keyhash, kidx.idx, vidx.idx,                      // this returns the previous KV at the position
     //  [ths, key, klen](ui32 blkidx){ return CompareBlock(ths,key,klen,blkidx); });
     KV        kv = s_ch.putHashed(keyhash, vi,                                  // this returns the previous KV at the position
-      [ths, key, klen](ui32 blkidx){ return CompareBlock(ths,key,klen,blkidx); });
+      [ths, key, klen](ui32 blkidx, ui32 ver){ return CompareBlock(ths,ver,key,klen,blkidx); });
 
     //if(kv.val!=EMPTY_KEY) s_cs.free(kv.val);
     //if(kv.key!=EMPTY_KEY) s_cs.free(kv.key);
@@ -1699,42 +1720,43 @@ public:
 
     return vi.idx;
   }
-  i64       get(const char* key, void* out_buf)
-  {
-    //Reader r = read( (void*)key, (ui32)strlen(key));
-    //if(r.kv.key==EMPTY_KEY || r.kv.readers<=0){ return -1; }
-
-    KV kv = read( (void*)key, (ui32)strlen(key));
-    if(kv.key==EMPTY_KEY){ return -1; }
-
-    ui64 len = getFromBlkIdx(kv.val, out_buf);
-
-    //if(r.doRm()){ m_cs.free(r.kv.val); m_cs.free(r.kv.key); }
-
-    return len;
-  }
+  //i64       get(const char* key, void* out_buf)
+  //{
+  //  //Reader r = read( (void*)key, (ui32)strlen(key));
+  //  //if(r.kv.key==EMPTY_KEY || r.kv.readers<=0){ return -1; }
+  //
+  //  KV kv = read( (void*)key, (ui32)strlen(key));
+  //  if(kv.key==EMPTY_KEY){ return -1; }
+  //
+  //  ui64 len = getFromBlkIdx(kv.val, out_buf);
+  //
+  //  //if(r.doRm()){ m_cs.free(r.kv.val); m_cs.free(r.kv.key); }
+  //
+  //  return len;
+  //}
   i64    getKey(ui32 idx, void* out_buf, ui32 klen)
   {
     if(klen<1) return 0;
     
     auto     ths = this;
-    auto runFunc = [ths, out_buf](KV kv){
-      return IsEmpty(kv)?  0ull  :  ths->s_cs.get(kv.key, out_buf);
+    auto runFunc = [ths, klen, out_buf](KV kv){
+      return IsEmpty(kv)?  0ull  :  ths->s_cs.get(kv.key, kv.version, out_buf, klen);
     };
     auto  retLen = s_ch.runRead(idx, runFunc);
 
     return retLen;
   }
-  i64       len(void* key, ui32 klen, ui32* out_klen=nullptr)
+  i64       len(const void *const key, ui32 klen, ui32* out_klen=nullptr)
   {
     if(klen<1) return 0;
 
     auto       ths = this;
-    void*   keyptr = key;
-    auto       hsh = ConcurrentHash::HashBytes( keyptr, klen );
+    //void*   keyptr = key;
+    //auto    keyptr = key;
+    auto       hsh = ConcurrentHash::HashBytes(key, klen );
 
-    auto matchFunc = [ths, key, klen](ui32 blkidx){
-      return CompareBlock(ths, key, klen, blkidx);
+    auto matchFunc = [ths, key, klen](ui32 blkidx, ui32 ver){
+      return CompareBlock(ths,ver,key,klen,blkidx);
     };
     
     ui32 len=0;
@@ -1745,23 +1767,6 @@ public:
     if( !s_ch.runMatch(hsh,  matchFunc, runFunc) ) return 0;
     return len;
   }
-  //ui32      len(ui32 idx)
-  //{
-  //  KV kv = s_ch.at(idx);
-  //  
-  //  //if(kv.key==EMPTY_KEY || kv.readers<0) return 0;
-  //  if( IsEmpty(kv) ) return 0;
-  //
-  //  auto    ths = this;
-  //  auto retLen = s_ch.runRead(idx, [ths](KV kv){
-  //    return IsEmpty(kv)?  0  :  ths->s_cs.len(kv.key);
-  //  });
-  //
-  //  return retLen;
-  //
-  //  //auto blkLen = m_cs.len(kv.key);
-  //  //return blkLen;
-  //}
   ui32      nxt() const
   {
     KV   empty = s_ch.empty_kv();
@@ -1842,7 +1847,7 @@ public:
     auto hash = ConcurrentHash::HashBytes(kbuf, len);
     auto  ths = this;
     KV kv = s_ch.rmHashed(hash,
-      [ths, kbuf, len](ui32 blkidx){ return CompareBlock(ths,kbuf,len,blkidx); });
+      [ths, kbuf, len](ui32 blkidx, ui32 ver){ return CompareBlock(ths,ver,kbuf,len,blkidx); });
 
     if(kv.val!=EMPTY_KEY) s_cs.free(kv.val);
     if(kv.key!=EMPTY_KEY) s_cs.free(kv.key);
@@ -1859,6 +1864,27 @@ public:
 
 
 
+
+
+
+
+//ui32      len(ui32 idx)
+//{
+//  KV kv = s_ch.at(idx);
+//  
+//  //if(kv.key==EMPTY_KEY || kv.readers<0) return 0;
+//  if( IsEmpty(kv) ) return 0;
+//
+//  auto    ths = this;
+//  auto retLen = s_ch.runRead(idx, [ths](KV kv){
+//    return IsEmpty(kv)?  0  :  ths->s_cs.len(kv.key);
+//  });
+//
+//  return retLen;
+//
+//  //auto blkLen = m_cs.len(kv.key);
+//  //return blkLen;
+//}
 
 //
 //static bool IsEmpty(KV kv){return kv.key==EMPTY_KEY || kv.readers<0;}

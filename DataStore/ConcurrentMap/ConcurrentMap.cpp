@@ -443,11 +443,11 @@ int main()
   str    kablam  =    "kablam";
 
   //if( db.isOwner() ){
-    Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
+    Println("put: ", db.put( wat.data(),   (ui32)wat.length(),    skidoosh.data(), (ui32)skidoosh.length()) );
     //db.rm("wat");
-    Println("put: ", db.put( (void*)wut.data(),   (ui32)wut.length(),    (void*)kablam.data(),   (ui32)kablam.length())   ); 
+    Println("put: ", db.put( wut.data(),   (ui32)wut.length(),    kablam.data(),   (ui32)kablam.length())   ); 
     //db.rm("wut");
-    Println("put: ", db.put( (void*)kablam.data(),(ui32)kablam.length(), (void*)skidoosh.data(), (ui32)skidoosh.length()) ); 
+    Println("put: ", db.put( kablam.data(),(ui32)kablam.length(), skidoosh.data(), (ui32)skidoosh.length()) ); 
     //db.rm("kablam");
     //Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
     //db.rm("wat");
@@ -458,7 +458,7 @@ int main()
   //}
 
   ui32 klen=0;
-  auto len = db.len( (void*)wat.data(), (ui32)wat.length(), &klen);
+  auto len = db.len( wat.data(), (ui32)wat.length(), &klen);
   Println("wat total len: ", len, " wat key len: ", klen, "\n");
 
   //TO(6,i)
