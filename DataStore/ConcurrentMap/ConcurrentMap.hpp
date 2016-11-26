@@ -111,6 +111,7 @@
 // -todo: add length and key length to ConcurrentStore
 // -todo: change to single block index key value pairs
 
+// todo: fix extra memory writing bug with byte key and 3 byte value
 // todo: test with more inserts and different blockSizes
 // todo: need more data with BlkIdx so that blocks read are known to be from the correct key value pair - do with versions
 // todo: make ConcurrentStore.get take a length that it won't exceed
@@ -957,15 +958,17 @@ public:
   //}
   void          put(i32  blkIdx, void* kbytes, i32 klen, void* vbytes, i32 vlen)
   {
+    using namespace std;
+    
     ui8*         b  =  (ui8*)kbytes;
     bool   kjagged  =  (klen % blockFreeSize()) != 0;
     i32    kblocks  =  kjagged? blocksNeeded(klen)-1 : blocksNeeded(klen);
-    ui32   remklen  =  klen - (kblocks*blockFreeSize());
+    i32   remklen   =  klen - (kblocks*blockFreeSize());
     
     ui32  fillvlen  =  blockFreeSize() - remklen;
     bool   vjagged  =  (vlen-fillvlen % blockFreeSize()) != 0;
     i32    vblocks  =  vjagged? blocksNeeded(vlen)-1 : blocksNeeded(vlen);
-    ui32   remvlen  =  (vlen-fillvlen) - (vblocks*blockFreeSize()); 
+    i32   remvlen   =  max(0, (vlen-fillvlen)-(vblocks*blockFreeSize()) ); 
 
     i32       cur  =  blkIdx;
     for(i32 i=0; i<kblocks; ++i){

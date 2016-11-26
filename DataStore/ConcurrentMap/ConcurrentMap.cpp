@@ -435,19 +435,19 @@ int main()
   bool lkFree = atomic<ui128_t>{}.is_lock_free();
   Println("is lock free 128: ",  lkFree );
 
-  simdb db("test", 8, 8);
+  simdb db("test", 8, 16);
 
   str       wat  =       "wat";
   str       wut  =       "wut";
-  str  skidoosh  =  "skidoosh";
+  str  skidoosh  =  "wat";
   str    kablam  =    "kablam";
 
   //if( db.isOwner() ){
     Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
     //db.rm("wat");
-    Println("put: ", db.put( (void*)wut.data(),   (ui32)wut.length(),    (void*)kablam.data(),   (ui32)kablam.length())   ); 
+    //Println("put: ", db.put( (void*)wut.data(),   (ui32)wut.length(),    (void*)kablam.data(),   (ui32)kablam.length())   ); 
     //db.rm("wut");
-    Println("put: ", db.put( (void*)kablam.data(),(ui32)kablam.length(), (void*)skidoosh.data(), (ui32)skidoosh.length()) ); 
+    //Println("put: ", db.put( (void*)kablam.data(),(ui32)kablam.length(), (void*)skidoosh.data(), (ui32)skidoosh.length()) ); 
     //db.rm("kablam");
     //Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
     //db.rm("wat");
