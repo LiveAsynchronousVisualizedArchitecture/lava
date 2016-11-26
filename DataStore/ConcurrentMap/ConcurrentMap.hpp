@@ -115,8 +115,8 @@
 // -todo: need more data with BlkIdx so that blocks read are known to be from the correct key value pair - do with versions
 // -todo: make memcmpBlk take a length parameter - already there
 // -todo: redo compare to only compare key
+// -todo: fix total len in BlkLst - runMatch returned boolean
 
-// todo: fix total len in BlkLst
 // todo: make version make it into ConcurrentHash KV
 // todo: make writeBlock only take a length parameter since the input pointer can be offset by the caller  
 // todo: redo ConcurrentStore.len() to take a version and output an optional klen
@@ -1096,23 +1096,12 @@ public:
   }
   ui32          len(i32  blkIdx, ui32 version, ui32* out_klen)
   {
-    //IDX  nxt;
-    //IDX  cur = blkIdx;
-    //ui32 ret = blockLen(cur);
-    //
-    //while( (nxt = nxtBlock(cur)) >= 0 ){        // todo: change this to LIST_END, initialize the BlkLst to LIST_END and use ui32 for indices
-    //  ret += blockLen(nxt);
-    //  cur  = nxt;
-    //}
-    //
-    //return ret;
-
     BlkLst bl = s_bls[blkIdx];
-    //if(version == bl.vi.version){
+    if(version == bl.vi.version){
       *out_klen = bl.klen;
       return bl.len;
-    //}else 
-      //return 0;
+    }else 
+      return 0;
   }
   auto         list() const -> ConcurrentList const&
   {
@@ -1132,12 +1121,14 @@ class   ConcurrentHash
 private:
 
 public:
+  using VerIdx = ConcurrentStore::VerIdx;
+
   static const  i8   RM_OWNER         =    -1;            // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
   static const ui8   LAST_READER      =     0;            // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
   static const ui8   INIT_READERS     =     0;            // eventually make this 1 again? - to catch when readers has dropped to 0
   static const ui8   FREE_READY       =     0;
   static const ui8   MAX_READERS      =  0xFF;
-  static const ui64  EMPTY_KEY        =  2097151;   // first 21 bits set 
+  static const ui64  EMPTY_KEY        =  2097151;         // first 21 bits set 
   static const ui32  EMPTY_HASH_IDX   =  0xFFFFFFFF;           // 32 bits set - hash indices are different from block indices 
   //static const ui64  EMPTY_KEY        =  0x000000000FFFFFFF;   // first 28 bits set 
   //static const ui64  EMPTY_KEY        =    0x0000000000200000;   // first 21 bits set 
@@ -1153,7 +1144,7 @@ public:
     ui64 asInt;
   };
 
-  static ui32 nextPowerOf2(ui32  v)
+  static ui32       nextPowerOf2(ui32  v)
   {
     v--;
     v |= v >> 1;
@@ -1165,22 +1156,21 @@ public:
 
     return v;
   }
-  static ui64 sizeBytes(ui32 size)
+  static ui64          sizeBytes(ui32 size)
   {
     return lava_vec<KV>::sizeBytes( nextPowerOf2(size) );
   }
-  static bool DefaultKeyCompare(ui32 a, ui32 b)
+  static bool  DefaultKeyCompare(ui32 a, ui32 b)
   {
     return a == b;
   }
-  static ui32 HashBytes(void* buf, ui32 len)
+  static ui32          HashBytes(void* buf, ui32 len)
   {
     ui64 hsh = fnv_64a_buf(buf, len);
 
     return (ui32)( (hsh>>32) ^ ((ui32)hsh));
   }
-  //static bool IsEmpty(KV kv){return kv.key==EMPTY_KEY || kv.readers<0;}
-  static KV    empty_kv()
+  static KV             empty_kv()
   {
     KV empty;
     empty.key      =  EMPTY_KEY;
@@ -1189,7 +1179,7 @@ public:
     //empty.readers  =  0;
     return empty;
   }
-  static bool   IsEmpty(KV kv)
+  static bool            IsEmpty(KV kv)
   {
     static KV emptykv = empty_kv();
     return emptykv.asInt == kv.asInt;
@@ -1295,12 +1285,14 @@ public:
 
   template<class MATCH_FUNC> 
   //KV       putHashed(ui32 hash, ui32 key, ui32 val, MATCH_FUNC match) const
-  KV       putHashed(ui32 hash, ui32 key, MATCH_FUNC match) const
+  //KV       putHashed(ui32 hash, ui32 key, MATCH_FUNC match) const
+  KV       putHashed(ui32 hash, VerIdx vi, MATCH_FUNC match) const
   {
     using namespace std;
   
-    KV desired   =  empty_kv();
-    desired.key  =  key;
+    KV desired       =  empty_kv();
+    desired.key      =  vi.idx;
+    desired.version  =  vi.version;
     //desired.val  =  val;
     ui32      i  =  hash;
     for(;; ++i)
@@ -1681,13 +1673,13 @@ public:
     //s_cs.put(kidx.idx, key, klen);
     //s_cs.put(vidx.idx, val, vlen);
     
-    auto  kidx = s_cs.alloc(klen+vlen, klen, &blkcnt);    // todo: use the VersionIdx struct // kidx is key index
-    if(kidx.idx==LIST_END) return EMPTY_KEY;
+    auto vi = s_cs.alloc(klen+vlen, klen, &blkcnt);    // todo: use the VersionIdx struct // kidx is key index
+    if(vi.idx==LIST_END) return EMPTY_KEY;
     if(blkcnt<0){
-      s_cs.free(kidx.idx);
+      s_cs.free(vi.idx);
       return EMPTY_KEY;
     }    
-    s_cs.put(kidx.idx, key, klen, val, vlen);
+    s_cs.put(vi.idx, key, klen, val, vlen);
     //s_cs.put(kidx.idx, key,);
 
     //ui32 keyhash = m_ch.hashBytes(key, klen);
@@ -1695,7 +1687,7 @@ public:
     auto     ths = this;                                                              // this silly song and dance is because the this pointer can't be passed to a lambda
     //KV        kv = s_ch.putHashed(keyhash, kidx.idx, vidx.idx,                      // this returns the previous KV at the position
     //  [ths, key, klen](ui32 blkidx){ return CompareBlock(ths,key,klen,blkidx); });
-    KV        kv = s_ch.putHashed(keyhash, kidx.idx,                                  // this returns the previous KV at the position
+    KV        kv = s_ch.putHashed(keyhash, vi,                                  // this returns the previous KV at the position
       [ths, key, klen](ui32 blkidx){ return CompareBlock(ths,key,klen,blkidx); });
 
     //if(kv.val!=EMPTY_KEY) s_cs.free(kv.val);
@@ -1705,7 +1697,7 @@ public:
 
     //if(kv.key != ConcurrentHash::EMPTY_KEY){ m_cs.free(kv.val); m_cs.free(kv.key); }
 
-    return kidx.idx;
+    return vi.idx;
   }
   i64       get(const char* key, void* out_buf)
   {
@@ -1868,6 +1860,19 @@ public:
 
 
 
+//
+//static bool IsEmpty(KV kv){return kv.key==EMPTY_KEY || kv.readers<0;}
+
+//IDX  nxt;
+//IDX  cur = blkIdx;
+//ui32 ret = blockLen(cur);
+//
+//while( (nxt = nxtBlock(cur)) >= 0 ){        // todo: change this to LIST_END, initialize the BlkLst to LIST_END and use ui32 for indices
+//  ret += blockLen(nxt);
+//  cur  = nxt;
+//}
+//
+//return ret;
 
 //union      KV         // 256 million keys (28 bits), 256 million values (28 bit),  127 readers (signed 8 bits)
 //{
