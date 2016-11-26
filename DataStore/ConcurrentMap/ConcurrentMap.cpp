@@ -439,15 +439,15 @@ int main()
 
   str       wat  =       "wat";
   str       wut  =       "wut";
-  str  skidoosh  =  "wat";
+  str  skidoosh  =  "skidoosh";
   str    kablam  =    "kablam";
 
   //if( db.isOwner() ){
     Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
     //db.rm("wat");
-    //Println("put: ", db.put( (void*)wut.data(),   (ui32)wut.length(),    (void*)kablam.data(),   (ui32)kablam.length())   ); 
+    Println("put: ", db.put( (void*)wut.data(),   (ui32)wut.length(),    (void*)kablam.data(),   (ui32)kablam.length())   ); 
     //db.rm("wut");
-    //Println("put: ", db.put( (void*)kablam.data(),(ui32)kablam.length(), (void*)skidoosh.data(), (ui32)skidoosh.length()) ); 
+    Println("put: ", db.put( (void*)kablam.data(),(ui32)kablam.length(), (void*)skidoosh.data(), (ui32)skidoosh.length()) ); 
     //db.rm("kablam");
     //Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
     //db.rm("wat");
@@ -456,6 +456,10 @@ int main()
   //else{
   //  Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
   //}
+
+  ui32 len, klen;
+  bool ok = db.len( (void*)wat.data(), (ui32)wat.length(), &len, &klen );
+  Println("wat total len: ", len, " wat key len: ", klen, "\n");
 
   //TO(6,i)
   //{

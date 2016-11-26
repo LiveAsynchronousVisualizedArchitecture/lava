@@ -266,8 +266,13 @@
 #include <mutex>
 #include <memory>
 #include <vector>
+#include <algorithm>
 
-#include <windows.h>
+#ifdef _WIN32      // windows
+ #define NOMINMAX
+ #define WIN32_LEAN_AND_MEAN
+ #include <windows.h>
+#endif
 
 using    i8   =   int8_t;
 using   ui8   =   uint8_t;
@@ -580,8 +585,6 @@ public:
   //using BlockLists  =  lava_vec<IDX>;
 
   const static ui32 LIST_END = ConcurrentList::LIST_END;
-  //const static VersionedIdx LIST_END = { ConcurrentList::LIST_END, 0 };
-  //const static VersionedIdx LIST_END = { ConcurrentList::LIST_END, 0 };
 
   static BlkLst   make_BlkLst(bool isKey, i32 readers, ui32 idx, ui32 ver, ui32 len, ui32 klen)
   {
@@ -784,8 +787,6 @@ private:
   }
 
 public:
-  //static ui64     BlksOfst(ui32 blockSize, ui32 blockCount)
-
   /* 
     The order of the shared memory is:
     Version
@@ -965,10 +966,11 @@ public:
     i32    kblocks  =  kjagged? blocksNeeded(klen)-1 : blocksNeeded(klen);
     i32   remklen   =  klen - (kblocks*blockFreeSize());
     
-    ui32  fillvlen  =  blockFreeSize() - remklen;
-    bool   vjagged  =  (vlen-fillvlen % blockFreeSize()) != 0;
-    i32    vblocks  =  vjagged? blocksNeeded(vlen)-1 : blocksNeeded(vlen);
-    i32   remvlen   =  max(0, (vlen-fillvlen)-(vblocks*blockFreeSize()) ); 
+    i32   fillvlen  =  min(vlen, blockFreeSize()-remklen);
+    i32   tailvlen  =  vlen-fillvlen;
+    bool   vjagged  =  (tailvlen % blockFreeSize()) != 0;
+    i32    vblocks  =  vjagged? blocksNeeded(tailvlen)-1 : blocksNeeded(tailvlen);
+    i32    remvlen  =  max<i32>(0, tailvlen - (vblocks*blockFreeSize()) ); 
 
     i32       cur  =  blkIdx;
     for(i32 i=0; i<kblocks; ++i){
@@ -988,8 +990,6 @@ public:
     if(vjagged && remvlen>0){
       b   +=  writeBlock(cur, b, remvlen);
     }
-
-
   }
   size_t        get(i32  blkIdx, void* bytes)            const
   {
@@ -1202,37 +1202,6 @@ private:
   {
     store_kv(i, empty_kv());
   }
-  //KV         incReaders(ui32 i)            const
-  //{
-  //  KV empty = empty_kv();
-  //  KV cur, nxt;
-  //  aui64* aidx = (aui64*)&(m_kvs[i].asInt);
-  //  cur.asInt   = aidx->load();
-  //
-  //  if(cur.asInt==empty.asInt) return empty;
-  //
-  //  do{
-  //    if(cur.readers<0) return cur;                           // if readers is already below 0, this index is done and won't come back 
-  //    nxt = cur;
-  //    nxt.readers += 1;
-  //  }while( !aidx->compare_exchange_strong(cur.asInt, nxt.asInt) );
-  //  
-  //  return nxt;
-  //}
-  //bool       decReaders(ui32 i)            const
-  //{
-  //  KV cur, nxt;
-  //  aui64* aidx = (aui64*)&(m_kvs[i].asInt);
-  //  cur.asInt   = aidx->load();
-  //  do{
-  //    nxt           =  cur;
-  //    nxt.readers  -=    1;
-  //  }while( !aidx->compare_exchange_strong(cur.asInt, nxt.asInt) );
-  //  
-  //  if(cur.readers==0){ doFree(i); return false; }
-  //
-  //  return true;
-  //}
 
   template<class MATCH_FUNC> 
   auto       checkMatch(ui32 i, ui32 key, MATCH_FUNC match) const -> Match //  decltype(match(empty_kv()))
@@ -1856,6 +1825,42 @@ public:
 
 
 
+
+
+//const static VersionedIdx LIST_END = { ConcurrentList::LIST_END, 0 };
+//const static VersionedIdx LIST_END = { ConcurrentList::LIST_END, 0 };
+
+//KV         incReaders(ui32 i)            const
+//{
+//  KV empty = empty_kv();
+//  KV cur, nxt;
+//  aui64* aidx = (aui64*)&(m_kvs[i].asInt);
+//  cur.asInt   = aidx->load();
+//
+//  if(cur.asInt==empty.asInt) return empty;
+//
+//  do{
+//    if(cur.readers<0) return cur;                           // if readers is already below 0, this index is done and won't come back 
+//    nxt = cur;
+//    nxt.readers += 1;
+//  }while( !aidx->compare_exchange_strong(cur.asInt, nxt.asInt) );
+//  
+//  return nxt;
+//}
+//bool       decReaders(ui32 i)            const
+//{
+//  KV cur, nxt;
+//  aui64* aidx = (aui64*)&(m_kvs[i].asInt);
+//  cur.asInt   = aidx->load();
+//  do{
+//    nxt           =  cur;
+//    nxt.readers  -=    1;
+//  }while( !aidx->compare_exchange_strong(cur.asInt, nxt.asInt) );
+//  
+//  if(cur.readers==0){ doFree(i); return false; }
+//
+//  return true;
+//}
 
 //             read(void*   key, i32        len) const
 //{

@@ -43,6 +43,9 @@
 *.opensdf
 *.suo
 
+# intel compiler nonsense
+*.amplxeproj
+
 # User-specific files
 *.suo
 *.user
