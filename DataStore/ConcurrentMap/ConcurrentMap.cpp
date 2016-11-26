@@ -429,7 +429,7 @@ int main()
   auto sz = sizeof(ConcurrentStore::BlkLst);
   Println("Blklst sz: ", sz);
 
-  Println("simdb sz: ", sizeof(simdb) );
+  Println("simdb stack sz: ", sizeof(simdb) );
 
   struct ui128_t { uint64_t low, high; };
   //struct ui128_t { uint64_t low; };

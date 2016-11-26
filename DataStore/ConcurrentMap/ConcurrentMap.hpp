@@ -129,6 +129,7 @@
 // -todo: make sure that a block isn't read from if readers<0
 // -todo: flip decReaders return value - no, because the return value is 'do I need to clea up'
 
+// todo: take value key from KV struct in ConccurrentHash and use VerIdx instead
 // todo: redo ConcurrentStore.get() to use single index block lists
 // todo: make readers for blocks only exist on the head of the list?
 // todo: make alloc give back blocks if allocation fails
