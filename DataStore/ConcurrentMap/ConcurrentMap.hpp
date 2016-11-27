@@ -138,8 +138,8 @@
 // -todo: implement simdb.get()
 // -todo: take out size_t from ConcurrentStore
 // -todo: give put() return type a BLKIDX type - no need for now, eventually will want to return a VerIdx ? 
+// -todo: implement C++ get(str)
 
-// todo: implement C++ get(str)
 // todo: test key iteration
 // todo: make alloc give back blocks if allocation fails
 // todo: make readers for blocks only exist on the head of the list?

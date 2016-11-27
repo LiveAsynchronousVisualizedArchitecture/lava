@@ -470,28 +470,17 @@ int main()
   db.get(wut,v);    Println("value: ", v);
   db.get(kablam,v); Println("value: ", v);
 
-  //TO(6,i)
-  //{
-  //  //str  key( db.len(db.nxt()), '\0');
-  //  //auto len = db.getKey(db.cur(), (void*)key.data(), (ui32)key.length());
-  //  //str  val(16, '\0');
-  //  //db.get(key, (void*)val.data() );
-  //  //val.resize( strlen(val.c_str()) );
-  //  //
-  //  //Println("len: ", len, 
-  //  //    " str len: ", 
-  //  //    key.length(), "  nxt key: [", key, 
-  //  //    "]  val: [", val,"] val len: ", val.length() );    
-  //
-  //  str  key = db.getKeyStr(db.nxt());
-  //  str  val(16, '\0');
-  //  db.get(key.c_str(), (void*)val.data() );
-  //  val.resize( strlen(val.c_str()) );
-  //
-  //  Println(" str len: ", 
-  //          key.length(), "  nxt key: [", key, 
-  //          "]  val: [", val,"] val len: ", val.length() );
-  //}
+  TO(6,i)
+  {  
+    str  key = db.getKeyStr(db.nxt());
+    str  val(16, '\0');
+    db.get(key.c_str(), (void*)val.data() );
+    val.resize( strlen(val.c_str()) );
+  
+    Println(" str len: ", 
+            key.length(), "  nxt key: [", key, 
+            "]  val: [", val,"] val len: ", val.length() );
+  }
 
   //Println("wat data len: ",    db.len(wat)    );
   //Println("wut data len: ",    db.len(wut)    );
@@ -552,6 +541,18 @@ int main()
 
 
 
+
+
+//str  key( db.len(db.nxt()), '\0');
+//auto len = db.getKey(db.cur(), (void*)key.data(), (ui32)key.length());
+//str  val(16, '\0');
+//db.get(key, (void*)val.data() );
+//val.resize( strlen(val.c_str()) );
+//
+//Println("len: ", len, 
+//    " str len: ", 
+//    key.length(), "  nxt key: [", key, 
+//    "]  val: [", val,"] val len: ", val.length() );    
 
 //auto idx = db.nxt();
 //str key( db.len(idx), '\0');
