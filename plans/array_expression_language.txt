@@ -4,6 +4,7 @@ Goal - be like regular expressions for working with lists, arrays, multi-dimensi
 To start:
   Take common functional iterators and turn them into terse operators
   Look at linq and anything similiar and translate those capabilities to terse operators
+  Look at APL / J / K for ideas
 
 consumers: collect find
 adapters: map filter fold take
@@ -11,8 +12,8 @@ array: sort
 
 Have parts of the closure be implicit? 
   |x| x + 1 could become +1
-Map: @
-map(ary, |x| x + 1) becomes ary@+1     ?
+Map: .
+map(ary, |x| x + 1) becomes ary.(+1)     ?
 
 Map: .  Collect: {}  Collect and Sort: []  
 
@@ -25,9 +26,11 @@ Fold:  @   Forward: ->
 (0..100:(%2)=0)@+                         // adds all even numbers from 0 to 100 exclusive
 
 Concatenation: ++                                        // concatenation
-StebBy: ` or !   
-Enumerate:   0..100:%2@*_                // even numbers mapped to be themselves multiplied by their index
+StebBy: `   
+Enumerate:   0..100:(%2).(*$)                // even numbers mapped to be themselves multiplied by their index
+Apply:  !
 
-
+Use -> and <- to pass two arguments?
+0..10:(%2) -> zip <- 0..5.(^$)                // produces (0,0),(2,1),(4,4),(6,9),(8,16)
 
 
