@@ -130,8 +130,11 @@
 // -todo: flip decReaders return value - no, because the return value is 'do I need to clea up'
 // -todo: take value key from KV struct in ConccurrentHash and use VerIdx instead
 // -todo: redo ConcurrentStore.get() to use single index block lists
+// -todo: make readBlock() take an offset
+// -todo: work out offset in store.get()
 
 // todo: test get()
+// todo: make nxtBlock() take a version number
 // todo: implement simdb.get()
 // todo: make readers for blocks only exist on the head of the list?
 // todo: make alloc give back blocks if allocation fails
@@ -819,17 +822,15 @@ private:
     //bool     fill = len < -1 || blkFree < len;
     //size_t cpyLen = fill? blkFree : len;
   }
-  size_t      readBlock(i32  blkIdx, ui32 version, void *const bytes) const
+  ui32        readBlock(i32  blkIdx, ui32 version, void *const bytes, ui32 ofst=0) const
   {
-    //if(!incReaders(blkIdx, version)) return 0;
     BlkLst bl = incReaders(blkIdx, version);      if(bl.len==0) return 0;
       i32   blkFree  =  blockFreeSize();
       ui8*        p  =  blockFreePtr(blkIdx);
-      //i32       nxt  =  nxtBlock(blkIdx);
-      //size_t cpyLen  =  nxt<0? -nxt : blkFree;           // if next is negative, then it will be the length of the bytes in that block
       i32       nxt  =  bl.idx;
-      size_t cpyLen  =  nxt<0? -nxt : blkFree;             // if next is negative, then it will be the length of the bytes in that block
-      memcpy(bytes, p, cpyLen);
+      ui32   cpyLen  =  nxt<0? -nxt : blkFree;             // if next is negative, then it will be the length of the bytes in that block
+      cpyLen        -=  ofst;
+      memcpy(bytes, p+ofst, cpyLen);
     decReaders(blkIdx);
 
     return cpyLen;
@@ -837,6 +838,10 @@ private:
     //if(decReaders(blkIdx)){
     //  doFree(blkIdx);
     //}
+
+    //if(!incReaders(blkIdx, version)) return 0;
+    //i32       nxt  =  nxtBlock(blkIdx);
+    //size_t cpyLen  =  nxt<0? -nxt : blkFree;           // if next is negative, then it will be the length of the bytes in that block
   }
 
 public:
@@ -891,7 +896,7 @@ public:
     assert(blockSize > sizeof(IDX));
   }
 
-  auto         alloc(i32   size, ui32 klen, i32* out_blocks=nullptr) -> VerIdx   // todo: doesn't this need to give back the blocks if allocation fails?
+  auto        alloc(i32   size, ui32 klen, i32* out_blocks=nullptr) -> VerIdx   // todo: doesn't this need to give back the blocks if allocation fails?
   {
     i32 byteRem  =  0;
     i32  blocks  =  blocksNeeded(size, &byteRem);
@@ -975,25 +980,43 @@ public:
       b   +=  writeBlock(cur, b, remvlen);
     }
   }
-  size_t        get(i32  blkIdx, ui32 version, void const *const bytes, ui32 maxlen) const
+  ui32          get(i32  blkIdx, ui32 version, void *const bytes, ui32 maxlen) const
   {
     if(blkIdx == LIST_END){ return 0; }
 
-    size_t    len = 0;
-    size_t  rdLen = 0;
-    ui8*        b = (ui8*)bytes;
-    i32       cur = blkIdx;
-    i32       nxt;
-    while(true)
+    BlkLst bl = incReaders(blkIdx, version);   
+    
+    if(bl.len==0 || (bl.len-bl.klen)>maxlen ) return 0;
+
+    auto   kdiv = div(bl.klen, blockFreeSize());
+    auto  kblks = kdiv.quot;
+    auto   krem = kdiv.rem;
+    ui32    len = 0;
+    ui32  rdLen = 0;
+    i8*       b = (i8*)bytes;
+    i8*      en = b + maxlen;
+    i32     cur = blkIdx;
+    i32     nxt;
+    for(int i=0; i<kblks; ++i) cur=nxtBlock(cur);
+
+    rdLen  =  readBlock(cur, version, b, krem);
+    b     +=  rdLen;
+    len   +=  rdLen;
+    nxt    =  nxtBlock(cur);
+
+    //while(true)
+    while( !(nxt<0) && nxt!=LIST_END )
     {
-      nxt    =  nxtBlock(cur);
-      rdLen  =  readBlock(cur, version, b);                         // rdLen is read length
+      cur    =  nxt;
+      rdLen  =  readBlock(cur, version, b);  if(rdLen==0) break;        // rdLen is read length
       b     +=  rdLen;
       len   +=  rdLen;
-      if(nxt<0 || nxt==LIST_END) break;
+      nxt    =  nxtBlock(cur);
+      //if(nxt<0 || nxt==LIST_END) break;
 
-      cur    =  nxt;
     }
+
+    decReaders(blkIdx);
 
     return len;                                           // only one return after the top to make sure readers can be decremented - maybe it should be wrapped in a struct with a destructor
   }
@@ -1586,7 +1609,7 @@ public:
     if(isOwner()) s_flags->store(1);                                        // set to 1 to signal construction is done
   }
 
-  i32       put(void const *const key, ui32  klen, void const *const val, ui32 vlen)
+  i32        put(const void *const key, ui32 klen, const void *const val, ui32 vlen)
   {
     i32 blkcnt = 0;
     
@@ -1600,8 +1623,6 @@ public:
 
     ui32 keyhash = ConcurrentHash::HashBytes(key, klen);
     auto     ths = this;                                                              // this silly song and dance is because the this pointer can't be passed to a lambda
-    //VerIdx        kv = s_ch.putHashed(keyhash, kidx.idx, vidx.idx,                      // this returns the previous VerIdx at the position
-    //  [ths, key, klen](ui32 blkidx){ return CompareBlock(ths,key,klen,blkidx); });
     VerIdx        kv = s_ch.putHashed(keyhash, vi,                                  // this returns the previous VerIdx at the position
       [ths, key, klen](ui32 blkidx, ui32 ver){ return CompareBlock(ths,blkidx,ver,key,klen); });
 
@@ -1609,17 +1630,26 @@ public:
 
     return vi.idx;
   }
-  i64    getKey(ui32 idx, void* out_buf, ui32 klen)
+  bool       get(const void *const key, ui32 klen, void *const   out_val, ui32 vlen)
   {
     if(klen<1) return 0;
-    
-    auto     ths = this;
-    auto runFunc = [ths, klen, out_buf](VerIdx kv){
-      return IsEmpty(kv)?  0ull  :  ths->s_cs.get(kv.idx, kv.version, out_buf, klen);
-    };
-    auto  retLen = s_ch.runRead(idx, runFunc);
 
-    return retLen;
+    auto       ths = this;
+    auto       hsh = ConcurrentHash::HashBytes(key, klen);
+
+    auto matchFunc = [ths, key, klen](ui32 blkidx, ui32 ver){
+      return CompareBlock(ths,blkidx,ver,key,klen);
+    };
+    
+    ui32  out_klen = 0;
+    auto   runFunc = [ths, &out_klen, out_val, vlen](VerIdx kv){
+      return ths->s_cs.get(kv.idx, kv.version, out_val, vlen);
+    };
+
+    return s_ch.runMatch(hsh, matchFunc, runFunc);
+
+    //if( !s_ch.runMatch(hsh, matchFunc, runFunc) ) return false;
+    //return true;
   }
   i64       len(const void *const key, ui32 klen, ui32* out_klen=nullptr)
   {
@@ -1639,6 +1669,18 @@ public:
 
     if( !s_ch.runMatch(hsh,  matchFunc, runFunc) ) return 0;
     return len;
+  }
+  i64    getKey(ui32 idx, void* out_buf, ui32 klen)
+  {
+    if(klen<1) return 0;
+    
+    auto     ths = this;
+    auto runFunc = [ths, klen, out_buf](VerIdx kv){
+      return IsEmpty(kv)?  0ull  :  ths->s_cs.get(kv.idx, kv.version, out_buf, klen);
+    };
+    auto  retLen = s_ch.runRead(idx, runFunc);
+
+    return retLen;
   }
   ui32      nxt() const
   {
@@ -1722,6 +1764,9 @@ public:
 
 
 
+
+//VerIdx        kv = s_ch.putHashed(keyhash, kidx.idx, vidx.idx,                      // this returns the previous VerIdx at the position
+//  [ths, key, klen](ui32 blkidx){ return CompareBlock(ths,key,klen,blkidx); });
 
 //i32   kidx = s_cs.alloc(klen, &blkcnt).idx;    // todo: use the VersionIdx struct // kidx is key index
 //

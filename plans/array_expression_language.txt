@@ -6,18 +6,19 @@ To start:
   Look at linq and anything similiar and translate those capabilities to terse operators
   Look at APL / J / K for ideas
 
-consumers: collect find
+Is there a problem rectifying the utility in linqs focus on strings with more basic iteration operations?
+
+consumers: collect find collectAndSort 
 adapters: map filter fold take
-array: sort
 
 Have parts of the closure be implicit? 
   |x| x + 1 could become +1
 Map: .
 map(ary, |x| x + 1) becomes ary.(+1)     ?
 
-Map: .  Collect: {}  Collect and Sort: []  
+Map: .  Collect: {}  CollectAndSort: []  
 
-[ary|ary.%7]              // sorts an array by their remainders to 7 
+[ary|ary.%7]                              // sorts an array by their remainders to 7 
 
 Filter:    : 
 let evens = {0..100:(%2)=0}               // evens is only the even numbers between 0 and 100 exclusive
@@ -25,12 +26,38 @@ let evens = {0..100:(%2)=0}               // evens is only the even numbers betw
 Fold:  @   Forward: ->  
 (0..100:(%2)=0)@+                         // adds all even numbers from 0 to 100 exclusive
 
-Concatenation: ++                                        // concatenation
+Concatenation: ++                         // concatenation
 StebBy: `   
-Enumerate:   0..100:(%2).(*$)                // even numbers mapped to be themselves multiplied by their index
+Enumerate:   0..100:(%2).(*$)             // even numbers mapped to be themselves multiplied by their index
 Apply:  !
 
-Use -> and <- to pass two arguments?
-0..10:(%2) -> zip <- 0..5.(^$)                // produces (0,0),(2,1),(4,4),(6,9),(8,16)
+Use -> and <- to pass two arguments, creating a binary operator?
+0..10:(%2) -> zip <- 0..5.(^$)            // produces (0,0),(2,1),(4,4),(6,9),(8,16)
+
+
+Linq:
+    IEnumerable<string> query = from s in names 
+                               where s.Length == 5
+                               orderby s
+                               select s.ToUpper();
+
+[names:#_=5]$^                
+// names:             filter names
+// names:_            filter names with _ using the primary iteration variable 
+// names:#_           # means length so #_ is the length of the iteration variable
+// names:#_=5         filter names where length equals 5
+// [names:#_=5]       filter by length of 5 then collect and sort
+// $                  $ means string operation
+// $^                 $^ means toUpper which makes the whole string uppercase 
+// [names:#_=5]$^     filter names where length equals 5, sort, then make uppercase
+
+
+Strings:
+$^        toUpper
+$%' '     split
+$v        toLower
+
+
+
 
 
