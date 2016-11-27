@@ -1,0 +1,33 @@
+
+Goal - be like regular expressions for working with lists, arrays, multi-dimensional arrays, etc. 
+
+To start:
+  Take common functional iterators and turn them into terse operators
+  Look at linq and anything similiar and translate those capabilities to terse operators
+
+consumers: collect find
+adapters: map filter fold take
+array: sort
+
+Have parts of the closure be implicit? 
+  |x| x + 1 could become +1
+Map: @
+map(ary, |x| x + 1) becomes ary@+1     ?
+
+Map: .  Collect: {}  Collect and Sort: []  
+
+[ary|ary.%7]              // sorts an array by their remainders to 7 
+
+Filter:    : 
+let evens = {0..100:(%2)=0}               // evens is only the even numbers between 0 and 100 exclusive
+
+Fold:  @   Forward: ->  
+(0..100:(%2)=0)@+                         // adds all even numbers from 0 to 100 exclusive
+
+Concatenation: ++                                        // concatenation
+StebBy: ` or !   
+Enumerate:   0..100:%2@*_                // even numbers mapped to be themselves multiplied by their index
+
+
+
+

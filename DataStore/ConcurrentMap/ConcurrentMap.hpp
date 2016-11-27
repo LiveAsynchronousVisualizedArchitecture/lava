@@ -128,9 +128,11 @@
 // -todo: combine keys and data into one block run
 // -todo: make sure that a block isn't read from if readers<0
 // -todo: flip decReaders return value - no, because the return value is 'do I need to clea up'
+// -todo: take value key from KV struct in ConccurrentHash and use VerIdx instead
+// -todo: redo ConcurrentStore.get() to use single index block lists
 
-// todo: take value key from KV struct in ConccurrentHash and use VerIdx instead
-// todo: redo ConcurrentStore.get() to use single index block lists
+// todo: test get()
+// todo: implement simdb.get()
 // todo: make readers for blocks only exist on the head of the list?
 // todo: make alloc give back blocks if allocation fails
 // todo: take out size_t from ConcurrentStore
@@ -588,16 +590,17 @@ public:
 
     //ui32 asInt;
   };
-  //union BlkLst                            // need to do anything special to guarantee that readers is aligned so it is atomic?
-  //{
-  //  struct { KeyAndReaders kr; VerIdx vi; ui32 len; ui32 klen; };
-  //  //ui64 asInt;
-  //};
   union BlkLst                            // need to do anything special to guarantee that readers is aligned so it is atomic?
   {
     //struct { KeyAndReaders kr; ui32 version; i32 idx; ui32 len, klen; };
     struct { KeyAndReaders kr; i32 idx; ui32 len, klen; };
   };
+
+  //union BlkLst                            // need to do anything special to guarantee that readers is aligned so it is atomic?
+  //{
+  //  struct { KeyAndReaders kr; VerIdx vi; ui32 len; ui32 klen; };
+  //  //ui64 asInt;
+  //};
 
   using IDX         =  i32;
   using ai32        =  std::atomic<i32>;
@@ -637,43 +640,59 @@ public:
     return empty.asInt == vi.asInt;
   }
 
-  bool      incReaders(ui32 blkIdx, ui32 version) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
-  {
-    //ai32* aidx = (ai32*)&(m_bls[blkIdx].readers);
-    //i32    cur = aidx->load();
-    //i32    nxt;
-    
-    //BlkLst cur, nxt;
-    //aui64* aidx = (aui64*)&(s_bls[blkIdx].asInt);
-    //cur.asInt   = aidx->load();
-    ////nxtBl.asInt = curBl.asInt;
-    //do{
-    //  if(cur.kr.readers<0) return false;
-    //  nxt = cur;
-    //  nxt.kr.readers += 1;
-    //}while( !aidx->compare_exchange_strong(cur.asInt, nxt.asInt) );
+  //bool      incReaders(ui32 blkIdx, ui32 version) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
+  //{
+  //  //ai32* aidx = (ai32*)&(m_bls[blkIdx].readers);
+  //  //i32    cur = aidx->load();
+  //  //i32    nxt;
+  //  
+  //  //BlkLst cur, nxt;
+  //  //aui64* aidx = (aui64*)&(s_bls[blkIdx].asInt);
+  //  //cur.asInt   = aidx->load();
+  //  ////nxtBl.asInt = curBl.asInt;
+  //  //do{
+  //  //  if(cur.kr.readers<0) return false;
+  //  //  nxt = cur;
+  //  //  nxt.kr.readers += 1;
+  //  //}while( !aidx->compare_exchange_strong(cur.asInt, nxt.asInt) );
+  //
+  //  //KeyAndReaders cur, nxt;
+  //  //aui32* areaders = (aui32*)&(s_bls[blkIdx].kr.asInt);    
+  //  //cur.asInt       = areaders->load();
+  //  //do{
+  //  //  if(cur.readers<0) return false;
+  //  //  nxt = cur;
+  //  //  nxt.readers += 1;
+  //  //}while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
+  //  //
+  //  //return true;
+  //
+  //  KeyAndReaders cur, nxt;
+  //  aui64* areaders = (aui64*)&(s_bls[blkIdx].kr.asInt);    
+  //  cur.asInt       = areaders->load();
+  //  do{
+  //    if(cur.version!=version || cur.readers<0) return false;
+  //    nxt = cur;
+  //    nxt.readers += 1;
+  //  }while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
+  //  
+  //  return true;
+  //}
 
-    //KeyAndReaders cur, nxt;
-    //aui32* areaders = (aui32*)&(s_bls[blkIdx].kr.asInt);    
-    //cur.asInt       = areaders->load();
-    //do{
-    //  if(cur.readers<0) return false;
-    //  nxt = cur;
-    //  nxt.readers += 1;
-    //}while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
-    //
-    //return true;
+  BlkLst    incReaders(ui32 blkIdx, ui32 version) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
+  {
 
     KeyAndReaders cur, nxt;
-    aui64* areaders = (aui64*)&(s_bls[blkIdx].kr.asInt);    
+    BlkLst* bl      = &s_bls[blkIdx];
+    aui64* areaders = (aui64*)&(bl->kr.asInt);    
     cur.asInt       = areaders->load();
     do{
-      if(cur.version!=version || cur.readers<0) return false;
+      if(cur.version!=version || cur.readers<0) return make_BlkLst(0,0,0,0,0,0);
       nxt = cur;
       nxt.readers += 1;
     }while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
     
-    return true;
+    return *bl;  // after readers has been incremented this block list entry is not going away. The only thing that would change would be the readers and that doesn't matter to the calling function.
   }
   bool      decReaders(ui32 blkIdx)               const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
@@ -800,13 +819,16 @@ private:
     //bool     fill = len < -1 || blkFree < len;
     //size_t cpyLen = fill? blkFree : len;
   }
-  size_t      readBlock(i32  blkIdx, ui32 version, void* bytes) const
+  size_t      readBlock(i32  blkIdx, ui32 version, void *const bytes) const
   {
-    if(!incReaders(blkIdx, version)) return 0;
+    //if(!incReaders(blkIdx, version)) return 0;
+    BlkLst bl = incReaders(blkIdx, version);      if(bl.len==0) return 0;
       i32   blkFree  =  blockFreeSize();
       ui8*        p  =  blockFreePtr(blkIdx);
-      i32       nxt  =  nxtBlock(blkIdx);
-      size_t cpyLen  =  nxt<0? -nxt : blkFree;           // if next is negative, then it will be the length of the bytes in that block
+      //i32       nxt  =  nxtBlock(blkIdx);
+      //size_t cpyLen  =  nxt<0? -nxt : blkFree;           // if next is negative, then it will be the length of the bytes in that block
+      i32       nxt  =  bl.idx;
+      size_t cpyLen  =  nxt<0? -nxt : blkFree;             // if next is negative, then it will be the length of the bytes in that block
       memcpy(bytes, p, cpyLen);
     decReaders(blkIdx);
 
@@ -919,7 +941,7 @@ public:
     //}else return false;
   }
 
-  void          put(i32  blkIdx, void const *const kbytes, i32 klen, void const *const vbytes, i32 vlen)
+  void          put(i32  blkIdx, void const *const kbytes, i32 klen, void const *const vbytes, i32 vlen)  // don't need version because this will only be used after allocating and therefore will only be seen by one thread until it is inserted into the ConcurrentHash
   {
     using namespace std;
     
@@ -977,7 +999,7 @@ public:
   }
   Match   memcmpBlk(i32  blkIdx, ui32 version, void const *const buf1, void const *const buf2, size_t size) const  // todo: eventually take out the inc and dec readers and only do them when dealing with the whole chain of blocks
   {
-    if(!incReaders(blkIdx, version)) return MATCH_REMOVED;
+    if(incReaders(blkIdx, version).len==0) return MATCH_REMOVED;
       //if(!s_bls[blkIdx].vi.version == version) return MATCH_REMOVED;
 
       auto ret = memcmp(buf1, buf2, size);
@@ -1057,16 +1079,16 @@ public:
   //static const ui64  EMPTY_KEY        =  0x000000000FFFFFFF;   // first 28 bits set 
   //static const ui64  EMPTY_KEY        =    0x0000000000200000;   // first 21 bits set 
 
-  union      KV         // 256 million keys (28 bits), 256 million values (28 bit),  127 readers (signed 8 bits)
-  {
-    struct
-    {
-      ui64     key : 21;
-      ui64     val : 21;
-      ui64 version : 22;
-    };
-    ui64 asInt;
-  };
+  //union      VerIdx         // 256 million keys (28 bits), 256 million values (28 bit),  127 readers (signed 8 bits)
+  //{
+  //  struct
+  //  {
+  //    ui64     key : 21;
+  //    ui64     val : 21;
+  //    ui64 version : 22;
+  //  };
+  //  ui64 asInt;
+  //};
 
   static ui32       nextPowerOf2(ui32  v)
   {
@@ -1082,7 +1104,7 @@ public:
   }
   static ui64          sizeBytes(ui32 size)
   {
-    return lava_vec<KV>::sizeBytes( nextPowerOf2(size) );
+    return lava_vec<VerIdx>::sizeBytes( nextPowerOf2(size) );
   }
   static bool  DefaultKeyCompare(ui32 a, ui32 b)
   {
@@ -1094,18 +1116,18 @@ public:
 
     return (ui32)( (hsh>>32) ^ ((ui32)hsh));
   }
-  static KV             empty_kv()
+  static VerIdx             empty_kv()
   {
-    KV empty;
-    empty.key      =  EMPTY_KEY;
-    empty.val      =  EMPTY_KEY;
+    VerIdx empty;
+    empty.idx      =  EMPTY_KEY;
+    //empty.val      =  EMPTY_KEY;
     empty.version  =  0;
     //empty.readers  =  0;
     return empty;
   }
-  static bool            IsEmpty(KV kv)
+  static bool            IsEmpty(VerIdx kv)
   {
-    static KV emptykv = empty_kv();
+    static VerIdx emptykv = empty_kv();
     return emptykv.asInt == kv.asInt;
   }
 
@@ -1116,28 +1138,28 @@ private:
   using ui64      =  uint64_t;
   using Aui32     =  std::atomic<ui32>;
   using Aui64     =  std::atomic<ui64>;  
-  using KVs       =  lava_vec<KV>;
+  using VerIdxs       =  lava_vec<VerIdx>;
   using Mut       =  std::mutex;
   using UnqLock   =  std::unique_lock<Mut>;
 
          ui32    m_sz;
-  mutable KVs   m_kvs;
+  mutable VerIdxs   m_kvs;
 
-  KV            load_kv(ui32 i)            const
+  VerIdx            load_kv(ui32 i)            const
   {
     using namespace std;
     
-    KV keyval;
+    VerIdx keyval;
     keyval.asInt   =  atomic_load<ui64>( (Aui64*)(&(m_kvs.data()[i].asInt)) );              // Load the key that was there.
     return keyval;
   }
-  KV           store_kv(ui32 i, KV keyval) const
+  VerIdx           store_kv(ui32 i, VerIdx keyval) const
   {
     using namespace std;
     
     //atomic_store<ui64>( (Aui64*)&m_kvs[i].asInt, _kv.asInt );
 
-    KV ret;
+    VerIdx ret;
     ret.asInt = atomic_exchange<ui64>( (Aui64*)(&(m_kvs[i].asInt)), keyval.asInt);
     return ret;
   }
@@ -1161,7 +1183,7 @@ private:
   template<class MATCH_FUNC> 
   auto       checkMatch(ui32 i, ui32 version, ui32 key, MATCH_FUNC match) const -> Match //  decltype(match(empty_kv()))
   {
-    //incReaders(i);  // todo: have incReaders return a KV?
+    //incReaders(i);  // todo: have incReaders return a VerIdx?
       Match ret = match(key, version);
     //decReaders(i);
     
@@ -1171,7 +1193,7 @@ private:
   template<class MATCH_FUNC, class FUNC> 
   bool       runIfMatch(ui32 i, ui32 version, ui32 key, MATCH_FUNC match, FUNC f) const // const -> bool
   {
-    //KV kv = incReaders(i);    
+    //VerIdx kv = incReaders(i);    
       Match      m = match(key, version);
       bool matched = false;                                       // not inside a scope
       if(m==MATCH_TRUE){ matched=true; f(load_kv(i)); }          
@@ -1191,7 +1213,7 @@ public:
     m_kvs(addr, m_sz)
   {
     if(owner){
-      KV defKv = empty_kv();
+      VerIdx defKv = empty_kv();
       for(ui64 i=0; i<m_kvs.size(); ++i)
         m_kvs[i] = defKv;
     }
@@ -1202,33 +1224,33 @@ public:
   ConcurrentHash& operator=(ConcurrentHash const& lval) = delete;
   ConcurrentHash& operator=(ConcurrentHash&&      rval) = delete;
 
-  KV operator[](ui32 idx) const
+  VerIdx operator[](ui32 idx) const
   {
     return m_kvs[idx];
   }
 
   template<class MATCH_FUNC> 
-  KV       putHashed(ui32 hash, VerIdx vi, MATCH_FUNC match) const
+  VerIdx       putHashed(ui32 hash, VerIdx vi, MATCH_FUNC match) const
   {
     using namespace std;
   
-    KV desired       =  empty_kv();
-    desired.key      =  vi.idx;
+    VerIdx desired       =  empty_kv();
+    desired.idx      =  vi.idx;
     desired.version  =  vi.version;
     ui32          i  =  hash;
     for(;; ++i)
     {
       i  &=  m_sz-1;
-      KV probedKv = load_kv(i);
-      if(probedKv.key==EMPTY_KEY)
+      VerIdx probedKv = load_kv(i);
+      if(probedKv.idx==EMPTY_KEY)
       {          
-        KV   expected  =  empty_kv();
+        VerIdx   expected  =  empty_kv();
         bool  success  =  compexchange_kv(i, &expected.asInt, desired.asInt);
         if( success ) return expected;  // continue;                                       // WRONG!? // Another thread just stole it from underneath us.
         else{ --i; continue; }
       }                                                                                    // Either we just added the key, or another thread did.
       
-      if( checkMatch(i, probedKv.version, probedKv.key, match)==MATCH_TRUE ){
+      if( checkMatch(i, probedKv.version, probedKv.idx, match)==MATCH_TRUE ){
         return store_kv(i, desired);
       }
     }
@@ -1242,9 +1264,9 @@ public:
     for(;; ++i)
     {
       i &= m_sz - 1;
-      KV probedKv = load_kv(i);
-      if(probedKv.key==EMPTY_KEY) return EMPTY_KEY;
-      if( checkMatch(i, probedKv.key, match)==MATCH_TRUE ) return probedKv.val;
+      VerIdx probedKv = load_kv(i);
+      if(probedKv.idx==EMPTY_KEY) return EMPTY_KEY;
+      if( checkMatch(i, probedKv.idx, match)==MATCH_TRUE ) return probedKv.val;
       //if( match(probedKv.key) )   return probedKv.val;
     }
   }
@@ -1255,23 +1277,23 @@ public:
     for(;; ++i)
     {
       i &= m_sz - 1;
-      KV probedKv = load_kv(i);
-      if( probedKv.key==EMPTY_KEY )            return EMPTY_HASH_IDX;          // todo: this conflates and assumes that EMPTY_KEY is both the ConcurrentStore block index EMPTY_KEY and the ConcurrentHash EMPTY_KEY
-      if( checkMatch(i, probedKv.key, match) ) return i;
+      VerIdx probedKv = load_kv(i);
+      if( probedKv.idx==EMPTY_KEY )            return EMPTY_HASH_IDX;          // todo: this conflates and assumes that EMPTY_KEY is both the ConcurrentStore block index EMPTY_KEY and the ConcurrentHash EMPTY_KEY
+      if( checkMatch(i, probedKv.idx, match) ) return i;
     }
   }
   template<class MATCH_FUNC> 
-  KV        rmHashed(ui32 hash, MATCH_FUNC match) const // -> Reader
+  VerIdx        rmHashed(ui32 hash, MATCH_FUNC match) const // -> Reader
   //bool      rmHashed(ui32 hash, MATCH_FUNC match) const // -> Reader
   {  
     ui32 i = hash;
     for(;; ++i)
     {
       i  &=  m_sz - 1;
-      KV probedKv = load_kv(i);
-      if(probedKv.key==EMPTY_KEY) return empty_kv(); //{ return false; } //  // probedKv; // MATCH_FALSE; // empty_reader();
-      //Match m = match(probedKv.key);
-      Match m = checkMatch(i, probedKv.version, probedKv.key, match);
+      VerIdx probedKv = load_kv(i);
+      if(probedKv.idx==EMPTY_KEY) return empty_kv(); //{ return false; } //  // probedKv; // MATCH_FALSE; // empty_reader();
+      //Match m = match(probedKv.idx);
+      Match m = checkMatch(i, probedKv.version, probedKv.idx, match);
       if(m==MATCH_TRUE){
         return probedKv;
         
@@ -1287,7 +1309,7 @@ public:
     return empty_kv(); // false;    
   }
   template<class MATCH_FUNC> 
-  KV      readHashed(ui32 hash, MATCH_FUNC match) const // -> Reader
+  VerIdx      readHashed(ui32 hash, MATCH_FUNC match) const // -> Reader
   {
     using namespace std;
 
@@ -1295,10 +1317,10 @@ public:
     for(;; ++i)
     {
       i &= m_sz - 1;
-      KV probedKv = load_kv(i);
-      if(probedKv.key==EMPTY_KEY) return empty_kv();
-      //if( match(probedKv.key)==MATCH_TRUE ) return probedKv;
-      if( checkMatch(i, probedKv.version, probedKv.key, match)==MATCH_TRUE ) return probedKv;
+      VerIdx probedKv = load_kv(i);
+      if(probedKv.idx==EMPTY_KEY) return empty_kv();
+      //if( match(probedKv.idx)==MATCH_TRUE ) return probedKv;
+      if( checkMatch(i, probedKv.version, probedKv.idx, match)==MATCH_TRUE ) return probedKv;
 
       //if(probedKv.key==EMPTY_KEY) return empty_reader();         // empty_kv();
       //if( match(probedKv.key)==MATCH_TRUE ){
@@ -1316,22 +1338,22 @@ public:
   }
 
   template<class MATCH_FUNC, class FUNC> 
-  bool      runMatch(ui32 hash, MATCH_FUNC match, FUNC f) const // -> decltype( f(KV()) )
+  bool      runMatch(ui32 hash, MATCH_FUNC match, FUNC f) const // -> decltype( f(VerIdx()) )
   {
     ui32 i = hash;
     for(;; ++i)
     {
       i &= m_sz - 1;
-      KV probedKv = load_kv(i);
-      if( probedKv.key==EMPTY_KEY )               return false;     // todo: this conflates and assumes that EMPTY_KEY is both the ConcurrentStore block index EMPTY_KEY and the ConcurrentHash EMPTY_KEY
-      if( runIfMatch(i, probedKv.version, probedKv.key, match, f) ) return  true;
+      VerIdx probedKv = load_kv(i);
+      if( probedKv.idx==EMPTY_KEY )               return false;     // todo: this conflates and assumes that EMPTY_KEY is both the ConcurrentStore block index EMPTY_KEY and the ConcurrentHash EMPTY_KEY
+      if( runIfMatch(i, probedKv.version, probedKv.idx, match, f) ) return  true;
     }
   }
   
   template<class FUNC> 
-  auto       runRead(ui32  idx, FUNC f)           const -> decltype( f(KV()) )    // decltype( (f(empty_kv())) )
+  auto       runRead(ui32  idx, FUNC f)           const -> decltype( f(VerIdx()) )    // decltype( (f(empty_kv())) )
   {
-    //KV kv = incReaders(idx);
+    //VerIdx kv = incReaders(idx);
       auto ret = f( load_kv(idx) );
     //decReaders(idx);
 
@@ -1343,25 +1365,25 @@ public:
     using namespace std;
     
     m_sz      =  nextPowerOf2(sz);
-    m_kvs     =  lava_vec<KV>(m_sz);
-    KV defKv  =  empty_kv();
+    m_kvs     =  lava_vec<VerIdx>(m_sz);
+    VerIdx defKv  =  empty_kv();
     for(ui64 i=0; i<m_kvs.size(); ++i) m_kvs[i] = defKv;
     
     return true;
 
     //m_kvs.resize(m_sz, defKv);
   }
-  KV              at(ui32  idx)                   const
+  VerIdx              at(ui32  idx)                   const
   {
     //return m_kvs[idx];
     return load_kv(idx);
   }
   ui32           nxt(ui32  idx)                   const
   {
-    KV empty = empty_kv();
+    VerIdx empty = empty_kv();
     while(true){
-      KV kv = load_kv(idx);
-      if( kv.key!=empty.key /* && kv.readers>=0 */ ) break;
+      VerIdx kv = load_kv(idx);
+      if( kv.idx!=empty.idx /* && kv.readers>=0 */ ) break;
       idx = (idx+1) % m_sz;                                             // don't increment idx above since break comes before it here
     }
     
@@ -1466,7 +1488,7 @@ public:
 class            simdb
 {
 public:
-  using KV     = ConcurrentHash::KV;
+  using VerIdx = ConcurrentHash::VerIdx;
   using VerIdx = ConcurrentStore::VerIdx;
 
 private:
@@ -1504,10 +1526,10 @@ private:
   { 
     return ths->s_cs.compare(blkIdx, version, buf, len);
   }
-  static bool           IsEmpty(KV kv){return ConcurrentHash::IsEmpty(kv);}           // special value for ConcurrentHash
+  static bool           IsEmpty(VerIdx kv){return ConcurrentHash::IsEmpty(kv);}           // special value for ConcurrentHash
   static bool         IsListEnd(VerIdx vi){return ConcurrentStore::IsListEnd(vi); }   // special value for ConcurrentStore
 
-  KV             read(void*   key, i32        len) const
+  VerIdx             read(void*   key, i32        len) const
   {
     using namespace std;
     
@@ -1596,15 +1618,15 @@ public:
     //ui32 keyhash = m_ch.hashBytes(key, klen);
     ui32 keyhash = ConcurrentHash::HashBytes(key, klen);
     auto     ths = this;                                                              // this silly song and dance is because the this pointer can't be passed to a lambda
-    //KV        kv = s_ch.putHashed(keyhash, kidx.idx, vidx.idx,                      // this returns the previous KV at the position
+    //VerIdx        kv = s_ch.putHashed(keyhash, kidx.idx, vidx.idx,                      // this returns the previous VerIdx at the position
     //  [ths, key, klen](ui32 blkidx){ return CompareBlock(ths,key,klen,blkidx); });
-    KV        kv = s_ch.putHashed(keyhash, vi,                                  // this returns the previous KV at the position
+    VerIdx        kv = s_ch.putHashed(keyhash, vi,                                  // this returns the previous VerIdx at the position
       [ths, key, klen](ui32 blkidx, ui32 ver){ return CompareBlock(ths,blkidx,ver,key,klen); });
 
     //if(kv.val!=EMPTY_KEY) s_cs.free(kv.val);
     //if(kv.key!=EMPTY_KEY) s_cs.free(kv.key);
 
-    if(kv.key!=EMPTY_KEY) s_cs.free(kv.key);
+    if(kv.idx!=EMPTY_KEY) s_cs.free(kv.idx);
 
     //if(kv.key != ConcurrentHash::EMPTY_KEY){ m_cs.free(kv.val); m_cs.free(kv.key); }
 
@@ -1615,8 +1637,8 @@ public:
     if(klen<1) return 0;
     
     auto     ths = this;
-    auto runFunc = [ths, klen, out_buf](KV kv){
-      return IsEmpty(kv)?  0ull  :  ths->s_cs.get(kv.key, kv.version, out_buf, klen);
+    auto runFunc = [ths, klen, out_buf](VerIdx kv){
+      return IsEmpty(kv)?  0ull  :  ths->s_cs.get(kv.idx, kv.version, out_buf, klen);
     };
     auto  retLen = s_ch.runRead(idx, runFunc);
 
@@ -1634,8 +1656,8 @@ public:
     };
     
     ui32 len=0;
-    auto runFunc = [ths, &len, out_klen](KV kv){
-      len = IsEmpty(kv)?  0ull  :  ths->s_cs.len(kv.key, kv.version, out_klen);
+    auto runFunc = [ths, &len, out_klen](VerIdx kv){
+      len = IsEmpty(kv)?  0ull  :  ths->s_cs.len(kv.idx, kv.version, out_klen);
     };
 
     if( !s_ch.runMatch(hsh,  matchFunc, runFunc) ) return 0;
@@ -1643,9 +1665,9 @@ public:
   }
   ui32      nxt() const
   {
-    KV   empty = s_ch.empty_kv();
+    VerIdx   empty = s_ch.empty_kv();
     ui32 chNxt; // = empty.key;
-    KV     kv;
+    VerIdx     kv;
     do{
            chNxt = s_ch.nxt(m_nxtChIdx);                 // can return the same index - it does not do the iteration after finding a non empty key
               kv = s_ch.at(chNxt);
@@ -1688,7 +1710,7 @@ public:
     //if(r.kv.key == EMPTY_KEY || r.kv.readers <= 0){ return -1; }
 
     ui64 len = getFromBlkIdx(r.kv.val, out_buf);
-    if(r.doRm()){ m_cs.free(r.kv.val); m_cs.free(r.kv.key); }
+    if(r.doRm()){ m_cs.free(r.kv.val); m_cs.free(r.kv.idx); }
 
     return len;
   }
@@ -1698,13 +1720,13 @@ public:
     auto kbuf = (void*)key.data();
     auto hash = ConcurrentHash::HashBytes(kbuf, len);
     auto  ths = this;
-    KV kv = s_ch.rmHashed(hash,
+    VerIdx kv = s_ch.rmHashed(hash,
       [ths, kbuf, len](ui32 blkidx, ui32 ver){ return CompareBlock(ths,blkidx,ver,kbuf,len); });
 
-    if(kv.val!=EMPTY_KEY) s_cs.free(kv.val);
-    if(kv.key!=EMPTY_KEY) s_cs.free(kv.key);
+    //if(kv.val!=EMPTY_KEY) s_cs.free(kv.val);
+    if(kv.idx!=EMPTY_KEY) s_cs.free(kv.idx);
 
-    return kv.key!=EMPTY_KEY; // removed; // kv.key!=EMPTY_KEY;
+    return kv.idx!=EMPTY_KEY; // removed; // kv.key!=EMPTY_KEY;
   }
   // end separated C++ functions
 
