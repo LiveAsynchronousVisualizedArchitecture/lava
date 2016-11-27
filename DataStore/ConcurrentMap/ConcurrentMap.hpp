@@ -1589,22 +1589,6 @@ public:
   i32       put(void const *const key, ui32  klen, void const *const val, ui32 vlen)
   {
     i32 blkcnt = 0;
-    //i32   kidx = s_cs.alloc(klen, &blkcnt).idx;    // todo: use the VersionIdx struct // kidx is key index
-    
-    //auto  kidx = s_cs.alloc(klen, &blkcnt);    // todo: use the VersionIdx struct // kidx is key index
-    //if(kidx.idx==LIST_END) return EMPTY_KEY;
-    //if(blkcnt<0){
-    //  s_cs.free(kidx.idx);
-    //  return EMPTY_KEY;
-    //}
-    //auto  vidx = s_cs.alloc(vlen, &blkcnt);    // if there aren't enough blocks, the blkCnt wil be the amount of blocks that got allocated anyway * -1.  
-    //if(vidx.idx==LIST_END) return EMPTY_KEY;       // vidx is value index
-    //if(blkcnt<0){
-    //  s_cs.free(vidx.idx);
-    //  return EMPTY_KEY;
-    //}
-    //s_cs.put(kidx.idx, key, klen);
-    //s_cs.put(vidx.idx, val, vlen);
     
     auto vi = s_cs.alloc(klen+vlen, klen, &blkcnt);    // todo: use the VersionIdx struct // kidx is key index
     if(vi.idx==LIST_END) return EMPTY_KEY;
@@ -1613,9 +1597,7 @@ public:
       return EMPTY_KEY;
     }    
     s_cs.put(vi.idx, key, klen, val, vlen);
-    //s_cs.put(kidx.idx, key,);
 
-    //ui32 keyhash = m_ch.hashBytes(key, klen);
     ui32 keyhash = ConcurrentHash::HashBytes(key, klen);
     auto     ths = this;                                                              // this silly song and dance is because the this pointer can't be passed to a lambda
     //VerIdx        kv = s_ch.putHashed(keyhash, kidx.idx, vidx.idx,                      // this returns the previous VerIdx at the position
@@ -1623,12 +1605,7 @@ public:
     VerIdx        kv = s_ch.putHashed(keyhash, vi,                                  // this returns the previous VerIdx at the position
       [ths, key, klen](ui32 blkidx, ui32 ver){ return CompareBlock(ths,blkidx,ver,key,klen); });
 
-    //if(kv.val!=EMPTY_KEY) s_cs.free(kv.val);
-    //if(kv.key!=EMPTY_KEY) s_cs.free(kv.key);
-
     if(kv.idx!=EMPTY_KEY) s_cs.free(kv.idx);
-
-    //if(kv.key != ConcurrentHash::EMPTY_KEY){ m_cs.free(kv.val); m_cs.free(kv.key); }
 
     return vi.idx;
   }
@@ -1740,6 +1717,36 @@ public:
 
 
 
+
+
+
+
+
+
+//i32   kidx = s_cs.alloc(klen, &blkcnt).idx;    // todo: use the VersionIdx struct // kidx is key index
+//
+//auto  kidx = s_cs.alloc(klen, &blkcnt);    // todo: use the VersionIdx struct // kidx is key index
+//if(kidx.idx==LIST_END) return EMPTY_KEY;
+//if(blkcnt<0){
+//  s_cs.free(kidx.idx);
+//  return EMPTY_KEY;
+//}
+//auto  vidx = s_cs.alloc(vlen, &blkcnt);    // if there aren't enough blocks, the blkCnt wil be the amount of blocks that got allocated anyway * -1.  
+//if(vidx.idx==LIST_END) return EMPTY_KEY;       // vidx is value index
+//if(blkcnt<0){
+//  s_cs.free(vidx.idx);
+//  return EMPTY_KEY;
+//}
+//s_cs.put(kidx.idx, key, klen);
+//s_cs.put(vidx.idx, val, vlen);
+//    
+//s_cs.put(kidx.idx, key,);
+//ui32 keyhash = m_ch.hashBytes(key, klen);
+//
+//if(kv.val!=EMPTY_KEY) s_cs.free(kv.val);
+//if(kv.key!=EMPTY_KEY) s_cs.free(kv.key);
+//
+//if(kv.key != ConcurrentHash::EMPTY_KEY){ m_cs.free(kv.val); m_cs.free(kv.key); }
 
 //auto         alloc(i32   size, i32* out_blocks=nullptr) -> VerIdx   // todo: doesn't this need to give back the blocks if allocation fails?
 //{
