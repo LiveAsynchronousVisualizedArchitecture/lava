@@ -134,13 +134,15 @@
 // -todo: work out offset in store.get()
 // -todo: make len() give back the length of the value
 // -todo: test get()
+// -todo: make nxtBlock() take a version number - instead just return a VerIdx struct
+// -todo: implement simdb.get()
+// -todo: take out size_t from ConcurrentStore
+// -todo: give put() return type a BLKIDX type - no need for now, eventually will want to return a VerIdx ? 
 
-// todo: make nxtBlock() take a version number
-// todo: implement simdb.get()
-// todo: make readers for blocks only exist on the head of the list?
+// todo: implement C++ get(str)
+// todo: test key iteration
 // todo: make alloc give back blocks if allocation fails
-// todo: take out size_t from ConcurrentStore
-// todo: give put() return type a BLKIDX type
+// todo: make readers for blocks only exist on the head of the list?
 // todo: redo simdb functions to use runRead
 // todo: change ConcurrentHash to no longer be only powers of 2
 // todo: organize all C++ functions separate from C functions so that they can be #ifdef out if used as a C library
@@ -220,6 +222,7 @@
 //       !- if only the upper bit is needed, can the 64 bit atomic operation happen with 56 bits for the version and only 8 bits for the index?
 //    4. then check the whole version and do some sort of error handling and recovery if the version is not the same - although 56 bits should be a year's worth of cpu cycles, so having 72 quadrillion allocations between a few instructions on another thread seems unlikely 
 //    5. in theory a mutex could be used and the entire range of versions could be remapped and the master version atomic could be set to the new max+1
+// q: is it possible to defragment and if so it is possible to do on removal?
 
 /*
  SimDB
@@ -316,7 +319,7 @@ namespace {
     void operator()(){}
   };
 
-  ui64 fnv_64a_buf(void const *const buf, size_t len)
+  ui64 fnv_64a_buf(void const *const buf, ui64 len)
   {
     // const ui64 FNV_64_PRIME = 0x100000001b3;
     ui64 hval = 0xcbf29ce484222325;    // FNV1_64_INIT;  // ((Fnv64_t)0xcbf29ce484222325ULL)
@@ -600,12 +603,6 @@ public:
     struct { KeyAndReaders kr; i32 idx; ui32 len, klen; };
   };
 
-  //union BlkLst                            // need to do anything special to guarantee that readers is aligned so it is atomic?
-  //{
-  //  struct { KeyAndReaders kr; VerIdx vi; ui32 len; ui32 klen; };
-  //  //ui64 asInt;
-  //};
-
   using IDX         =  i32;
   using ai32        =  std::atomic<i32>;
   using BlockLists  =  lava_vec<BlkLst>;   // only the indices returned from the concurrent list are altered, and only one thread will deal with any single index at a time 
@@ -644,45 +641,6 @@ public:
     return empty.asInt == vi.asInt;
   }
 
-  //bool      incReaders(ui32 blkIdx, ui32 version) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
-  //{
-  //  //ai32* aidx = (ai32*)&(m_bls[blkIdx].readers);
-  //  //i32    cur = aidx->load();
-  //  //i32    nxt;
-  //  
-  //  //BlkLst cur, nxt;
-  //  //aui64* aidx = (aui64*)&(s_bls[blkIdx].asInt);
-  //  //cur.asInt   = aidx->load();
-  //  ////nxtBl.asInt = curBl.asInt;
-  //  //do{
-  //  //  if(cur.kr.readers<0) return false;
-  //  //  nxt = cur;
-  //  //  nxt.kr.readers += 1;
-  //  //}while( !aidx->compare_exchange_strong(cur.asInt, nxt.asInt) );
-  //
-  //  //KeyAndReaders cur, nxt;
-  //  //aui32* areaders = (aui32*)&(s_bls[blkIdx].kr.asInt);    
-  //  //cur.asInt       = areaders->load();
-  //  //do{
-  //  //  if(cur.readers<0) return false;
-  //  //  nxt = cur;
-  //  //  nxt.readers += 1;
-  //  //}while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
-  //  //
-  //  //return true;
-  //
-  //  KeyAndReaders cur, nxt;
-  //  aui64* areaders = (aui64*)&(s_bls[blkIdx].kr.asInt);    
-  //  cur.asInt       = areaders->load();
-  //  do{
-  //    if(cur.version!=version || cur.readers<0) return false;
-  //    nxt = cur;
-  //    nxt.readers += 1;
-  //  }while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
-  //  
-  //  return true;
-  //}
-
   BlkLst    incReaders(ui32 blkIdx, ui32 version) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
 
@@ -700,22 +658,6 @@ public:
   }
   bool      decReaders(ui32 blkIdx)               const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
-    //ai32* aidx = (ai32*)&(m_bls[blkIdx].readers);
-    //
-    //auto prev = aidx->fetch_add(-1);
-    //if(prev==0){ doFree(blkIdx); return false; }
-
-    //BlkLst cur, nxt;
-    //aui64* aidx = (aui64*)&(s_bls[blkIdx].asInt);
-    //cur.asInt   = aidx->load();
-    //do{
-    //  nxt = cur;
-    //  nxt.kr.readers -= 1;
-    //}while( !aidx->compare_exchange_strong(cur.asInt, nxt.asInt) );
-    //
-    //if(cur.kr.readers==0){ doFree(blkIdx); return false; }
-
-
     KeyAndReaders cur, nxt;
     aui64* areaders = (aui64*)&(s_bls[blkIdx].kr.asInt);    
     cur.asInt = areaders->load();
@@ -748,11 +690,6 @@ private:
     //return m_bls[blkIdx].idx;
     //return m_bls[blkIdx].idx;
   }
-  //IDX          nxtBlock(i32  blkIdx)  const
-  //{
-  //  //return *(stPtr(blkIdx));
-  //  return s_bls[blkIdx].idx;
-  //}
   VerIdx       nxtBlock(i32  blkIdx)  const
   {
     BlkLst bl = s_bls[blkIdx];
@@ -814,22 +751,16 @@ private:
     s_bls[cur].kr.readers = 0;                 // reset the reader count
     s_cl.free(cur);
   }
-
   ui32       writeBlock(i32  blkIdx, void const* const bytes, ui32 len=0, ui32 ofst=0)      // don't need to increment readers since write should be done before the block is exposed to any other threads
   {
     i32   blkFree  =  blockFreeSize();
     ui8*        p  =  blockFreePtr(blkIdx);
     auto      nxt  =  nxtBlock(blkIdx);
-    //size_t cpyLen  =  nxt<0? -nxt : blkFree;           // if next is negative, then it will be the length of the bytes in that block
     ui32   cpyLen  =  len==0? blkFree : len;             // if next is negative, then it will be the length of the bytes in that block
     p      += ofst;
-    //cpyLen -= ofst;
     memcpy(p, bytes, cpyLen);
 
     return cpyLen;
-
-    //bool     fill = len < -1 || blkFree < len;
-    //size_t cpyLen = fill? blkFree : len;
   }
   ui32        readBlock(i32  blkIdx, ui32 version, void *const bytes, ui32 ofst=0) const
   {
@@ -843,14 +774,6 @@ private:
     decReaders(blkIdx);
 
     return cpyLen;
-
-    //if(decReaders(blkIdx)){
-    //  doFree(blkIdx);
-    //}
-
-    //if(!incReaders(blkIdx, version)) return 0;
-    //i32       nxt  =  nxtBlock(blkIdx);
-    //size_t cpyLen  =  nxt<0? -nxt : blkFree;           // if next is negative, then it will be the length of the bytes in that block
   }
 
 public:
@@ -905,7 +828,7 @@ public:
     assert(blockSize > sizeof(IDX));
   }
 
-  auto        alloc(i32   size, ui32 klen, i32* out_blocks=nullptr) -> VerIdx   // todo: doesn't this need to give back the blocks if allocation fails?
+  auto        alloc(i32    size, ui32 klen, i32* out_blocks=nullptr) -> VerIdx   // todo: doesn't this need to give back the blocks if allocation fails?
   {
     i32 byteRem  =  0;
     i32  blocks  =  blocksNeeded(size, &byteRem);
@@ -948,13 +871,7 @@ public:
   bool         free(i32  blkIdx)        // frees a list/chain of blocks
   {
     return decReaders(blkIdx);
-
-    //if(decReaders(blkIdx)){
-    //  doFree(blkIdx);
-    //  return true;
-    //}else return false;
   }
-
   void          put(i32  blkIdx, void const *const kbytes, i32 klen, void const *const vbytes, i32 vlen)  // don't need version because this will only be used after allocating and therefore will only be seen by one thread until it is inserted into the ConcurrentHash
   {
     using namespace std;
@@ -1033,12 +950,10 @@ public:
 
     return len;                                           // only one return after the top to make sure readers can be decremented - maybe it should be wrapped in a struct with a destructor
   }
-  Match   memcmpBlk(i32  blkIdx, ui32 version, void const *const buf1, void const *const buf2, size_t size) const  // todo: eventually take out the inc and dec readers and only do them when dealing with the whole chain of blocks
+  Match   memcmpBlk(i32  blkIdx, ui32 version, void const *const buf1, void const *const buf2, ui32 len) const  // todo: eventually take out the inc and dec readers and only do them when dealing with the whole chain of blocks
   {
     if(incReaders(blkIdx, version).len==0) return MATCH_REMOVED;
-      //if(!s_bls[blkIdx].vi.version == version) return MATCH_REMOVED;
-
-      auto ret = memcmp(buf1, buf2, size);
+      auto ret = memcmp(buf1, buf2, len);
     decReaders(blkIdx);
 
     if(ret==0) return MATCH_TRUE;
@@ -1529,13 +1444,13 @@ public:
   using VerIdx = ConcurrentStore::VerIdx;
 
 private:
-  SharedMem          m_mem;
+  SharedMem           m_mem;
 
-  aui64*           s_flags;
-  aui64*       s_blockSize;
-  aui64*      s_blockCount;
-  ConcurrentStore     s_cs;     // store data in blocks and get back indices
-  ConcurrentHash      s_ch;     // store the indices of keys and values - contains a ConcurrentList
+  aui64*            s_flags;
+  aui64*        s_blockSize;
+  aui64*       s_blockCount;
+  ConcurrentStore      s_cs;     // store data in blocks and get back indices
+  ConcurrentHash       s_ch;     // store the indices of keys and values - contains a ConcurrentList
 
   // these variables are local to the stack where simdb lives, unlike the others, they are not simply a pointer into the shared memory
   mutable ui32   m_nxtChIdx;      
@@ -1744,6 +1659,15 @@ public:
 
     return len;
   }
+  bool         get(std::string const& key, std::string& out_value)
+  {
+    ui32   vlen = 0;
+    auto  kvLen = len(key.data(), (ui32)key.length(), &vlen);
+    new (&out_value) std::string(vlen,'\0');
+    bool     ok = get(key.data(), (ui32)key.length(), (void*)out_value.data(), vlen);
+
+    return ok;
+  }
   bool          rm(std::string const& key)
   {
     auto  len = (ui32)key.length();
@@ -1775,6 +1699,96 @@ public:
 
 
 
+
+//
+//if(!s_bls[blkIdx].vi.version == version) return MATCH_REMOVED;
+
+//if(decReaders(blkIdx)){
+//  doFree(blkIdx);
+//}
+
+//if(!incReaders(blkIdx, version)) return 0;
+//i32       nxt  =  nxtBlock(blkIdx);
+//size_t cpyLen  =  nxt<0? -nxt : blkFree;           // if next is negative, then it will be the length of the bytes in that block
+
+//if(decReaders(blkIdx)){
+//  doFree(blkIdx);
+//  return true;
+//}else return false;
+
+//ai32* aidx = (ai32*)&(m_bls[blkIdx].readers);
+//
+//auto prev = aidx->fetch_add(-1);
+//if(prev==0){ doFree(blkIdx); return false; }
+
+//BlkLst cur, nxt;
+//aui64* aidx = (aui64*)&(s_bls[blkIdx].asInt);
+//cur.asInt   = aidx->load();
+//do{
+//  nxt = cur;
+//  nxt.kr.readers -= 1;
+//}while( !aidx->compare_exchange_strong(cur.asInt, nxt.asInt) );
+//
+//if(cur.kr.readers==0){ doFree(blkIdx); return false; }
+
+//union BlkLst                            // need to do anything special to guarantee that readers is aligned so it is atomic?
+//{
+//  struct { KeyAndReaders kr; VerIdx vi; ui32 len; ui32 klen; };
+//  //ui64 asInt;
+//};
+
+//bool      incReaders(ui32 blkIdx, ui32 version) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
+//{
+//  //ai32* aidx = (ai32*)&(m_bls[blkIdx].readers);
+//  //i32    cur = aidx->load();
+//  //i32    nxt;
+//  
+//  //BlkLst cur, nxt;
+//  //aui64* aidx = (aui64*)&(s_bls[blkIdx].asInt);
+//  //cur.asInt   = aidx->load();
+//  ////nxtBl.asInt = curBl.asInt;
+//  //do{
+//  //  if(cur.kr.readers<0) return false;
+//  //  nxt = cur;
+//  //  nxt.kr.readers += 1;
+//  //}while( !aidx->compare_exchange_strong(cur.asInt, nxt.asInt) );
+//
+//  //KeyAndReaders cur, nxt;
+//  //aui32* areaders = (aui32*)&(s_bls[blkIdx].kr.asInt);    
+//  //cur.asInt       = areaders->load();
+//  //do{
+//  //  if(cur.readers<0) return false;
+//  //  nxt = cur;
+//  //  nxt.readers += 1;
+//  //}while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
+//  //
+//  //return true;
+//
+//  KeyAndReaders cur, nxt;
+//  aui64* areaders = (aui64*)&(s_bls[blkIdx].kr.asInt);    
+//  cur.asInt       = areaders->load();
+//  do{
+//    if(cur.version!=version || cur.readers<0) return false;
+//    nxt = cur;
+//    nxt.readers += 1;
+//  }while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
+//  
+//  return true;
+//}
+
+//size_t cpyLen  =  nxt<0? -nxt : blkFree;           // if next is negative, then it will be the length of the bytes in that block
+//
+//
+//cpyLen -= ofst;
+//
+//bool     fill = len < -1 || blkFree < len;
+//size_t cpyLen = fill? blkFree : len;
+
+//IDX          nxtBlock(i32  blkIdx)  const
+//{
+//  //return *(stPtr(blkIdx));
+//  return s_bls[blkIdx].idx;
+//}
 
 //if( !s_ch.runMatch(hsh, matchFunc, runFunc) ) return false;
 //return true;

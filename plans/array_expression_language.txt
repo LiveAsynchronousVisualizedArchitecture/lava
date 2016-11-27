@@ -27,9 +27,11 @@ Fold:  @   Forward: ->
 (0..100:(%2)=0)@+                         // adds all even numbers from 0 to 100 exclusive
 
 Concatenation: ++                         // concatenation
-StebBy: `   
+StebBy: `                                 // `
 Enumerate:   0..100:(%2).(*$)             // even numbers mapped to be themselves multiplied by their index
 Apply:  !
+Flatten / join: <lstOfStrs|' '>  
+
 
 Use -> and <- to pass two arguments, creating a binary operator?
 0..10:(%2) -> zip <- 0..5.(^$)            // produces (0,0),(2,1),(4,4),(6,9),(8,16)
@@ -54,7 +56,7 @@ Linq:
 
 Strings:
 $U        toUpper
-$' '      split by ' ' character
+$' '      //' split by string inside ' ' 
 $L        toLower
 
 
