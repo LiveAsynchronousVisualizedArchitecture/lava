@@ -459,9 +459,12 @@ int main()
   //  Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
   //}
 
-  ui32 klen=0;
-  auto len = db.len( wat.data(), (ui32)wat.length(), &klen);
-  Println("wat total len: ", len, " wat key len: ", klen, "\n");
+  ui32 vlen = 0;
+  auto  len = db.len( wat.data(), (ui32)wat.length(), &vlen);
+  str   val(vlen, '\0');
+  bool   ok = db.get( wat.data(), (ui32)wat.length(), (void*)val.data(), (ui32)val.length() );
+  Println("ok: ", ok, " value: ", val, "  wat total len: ", len, " wat val len: ", vlen, "\n");
+
 
   //TO(6,i)
   //{

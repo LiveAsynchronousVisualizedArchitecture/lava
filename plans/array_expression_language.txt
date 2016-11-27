@@ -43,7 +43,7 @@ Linq:
 
 [names:#_=5]$^                
 // names:             filter names
-// names:_            filter names with _ using the primary iteration variable 
+// names:_            filter names using the primary iteration variable 
 // names:#_           # means length so #_ is the length of the iteration variable
 // names:#_=5         filter names where length equals 5
 // [names:#_=5]       filter by length of 5 then collect and sort
@@ -53,9 +53,9 @@ Linq:
 
 
 Strings:
-$^        toUpper
-$%' '     split
-$v        toLower
+$U        toUpper
+$' '      split by ' ' character
+$L        toLower
 
 
 
