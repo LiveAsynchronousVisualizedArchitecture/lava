@@ -189,8 +189,8 @@ template<class T1, class... T> inline void
 }
 
 
-      template<class T, class _Alloc=std::allocator<T> > 
-using vec        =  std::vector<T, _Alloc>;
+//      template<class T, class _Alloc=std::allocator<T> > 
+//using vec        =  std::vector<T, _Alloc>;
 
 using std::thread;
 
@@ -466,29 +466,30 @@ int main()
   //Println("ok: ", ok, " value: ", val, "  wat total len: ", len, " wat val len: ", vlen, "\n");
 
   str v; 
-  db.get(wat,&v);    Println("value: ", v);
-  db.get(wut,&v);    Println("value: ", v);
-  db.get(kablam,&v); Println("value: ", v);
+  db.get(wat,   &v);  Println("value: ", v);
+  db.get(wut,   &v);  Println("value: ", v);
+  db.get(kablam,&v);  Println("value: ", v);
 
-  TO(6,i)
-  {  
-    ui32 klen, vlen;
-    auto   nxt = db.nxt();
-    bool oklen = db.len(nxt.idx, nxt.version, &klen, &vlen);
-    str key(klen,'\0');
-    bool okkey = db.getKey(nxt.idx, nxt.version, (void*)key.data(), klen);
+  Println("\nKEYS");
+  auto keys = db.getKeys();
+  for(auto k : keys) Println(k);
+  Println("\n");
 
-    //str  key = db.getKeyStr(db.nxt());
-    //str  val(16, '\0');
-    //db.get(key.c_str(), (void*)val.data() );
-    //val.resize( strlen(val.c_str()) );
-  
-    str val;
-    bool okval = db.get(key, &val);
-    Println("VerIdx: ",nxt.idx,", ",nxt.version,
-            " str len: ", key.length(), "  nxt key: [", key, 
-            "] val: [", val,"] val len: ", val.length() );
-  }
+  //TO(6,i)
+  //{  
+  //  ui32 klen, vlen;
+  //  auto   nxt = db.nxt();
+  //  bool oklen = db.len(nxt.idx, nxt.version, &klen, &vlen);
+  //  str key(klen,'\0');
+  //  bool okkey = db.getKey(nxt.idx, nxt.version, (void*)key.data(), klen);
+  //
+  //  //str val;
+  //  //bool okval = db.get(key, &val);
+  //  str val = db.get(key);
+  //  Println("VerIdx: ",nxt.idx,", ",nxt.version,
+  //          " str len: ", key.length(), "  nxt key: [", key, 
+  //          "] val: [", val,"] val len: ", val.length() );
+  //}
 
   //Println("wat data len: ",    db.len(wat)    );
   //Println("wut data len: ",    db.len(wut)    );
@@ -550,6 +551,11 @@ int main()
 
 
 
+
+//str  key = db.getKeyStr(db.nxt());
+//str  val(16, '\0');
+//db.get(key.c_str(), (void*)val.data() );
+//val.resize( strlen(val.c_str()) );
 
 //str  key( db.len(db.nxt()), '\0');
 //auto len = db.getKey(db.cur(), (void*)key.data(), (ui32)key.length());
