@@ -466,9 +466,9 @@ int main()
   //Println("ok: ", ok, " value: ", val, "  wat total len: ", len, " wat val len: ", vlen, "\n");
 
   str v; 
-  db.get(wat,v);    Println("value: ", v);
-  db.get(wut,v);    Println("value: ", v);
-  db.get(kablam,v); Println("value: ", v);
+  db.get(wat,&v);    Println("value: ", v);
+  db.get(wut,&v);    Println("value: ", v);
+  db.get(kablam,&v); Println("value: ", v);
 
   TO(6,i)
   {  
@@ -483,8 +483,11 @@ int main()
     //db.get(key.c_str(), (void*)val.data() );
     //val.resize( strlen(val.c_str()) );
   
-    Println("VerIdx: ",nxt.idx,", ",nxt.version," str len: ", key.length(), 
-            "  nxt key: [", key, "]"); //  val: [", val,"] val len: ", val.length() );
+    str val;
+    bool okval = db.get(key, &val);
+    Println("VerIdx: ",nxt.idx,", ",nxt.version,
+            " str len: ", key.length(), "  nxt key: [", key, 
+            "] val: [", val,"] val len: ", val.length() );
   }
 
   //Println("wat data len: ",    db.len(wat)    );

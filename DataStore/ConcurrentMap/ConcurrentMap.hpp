@@ -148,8 +148,8 @@
 // -todo: make len be a direct lookup somehow? - if ConcurrentHash is the authority, len can be done the same way as an  empty/full bitset ? 
 // -todo: take out simdb::read()
 // -todo: take out simdb::SpinWhileFalse() ?
+// -todo: commit and push to git
 
-// todo: commit and push to git
 // todo: change ConcurrentHash to no longer be only powers of 2
 // todo: make alloc give back blocks if allocation fails
 // todo: make readers for blocks only exist on the head of the list?
@@ -1531,7 +1531,6 @@ private:
   ui64             m_blkCnt;
   ui64              m_blkSz;
 
-
   static const ui32  EMPTY_KEY = ConcurrentHash::EMPTY_KEY;          // 28 bits set 
   static const ui32   LIST_END = ConcurrentStore::LIST_END;
   static ui64       OffsetBytes()
@@ -1737,12 +1736,12 @@ public:
 
     return len;
   }
-  bool         get(std::string const& key, std::string& out_value)
+  bool         get(std::string const& key, std::string* out_value)
   {
     ui32   vlen = 0;
     auto  kvLen = len(key.data(), (ui32)key.length(), &vlen);
-    new (&out_value) std::string(vlen,'\0');
-    bool     ok = get(key.data(), (ui32)key.length(), (void*)out_value.data(), vlen);
+    new (out_value) std::string(vlen,'\0');
+    bool     ok = get(key.data(), (ui32)key.length(), (void*)out_value->data(), vlen);
 
     return ok;
   }
