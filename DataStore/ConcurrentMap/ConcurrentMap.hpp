@@ -141,12 +141,14 @@
 // -todo: implement C++ get(str)
 // -todo: test key iteration
 // -todo: redo nxt() - needed a VerIdx that was the hashmap index combined with the version
+// -todo: put maxlength in readBlock()
+// -todo: figure out why getKey() is empty - get() was being used which gets the value and not the key
+// -todo: redo simdb functions to use runRead - used runRead and runMatch
 
-// todo: figure out why getKey() is empty
+// todo: commit and push to git
+// todo: change ConcurrentHash to no longer be only powers of 2
 // todo: make alloc give back blocks if allocation fails
 // todo: make readers for blocks only exist on the head of the list?
-// todo: redo simdb functions to use runRead
-// todo: change ConcurrentHash to no longer be only powers of 2
 // todo: organize all C++ functions separate from C functions so that they can be #ifdef out if used as a C library
 // todo: make len be a direct lookup somehow? - if ConcurrentHash is the authority, len can be done the same way as an  empty/full bitset ? 
 
@@ -764,18 +766,19 @@ private:
 
     return cpyLen;
   }
-  ui32        readBlock(i32  blkIdx, ui32 version, void *const bytes, ui32 ofst=0) const
+  ui32        readBlock(i32  blkIdx, ui32 version, void *const bytes, ui32 ofst=0, ui32 len=0) const
   {
     BlkLst bl = incReaders(blkIdx, version);      if(bl.kr.version==0) return 0;
       i32   blkFree  =  blockFreeSize();
       ui8*        p  =  blockFreePtr(blkIdx);
       i32       nxt  =  bl.idx;
-      ui32   cpyLen  =  nxt<0? -nxt : blkFree;             // if next is negative, then it will be the length of the bytes in that block
+      ui32   cpyLen  =  len==0?  blkFree  :  len;
       cpyLen        -=  ofst;
       memcpy(bytes, p+ofst, cpyLen);
     decReaders(blkIdx);
 
     return cpyLen;
+    //ui32   cpyLen  =  nxt<0? -nxt : blkFree;             // if next is negative, then it will be the length of the bytes in that block
   }
 
 public:
@@ -952,6 +955,66 @@ public:
 
     return len;                                           // only one return after the top to make sure readers can be decremented - maybe it should be wrapped in a struct with a destructor
   }
+  ui32       getKey(i32  blkIdx, ui32 version, void *const bytes, ui32 maxlen) const
+  {
+    if(blkIdx == LIST_END){ return 0; }
+
+    BlkLst bl = incReaders(blkIdx, version);   
+    
+    if(bl.len==0 || (bl.klen)>maxlen ) return 0;
+
+    auto   kdiv = div(bl.klen, blockFreeSize());
+    auto  kblks = kdiv.quot;
+    auto   krem = kdiv.rem;
+    ui32    len = 0;
+    ui32  rdLen = 0;
+    i8*       b = (i8*)bytes;
+    i32     cur = blkIdx;
+    VerIdx  nxt = { blkIdx, version };
+
+    if(krem>0) --kblks;
+    int i=0;
+    while( i<kblks && !(nxt.idx<0) && nxt.idx!=LIST_END && nxt.version==version)
+    {
+      cur    =  nxt.idx;
+      rdLen  =  readBlock(cur, version, b);          if(rdLen==0) goto read_failure;        // rdLen is read length
+      b     +=  rdLen;
+      len   +=  rdLen;
+      nxt    =  nxtBlock(cur);
+    }
+    rdLen  =  readBlock(cur, version, b, 0, krem);
+    b     +=  rdLen;
+    len   +=  rdLen;
+
+  read_failure:
+    decReaders(blkIdx);
+
+    return len;                                           // only one return after the top to make sure readers can be decremented - maybe it should be wrapped in a struct with a destructor
+    
+    //for(int i=0; i<kblks; ++i){ 
+    //  nxt    =  nxtBlock(cur);                 if(nxt.version!=version){ goto read_failure; }
+    //  rdLen  =  readBlock(cur, version, b);
+    //  b     +=  rdLen;
+    //  len   +=  rdLen;
+    //  cur    =  nxt.idx;
+    //}
+    //
+    //rdLen  =  readBlock(cur, version, b, krem);
+    //b     +=  rdLen;
+    //len   +=  rdLen;
+    //nxt    =  nxtBlock(cur);                  if(nxt.version!=version){ goto read_failure; }
+    //
+    ////while(true)
+    //while( !(nxt.idx<0) && nxt.idx!=LIST_END && nxt.version==version)
+    //{
+    //  cur    =  nxt.idx;
+    //  rdLen  =  readBlock(cur, version, b);  if(rdLen==0) break;        // rdLen is read length
+    //  b     +=  rdLen;
+    //  len   +=  rdLen;
+    //  nxt    =  nxtBlock(cur);
+    //  //if(nxt<0 || nxt==LIST_END) break;
+    //}
+  }
   Match   memcmpBlk(i32  blkIdx, ui32 version, void const *const buf1, void const *const buf2, ui32 len) const  // todo: eventually take out the inc and dec readers and only do them when dealing with the whole chain of blocks
   {
     if(incReaders(blkIdx, version).len==0) return MATCH_REMOVED;
@@ -1092,14 +1155,14 @@ private:
   using ui64      =  uint64_t;
   using Aui32     =  std::atomic<ui32>;
   using Aui64     =  std::atomic<ui64>;  
-  using VerIdxs       =  lava_vec<VerIdx>;
+  using VerIdxs   =  lava_vec<VerIdx>;
   using Mut       =  std::mutex;
   using UnqLock   =  std::unique_lock<Mut>;
 
-         ui32    m_sz;
+          ui32      m_sz;
   mutable VerIdxs   m_kvs;
 
-  VerIdx            load_kv(ui32 i)            const
+  VerIdx        load_kv(ui32 i)                const
   {
     using namespace std;
     
@@ -1107,7 +1170,7 @@ private:
     keyval.asInt   =  atomic_load<ui64>( (Aui64*)(&(m_kvs.data()[i].asInt)) );              // Load the key that was there.
     return keyval;
   }
-  VerIdx           store_kv(ui32 i, VerIdx keyval) const
+  VerIdx       store_kv(ui32 i, VerIdx keyval) const
   {
     using namespace std;
     
@@ -1129,7 +1192,7 @@ private:
 
     return atomic_compare_exchange_strong( (Aui64*)&(m_kvs.data()[i].asInt), expected, desired);                      // The entry was free. Now let's try to take it using a CAS. 
   }
-  void           doFree(ui32 i)            const
+  void           doFree(ui32 i)                const
   {
     store_kv(i, empty_kv());
   }
@@ -1184,7 +1247,7 @@ public:
   }
 
   template<class MATCH_FUNC> 
-  VerIdx       putHashed(ui32 hash, VerIdx vi, MATCH_FUNC match) const
+  VerIdx   putHashed(ui32 hash, VerIdx vi, MATCH_FUNC match) const
   {
     using namespace std;
   
@@ -1634,14 +1697,14 @@ public:
     
     return ret;
   }
-  bool   getKey(ui32 idx, ui32 version, void* out_buf, ui32 klen)
+  bool   getKey(ui32 idx, ui32 version, void *const out_buf, ui32 klen)
   {
     if(klen<1) return 0;
     
     auto     ths = this;
     auto runFunc = [ths, klen, out_buf](VerIdx kv){
       if(IsEmpty(kv)) return false;
-      auto getlen = ths->s_cs.get(kv.idx, kv.version, out_buf, klen);
+      auto getlen = ths->s_cs.getKey(kv.idx, kv.version, out_buf, klen);
       if(getlen<1) return false;
       
       return true;
