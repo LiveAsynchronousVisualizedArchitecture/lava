@@ -447,9 +447,9 @@ int main()
   //if( db.isOwner() ){
     Println("put: ", db.put( wat.data(),   (ui32)wat.length(),    skidoosh.data(), (ui32)skidoosh.length()) );
     //db.rm("wat");
-    Println("put: ", db.put( wut.data(),   (ui32)wut.length(),    kablam.data(),   (ui32)kablam.length())   ); 
+    //Println("put: ", db.put( wut.data(),   (ui32)wut.length(),    kablam.data(),   (ui32)kablam.length())   ); 
     //db.rm("wut");
-    Println("put: ", db.put( kablam.data(),(ui32)kablam.length(), skidoosh.data(), (ui32)skidoosh.length()) ); 
+    //Println("put: ", db.put( kablam.data(),(ui32)kablam.length(), skidoosh.data(), (ui32)skidoosh.length()) ); 
     //db.rm("kablam");
     //Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
     //db.rm("wat");
@@ -472,14 +472,20 @@ int main()
 
   TO(6,i)
   {  
-    str  key = db.getKeyStr(db.nxt());
-    str  val(16, '\0');
-    db.get(key.c_str(), (void*)val.data() );
-    val.resize( strlen(val.c_str()) );
+    ui32 klen, vlen;
+    auto   nxt = db.nxt();
+    bool oklen = db.len(nxt.idx, nxt.version, &klen, &vlen);
+    str key(klen,'\0');
+    bool okkey = db.getKey(nxt.idx, nxt.version, (void*)key.data(), klen);
+
+    //str  key = db.getKeyStr(db.nxt());
+    //str  val(16, '\0');
+    //db.get(key.c_str(), (void*)val.data() );
+    //val.resize( strlen(val.c_str()) );
   
     Println(" str len: ", 
-            key.length(), "  nxt key: [", key, 
-            "]  val: [", val,"] val len: ", val.length() );
+            key.length(), "  nxt key: [", key);
+            //"]  val: [", val,"] val len: ", val.length() );
   }
 
   //Println("wat data len: ",    db.len(wat)    );

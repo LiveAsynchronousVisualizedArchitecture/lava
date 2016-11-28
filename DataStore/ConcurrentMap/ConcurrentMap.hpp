@@ -139,8 +139,10 @@
 // -todo: take out size_t from ConcurrentStore
 // -todo: give put() return type a BLKIDX type - no need for now, eventually will want to return a VerIdx ? 
 // -todo: implement C++ get(str)
+// -todo: test key iteration
+// -todo: redo nxt() - needed a VerIdx that was the hashmap index combined with the version
 
-// todo: test key iteration
+// todo: figure out why getKey() is empty
 // todo: make alloc give back blocks if allocation fails
 // todo: make readers for blocks only exist on the head of the list?
 // todo: redo simdb functions to use runRead
@@ -1186,7 +1188,7 @@ public:
   {
     using namespace std;
   
-    VerIdx desired       =  empty_kv();
+    VerIdx desired   =  empty_kv();
     desired.idx      =  vi.idx;
     desired.version  =  vi.version;
     ui32          i  =  hash;
@@ -1196,15 +1198,20 @@ public:
       VerIdx probedKv = load_kv(i);
       if(probedKv.idx==EMPTY_KEY)
       {          
-        VerIdx   expected  =  empty_kv();
-        bool  success  =  compexchange_kv(i, &expected.asInt, desired.asInt);
-        if( success ) return expected;  // continue;                                       // WRONG!? // Another thread just stole it from underneath us.
+        VerIdx expected  =  empty_kv();
+        bool    success  =  compexchange_kv(i, &expected.asInt, desired.asInt);
+        if(success) return expected;  // continue;                                       // WRONG!? // Another thread just stole it from underneath us.
         else{ --i; continue; }
       }                                                                                    // Either we just added the key, or another thread did.
       
-      if( checkMatch(i, probedKv.version, probedKv.idx, match)==MATCH_TRUE ){
-        return store_kv(i, desired);
-      }
+      // todo: WRONG? check needs to be run on each spin if the entry is different
+      //if( checkMatch(i, probedKv.version, probedKv.idx, match)==MATCH_TRUE ){
+        //return store_kv(i, desired);
+      //}
+
+      do{
+       if( !checkMatch(i, probedKv.version, probedKv.idx, match) ) break;
+      }while( !compexchange_kv(i, &probedKv.asInt, desired.asInt) );
     }
 
     return empty_kv();  // should never be reached
@@ -1235,7 +1242,7 @@ public:
     }
   }
   template<class MATCH_FUNC> 
-  VerIdx        rmHashed(ui32 hash, MATCH_FUNC match) const // -> Reader
+  VerIdx    rmHashed(ui32 hash, MATCH_FUNC match) const // -> Reader
   //bool      rmHashed(ui32 hash, MATCH_FUNC match) const // -> Reader
   {  
     ui32 i = hash;
@@ -1261,7 +1268,7 @@ public:
     return empty_kv(); // false;    
   }
   template<class MATCH_FUNC> 
-  VerIdx      readHashed(ui32 hash, MATCH_FUNC match) const // -> Reader
+  VerIdx  readHashed(ui32 hash, MATCH_FUNC match) const // -> Reader
   {
     using namespace std;
 
@@ -1288,7 +1295,6 @@ public:
 
     return empty_kv();
   }
-
   template<class MATCH_FUNC, class FUNC> 
   bool      runMatch(ui32 hash, MATCH_FUNC match, FUNC f) const // -> decltype( f(VerIdx()) )
   {
@@ -1301,15 +1307,15 @@ public:
       if( runIfMatch(i, probedKv.version, probedKv.idx, match, f) ) return  true;
     }
   }
-  
   template<class FUNC> 
-  auto       runRead(ui32  idx, FUNC f)           const -> decltype( f(VerIdx()) )    // decltype( (f(empty_kv())) )
+  auto       runRead(ui32 idx, ui32 version, FUNC f)      const -> decltype( f(VerIdx()) )    // decltype( (f(empty_kv())) )
   {
     //VerIdx kv = incReaders(idx);
-      auto ret = f( load_kv(idx) );
+    //auto ret = f(vi);
     //decReaders(idx);
 
-    return ret;
+    auto  vi = load_kv(idx);        if(vi.version!=version) return false;
+    return f(vi);
   }
 
   bool          init(ui32   sz)
@@ -1325,7 +1331,7 @@ public:
 
     //m_kvs.resize(m_sz, defKv);
   }
-  VerIdx              at(ui32  idx)                   const
+  VerIdx          at(ui32  idx)                   const
   {
     //return m_kvs[idx];
     return load_kv(idx);
@@ -1349,7 +1355,6 @@ public:
   {
     return m_kvs.sizeBytes();
   }
-
 };
 struct       SharedMem       // in a halfway state right now - will need to use arbitrary memory and have other OS implementations for shared memory eventually
 {
@@ -1441,7 +1446,7 @@ class            simdb
 {
 public:
   using VerIdx = ConcurrentHash::VerIdx;
-  using VerIdx = ConcurrentStore::VerIdx;
+  //using VerIdx = ConcurrentStore::VerIdx;
 
 private:
   SharedMem           m_mem;
@@ -1552,7 +1557,7 @@ public:
 
     ui32 keyhash = ConcurrentHash::HashBytes(key, klen);
     auto     ths = this;                                                              // this silly song and dance is because the this pointer can't be passed to a lambda
-    VerIdx        kv = s_ch.putHashed(keyhash, vi,                                  // this returns the previous VerIdx at the position
+    VerIdx    kv = s_ch.putHashed(keyhash, vi,                                  // this returns the previous VerIdx at the position
       [ths, key, klen](ui32 blkidx, ui32 ver){ return CompareBlock(ths,blkidx,ver,key,klen); });
 
     if(kv.idx!=EMPTY_KEY) s_cs.free(kv.idx);
@@ -1596,33 +1601,52 @@ public:
     if( !s_ch.runMatch(hsh,  matchFunc, runFunc) ) return 0;
     return len;
   }
-  i64    getKey(ui32 idx, void* out_buf, ui32 klen)
+  bool      len(ui32 idx, ui32 version, ui32* out_klen=nullptr, ui32* out_vlen=nullptr)
+  {
+    auto  ths = this;
+    bool   ok = s_ch.runRead(idx, version, 
+    [ths, out_klen, out_vlen](VerIdx kv)
+    {
+      ui32 vlen = 0;
+      auto tlen = ths->s_cs.len(kv.idx, kv.version, out_vlen);
+      if(tlen>0){
+        *out_klen = tlen - *out_vlen;
+        return true;
+      }
+      return false;
+    });
+
+    return ok;
+  }
+  VerIdx    nxt() const                                   // this version index represents a hash index, not an block storage index
+  {
+    VerIdx   empty = s_ch.empty_kv();
+    ui32    chNxt; // = empty.key;
+    VerIdx     vi;
+    do{
+           chNxt = s_ch.nxt(m_nxtChIdx);                 // can return the same index - it does not do the iteration after finding a non empty key
+              vi = s_ch.at(chNxt);
+      m_nxtChIdx = (chNxt + 1) % m_blkCnt;
+    }while( IsEmpty(vi) );
+
+    m_curChIdx = chNxt;
+    VerIdx ret = {chNxt, vi.version};
+    
+    return ret;
+  }
+  bool   getKey(ui32 idx, ui32 version, void* out_buf, ui32 klen)
   {
     if(klen<1) return 0;
     
     auto     ths = this;
     auto runFunc = [ths, klen, out_buf](VerIdx kv){
-      return IsEmpty(kv)?  0ull  :  ths->s_cs.get(kv.idx, kv.version, out_buf, klen);
+      if(IsEmpty(kv)) return false;
+      auto getlen = ths->s_cs.get(kv.idx, kv.version, out_buf, klen);
+      if(getlen<1) return false;
+      
+      return true;
     };
-    auto  retLen = s_ch.runRead(idx, runFunc);
-
-    return retLen;
-  }
-  ui32      nxt() const
-  {
-    VerIdx   empty = s_ch.empty_kv();
-    ui32 chNxt; // = empty.key;
-    VerIdx     kv;
-    do{
-           chNxt = s_ch.nxt(m_nxtChIdx);                 // can return the same index - it does not do the iteration after finding a non empty key
-              kv = s_ch.at(chNxt);
-      m_nxtChIdx = (chNxt + 1) % m_blkCnt;
-    }while( IsEmpty(kv) );
-
-    //}while( kv.key==empty.key || kv.readers<0 );
-
-    m_curChIdx = chNxt;
-    return chNxt;
+    return s_ch.runRead(idx, version, runFunc);
   }
   ui32      cur() const
   {
@@ -1668,6 +1692,7 @@ public:
 
     return ok;
   }
+  // nxtkey()
   bool          rm(std::string const& key)
   {
     auto  len = (ui32)key.length();
@@ -1698,7 +1723,8 @@ public:
 
 
 
-
+//
+//}while( kv.key==empty.key || kv.readers<0 );
 
 //
 //if(!s_bls[blkIdx].vi.version == version) return MATCH_REMOVED;
