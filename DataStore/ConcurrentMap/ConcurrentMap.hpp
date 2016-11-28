@@ -144,13 +144,19 @@
 // -todo: put maxlength in readBlock()
 // -todo: figure out why getKey() is empty - get() was being used which gets the value and not the key
 // -todo: redo simdb functions to use runRead - used runRead and runMatch
+// -todo: organize all C++ functions separate from C functions so that they can be #ifdef out if used as a C library
+// -todo: make len be a direct lookup somehow? - if ConcurrentHash is the authority, len can be done the same way as an  empty/full bitset ? 
+// -todo: take out simdb::read()
+// -todo: take out simdb::SpinWhileFalse() ?
 
 // todo: commit and push to git
 // todo: change ConcurrentHash to no longer be only powers of 2
 // todo: make alloc give back blocks if allocation fails
 // todo: make readers for blocks only exist on the head of the list?
-// todo: organize all C++ functions separate from C functions so that they can be #ifdef out if used as a C library
-// todo: make len be a direct lookup somehow? - if ConcurrentHash is the authority, len can be done the same way as an  empty/full bitset ? 
+// todo: make 128 bit atomic function
+// todo: organize ConcurrentHash entry to have the index on the left side, version on the right side. 
+//       Put hash in the middle and use the first two bits of the index as empty and deleted flags
+//       empty : 1, deleted : 1, index : 35, hash : 35, version : 56 - total 128 bits, 34 billion entry limit 
 
 // todo: change string to pass through to c_str() and const char* overload
 // todo: take out power of 2 size restriction and use modulo
@@ -1509,7 +1515,6 @@ class            simdb
 {
 public:
   using VerIdx = ConcurrentHash::VerIdx;
-  //using VerIdx = ConcurrentStore::VerIdx;
 
 private:
   SharedMem           m_mem;
@@ -1529,9 +1534,6 @@ private:
 
   static const ui32  EMPTY_KEY = ConcurrentHash::EMPTY_KEY;          // 28 bits set 
   static const ui32   LIST_END = ConcurrentStore::LIST_END;
-  static aui64*  SpinWhileFalse(aui64* ptr)
-  {
-  }
   static ui64       OffsetBytes()
   {
     return sizeof(aui64)*3;
@@ -1548,17 +1550,6 @@ private:
   }
   static bool           IsEmpty(VerIdx kv){return ConcurrentHash::IsEmpty(kv);}           // special value for ConcurrentHash
   static bool         IsListEnd(VerIdx vi){return ConcurrentStore::IsListEnd(vi); }   // special value for ConcurrentStore
-
-  VerIdx             read(void*   key, i32        len) const
-  {
-    using namespace std;
-    
-    //ui32 keyhash  =  m_ch.hashBytes(key, len);
-    ui32 keyhash  =  ConcurrentHash::HashBytes(key, len);
-    auto     ths  =  this;
-    return s_ch.readHashed(keyhash, 
-      [ths, key, len](ui32 blkidx, ui32 ver){ return CompareBlock(ths,blkidx,ver,key,len); });
-  }
 
 public:
   simdb(){}
@@ -1606,7 +1597,7 @@ public:
     if(isOwner()) s_flags->store(1);                                        // set to 1 to signal construction is done
   }
 
-  i32       put(const void *const key, ui32 klen, const void *const val, ui32 vlen)
+  i32          put(const void *const key, ui32 klen, const void *const val, ui32 vlen)
   {
     i32 blkcnt = 0;
     
@@ -1627,7 +1618,7 @@ public:
 
     return vi.idx;
   }
-  bool      get(const void *const key, ui32 klen, void *const   out_val, ui32 vlen)
+  bool         get(const void *const key, ui32 klen, void *const   out_val, ui32 vlen)
   {
     if(klen<1) return 0;
 
@@ -1645,7 +1636,7 @@ public:
 
     return s_ch.runMatch(hsh, matchFunc, runFunc);
   }
-  i64       len(const void *const key, ui32 klen, ui32* out_vlen=nullptr)
+  i64          len(const void *const key, ui32 klen, ui32* out_vlen=nullptr)
   {
     if(klen<1) return 0;
 
@@ -1664,7 +1655,7 @@ public:
     if( !s_ch.runMatch(hsh,  matchFunc, runFunc) ) return 0;
     return len;
   }
-  bool      len(ui32 idx, ui32 version, ui32* out_klen=nullptr, ui32* out_vlen=nullptr)
+  bool         len(ui32 idx, ui32 version, ui32* out_klen=nullptr, ui32* out_vlen=nullptr)
   {
     auto  ths = this;
     bool   ok = s_ch.runRead(idx, version, 
@@ -1681,7 +1672,7 @@ public:
 
     return ok;
   }
-  VerIdx    nxt() const                                   // this version index represents a hash index, not an block storage index
+  VerIdx       nxt() const                                   // this version index represents a hash index, not an block storage index
   {
     VerIdx   empty = s_ch.empty_kv();
     ui32    chNxt; // = empty.key;
@@ -1697,7 +1688,7 @@ public:
     
     return ret;
   }
-  bool   getKey(ui32 idx, ui32 version, void *const out_buf, ui32 klen)
+  bool      getKey(ui32 idx, ui32 version, void *const out_buf, ui32 klen)
   {
     if(klen<1) return 0;
     
@@ -1711,24 +1702,24 @@ public:
     };
     return s_ch.runRead(idx, version, runFunc);
   }
-  ui32      cur() const
+  ui32         cur() const
   {
     return m_curChIdx;
   }
-  auto     data() const -> const void* const
+  auto        data() const -> const void* const
   {
     return s_cs.data();
   }
-  ui64     size() const
+  ui64        size() const
   {
     //return m_mem.size;
     return s_cs.sizeBytes( (ui32)s_blockSize->load(), (ui32)s_blockCount->load());
   }
-  bool  isOwner() const
+  bool     isOwner() const
   {
     return m_mem.owner;
   }
-  ui64   blocks() const
+  ui64      blocks() const
   {
     return s_blockCount->load();
   }
@@ -1755,7 +1746,6 @@ public:
 
     return ok;
   }
-  // nxtkey()
   bool          rm(std::string const& key)
   {
     auto  len = (ui32)key.length();
@@ -1770,6 +1760,7 @@ public:
 
     return kv.idx!=EMPTY_KEY; // removed; // kv.key!=EMPTY_KEY;
   }
+  // nxtkey()
   // end separated C++ functions
 
 };
@@ -1785,6 +1776,23 @@ public:
 
 
 
+//
+//using VerIdx = ConcurrentStore::VerIdx;
+
+//static aui64*  SpinWhileFalse(aui64* ptr)
+//{
+//}
+//
+//VerIdx             read(void*   key, i32        len) const
+//{
+//  using namespace std;
+//  
+//  //ui32 keyhash  =  m_ch.hashBytes(key, len);
+//  ui32 keyhash  =  ConcurrentHash::HashBytes(key, len);
+//  auto     ths  =  this;
+//  return s_ch.readHashed(keyhash, 
+//    [ths, key, len](ui32 blkidx, ui32 ver){ return CompareBlock(ths,blkidx,ver,key,len); });
+//}
 
 //
 //}while( kv.key==empty.key || kv.readers<0 );
