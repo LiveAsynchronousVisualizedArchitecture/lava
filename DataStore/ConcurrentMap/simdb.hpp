@@ -122,6 +122,15 @@
  #include <windows.h>
 #endif
 
+#ifdef _WIN32
+  // use _malloca ? - would need to use _freea and also know that _malloca always allocates on the heap in debug mode for some crazy reason
+  #define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);
+#else
+  // gcc/clang/linux ?
+  #include <alloca.h>
+  #define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);  
+#endif
+
 using    i8   =   int8_t;
 using   ui8   =   uint8_t;
 using   i64   =   int64_t;
@@ -164,7 +173,6 @@ namespace {
     }
     return hval;
   }
-}
 
 template<class T, class Deleter=std::default_delete<T>, class Allocator=std::allocator<T> >
 class lava_vec
@@ -271,15 +279,7 @@ public:
     return p;
   }
 };
-
-#ifdef _WIN32
-  // use _malloca ? - would need to use _freea and also know that _malloca always allocates on the heap in debug mode for some crazy reason
-  #define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);
-#else
-  // gcc/clang/linux ?
-  #include <alloca.h>
-  #define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);  
-#endif
+}
 
 class   ConcurrentList
 {

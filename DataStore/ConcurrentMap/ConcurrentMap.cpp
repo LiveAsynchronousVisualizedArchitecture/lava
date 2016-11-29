@@ -426,18 +426,30 @@ int main()
   //Println("empty kv: ", ConcurrentHash::empty_kv().key == ConcurrentHash::EMPTY_KEY );
   //Println("empty kv: ", ConcurrentHash::EMPTY_KEY );
 
-  auto sz = sizeof(ConcurrentStore::BlkLst);
-  Println("Blklst sz: ", sz);
+
+  struct ui128_t { uint64_t lo, hi; };
+  //struct ui128_t { uint64_t low; };
+
+  //bool lkFree = atomic<ui128_t>{}.is_lock_free();
+  //Println("is lock free 128: ",  lkFree );
+
+  ui128_t a = {0, 101};
+  i8 alignmem[256];
+  void* mem = (void*)(alignmem+(128-((ui64)alignmem % 128)));
+  //Println("mem: ", mem, "  rem: ", ((ui64)mem)%128 );
+  memcpy(mem, &a, sizeof(a));
+  int ok = _InterlockedCompareExchange128((volatile long long*)mem, 202, 1, (long long*)&a);
+  memcpy(&a, mem, sizeof(a));
+  ui128_t* b = (ui128_t*)mem;
+  Println("ok ", ok, " lo  ", b->lo, "  hi  ", b->hi);
+  Println("\n");
+
+  //auto sz = sizeof(ConcurrentStore::BlkLst);
+  //Println("Blklst sz: ", sz);
 
   Println("simdb stack sz: ", sizeof(simdb) );
 
-  struct ui128_t { uint64_t low, high; };
-  //struct ui128_t { uint64_t low; };
-
-  bool lkFree = atomic<ui128_t>{}.is_lock_free();
-  Println("is lock free 128: ",  lkFree );
-
-  simdb db("test", 8, 16);
+  simdb db("test", 8, 6);
 
   str       wat  =       "wat";
   str       wut  =       "wut";
@@ -465,10 +477,10 @@ int main()
   //bool   ok = db.get( wat.data(), (ui32)wat.length(), (void*)val.data(), (ui32)val.length() );
   //Println("ok: ", ok, " value: ", val, "  wat total len: ", len, " wat val len: ", vlen, "\n");
 
-  str v; 
-  db.get(wat,   &v);  Println("value: ", v);
-  db.get(wut,   &v);  Println("value: ", v);
-  db.get(kablam,&v);  Println("value: ", v);
+  //str v; 
+  //db.get(wat,   &v);  Println("value: ", v);
+  //db.get(wut,   &v);  Println("value: ", v);
+  //db.get(kablam,&v);  Println("value: ", v);
 
   Println("\nKEYS");
   auto keys = db.getKeys();
