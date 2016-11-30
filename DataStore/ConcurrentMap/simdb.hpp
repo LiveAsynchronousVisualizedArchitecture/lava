@@ -5,14 +5,16 @@
 // -todo: figure out why getKeys returns one empty string - for short blocks, the last block is a key/starting block because it is also the first block. The make_BlkLst function made non keys have length and key length automatically set to 0.
 // -todo: figure out why duplicate keys aren't overwriting each other - putHashed needs to match without using version, then compare and swap using version, checking the match each time
 // -todo: test with multiple threads in a loop
+// -todo: take out infinite loop possibility in rm
 
+// todo: make put return VerIdx ?
 // todo: make a DELETED value for hash entries so that when something is removed, it doesn't block a linear search
-// todo: take out infinite loop possibility in rm
 // todo: take out inf loop in get
 // todo: make readers for blocks only exist on the head of the list?
 // todo: prefetch memory for next block when looping through blocks - does this require a system call and does it lock?
 // todo: look at making a memory access to the next block that can't be optimized away
 // todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
+// todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
 // todo: make 128 bit atomic function
 // todo: organize ConcurrentHash entry to have the index on the left side, version on the right side. 
 //       Put hash in the middle and use the first two bits of the index as empty and deleted flags
