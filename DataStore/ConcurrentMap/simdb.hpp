@@ -6,12 +6,12 @@
 // -todo: figure out why duplicate keys aren't overwriting each other - putHashed needs to match without using version, then compare and swap using version, checking the match each time
 // -todo: test with multiple threads in a loop
 // -todo: take out infinite loop possibility in rm
+// -todo: take out any inf loops in runMatch
 
 // todo: make put return VerIdx ?
 // todo: make a DELETED value for hash entries so that when something is removed, it doesn't block a linear search
-// todo: take out any inf loops in runMatch
 // todo: make readers for blocks only exist on the head of the list?
-// todo: prefetch memory for next block when looping through blocks - does this require a system call and does it lock?
+// todo: prefetch memory for next block when looping through blocks - does this require a system call for shared memory and does it lock? it should just be the prefetch instruction or an unoptimized away load? use intrinsic?
 // todo: look at making a memory access to the next block that can't be optimized away
 // todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
 // todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
