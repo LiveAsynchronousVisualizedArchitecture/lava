@@ -9,7 +9,7 @@
 
 // todo: make put return VerIdx ?
 // todo: make a DELETED value for hash entries so that when something is removed, it doesn't block a linear search
-// todo: take out inf loop in get
+// todo: take out any inf loops in runMatch
 // todo: make readers for blocks only exist on the head of the list?
 // todo: prefetch memory for next block when looping through blocks - does this require a system call and does it lock?
 // todo: look at making a memory access to the next block that can't be optimized away
@@ -1032,14 +1032,6 @@ private:
     return ret;
   }
 
-  //template<class MATCH_FUNC> 
-  //VerIdx       checkMatch(ui32 i, ui32 key, MATCH_FUNC match) const -> Match //  decltype(match(empty_kv()))
-  //{
-  //  Match ret = match(key);
-  //  
-  //  return ret;
-  //}
-
   template<class MATCH_FUNC, class FUNC> 
   bool       runIfMatch(ui32 i, ui32 version, ui32 key, MATCH_FUNC match, FUNC f) const // const -> bool
   {
@@ -1085,7 +1077,6 @@ public:
     using namespace std;
     static const VerIdx empty = empty_kv();
 
-  
     VerIdx desired   =  empty;
     desired.idx      =  vi.idx;
     desired.version  =  vi.version;
@@ -1146,14 +1137,17 @@ public:
   template<class MATCH_FUNC, class FUNC> 
   bool      runMatch(ui32 hash, MATCH_FUNC match, FUNC f)    const // -> decltype( f(VerIdx()) )
   {
-    ui32 i = hash;
+    using namespace std;
+    
+    ui32  i = hash;
+    ui32 en = min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap?   // % m_sz;   //>0? hash-1  :  m_sz
     for(;; ++i)
     {
-      //i &= m_sz - 1;
       i %= m_sz;
       VerIdx probedKv = load_kv(i);
-      if( probedKv.idx==EMPTY_KEY )               return false;     // todo: this conflates and assumes that EMPTY_KEY is both the ConcurrentStore block index EMPTY_KEY and the ConcurrentHash EMPTY_KEY
+      if( probedKv.idx==EMPTY_KEY ) return false;     // todo: this conflates and assumes that EMPTY_KEY is both the ConcurrentStore block index EMPTY_KEY and the ConcurrentHash EMPTY_KEY?
       if( runIfMatch(i, probedKv.version, probedKv.idx, match, f) ) return  true;
+      if(i==en) return false;
     }
   }
   template<class FUNC> 
@@ -1546,7 +1540,7 @@ public:
 
     return key;                    // copy elision 
   }
-  auto     getKeys() -> vec<str>
+  auto  getKeyStrs() -> vec<str>
   {
     using namespace std;
     
@@ -1591,6 +1585,15 @@ public:
 
 
 
+
+
+//template<class MATCH_FUNC> 
+//VerIdx       checkMatch(ui32 i, ui32 key, MATCH_FUNC match) const -> Match //  decltype(match(empty_kv()))
+//{
+//  Match ret = match(key);
+//  
+//  return ret;
+//}
 
 // todo: WRONG? check needs to be run on each spin if the entry is different
 //if( checkMatch(i, probedKv.version, probedKv.idx, match)==MATCH_TRUE ){

@@ -510,7 +510,7 @@ int main()
   //db.get(kablam,&v);  Println("value: ", v);
 
   Println("\nKEYS");
-  auto keys = db.getKeys();
+  auto keys = db.getKeyStrs();
   for(auto k : keys) Println(k,":  ", db.get(k) );
   Println("\n");
 
