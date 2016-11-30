@@ -427,6 +427,7 @@ int main()
   //Println("empty kv: ", ConcurrentHash::EMPTY_KEY );
 
 
+  Println("\n");
   struct ui128_t { uint64_t lo, hi; };
   //struct ui128_t { uint64_t low; };
 
@@ -441,31 +442,60 @@ int main()
   int ok = _InterlockedCompareExchange128((volatile long long*)mem, 202, 1, (long long*)&a);
   memcpy(&a, mem, sizeof(a));
   ui128_t* b = (ui128_t*)mem;
-  Println("ok ", ok, " lo  ", b->lo, "  hi  ", b->hi);
-  Println("\n");
+  //Println("ok: [", ok, "]  lo: [", b->lo, "]  hi: [", b->hi, "]");
 
   //auto sz = sizeof(ConcurrentStore::BlkLst);
   //Println("Blklst sz: ", sz);
 
-  Println("simdb stack sz: ", sizeof(simdb) );
+  //Println("simdb stack sz: ", sizeof(simdb) );
 
-  simdb db("test", 8, 6);
+  simdb db("test", 16, 256);
 
-  str       wat  =       "wat";
-  str       wut  =       "wut";
-  str  skidoosh  =  "skidoosh";
-  str    kablam  =    "kablam";
+  str numkey[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"};
+  str  label[] = {"zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven"};
+  
+  vec<thread> thrds;
+
+  //int sz = (int)thrds.size(); 
+  
+  TO(12,i)
+  {
+    //thrds[i] = move(thread( [i,&label,&db]
+    thrds.emplace_back([i, &numkey, &label, &db]
+    {
+      //RngInt<ui32> rnd(i*10, ((i+1)*10)-1);
+      //RngInt<ui32> rnd(0, 10, i);
+      //db.put( toString(rnd()), label[i] );
+      TO(1000000,j){ 
+        db.put(numkey[i%12], label[i%12] ); 
+        //db.rm( "10" ); // toString(rnd()) );
+      }
+      
+      Println(i, " done");
+    });
+    //thrds[i].detach();
+
+    //TO(10,i) Print(rnd(), " ");
+    //break;
+  }
+  //thrds.resize(0);
+  TO(thrds.size(),i) thrds[i].join();
+
+  //str       wat  =       "wat";
+  //str       wut  =       "wut";
+  //str  skidoosh  =  "skidoosh";
+  //str    kablam  =    "kablam";
 
   //if( db.isOwner() ){
-    Println("put: ", db.put( wat.data(),   (ui32)wat.length(),    skidoosh.data(), (ui32)skidoosh.length()) );
+    //Println("put: ", db.put( wat.data(),   (ui32)wat.length(),    skidoosh.data(), (ui32)skidoosh.length()) );
     //db.rm("wat");
-    Println("put: ", db.put( wut.data(),   (ui32)wut.length(),    kablam.data(),   (ui32)kablam.length())   ); 
+    //Println("put: ", db.put( wut.data(),   (ui32)wut.length(),    kablam.data(),   (ui32)kablam.length())   ); 
     //db.rm("wut");
-    Println("put: ", db.put( kablam.data(),(ui32)kablam.length(), skidoosh.data(), (ui32)skidoosh.length()) ); 
+    //Println("put: ", db.put( kablam.data(),(ui32)kablam.length(), skidoosh.data(), (ui32)skidoosh.length()) ); 
     //db.rm("kablam");
     //Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
     //db.rm("wat");
-    Println();
+    //Println();
   //}
   //else{
   //  Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
@@ -484,7 +514,7 @@ int main()
 
   Println("\nKEYS");
   auto keys = db.getKeys();
-  for(auto k : keys) Println(k);
+  for(auto k : keys) Println(k,":  ", db.get(k) );
   Println("\n");
 
   //TO(6,i)
@@ -528,8 +558,9 @@ int main()
   //
 
   Println("size: ", db.size());
-  str memstr( (const char*)db.data(), (const char*)db.data() + db.size());
-  Println("\nmem: ", memstr, "\n" );
+  
+  //str memstr( (const char*)db.data(), (const char*)db.data() + db.size());
+  //Println("\nmem: ", memstr, "\n" );
 
   //
   //Println("owner: ", db.isOwner(), "\n\n");
@@ -554,7 +585,7 @@ int main()
   ////TO(lv.size(), i) cout << lv[i] << " ";
   ////lv.~lava_vec();  // running the destructor explicitly tests double destrucion since it will be destructed at the end of the function also
 
-  Println("\n");
+  //Println("\n");
   PAUSE
 
   return 0;

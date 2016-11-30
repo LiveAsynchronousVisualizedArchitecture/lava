@@ -1,12 +1,18 @@
 
+// -todo: test 128 bit atomics
+// -todo: find memory corruption bug on looping insert of random numbers - just put key where value should be in C++ string put
+// -todo: figure out why all keys are being printed - getKeys() returns a single empty string
+// -todo: figure out why getKeys returns one empty string - for short blocks, the last block is a key/starting block because it is also the first block. The make_BlkLst function made non keys have length and key length automatically set to 0.
+// -todo: figure out why duplicate keys aren't overwriting each other - putHashed needs to match without using version, then compare and swap using version, checking the match each time
+// -todo: test with multiple threads in a loop
 
 // todo: make readers for blocks only exist on the head of the list?
 // todo: make 128 bit atomic function
 // todo: organize ConcurrentHash entry to have the index on the left side, version on the right side. 
 //       Put hash in the middle and use the first two bits of the index as empty and deleted flags
 //       empty : 1, deleted : 1, index : 35, hash : 35, version : 56 - total 128 bits, 34 billion entry limit 
-// todo: test with multiple threads in a loop
-// todo: prefetch memory for next block when looping through blocks
+// todo: prefetch memory for next block when looping through blocks - does this require a system call and does it lock?
+// todo: look at making a memory access to the next block that can't be optimized away
 // todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
 
 // q: can cleanup be done by a ring buffer of block lists? would the ring buffer only need to be as long as the number of threads if each thread helps clear out the ring buffer after every free()? Probably not, because delayed deallocation would be useful only when there is a reader/ref count, which would mean many more reads than writes could stall the ability to free? But each thread can really only hold one reference at a time so maybe it would work? 
@@ -686,7 +692,7 @@ public:
       m_blocksUsed.fetch_add(1);
     }
 
-    BlkLst bl  = make_BlkLst(false, 0, byteRem? -byteRem : -blockFreeSize(), ver, size, klen);
+    BlkLst bl  = make_BlkLst(cur==st, 0, byteRem? -byteRem : -blockFreeSize(), ver, size, klen);
     s_bls[cur] = bl;
 
     if(out_blocks){ *out_blocks = nxt==LIST_END? -cnt : cnt; }     
@@ -1021,6 +1027,14 @@ private:
     return ret;
   }
 
+  //template<class MATCH_FUNC> 
+  //VerIdx       checkMatch(ui32 i, ui32 key, MATCH_FUNC match) const -> Match //  decltype(match(empty_kv()))
+  //{
+  //  Match ret = match(key);
+  //  
+  //  return ret;
+  //}
+
   template<class MATCH_FUNC, class FUNC> 
   bool       runIfMatch(ui32 i, ui32 version, ui32 key, MATCH_FUNC match, FUNC f) const // const -> bool
   {
@@ -1069,6 +1083,7 @@ public:
     desired.idx      =  vi.idx;
     desired.version  =  vi.version;
     ui32          i  =  hash;
+    ui32         en  =  (hash%m_sz - 1) % m_sz;   //>0? hash-1  :  m_sz
     for(;; ++i)
     {
       //i  &=  m_sz-1;
@@ -1087,9 +1102,12 @@ public:
         //return store_kv(i, desired);
       //}
 
-      do{
-       if( !checkMatch(i, probedKv.version, probedKv.idx, match) ) break;
-      }while( !compexchange_kv(i, &probedKv.asInt, desired.asInt) );
+      if( checkMatch(i, probedKv.version, probedKv.idx, match)!=MATCH_TRUE ) continue;
+      bool success = compexchange_kv(i, &probedKv.asInt, desired.asInt);
+      if(success) return probedKv;
+      else{ --i; continue; }
+
+      if(i==en) break;
     }
 
     return empty_kv();  // should never be reached
@@ -1351,18 +1369,20 @@ public:
     
     auto vi = s_cs.alloc(klen+vlen, klen, &blkcnt);    // todo: use the VersionIdx struct // kidx is key index
     if(vi.idx==LIST_END) return EMPTY_KEY;
-    if(blkcnt<0){
-      s_cs.free(vi.idx, vi.version);
-      return EMPTY_KEY;
-    }    
+    //if(blkcnt<0){
+    //  s_cs.free(vi.idx, vi.version);
+    //  return EMPTY_KEY;
+    //}    
     s_cs.put(vi.idx, key, klen, val, vlen);
 
     ui32 keyhash = ConcurrentHash::HashBytes(key, klen);
-    auto     ths = this;                                                              // this silly song and dance is because the this pointer can't be passed to a lambda
+    auto     ths = this;                                                        // this silly song and dance is because the this pointer can't be passed to a lambda
     VerIdx    kv = s_ch.putHashed(keyhash, vi,                                  // this returns the previous VerIdx at the position
-      [ths, key, klen](ui32 blkidx, ui32 ver){ return CompareBlock(ths,blkidx,ver,key,klen); });
+      [ths, key, klen](ui32 blkidx, ui32 ver){
+        return CompareBlock(ths,blkidx,ver,key,klen);
+      });
 
-    if(kv.idx!=EMPTY_KEY) s_cs.free(kv.idx, kv.version);
+    if(kv.idx!=EMPTY_KEY) s_cs.free(kv.idx, kv.version);                       // putHashed returns the entry that was there before, which is the entry that was replaced. If it wasn't empty, we free it here. 
 
     return vi.idx;
   }
@@ -1473,17 +1493,9 @@ public:
   }
 
   // separated C++ functions - these won't need to exist if compiled for a C interface
-  template<class T>
-  i64          get(vec<T> const& key, void*  out_buf)
+  i64          put(str    const& key, str const& value)
   {
-    Reader r = read((void*)key.data(), (ui32)(key.size() * sizeof(T)));
-    if(isEmpty(r.kv)) return -1;
-    //if(r.kv.key == EMPTY_KEY || r.kv.readers <= 0){ return -1; }
-
-    ui64 len = getFromBlkIdx(r.kv.val, out_buf);
-    if(r.doRm()){ m_cs.free(r.kv.val); m_cs.free(r.kv.idx); }
-
-    return len;
+    return put(key.data(), (ui32)key.length(), value.data(), (ui32)value.length());
   }
   bool         get(str    const& key, str* out_value)
   {
@@ -1516,10 +1528,14 @@ public:
     using namespace std;
     
     unordered_set<str> keys;
+    ui32  i = 0; 
     str nxt = nxtKey();
-    while( keys.find(nxt)==keys.end() ){
-      keys.insert(nxt);
+    while( i<m_blkCnt && keys.find(nxt)==keys.end() )
+    {
+      if(nxt.length()>0) keys.insert(nxt);
+    
       nxt = nxtKey();
+      ++i;
     }
 
     return vec<str>(keys.begin(), keys.end());
@@ -1538,6 +1554,20 @@ public:
 
     return kv.idx!=EMPTY_KEY; // removed; // kv.key!=EMPTY_KEY;
   }
+
+  template<class T>
+  i64          get(vec<T> const& key, void*  out_buf)
+  {
+    Reader r = read((void*)key.data(), (ui32)(key.size() * sizeof(T)));
+    if(isEmpty(r.kv)) return -1;
+    //if(r.kv.key == EMPTY_KEY || r.kv.readers <= 0){ return -1; }
+
+    ui64 len = getFromBlkIdx(r.kv.val, out_buf);
+    if(r.doRm()){ m_cs.free(r.kv.val); m_cs.free(r.kv.idx); }
+
+    return len;
+  }
+
   // nxtkey()
   // end separated C++ functions
 
