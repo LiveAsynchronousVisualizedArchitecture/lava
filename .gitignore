@@ -42,6 +42,8 @@
 *.filters
 *.opensdf
 *.suo
+*.psess
+*.vsp
 
 # intel compiler nonsense
 *.amplxeproj
