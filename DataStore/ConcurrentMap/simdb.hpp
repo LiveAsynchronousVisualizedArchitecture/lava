@@ -6,14 +6,17 @@
 // -todo: figure out why duplicate keys aren't overwriting each other - putHashed needs to match without using version, then compare and swap using version, checking the match each time
 // -todo: test with multiple threads in a loop
 
+// todo: make a DELETED value for hash entries so that when something is removed, it doesn't block a linear search
+// todo: take out infinite loop possibility in rm
+// todo: take out inf loop in get
 // todo: make readers for blocks only exist on the head of the list?
+// todo: prefetch memory for next block when looping through blocks - does this require a system call and does it lock?
+// todo: look at making a memory access to the next block that can't be optimized away
+// todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
 // todo: make 128 bit atomic function
 // todo: organize ConcurrentHash entry to have the index on the left side, version on the right side. 
 //       Put hash in the middle and use the first two bits of the index as empty and deleted flags
 //       empty : 1, deleted : 1, index : 35, hash : 35, version : 56 - total 128 bits, 34 billion entry limit 
-// todo: prefetch memory for next block when looping through blocks - does this require a system call and does it lock?
-// todo: look at making a memory access to the next block that can't be optimized away
-// todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
 
 // q: can cleanup be done by a ring buffer of block lists? would the ring buffer only need to be as long as the number of threads if each thread helps clear out the ring buffer after every free()? Probably not, because delayed deallocation would be useful only when there is a reader/ref count, which would mean many more reads than writes could stall the ability to free? But each thread can really only hold one reference at a time so maybe it would work? 
 // q: if using a ring buffer, indices might be freed in between non-freed indices, in which case the pointer to beginning and end would not be able to shift, and therefore would need space for more indices than just the number of threads
@@ -1078,58 +1081,65 @@ public:
   VerIdx   putHashed(ui32 hash, VerIdx vi, MATCH_FUNC match) const
   {
     using namespace std;
+    static const VerIdx empty = empty_kv();
+
   
-    VerIdx desired   =  empty_kv();
+    VerIdx desired   =  empty;
     desired.idx      =  vi.idx;
     desired.version  =  vi.version;
     ui32          i  =  hash;
-    ui32         en  =  (hash%m_sz - 1) % m_sz;   //>0? hash-1  :  m_sz
+    ui32         en  =  min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap?   // % m_sz;   //>0? hash-1  :  m_sz
     for(;; ++i)
     {
-      //i  &=  m_sz-1;
       i %= m_sz;
       VerIdx probedKv = load_kv(i);
       if(probedKv.idx==EMPTY_KEY)
       {          
-        VerIdx expected  =  empty_kv();
+        VerIdx expected  =  empty;
         bool    success  =  compexchange_kv(i, &expected.asInt, desired.asInt);
         if(success) return expected;  // continue;                                       // WRONG!? // Another thread just stole it from underneath us.
-        else{ --i; continue; }
+        else{ i==0? (m_sz-1)  : (i-1); continue; }  // retry the same loop again
       }                                                                                    // Either we just added the key, or another thread did.
       
-      // todo: WRONG? check needs to be run on each spin if the entry is different
-      //if( checkMatch(i, probedKv.version, probedKv.idx, match)==MATCH_TRUE ){
-        //return store_kv(i, desired);
-      //}
-
       if( checkMatch(i, probedKv.version, probedKv.idx, match)!=MATCH_TRUE ) continue;
       bool success = compexchange_kv(i, &probedKv.asInt, desired.asInt);
       if(success) return probedKv;
-      else{ --i; continue; }
+      else{ i==0? (m_sz-1)  : (i-1); continue; }
 
       if(i==en) break;
     }
 
-    return empty_kv();  // should never be reached
+    return empty;  // should never be reached
   }
   template<class MATCH_FUNC> 
   VerIdx    rmHashed(ui32 hash, MATCH_FUNC match)            const
   {  
-    ui32 i = hash;
+    using namespace std;
+    static const VerIdx empty = empty_kv();
+
+    ui32  i = hash;
+    ui32 en = min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap? 
     for(;; ++i)
     {
-      //i  &=  m_sz - 1;
       i %= m_sz;
       VerIdx probedKv = load_kv(i);
-      if(probedKv.idx==EMPTY_KEY) return empty_kv();
+
+      if(probedKv.idx==EMPTY_KEY) return empty;
+
       Match m = checkMatch(i, probedKv.version, probedKv.idx, match);
       if(m==MATCH_TRUE){
-        return probedKv;        
+        bool success = compexchange_kv(i, &probedKv.asInt, empty.asInt);
+        if(success) return probedKv;
+        else{ i==0? (m_sz-1)  : (i-1); continue; }  // retry the same loop again
+
+        return probedKv;   
       }
-      if(m==MATCH_REMOVED) return empty_kv();
+      if(m==MATCH_REMOVED || i==en){ return empty; }
+
+      //if(i==en) break;
     }
 
-    return empty_kv(); 
+    return empty; 
   }
   template<class MATCH_FUNC, class FUNC> 
   bool      runMatch(ui32 hash, MATCH_FUNC match, FUNC f)    const // -> decltype( f(VerIdx()) )
@@ -1404,6 +1414,17 @@ public:
 
     return s_ch.runMatch(hsh, matchFunc, runFunc);
   }
+  bool          rm(const void *const key, ui32 klen)
+  {
+    auto hash = ConcurrentHash::HashBytes(key, klen);
+    auto  ths = this;
+    VerIdx kv = s_ch.rmHashed(hash,
+      [ths, key, klen](ui32 blkidx, ui32 ver){ return CompareBlock(ths,blkidx,ver,key,klen); });
+
+    if(kv.idx!=EMPTY_KEY) s_cs.free(kv.idx, kv.version);
+
+    return kv.idx!=EMPTY_KEY;
+  }
   i64          len(const void *const key, ui32 klen, ui32* out_vlen=nullptr)
   {
     if(klen<1) return 0;
@@ -1542,17 +1563,7 @@ public:
   }
   bool          rm(std::string const& key)
   {
-    auto  len = (ui32)key.length();
-    auto kbuf = (void*)key.data();
-    auto hash = ConcurrentHash::HashBytes(kbuf, len);
-    auto  ths = this;
-    VerIdx kv = s_ch.rmHashed(hash,
-      [ths, kbuf, len](ui32 blkidx, ui32 ver){ return CompareBlock(ths,blkidx,ver,kbuf,len); });
-
-    //if(kv.val!=EMPTY_KEY) s_cs.free(kv.val);
-    if(kv.idx!=EMPTY_KEY) s_cs.free(kv.idx, kv.version);
-
-    return kv.idx!=EMPTY_KEY; // removed; // kv.key!=EMPTY_KEY;
+    return this->rm( key.data(), (ui32)key.length() );
   }
 
   template<class T>
@@ -1577,3 +1588,12 @@ public:
 
 
 
+
+
+// todo: WRONG? check needs to be run on each spin if the entry is different
+//if( checkMatch(i, probedKv.version, probedKv.idx, match)==MATCH_TRUE ){
+  //return store_kv(i, desired);
+//}
+
+//
+//i  &=  m_sz - 1;

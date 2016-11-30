@@ -454,29 +454,26 @@ int main()
   str numkey[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"};
   str  label[] = {"zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven"};
   
-  vec<thread> thrds;
+  vec<thread>            thrds;
+  vec<RngInt<ui32>> rngSwitches;
+  TO(12,i) rngSwitches.emplace_back(0,1,i);
 
   //int sz = (int)thrds.size(); 
   
   TO(12,i)
   {
-    //thrds[i] = move(thread( [i,&label,&db]
-    thrds.emplace_back([i, &numkey, &label, &db]
+    int idx = i % 12;
+    thrds.emplace_back([i, idx, &rngSwitches, &numkey, &label, &db]
     {
-      //RngInt<ui32> rnd(i*10, ((i+1)*10)-1);
-      //RngInt<ui32> rnd(0, 10, i);
-      //db.put( toString(rnd()), label[i] );
+      auto& numk = numkey[idx];
+      auto&  lbl = label[idx]; 
       TO(1000000,j){ 
-        db.put(numkey[i%12], label[i%12] ); 
-        //db.rm( "10" ); // toString(rnd()) );
+        db.put(numk, lbl); 
+        if(rngSwitches[idx]()) db.rm(numk);
       }
       
       Println(i, " done");
     });
-    //thrds[i].detach();
-
-    //TO(10,i) Print(rnd(), " ");
-    //break;
   }
   //thrds.resize(0);
   TO(thrds.size(),i) thrds[i].join();
@@ -596,3 +593,12 @@ int main()
 
 
 
+
+//thrds[i] = move(thread( [i,&label,&db]
+//RngInt<ui32> rnd(i*10, ((i+1)*10)-1);
+//RngInt<ui32> rnd(0, 10, i);
+//db.put( toString(rnd()), label[i] );
+//thrds[i].detach();
+
+//TO(10,i) Print(rnd(), " ");
+//break;
