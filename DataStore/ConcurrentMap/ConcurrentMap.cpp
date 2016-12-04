@@ -443,29 +443,29 @@ int main()
   //Println("empty kv: ", ConcurrentHash::EMPTY_KEY );
 
 
-  Println("\n");
-  struct ui128_t { uint64_t lo, hi; };
-  //struct ui128_t { uint64_t low; };
+  //Println("\n");
+  //struct ui128_t { uint64_t lo, hi; };
+  ////struct ui128_t { uint64_t low; };
 
   //bool lkFree = atomic<ui128_t>{}.is_lock_free();
   //Println("is lock free 128: ",  lkFree );
 
-  ui128_t a = {0, 101};
-  i8 alignmem[256];
-  void* mem = (void*)(alignmem+(128-((ui64)alignmem % 128)));
-  //Println("mem: ", mem, "  rem: ", ((ui64)mem)%128 );
-  memcpy(mem, &a, sizeof(a));
-  int ok = _InterlockedCompareExchange128((volatile long long*)mem, 202, 1, (long long*)&a);
-  memcpy(&a, mem, sizeof(a));
-  ui128_t* b = (ui128_t*)mem;
-  //Println("ok: [", ok, "]  lo: [", b->lo, "]  hi: [", b->hi, "]");
+  //ui128_t a = {0, 101};
+  //i8 alignmem[256];
+  //void* mem = (void*)(alignmem+(128-((ui64)alignmem % 128)));
+  ////Println("mem: ", mem, "  rem: ", ((ui64)mem)%128 );
+  //memcpy(mem, &a, sizeof(a));
+  //int ok = _InterlockedCompareExchange128((volatile long long*)mem, 202, 1, (long long*)&a);
+  //memcpy(&a, mem, sizeof(a));
+  //ui128_t* b = (ui128_t*)mem;
+  ////Println("ok: [", ok, "]  lo: [", b->lo, "]  hi: [", b->hi, "]");
 
   //auto sz = sizeof(ConcurrentStore::BlkLst);
   //Println("Blklst sz: ", sz);
 
   //Println("simdb stack sz: ", sizeof(simdb) );
 
-  simdb db("test", 16, 256);
+  simdb db("test", 16, 16);
 
   str numkey[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"};
   str  label[] = {"zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven"};
@@ -476,31 +476,30 @@ int main()
 
   //int sz = (int)thrds.size(); 
   
-  TO(12,i)
-  {
-    int idx = i % 12;
-    thrds.emplace_back([i, idx, &rngSwitches, &numkey, &label, &db]
-    {
-      auto& numk = numkey[idx];
-      auto&  lbl = label[idx]; 
-      TO(1000000,j){ 
-        db.put(numk, lbl); 
-        if(rngSwitches[idx]()) db.rm(numk);
-      }
-      
-      Println(i, " done");
-    });
-  }
-  //thrds.resize(0);
-  TO(thrds.size(),i) thrds[i].join();
+  //TO(12,i)
+  //{
+  //  int idx = i % 12;
+  //  thrds.emplace_back([i, idx, &rngSwitches, &numkey, &label, &db]
+  //  {
+  //    auto& numk = numkey[idx];
+  //    auto&  lbl = label[idx]; 
+  //    TO(10,j){ 
+  //      db.put(numk, lbl); 
+  //      if(rngSwitches[idx]()) db.rm(numk);
+  //    }
+  //    
+  //    Println(i, " done");
+  //  });
+  //}
+  //TO(thrds.size(),i) thrds[i].join();
 
-  //str       wat  =       "wat";
+  str       wat  =       "wat";
   //str       wut  =       "wut";
-  //str  skidoosh  =  "skidoosh";
+  str  skidoosh  =  "skidoosh";
   //str    kablam  =    "kablam";
 
   //if( db.isOwner() ){
-    //Println("put: ", db.put( wat.data(),   (ui32)wat.length(),    skidoosh.data(), (ui32)skidoosh.length()) );
+    Println("put: ", db.put( wat.data(),   (ui32)wat.length(),    skidoosh.data(), (ui32)skidoosh.length()) );
     //db.rm("wat");
     //Println("put: ", db.put( wut.data(),   (ui32)wut.length(),    kablam.data(),   (ui32)kablam.length())   ); 
     //db.rm("wut");
@@ -514,21 +513,21 @@ int main()
   //  Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
   //}
 
-  //ui32 vlen = 0;
-  //auto  len = db.len( wat.data(), (ui32)wat.length(), &vlen);
-  //str   val(vlen, '\0');
-  //bool   ok = db.get( wat.data(), (ui32)wat.length(), (void*)val.data(), (ui32)val.length() );
-  //Println("ok: ", ok, " value: ", val, "  wat total len: ", len, " wat val len: ", vlen, "\n");
+  ui32 vlen = 0;
+  auto  len = db.len( wat.data(), (ui32)wat.length(), &vlen);
+  str   val(vlen, '\0');
+  bool   ok = db.get( wat.data(), (ui32)wat.length(), (void*)val.data(), (ui32)val.length() );
+  Println("ok: ", ok, " value: ", val, "  wat total len: ", len, " wat val len: ", vlen, "\n");
 
   //str v; 
   //db.get(wat,   &v);  Println("value: ", v);
   //db.get(wut,   &v);  Println("value: ", v);
   //db.get(kablam,&v);  Println("value: ", v);
 
-  Println("\nKEYS");
-  auto keys = db.getKeyStrs();
-  for(auto k : keys) Println(k,":  ", db.get(k) );
-  Println("\n");
+  //Println("\nKEYS");
+  //auto keys = db.getKeyStrs();
+  //for(auto k : keys) Println(k,":  ", db.get(k) );
+  //Println("\n");
 
   //TO(6,i)
   //{  
@@ -571,7 +570,12 @@ int main()
   //
 
   Println("size: ", db.size());
-  
+
+  //str memstr;
+  //memstr.resize(db.size()+1);
+  vec<i8> memv(db.memsize(), 0);
+  memcpy( (void*)memv.data(), db.mem(), db.memsize() );
+
   //str memstr( (const char*)db.data(), (const char*)db.data() + db.size());
   //Println("\nmem: ", memstr, "\n" );
 

@@ -8,6 +8,7 @@
 // -todo: take out infinite loop possibility in rm
 // -todo: take out any inf loops in runMatch
 
+// todo: make ConcurrentStore get() stop before exceeding maxlen?
 // todo: make put return VerIdx ?
 // todo: make a DELETED value for hash entries so that when something is removed, it doesn't block a linear search
 // todo: make readers for blocks only exist on the head of the list?
@@ -19,6 +20,7 @@
 // todo: organize ConcurrentHash entry to have the index on the left side, version on the right side. 
 //       Put hash in the middle and use the first two bits of the index as empty and deleted flags
 //       empty : 1, deleted : 1, index : 35, hash : 35, version : 56 - total 128 bits, 34 billion entry limit 
+
 
 // q: can cleanup be done by a ring buffer of block lists? would the ring buffer only need to be as long as the number of threads if each thread helps clear out the ring buffer after every free()? Probably not, because delayed deallocation would be useful only when there is a reader/ref count, which would mean many more reads than writes could stall the ability to free? But each thread can really only hold one reference at a time so maybe it would work? 
 // q: if using a ring buffer, indices might be freed in between non-freed indices, in which case the pointer to beginning and end would not be able to shift, and therefore would need space for more indices than just the number of threads
@@ -608,8 +610,8 @@ private:
       i32   blkFree  =  blockFreeSize();
       ui8*        p  =  blockFreePtr(blkIdx);
       i32       nxt  =  bl.idx;
-      ui32   cpyLen  =  len==0?  blkFree  :  len;
-      cpyLen        -=  ofst;
+      ui32   cpyLen  =  len==0?  blkFree-ofst  :  len;
+      //cpyLen        -=  ofst;
       memcpy(bytes, p+ofst, cpyLen);
     decReaders(blkIdx, version);
 
@@ -749,6 +751,8 @@ public:
   }
   ui32          get(i32  blkIdx, ui32 version, void *const bytes, ui32 maxlen) const
   {
+    using namespace std;
+
     if(blkIdx == LIST_END){ return 0; }
 
     BlkLst bl = incReaders(blkIdx, version);   
@@ -774,16 +778,14 @@ public:
     len   +=  rdLen;
     nxt    =  nxtBlock(cur);         if(nxt.version!=version){ goto read_failure; }
 
-    //while(true)
-    while( !(nxt.idx<0) && nxt.idx!=LIST_END && nxt.version==version)
+    while(len<maxlen && !(nxt.idx<0) && nxt.idx!=LIST_END && nxt.version==version)
     {
+      auto vrdLen = min<ui32>(blockFreeSize(), maxlen-len);
       cur    =  nxt.idx;
-      rdLen  =  readBlock(cur, version, b);  if(rdLen==0) break;        // rdLen is read length
+      rdLen  =  readBlock(cur, version, b, 0, vrdLen);  if(rdLen==0) break;        // rdLen is read length
       b     +=  rdLen;
       len   +=  rdLen;
       nxt    =  nxtBlock(cur);
-      //if(nxt<0 || nxt==LIST_END) break;
-
     }
 
   read_failure:
@@ -1023,7 +1025,7 @@ private:
   }
 
   template<class MATCH_FUNC> 
-  auto       checkMatch(ui32 i, ui32 version, ui32 key, MATCH_FUNC match) const -> Match //  decltype(match(empty_kv()))
+  auto       checkMatch(ui32 version, ui32 key, MATCH_FUNC match) const -> Match //  decltype(match(empty_kv()))
   {
     //incReaders(i);  // todo: have incReaders return a VerIdx?
       Match ret = match(key, version);
@@ -1094,7 +1096,7 @@ public:
         else{ i==0? (m_sz-1)  : (i-1); continue; }  // retry the same loop again
       }                                                                                    // Either we just added the key, or another thread did.
       
-      if( checkMatch(i, probedKv.version, probedKv.idx, match)!=MATCH_TRUE ) continue;
+      if( checkMatch(probedKv.version, probedKv.idx, match)!=MATCH_TRUE ) continue;
       bool success = compexchange_kv(i, &probedKv.asInt, desired.asInt);
       if(success) return probedKv;
       else{ i==0? (m_sz-1)  : (i-1); continue; }
@@ -1119,7 +1121,7 @@ public:
 
       if(probedKv.idx==EMPTY_KEY) return empty;
 
-      Match m = checkMatch(i, probedKv.version, probedKv.idx, match);
+      Match m = checkMatch(probedKv.version, probedKv.idx, match);
       if(m==MATCH_TRUE){
         bool success = compexchange_kv(i, &probedKv.asInt, empty.asInt);
         if(success) return probedKv;
@@ -1200,6 +1202,8 @@ public:
 };
 struct       SharedMem       // in a halfway state right now - will need to use arbitrary memory and have other OS implementations for shared memory eventually
 {
+  static const int alignment = 0;
+  
   void*      fileHndl;
   void*       hndlPtr;
   void*           ptr;
@@ -1223,7 +1227,8 @@ public:
 
       SharedMem sm;
       sm.owner = false;
-      sm.size  = size;
+      //sm.size  = size;
+      sm.size  = alignment==0? size  :  alignment-(size%alignment);
 
       sm.fileHndl = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, path);
       if(sm.fileHndl==NULL)
@@ -1249,8 +1254,8 @@ public:
     #endif       // END windows
   
     ui64      addr = (ui64)(sm.hndlPtr);
-    ui64 alignAddr = (addr + ((64-addr%64)%64));
-    sm.ptr    = (void*)(alignAddr);
+    ui64 alignAddr = alignment==0? addr  :  addr + ((alignment-addr%alignment)%alignment);  // why was the second modulo needed?
+    sm.ptr         = (void*)(alignAddr);
 
     return move(sm);
   }
@@ -1498,7 +1503,8 @@ public:
   ui64        size() const
   {
     //return m_mem.size;
-    return s_cs.sizeBytes( (ui32)s_blockSize->load(), (ui32)s_blockCount->load());
+    //return s_cs.sizeBytes( (ui32)s_blockSize->load(), (ui32)s_blockCount->load());
+    return ConcurrentStore::sizeBytes( (ui32)s_blockSize->load(), (ui32)s_blockCount->load());
   }
   bool     isOwner() const
   {
@@ -1507,6 +1513,14 @@ public:
   ui64      blocks() const
   {
     return s_blockCount->load();
+  }
+  auto         mem() const -> void*
+  {
+    return m_mem.hndlPtr;
+  }
+  ui64     memsize() const
+  {
+    return m_mem.size;
   }
 
   // separated C++ functions - these won't need to exist if compiled for a C interface

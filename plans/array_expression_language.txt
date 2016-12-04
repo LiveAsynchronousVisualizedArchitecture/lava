@@ -59,6 +59,10 @@ $U        toUpper
 $' '      //' split by string inside ' ' 
 $L        toLower
 
+Numbers:
+`MX         // maximum
+`MN         // minimum
+
 
 
 
