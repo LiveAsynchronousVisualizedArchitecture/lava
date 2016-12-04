@@ -1556,10 +1556,12 @@ public:
   {
     ui32 klen, vlen;
     bool    ok = false;
-    VerIdx nxt = this->nxt();   if(nxt.idx==EMPTY_KEY) return "";
-    ok         = this->len(nxt.idx, nxt.version, &klen, &vlen);  if(!ok) return "";
+    VerIdx nxt = this->nxt();                           if(nxt.idx==EMPTY_KEY) return "";
+    ok         = this->len(nxt.idx, nxt.version, 
+                           &klen, &vlen);               if(!ok) return "";
     str key(klen,'\0');
-    ok         = this->getKey(nxt.idx, nxt.version, (void*)key.data(), klen); if(!ok) return "";
+    ok         = this->getKey(nxt.idx, nxt.version, 
+                              (void*)key.data(), klen); if(!ok) return "";
 
     return key;                    // copy elision 
   }
