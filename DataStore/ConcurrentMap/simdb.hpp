@@ -866,7 +866,7 @@ public:
 
     return MATCH_FALSE;
   }
-  Match     compare(IDX  blkIdx, ui32 version, void const *const buf, ui32 len)      const
+  Match     compare(IDX  blkIdx, ui32 version, void const *const buf, ui32 len) const
   {
     using namespace std;
     
@@ -1183,16 +1183,21 @@ public:
     //return m_kvs[idx];
     return load_kv(idx);
   }
-  ui32           nxt(ui32  idx)                   const
+  ui32           nxt(ui32  stIdx)                 const
   {
+    auto idx = stIdx;
     VerIdx empty = empty_kv();
-    while(true){
+    do{
       VerIdx kv = load_kv(idx);
-      if( kv.idx!=empty.idx /* && kv.readers>=0 */ ) break;
+      if(kv.idx != empty.idx) break;
       idx = (idx+1) % m_sz;                                             // don't increment idx above since break comes before it here
-    }
-    
-    return idx;
+
+      if(idx==stIdx) return empty.idx;
+    }while(true);
+
+    return  idx;
+
+    /* && kv.readers>=0 */
   }
   ui32          size()                            const
   {
@@ -1467,14 +1472,15 @@ public:
   }
   VerIdx       nxt() const                                   // this version index represents a hash index, not an block storage index
   {
+    auto        st = m_nxtChIdx;
     VerIdx   empty = s_ch.empty_kv();
     ui32    chNxt; // = empty.key;
     VerIdx     vi;
     do{
-           chNxt = s_ch.nxt(m_nxtChIdx);                 // can return the same index - it does not do the iteration after finding a non empty key
+           chNxt = s_ch.nxt(m_nxtChIdx);      if(chNxt==empty.idx) return empty;             // can return the same index - it does not do the iteration after finding a non empty key
               vi = s_ch.at(chNxt);
       m_nxtChIdx = (chNxt + 1) % m_blkCnt;
-    }while( IsEmpty(vi) );
+    }while( IsEmpty(vi) );                               // m_nxtChIdx!=st && 
 
     m_curChIdx = chNxt;
     VerIdx ret = {chNxt, vi.version};
@@ -1550,7 +1556,7 @@ public:
   {
     ui32 klen, vlen;
     bool    ok = false;
-    auto   nxt = this->nxt();
+    VerIdx nxt = this->nxt();   if(nxt.idx==EMPTY_KEY) return "";
     ok         = this->len(nxt.idx, nxt.version, &klen, &vlen);  if(!ok) return "";
     str key(klen,'\0');
     ok         = this->getKey(nxt.idx, nxt.version, (void*)key.data(), klen); if(!ok) return "";
