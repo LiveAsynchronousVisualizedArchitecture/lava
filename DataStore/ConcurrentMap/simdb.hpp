@@ -757,11 +757,13 @@ public:
 
     BlkLst bl = incReaders(blkIdx, version);   
     
-    if(bl.len==0 || (bl.len-bl.klen)>maxlen ) return 0;
+    auto vlen = bl.len-bl.klen;
+    if(bl.len==0 || vlen>maxlen ) return 0;
 
     auto   kdiv = div(bl.klen, blockFreeSize());
     auto  kblks = kdiv.quot;
     auto   krem = kdiv.rem;
+    auto vrdLen = 0;
     ui32    len = 0;
     ui32  rdLen = 0;
     i8*       b = (i8*)bytes;
@@ -773,14 +775,15 @@ public:
       cur = nxt.idx;
     }
 
-    rdLen  =  readBlock(cur, version, b, krem);
+    vrdLen =  min<ui32>(blockFreeSize()-krem, vlen);
+    rdLen  =  readBlock(cur, version, b, krem, vrdLen);
     b     +=  rdLen;
     len   +=  rdLen;
     nxt    =  nxtBlock(cur);         if(nxt.version!=version){ goto read_failure; }
 
     while(len<maxlen && !(nxt.idx<0) && nxt.idx!=LIST_END && nxt.version==version)
     {
-      auto vrdLen = min<ui32>(blockFreeSize(), maxlen-len);
+      vrdLen =  min<ui32>(blockFreeSize(), maxlen-len);
       cur    =  nxt.idx;
       rdLen  =  readBlock(cur, version, b, 0, vrdLen);  if(rdLen==0) break;        // rdLen is read length
       b     +=  rdLen;
