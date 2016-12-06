@@ -85,6 +85,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>D:\Development\glm-0.9.4.6\glm;D:\Development\glew-2.0.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -137,6 +138,7 @@
     <ClCompile Include="pRawDllMain.c" />
     <ClCompile Include="qsort.c" />
     <ClCompile Include="strstr.c" />
+    <ClCompile Include="..\IndexedVerts.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\glfw3.h" />
@@ -144,6 +146,7 @@
     <ClInclude Include="..\no_rt_util.h" />
     <ClInclude Include="..\nuklear.h" />
     <ClInclude Include="..\nuklear_glfw_gl3.h" />
+    <ClInclude Include="..\IndexedVerts.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\fragmentShader.frag" />
