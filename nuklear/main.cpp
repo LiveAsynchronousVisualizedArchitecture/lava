@@ -1,3 +1,4 @@
+
 // TODO: Add all attributes
 // TODO: Control camera with mouse
 
@@ -5,15 +6,23 @@
 #include <fstream>
 #include <sstream>
 
-#include "../DataStore/ConcurrentMap/simdb.hpp"
-#include "IndexedVerts.h"
+//#include "../DataStore/ConcurrentMap/simdb.hpp"
+//#include "IndexedVerts.h"
+
 #include "no_rt_util.h"
 
 #include <GL/glew.h>
+
+#define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include "glfw3.h"
+
+#ifdef _MSC_VER
+  #pragma comment(lib, "glfw3dll.lib")
+  #pragma comment(lib, "glew32.lib")
+#endif
 
 #define NK_INCLUDE_FIXED_TYPES
 #define NK_INCLUDE_STANDARD_IO
@@ -27,10 +36,14 @@
 #include "nuklear.h"
 #include "nuklear_glfw_gl3.h"
 
+#include "VizDataStructures.hpp"
+#include "VizGenerators.hpp"
+#include "VizTransforms.hpp"
+
 #define WINDOW_WIDTH 1200
 #define WINDOW_HEIGHT 800
 
-#define MAX_VERTEX_BUFFER 512 * 1024
+#define MAX_VERTEX_BUFFER  512 * 1024
 #define MAX_ELEMENT_BUFFER 128 * 1024
 
 #define UNUSED(a) (void)a
@@ -38,162 +51,403 @@
 #define MAX(a,b) ((a) < (b) ? (b) : (a))
 #define LEN(a) (sizeof(a)/sizeof(a)[0])
 
-std::vector<ui8> makeTriangle(size_t& byteLen, bool left);
-std::vector<ui8> makeCube(size_t& byteLen);
+//vec<ui8> makeTriangle(size_t& byteLen, bool left);
+//vec<ui8> makeCube(size_t& byteLen);
 
-struct Shader {
+//int sidebar(struct nk_context *ctx, int width, int height, vec<Key>& keys, const vec<str>& dbKeys);
+//
+//void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
-    GLuint shaderProgramId;
-
-    void use() {
-        glUseProgram(shaderProgramId);
-    }
-
-    void loadShaders(std::string& vertShader, std::string& fragShader) {
-        std::string vertexCode;
-        std::string fragmentCode;
-        std::ifstream vShaderFile;
-        std::ifstream fShaderFile;
-
-        vShaderFile.exceptions(std::ifstream::badbit);
-        fShaderFile.exceptions(std::ifstream::badbit);
-        try
-        {
-            vShaderFile.open(vertShader.c_str());
-            fShaderFile.open(fragShader.c_str());
-            std::stringstream vShaderStream, fShaderStream;
-            vShaderStream << vShaderFile.rdbuf();
-            fShaderStream << fShaderFile.rdbuf();
-            vShaderFile.close();
-            fShaderFile.close();
-            vertexCode = vShaderStream.str();
-            fragmentCode = fShaderStream.str();
-        }
-        catch(std::ifstream::failure e)
-        {
-            printf("ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ\n");
-        }
-
-        GLuint vertexShader;
-        vertexShader = glCreateShader(GL_VERTEX_SHADER);
-        const GLchar* vShaderSource = vertexCode.c_str();
-        glShaderSource(vertexShader, 1, &vShaderSource, NULL);
-        glCompileShader(vertexShader);
-        GLint success;
-        glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-        if(!success) {
-            GLchar infoLog[1024];
-            glGetShaderInfoLog(vertexShader, 1024, NULL, infoLog);
-            printf("Compiling vertex shader failed: %s\n", infoLog);
-        }
-
-        GLuint fragmentShader;
-        fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-        const GLchar* fShaderSource = fragmentCode.c_str();
-        glShaderSource(fragmentShader, 1, &fShaderSource, NULL);
-        glCompileShader(fragmentShader);
-        glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-        if(!success) {
-            GLchar infoLog[1024];
-            glGetShaderInfoLog(fragmentShader, 1024, NULL, infoLog);
-            printf("Compiling fragment shader failed: %s\n", infoLog);
-        }
-
-        shaderProgramId = glCreateProgram();
-        glAttachShader(shaderProgramId, vertexShader);
-        glAttachShader(shaderProgramId, fragmentShader);
-        glLinkProgram(shaderProgramId);
-        glGetShaderiv(fragmentShader, GL_LINK_STATUS, &success);
-        if(!success) {
-            GLchar infoLog[1024];
-            glGetProgramInfoLog(shaderProgramId, 1024, NULL, infoLog);
-            printf("Linking failed: %s\n", infoLog);
-        }
-        glDeleteShader(vertexShader);
-        glDeleteShader(fragmentShader);
-    }
-};
-
-struct Key {
-    int active;
-    std::string key;
-    void* bytes;
-    GLuint vertexBuffer;
-    GLuint vertexArray;
-    GLuint indexBuffer;
-    IndexedVerts* iv;
-    Shader shader;
-
-    Key(std::string& dbKey, void* dbBytes) :
-        active(false),
-        key(dbKey),
-        bytes(dbBytes),
-        iv(nullptr) {
-
-        std::string vShader = "../vertexShader.vert";
-        std::string fShader = "../fragmentShader.frag";
-        shader.loadShaders(vShader, fShader);
-    }
-
-    void render() {
-        if(!iv) {
-            // Create IndexedVerts instance
-            // TODO(Chris): Generalize this
-            iv = (IndexedVerts*)IndexedVertsLoad(bytes);
-
-            glGenVertexArrays(1, &vertexArray);
-            glGenBuffers(1, &vertexBuffer);
-            glGenBuffers(1, &indexBuffer);
-
-            glBindVertexArray(vertexArray);
-
-            glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex)* iv->vertsLen, iv->verts, GL_STATIC_DRAW);
-
-            glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-            glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t)* iv->indicesLen, iv->indices, GL_STATIC_DRAW);
-
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
-            glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 6));
-
-            glEnableVertexAttribArray(0);
-            glEnableVertexAttribArray(1);
-
-            glBindVertexArray(0);
-        }
-
-        // Camera/View transformation
-        shader.use();
-        glm::mat4 transform;
-        transform = glm::rotate(transform, (GLfloat)glfwGetTime() * 50.0f, glm::vec3(0.2f, 0.5f, 1.0f));
-        GLint transformLoc = glGetUniformLocation(shader.shaderProgramId, "transform");
-        glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transform));
-
-        // Render
-        int size;
-        glBindVertexArray(vertexArray);
-        glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
-        glDrawElements(GL_TRIANGLES, size/sizeof(uint32_t), GL_UNSIGNED_INT, 0);
-        glBindVertexArray(0);
-    }
-
-    void deactivate() {
-        // TODO(Chris): Delete glBuffer?
-        glDeleteVertexArrays(1, &vertexArray);
-        IndexedVertsDestroy(iv);
-        iv = nullptr;
-    }
-};
-
-
-int sidebar(struct nk_context *ctx, int width, int height, std::vector<Key>& keys, const std::vector<std::string>& dbKeys);
-// #include "overview.c"
-// #include "node_editor.c"
-
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 static void error_callback(int e, const char *d) {
     printf("Error %d: %s\n", e, d);
 }
+
+void   key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, GL_TRUE);
+}
+
+void   genTestGeo(simdb* db)
+{
+  // Create serialized IndexedVerts
+  size_t leftLen, rightLen, cubeLen;
+  vec<ui8>  leftData = makeTriangle(leftLen,   true);
+  vec<ui8> rightData = makeTriangle(rightLen, false);
+  vec<ui8>  cubeData = makeCube(cubeLen);
+
+  // Store serialized IndexedVerts in the db
+  str  leftTriangle = "leftTriangle";       // todo: make simdb put() that takes a const char* as key
+  str rightTriangle = "rightTriangle";
+  str          cube = "cube";
+
+  db->put(leftTriangle.data(), (ui32)leftTriangle.length(), leftData.data(), (ui32)leftLen);
+  db->put(rightTriangle.data(), (ui32)rightTriangle.length(), rightData.data(), (ui32)rightLen);
+  db->put(cube.data(), (ui32)cube.length(), cubeData.data(), (ui32)cubeLen);
+}
+
+int    sidebar(struct nk_context *ctx, int width, int height, VizData* vd)
+{
+  using namespace std;
+
+  static enum nk_style_header_align header_align = NK_HEADER_RIGHT;
+  static nk_flags window_flags = 0;                /* window flags */
+
+  struct nk_panel layout;                          /* popups */
+
+  ctx->style.window.header.align = header_align;   /* window flags */
+
+  struct nk_rect rect = nk_rect((5/6.0f) * (float)width, 0, (1/6.0f) * (float)width, (float)height);
+  if(nk_begin(ctx, &layout, "Overview", rect, window_flags))
+  {
+    if(nk_tree_push(ctx, NK_TREE_TAB, "Drawables", NK_MINIMIZED))
+    {
+      nk_layout_row_static(ctx, 18, 100, 1);
+      for(auto& kv : *vd){          
+        nk_selectable_label(ctx, kv.first.c_str(), NK_TEXT_LEFT, &kv.second.active);
+      }
+      nk_tree_pop(ctx);
+    }
+  }
+  nk_end(ctx);
+
+  return !nk_window_is_closed(ctx, "Overview");
+}
+
+void   RenderShape(Shape const& shp)
+{
+  // Camera/View transformation
+  glUseProgram(shp.shader);  //shader.use();
+  glm::mat4 transform;
+  transform = glm::rotate(transform, (GLfloat)glfwGetTime() * 50.0f, glm::vec3(0.2f, 0.5f, 1.0f));
+  GLint transformLoc = glGetUniformLocation(shp.shader, "transform");
+  glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transform));
+
+  // Render
+  int size;
+  glBindVertexArray(shp.vertary);
+  glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
+  glDrawElements(GL_TRIANGLES, size/sizeof(uint32_t), GL_UNSIGNED_INT, 0);
+  glBindVertexArray(0);
+}
+
+int main(void)
+{
+  using namespace std;
+
+  /* Platform */
+  static GLFWwindow *win;
+  int width = 0, height = 0;
+  struct nk_context *ctx;
+  struct nk_color background;
+
+  /* GLFW */
+  glfwSetErrorCallback(error_callback);
+  if (!glfwInit()) {
+      fprintf(stdout, "[GFLW] failed to init!\n");
+      exit(1);
+  }
+
+  win = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Demo", NULL, NULL);
+  glfwMakeContextCurrent(win);
+  glfwGetWindowSize(win, &width, &height);
+
+  /* OpenGL */
+  glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+  glewExperimental = 1;
+  if (glewInit() != GLEW_OK) {
+      fprintf(stderr, "Failed to setup GLEW\n");
+      exit(1);
+  }
+
+  glfwSetKeyCallback(win, key_callback);
+
+  VizData vd;
+  simdb db("test", 1024, 8);      // Create the DB
+  genTestGeo(&db);
+
+  /* nuklear */
+  ctx = nk_glfw3_init(win, NK_GLFW3_INSTALL_CALLBACKS);
+  struct nk_font_atlas *atlas;
+  nk_glfw3_font_stash_begin(&atlas);
+  nk_glfw3_font_stash_end();
+
+  glEnable(GL_DEPTH_TEST);
+  // glDepthFunc(GL_LESS);
+
+  // todo: need simdb::VerIdx and simdb::VerKey structs ? need simdb.getVersion() ?
+  vec<str> dbKeys = db.getKeyStrs();    // Get all keys in DB - this will need to be ran in the main loop, but not every frame
+
+  //sort( dbKeys.begin(), dbKeys.end() );
+  //vd.keys = dbKeys;
+  for(auto& k : dbKeys){ 
+    ui32 vlen = 0;
+    auto len = db.len(k.data(), (ui32)k.length(), &vlen);          // todo: make ui64 as the input length
+
+    vec<i8> ivbuf(vlen);
+    db.get(k.data(), (ui32)k.length(), ivbuf.data(), (ui32)len);
+
+    vd[k] = ivbuf_to_shape(ivbuf.data(), len);
+  };
+
+  background = nk_rgb(28,48,62);
+  while(!glfwWindowShouldClose(win))
+  {
+    /* Input */
+    glfwPollEvents();
+    nk_glfw3_new_frame();
+
+    // TODO(Chris): Resize sidebar on window resize
+    //sidebar(ctx, width, height, keys, dbKeys);
+    sidebar(ctx, width, height, &vd);   //keys, dbKeys);
+
+    /* Draw */
+    {
+      float bg[4];
+      nk_color_fv(bg, background);
+      glfwGetWindowSize(win, &width, &height);
+      glViewport(0, 0, width, height);
+      glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      glClearColor(bg[0], bg[1], bg[2], bg[3]);
+
+      //for(auto key : keys) {
+      //    if(key.active) {
+      //        key.render();
+      //    }
+      //}
+
+      for(auto& kv : vd){
+        if(kv.second.active)
+          RenderShape( kv.second );
+      }
+
+      /* IMPORTANT: `nk_glfw_render` modifies some global OpenGL state
+        * with blending, scissor, face culling, depth test and viewport and
+        * defaults everything back into a default state.
+        * Make sure to either a.) save and restore or b.) reset your own state after
+        * rendering the UI. */
+      nk_glfw3_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_BUFFER, MAX_ELEMENT_BUFFER);
+      glfwSwapBuffers(win);
+    }
+  }
+  nk_glfw3_shutdown();
+  glfwTerminate();
+  return 0;
+}
+
+
+
+//// Create serialized IndexedVerts
+//size_t leftLen, rightLen, cubeLen;
+//vec<ui8>  leftData = makeTriangle(leftLen,   true);
+//vec<ui8> rightData = makeTriangle(rightLen, false);
+//vec<ui8>  cubeData = makeCube(cubeLen);
+//
+//// Store serialized IndexedVerts in the db
+//str  leftTriangle = "leftTriangle";       // todo: make simdb put() that takes a const char* as key
+//str rightTriangle = "rightTriangle";
+//str          cube = "cube";
+//
+//db.put(leftTriangle.data(), (ui32)leftTriangle.length(), leftData.data(), (ui32)leftLen);
+//db.put(rightTriangle.data(), (ui32)rightTriangle.length(), rightData.data(), (ui32)rightLen);
+//db.put(cube.data(), (ui32)cube.length(), cubeData.data(), (ui32)cubeLen);
+
+// Retrieve data from the db and create new Keys with it
+//ui32 leftSize, rightSize, cubeSize;
+//i64 totalCubeLen = db.len(cube.data(), (ui32)cube.length(), &cubeSize);
+//i64 totalLeftLen = db.len(leftTriangle.data(), (ui32)leftTriangle.length(), &leftSize);
+//i64 totalRightLen = db.len(rightTriangle.data(), (ui32)rightTriangle.length(), &rightSize);
+//
+//vec<ui8> retrievedLeftData(leftSize);
+//vec<ui8> retrievedRightData(rightSize);
+//vec<ui8> retrievedCubeData(cubeSize);
+//
+//if(!db.get(leftTriangle.data(), (ui32)leftTriangle.length(), retrievedLeftData.data(), leftSize)) {
+//    printf("Error reading from db. Key %s does not exist.\n", leftTriangle.c_str());
+//}
+//if(!db.get(rightTriangle.data(), (ui32)rightTriangle.length(), retrievedRightData.data(), rightSize)) {
+//    printf("Error reading from db. Key %s does not exist.\n", rightTriangle.c_str());
+//}
+//if(!db.get(cube.data(), (ui32)cube.length(), retrievedCubeData.data(), cubeSize)) {
+//    printf("Error retrieving value for %s\n", cube.c_str());
+//}
+//
+//// Create the Keys
+//Key k1(leftTriangle, retrievedLeftData.data());
+//Key k2(rightTriangle, retrievedRightData.data());
+//Key k3(cube, retrievedCubeData.data());
+//
+//vec<Key> keys;
+//keys.push_back(k1);
+//keys.push_back(k2);
+//keys.push_back(k3);
+
+//
+// vec<Key>& keys, const vec<str>& dbKeys)
+
+//for(auto& key : keys) {
+//     if(find(dbKeys.begin(), dbKeys.end(), key.key) != dbKeys.end()) {
+//         nk_selectable_label(ctx, key.key.c_str(), NK_TEXT_LEFT, &key.active);
+//         if(!key.active && key.iv) {
+//             key.deactivate();
+//         }
+//     }
+// }
+
+//vector<ui8> makeCube(size_t& byteLen) {
+//    const unsigned int NUM_VERTICES = 8;
+//    const unsigned int NUM_INDICES = 36;
+//
+//    IndexedVerts* iv = (IndexedVerts*)IndexedVertsCreate(0, 6, IV_TRIANGLES, NUM_VERTICES, NUM_INDICES, 0, 0, 0);
+//
+//    iv->verts[0] = {
+//        {-0.5f, -0.5f, 0.5f},     //pos
+//        {0.0f, 0.0f, -1.0f},      //norm
+//        {1.0f, 0.0f, 0.0f, 1.0f}, //color
+//        {0.0f, 0.0f}              //texCoord
+//    };
+//    iv->verts[1] = {
+//        {0.5f, -0.5f, 0.5f},      //pos
+//        {0.0f, 0.0f, -1.0f},      //norm
+//        {0.0f, 1.0f, 0.0f, 1.0f}, //color
+//        {0.0f, 0.0f}              //texCoord
+//    };
+//    iv->verts[2] = {
+//        {0.5f, 0.5f, 0.5f},       //pos
+//        {0.0f, 0.0f, -1.0f},      //norm
+//        {0.0f, 0.0f, 1.0f, 1.0f}, //color
+//        {0.0f, 0.0f}              //texCoord
+//    };
+//    iv->verts[3] = {
+//        {-0.5f, 0.5f, 0.5f},      //pos
+//        {0.0f, 0.0f, -1.0f},      //norm
+//        {1.0f, 0.5f, 0.25f, 1.0f}, //color
+//        {0.0f, 0.0f}              //texCoord
+//    };
+//    iv->verts[4] = {
+//        {-0.5f, -0.5f, -0.5f},    //pos
+//        {0.0f, 0.0f, -1.0f},      //norm
+//        {1.0f, 0.0f, 0.0f, 1.0f}, //color
+//        {0.0f, 0.0f}              //texCoord
+//    };
+//    iv->verts[5] = {
+//        {0.5f, -0.5f, -0.5f},     //pos
+//        {0.0f, 0.0f, -1.0f},      //norm
+//        {0.0f, 1.0f, 0.0f, 1.0f}, //color
+//        {0.0f, 0.0f}              //texCoord
+//    };
+//    iv->verts[6] = {
+//        {0.5f, 0.5f, -0.5f},      //pos
+//        {0.0f, 0.0f, -1.0f},      //norm
+//        {0.0f, 0.0f, 1.0f, 1.0f}, //color
+//        {0.0f, 0.0f}              //texCoord
+//    };
+//    iv->verts[7] = {
+//        {-0.5f, 0.5f, -0.5f},     //pos
+//        {0.0f, 0.0f, -1.0f},      //norm
+//        {1.0f, 0.5f, 0.25f, 1.0f}, //color
+//        {0.0f, 0.0f}              //texCoord
+//    };
+//
+//    uint32_t cubeIndices[NUM_INDICES] = {
+//        // front
+//        0, 1, 2,
+//        2, 3, 0,
+//        // top
+//        1, 5, 6,
+//        6, 2, 1,
+//        // back
+//        7, 6, 5,
+//        5, 4, 7,
+//        // bottom
+//        4, 0, 3,
+//        3, 7, 4,
+//        // left
+//        4, 5, 1,
+//        1, 0, 4,
+//        // right
+//        3, 2, 6,
+//        6, 7, 3,
+//    };
+//
+//    // Copy index data into IndexedVerts.indices
+//    memcpy(iv->indices, cubeIndices, sizeof(GLuint) * NUM_INDICES);
+//
+//    // Call once to get byteLen
+//    IndexedVertsSave(iv, nullptr, &byteLen);
+//    vector<ui8> bytes(byteLen);
+//    // Call again to serialize
+//    IndexedVertsSave(iv, bytes.data(), &byteLen);
+//    IndexedVertsDestroy(iv);
+//
+//    return bytes;
+//}
+//
+//std::vector<ui8> makeTriangle(size_t& byteLen, bool left) {
+//    // Create triangle Vertex data
+//    const unsigned int NUM_VERTICES = 3;
+//    const unsigned int NUM_INDICES = 3;
+//
+//    IndexedVerts* iv = (IndexedVerts*)IndexedVertsCreate(0, 6, IV_TRIANGLES, NUM_VERTICES, 3, 0, 0, 0);
+//
+//    if(left) {
+//        iv->verts[0] = {
+//            {-1.0, -1.0f, 0.0f},     //pos
+//            {0.0f, 0.0f, -1.0f},      //norm
+//            {1.0f, 1.0f, 1.0f, 1.0f}, //color
+//            {0.0f, 0.0f}              //texCoord
+//        };
+//        iv->verts[1] = {
+//            {-0.17f, -1.0f, 0.0f},      //pos
+//            {0.0f, 0.0f, -1.0f},      //norm
+//            {1.0f, 1.0f, 1.0f, 1.0f}, //color
+//            {0.0f, 0.0f}              //texCoord
+//        };
+//        iv->verts[2] = {
+//            {-0.58f, 1.0f, 0.0f},       //pos
+//            {0.0f, 0.0f, -1.0f},      //norm
+//            {1.0f, 1.0f, 1.0f, 1.0f}, //color
+//            {0.0f, 0.0f}              //texCoord
+//        };
+//    }
+//    else {
+//        iv->verts[0] = {
+//            {-0.17, -1.0f, 0.0f},     //pos
+//            {0.0f, 0.0f, -1.0f},      //norm
+//            {1.0f, 1.0f, 1.0f, 1.0f}, //color
+//            {0.0f, 0.0f}              //texCoord
+//        };
+//        iv->verts[1] = {
+//            {0.66f, -1.0f, 0.0f},      //pos
+//            {0.0f, 0.0f, -1.0f},      //norm
+//            {1.0f, 1.0f, 1.0f, 1.0f}, //color
+//            {0.0f, 0.0f}              //texCoord
+//        };
+//        iv->verts[2] = {
+//            {0.25, 1.0f, 0.0f},       //pos
+//            {0.0f, 0.0f, -1.0f},      //norm
+//            {1.0f, 1.0f, 1.0f, 1.0f}, //color
+//            {0.0f, 0.0f}              //texCoord
+//        };
+//    }
+//
+//    GLuint indices[NUM_INDICES] = {0, 1, 2};
+//
+//    // Copy index data into IndexedVerts.indices
+//    memcpy(iv->indices, indices, sizeof(GLuint)* NUM_INDICES);
+//
+//    // Call once to get byteLen
+//    IndexedVertsSave(iv, nullptr, &byteLen);
+//    std::vector<ui8> bytes(byteLen);
+//    // Call again to serialize
+//    IndexedVertsSave(iv, bytes.data(), &byteLen);
+//    IndexedVertsDestroy(iv);
+//
+//    return bytes;
+//}
+
+// #include "overview.c"
+// #include "node_editor.c"
 
 //int CALLBACK WinMain(
 //  _In_ HINSTANCE hInstance,
@@ -201,322 +455,6 @@ static void error_callback(int e, const char *d) {
 //  _In_ LPSTR     lpCmdLine,
 //  _In_ int       nCmdShow
 //)
-
-int main(void)
-{
-    /* Platform */
-    static GLFWwindow *win;
-    int width = 0, height = 0;
-    struct nk_context *ctx;
-    struct nk_color background;
-
-    /* GLFW */
-    glfwSetErrorCallback(error_callback);
-    if (!glfwInit()) {
-        fprintf(stdout, "[GFLW] failed to init!\n");
-        exit(1);
-    }
-
-    win = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Demo", NULL, NULL);
-    glfwMakeContextCurrent(win);
-    glfwGetWindowSize(win, &width, &height);
-
-    /* OpenGL */
-    glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
-    glewExperimental = 1;
-    if (glewInit() != GLEW_OK) {
-        fprintf(stderr, "Failed to setup GLEW\n");
-        exit(1);
-    }
-
-    glfwSetKeyCallback(win, key_callback);
-
-    // Create the DB
-    simdb db("test", 1024, 8);
-
-    // Create serialized IndexedVerts
-    size_t leftLen, rightLen, cubeLen;
-    std::vector<ui8> leftData = makeTriangle(leftLen, true);
-    std::vector<ui8> rightData = makeTriangle(rightLen, false);
-    std::vector<ui8> cubeData = makeCube(cubeLen);
-
-    // Store serialized IndexedVerts in the db
-    std::string leftTriangle = "leftTriangle";
-    std::string rightTriangle = "rightTriangle";
-    std::string cube = "cube";
-
-    db.put(leftTriangle.data(), (ui32)leftTriangle.length(), leftData.data(), (ui32)leftLen);
-    db.put(rightTriangle.data(), (ui32)rightTriangle.length(), rightData.data(), (ui32)rightLen);
-    db.put(cube.data(), (ui32)cube.length(), cubeData.data(), (ui32)cubeLen);
-
-    // Retrieve data from the db and create new Keys with it
-    ui32 leftSize, rightSize, cubeSize;
-    i64 totalCubeLen = db.len(cube.data(), (ui32)cube.length(), &cubeSize);
-    i64 totalLeftLen = db.len(leftTriangle.data(), (ui32)leftTriangle.length(), &leftSize);
-    i64 totalRightLen = db.len(rightTriangle.data(), (ui32)rightTriangle.length(), &rightSize);
-
-    std::vector<ui8> retrievedLeftData(leftSize);
-    std::vector<ui8> retrievedRightData(rightSize);
-    std::vector<ui8> retrievedCubeData(cubeSize);
-
-    if(!db.get(leftTriangle.data(), (ui32)leftTriangle.length(), retrievedLeftData.data(), leftSize)) {
-        printf("Error reading from db. Key %s does not exist.\n", leftTriangle.c_str());
-    }
-    if(!db.get(rightTriangle.data(), (ui32)rightTriangle.length(), retrievedRightData.data(), rightSize)) {
-        printf("Error reading from db. Key %s does not exist.\n", rightTriangle.c_str());
-    }
-    if(!db.get(cube.data(), (ui32)cube.length(), retrievedCubeData.data(), cubeSize)) {
-        printf("Error retrieving value for %s\n", cube.c_str());
-    }
-
-    // Create the Keys
-    Key k1(leftTriangle, retrievedLeftData.data());
-    Key k2(rightTriangle, retrievedRightData.data());
-    Key k3(cube, retrievedCubeData.data());
-
-    std::vector<Key> keys;
-    keys.push_back(k1);
-    keys.push_back(k2);
-    keys.push_back(k3);
-
-    /* nuklear */
-    ctx = nk_glfw3_init(win, NK_GLFW3_INSTALL_CALLBACKS);
-    struct nk_font_atlas *atlas;
-    nk_glfw3_font_stash_begin(&atlas);
-    nk_glfw3_font_stash_end();
-
-    glEnable(GL_DEPTH_TEST);
-    // glDepthFunc(GL_LESS);
-
-    background = nk_rgb(28,48,62);
-    while (!glfwWindowShouldClose(win))
-    {
-        /* Input */
-        glfwPollEvents();
-        nk_glfw3_new_frame();
-
-        // Get all keys in DB
-        std::vector<std::string> dbKeys = db.getKeyStrs();
-
-        // TODO(Chris): Resize sidebar on window resize
-        sidebar(ctx, width, height, keys, dbKeys);
-
-        /* Draw */
-        {float bg[4];
-        nk_color_fv(bg, background);
-        glfwGetWindowSize(win, &width, &height);
-        glViewport(0, 0, width, height);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        glClearColor(bg[0], bg[1], bg[2], bg[3]);
-
-        for(auto key : keys) {
-            if(key.active) {
-                key.render();
-            }
-        }
-
-        /* IMPORTANT: `nk_glfw_render` modifies some global OpenGL state
-         * with blending, scissor, face culling, depth test and viewport and
-         * defaults everything back into a default state.
-         * Make sure to either a.) save and restore or b.) reset your own state after
-         * rendering the UI. */
-        nk_glfw3_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_BUFFER, MAX_ELEMENT_BUFFER);
-        glfwSwapBuffers(win);}
-    }
-    nk_glfw3_shutdown();
-    glfwTerminate();
-    return 0;
-}
-
-std::vector<ui8> makeCube(size_t& byteLen) {
-    const unsigned int NUM_VERTICES = 8;
-    const unsigned int NUM_INDICES = 36;
-
-    IndexedVerts* iv = (IndexedVerts*)IndexedVertsCreate(0, 6, IV_TRIANGLES, NUM_VERTICES, NUM_INDICES, 0, 0, 0);
-
-    iv->verts[0] = {
-        {-0.5f, -0.5f, 0.5f},     //pos
-        {0.0f, 0.0f, -1.0f},      //norm
-        {1.0f, 0.0f, 0.0f, 1.0f}, //color
-        {0.0f, 0.0f}              //texCoord
-    };
-    iv->verts[1] = {
-        {0.5f, -0.5f, 0.5f},      //pos
-        {0.0f, 0.0f, -1.0f},      //norm
-        {0.0f, 1.0f, 0.0f, 1.0f}, //color
-        {0.0f, 0.0f}              //texCoord
-    };
-    iv->verts[2] = {
-        {0.5f, 0.5f, 0.5f},       //pos
-        {0.0f, 0.0f, -1.0f},      //norm
-        {0.0f, 0.0f, 1.0f, 1.0f}, //color
-        {0.0f, 0.0f}              //texCoord
-    };
-    iv->verts[3] = {
-        {-0.5f, 0.5f, 0.5f},      //pos
-        {0.0f, 0.0f, -1.0f},      //norm
-        {1.0f, 0.5f, 0.25f, 1.0f}, //color
-        {0.0f, 0.0f}              //texCoord
-    };
-    iv->verts[4] = {
-        {-0.5f, -0.5f, -0.5f},    //pos
-        {0.0f, 0.0f, -1.0f},      //norm
-        {1.0f, 0.0f, 0.0f, 1.0f}, //color
-        {0.0f, 0.0f}              //texCoord
-    };
-    iv->verts[5] = {
-        {0.5f, -0.5f, -0.5f},     //pos
-        {0.0f, 0.0f, -1.0f},      //norm
-        {0.0f, 1.0f, 0.0f, 1.0f}, //color
-        {0.0f, 0.0f}              //texCoord
-    };
-    iv->verts[6] = {
-        {0.5f, 0.5f, -0.5f},      //pos
-        {0.0f, 0.0f, -1.0f},      //norm
-        {0.0f, 0.0f, 1.0f, 1.0f}, //color
-        {0.0f, 0.0f}              //texCoord
-    };
-    iv->verts[7] = {
-        {-0.5f, 0.5f, -0.5f},     //pos
-        {0.0f, 0.0f, -1.0f},      //norm
-        {1.0f, 0.5f, 0.25f, 1.0f}, //color
-        {0.0f, 0.0f}              //texCoord
-    };
-
-    uint32_t cubeIndices[NUM_INDICES] = {
-        // front
-        0, 1, 2,
-        2, 3, 0,
-        // top
-        1, 5, 6,
-        6, 2, 1,
-        // back
-        7, 6, 5,
-        5, 4, 7,
-        // bottom
-        4, 0, 3,
-        3, 7, 4,
-        // left
-        4, 5, 1,
-        1, 0, 4,
-        // right
-        3, 2, 6,
-        6, 7, 3,
-    };
-
-    // Copy index data into IndexedVerts.indices
-    memcpy(iv->indices, cubeIndices, sizeof(GLuint) * NUM_INDICES);
-
-    // Call once to get byteLen
-    IndexedVertsSave(iv, nullptr, &byteLen);
-    std::vector<ui8> bytes(byteLen);
-    // Call again to serialize
-    IndexedVertsSave(iv, bytes.data(), &byteLen);
-    IndexedVertsDestroy(iv);
-
-    return bytes;
-}
-
-std::vector<ui8> makeTriangle(size_t& byteLen, bool left) {
-    // Create triangle Vertex data
-    const unsigned int NUM_VERTICES = 3;
-    const unsigned int NUM_INDICES = 3;
-
-    IndexedVerts* iv = (IndexedVerts*)IndexedVertsCreate(0, 6, IV_TRIANGLES, NUM_VERTICES, 3, 0, 0, 0);
-
-    if(left) {
-        iv->verts[0] = {
-            {-1.0, -1.0f, 0.0f},     //pos
-            {0.0f, 0.0f, -1.0f},      //norm
-            {1.0f, 1.0f, 1.0f, 1.0f}, //color
-            {0.0f, 0.0f}              //texCoord
-        };
-        iv->verts[1] = {
-            {-0.17f, -1.0f, 0.0f},      //pos
-            {0.0f, 0.0f, -1.0f},      //norm
-            {1.0f, 1.0f, 1.0f, 1.0f}, //color
-            {0.0f, 0.0f}              //texCoord
-        };
-        iv->verts[2] = {
-            {-0.58f, 1.0f, 0.0f},       //pos
-            {0.0f, 0.0f, -1.0f},      //norm
-            {1.0f, 1.0f, 1.0f, 1.0f}, //color
-            {0.0f, 0.0f}              //texCoord
-        };
-    }
-    else {
-        iv->verts[0] = {
-            {-0.17, -1.0f, 0.0f},     //pos
-            {0.0f, 0.0f, -1.0f},      //norm
-            {1.0f, 1.0f, 1.0f, 1.0f}, //color
-            {0.0f, 0.0f}              //texCoord
-        };
-        iv->verts[1] = {
-            {0.66f, -1.0f, 0.0f},      //pos
-            {0.0f, 0.0f, -1.0f},      //norm
-            {1.0f, 1.0f, 1.0f, 1.0f}, //color
-            {0.0f, 0.0f}              //texCoord
-        };
-        iv->verts[2] = {
-            {0.25, 1.0f, 0.0f},       //pos
-            {0.0f, 0.0f, -1.0f},      //norm
-            {1.0f, 1.0f, 1.0f, 1.0f}, //color
-            {0.0f, 0.0f}              //texCoord
-        };
-    }
-
-    GLuint indices[NUM_INDICES] = {0, 1, 2};
-
-    // Copy index data into IndexedVerts.indices
-    memcpy(iv->indices, indices, sizeof(GLuint)* NUM_INDICES);
-
-    // Call once to get byteLen
-    IndexedVertsSave(iv, nullptr, &byteLen);
-    std::vector<ui8> bytes(byteLen);
-    // Call again to serialize
-    IndexedVertsSave(iv, bytes.data(), &byteLen);
-    IndexedVertsDestroy(iv);
-
-    return bytes;
-}
-
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
-{
-    if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, GL_TRUE);
-}
-
-int sidebar(struct nk_context *ctx, int width, int height, std::vector<Key>& keys, const std::vector<std::string>& dbKeys)
-{
-    /* window flags */
-    static nk_flags window_flags = 0;
-
-    /* popups */
-    static enum nk_style_header_align header_align = NK_HEADER_RIGHT;
-    struct nk_panel layout;
-
-    /* window flags */
-    ctx->style.window.header.align = header_align;
-
-    if(nk_begin(ctx, &layout, "Overview", nk_rect((5/6.0f) * (float)width, 0, (1/6.0f) * (float)width, (float)height), window_flags))
-    {
-        if(nk_tree_push(ctx, NK_TREE_TAB, "Drawables", NK_MINIMIZED))
-        {
-            nk_layout_row_static(ctx, 18, 100, 1);
-            for(auto& key : keys) {
-                if(std::find(dbKeys.begin(), dbKeys.end(), key.key) != dbKeys.end()) {
-                    nk_selectable_label(ctx, key.key.c_str(), NK_TEXT_LEFT, &key.active);
-                    if(!key.active && key.iv) {
-                        key.deactivate();
-                    }
-                }
-            }
-            nk_tree_pop(ctx);
-        }
-    }
-    nk_end(ctx);
-    return !nk_window_is_closed(ctx, "Overview");
-}
 
 /*struct Attributes
 {

@@ -1262,7 +1262,8 @@ public:
     #endif       // END windows
   
     ui64      addr = (ui64)(sm.hndlPtr);
-    ui64 alignAddr = alignment==0? addr  :  addr + ((alignment-addr%alignment)%alignment);  // why was the second modulo needed?
+    ui64 alignAddr = addr;
+    if(alignment!=0) alignAddr = addr + ((alignment-addr%alignment)%alignment);       // why was the second modulo needed?
     sm.ptr         = (void*)(alignAddr);
 
     return move(sm);

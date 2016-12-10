@@ -86,6 +86,8 @@
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>D:\Development\glm-0.9.4.6\glm;D:\Development\glew-2.0.0\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <InlineFunctionExpansion>Disabled</InlineFunctionExpansion>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <DisableSpecificWarnings>4724</DisableSpecificWarnings>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -135,9 +137,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\main.cpp" />
-    <ClCompile Include="pRawDllMain.c" />
-    <ClCompile Include="qsort.c" />
-    <ClCompile Include="strstr.c" />
     <ClCompile Include="..\IndexedVerts.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -147,6 +146,9 @@
     <ClInclude Include="..\nuklear.h" />
     <ClInclude Include="..\nuklear_glfw_gl3.h" />
     <ClInclude Include="..\IndexedVerts.h" />
+    <ClInclude Include="..\VizDataStructures.hpp" />
+    <ClInclude Include="..\VizGenerators.hpp" />
+    <ClInclude Include="..\VizTransforms.hpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="..\fragmentShader.frag" />
