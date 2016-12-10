@@ -41,8 +41,78 @@
 std::vector<ui8> makeTriangle(size_t& byteLen, bool left);
 std::vector<ui8> makeCube(size_t& byteLen);
 
-// TODO(Chris): Remove global
-static GLuint shaderProgramId;
+struct Shader {
+
+    GLuint shaderProgramId;
+
+    void use() {
+        glUseProgram(shaderProgramId);
+    }
+
+    void loadShaders(std::string& vertShader, std::string& fragShader) {
+        std::string vertexCode;
+        std::string fragmentCode;
+        std::ifstream vShaderFile;
+        std::ifstream fShaderFile;
+
+        vShaderFile.exceptions(std::ifstream::badbit);
+        fShaderFile.exceptions(std::ifstream::badbit);
+        try
+        {
+            vShaderFile.open(vertShader.c_str());
+            fShaderFile.open(fragShader.c_str());
+            std::stringstream vShaderStream, fShaderStream;
+            vShaderStream << vShaderFile.rdbuf();
+            fShaderStream << fShaderFile.rdbuf();
+            vShaderFile.close();
+            fShaderFile.close();
+            vertexCode = vShaderStream.str();
+            fragmentCode = fShaderStream.str();
+        }
+        catch(std::ifstream::failure e)
+        {
+            printf("ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ\n");
+        }
+
+        GLuint vertexShader;
+        vertexShader = glCreateShader(GL_VERTEX_SHADER);
+        const GLchar* vShaderSource = vertexCode.c_str();
+        glShaderSource(vertexShader, 1, &vShaderSource, NULL);
+        glCompileShader(vertexShader);
+        GLint success;
+        glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+        if(!success) {
+            GLchar infoLog[1024];
+            glGetShaderInfoLog(vertexShader, 1024, NULL, infoLog);
+            printf("Compiling vertex shader failed: %s\n", infoLog);
+        }
+
+        GLuint fragmentShader;
+        fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+        const GLchar* fShaderSource = fragmentCode.c_str();
+        glShaderSource(fragmentShader, 1, &fShaderSource, NULL);
+        glCompileShader(fragmentShader);
+        glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+        if(!success) {
+            GLchar infoLog[1024];
+            glGetShaderInfoLog(fragmentShader, 1024, NULL, infoLog);
+            printf("Compiling fragment shader failed: %s\n", infoLog);
+        }
+
+        shaderProgramId = glCreateProgram();
+        glAttachShader(shaderProgramId, vertexShader);
+        glAttachShader(shaderProgramId, fragmentShader);
+        glLinkProgram(shaderProgramId);
+        glGetShaderiv(fragmentShader, GL_LINK_STATUS, &success);
+        if(!success) {
+            GLchar infoLog[1024];
+            glGetProgramInfoLog(shaderProgramId, 1024, NULL, infoLog);
+            printf("Linking failed: %s\n", infoLog);
+        }
+        glDeleteShader(vertexShader);
+        glDeleteShader(fragmentShader);
+    }
+};
 
 struct Key {
     int active;
@@ -52,12 +122,17 @@ struct Key {
     GLuint vertexArray;
     GLuint indexBuffer;
     IndexedVerts* iv;
+    Shader shader;
 
     Key(std::string& dbKey, void* dbBytes) :
         active(false),
         key(dbKey),
         bytes(dbBytes),
         iv(nullptr) {
+
+        std::string vShader = "../vertexShader.vert";
+        std::string fShader = "../fragmentShader.frag";
+        shader.loadShaders(vShader, fShader);
     }
 
     void render() {
@@ -86,11 +161,12 @@ struct Key {
 
             glBindVertexArray(0);
         }
+
         // Camera/View transformation
-        glUseProgram(shaderProgramId);
+        shader.use();
         glm::mat4 transform;
         transform = glm::rotate(transform, (GLfloat)glfwGetTime() * 50.0f, glm::vec3(0.2f, 0.5f, 1.0f));
-        GLint transformLoc = glGetUniformLocation(shaderProgramId, "transform");
+        GLint transformLoc = glGetUniformLocation(shader.shaderProgramId, "transform");
         glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transform));
 
         // Render
@@ -108,6 +184,7 @@ struct Key {
         iv = nullptr;
     }
 };
+
 
 int sidebar(struct nk_context *ctx, int width, int height, std::vector<Key>& keys, const std::vector<std::string>& dbKeys);
 // #include "overview.c"
@@ -154,69 +231,6 @@ int main(void)
 
     glfwSetKeyCallback(win, key_callback);
 
-    // Shaders
-    std::string vertexCode;
-    std::string fragmentCode;
-    std::ifstream vShaderFile;
-    std::ifstream fShaderFile;
-
-    vShaderFile.exceptions(std::ifstream::badbit);
-    fShaderFile.exceptions(std::ifstream::badbit);
-    try
-    {
-        vShaderFile.open("../vertexShader.vert");
-        fShaderFile.open("../fragmentShader.frag");
-        std::stringstream vShaderStream, fShaderStream;
-        vShaderStream << vShaderFile.rdbuf();
-        fShaderStream << fShaderFile.rdbuf();
-        vShaderFile.close();
-        fShaderFile.close();
-        vertexCode = vShaderStream.str();
-        fragmentCode = fShaderStream.str();
-    }
-    catch(std::ifstream::failure e)
-    {
-        printf("ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ\n");
-    }
-
-    GLuint vertexShader;
-    vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    const GLchar* vShaderSource = vertexCode.c_str();
-    glShaderSource(vertexShader, 1, &vShaderSource, NULL);
-    glCompileShader(vertexShader);
-    GLint success;
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
-    if(!success) {
-        GLchar infoLog[1024];
-        glGetShaderInfoLog(vertexShader, 1024, NULL, infoLog);
-        printf("Compiling vertex shader failed: %s\n", infoLog);
-    }
-
-    GLuint fragmentShader;
-    fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-    const GLchar* fShaderSource = fragmentCode.c_str();
-    glShaderSource(fragmentShader, 1, &fShaderSource, NULL);
-    glCompileShader(fragmentShader);
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
-    if(!success) {
-        GLchar infoLog[1024];
-        glGetShaderInfoLog(fragmentShader, 1024, NULL, infoLog);
-        printf("Compiling fragment shader failed: %s\n", infoLog);
-    }
-
-    shaderProgramId = glCreateProgram();
-    glAttachShader(shaderProgramId, vertexShader);
-    glAttachShader(shaderProgramId, fragmentShader);
-    glLinkProgram(shaderProgramId);
-    glGetShaderiv(fragmentShader, GL_LINK_STATUS, &success);
-    if(!success) {
-        GLchar infoLog[1024];
-        glGetProgramInfoLog(shaderProgramId, 1024, NULL, infoLog);
-        printf("Linking failed: %s\n", infoLog);
-    }
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-
     // Create the DB
     simdb db("test", 1024, 8);
 
@@ -241,24 +255,24 @@ int main(void)
     i64 totalLeftLen = db.len(leftTriangle.data(), (ui32)leftTriangle.length(), &leftSize);
     i64 totalRightLen = db.len(rightTriangle.data(), (ui32)rightTriangle.length(), &rightSize);
 
-    void* retrievedLeftData = malloc(sizeof(ui8) * leftSize);
-    void* retrievedRightData = malloc(sizeof(ui8) * rightSize);
-    void* retrievedCubeData = malloc(sizeof(ui8)* cubeSize);
+    std::vector<ui8> retrievedLeftData(leftSize);
+    std::vector<ui8> retrievedRightData(rightSize);
+    std::vector<ui8> retrievedCubeData(cubeSize);
 
-    if(!db.get(leftTriangle.data(), (ui32)leftTriangle.length(), retrievedLeftData, leftSize)) {
+    if(!db.get(leftTriangle.data(), (ui32)leftTriangle.length(), retrievedLeftData.data(), leftSize)) {
         printf("Error reading from db. Key %s does not exist.\n", leftTriangle.c_str());
     }
-    if(!db.get(rightTriangle.data(), (ui32)rightTriangle.length(), retrievedRightData, rightSize)) {
+    if(!db.get(rightTriangle.data(), (ui32)rightTriangle.length(), retrievedRightData.data(), rightSize)) {
         printf("Error reading from db. Key %s does not exist.\n", rightTriangle.c_str());
     }
-    if(!db.get(cube.data(), (ui32)cube.length(), retrievedCubeData, cubeSize)) {
+    if(!db.get(cube.data(), (ui32)cube.length(), retrievedCubeData.data(), cubeSize)) {
         printf("Error retrieving value for %s\n", cube.c_str());
     }
 
     // Create the Keys
-    Key k1(leftTriangle, retrievedLeftData);
-    Key k2(rightTriangle, retrievedRightData);
-    Key k3(cube, retrievedCubeData);
+    Key k1(leftTriangle, retrievedLeftData.data());
+    Key k2(rightTriangle, retrievedRightData.data());
+    Key k3(cube, retrievedCubeData.data());
 
     std::vector<Key> keys;
     keys.push_back(k1);
@@ -504,263 +518,262 @@ int sidebar(struct nk_context *ctx, int width, int height, std::vector<Key>& key
     return !nk_window_is_closed(ctx, "Overview");
 }
 
-//struct Attributes
-//{
-//    GLuint position;
-//    GLuint normal;
-//    GLuint sourceColour;
-//    GLuint textureCoordIn;
-//
-//    Attributes(Shader& shaderProgram)
-//    {
-//        position = createAttribute(shaderProgram, "position");
-//        normal = createAttribute(shaderProgram, "normal");
-//        sourceColour = createAttribute(shaderProgram, "sourceColour");
-//        texureCoordIn = createAttribute(shaderProgram, "texureCoordIn");
-//    }
-//    void enable()
-//    {
-//        if(position != nullptr)
-//        {
-//            glVertexAttribPointer(position->attributeID, 3, GL_FLOAT, GL_FALSE, sizeof (Vertex), 0);
-//            glEnableVertexAttribArray(position->attributeID);
-//        }
-//
-//        if(normal != nullptr)
-//        {
-//            glVertexAttribPointer(normal->attributeID, 3, GL_FLOAT, GL_FALSE, sizeof (Vertex), (GLvoid*)(sizeof (float)* 3));
-//            glEnableVertexAttribArray(normal->attributeID);
-//        }
-//
-//        if(sourceColour != nullptr)
-//        {
-//            glVertexAttribPointer(sourceColour->attributeID, 4, GL_FLOAT, GL_FALSE, sizeof (Vertex), (GLvoid*)(sizeof (float)* 6));
-//            glEnableVertexAttribArray(sourceColour->attributeID);
-//        }
-//
-//        if(texureCoordIn != nullptr)
-//        {
-//            glVertexAttribPointer(texureCoordIn->attributeID, 2, GL_FLOAT, GL_FALSE, sizeof (Vertex), (GLvoid*)(sizeof (float)* 10));
-//            glEnableVertexAttribArray(texureCoordIn->attributeID);
-//        }
-//    }
-//    void disable()
-//    {
-//        if(position != nullptr)       glDisableVertexAttribArray(position->attributeID);
-//        if(normal != nullptr)         glDisableVertexAttribArray(normal->attributeID);
-//        if(sourceColour != nullptr)   glDisableVertexAttribArray(sourceColour->attributeID);
-//        if(texureCoordIn != nullptr)  glDisableVertexAttribArray(texureCoordIn->attributeID);
-//    }
-//    // ScopedPointer<OpenGLShaderProgram::Attribute> position, normal, sourceColour, texureCoordIn;
-//
-//private:
-//    static GLuint createAttribute(Shader& shader, const char* attributeName)
-//    {
-//        if(glGetAttribLocation(shader.id, attributeName) < 0)
-//            return nullptr;
-//
-//        return new OpenGLShaderProgram::Attribute(shader, attributeName);
-//    }
-//};
-//
-//struct VertexBuffer
-//{
-//private:
-//    //bool            m_moved         =   false;
-//    //GLenum          m_mode          =   GL_POINTS;
-//    bool            m_owned = true;
-//    i32             m_numIndices = 0;
-//    GLenum          m_mode = GL_POINTS;
-//    GLuint          vertexBuffer = -1;
-//    GLuint          indexBuffer = -1;
-//    // OpenGLContext*  openGLContext = nullptr;
-//
-//    void mv(VertexBuffer&& rval)
-//    {
-//        m_numIndices = rval.m_numIndices;
-//        m_mode = rval.m_mode;
-//        vertexBuffer = rval.vertexBuffer;
-//        indexBuffer = rval.indexBuffer;
-//        // openGLContext = rval.openGLContext;
-//
-//        rval.m_owned = false;
-//    }
-//
-//public:
-//    VertexBuffer(IndexedVerts* idxVerts) :
-//        // openGLContext(context),
-//        m_mode(idxVerts->mode)
-//    {
-//        m_numIndices = (i32)idxVerts->indicesLen;
-//
-//        glGenBuffers(1, &vertexBuffer);
-//        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-//
-//        glBufferData(GL_ARRAY_BUFFER,
-//            static_cast<GLsizeiptr>(static_cast<size_t>(idxVerts->vertsLen)*sizeof(Vertex)),
-//            idxVerts->verts,
-//            GL_STATIC_DRAW);
-//
-//        glGenBuffers(1, &indexBuffer);
-//        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-//        glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-//            static_cast<GLsizeiptr>(static_cast<size_t>(m_numIndices)*sizeof(uint32_t)),
-//            idxVerts->indices,
-//            GL_STATIC_DRAW);
-//    }
-//    VertexBuffer(std::vector<Vertex> verts, std::vector<int32_t> indices)
-//    {
-//        //numIndices = aShape.mesh.indices.size();
-//        m_numIndices = (i32)indices.size();
-//
-//        glGenBuffers(1, &vertexBuffer);
-//        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-//
-//        //Array<Vertex> vertices;
-//        //createVertexListFromMesh (aShape.mesh, vertices, Colours::green);
-//
-//        glBufferData(GL_ARRAY_BUFFER,
-//            static_cast<GLsizeiptr>(static_cast<size_t>(verts.size())*sizeof(Vertex)),
-//            verts.data(),
-//            GL_STATIC_DRAW);
-//
-//        glGenBuffers(1, &indexBuffer);
-//        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-//        glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-//            static_cast<GLsizeiptr>(static_cast<size_t>(m_numIndices)*sizeof(uint32_t)),
-//            indices.data(),
-//            GL_STATIC_DRAW);
-//    }
-//    ~VertexBuffer()
-//    {
-//        if(m_owned) {
-//            glDeleteBuffers(1, &vertexBuffer);
-//            glDeleteBuffers(1, &indexBuffer);
-//        }
-//    }
-//
-//    VertexBuffer(VertexBuffer const& vb) = delete;
-//    VertexBuffer& operator=(VertexBuffer const& vb) = delete;
-//
-//    VertexBuffer(VertexBuffer&& vb)
-//    {
-//        mv(std::move(vb));
-//    }
-//    VertexBuffer& operator=(VertexBuffer&& vb)
-//    {
-//        mv(std::move(vb));
-//        return *this;
-//        //m_numIndices   =  vb.m_numIndices;
-//        //vertexBuffer   =  vb.vertexBuffer;
-//        //indexBuffer    =  vb.indexBuffer;
-//        //openGLContext  =  vb.openGLContext;
-//        //
-//        ////vb.m_moved     =  true;
-//        //vb.m_owned     =  false;
-//        //return *this;
-//    }
-//
-//    void    bind()
-//    {
-//        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
-//        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
-//    }
-//    i32     numIndices() const
-//    {
-//        return m_numIndices;
-//    }
-//    GLenum  mode()       const
-//    {
-//        return m_mode;
-//    }
-//};
-//
-//struct Shape
-//{
-//private:
-//    // using ScopedUniform = ScopedPointer<OpenGLShaderProgram::Uniform>;
-//
-//    bool                m_visible = false;
-//    std::vector<VertexBuffer>   vertexBuffers;
-//    GLuint              m_texID = 0;
-//    GLsizei             w = 0;
-//    GLsizei             h = 0;
-//    IndexedVerts*       m_iv;
-//
-//    void mv(Shape&& rval)
-//    {
-//        m_visible = rval.m_visible;
-//        vertexBuffers = move(rval.vertexBuffers);
-//        //memcpy(&m_tex, &rval.m_tex, sizeof(decltype(m_tex)) );
-//        m_texID = rval.m_texID;
-//        w = rval.w;
-//        h = rval.h;
-//        //m_iv           =  rval.m_iv;
-//    }
-//
-//public:
-//    Shape(){}
-//    Shape(IndexedVerts* iv)
-//    {
-//        vertexBuffers.emplace_back(std::move(VertexBuffer(iv)));
-//
-//        // check for iv having more than 4 dimensions?
-//        glActiveTexture(GL_TEXTURE0);
-//        glGenTextures(1, &m_texID);
-//        glBindTexture(GL_TEXTURE_2D, m_texID);
-//        glTexImage2D(GL_TEXTURE_2D,
-//            0, GL_RGBA,
-//            (GLint)iv->imgWidth, (GLint)iv->imgHeight,
-//            0, GL_RGBA, GL_FLOAT, iv->pixels);
-//    }
-//
-//    Shape(Shape const& s) = delete;
-//    Shape& operator=(Shape const& s) = delete;
-//
-//    Shape(Shape&& rval)
-//    {
-//        mv(std::move(rval));
-//    }
-//    Shape& operator=(Shape&& rval)
-//    {
-//        mv(std::move(rval));
-//        return *this;
-//    }
-//
-//    void release()
-//    {
-//        //m_tex.release();
-//        vertexBuffers.clear();
-//    }
-//    void draw(Attributes& glAttributes, GLuint shaderHnd)
-//    {
-//        if(m_visible)
-//        {
-//            for(auto& vb : vertexBuffers)
-//            {
-//                //m_tex.bind();
-//
-//                vb.bind();
-//
-//                glActiveTexture(GL_TEXTURE0);
-//                glBindTexture(GL_TEXTURE_2D, m_texID);
-//                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-//                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-//                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); // GL_LINEAR);
-//                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); // GL_LINEAR);
-//                auto loc = glGetUniformLocation(shaderHnd, "tex0");
-//                glUniform1i(loc, 0);
-//                glAttributes.enable();
-//                //glPointSize(1.f);
-//                glDrawElements(vb.mode(), vb.numIndices(), GL_UNSIGNED_INT, 0);
-//                glAttributes.disable();
-//
-//                //m_tex.unbind();
-//            }
-//            //glDrawPixels(m_iv->imgWidth, m_iv->imgHeight, GL_RGBA, GL_FLOAT, m_iv->pixels );
-//        }
-//    }
-//    void visible(bool b) { m_visible = b; }
-//    bool visible() const { return m_visible; }
-//};
-//
+/*struct Attributes
+{
+    GLuint position;
+    GLuint normal;
+    GLuint sourceColour;
+    GLuint textureCoordIn;
+
+    Attributes(Shader& shaderProgram)
+    {
+        position = createAttribute(shaderProgram, "position");
+        normal = createAttribute(shaderProgram, "normal");
+        sourceColour = createAttribute(shaderProgram, "sourceColour");
+        texureCoordIn = createAttribute(shaderProgram, "texureCoordIn");
+    }
+    void enable()
+    {
+        if(position != nullptr)
+        {
+            glVertexAttribPointer(position->attributeID, 3, GL_FLOAT, GL_FALSE, sizeof (Vertex), 0);
+            glEnableVertexAttribArray(position->attributeID);
+        }
+
+        if(normal != nullptr)
+        {
+            glVertexAttribPointer(normal->attributeID, 3, GL_FLOAT, GL_FALSE, sizeof (Vertex), (GLvoid*)(sizeof (float)* 3));
+            glEnableVertexAttribArray(normal->attributeID);
+        }
+
+        if(sourceColour != nullptr)
+        {
+            glVertexAttribPointer(sourceColour->attributeID, 4, GL_FLOAT, GL_FALSE, sizeof (Vertex), (GLvoid*)(sizeof (float)* 6));
+            glEnableVertexAttribArray(sourceColour->attributeID);
+        }
+
+        if(texureCoordIn != nullptr)
+        {
+            glVertexAttribPointer(texureCoordIn->attributeID, 2, GL_FLOAT, GL_FALSE, sizeof (Vertex), (GLvoid*)(sizeof (float)* 10));
+            glEnableVertexAttribArray(texureCoordIn->attributeID);
+        }
+    }
+    void disable()
+    {
+        if(position != nullptr)       glDisableVertexAttribArray(position->attributeID);
+        if(normal != nullptr)         glDisableVertexAttribArray(normal->attributeID);
+        if(sourceColour != nullptr)   glDisableVertexAttribArray(sourceColour->attributeID);
+        if(texureCoordIn != nullptr)  glDisableVertexAttribArray(texureCoordIn->attributeID);
+    }
+    // ScopedPointer<OpenGLShaderProgram::Attribute> position, normal, sourceColour, texureCoordIn;
+
+private:
+    static GLuint createAttribute(Shader& shader, const char* attributeName)
+    {
+        if(glGetAttribLocation(shader.id, attributeName) < 0)
+            return nullptr;
+
+        return new OpenGLShaderProgram::Attribute(shader, attributeName);
+    }
+};*/
+
+/*struct VertexBuffer
+{
+private:
+    //bool            m_moved         =   false;
+    //GLenum          m_mode          =   GL_POINTS;
+    bool            m_owned = true;
+    i32             m_numIndices = 0;
+    GLenum          m_mode = GL_POINTS;
+    GLuint          vertexBuffer = -1;
+    GLuint          indexBuffer = -1;
+    // OpenGLContext*  openGLContext = nullptr;
+
+    void mv(VertexBuffer&& rval)
+    {
+        m_numIndices = rval.m_numIndices;
+        m_mode = rval.m_mode;
+        vertexBuffer = rval.vertexBuffer;
+        indexBuffer = rval.indexBuffer;
+        // openGLContext = rval.openGLContext;
+
+        rval.m_owned = false;
+    }
+
+public:
+    VertexBuffer(IndexedVerts* idxVerts) :
+        // openGLContext(context),
+        m_mode(idxVerts->mode)
+    {
+        m_numIndices = (i32)idxVerts->indicesLen;
+
+        glGenBuffers(1, &vertexBuffer);
+        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+
+        glBufferData(GL_ARRAY_BUFFER,
+            static_cast<GLsizeiptr>(static_cast<size_t>(idxVerts->vertsLen)*sizeof(Vertex)),
+            idxVerts->verts,
+            GL_STATIC_DRAW);
+
+        glGenBuffers(1, &indexBuffer);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+            static_cast<GLsizeiptr>(static_cast<size_t>(m_numIndices)*sizeof(uint32_t)),
+            idxVerts->indices,
+            GL_STATIC_DRAW);
+    }
+    VertexBuffer(std::vector<Vertex> verts, std::vector<int32_t> indices)
+    {
+        //numIndices = aShape.mesh.indices.size();
+        m_numIndices = (i32)indices.size();
+
+        glGenBuffers(1, &vertexBuffer);
+        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+
+        //Array<Vertex> vertices;
+        //createVertexListFromMesh (aShape.mesh, vertices, Colours::green);
+
+        glBufferData(GL_ARRAY_BUFFER,
+            static_cast<GLsizeiptr>(static_cast<size_t>(verts.size())*sizeof(Vertex)),
+            verts.data(),
+            GL_STATIC_DRAW);
+
+        glGenBuffers(1, &indexBuffer);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+        glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+            static_cast<GLsizeiptr>(static_cast<size_t>(m_numIndices)*sizeof(uint32_t)),
+            indices.data(),
+            GL_STATIC_DRAW);
+    }
+    ~VertexBuffer()
+    {
+        if(m_owned) {
+            glDeleteBuffers(1, &vertexBuffer);
+            glDeleteBuffers(1, &indexBuffer);
+        }
+    }
+
+    VertexBuffer(VertexBuffer const& vb) = delete;
+    VertexBuffer& operator=(VertexBuffer const& vb) = delete;
+
+    VertexBuffer(VertexBuffer&& vb)
+    {
+        mv(std::move(vb));
+    }
+    VertexBuffer& operator=(VertexBuffer&& vb)
+    {
+        mv(std::move(vb));
+        return *this;
+        //m_numIndices   =  vb.m_numIndices;
+        //vertexBuffer   =  vb.vertexBuffer;
+        //indexBuffer    =  vb.indexBuffer;
+        //openGLContext  =  vb.openGLContext;
+        //
+        ////vb.m_moved     =  true;
+        //vb.m_owned     =  false;
+        //return *this;
+    }
+
+    void    bind()
+    {
+        glBindBuffer(GL_ARRAY_BUFFER, vertexBuffer);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer);
+    }
+    i32     numIndices() const
+    {
+        return m_numIndices;
+    }
+    GLenum  mode()       const
+    {
+        return m_mode;
+    }
+};*/
+
+/*struct Shape
+{
+private:
+    // using ScopedUniform = ScopedPointer<OpenGLShaderProgram::Uniform>;
+
+    bool                m_visible = false;
+    std::vector<VertexBuffer>   vertexBuffers;
+    GLuint              m_texID = 0;
+    GLsizei             w = 0;
+    GLsizei             h = 0;
+    IndexedVerts*       m_iv;
+
+    void mv(Shape&& rval)
+    {
+        m_visible = rval.m_visible;
+        vertexBuffers = move(rval.vertexBuffers);
+        //memcpy(&m_tex, &rval.m_tex, sizeof(decltype(m_tex)) );
+        m_texID = rval.m_texID;
+        w = rval.w;
+        h = rval.h;
+        //m_iv           =  rval.m_iv;
+    }
+
+public:
+    Shape(){}
+    Shape(IndexedVerts* iv)
+    {
+        vertexBuffers.emplace_back(std::move(VertexBuffer(iv)));
+
+        // check for iv having more than 4 dimensions?
+        glActiveTexture(GL_TEXTURE0);
+        glGenTextures(1, &m_texID);
+        glBindTexture(GL_TEXTURE_2D, m_texID);
+        glTexImage2D(GL_TEXTURE_2D,
+            0, GL_RGBA,
+            (GLint)iv->imgWidth, (GLint)iv->imgHeight,
+            0, GL_RGBA, GL_FLOAT, iv->pixels);
+    }
+
+    Shape(Shape const& s) = delete;
+    Shape& operator=(Shape const& s) = delete;
+
+    Shape(Shape&& rval)
+    {
+        mv(std::move(rval));
+    }
+    Shape& operator=(Shape&& rval)
+    {
+        mv(std::move(rval));
+        return *this;
+    }
+
+    void release()
+    {
+        //m_tex.release();
+        vertexBuffers.clear();
+    }
+    void draw(Attributes& glAttributes, GLuint shaderHnd)
+    {
+        if(m_visible)
+        {
+            for(auto& vb : vertexBuffers)
+            {
+                //m_tex.bind();
+
+                vb.bind();
+
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, m_texID);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); // GL_LINEAR);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); // GL_LINEAR);
+                auto loc = glGetUniformLocation(shaderHnd, "tex0");
+                glUniform1i(loc, 0);
+                glAttributes.enable();
+                //glPointSize(1.f);
+                glDrawElements(vb.mode(), vb.numIndices(), GL_UNSIGNED_INT, 0);
+                glAttributes.disable();
+
+                //m_tex.unbind();
+            }
+            //glDrawPixels(m_iv->imgWidth, m_iv->imgHeight, GL_RGBA, GL_FLOAT, m_iv->pixels );
+        }
+    }
+    void visible(bool b) { m_visible = b; }
+    bool visible() const { return m_visible; }
+};*/
