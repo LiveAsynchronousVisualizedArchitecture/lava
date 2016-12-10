@@ -87,7 +87,7 @@ void   genTestGeo(simdb* db)
   db->put(cube.data(), (ui32)cube.length(), cubeData.data(), (ui32)cubeLen);
 }
 
-int    sidebar(struct nk_context *ctx, int width, int height, VizData* vd)
+int    sidebar(struct nk_context *ctx, VizData* vd)
 {
   using namespace std;
 
@@ -98,13 +98,16 @@ int    sidebar(struct nk_context *ctx, int width, int height, VizData* vd)
 
   ctx->style.window.header.align = header_align;   /* window flags */
 
-  struct nk_rect rect = nk_rect((5/6.0f) * (float)width, 0, (1/6.0f) * (float)width, (float)height);
+  struct nk_rect rect = nk_rect( (5/6.0f) * (float)vd->ui.w, 
+                                                          0, 
+                                 (1/6.0f) * (float)vd->ui.w, 
+                                            (float)vd->ui.h  );
   if(nk_begin(ctx, &layout, "Overview", rect, window_flags))
   {
     if(nk_tree_push(ctx, NK_TREE_TAB, "Drawables", NK_MINIMIZED))
     {
       nk_layout_row_static(ctx, 18, 100, 1);
-      for(auto& kv : *vd){          
+      for(auto& kv : vd->shapes){          
         nk_selectable_label(ctx, kv.first.c_str(), NK_TEXT_LEFT, &kv.second.active);
       }
       nk_tree_pop(ctx);
@@ -136,11 +139,15 @@ int    main(void)
 {
   using namespace std;
 
-  /* Platform */
-  static GLFWwindow *win;
-  int width = 0, height = 0;
+  static GLFWwindow *win;              /* Platform */    //int width = 0, height = 0;
   struct nk_context *ctx;
   struct nk_color background;
+
+  VizData vd;
+  vd.ui.w = 1024; 
+  vd.ui.h =  768;
+  simdb   db("test", 1024, 8);        // Create the DB
+  genTestGeo(&db);
 
   /* GLFW */
   glfwSetErrorCallback(error_callback);
@@ -149,9 +156,9 @@ int    main(void)
       exit(1);
   }
 
-  win = glfwCreateWindow(WINDOW_WIDTH, WINDOW_HEIGHT, "Demo", NULL, NULL);
+  win = glfwCreateWindow(vd.ui.w, vd.ui.h, "Demo", NULL, NULL);
   glfwMakeContextCurrent(win);
-  glfwGetWindowSize(win, &width, &height);
+  glfwGetWindowSize(win, &vd.ui.w, &vd.ui.h);
 
   /* OpenGL */
   glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
@@ -162,10 +169,6 @@ int    main(void)
   }
 
   glfwSetKeyCallback(win, key_callback);
-
-  VizData vd;
-  simdb db("test", 1024, 8);      // Create the DB
-  genTestGeo(&db);
 
   /* nuklear */
   ctx = nk_glfw3_init(win, NK_GLFW3_INSTALL_CALLBACKS);
@@ -179,7 +182,7 @@ int    main(void)
   // todo: need simdb::VerIdx and simdb::VerKey structs ? need simdb.getVersion() ?
   vec<str> dbKeys = db.getKeyStrs();    // Get all keys in DB - this will need to be ran in the main loop, but not every frame
 
-  GLuint shaderId = shaderstrs_to_shaderid(vShaderPath, fShaderPath);  
+  GLuint shaderId = shadersrc_to_shaderid(vertShader, fragShader);  
   for(auto& k : dbKeys){
     ui32 vlen = 0;
     auto  len = db.len(k.data(), (ui32)k.length(), &vlen);          // todo: make ui64 as the input length
@@ -189,7 +192,7 @@ int    main(void)
 
     Shape s  = ivbuf_to_shape(ivbuf.data(), len);
     s.shader = shaderId;
-    vd[k]    = move(s);
+    vd.shapes[k] = move(s);
   };
 
   background = nk_rgb(28,48,62);
@@ -199,18 +202,18 @@ int    main(void)
     glfwPollEvents();
     nk_glfw3_new_frame();
 
-    sidebar(ctx, width, height, &vd);    // TODO(Chris): Resize sidebar on window resize  //keys, dbKeys);
+    sidebar(ctx, &vd);        // TODO(Chris): Resize sidebar on window resize  //keys, dbKeys);
 
     /* Draw */
     {
       float bg[4];
       nk_color_fv(bg, background);
-      glfwGetWindowSize(win, &width, &height);
-      glViewport(0, 0, width, height);
+      glfwGetWindowSize(win, &vd.ui.w, &vd.ui.h);
+      glViewport(0, 0, vd.ui.w, vd.ui.h);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
       glClearColor(bg[0], bg[1], bg[2], bg[3]);
 
-      for(auto& kv : vd){
+      for(auto& kv : vd.shapes){
         if(kv.second.active)
           RenderShape( kv.second );
       }

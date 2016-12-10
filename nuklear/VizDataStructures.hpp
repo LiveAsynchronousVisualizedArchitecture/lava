@@ -47,6 +47,24 @@ using str = std::string;
 
 static const char*  vShaderPath  =  "../vertexShader.vert";
 static const char*  fShaderPath  =  "../fragmentShader.frag";
+static const char*  vertShader   = 
+"#version 330 core\
+layout(location = 0) in vec3 position;\
+layout(location = 1) in vec4 color;\
+out vec4 finalColor;\
+uniform mat4 transform;\
+void main(){\
+  gl_Position = transform * vec4(position, 1.0f);\
+  finalColor = color;\
+}";
+static const char*  fragShader   = 
+"#version 330 core\
+in vec4 finalColor;\
+out vec4 color;\
+void main(){\
+  color = finalColor;\
+}";
+
 
 struct Shader {
 
@@ -265,19 +283,18 @@ public:
 //struct ui{};
 // todo: make VizData a struct again, have the map be shapes and ui data be in a struct called ui
 
-using   VizData = map<str, Shape>;
+//using VizData = map<str, Shape>;
 
 using KeyShapes = map<str, Shape>;
-
-struct _VizData
+struct VizData
 {
-  KeyShapes shapes;
-  struct ui
+  KeyShapes   shapes;
+  GLuint    shaderId;
+  struct
   {
-    
+    int w, h;
     struct nk_rect sidebar;
-  };
-  GLuint shaderId;
+  } ui;
 };
 
 #endif

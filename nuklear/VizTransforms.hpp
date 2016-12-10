@@ -16,39 +16,39 @@
 #include "IndexedVerts.h"
 #include "VizDataStructures.hpp"
 
-//inline Shape       ivbuf_to_shape( )    //IndexedVerts* iv)
-
-inline GLuint shaderstrs_to_shaderid(str const& vertShader, str const& fragShader)
+//inline GLuint shadersrc_to_shaderid(str const& vert, str const& frag)
+inline GLuint shadersrc_to_shaderid(const char* vert, const char* frag)
 {
   using namespace std;
   
-  str         vertexCode;
-  str       fragmentCode;
-  ifstream   vShaderFile;
-  ifstream   fShaderFile;
-
-  vShaderFile.exceptions(ifstream::badbit);
-  fShaderFile.exceptions(ifstream::badbit);
-  try
-  {
-      vShaderFile.open(vertShader.c_str());
-      fShaderFile.open(fragShader.c_str());
-      stringstream vShaderStream, fShaderStream;
-      vShaderStream << vShaderFile.rdbuf();
-      fShaderStream << fShaderFile.rdbuf();
-      vShaderFile.close();
-      fShaderFile.close();
-      vertexCode = vShaderStream.str();
-      fragmentCode = fShaderStream.str();
-  }
-  catch(ifstream::failure e)
-  {
-      printf("ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ\n");
-  }
+  //str         vertexCode;
+  //str       fragmentCode;
+  //  
+  //ifstream   vShaderFile;
+  //ifstream   fShaderFile;
+  //
+  //vShaderFile.exceptions(ifstream::badbit);
+  //fShaderFile.exceptions(ifstream::badbit);
+  //try
+  //{
+  //    vShaderFile.open(vertShader.c_str());
+  //    fShaderFile.open(fragShader.c_str());
+  //    stringstream vShaderStream, fShaderStream;
+  //    vShaderStream << vShaderFile.rdbuf();
+  //    fShaderStream << fShaderFile.rdbuf();
+  //    vShaderFile.close();
+  //    fShaderFile.close();
+  //    vertexCode = vShaderStream.str();
+  //    fragmentCode = fShaderStream.str();
+  //}
+  //catch(ifstream::failure e)
+  //{
+  //    printf("ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ\n");
+  //}
 
   GLuint vertexShader;
   vertexShader = glCreateShader(GL_VERTEX_SHADER);
-  const GLchar* vShaderSource = vertexCode.c_str();
+  const GLchar* vShaderSource =  vert; //.c_str();   // vertexCode.c_str();
   glShaderSource(vertexShader, 1, &vShaderSource, NULL);
   glCompileShader(vertexShader);
   GLint success;
@@ -61,7 +61,7 @@ inline GLuint shaderstrs_to_shaderid(str const& vertShader, str const& fragShade
 
   GLuint fragmentShader;
   fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-  const GLchar* fShaderSource = fragmentCode.c_str();
+  const GLchar* fShaderSource = frag;  //.c_str(); // fragmentCode.c_str();
   glShaderSource(fragmentShader, 1, &fShaderSource, NULL);
   glCompileShader(fragmentShader);
   glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
@@ -124,3 +124,75 @@ inline Shape          ivbuf_to_shape(void* buf, ui64 len)    //IndexedVerts* iv)
 
 
 #endif
+
+
+//inline Shape       ivbuf_to_shape( )    //IndexedVerts* iv)
+//
+//inline GLuint shaderstrs_to_shaderid(str const& vertShader, str const& fragShader)
+//{
+//  using namespace std;
+//  
+//  str         vertexCode;
+//  str       fragmentCode;
+//  ifstream   vShaderFile;
+//  ifstream   fShaderFile;
+//
+//  vShaderFile.exceptions(ifstream::badbit);
+//  fShaderFile.exceptions(ifstream::badbit);
+//  try
+//  {
+//      vShaderFile.open(vertShader.c_str());
+//      fShaderFile.open(fragShader.c_str());
+//      stringstream vShaderStream, fShaderStream;
+//      vShaderStream << vShaderFile.rdbuf();
+//      fShaderStream << fShaderFile.rdbuf();
+//      vShaderFile.close();
+//      fShaderFile.close();
+//      vertexCode = vShaderStream.str();
+//      fragmentCode = fShaderStream.str();
+//  }
+//  catch(ifstream::failure e)
+//  {
+//      printf("ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ\n");
+//  }
+//
+//  GLuint vertexShader;
+//  vertexShader = glCreateShader(GL_VERTEX_SHADER);
+//  const GLchar* vShaderSource = vertexCode.c_str();
+//  glShaderSource(vertexShader, 1, &vShaderSource, NULL);
+//  glCompileShader(vertexShader);
+//  GLint success;
+//  glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
+//  if(!success) {
+//      GLchar infoLog[1024];
+//      glGetShaderInfoLog(vertexShader, 1024, NULL, infoLog);
+//      printf("Compiling vertex shader failed: %s\n", infoLog);
+//  }
+//
+//  GLuint fragmentShader;
+//  fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+//  const GLchar* fShaderSource = fragmentCode.c_str();
+//  glShaderSource(fragmentShader, 1, &fShaderSource, NULL);
+//  glCompileShader(fragmentShader);
+//  glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &success);
+//  if(!success) {
+//      GLchar infoLog[1024];
+//      glGetShaderInfoLog(fragmentShader, 1024, NULL, infoLog);
+//      printf("Compiling fragment shader failed: %s\n", infoLog);
+//  }
+//
+//  GLuint shaderProgramId = glCreateProgram();
+//  glAttachShader(shaderProgramId, vertexShader);
+//  glAttachShader(shaderProgramId, fragmentShader);
+//  glLinkProgram(shaderProgramId);
+//  glGetShaderiv(fragmentShader, GL_LINK_STATUS, &success);
+//  if(!success) {
+//      GLchar infoLog[1024];
+//      glGetProgramInfoLog(shaderProgramId, 1024, NULL, infoLog);
+//      printf("Linking failed: %s\n", infoLog);
+//  }
+//  glDeleteShader(vertexShader);
+//  glDeleteShader(fragmentShader);
+//
+//  return shaderProgramId;
+//}
