@@ -274,6 +274,7 @@ struct _VizData
   KeyShapes shapes;
   struct ui
   {
+    
     struct nk_rect sidebar;
   };
   GLuint shaderId;
