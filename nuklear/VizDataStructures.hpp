@@ -12,8 +12,22 @@
 #endif
 
 //#include <unordered_map>
+
 #include <map>
 #include <GL/glew.h>
+
+#define NK_INCLUDE_FIXED_TYPES
+#define NK_INCLUDE_STANDARD_IO
+#define NK_INCLUDE_STANDARD_VARARGS
+#define NK_INCLUDE_DEFAULT_ALLOCATOR
+#define NK_INCLUDE_VERTEX_BUFFER_OUTPUT
+#define NK_INCLUDE_FONT_BAKING
+#define NK_INCLUDE_DEFAULT_FONT
+#define NK_IMPLEMENTATION
+#define NK_GLFW_GL3_IMPLEMENTATION
+#include "nuklear.h"
+#include "nuklear_glfw_gl3.h"
+
 #include "../DataStore/ConcurrentMap/simdb.hpp"
 #include "IndexedVerts.h"
 
@@ -29,7 +43,10 @@ template<class KEY, class VALUE,
   class _Alloc   = std::allocator<std::pair<const KEY,VALUE> > >
 using map = std::map<KEY,VALUE, _Compare, _Alloc >;
 
-using   str = std::string;
+using str = std::string;
+
+static const char*  vShaderPath  =  "../vertexShader.vert";
+static const char*  fShaderPath  =  "../fragmentShader.frag";
 
 struct Shader {
 
@@ -217,7 +234,7 @@ private:
 public:
   ui32    version; 
   int      active;
-  GLuint  vertbuf, vertary, idxbuf, tx, shader;
+  GLuint  vertbuf, vertary, idxbuf, tx, shader;  // todo: take out shader 
 
   Shape() :
     version(0),
@@ -247,6 +264,19 @@ public:
 
 //struct ui{};
 // todo: make VizData a struct again, have the map be shapes and ui data be in a struct called ui
-using VizData = map<str, Shape>;
+
+using   VizData = map<str, Shape>;
+
+using KeyShapes = map<str, Shape>;
+
+struct _VizData
+{
+  KeyShapes shapes;
+  struct ui
+  {
+    struct nk_rect sidebar;
+  };
+  GLuint shaderId;
+};
 
 #endif

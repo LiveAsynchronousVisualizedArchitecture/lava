@@ -58,6 +58,7 @@
 //
 //void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
+
 static void error_callback(int e, const char *d) {
     printf("Error %d: %s\n", e, d);
 }
@@ -114,7 +115,7 @@ int    sidebar(struct nk_context *ctx, int width, int height, VizData* vd)
   return !nk_window_is_closed(ctx, "Overview");
 }
 
-void   RenderShape(Shape const& shp)
+void   RenderShape(Shape const& shp) // GLuint shaderId)
 {
   // Camera/View transformation
   glUseProgram(shp.shader);  //shader.use();
@@ -131,7 +132,7 @@ void   RenderShape(Shape const& shp)
   glBindVertexArray(0);
 }
 
-int main(void)
+int    main(void)
 {
   using namespace std;
 
@@ -178,16 +179,17 @@ int main(void)
   // todo: need simdb::VerIdx and simdb::VerKey structs ? need simdb.getVersion() ?
   vec<str> dbKeys = db.getKeyStrs();    // Get all keys in DB - this will need to be ran in the main loop, but not every frame
 
-  //sort( dbKeys.begin(), dbKeys.end() );
-  //vd.keys = dbKeys;
-  for(auto& k : dbKeys){ 
+  GLuint shaderId = shaderstrs_to_shaderid(vShaderPath, fShaderPath);  
+  for(auto& k : dbKeys){
     ui32 vlen = 0;
-    auto len = db.len(k.data(), (ui32)k.length(), &vlen);          // todo: make ui64 as the input length
+    auto  len = db.len(k.data(), (ui32)k.length(), &vlen);          // todo: make ui64 as the input length
 
     vec<i8> ivbuf(vlen);
     db.get(k.data(), (ui32)k.length(), ivbuf.data(), (ui32)len);
 
-    vd[k] = ivbuf_to_shape(ivbuf.data(), len);
+    Shape s  = ivbuf_to_shape(ivbuf.data(), len);
+    s.shader = shaderId;
+    vd[k]    = move(s);
   };
 
   background = nk_rgb(28,48,62);
@@ -197,9 +199,7 @@ int main(void)
     glfwPollEvents();
     nk_glfw3_new_frame();
 
-    // TODO(Chris): Resize sidebar on window resize
-    //sidebar(ctx, width, height, keys, dbKeys);
-    sidebar(ctx, width, height, &vd);   //keys, dbKeys);
+    sidebar(ctx, width, height, &vd);    // TODO(Chris): Resize sidebar on window resize  //keys, dbKeys);
 
     /* Draw */
     {
@@ -209,12 +209,6 @@ int main(void)
       glViewport(0, 0, width, height);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
       glClearColor(bg[0], bg[1], bg[2], bg[3]);
-
-      //for(auto key : keys) {
-      //    if(key.active) {
-      //        key.render();
-      //    }
-      //}
 
       for(auto& kv : vd){
         if(kv.second.active)
@@ -236,6 +230,20 @@ int main(void)
 }
 
 
+
+
+
+//for(auto key : keys) {
+//    if(key.active) {
+//        key.render();
+//    }
+//}
+
+//
+//sidebar(ctx, width, height, keys, dbKeys);
+
+//sort( dbKeys.begin(), dbKeys.end() );
+//vd.keys = dbKeys;
 
 //// Create serialized IndexedVerts
 //size_t leftLen, rightLen, cubeLen;
