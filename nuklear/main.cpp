@@ -259,7 +259,8 @@ int    main(void)
       vd.verRefreshClock -= vd.verRefresh;
     }else if( vd.verRefreshClock > vd.verRefresh ){
       for(auto& kv : vd.shapes){
-        updateKey(db, kv.first, &vd);
+        if(kv.second.active)
+          updateKey(db, kv.first, &vd);
       }
       vd.verRefreshClock -= vd.verRefresh;
     }
