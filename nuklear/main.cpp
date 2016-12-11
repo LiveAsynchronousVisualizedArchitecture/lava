@@ -4,17 +4,15 @@
 
 // TODO: Add all attributes
 // TODO: Control camera with mouse
+// todo: put GLFW window pointer and nuklear context pointer into VizData ?
+// todo: need simdb.getVersion() ?
+// todo: need simdb::VerIdx and simdb::VerKey structs ? 
 
 #include <algorithm>
 #include <fstream>
 #include <sstream>
-
-//#include "../DataStore/ConcurrentMap/simdb.hpp"
-//#include "IndexedVerts.h"
-
-#include "no_rt_util.h"
-
 #include <GL/glew.h>
+#include "no_rt_util.h"
 
 #define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
@@ -22,31 +20,21 @@
 #include <glm/gtc/type_ptr.hpp>
 #include "glfw3.h"
 
+#include "VizDataStructures.hpp"
+#include "VizGenerators.hpp"
+#include "VizTransforms.hpp"
+
 #ifdef _MSC_VER
   #pragma comment(lib, "glfw3dll.lib")
   #pragma comment(lib, "glew32.lib")
 #endif
 
-//#define NK_INCLUDE_FIXED_TYPES
-//#define NK_INCLUDE_STANDARD_IO
-//#define NK_INCLUDE_STANDARD_VARARGS
-//#define NK_INCLUDE_DEFAULT_ALLOCATOR
-//#define NK_INCLUDE_VERTEX_BUFFER_OUTPUT
-//#define NK_INCLUDE_FONT_BAKING
-//#define NK_INCLUDE_DEFAULT_FONT
-//#define NK_IMPLEMENTATION
-//#define NK_GLFW_GL3_IMPLEMENTATION
-//#include "nuklear.h"
-//#include "nuklear_glfw_gl3.h"
-
-#include "VizDataStructures.hpp"
-#include "VizGenerators.hpp"
-#include "VizTransforms.hpp"
-
 #define MAX_VERTEX_BUFFER  512 * 1024
 #define MAX_ELEMENT_BUFFER 128 * 1024
 
 namespace {
+
+//using nk_ctxptr = struct nk_contex*;
 
 static void  error_callback(int e, const char *d) {
     printf("Error %d: %s\n", e, d);
@@ -77,27 +65,6 @@ static void  genTestGeo(simdb* db)
 static int   sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* shps) // VizData* vd)
 {
   using namespace std;
-
-  //static enum nk_style_header_align header_align = NK_HEADER_RIGHT;
-  //static nk_flags window_flags = 0;                /* window flags */
-  //
-  //struct nk_rect winBnds = {0,0, vd.ui.w, vd.ui.h};
-  //
-  //ctx->active->bounds. = (float)vd.ui.h;
-  //ctx->active->bounds.h = (float)vd.ui.h;
-  // sb - this is a hack until figuring out why nuklear doesn't take the bounds in the sidebar function
-  //
-  //struct nk_rect rect = nk_rect( (5/6.0f) * (float)vd->ui.w, 
-  //                                                        0, 
-  //                               (1/6.0f) * (float)vd->ui.w, 
-  //                                          (float)vd->ui.h  );
-
-  //float w = max(192.f, (1/6.f)*(float)vd->ui.w );
-  //float x = (float)vd->ui.w - w;
-  //struct nk_rect rect = nk_rect(x, 0, w, (float)vd->ui.h );
-
-  //
-  //auto rect = winbnd_to_sidebarRect((float)vd->ui.w, (float)vd->ui.h);
 
   nk_flags window_flags = 0;                 /* window flags */
   struct nk_panel layout;                    /* popups */
@@ -164,6 +131,15 @@ static void         initGlew()
     exit(1);
   }
 }
+static auto      initNuklear(GLFWwindow* win) -> struct nk_context*
+{
+  struct nk_context*      ctx = nk_glfw3_init(win, NK_GLFW3_INSTALL_CALLBACKS);
+  struct nk_font_atlas* atlas;
+  nk_glfw3_font_stash_begin(&atlas);
+  nk_glfw3_font_stash_end();
+
+  return ctx;
+}
 
 // todo: will need to remove keys that aren't in VizData too
 static void  shapesFromKeys(simdb const& db, vec<str> const& dbKeys, VizData* vd)
@@ -190,47 +166,39 @@ int    main(void)
 {
   using namespace std;
 
-  GLFWwindow*            win;                      /* Platform */    //int width = 0, height = 0;
-  struct nk_context*     ctx;
-  struct nk_color background;
+  //GLFWwindow*            win;                      /* Platform */    //int width = 0, height = 0;
+  //struct nk_context*     ctx;
 
   VizData vd;
-  vd.ui.w = 1024; 
-  vd.ui.h =  768;
+  vd.ui.w      =  1024; 
+  vd.ui.h      =   768;
+  vd.ui.bgclr  =  nk_rgb(28,48,62);
   simdb   db("test", 1024, 8);        // Create the DB
   genTestGeo(&db);
 
-  win = initGLFW( &vd );
+  vd.win = initGLFW( &vd );
   initGlew();
+  vd.ctx = initNuklear(vd.win);
 
-  /* nuklear */
-  ctx = nk_glfw3_init(win, NK_GLFW3_INSTALL_CALLBACKS);
-  struct nk_font_atlas *atlas;
-  nk_glfw3_font_stash_begin(&atlas);
-  nk_glfw3_font_stash_end();
-
-  // todo: need simdb::VerIdx and simdb::VerKey structs ? need simdb.getVersion() ?
   vec<str> dbKeys = db.getKeyStrs();    // Get all keys in DB - this will need to be ran in the main loop, but not every frame
   shapesFromKeys(db, dbKeys, &vd);
+  // todo: remove shapes from missing keys
 
-  background = nk_rgb(28,48,62);
-  while(!glfwWindowShouldClose(win))
+  while(!glfwWindowShouldClose(vd.win))
   {
-    glfwPollEvents();                             /* Input */
+    glfwPollEvents();                                         /* Input */
     nk_glfw3_new_frame();
 
-    glfwGetWindowSize(win, &vd.ui.w, &vd.ui.h);
+    glfwGetWindowSize(vd.win, &vd.ui.w, &vd.ui.h);
     vd.ui.rect = winbnd_to_sidebarRect((float)vd.ui.w, (float)vd.ui.h);
-    sidebar(ctx, vd.ui.rect, &vd.shapes);                // alters the shapes by setting their active flags
+    sidebar(vd.ctx, vd.ui.rect, &vd.shapes);                     // alters the shapes by setting their active flags
 
-    /* Draw */
-    {
-
+    // Draw
+    { 
       float bg[4];
-      nk_color_fv(bg, background);
+      nk_color_fv(bg, vd.ui.bgclr);
       glViewport(0, 0, vd.ui.w, vd.ui.h);
-      glEnable(GL_DEPTH_TEST);
-      // glDepthFunc(GL_LESS);
+      glEnable(GL_DEPTH_TEST);                               // glDepthFunc(GL_LESS);
 
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
       glClearColor(bg[0], bg[1], bg[2], bg[3]);
@@ -240,13 +208,13 @@ int    main(void)
           RenderShape( kv.second );
       }
 
-      /* IMPORTANT: `nk_glfw_render` modifies some global OpenGL state
+      nk_glfw3_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_BUFFER, MAX_ELEMENT_BUFFER);        /* 
+        * IMPORTANT: `nk_glfw_render` modifies some global OpenGL state
         * with blending, scissor, face culling, depth test and viewport and
         * defaults everything back into a default state.
         * Make sure to either a.) save and restore or b.) reset your own state after
         * rendering the UI. */
-      nk_glfw3_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_BUFFER, MAX_ELEMENT_BUFFER);
-      glfwSwapBuffers(win);
+      glfwSwapBuffers(vd.win);
     }
   }
   nk_glfw3_shutdown();
@@ -258,6 +226,50 @@ int    main(void)
 
 
 
+
+//ctx = nk_glfw3_init(win, NK_GLFW3_INSTALL_CALLBACKS);
+//struct nk_font_atlas* atlas;
+//nk_glfw3_font_stash_begin(&atlas);
+//nk_glfw3_font_stash_end();
+
+//struct nk_color background;
+//background = nk_rgb(28,48,62);
+
+//static enum nk_style_header_align header_align = NK_HEADER_RIGHT;
+//static nk_flags window_flags = 0;                /* window flags */
+//
+//struct nk_rect winBnds = {0,0, vd.ui.w, vd.ui.h};
+//
+//ctx->active->bounds. = (float)vd.ui.h;
+//ctx->active->bounds.h = (float)vd.ui.h;
+// sb - this is a hack until figuring out why nuklear doesn't take the bounds in the sidebar function
+//
+//struct nk_rect rect = nk_rect( (5/6.0f) * (float)vd->ui.w, 
+//                                                        0, 
+//                               (1/6.0f) * (float)vd->ui.w, 
+//                                          (float)vd->ui.h  );
+
+//float w = max(192.f, (1/6.f)*(float)vd->ui.w );
+//float x = (float)vd->ui.w - w;
+//struct nk_rect rect = nk_rect(x, 0, w, (float)vd->ui.h );
+
+//
+//auto rect = winbnd_to_sidebarRect((float)vd->ui.w, (float)vd->ui.h);
+
+//#include "../DataStore/ConcurrentMap/simdb.hpp"
+//#include "IndexedVerts.h"
+//
+//#define NK_INCLUDE_FIXED_TYPES
+//#define NK_INCLUDE_STANDARD_IO
+//#define NK_INCLUDE_STANDARD_VARARGS
+//#define NK_INCLUDE_DEFAULT_ALLOCATOR
+//#define NK_INCLUDE_VERTEX_BUFFER_OUTPUT
+//#define NK_INCLUDE_FONT_BAKING
+//#define NK_INCLUDE_DEFAULT_FONT
+//#define NK_IMPLEMENTATION
+//#define NK_GLFW_GL3_IMPLEMENTATION
+//#include "nuklear.h"
+//#include "nuklear_glfw_gl3.h"
 
 //ctx->active->bounds = {0.f,0.f, (float)vd.ui.w, (float)vd.ui.h};
 //if(ctx->current)

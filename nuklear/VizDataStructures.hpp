@@ -100,6 +100,8 @@ public:
 using  KeyShapes = map<str, Shape>;
 struct VizData
 {
+  GLFWwindow*            win;                      /* Platform */    //int width = 0, height = 0;
+  struct nk_context*     ctx;
   // todo: camera 
   KeyShapes   shapes;
   GLuint    shaderId;

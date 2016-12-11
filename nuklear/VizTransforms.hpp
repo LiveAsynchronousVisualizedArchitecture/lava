@@ -125,7 +125,7 @@ inline auto    winbnd_to_sidebarRect(float w, float h) -> struct nk_rect
   using namespace std;
   
   float sbw = max(192.f, (1/6.f)*w );            // sbw is sidebar width
-  float sbx = sbw - w;                           // sbx is sidebar x position
+  float sbx = w - sbw;                           // sbx is sidebar x position
   
   return nk_rect(sbx, 0, sbw, h);    //struct nk_rect rect =
 }
