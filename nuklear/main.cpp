@@ -1,7 +1,9 @@
 
+// -TODO(Chris): Resize sidebar on window resize
+// -todo: fix sidebar not changing with window resize
+
 // TODO: Add all attributes
 // TODO: Control camera with mouse
-// todo: fix sidebar not changing with window resize
 
 #include <algorithm>
 #include <fstream>
@@ -44,17 +46,18 @@
 #define MAX_VERTEX_BUFFER  512 * 1024
 #define MAX_ELEMENT_BUFFER 128 * 1024
 
-static void error_callback(int e, const char *d) {
+namespace {
+
+static void  error_callback(int e, const char *d) {
     printf("Error %d: %s\n", e, d);
 }
-
-void   key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+static void  key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
-void   genTestGeo(simdb* db)
+static void  genTestGeo(simdb* db)
 {
   // Create serialized IndexedVerts
   size_t leftLen, rightLen, cubeLen;
@@ -71,28 +74,46 @@ void   genTestGeo(simdb* db)
   db->put(rightTriangle.data(), (ui32)rightTriangle.length(), rightData.data(), (ui32)rightLen);
   db->put(cube.data(), (ui32)cube.length(), cubeData.data(), (ui32)cubeLen);
 }
-
-int    sidebar(struct nk_context *ctx, VizData* vd)
+static int   sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* shps) // VizData* vd)
 {
   using namespace std;
 
-  static enum nk_style_header_align header_align = NK_HEADER_RIGHT;
-  static nk_flags window_flags = 0;                /* window flags */
+  //static enum nk_style_header_align header_align = NK_HEADER_RIGHT;
+  //static nk_flags window_flags = 0;                /* window flags */
+  //
+  //struct nk_rect winBnds = {0,0, vd.ui.w, vd.ui.h};
+  //
+  //ctx->active->bounds. = (float)vd.ui.h;
+  //ctx->active->bounds.h = (float)vd.ui.h;
+  // sb - this is a hack until figuring out why nuklear doesn't take the bounds in the sidebar function
+  //
+  //struct nk_rect rect = nk_rect( (5/6.0f) * (float)vd->ui.w, 
+  //                                                        0, 
+  //                               (1/6.0f) * (float)vd->ui.w, 
+  //                                          (float)vd->ui.h  );
 
-  struct nk_panel layout;                          /* popups */
+  //float w = max(192.f, (1/6.f)*(float)vd->ui.w );
+  //float x = (float)vd->ui.w - w;
+  //struct nk_rect rect = nk_rect(x, 0, w, (float)vd->ui.h );
 
-  ctx->style.window.header.align = header_align;   /* window flags */
+  //
+  //auto rect = winbnd_to_sidebarRect((float)vd->ui.w, (float)vd->ui.h);
 
-  struct nk_rect rect = nk_rect( (5/6.0f) * (float)vd->ui.w, 
-                                                          0, 
-                                 (1/6.0f) * (float)vd->ui.w, 
-                                            (float)vd->ui.h  );
+  nk_flags window_flags = 0;                 /* window flags */
+  struct nk_panel layout;                    /* popups */
+
+  ctx->style.window.header.align = NK_HEADER_RIGHT;   // header_align;   /* window flags */
+
+  if(ctx->active){
+    memcpy( &ctx->active->bounds, &rect, sizeof(struct nk_rect) );
+  }
+
   if(nk_begin(ctx, &layout, "Overview", rect, window_flags))
   {
     if(nk_tree_push(ctx, NK_TREE_TAB, "Drawables", NK_MINIMIZED))
     {
       nk_layout_row_static(ctx, 18, 100, 1);
-      for(auto& kv : vd->shapes){          
+      for(auto& kv : *shps){
         nk_selectable_label(ctx, kv.first.c_str(), NK_TEXT_LEFT, &kv.second.active);
       }
       nk_tree_pop(ctx);
@@ -102,8 +123,7 @@ int    sidebar(struct nk_context *ctx, VizData* vd)
 
   return !nk_window_is_closed(ctx, "Overview");
 }
-
-void   RenderShape(Shape const& shp) // GLuint shaderId)
+static void  RenderShape(Shape const& shp) // GLuint shaderId)
 {
   // Camera/View transformation
   glUseProgram(shp.shader);  //shader.use();
@@ -120,12 +140,58 @@ void   RenderShape(Shape const& shp) // GLuint shaderId)
   glBindVertexArray(0);
 }
 
+static GLFWwindow*  initGLFW(VizData* vd)
+{
+  glfwSetErrorCallback(error_callback);
+  if( !glfwInit() ){
+    fprintf(stdout, "[GFLW] failed to init!\n");
+    exit(1);
+  }
+
+  GLFWwindow* win = glfwCreateWindow(vd->ui.w, vd->ui.h, "Demo", NULL, NULL);
+  glfwMakeContextCurrent(win);
+  glfwGetWindowSize(win, &vd->ui.w, &vd->ui.h);
+
+  glfwSetKeyCallback(win, key_callback);
+
+  return win;
+}
+static void         initGlew()
+{
+  glewExperimental = 1;
+  if(glewInit() != GLEW_OK) {
+    fprintf(stderr, "Failed to setup GLEW\n");
+    exit(1);
+  }
+}
+
+// todo: will need to remove keys that aren't in VizData too
+static void  shapesFromKeys(simdb const& db, vec<str> const& dbKeys, VizData* vd)
+{
+  using namespace std;
+
+  vd->shaderId = shadersrc_to_shaderid(vertShader, fragShader);  
+  for(auto& k : dbKeys){
+    ui32 vlen = 0;
+    auto  len = db.len(k.data(), (ui32)k.length(), &vlen);          // todo: make ui64 as the input length
+
+    vec<i8> ivbuf(vlen);
+    db.get(k.data(), (ui32)k.length(), ivbuf.data(), (ui32)len);
+
+    Shape  s = ivbuf_to_shape(ivbuf.data(), len);
+    s.shader = vd->shaderId;
+    vd->shapes[k] = move(s);
+  };
+}
+
+}
+
 int    main(void)
 {
   using namespace std;
 
-  static GLFWwindow *win;              /* Platform */    //int width = 0, height = 0;
-  struct nk_context *ctx;
+  GLFWwindow*            win;                      /* Platform */    //int width = 0, height = 0;
+  struct nk_context*     ctx;
   struct nk_color background;
 
   VizData vd;
@@ -134,26 +200,8 @@ int    main(void)
   simdb   db("test", 1024, 8);        // Create the DB
   genTestGeo(&db);
 
-  /* GLFW */
-  glfwSetErrorCallback(error_callback);
-  if (!glfwInit()) {
-      fprintf(stdout, "[GFLW] failed to init!\n");
-      exit(1);
-  }
-
-  win = glfwCreateWindow(vd.ui.w, vd.ui.h, "Demo", NULL, NULL);
-  glfwMakeContextCurrent(win);
-  glfwGetWindowSize(win, &vd.ui.w, &vd.ui.h);
-
-  /* OpenGL */
-  //glViewport(0, 0, vd.ui.w, vd.ui.h);
-  glewExperimental = 1;
-  if(glewInit() != GLEW_OK) {
-      fprintf(stderr, "Failed to setup GLEW\n");
-      exit(1);
-  }
-
-  glfwSetKeyCallback(win, key_callback);
+  win = initGLFW( &vd );
+  initGlew();
 
   /* nuklear */
   ctx = nk_glfw3_init(win, NK_GLFW3_INSTALL_CALLBACKS);
@@ -163,20 +211,7 @@ int    main(void)
 
   // todo: need simdb::VerIdx and simdb::VerKey structs ? need simdb.getVersion() ?
   vec<str> dbKeys = db.getKeyStrs();    // Get all keys in DB - this will need to be ran in the main loop, but not every frame
-
-  //GLuint shaderId
-  vd.shaderId = shadersrc_to_shaderid(vertShader, fragShader);  
-  for(auto& k : dbKeys){
-    ui32 vlen = 0;
-    auto  len = db.len(k.data(), (ui32)k.length(), &vlen);          // todo: make ui64 as the input length
-
-    vec<i8> ivbuf(vlen);
-    db.get(k.data(), (ui32)k.length(), ivbuf.data(), (ui32)len);
-
-    Shape  s = ivbuf_to_shape(ivbuf.data(), len);
-    s.shader = vd.shaderId;
-    vd.shapes[k] = move(s);
-  };
+  shapesFromKeys(db, dbKeys, &vd);
 
   background = nk_rgb(28,48,62);
   while(!glfwWindowShouldClose(win))
@@ -185,21 +220,8 @@ int    main(void)
     nk_glfw3_new_frame();
 
     glfwGetWindowSize(win, &vd.ui.w, &vd.ui.h);
-    //struct nk_rect winBnds = {0,0, vd.ui.w, vd.ui.h};
-    if(ctx->active){
-      //ctx->active->bounds. = (float)vd.ui.h;
-      //ctx->active->bounds.h = (float)vd.ui.h;
-      // sb - this is a hack until figuring out why nuklear doesn't take the bounds in the sidebar function
-      float w = max(192.f, (1/6.f)*(float)vd.ui.w );
-      float x = (float)vd.ui.w - w;
-      struct nk_rect rect = nk_rect(x, 0, w, (float)vd.ui.h );
-      memcpy( &ctx->active->bounds, &rect, sizeof(struct nk_rect) );
-    }
-    sidebar(ctx, &vd);        // TODO(Chris): Resize sidebar on window resize  //keys, dbKeys);
-
-      //ctx->active->bounds = {0.f,0.f, (float)vd.ui.w, (float)vd.ui.h};
-    //if(ctx->current)
-      //ctx->current->bounds = {0.f,0.f, (float)vd.ui.w, (float)vd.ui.h};
+    vd.ui.rect = winbnd_to_sidebarRect((float)vd.ui.w, (float)vd.ui.h);
+    sidebar(ctx, vd.ui.rect, &vd.shapes);                // alters the shapes by setting their active flags
 
     /* Draw */
     {
@@ -236,6 +258,23 @@ int    main(void)
 
 
 
+
+//ctx->active->bounds = {0.f,0.f, (float)vd.ui.w, (float)vd.ui.h};
+//if(ctx->current)
+//ctx->current->bounds = {0.f,0.f, (float)vd.ui.w, (float)vd.ui.h};
+
+//vd.shaderId = shadersrc_to_shaderid(vertShader, fragShader);  
+//for(auto& k : dbKeys){
+//  ui32 vlen = 0;
+//  auto  len = db.len(k.data(), (ui32)k.length(), &vlen);          // todo: make ui64 as the input length
+//
+//  vec<i8> ivbuf(vlen);
+//  db.get(k.data(), (ui32)k.length(), ivbuf.data(), (ui32)len);
+//
+//  Shape  s = ivbuf_to_shape(ivbuf.data(), len);
+//  s.shader = vd.shaderId;
+//  vd.shapes[k] = move(s);
+//};
 
 //#define WINDOW_WIDTH 1200
 //#define WINDOW_HEIGHT 800

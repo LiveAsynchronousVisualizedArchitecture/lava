@@ -898,7 +898,7 @@ public:
     //}else if(-nxt != curlen){ return MATCH_FALSE; }
     // return MATCH_TRUE; // never reached
   }
-  ui32          len(i32  blkIdx, ui32 version, ui32* out_vlen)
+  ui32          len(i32  blkIdx, ui32 version, ui32* out_vlen) const
   {
     BlkLst bl = s_bls[blkIdx];
     if(version==bl.kr.version && bl.len>0){
@@ -1334,8 +1334,8 @@ private:
   { 
     return ths->s_cs.compare(blkIdx, version, buf, len);
   }
-  static bool           IsEmpty(VerIdx kv){return ConcurrentHash::IsEmpty(kv);}           // special value for ConcurrentHash
-  static bool         IsListEnd(VerIdx vi){return ConcurrentStore::IsListEnd(vi); }   // special value for ConcurrentStore
+  static bool           IsEmpty(VerIdx kv){return ConcurrentHash::IsEmpty(kv);}         // special value for ConcurrentHash
+  static bool         IsListEnd(VerIdx vi){return ConcurrentStore::IsListEnd(vi); }     // special value for ConcurrentStore
 
 public:
   simdb(){}
@@ -1406,7 +1406,7 @@ public:
 
     return vi.idx;
   }
-  bool         get(const void *const key, ui32 klen, void *const   out_val, ui32 vlen)
+  bool         get(const void *const key, ui32 klen, void *const   out_val, ui32 vlen) const
   {
     if(klen<1) return 0;
 
@@ -1435,7 +1435,7 @@ public:
 
     return kv.idx!=EMPTY_KEY;
   }
-  i64          len(const void *const key, ui32 klen, ui32* out_vlen=nullptr)
+  i64          len(const void *const key, ui32 klen, ui32* out_vlen=nullptr) const
   {
     if(klen<1) return 0;
 
@@ -1454,7 +1454,7 @@ public:
     if( !s_ch.runMatch(hsh,  matchFunc, runFunc) ) return 0;
     return len;
   }
-  bool         len(ui32 idx, ui32 version, ui32* out_klen=nullptr, ui32* out_vlen=nullptr)
+  bool         len(ui32 idx, ui32 version, ui32* out_klen=nullptr, ui32* out_vlen=nullptr) const
   {
     auto  ths = this;
     bool   ok = s_ch.runRead(idx, version, 
@@ -1488,7 +1488,7 @@ public:
     
     return ret;
   }
-  bool      getKey(ui32 idx, ui32 version, void *const out_buf, ui32 klen)
+  bool      getKey(ui32 idx, ui32 version, void *const out_buf, ui32 klen)   const
   {
     if(klen<1) return 0;
     
@@ -1538,7 +1538,7 @@ public:
   {
     return put(key.data(), (ui32)key.length(), value.data(), (ui32)value.length());
   }
-  bool         get(str    const& key, str* out_value)
+  bool         get(str    const& key, str* out_value) const
   {
     ui32   vlen = 0;
     auto  kvLen = len(key.data(), (ui32)key.length(), &vlen);
@@ -1547,13 +1547,13 @@ public:
 
     return ok;
   }
-  auto         get(str    const& key) -> std::string
+  auto         get(str    const& key)                 const -> std::string
   {
     str ret;
     if(this->get(key, &ret)) return ret;
     else return str("");
   }
-  str       nxtKey()
+  str       nxtKey() const
   {
     ui32 klen, vlen;
     bool    ok = false;
@@ -1566,7 +1566,7 @@ public:
 
     return key;                    // copy elision 
   }
-  auto  getKeyStrs() -> vec<str>
+  auto  getKeyStrs() const -> vec<str>
   {
     using namespace std;
     
@@ -1589,7 +1589,7 @@ public:
   }
 
   template<class T>
-  i64          get(vec<T> const& key, void*  out_buf)
+  i64          get(vec<T> const& key, void*  out_buf) const
   {
     Reader r = read((void*)key.data(), (ui32)(key.size() * sizeof(T)));
     if(isEmpty(r.kv)) return -1;

@@ -16,7 +16,7 @@
 #include "IndexedVerts.h"
 #include "VizDataStructures.hpp"
 
-inline GLuint shadersrc_to_shaderid(const char* vert, const char* frag)
+inline GLuint  shadersrc_to_shaderid(const char* vert, const char* frag)
 {
   using namespace std;
   
@@ -120,7 +120,15 @@ inline Shape          ivbuf_to_shape(void* buf, ui64 len)    //IndexedVerts* iv)
 
   return move(shp);
 }
-
+inline auto    winbnd_to_sidebarRect(float w, float h) -> struct nk_rect
+{
+  using namespace std;
+  
+  float sbw = max(192.f, (1/6.f)*w );            // sbw is sidebar width
+  float sbx = sbw - w;                           // sbx is sidebar x position
+  
+  return nk_rect(sbx, 0, sbw, h);    //struct nk_rect rect =
+}
 
 #endif
 

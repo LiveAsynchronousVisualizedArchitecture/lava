@@ -106,7 +106,8 @@ struct VizData
   struct
   {
     int w, h;
-    struct nk_rect sidebar;
+    struct nk_rect      rect;                // rect is the rectangle of the sidebar gui
+    struct nk_color    bgclr;
   } ui;
 };
 

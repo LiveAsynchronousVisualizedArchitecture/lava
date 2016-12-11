@@ -136,8 +136,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\main.cpp" />
-    <ClCompile Include="..\IndexedVerts.cpp" />
+    <ClCompile Include="..\unified.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\glfw3.h" />
