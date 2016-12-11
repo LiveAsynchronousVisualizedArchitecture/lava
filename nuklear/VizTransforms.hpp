@@ -16,7 +16,6 @@
 #include "IndexedVerts.h"
 #include "VizDataStructures.hpp"
 
-//inline GLuint shadersrc_to_shaderid(str const& vert, str const& frag)
 inline GLuint shadersrc_to_shaderid(const char* vert, const char* frag)
 {
   using namespace std;
@@ -125,6 +124,9 @@ inline Shape          ivbuf_to_shape(void* buf, ui64 len)    //IndexedVerts* iv)
 
 #endif
 
+
+//
+//inline GLuint shadersrc_to_shaderid(str const& vert, str const& frag)
 
 //inline Shape       ivbuf_to_shape( )    //IndexedVerts* iv)
 //

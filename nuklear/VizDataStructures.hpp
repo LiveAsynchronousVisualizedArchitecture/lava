@@ -100,6 +100,7 @@ public:
 using  KeyShapes = map<str, Shape>;
 struct VizData
 {
+  // todo: camera 
   KeyShapes   shapes;
   GLuint    shaderId;
   struct

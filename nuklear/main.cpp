@@ -1,6 +1,7 @@
 
 // TODO: Add all attributes
 // TODO: Control camera with mouse
+// todo: fix sidebar not changing with window resize
 
 #include <algorithm>
 #include <fstream>
@@ -40,24 +41,8 @@
 #include "VizGenerators.hpp"
 #include "VizTransforms.hpp"
 
-//#define WINDOW_WIDTH 1200
-//#define WINDOW_HEIGHT 800
-
 #define MAX_VERTEX_BUFFER  512 * 1024
 #define MAX_ELEMENT_BUFFER 128 * 1024
-
-#define UNUSED(a) (void)a
-#define MIN(a,b) ((a) < (b) ? (a) : (b))
-#define MAX(a,b) ((a) < (b) ? (b) : (a))
-#define LEN(a) (sizeof(a)/sizeof(a)[0])
-
-//vec<ui8> makeTriangle(size_t& byteLen, bool left);
-//vec<ui8> makeCube(size_t& byteLen);
-
-//int sidebar(struct nk_context *ctx, int width, int height, vec<Key>& keys, const vec<str>& dbKeys);
-//
-//void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
-
 
 static void error_callback(int e, const char *d) {
     printf("Error %d: %s\n", e, d);
@@ -161,9 +146,9 @@ int    main(void)
   glfwGetWindowSize(win, &vd.ui.w, &vd.ui.h);
 
   /* OpenGL */
-  glViewport(0, 0, vd.ui.w, vd.ui.h);
+  //glViewport(0, 0, vd.ui.w, vd.ui.h);
   glewExperimental = 1;
-  if (glewInit() != GLEW_OK) {
+  if(glewInit() != GLEW_OK) {
       fprintf(stderr, "Failed to setup GLEW\n");
       exit(1);
   }
@@ -176,13 +161,11 @@ int    main(void)
   nk_glfw3_font_stash_begin(&atlas);
   nk_glfw3_font_stash_end();
 
-  glEnable(GL_DEPTH_TEST);
-  // glDepthFunc(GL_LESS);
-
   // todo: need simdb::VerIdx and simdb::VerKey structs ? need simdb.getVersion() ?
   vec<str> dbKeys = db.getKeyStrs();    // Get all keys in DB - this will need to be ran in the main loop, but not every frame
 
-  GLuint shaderId = shadersrc_to_shaderid(vertShader, fragShader);  
+  //GLuint shaderId
+  vd.shaderId = shadersrc_to_shaderid(vertShader, fragShader);  
   for(auto& k : dbKeys){
     ui32 vlen = 0;
     auto  len = db.len(k.data(), (ui32)k.length(), &vlen);          // todo: make ui64 as the input length
@@ -190,26 +173,43 @@ int    main(void)
     vec<i8> ivbuf(vlen);
     db.get(k.data(), (ui32)k.length(), ivbuf.data(), (ui32)len);
 
-    Shape s  = ivbuf_to_shape(ivbuf.data(), len);
-    s.shader = shaderId;
+    Shape  s = ivbuf_to_shape(ivbuf.data(), len);
+    s.shader = vd.shaderId;
     vd.shapes[k] = move(s);
   };
 
   background = nk_rgb(28,48,62);
   while(!glfwWindowShouldClose(win))
   {
-    /* Input */
-    glfwPollEvents();
+    glfwPollEvents();                             /* Input */
     nk_glfw3_new_frame();
 
+    glfwGetWindowSize(win, &vd.ui.w, &vd.ui.h);
+    //struct nk_rect winBnds = {0,0, vd.ui.w, vd.ui.h};
+    if(ctx->active){
+      //ctx->active->bounds. = (float)vd.ui.h;
+      //ctx->active->bounds.h = (float)vd.ui.h;
+      // sb - this is a hack until figuring out why nuklear doesn't take the bounds in the sidebar function
+      float w = max(192.f, (1/6.f)*(float)vd.ui.w );
+      float x = (float)vd.ui.w - w;
+      struct nk_rect rect = nk_rect(x, 0, w, (float)vd.ui.h );
+      memcpy( &ctx->active->bounds, &rect, sizeof(struct nk_rect) );
+    }
     sidebar(ctx, &vd);        // TODO(Chris): Resize sidebar on window resize  //keys, dbKeys);
+
+      //ctx->active->bounds = {0.f,0.f, (float)vd.ui.w, (float)vd.ui.h};
+    //if(ctx->current)
+      //ctx->current->bounds = {0.f,0.f, (float)vd.ui.w, (float)vd.ui.h};
 
     /* Draw */
     {
+
       float bg[4];
       nk_color_fv(bg, background);
-      glfwGetWindowSize(win, &vd.ui.w, &vd.ui.h);
       glViewport(0, 0, vd.ui.w, vd.ui.h);
+      glEnable(GL_DEPTH_TEST);
+      // glDepthFunc(GL_LESS);
+
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
       glClearColor(bg[0], bg[1], bg[2], bg[3]);
 
@@ -235,6 +235,22 @@ int    main(void)
 
 
 
+
+
+//#define WINDOW_WIDTH 1200
+//#define WINDOW_HEIGHT 800
+
+//#define UNUSED(a) (void)a
+//#define MIN(a,b) ((a) < (b) ? (a) : (b))
+//#define MAX(a,b) ((a) < (b) ? (b) : (a))
+//#define LEN(a) (sizeof(a)/sizeof(a)[0])
+
+//vec<ui8> makeTriangle(size_t& byteLen, bool left);
+//vec<ui8> makeCube(size_t& byteLen);
+
+//int sidebar(struct nk_context *ctx, int width, int height, vec<Key>& keys, const vec<str>& dbKeys);
+//
+//void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
 //for(auto key : keys) {
 //    if(key.active) {
