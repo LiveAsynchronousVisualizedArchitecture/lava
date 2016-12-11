@@ -1571,20 +1571,6 @@ public:
     if(this->get(key, &ret)) return ret;
     else return str("");
   }
-  //str       nxtKey(ui32* out_version=nullptr)         const
-  //{
-  //  ui32 klen, vlen;
-  //  bool    ok = false;
-  //  VerIdx nxt = this->nxt();                           if(nxt.idx==EMPTY_KEY) return "";
-  //  ok         = this->len(nxt.idx, nxt.version, 
-  //                         &klen, &vlen);               if(!ok) return "";
-  //  str key(klen,'\0');
-  //  ok         = this->getKey(nxt.idx, nxt.version, 
-  //                            (void*)key.data(), klen); if(!ok) return "";
-  //
-  //  if(out_version) *out_version = nxt.version;
-  //  return key;                    // copy elision 
-  //}
   VerStr    nxtKey()                                  const
   {
     ui32 klen, vlen;
@@ -1659,6 +1645,21 @@ public:
 
 
 
+
+//str       nxtKey(ui32* out_version=nullptr)         const
+//{
+//  ui32 klen, vlen;
+//  bool    ok = false;
+//  VerIdx nxt = this->nxt();                           if(nxt.idx==EMPTY_KEY) return "";
+//  ok         = this->len(nxt.idx, nxt.version, 
+//                         &klen, &vlen);               if(!ok) return "";
+//  str key(klen,'\0');
+//  ok         = this->getKey(nxt.idx, nxt.version, 
+//                            (void*)key.data(), klen); if(!ok) return "";
+//
+//  if(out_version) *out_version = nxt.version;
+//  return key;                    // copy elision 
+//}
 
 //template< template<class> class V, class T>
 //using VAL_TYPE = V::value_type;

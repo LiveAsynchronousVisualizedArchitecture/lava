@@ -7,13 +7,16 @@
 // -todo: need simdb.getVersion() - using VerStr for versioned strings
 // -todo: need simdb::VerIdx and simdb::VerKey structs
 // -todo: make keys check for version before get()
+// -todo: add timed key update in main loop
+// todo: add const char* key get() to simdb
 
 // TODO: Add all attributes
 // TODO: Control camera with mouse
-// todo: add const char* key get() to simdb
+// todo: add timed key version check 
 // todo: test with updating geometry from separate process
 // todo: move and rename project to LavaViz
 
+#include <chrono>
 #include <algorithm>
 #include <fstream>
 #include <sstream>
@@ -85,7 +88,7 @@ static int           sidebar(struct nk_context *ctx, struct nk_rect rect, KeySha
 
   if(nk_begin(ctx, &layout, "Overview", rect, window_flags))
   {
-    if(nk_tree_push(ctx, NK_TREE_TAB, "Drawables", NK_MINIMIZED))
+    if(nk_tree_push(ctx, NK_TREE_TAB, "Drawables", NK_MAXIMIZED)) // NK_MINIMIZED))
     {
       nk_layout_row_static(ctx, 18, 100, 1);
       for(auto& kv : *shps){
@@ -153,7 +156,7 @@ static void   shapesFromKeys(simdb const& db, vec<VerStr> const& dbKeys, VizData
 {
   using namespace std;
 
-  vd->shaderId = shadersrc_to_shaderid(vertShader, fragShader);  
+  vd->shaderId = shadersrc_to_shaderid(vertShader, fragShader);
   for(auto& k : dbKeys)
   {
     auto cur = vd->shapes.find(k);
@@ -163,16 +166,15 @@ static void   shapesFromKeys(simdb const& db, vec<VerStr> const& dbKeys, VizData
     ui32 version = 0;
     auto len = db.len(k.s.data(), (ui32)k.s.length(), &vlen, &version);          // todo: make ui64 as the input length
 
-    //if(version==k.v) continue;
-
     vec<i8> ivbuf(vlen);
-    db.get(k.s.data(), (ui32)k.s.length(), ivbuf.data(), (ui32)len);
+    db.get(k.s.data(), (ui32)k.s.length(), ivbuf.data(), (ui32)ivbuf.size());
 
     Shape  s = ivbuf_to_shape(ivbuf.data(), len);
     s.shader = vd->shaderId;
     vd->shapes[k] = move(s);
   };
 }
+
 static int  eraseMissingKeys(vec<VerStr> dbKeys, KeyShapes* shps)           // vec<str> dbKeys,
 {
   int cnt = 0;
@@ -186,6 +188,37 @@ static int  eraseMissingKeys(vec<VerStr> dbKeys, KeyShapes* shps)           // v
 
   return cnt;
 }
+static bool        updateKey(simdb const& db, VerStr const& key, VizData* vd)
+{
+  using namespace std;
+
+  ui32 version=0;
+  ui32    vlen=0;
+  auto len = db.len(key.s.data(), (ui32)key.s.length(), &vlen, &version);
+
+  if(len>0 && version!=key.v){
+    vec<i8> ivbuf(vlen);
+    db.get(key.s.data(), (ui32)key.s.length(), ivbuf.data(), (ui32)ivbuf.size());
+
+    Shape  s = ivbuf_to_shape(ivbuf.data(), len);
+    s.shader = vd->shaderId;
+    vd->shapes[key] = move(s);
+    
+    return true;
+  }
+
+  return false;
+}
+
+static double           nowd()
+{
+  using namespace std;
+  using namespace std::chrono;
+
+  auto nano = duration_cast<nanoseconds>( chrono::high_resolution_clock::now().time_since_epoch() );
+
+  return nano.count() / 1000000000.0; 
+}
 
 }
 
@@ -194,9 +227,16 @@ int    main(void)
   using namespace std;
 
   VizData vd;
-  vd.ui.w      =  1024; 
-  vd.ui.h      =   768;
-  vd.ui.bgclr  =  nk_rgb(28,48,62);
+  vd.ui.w        =  1024; 
+  vd.ui.h        =   768;
+  vd.ui.bgclr    =  nk_rgb(28,48,62);
+  vd.now         =  nowd();
+  vd.prev        =  vd.now;
+  vd.verRefresh  =  0.1;
+  vd.verRefreshClock = 0.0;
+  vd.keyRefresh  =  2.0;
+  vd.keyRefreshClock = vd.keyRefresh;
+  //vd.keyRefreshClock = 
   simdb   db("test", 1024, 8);        // Create the DB
   genTestGeo(&db);
 
@@ -204,15 +244,31 @@ int    main(void)
   initGlew();
   vd.ctx = initNuklear(vd.win);
 
-  auto dbKeys = db.getKeyStrs();          // Get all keys in DB - this will need to be ran in the main loop, but not every frame
-  shapesFromKeys(db, dbKeys, &vd);
-  eraseMissingKeys(move(dbKeys), &vd.shapes);
-
   while(!glfwWindowShouldClose(vd.win))
   {
+    vd.now  = nowd();
+    double passed = vd.now - vd.prev;
+    vd.prev = vd.now;
+    vd.keyRefreshClock += passed;
+    if( vd.keyRefreshClock > vd.keyRefresh ){
+      auto dbKeys = db.getKeyStrs();                           // Get all keys in DB - this will need to be ran in the main loop, but not every frame
+      shapesFromKeys(db, dbKeys, &vd);
+      eraseMissingKeys(move(dbKeys), &vd.shapes);
+
+      vd.keyRefreshClock -= vd.keyRefresh;
+      vd.verRefreshClock -= vd.verRefresh;
+    }else if( vd.verRefreshClock > vd.verRefresh ){
+      for(auto& kv : vd.shapes){
+        updateKey(db, kv.first, &vd);
+      }
+      vd.verRefreshClock -= vd.verRefresh;
+    }
+
     glfwPollEvents();                                         /* Input */
     nk_glfw3_new_frame();
     glfwGetWindowSize(vd.win, &vd.ui.w, &vd.ui.h);
+
+
 
     vd.ui.rect = winbnd_to_sidebarRect((float)vd.ui.w, (float)vd.ui.h);
     sidebar(vd.ctx, vd.ui.rect, &vd.shapes);                     // alters the shapes by setting their active flags

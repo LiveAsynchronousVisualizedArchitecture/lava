@@ -114,6 +114,8 @@ struct VizData
     struct nk_rect      rect;                // rect is the rectangle of the sidebar gui
     struct nk_color    bgclr;
   } ui;
+
+  double keyRefresh, keyRefreshClock, verRefresh, verRefreshClock, prev, now;
 };
 
 #endif
