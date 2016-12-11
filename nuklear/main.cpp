@@ -7,6 +7,7 @@
 
 // TODO: Add all attributes
 // TODO: Control camera with mouse
+// todo: add const char* key get() to simdb
 // todo: need simdb.getVersion() ?
 // todo: need simdb::VerIdx and simdb::VerKey structs ? 
 // todo: test with updating geometry from separate process
