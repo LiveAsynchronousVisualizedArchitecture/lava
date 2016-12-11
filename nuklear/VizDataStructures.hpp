@@ -34,7 +34,9 @@ template<class KEY, class VALUE,
   class _Alloc   = std::allocator<std::pair<const KEY,VALUE> > >
 using map = std::map<KEY,VALUE, _Compare, _Alloc >;
 
-using str = std::string;
+using str    = std::string;
+using VerStr = simdb::VerStr;
+
 
 static const char*  vShaderPath  =  "../vertexShader.vert";
 static const char*  fShaderPath  =  "../fragmentShader.frag";
@@ -97,7 +99,8 @@ public:
   }
 };
 
-using  KeyShapes = map<str, Shape>;
+//using  KeyShapes = map<str, Shape>;
+using  KeyShapes = map<VerStr, Shape>;
 struct VizData
 {
   GLFWwindow*            win;                      /* Platform */    //int width = 0, height = 0;

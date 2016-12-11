@@ -39,16 +39,16 @@
 
 namespace {
 
-static void  error_callback(int e, const char *d) {
+static void   error_callback(int e, const char *d) {
     printf("Error %d: %s\n", e, d);
 }
-static void  key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+static void     key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
-static void  genTestGeo(simdb* db)
+static void       genTestGeo(simdb* db)
 {
   // Create serialized IndexedVerts
   size_t leftLen, rightLen, cubeLen;
@@ -65,7 +65,7 @@ static void  genTestGeo(simdb* db)
   db->put(rightTriangle.data(), (ui32)rightTriangle.length(), rightData.data(), (ui32)rightLen);
   db->put(cube.data(), (ui32)cube.length(), cubeData.data(), (ui32)cubeLen);
 }
-static int   sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* shps) // VizData* vd)
+static int           sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* shps) // VizData* vd)
 {
   using namespace std;
 
@@ -84,7 +84,7 @@ static int   sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* shp
     {
       nk_layout_row_static(ctx, 18, 100, 1);
       for(auto& kv : *shps){
-        nk_selectable_label(ctx, kv.first.c_str(), NK_TEXT_LEFT, &kv.second.active);
+        nk_selectable_label(ctx, kv.first.s.c_str(), NK_TEXT_LEFT, &kv.second.active);
       }
       nk_tree_pop(ctx);
     }
@@ -93,7 +93,7 @@ static int   sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* shp
 
   return !nk_window_is_closed(ctx, "Overview");
 }
-static void  RenderShape(Shape const& shp) // GLuint shaderId)
+static void      RenderShape(Shape const& shp) // GLuint shaderId)
 {
   // Camera/View transformation
   glUseProgram(shp.shader);  //shader.use();
@@ -144,29 +144,30 @@ static auto      initNuklear(GLFWwindow* win) -> struct nk_context*
   return ctx;
 }
 
-static void  shapesFromKeys(simdb const& db, vec<str> const& dbKeys, VizData* vd)
+static void   shapesFromKeys(simdb const& db, vec<VerStr> const& dbKeys, VizData* vd)  // vec<str> const& dbKeys
 {
   using namespace std;
 
   vd->shaderId = shadersrc_to_shaderid(vertShader, fragShader);  
-  for(auto& k : dbKeys){
+  for(auto& k : dbKeys)
+  {
     ui32 vlen = 0;
-    auto  len = db.len(k.data(), (ui32)k.length(), &vlen);          // todo: make ui64 as the input length
+    auto  len = db.len(k.s.data(), (ui32)k.s.length(), &vlen);          // todo: make ui64 as the input length
 
     vec<i8> ivbuf(vlen);
-    db.get(k.data(), (ui32)k.length(), ivbuf.data(), (ui32)len);
+    db.get(k.s.data(), (ui32)k.s.length(), ivbuf.data(), (ui32)len);
 
     Shape  s = ivbuf_to_shape(ivbuf.data(), len);
     s.shader = vd->shaderId;
     vd->shapes[k] = move(s);
   };
 }
-static int eraseMissingKeys(vec<str> dbKeys, KeyShapes* shps)
+static int  eraseMissingKeys(vec<VerStr> dbKeys, KeyShapes* shps)           // vec<str> dbKeys,
 {
   int cnt = 0;
   sort( ALL(dbKeys) );
   for(auto const& kv : *shps){
-    if( binary_search(ALL(dbKeys),kv.first) ){
+    if( !binary_search(ALL(dbKeys),kv.first) ){
       shps->erase(kv.first);
       ++cnt;
     }
@@ -192,7 +193,7 @@ int    main(void)
   initGlew();
   vd.ctx = initNuklear(vd.win);
 
-  vec<str> dbKeys = db.getKeyStrs();    // Get all keys in DB - this will need to be ran in the main loop, but not every frame
+  auto dbKeys = db.getKeyStrs();          // Get all keys in DB - this will need to be ran in the main loop, but not every frame
   shapesFromKeys(db, dbKeys, &vd);
   eraseMissingKeys(move(dbKeys), &vd.shapes);
 
@@ -237,6 +238,9 @@ int    main(void)
 
 
 
+
+//
+//vec<str> dbKeys = db.getKeyStrs();    // Get all keys in DB - this will need to be ran in the main loop, but not every frame
 
 //
 //using nk_ctxptr = struct nk_contex*;

@@ -21,7 +21,6 @@
 //       Put hash in the middle and use the first two bits of the index as empty and deleted flags
 //       empty : 1, deleted : 1, index : 35, hash : 35, version : 56 - total 128 bits, 34 billion entry limit 
 
-
 // q: can cleanup be done by a ring buffer of block lists? would the ring buffer only need to be as long as the number of threads if each thread helps clear out the ring buffer after every free()? Probably not, because delayed deallocation would be useful only when there is a reader/ref count, which would mean many more reads than writes could stall the ability to free? But each thread can really only hold one reference at a time so maybe it would work? 
 // q: if using a ring buffer, indices might be freed in between non-freed indices, in which case the pointer to beginning and end would not be able to shift, and therefore would need space for more indices than just the number of threads
 // q: if using a ring buffer for frees, could a thread freeing the index then bubble sort backwards and move the begin pointer forwards until the begin and end pointers have only non freed indices between them 
@@ -117,8 +116,8 @@
 
 */
 
-#ifndef __CONCURRENTMAP_HEADER_GUARD__
-#define __CONCURRENTMAP_HEADER_GUARD__
+#ifndef __SIMDB_HEADER_GUARD__
+#define __SIMDB_HEADER_GUARD__
 
 #include <cstdint>
 #include <cstring>
@@ -127,6 +126,7 @@
 #include <memory>
 #include <vector>
 #include <unordered_set>
+#include <set>
 #include <algorithm>
 
 #ifdef _WIN32      // windows
@@ -1534,6 +1534,13 @@ public:
   }
 
   // separated C++ functions - these won't need to exist if compiled for a C interface
+  struct VerStr { 
+    ui32 v; str s; 
+    bool  operator<(VerStr const& vs) const { return s<vs.s;  }  
+    bool  operator<(str const&    rs) const { return s<rs;    }
+    bool operator==(VerStr const& vs) const { return s==vs.s; } 
+  };   
+
   i64          put(str    const& key, str const& value)
   {
     return put(key.data(), (ui32)key.length(), value.data(), (ui32)value.length());
@@ -1553,37 +1560,63 @@ public:
     if(this->get(key, &ret)) return ret;
     else return str("");
   }
-  str       nxtKey() const
+  //str       nxtKey(ui32* out_version=nullptr)         const
+  //{
+  //  ui32 klen, vlen;
+  //  bool    ok = false;
+  //  VerIdx nxt = this->nxt();                           if(nxt.idx==EMPTY_KEY) return "";
+  //  ok         = this->len(nxt.idx, nxt.version, 
+  //                         &klen, &vlen);               if(!ok) return "";
+  //  str key(klen,'\0');
+  //  ok         = this->getKey(nxt.idx, nxt.version, 
+  //                            (void*)key.data(), klen); if(!ok) return "";
+  //
+  //  if(out_version) *out_version = nxt.version;
+  //  return key;                    // copy elision 
+  //}
+  VerStr    nxtKey()                                  const
   {
     ui32 klen, vlen;
     bool    ok = false;
-    VerIdx nxt = this->nxt();                           if(nxt.idx==EMPTY_KEY) return "";
+    VerIdx nxt = this->nxt();                           if(nxt.idx==EMPTY_KEY) return {nxt.version, ""};
     ok         = this->len(nxt.idx, nxt.version, 
-                           &klen, &vlen);               if(!ok) return "";
+                           &klen, &vlen);               if(!ok) return {nxt.version, ""};
     str key(klen,'\0');
     ok         = this->getKey(nxt.idx, nxt.version, 
-                              (void*)key.data(), klen); if(!ok) return "";
+                              (void*)key.data(), klen); if(!ok) return {nxt.version, ""};
 
-    return key;                    // copy elision 
+    //if(out_version) *out_version = nxt.version;
+    return { nxt.version, key };                    // copy elision 
   }
-  auto  getKeyStrs() const -> vec<str>
+  auto  getKeyStrs() const -> vec<VerStr>            // vec<ui32>* out_versions=nullptr
   {
     using namespace std;
     
-    unordered_set<str> keys;
+    //unordered_set<str> keys;
+    
+    //template<> struct hash<VerStr>{
+    //  size_t operator()(VerStr const& vs){ 
+    //    return hash<str>()(vs.str);
+    //  }  
+    //};
+    //unordered_set<VerStr> keys;
+    set<VerStr> keys;
+
     ui32  i = 0; 
-    str nxt = nxtKey();
+    //str nxt = nxtKey();
+    auto nxt = nxtKey();
     while( i<m_blkCnt && keys.find(nxt)==keys.end() )
     {
-      if(nxt.length()>0) keys.insert(nxt);
+      if(nxt.s.length()>0) keys.insert(nxt);
     
       nxt = nxtKey();
       ++i;
     }
 
-    return vec<str>(keys.begin(), keys.end());
+    //if(out_versions) new (out_versions) vec<ui32>()
+    return vec<VerStr>(keys.begin(), keys.end());
   }
-  bool          rm(std::string const& key)
+  bool          rm(str const& key)
   {
     return this->rm( key.data(), (ui32)key.length() );
   }
