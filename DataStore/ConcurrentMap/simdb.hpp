@@ -1391,10 +1391,7 @@ public:
     
     auto vi = s_cs.alloc(klen+vlen, klen, &blkcnt);    // todo: use the VersionIdx struct // kidx is key index
     if(vi.idx==LIST_END) return EMPTY_KEY;
-    //if(blkcnt<0){
-    //  s_cs.free(vi.idx, vi.version);
-    //  return EMPTY_KEY;
-    //}    
+
     s_cs.put(vi.idx, key, klen, val, vlen);
 
     ui32 keyhash = ConcurrentHash::HashBytes(key, klen);
@@ -1407,6 +1404,10 @@ public:
     if(kv.idx!=EMPTY_KEY) s_cs.free(kv.idx, kv.version);                       // putHashed returns the entry that was there before, which is the entry that was replaced. If it wasn't empty, we free it here. 
 
     return vi.idx;
+  }
+  i32          put(char const* const key, const void *const val, ui32 vlen)
+  {
+    return put(key, (ui32)strlen(key), val, vlen);
   }
   bool         get(const void *const key, ui32 klen, void *const   out_val, ui32 vlen) const
   {
@@ -1425,6 +1426,10 @@ public:
     };
 
     return s_ch.runMatch(hsh, matchFunc, runFunc);
+  }
+  bool         get(char const* const key, void *const val, ui32 vlen) const
+  {
+    return get(key, (ui32)strlen(key), val, vlen);
   }
   bool          rm(const void *const key, ui32 klen)
   {
@@ -1628,7 +1633,12 @@ public:
   }
 
   template<class T>
-  i64          get(vec<T> const& key, void*  out_buf) const
+  i64          put(str    const& key, vec<T> const& val)
+  {    
+    return put(key.data(), (ui32)key.length(), val.data(), (ui32)(val.size()*sizeof(T)) );
+  }
+  template<class T>
+  i64          get(vec<T> const& key, void*  out_buf) const     // todo: needs to be redone
   {
     Reader r = read((void*)key.data(), (ui32)(key.size() * sizeof(T)));
     if(isEmpty(r.kv)) return -1;
@@ -1639,8 +1649,6 @@ public:
 
     return len;
   }
-
-  // nxtkey()
   // end separated C++ functions
 
 };
@@ -1651,6 +1659,15 @@ public:
 
 
 
+
+//template< template<class> class V, class T>
+//using VAL_TYPE = V::value_type;
+//vec<int>::value_type
+
+//if(blkcnt<0){
+//  s_cs.free(vi.idx, vi.version);
+//  return EMPTY_KEY;
+//}    
 
 //template<class MATCH_FUNC> 
 //VerIdx       checkMatch(ui32 i, ui32 key, MATCH_FUNC match) const -> Match //  decltype(match(empty_kv()))

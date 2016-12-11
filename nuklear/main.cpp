@@ -62,9 +62,13 @@ static void       genTestGeo(simdb* db)
   str rightTriangle = "rightTriangle";
   str          cube = "cube";
 
-  db->put(leftTriangle.data(), (ui32)leftTriangle.length(), leftData.data(), (ui32)leftLen);
-  db->put(rightTriangle.data(), (ui32)rightTriangle.length(), rightData.data(), (ui32)rightLen);
-  db->put(cube.data(), (ui32)cube.length(), cubeData.data(), (ui32)cubeLen);
+  //db->put(leftTriangle.data(), (ui32)leftTriangle.length(), leftData.data(), (ui32)leftLen);
+  //db->put(rightTriangle.data(), (ui32)rightTriangle.length(), rightData.data(), (ui32)rightLen);
+  //db->put(cube.data(), (ui32)cube.length(), cubeData.data(), (ui32)cubeLen);
+
+  db->put(leftTriangle,   leftData);
+  db->put(rightTriangle, rightData);
+  db->put(cube, cubeData);
 }
 static int           sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* shps) // VizData* vd)
 {
