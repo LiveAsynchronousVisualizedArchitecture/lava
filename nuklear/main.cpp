@@ -195,12 +195,12 @@ int    main(void)
 
     // Draw
     { 
-      float bg[4];
-      nk_color_fv(bg, vd.ui.bgclr);
       glViewport(0, 0, vd.ui.w, vd.ui.h);
       glEnable(GL_DEPTH_TEST);                               // glDepthFunc(GL_LESS);
 
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+      float bg[4];
+      nk_color_fv(bg, vd.ui.bgclr);
       glClearColor(bg[0], bg[1], bg[2], bg[3]);
 
       for(auto& kv : vd.shapes){
