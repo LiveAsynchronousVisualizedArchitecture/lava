@@ -4,12 +4,13 @@
 // -todo: put GLFW window pointer and nuklear context pointer into VizData
 // -todo: remove shapes when keys are missing
 // -todo: will need to remove keys that aren't in VizData too
+// -todo: need simdb.getVersion() - using VerStr for versioned strings
+// -todo: need simdb::VerIdx and simdb::VerKey structs
+// -todo: make keys check for version before get()
 
 // TODO: Add all attributes
 // TODO: Control camera with mouse
 // todo: add const char* key get() to simdb
-// todo: need simdb.getVersion() ?
-// todo: need simdb::VerIdx and simdb::VerKey structs ? 
 // todo: test with updating geometry from separate process
 // todo: move and rename project to LavaViz
 
@@ -151,8 +152,14 @@ static void   shapesFromKeys(simdb const& db, vec<VerStr> const& dbKeys, VizData
   vd->shaderId = shadersrc_to_shaderid(vertShader, fragShader);  
   for(auto& k : dbKeys)
   {
-    ui32 vlen = 0;
-    auto  len = db.len(k.s.data(), (ui32)k.s.length(), &vlen);          // todo: make ui64 as the input length
+    auto cur = vd->shapes.find(k);
+    if(cur!=vd->shapes.end() && cur->first.v==k.v) continue;
+
+    ui32    vlen = 0;
+    ui32 version = 0;
+    auto len = db.len(k.s.data(), (ui32)k.s.length(), &vlen, &version);          // todo: make ui64 as the input length
+
+    //if(version==k.v) continue;
 
     vec<i8> ivbuf(vlen);
     db.get(k.s.data(), (ui32)k.s.length(), ivbuf.data(), (ui32)len);

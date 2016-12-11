@@ -20,6 +20,8 @@
 // todo: organize ConcurrentHash entry to have the index on the left side, version on the right side. 
 //       Put hash in the middle and use the first two bits of the index as empty and deleted flags
 //       empty : 1, deleted : 1, index : 35, hash : 35, version : 56 - total 128 bits, 34 billion entry limit 
+// todo: make resize function so block lists can be resized rather than freed, only to be reallocated
+// todo: test alignment
 
 // q: can cleanup be done by a ring buffer of block lists? would the ring buffer only need to be as long as the number of threads if each thread helps clear out the ring buffer after every free()? Probably not, because delayed deallocation would be useful only when there is a reader/ref count, which would mean many more reads than writes could stall the ability to free? But each thread can really only hold one reference at a time so maybe it would work? 
 // q: if using a ring buffer, indices might be freed in between non-freed indices, in which case the pointer to beginning and end would not be able to shift, and therefore would need space for more indices than just the number of threads
@@ -1435,7 +1437,7 @@ public:
 
     return kv.idx!=EMPTY_KEY;
   }
-  i64          len(const void *const key, ui32 klen, ui32* out_vlen=nullptr) const
+  i64          len(const void *const key, ui32 klen, ui32* out_vlen=nullptr, ui32* out_version=nullptr) const
   {
     if(klen<1) return 0;
 
@@ -1447,11 +1449,15 @@ public:
     };
     
     ui32 len=0;
-    auto runFunc = [ths, &len, out_vlen](VerIdx kv){
+    ui32 ver=0;
+    auto runFunc = [ths, &len, &ver, out_vlen](VerIdx kv){
       len = IsEmpty(kv)?  0ull  :  ths->s_cs.len(kv.idx, kv.version, out_vlen);
+      ver = kv.version;
     };
 
     if( !s_ch.runMatch(hsh,  matchFunc, runFunc) ) return 0;
+
+    if(out_version) *out_version = ver;
     return len;
   }
   bool         len(ui32 idx, ui32 version, ui32* out_klen=nullptr, ui32* out_vlen=nullptr) const
