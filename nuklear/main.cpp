@@ -1,12 +1,16 @@
 
 // -TODO(Chris): Resize sidebar on window resize
 // -todo: fix sidebar not changing with window resize
+// -todo: put GLFW window pointer and nuklear context pointer into VizData
+// -todo: remove shapes when keys are missing
+// -todo: will need to remove keys that aren't in VizData too
 
 // TODO: Add all attributes
 // TODO: Control camera with mouse
-// todo: put GLFW window pointer and nuklear context pointer into VizData ?
 // todo: need simdb.getVersion() ?
 // todo: need simdb::VerIdx and simdb::VerKey structs ? 
+// todo: test with updating geometry from separate process
+// todo: move and rename project to LavaViz
 
 #include <algorithm>
 #include <fstream>
@@ -33,8 +37,6 @@
 #define MAX_ELEMENT_BUFFER 128 * 1024
 
 namespace {
-
-//using nk_ctxptr = struct nk_contex*;
 
 static void  error_callback(int e, const char *d) {
     printf("Error %d: %s\n", e, d);
@@ -141,7 +143,6 @@ static auto      initNuklear(GLFWwindow* win) -> struct nk_context*
   return ctx;
 }
 
-// todo: will need to remove keys that aren't in VizData too
 static void  shapesFromKeys(simdb const& db, vec<str> const& dbKeys, VizData* vd)
 {
   using namespace std;
@@ -159,15 +160,25 @@ static void  shapesFromKeys(simdb const& db, vec<str> const& dbKeys, VizData* vd
     vd->shapes[k] = move(s);
   };
 }
+static int eraseMissingKeys(vec<str> dbKeys, KeyShapes* shps)
+{
+  int cnt = 0;
+  sort( ALL(dbKeys) );
+  for(auto const& kv : *shps){
+    if( binary_search(ALL(dbKeys),kv.first) ){
+      shps->erase(kv.first);
+      ++cnt;
+    }
+  }
+
+  return cnt;
+}
 
 }
 
 int    main(void)
 {
   using namespace std;
-
-  //GLFWwindow*            win;                      /* Platform */    //int width = 0, height = 0;
-  //struct nk_context*     ctx;
 
   VizData vd;
   vd.ui.w      =  1024; 
@@ -182,21 +193,20 @@ int    main(void)
 
   vec<str> dbKeys = db.getKeyStrs();    // Get all keys in DB - this will need to be ran in the main loop, but not every frame
   shapesFromKeys(db, dbKeys, &vd);
-  // todo: remove shapes from missing keys
+  eraseMissingKeys(move(dbKeys), &vd.shapes);
 
   while(!glfwWindowShouldClose(vd.win))
   {
     glfwPollEvents();                                         /* Input */
     nk_glfw3_new_frame();
-
     glfwGetWindowSize(vd.win, &vd.ui.w, &vd.ui.h);
+
     vd.ui.rect = winbnd_to_sidebarRect((float)vd.ui.w, (float)vd.ui.h);
     sidebar(vd.ctx, vd.ui.rect, &vd.shapes);                     // alters the shapes by setting their active flags
 
-    // Draw
-    { 
+    { // Draw 
       glViewport(0, 0, vd.ui.w, vd.ui.h);
-      glEnable(GL_DEPTH_TEST);                               // glDepthFunc(GL_LESS);
+      glEnable(GL_DEPTH_TEST);                                   // glDepthFunc(GL_LESS);
 
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
       float bg[4];
@@ -219,6 +229,7 @@ int    main(void)
   }
   nk_glfw3_shutdown();
   glfwTerminate();
+
   return 0;
 }
 
@@ -226,6 +237,21 @@ int    main(void)
 
 
 
+//
+//using nk_ctxptr = struct nk_contex*;
+
+//sort( ALL(dbKeys) );
+//for(auto kv : vd.shapes){
+//  if( binary_search(ALL(dbKeys),kv.first) )
+//    vd.shapes.erase(kv.first);
+//}
+
+// todo: remove shapes from missing keys
+//.begin(), dbKeys.end()
+//auto& key = kv.first;
+
+//GLFWwindow*            win;                      /* Platform */    //int width = 0, height = 0;
+//struct nk_context*     ctx;
 
 //ctx = nk_glfw3_init(win, NK_GLFW3_INSTALL_CALLBACKS);
 //struct nk_font_atlas* atlas;
