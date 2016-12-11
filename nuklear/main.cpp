@@ -40,8 +40,8 @@
 #include "VizGenerators.hpp"
 #include "VizTransforms.hpp"
 
-#define WINDOW_WIDTH 1200
-#define WINDOW_HEIGHT 800
+//#define WINDOW_WIDTH 1200
+//#define WINDOW_HEIGHT 800
 
 #define MAX_VERTEX_BUFFER  512 * 1024
 #define MAX_ELEMENT_BUFFER 128 * 1024
@@ -161,7 +161,7 @@ int    main(void)
   glfwGetWindowSize(win, &vd.ui.w, &vd.ui.h);
 
   /* OpenGL */
-  glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+  glViewport(0, 0, vd.ui.w, vd.ui.h);
   glewExperimental = 1;
   if (glewInit() != GLEW_OK) {
       fprintf(stderr, "Failed to setup GLEW\n");
