@@ -8,11 +8,12 @@
 // -todo: need simdb::VerIdx and simdb::VerKey structs
 // -todo: make keys check for version before get()
 // -todo: add timed key update in main loop
-// todo: add const char* key get() to simdb
+// -todo: add const char* key get() to simdb
+// -todo: add timed key version check 
 
 // TODO: Add all attributes
 // TODO: Control camera with mouse
-// todo: add timed key version check 
+// todo: check if timing is behind more than 2 updates and wipe out the extra
 // todo: test with updating geometry from separate process
 // todo: move and rename project to LavaViz
 
@@ -174,7 +175,6 @@ static void   shapesFromKeys(simdb const& db, vec<VerStr> const& dbKeys, VizData
     vd->shapes[k] = move(s);
   };
 }
-
 static int  eraseMissingKeys(vec<VerStr> dbKeys, KeyShapes* shps)           // vec<str> dbKeys,
 {
   int cnt = 0;
@@ -236,7 +236,6 @@ int    main(void)
   vd.verRefreshClock = 0.0;
   vd.keyRefresh  =  2.0;
   vd.keyRefreshClock = vd.keyRefresh;
-  //vd.keyRefreshClock = 
   simdb   db("test", 1024, 8);        // Create the DB
   genTestGeo(&db);
 
@@ -246,35 +245,50 @@ int    main(void)
 
   while(!glfwWindowShouldClose(vd.win))
   {
-    vd.now  = nowd();
-    double passed = vd.now - vd.prev;
-    vd.prev = vd.now;
-    vd.keyRefreshClock += passed;
-    if( vd.keyRefreshClock > vd.keyRefresh ){
-      auto dbKeys = db.getKeyStrs();                           // Get all keys in DB - this will need to be ran in the main loop, but not every frame
-      shapesFromKeys(db, dbKeys, &vd);
-      eraseMissingKeys(move(dbKeys), &vd.shapes);
-
-      vd.keyRefreshClock -= vd.keyRefresh;
-      vd.verRefreshClock -= vd.verRefresh;
-    }else if( vd.verRefreshClock > vd.verRefresh ){
-      for(auto& kv : vd.shapes){
-        if(kv.second.active)
-          updateKey(db, kv.first, &vd);
-      }
-      vd.verRefreshClock -= vd.verRefresh;
+    SECTION(add the time passed to refresh clocks)
+    {
+      vd.now  = nowd();
+      double passed = vd.now - vd.prev;
+      vd.prev = vd.now;
+      vd.keyRefreshClock += passed;
+      vd.verRefreshClock += passed;
     }
+    SECTION(check updates if enough time stored in refresh clock variables)
+    {
+      if( vd.keyRefreshClock > vd.keyRefresh ){
+        auto dbKeys = db.getKeyStrs();                           // Get all keys in DB - this will need to be ran in the main loop, but not every frame
+        shapesFromKeys(db, dbKeys, &vd);
+        eraseMissingKeys(move(dbKeys), &vd.shapes);
 
-    glfwPollEvents();                                         /* Input */
-    nk_glfw3_new_frame();
-    glfwGetWindowSize(vd.win, &vd.ui.w, &vd.ui.h);
+        vd.keyRefreshClock -= vd.keyRefresh;
+        vd.verRefreshClock -= vd.verRefresh;
 
+        if(vd.keyRefreshClock > vd.keyRefresh)                 // if there is already enough time saved up for another update make sure that less that two updates worth of time is kept 
+          vd.keyRefreshClock = vd.keyRefresh + fmod(vd.keyRefreshClock, vd.keyRefresh);
+      }else if( vd.verRefreshClock > vd.verRefresh ){
+        for(auto& kv : vd.shapes){
+          if(kv.second.active)
+            updateKey(db, kv.first, &vd);
+        }
+        vd.verRefreshClock -= vd.verRefresh;
 
-
-    vd.ui.rect = winbnd_to_sidebarRect((float)vd.ui.w, (float)vd.ui.h);
-    sidebar(vd.ctx, vd.ui.rect, &vd.shapes);                     // alters the shapes by setting their active flags
-
-    { // Draw 
+        if(vd.verRefreshClock > vd.verRefresh)                 // if there is already enough time saved up for another update make sure that less that two updates worth of time is kept 
+          vd.verRefreshClock = vd.verRefresh + fmod(vd.verRefreshClock, vd.verRefresh);
+      } // end of updates to shapes 
+    }
+    SECTION(GLFW input)
+    {
+     glfwPollEvents();                                             /* Input */
+     glfwGetWindowSize(vd.win, &vd.ui.w, &vd.ui.h);
+    }
+    SECTION(draw nuklear)
+    {
+      nk_glfw3_new_frame();
+      vd.ui.rect = winbnd_to_sidebarRect((float)vd.ui.w, (float)vd.ui.h);
+      sidebar(vd.ctx, vd.ui.rect, &vd.shapes);                     // alters the shapes by setting their active flags
+    }
+    SECTION(openGL frame setup)
+    {
       glViewport(0, 0, vd.ui.w, vd.ui.h);
       glEnable(GL_DEPTH_TEST);                                   // glDepthFunc(GL_LESS);
 
@@ -282,20 +296,22 @@ int    main(void)
       float bg[4];
       nk_color_fv(bg, vd.ui.bgclr);
       glClearColor(bg[0], bg[1], bg[2], bg[3]);
-
+    }
+    SECTION(render the shapes in VizData::shapes)
+    {
       for(auto& kv : vd.shapes){
         if(kv.second.active)
           RenderShape( kv.second );
       }
+    }
 
-      nk_glfw3_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_BUFFER, MAX_ELEMENT_BUFFER);        /* 
+    nk_glfw3_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_BUFFER, MAX_ELEMENT_BUFFER);        /* 
         * IMPORTANT: `nk_glfw_render` modifies some global OpenGL state
         * with blending, scissor, face culling, depth test and viewport and
         * defaults everything back into a default state.
         * Make sure to either a.) save and restore or b.) reset your own state after
         * rendering the UI. */
-      glfwSwapBuffers(vd.win);
-    }
+    glfwSwapBuffers(vd.win);
   }
   nk_glfw3_shutdown();
   glfwTerminate();
@@ -306,6 +322,11 @@ int    main(void)
 
 
 
+
+
+
+//SECTION(render the previously generated nuklear gui)
+//{
 
 //
 //vec<str> dbKeys = db.getKeyStrs();    // Get all keys in DB - this will need to be ran in the main loop, but not every frame

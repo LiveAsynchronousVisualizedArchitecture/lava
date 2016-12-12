@@ -20,31 +20,6 @@ inline GLuint  shadersrc_to_shaderid(const char* vert, const char* frag)
 {
   using namespace std;
   
-  //str         vertexCode;
-  //str       fragmentCode;
-  //  
-  //ifstream   vShaderFile;
-  //ifstream   fShaderFile;
-  //
-  //vShaderFile.exceptions(ifstream::badbit);
-  //fShaderFile.exceptions(ifstream::badbit);
-  //try
-  //{
-  //    vShaderFile.open(vertShader.c_str());
-  //    fShaderFile.open(fragShader.c_str());
-  //    stringstream vShaderStream, fShaderStream;
-  //    vShaderStream << vShaderFile.rdbuf();
-  //    fShaderStream << fShaderFile.rdbuf();
-  //    vShaderFile.close();
-  //    fShaderFile.close();
-  //    vertexCode = vShaderStream.str();
-  //    fragmentCode = fShaderStream.str();
-  //}
-  //catch(ifstream::failure e)
-  //{
-  //    printf("ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ\n");
-  //}
-
   GLuint vertexShader;
   vertexShader = glCreateShader(GL_VERTEX_SHADER);
   const GLchar* vShaderSource =  vert; //.c_str();   // vertexCode.c_str();
@@ -132,6 +107,33 @@ inline auto    winbnd_to_sidebarRect(float w, float h) -> struct nk_rect
 
 #endif
 
+
+
+
+//str         vertexCode;
+//str       fragmentCode;
+//  
+//ifstream   vShaderFile;
+//ifstream   fShaderFile;
+//
+//vShaderFile.exceptions(ifstream::badbit);
+//fShaderFile.exceptions(ifstream::badbit);
+//try
+//{
+//    vShaderFile.open(vertShader.c_str());
+//    fShaderFile.open(fragShader.c_str());
+//    stringstream vShaderStream, fShaderStream;
+//    vShaderStream << vShaderFile.rdbuf();
+//    fShaderStream << fShaderFile.rdbuf();
+//    vShaderFile.close();
+//    fShaderFile.close();
+//    vertexCode = vShaderStream.str();
+//    fragmentCode = fShaderStream.str();
+//}
+//catch(ifstream::failure e)
+//{
+//    printf("ERROR::SHADER::FILE_NOT_SUCCESFULLY_READ\n");
+//}
 
 //
 //inline GLuint shadersrc_to_shaderid(str const& vert, str const& frag)
