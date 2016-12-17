@@ -98,12 +98,38 @@ static int           sidebar(struct nk_context *ctx, struct nk_rect rect, KeySha
 
   return !nk_window_is_closed(ctx, "Overview");
 }
+static GLfloat fieldOfView = 45.0f;
+static bool increasing = true;
 static void      RenderShape(Shape const& shp) // GLuint shaderId)
 {
   // Camera/View transformation
   glUseProgram(shp.shader);  //shader.use();
+  glm::mat4 view;
+  view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+  glm::mat4 model;
+  model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+
+  if(fieldOfView < 45.0f) {
+    fieldOfView = 45.0f;
+    increasing = true;
+  }
+  else if(fieldOfView > 90.0f) {
+    fieldOfView = 90.0f;
+    increasing = false;
+  }
+  else {
+    if(increasing) {
+        fieldOfView += 0.05f;
+    }
+    else {
+        fieldOfView -= 0.05f;
+    }
+  }
+
+  glm::mat4 projection;
+  projection = glm::perspective(fieldOfView, (GLfloat)1200 / (GLfloat)800, 0.1f, 100.0f);
   glm::mat4 transform;
-  transform = glm::rotate(transform, (GLfloat)glfwGetTime() * 50.0f, glm::vec3(0.2f, 0.5f, 1.0f));
+  transform = projection * view * model;
   GLint transformLoc = glGetUniformLocation(shp.shader, "transform");
   glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transform));
 
