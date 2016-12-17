@@ -89,14 +89,10 @@ static int           sidebar(struct nk_context *ctx, struct nk_rect rect, KeySha
 
   if(nk_begin(ctx, &layout, "Overview", rect, window_flags))
   {
-    if(nk_tree_push(ctx, NK_TREE_TAB, "Drawables", NK_MAXIMIZED)) // NK_MINIMIZED))
-    {
       nk_layout_row_static(ctx, 18, 100, 1);
       for(auto& kv : *shps){
         nk_selectable_label(ctx, kv.first.s.c_str(), NK_TEXT_LEFT, &kv.second.active);
       }
-      nk_tree_pop(ctx);
-    }
   }
   nk_end(ctx);
 
