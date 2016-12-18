@@ -298,7 +298,7 @@ int    main(void)
 
     vd.ui.w         =  1024; 
     vd.ui.h         =   768;
-    vd.ui.bgclr     =  nk_rgb(28,48,62);
+    vd.ui.bgclr     =  nk_rgb(16,16,16);
     vd.now          =  nowd();
     vd.prev         =  vd.now;
     vd.verRefresh   =  0.007;                // roughly 144hz
