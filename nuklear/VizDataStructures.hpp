@@ -29,14 +29,15 @@
 #include "../DataStore/ConcurrentMap/simdb.hpp"
 #include "IndexedVerts.h"
 
-template<class KEY, class VALUE,
-  class _Compare = std::less<KEY>,
-  class _Alloc   = std::allocator<std::pair<const KEY,VALUE> > >
-using map = std::map<KEY,VALUE, _Compare, _Alloc >;
+//template<class KEY, class VALUE,
+//  class _Compare = std::less<KEY>,
+//  class _Alloc   = std::allocator<std::pair<const KEY,VALUE> > >
+//using map = std::map<KEY,VALUE, _Compare, _Alloc >;
+//template<class T> using unq = std::unique_ptr<T>;
 
+using std::map;
 using str    = std::string;
 using VerStr = simdb::VerStr;
-
 
 static const char*  vShaderPath  =  "../vertexShader.vert";
 static const char*  fShaderPath  =  "../fragmentShader.frag";

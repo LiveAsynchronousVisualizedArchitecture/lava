@@ -1387,6 +1387,8 @@ public:
 
   i32          put(const void *const key, ui32 klen, const void *const val, ui32 vlen)
   {
+    assert(klen>0);
+
     i32 blkcnt = 0;
     
     auto vi = s_cs.alloc(klen+vlen, klen, &blkcnt);    // todo: use the VersionIdx struct // kidx is key index
@@ -1407,6 +1409,7 @@ public:
   }
   i32          put(char const* const key, const void *const val, ui32 vlen)
   {
+    assert(strlen(key)>0);
     return put(key, (ui32)strlen(key), val, vlen);
   }
   bool         get(const void *const key, ui32 klen, void *const   out_val, ui32 vlen) const
@@ -1501,7 +1504,7 @@ public:
   }
   bool      getKey(ui32 idx, ui32 version, void *const out_buf, ui32 klen)   const
   {
-    if(klen<1) return 0;
+    if(klen<1) return false;
     
     auto     ths = this;
     auto runFunc = [ths, klen, out_buf](VerIdx kv){
@@ -1580,10 +1583,14 @@ public:
                            &klen, &vlen);               if(!ok) return {nxt.version, ""};
     str key(klen,'\0');
     ok         = this->getKey(nxt.idx, nxt.version, 
-                              (void*)key.data(), klen); if(!ok) return {nxt.version, ""};
+                              (void*)key.data(), klen); 
+                              
+    if(!ok || strlen(key.c_str())!=key.length() ) return {nxt.version, ""};
 
     //if(out_version) *out_version = nxt.version;
+    //if(ok) 
     return { nxt.version, key };                    // copy elision 
+    //else   return { 0, "" };
   }
   auto  getKeyStrs() const -> vec<VerStr>            // vec<ui32>* out_versions=nullptr
   {
@@ -1597,9 +1604,10 @@ public:
     //  }  
     //};
     //unordered_set<VerStr> keys;
+
     set<VerStr> keys;
 
-    ui32  i = 0; 
+    ui32  i = 0;
     //str nxt = nxtKey();
     auto nxt = nxtKey();
     while( i<m_blkCnt && keys.find(nxt)==keys.end() )

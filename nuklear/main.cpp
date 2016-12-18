@@ -10,11 +10,12 @@
 // -todo: add timed key update in main loop
 // -todo: add const char* key get() to simdb
 // -todo: add timed key version check 
+// -todo: figure out why empty string is making it into the db - not making it in, but nxtKey doesn't 
+// -todo: check if timing is behind more than 2 updates and wipe out the extra
+// -todo: test with updating geometry from separate process
 
 // TODO: Add all attributes
 // TODO: Control camera with mouse
-// todo: check if timing is behind more than 2 updates and wipe out the extra
-// todo: test with updating geometry from separate process
 // todo: move and rename project to LavaViz
 
 #include <chrono>
@@ -44,16 +45,16 @@
 
 namespace {
 
-static void   error_callback(int e, const char *d) {
+void   error_callback(int e, const char *d) {
     printf("Error %d: %s\n", e, d);
 }
-static void     key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+void     key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
 }
 
-static void       genTestGeo(simdb* db)
+void       genTestGeo(simdb* db)
 {
   // Create serialized IndexedVerts
   size_t leftLen, rightLen, cubeLen;
@@ -74,7 +75,7 @@ static void       genTestGeo(simdb* db)
   db->put(rightTriangle, rightData);
   db->put(cube, cubeData);
 }
-static int           sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* shps) // VizData* vd)
+int           sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* shps) // VizData* vd)
 {
   using namespace std;
 
@@ -91,14 +92,15 @@ static int           sidebar(struct nk_context *ctx, struct nk_rect rect, KeySha
   {
       nk_layout_row_static(ctx, 18, 100, 1);
       for(auto& kv : *shps){
-        nk_selectable_label(ctx, kv.first.s.c_str(), NK_TEXT_LEFT, &kv.second.active);
+        if(kv.first.s.length()>0)
+          nk_selectable_label(ctx, kv.first.s.c_str(), NK_TEXT_LEFT, &kv.second.active);
       }
   }
   nk_end(ctx);
 
   return !nk_window_is_closed(ctx, "Overview");
 }
-static void      RenderShape(Shape const& shp) // GLuint shaderId)
+void      RenderShape(Shape const& shp) // GLuint shaderId)
 {
   // Camera/View transformation
   glUseProgram(shp.shader);  //shader.use();
@@ -115,7 +117,7 @@ static void      RenderShape(Shape const& shp) // GLuint shaderId)
   glBindVertexArray(0);
 }
 
-static GLFWwindow*  initGLFW(VizData* vd)
+GLFWwindow*  initGLFW(VizData* vd)
 {
   glfwSetErrorCallback(error_callback);
   if( !glfwInit() ){
@@ -131,7 +133,7 @@ static GLFWwindow*  initGLFW(VizData* vd)
 
   return win;
 }
-static void         initGlew()
+void         initGlew()
 {
   glewExperimental = 1;
   if(glewInit() != GLEW_OK) {
@@ -139,7 +141,7 @@ static void         initGlew()
     exit(1);
   }
 }
-static auto      initNuklear(GLFWwindow* win) -> struct nk_context*
+auto      initNuklear(GLFWwindow* win) -> struct nk_context*
 {
   struct nk_context*      ctx = nk_glfw3_init(win, NK_GLFW3_INSTALL_CALLBACKS);
   struct nk_font_atlas* atlas;
@@ -149,7 +151,7 @@ static auto      initNuklear(GLFWwindow* win) -> struct nk_context*
   return ctx;
 }
 
-static void   shapesFromKeys(simdb const& db, vec<VerStr> const& dbKeys, VizData* vd)  // vec<str> const& dbKeys
+void   shapesFromKeys(simdb const& db, vec<VerStr> const& dbKeys, VizData* vd)  // vec<str> const& dbKeys
 {
   using namespace std;
 
@@ -168,23 +170,37 @@ static void   shapesFromKeys(simdb const& db, vec<VerStr> const& dbKeys, VizData
 
     Shape  s = ivbuf_to_shape(ivbuf.data(), len);
     s.shader = vd->shaderId;
+    s.active = true;
     vd->shapes[k] = move(s);
   };
 }
-static int  eraseMissingKeys(vec<VerStr> dbKeys, KeyShapes* shps)           // vec<str> dbKeys,
+int  eraseMissingKeys(vec<VerStr> dbKeys, KeyShapes* shps)           // vec<str> dbKeys,
 {
+  //for(auto const& kv : *shps){
+  //  if( !binary_search(ALL(dbKeys),kv.first) ){
+  //    shps->erase(kv.first);
+  //    ++cnt;
+  //  }
+  //}
+
   int cnt = 0;
   sort( ALL(dbKeys) );
-  for(auto const& kv : *shps){
+  //assert( shps->size() == 0 || dbKeys.size() != 0 );
+  if( shps->size() > 0 && dbKeys.size() == 0 )
+    printf("wat");
+
+  for(auto it = shps->begin(); it != shps->end(); )
+  {
+    auto const& kv = *it;
     if( !binary_search(ALL(dbKeys),kv.first) ){
-      shps->erase(kv.first);
+      it = shps->erase(it);
       ++cnt;
-    }
+    }else ++it;
   }
 
   return cnt;
 }
-static bool        updateKey(simdb const& db, VerStr const& key, VizData* vd)
+bool        updateKey(simdb const& db, VerStr const& key, VizData* vd)
 {
   using namespace std;
 
@@ -198,6 +214,7 @@ static bool        updateKey(simdb const& db, VerStr const& key, VizData* vd)
 
     Shape  s = ivbuf_to_shape(ivbuf.data(), len);
     s.shader = vd->shaderId;
+    s.active = true;                     // because updates only happen when the shape is active, always setting an updated shape to active should work
     vd->shapes[key] = move(s);
     
     return true;
@@ -206,7 +223,7 @@ static bool        updateKey(simdb const& db, VerStr const& key, VizData* vd)
   return false;
 }
 
-static double           nowd()
+double           nowd()
 {
   using namespace std;
   using namespace std::chrono;
@@ -222,18 +239,22 @@ int    main(void)
 {
   using namespace std;
 
-  VizData vd;
-  vd.ui.w        =  1024; 
-  vd.ui.h        =   768;
-  vd.ui.bgclr    =  nk_rgb(28,48,62);
-  vd.now         =  nowd();
-  vd.prev        =  vd.now;
-  vd.verRefresh  =  0.1;
-  vd.verRefreshClock = 0.0;
-  vd.keyRefresh  =  2.0;
-  vd.keyRefreshClock = vd.keyRefresh;
-  simdb   db("test", 1024, 8);        // Create the DB
-  genTestGeo(&db);
+  VizData vd;                         // nothing should happen here in the 'default' constructor, although msvc's STL implementation might allocate memory in the default constructor of std::map
+  SECTION(initialize single VizData)
+  {
+    vd.ui.w        =  1024; 
+    vd.ui.h        =   768;
+    vd.ui.bgclr    =  nk_rgb(28,48,62);
+    vd.now         =  nowd();
+    vd.prev        =  vd.now;
+    vd.verRefresh  =  0.1;
+    vd.verRefreshClock = 0.0;
+    vd.keyRefresh  =  2.0;
+    vd.keyRefreshClock = vd.keyRefresh;
+  }
+
+  simdb   db("test", 1024, 64);        // Create the DB
+  //genTestGeo(&db);
 
   vd.win = initGLFW( &vd );
   initGlew();
@@ -309,9 +330,9 @@ int    main(void)
         * rendering the UI. */
     glfwSwapBuffers(vd.win);
   }
+
   nk_glfw3_shutdown();
   glfwTerminate();
-
   return 0;
 }
 
