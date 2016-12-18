@@ -99,13 +99,21 @@ public:
   }
 };
 
+struct Camera
+{
+  GLfloat fieldOfView;
+  GLfloat xDiff;
+  GLfloat yDiff;
+  bool rightButtonDown;
+  bool leftButtonDown;
+};
 //using  KeyShapes = map<str, Shape>;
 using  KeyShapes = map<VerStr, Shape>;
 struct VizData
 {
   GLFWwindow*            win;                      /* Platform */    //int width = 0, height = 0;
   struct nk_context*     ctx;
-  // todo: camera 
+  Camera      camera;
   KeyShapes   shapes;
   GLuint    shaderId;
   struct

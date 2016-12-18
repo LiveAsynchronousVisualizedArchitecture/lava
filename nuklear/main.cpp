@@ -44,16 +44,53 @@
 
 namespace {
 
-static void   error_callback(int e, const char *d) {
+static void      error_callback(int e, const char *d) {
     printf("Error %d: %s\n", e, d);
 }
-static void     key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+static void        key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
 }
+static void     scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+{
+  VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
+  if(vd->camera.fieldOfView < 45.0f) {
+    vd->camera.fieldOfView = 45.0f;
+  }
+  if(vd->camera.fieldOfView > 90.0f) {
+    vd->camera.fieldOfView = 90.0f;
+  }
+  vd->camera.fieldOfView += (GLfloat)(yoffset / 10);
+}
+static void  mouse_btn_callback(GLFWwindow* window, int button, int action, int mods)
+{
+  VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
+  if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+  {
+    vd->camera.rightButtonDown = true;
+    printf("Left mouse pressed\n");
+  }
+  if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
+  {
+    vd->camera.rightButtonDown = false;
+    printf("Left mouse released\n");
+  }
+}
+static void cursor_pos_callback(GLFWwindow* window, double xposition, double yposition)
+{
+  VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
+  if(vd->camera.rightButtonDown)
+  {
+    // printf("X: %f\n", xposition);
+    // printf("Y: %f\n", yposition);
 
-static void       genTestGeo(simdb* db)
+    vd->camera.xDiff = xposition;
+    vd->camera.yDiff = yposition;
+  }
+}
+
+static void  genTestGeo(simdb* db)
 {
   // Create serialized IndexedVerts
   size_t leftLen, rightLen, cubeLen;
@@ -74,7 +111,7 @@ static void       genTestGeo(simdb* db)
   db->put(rightTriangle, rightData);
   db->put(cube, cubeData);
 }
-static int           sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* shps) // VizData* vd)
+static int      sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* shps) // VizData* vd)
 {
   using namespace std;
 
@@ -98,12 +135,23 @@ static int           sidebar(struct nk_context *ctx, struct nk_rect rect, KeySha
 
   return !nk_window_is_closed(ctx, "Overview");
 }
-static void      RenderShape(Shape const& shp) // GLuint shaderId)
+static void RenderShape(Shape const& shp, Camera& camera) // GLuint shaderId)
 {
   // Camera/View transformation
   glUseProgram(shp.shader);  //shader.use();
+  glm::mat4 view;
+  view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+  glm::mat4 model;
+  model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+
+  glm::mat4 projection;
+  projection = glm::perspective((float)camera.fieldOfView, (GLfloat)1024 / (GLfloat)768, 0.1f, 100.0f);
   glm::mat4 transform;
-  transform = glm::rotate(transform, (GLfloat)glfwGetTime() * 50.0f, glm::vec3(0.2f, 0.5f, 1.0f));
+  transform = projection * view * model;
+  if(camera.xDiff || camera.yDiff)
+  {
+    transform = glm::rotate(transform, 90.0f, glm::vec3((camera.yDiff / 768.0f), (camera.xDiff / 1024.0f), 0.0f));
+  }
   GLint transformLoc = glGetUniformLocation(shp.shader, "transform");
   glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transform));
 
@@ -128,6 +176,9 @@ static GLFWwindow*  initGLFW(VizData* vd)
   glfwGetWindowSize(win, &vd->ui.w, &vd->ui.h);
 
   glfwSetKeyCallback(win, key_callback);
+  glfwSetScrollCallback(win, scroll_callback);
+  glfwSetCursorPosCallback(win, cursor_pos_callback);
+  glfwSetMouseButtonCallback(win, mouse_btn_callback);
 
   return win;
 }
@@ -232,10 +283,16 @@ int    main(void)
   vd.verRefreshClock = 0.0;
   vd.keyRefresh  =  2.0;
   vd.keyRefreshClock = vd.keyRefresh;
+  vd.camera.fieldOfView = 45.0f;
+  vd.camera.xDiff = 0;
+  vd.camera.yDiff = 0;
+  vd.camera.rightButtonDown = false;
+  vd.camera.leftButtonDown = false;
   simdb   db("test", 1024, 8);        // Create the DB
   genTestGeo(&db);
 
   vd.win = initGLFW( &vd );
+  glfwSetWindowUserPointer(vd.win, &vd);
   initGlew();
   vd.ctx = initNuklear(vd.win);
 
@@ -297,7 +354,7 @@ int    main(void)
     {
       for(auto& kv : vd.shapes){
         if(kv.second.active)
-          RenderShape( kv.second );
+          RenderShape( kv.second, vd.camera );
       }
     }
 
