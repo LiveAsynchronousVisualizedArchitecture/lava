@@ -17,7 +17,30 @@
 // -todo: make updates by all keys respect previous visibility
 
 // TODO: Add all attributes
-// todo: move and rename project to LavaViz
+// todo: make IndexedVerts single header with split declaration and implementation sections
+// todo: fix camera rotation resetting on mouse down
+// todo: add panning to right mouse button
+// todo: add fps counter in the corner
+// todo: add color under cursor like previous visualizer - use the gl get frame like the previous visualizer - check if the cursor is over the gl window first as an optimization?
+// todo: move and rename project to LavaViz or any non test name
+
+// idea: call getKeys asynchronously - use futures? 
+// idea: put version next to key value 
+// idea: test indexed verts with images
+// idea: ability to save indexed verts objects to a file
+// idea: look into drag and drop to load indexed verts objects by dragging from a file
+// idea: make a text visualizer? 
+//       - display keys and data from db directly - keys then string on one line, click the line and add a tab with the key name in the tab title and a split window between hex and string form?
+//       - display values and strings
+// idea: make a strings binary format - will this work for an arbitrary packed binary list? - should there be a data structure type and an underlying data type?
+//       - first 8 bytes -> total size in bytes
+//       - next  4 bytes  -> data structure type? - binary list here?
+//       - next  4 bytes  -> underlying data type?
+//       - next  8 bytes  -> number of strings
+//       - for the number of strings -> 8 bytes for the offset of each string from the start of the whole binary 
+//       - next bytes are all string data - does the encoding matter here? should it be utf8 since you know the length of each string?
+// idea: work out a type enum for lava data structures? use the upper 16 bits of the size? this leaves 'only' 65,536 different types and 281 terabytes as the max size - use first 8 bytes for size and next 8 bytes for version?
+// idea: ability to display points of an indexed verts type as numbers - this would give the ability to have numbers floating in space
 
 #include <chrono>
 #include <algorithm>
@@ -269,7 +292,7 @@ int    main(void)
 {
   using namespace std;
 
-  SECTION(initialize static simdb and VizData)
+  SECTION(initialize static simdb and static VizData)
   {
     new (&db) simdb("test", 1024, 64);        // inititialize the DB with placement new into the data segment
 
@@ -278,15 +301,15 @@ int    main(void)
     vd.ui.bgclr     =  nk_rgb(28,48,62);
     vd.now          =  nowd();
     vd.prev         =  vd.now;
-    vd.verRefresh   =  0.1;
+    vd.verRefresh   =  0.007;                // roughly 144hz
     vd.verRefreshClock = 0.0;
     vd.keyRefresh         =  2.0;
     vd.keyRefreshClock    = vd.keyRefresh;
-    vd.camera.fieldOfView = 45.0f;
+    vd.camera.fieldOfView = 65.0f;
     vd.camera.xDiff       = 0;
     vd.camera.yDiff       = 0;
     vd.camera.rightButtonDown = false;
-    vd.camera.leftButtonDown = false;
+    vd.camera.leftButtonDown  = false;
   }
   SECTION(initialize glfw window, glew, and nuklear)
   {

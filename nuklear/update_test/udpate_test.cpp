@@ -14,6 +14,31 @@ using std::chrono::milliseconds;
 using std::this_thread::sleep_for;
 using ms = duration<double, std::milli>;
 
+}
+
+int    main(void)
+{
+  new (&db) simdb("test", 1024, 64);        // inititialize the DB with placement new into the data segment
+  
+  ui64 rightLen, cubeLen;
+  vec<ui8> rightData = makeTriangle(rightLen, false);
+  vec<ui8>  cubeData = makeCube(cubeLen);
+
+  while(true)
+  {
+    sleep_for( milliseconds(1) );
+    db.put("shape", cubeData);
+
+    sleep_for( milliseconds(1) );    
+    db.put("shape", rightData);
+  }
+  
+  return 0;
+}
+
+
+
+
 //using std::this_thread;
 //
 //void       genTestGeo(simdb* db)
@@ -33,30 +58,6 @@ using ms = duration<double, std::milli>;
 //  db->put(rightTriangle, rightData);
 //  db->put(cube, cubeData);
 //}
-
-}
-
-int    main(void)
-{
-  new (&db) simdb("test", 1024, 64);        // inititialize the DB with placement new into the data segment
-  
-  ui64 rightLen, cubeLen;
-  vec<ui8> rightData = makeTriangle(rightLen, false);
-  vec<ui8>  cubeData = makeCube(cubeLen);
-
-  while(true)
-  {
-    sleep_for( milliseconds(10) );
-    db.put("shape", cubeData);
-
-    sleep_for( milliseconds(10) );    
-    db.put("shape", rightData);
-  }
-  
-  return 0;
-}
-
-
 
 //
 //genTestGeo(&db);
