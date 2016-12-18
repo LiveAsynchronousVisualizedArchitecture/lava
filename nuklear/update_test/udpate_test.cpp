@@ -1,5 +1,5 @@
 
-#include "../IndexedVerts.cpp"         // todo: make IndexedVerts into an hpp file or a single header file style lib
+#include "../IndexedVerts.cpp"               // todo: make IndexedVerts into an hpp file or a single header file style lib
 
 #include <thread>
 #include <chrono>
@@ -46,10 +46,10 @@ int    main(void)
 
   while(true)
   {
-    sleep_for( milliseconds(1) );
+    sleep_for( milliseconds(10) );
     db.put("shape", cubeData);
 
-    sleep_for( milliseconds(1) );    
+    sleep_for( milliseconds(10) );    
     db.put("shape", rightData);
   }
   

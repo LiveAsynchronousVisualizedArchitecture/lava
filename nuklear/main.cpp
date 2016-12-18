@@ -13,9 +13,10 @@
 // -todo: figure out why empty string is making it into the db - not making it in, but nxtKey doesn't 
 // -todo: check if timing is behind more than 2 updates and wipe out the extra
 // -todo: test with updating geometry from separate process
+// -TODO: Control camera with mouse
+// -todo: make updates by all keys respect previous visibility
 
 // TODO: Add all attributes
-// TODO: Control camera with mouse
 // todo: move and rename project to LavaViz
 
 #include <chrono>
@@ -199,7 +200,7 @@ void   shapesFromKeys(simdb const& db, vec<VerStr> const& dbKeys, VizData* vd)  
 
     Shape  s = ivbuf_to_shape(ivbuf.data(), len);
     s.shader = vd->shaderId;
-    s.active = true;
+    s.active = vd->shapes[k].active;
     vd->shapes[k] = move(s);
   };
 }
