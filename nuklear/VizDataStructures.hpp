@@ -13,6 +13,7 @@
 
 #include <map>
 #include <GL/glew.h>
+#include <glm\glm.hpp>
 
 #define NK_INCLUDE_FIXED_TYPES
 #define NK_INCLUDE_STANDARD_IO
@@ -82,7 +83,14 @@ public:
 
 struct Camera
 {
-  float fieldOfView, xDiff, yDiff;
+  float fieldOfView, xRotationStart, yRotationStart, sensitivity;
+  glm::vec2 mouseDelta;
+  glm::vec3 position;
+  glm::vec3 viewDirection;
+  glm::vec3 up;
+  glm::mat4 transformMtx;
+
+  glm::vec2 oldMousePos;
   bool rightButtonDown, leftButtonDown;
 };
 
@@ -144,7 +152,6 @@ void main(){ \
   //Ci        =  vec4(tClr.xyz*tClr.a,tClr.a) + ( (1-tClr.a)*fragC ); \n \
   //Ci        =  vec4(tClr.rgb*tClr.a,tClr.a) + ( (1-tClr.a)*fragC ); \n \
   Ci        =  tClr + ( (1-tClr.a)*fragC ); \n \
-  //Ci = vec4(tClr.rgb, 1);  \n \
 }";
 
 static simdb    db;
