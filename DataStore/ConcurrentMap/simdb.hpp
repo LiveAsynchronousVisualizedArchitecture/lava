@@ -8,6 +8,7 @@
 // -todo: take out infinite loop possibility in rm
 // -todo: take out any inf loops in runMatch
 
+// todo: make put give back FAILED_PUT on error
 // todo: make ConcurrentStore get() stop before exceeding maxlen?
 // todo: make put return VerIdx ?
 // todo: make a DELETED value for hash entries so that when something is removed, it doesn't block a linear search
@@ -1320,7 +1321,9 @@ private:
   ui64             m_blkCnt;
   ui64              m_blkSz;
 
+public:
   static const ui32  EMPTY_KEY = ConcurrentHash::EMPTY_KEY;          // 28 bits set 
+  static const ui32 FAILED_PUT = ConcurrentHash::EMPTY_KEY;          // 28 bits set 
   static const ui32   LIST_END = ConcurrentStore::LIST_END;
   static ui64       OffsetBytes()
   {

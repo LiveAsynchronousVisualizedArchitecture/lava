@@ -1,9 +1,10 @@
-#include <stdarg.h>
-#include <stdlib.h>
-#include <string.h>
 
 #include "IndexedVerts.h"
 
+
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
 extern "C"
 {
     void* IndexedVertsCreate(uint32_t constructor, uint32_t arglen, ...)

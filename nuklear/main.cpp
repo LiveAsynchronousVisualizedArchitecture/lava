@@ -15,21 +15,24 @@
 // -todo: test with updating geometry from separate process
 // -TODO: Control camera with mouse
 // -todo: make updates by all keys respect previous visibility
+// -todo: make IndexedVerts single header with split declaration and implementation sections
 
 // TODO: Add all attributes
-// todo: make IndexedVerts single header with split declaration and implementation sections
+// todo: get working uvs and images
+// todo: rename VizDataStructures to just VizData
+// todo: add fps counter in the corner
 // todo: fix camera rotation resetting on mouse down
 // todo: add panning to right mouse button
-// todo: add fps counter in the corner
 // todo: add color under cursor like previous visualizer - use the gl get frame like the previous visualizer - check if the cursor is over the gl window first as an optimization?
 // todo: move and rename project to LavaViz or any non test name
 
+// idea: make IndexedVerts restore without copying bytes? - this would mean that there would need to be a pointer to the head and each member would be pointers filled in on deserialization? 
 // idea: call getKeys asynchronously - use futures? 
 // idea: put version next to key value 
 // idea: test indexed verts with images
 // idea: ability to save indexed verts objects to a file
 // idea: look into drag and drop to load indexed verts objects by dragging from a file
-// idea: make a text visualizer? 
+// idea: make a text visualizer?
 //       - display keys and data from db directly - keys then string on one line, click the line and add a tab with the key name in the tab title and a split window between hex and string form?
 //       - display values and strings
 // idea: make a strings binary format - will this work for an arbitrary packed binary list? - should there be a data structure type and an underlying data type?
@@ -140,7 +143,7 @@ int           sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* sh
 
   return !nk_window_is_closed(ctx, "Overview");
 }
-void      RenderShape(Shape const& shp, Camera& camera) // GLuint shaderId)
+void      RenderShape(Shape const& shp, Camera const& camera) // GLuint shaderId)
 {
   // Camera/View transformation
   glUseProgram(shp.shader);  //shader.use();
@@ -162,10 +165,24 @@ void      RenderShape(Shape const& shp, Camera& camera) // GLuint shaderId)
 
   // Render
   int size;
+  glActiveTexture(GL_TEXTURE0);	// Activate the texture unit first before binding texture
+  glBindTexture(GL_TEXTURE_2D, shp.tx);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); // GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); // GL_LINEAR);
+
+  auto loc = glGetUniformLocation(shp.shader, "tex0");
+  glUniform1i(loc, 0);
+
   glBindVertexArray(shp.vertary);
-  glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);
-  glDrawElements(GL_TRIANGLES, size/sizeof(uint32_t), GL_UNSIGNED_INT, 0);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shp.idxbuf);
+  glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);   // todo: keep size with shape instead of querying it
+  glDrawElements(shp.mode, size/sizeof(uint32_t), GL_UNSIGNED_INT, 0);
+  //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+  
   glBindVertexArray(0);
+  glBindTexture(GL_TEXTURE_2D, 0);
 }
 GLFWwindow*  initGLFW(VizData* vd)
 {
@@ -294,11 +311,11 @@ int    main(void)
 
   SECTION(initialize static simdb and static VizData)
   {
-    new (&db) simdb("test", 1024, 64);        // inititialize the DB with placement new into the data segment
+    new (&db) simdb("test", 1024, 1<<12);        // inititialize the DB with placement new into the data segment
 
     vd.ui.w         =  1024; 
     vd.ui.h         =   768;
-    vd.ui.bgclr     =  nk_rgb(16,16,16);
+    vd.ui.bgclr     =  nk_rgb(16,16,16);     // darker than this may risk not seeing the difference between black and the background
     vd.now          =  nowd();
     vd.prev         =  vd.now;
     vd.verRefresh   =  0.007;                // roughly 144hz
@@ -366,7 +383,11 @@ int    main(void)
     SECTION(openGL frame setup)
     {
       glViewport(0, 0, vd.ui.w, vd.ui.h);
+      glEnable(GL_BLEND);
+      glEnable(GL_TEXTURE_2D);
+      glEnable(GL_DEPTH);
       glEnable(GL_DEPTH_TEST);                                   // glDepthFunc(GL_LESS);
+      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
       float bg[4];

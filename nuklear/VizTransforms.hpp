@@ -71,6 +71,13 @@ inline Shape          ivbuf_to_shape(void* buf, ui64 len)    //IndexedVerts* iv)
   auto iv = (IndexedVerts*)IndexedVertsLoad(buf);
   if(!iv) return shp;
 
+  shp.mode = iv->mode;
+
+  glGenTextures(1, &shp.tx);
+  glBindTexture(GL_TEXTURE_2D, shp.tx);
+  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, iv->imgWidth, iv->imgHeight, 0, GL_RGBA, GL_FLOAT, iv->pixels); 
+  glBindTexture(GL_TEXTURE_2D, 0);
+
   glGenVertexArrays(1, &shp.vertary);
   glGenBuffers(1,      &shp.vertbuf);
   glGenBuffers(1,      &shp.idxbuf );
@@ -84,12 +91,16 @@ inline Shape          ivbuf_to_shape(void* buf, ui64 len)    //IndexedVerts* iv)
   glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t)* iv->indicesLen, iv->indices, GL_STATIC_DRAW);
 
   IndexedVertsDestroy(iv);
+  
+  glVertexAttribPointer(POSITION, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);                      
+  glVertexAttribPointer(NORMAL,   3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) *  3));
+  glVertexAttribPointer(COLOR,    4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) *  6));
+  glVertexAttribPointer(TEXCOORD, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 10));
 
-  glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);
-  glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 6));
-
-  glEnableVertexAttribArray(0);
-  glEnableVertexAttribArray(1);
+  glEnableVertexAttribArray(POSITION);
+  glEnableVertexAttribArray(NORMAL);
+  glEnableVertexAttribArray(COLOR);
+  glEnableVertexAttribArray(TEXCOORD);
 
   glBindVertexArray(0);
 
@@ -109,6 +120,10 @@ inline auto    winbnd_to_sidebarRect(float w, float h) -> struct nk_rect
 
 
 
+
+//glVertexAttribPointer( (GLuint)AtrId::POSITION, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);                  // position 
+//glVertexAttribPointer( (GLuint)AtrId::NORMAL,   4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 6));   // normals 
+//glVertexAttribPointer( (GLuint)AtrId::COLOR,    4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 6));   // color 
 
 //str         vertexCode;
 //str       fragmentCode;

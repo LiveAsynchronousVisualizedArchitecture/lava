@@ -29,6 +29,10 @@
 #include "../DataStore/ConcurrentMap/simdb.hpp"
 #include "IndexedVerts.h"
 
+//enum struct AttribId { POSITION=0, NORMAL, COLOR, TEXCOORD };
+//enum struct AtrId : GLuint { POSITION=0, NORMAL=1, COLOR=2, TEXCOORD=3 };  // this coresponds to the the Vertex struct in IndexedVerts
+enum AtrId : GLuint { POSITION=0, NORMAL=1, COLOR=2, TEXCOORD=3 };  // this coresponds to the the Vertex struct in IndexedVerts
+
 using std::map;
 using str    = std::string;
 using VerStr = simdb::VerStr;
@@ -42,9 +46,10 @@ private:
   }
 
 public:
-  ui32    version; 
   int      active;
-  GLuint  vertbuf, vertary, idxbuf, tx, shader;  // todo: take out shader 
+  ui32    version, mode, indsz;          // mode is the openGL type of geometry to draw, indsz is the number of indices
+  GLuint  vertbuf, vertary, idxbuf, tx;  // normals, colors, uvcoords, image data 
+  GLuint   shader;                       // the shader ID is not owned by the shape 
 
   Shape() :
     version(0),
@@ -68,7 +73,10 @@ public:
 
   ~Shape()  // todo: put in checking to make sure that indices to delete are ok
   { 
+    // todo: need to build in ownership to not run the destructor twice?
     glDeleteVertexArrays(1, &vertary);
+    glDeleteBuffers(1,       &idxbuf);
+    glDeleteTextures(1,          &tx);
   }
 };
 
@@ -94,6 +102,8 @@ struct VizData
   } ui;
 
   double keyRefresh, keyRefreshClock, verRefresh, verRefreshClock, prev, now;
+
+  // todo: VizData deconstructor - will need this to clean up shader programs 
 };
 
 static const char*  vShaderPath  =  "../vertexShader.vert";
@@ -101,21 +111,38 @@ static const char*  fShaderPath  =  "../fragmentShader.frag";
 static const char*  vertShader   = 
 "#version 330 core \n \
 \
-layout(location = 0) in vec3 position; \
-layout(location = 1) in vec4 color; \
-out vec4 finalColor; \
+layout(location = 0) in vec3  P; \
+layout(location = 1) in vec3  N; \
+layout(location = 2) in vec4  C; \
+layout(location = 3) in vec2 UV; \
+\
+out vec3  fragN; \
+out vec4  fragC; \
+out vec2 fragUV; \
+\
 uniform mat4 transform; \
 void main(){ \
-  gl_Position = transform * vec4(position, 1.0f); \
-  finalColor = color; \
+  gl_Position = transform * vec4(P, 1.0f); \
+  fragN  =  N; \
+  fragC  =  C; \
+  fragUV = UV; \
 }";
 static const char*  fragShader   = 
 "#version 330 core \n \
 \
-in vec4 finalColor; \
-out vec4 color; \
+in vec3 fragN;  \
+in vec4 fragC;  \
+in vec2 fragUV; \
+\
+out vec4 Ci; \
+\
+uniform sampler2D tex0; \n \
+\
 void main(){ \
-  color = finalColor; \
+  //Ci = fragC; \n \
+  vec4 tClr =  texture2D(tex0, fragUV); \n \
+  //Ci        =  vec4(tClr.xyz*tClr.a,tClr.a) + ( (1-tClr.a)*fragC ); \n \
+  Ci = vec4(tClr.rgb, 1);  \
 }";
 
 static simdb    db;
