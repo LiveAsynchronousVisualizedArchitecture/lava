@@ -1,11 +1,21 @@
 
 #include "../IndexedVerts.cpp"         // todo: make IndexedVerts into an hpp file or a single header file style lib
 
+#include <thread>
+#include <chrono>
 #include "update_test_data.hpp"
 #include "update_test_generators.hpp"
 
 namespace {
 
+using std::thread;
+using std::chrono::duration;
+using std::chrono::milliseconds;
+using std::this_thread::sleep_for;
+using ms = duration<double, std::milli>;
+
+//using std::this_thread;
+//
 //void       genTestGeo(simdb* db)
 //{
 //  // Create serialized IndexedVerts
@@ -36,7 +46,10 @@ int    main(void)
 
   while(true)
   {
+    sleep_for( milliseconds(1) );
     db.put("shape", cubeData);
+
+    sleep_for( milliseconds(1) );    
     db.put("shape", rightData);
   }
   

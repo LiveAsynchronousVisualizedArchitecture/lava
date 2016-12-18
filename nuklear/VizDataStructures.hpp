@@ -29,37 +29,9 @@
 #include "../DataStore/ConcurrentMap/simdb.hpp"
 #include "IndexedVerts.h"
 
-//template<class KEY, class VALUE,
-//  class _Compare = std::less<KEY>,
-//  class _Alloc   = std::allocator<std::pair<const KEY,VALUE> > >
-//using map = std::map<KEY,VALUE, _Compare, _Alloc >;
-//template<class T> using unq = std::unique_ptr<T>;
-
 using std::map;
 using str    = std::string;
 using VerStr = simdb::VerStr;
-
-static const char*  vShaderPath  =  "../vertexShader.vert";
-static const char*  fShaderPath  =  "../fragmentShader.frag";
-static const char*  vertShader   = 
-"#version 330 core \n \
-\
-layout(location = 0) in vec3 position; \
-layout(location = 1) in vec4 color; \
-out vec4 finalColor; \
-uniform mat4 transform; \
-void main(){ \
-  gl_Position = transform * vec4(position, 1.0f); \
-  finalColor = color; \
-}";
-static const char*  fragShader   = 
-"#version 330 core \n \
-\
-in vec4 finalColor; \
-out vec4 color; \
-void main(){ \
-  color = finalColor; \
-}";
 
 struct Shape {                     // todo: make rvalue constructor - make all constructors?
 private:
@@ -100,13 +72,18 @@ public:
   }
 };
 
-//using  KeyShapes = map<str, Shape>;
+struct Camera
+{
+  float fieldOfView, xDiff, yDiff;
+  bool rightButtonDown, leftButtonDown;
+};
+
 using  KeyShapes = map<VerStr, Shape>;
 struct VizData
 {
   GLFWwindow*            win;                      /* Platform */    //int width = 0, height = 0;
   struct nk_context*     ctx;
-  // todo: camera 
+  Camera      camera;
   KeyShapes   shapes;
   GLuint    shaderId;
   struct
@@ -119,12 +96,45 @@ struct VizData
   double keyRefresh, keyRefreshClock, verRefresh, verRefreshClock, prev, now;
 };
 
+static const char*  vShaderPath  =  "../vertexShader.vert";
+static const char*  fShaderPath  =  "../fragmentShader.frag";
+static const char*  vertShader   = 
+"#version 330 core \n \
+\
+layout(location = 0) in vec3 position; \
+layout(location = 1) in vec4 color; \
+out vec4 finalColor; \
+uniform mat4 transform; \
+void main(){ \
+  gl_Position = transform * vec4(position, 1.0f); \
+  finalColor = color; \
+}";
+static const char*  fragShader   = 
+"#version 330 core \n \
+\
+in vec4 finalColor; \
+out vec4 color; \
+void main(){ \
+  color = finalColor; \
+}";
+
+static simdb    db;
+static VizData  vd;
+
+
 #endif
 
 
 
 
 
+//template<class KEY, class VALUE,
+//  class _Compare = std::less<KEY>,
+//  class _Alloc   = std::allocator<std::pair<const KEY,VALUE> > >
+//using map = std::map<KEY,VALUE, _Compare, _Alloc >;
+//template<class T> using unq = std::unique_ptr<T>;
+//
+//using  KeyShapes = map<str, Shape>;
 
 //
 //#include <unordered_map>

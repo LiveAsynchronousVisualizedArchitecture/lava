@@ -338,7 +338,7 @@ nk_glfw3_init(GLFWwindow *win, enum nk_glfw_init_state init_state)
 {
     glfw.win = win;
     if (init_state == NK_GLFW3_INSTALL_CALLBACKS) {
-        glfwSetScrollCallback(win, nk_gflw3_scroll_callback);
+        // glfwSetScrollCallback(win, nk_gflw3_scroll_callback);
         glfwSetCharCallback(win, nk_glfw3_char_callback);
     }
 

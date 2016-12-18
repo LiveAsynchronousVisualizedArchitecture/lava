@@ -1578,14 +1578,21 @@ public:
   {
     ui32 klen, vlen;
     bool    ok = false;
-    VerIdx nxt = this->nxt();                           if(nxt.idx==EMPTY_KEY) return {nxt.version, ""};
+    VerIdx nxt = this->nxt();                           
+    if(nxt.idx==EMPTY_KEY) 
+      return {nxt.version, ""};
+    
     ok         = this->len(nxt.idx, nxt.version, 
-                           &klen, &vlen);               if(!ok) return {nxt.version, ""};
+                           &klen, &vlen);               
+    if(!ok)
+      return {nxt.version, ""};
+    
     str key(klen,'\0');
     ok         = this->getKey(nxt.idx, nxt.version, 
                               (void*)key.data(), klen); 
                               
-    if(!ok || strlen(key.c_str())!=key.length() ) return {nxt.version, ""};
+    if(!ok || strlen(key.c_str())!=key.length() )
+      return {nxt.version, ""};
 
     //if(out_version) *out_version = nxt.version;
     //if(ok) 

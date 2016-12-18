@@ -45,36 +45,52 @@
 
 namespace {
 
-void   error_callback(int e, const char *d) {
+void      error_callback(int e, const char *d) {
     printf("Error %d: %s\n", e, d);
 }
-void     key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+void        key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
 }
-
-void       genTestGeo(simdb* db)
+void     scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
 {
-  // Create serialized IndexedVerts
-  size_t leftLen, rightLen, cubeLen;
-  vec<ui8>  leftData = makeTriangle(leftLen,   true);
-  vec<ui8> rightData = makeTriangle(rightLen, false);
-  vec<ui8>  cubeData = makeCube(cubeLen);
-
-  // Store serialized IndexedVerts in the db
-  str  leftTriangle = "leftTriangle";       // todo: make simdb put() that takes a const char* as key
-  str rightTriangle = "rightTriangle";
-  str          cube = "cube";
-
-  //db->put(leftTriangle.data(), (ui32)leftTriangle.length(), leftData.data(), (ui32)leftLen);
-  //db->put(rightTriangle.data(), (ui32)rightTriangle.length(), rightData.data(), (ui32)rightLen);
-  //db->put(cube.data(), (ui32)cube.length(), cubeData.data(), (ui32)cubeLen);
-
-  db->put(leftTriangle,   leftData);
-  db->put(rightTriangle, rightData);
-  db->put(cube, cubeData);
+  VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
+  if(vd->camera.fieldOfView < 45.0f) {
+    vd->camera.fieldOfView = 45.0f;
+  }
+  if(vd->camera.fieldOfView > 90.0f) {
+    vd->camera.fieldOfView = 90.0f;
+  }
+  vd->camera.fieldOfView += (GLfloat)(yoffset / 10);
 }
+void  mouse_btn_callback(GLFWwindow* window, int button, int action, int mods)
+{
+  VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
+  if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
+  {
+    vd->camera.rightButtonDown = true;
+    printf("Left mouse pressed\n");
+  }
+  if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
+  {
+    vd->camera.rightButtonDown = false;
+    printf("Left mouse released\n");
+  }
+}
+void cursor_pos_callback(GLFWwindow* window, double xposition, double yposition)
+{
+  VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
+  if(vd->camera.rightButtonDown)
+  {
+    // printf("X: %f\n", xposition);
+    // printf("Y: %f\n", yposition);
+
+    vd->camera.xDiff = (float)xposition;
+    vd->camera.yDiff = (float)yposition;
+  }
+}
+
 int           sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* shps) // VizData* vd)
 {
   using namespace std;
@@ -100,12 +116,23 @@ int           sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* sh
 
   return !nk_window_is_closed(ctx, "Overview");
 }
-void      RenderShape(Shape const& shp) // GLuint shaderId)
+void      RenderShape(Shape const& shp, Camera& camera) // GLuint shaderId)
 {
   // Camera/View transformation
   glUseProgram(shp.shader);  //shader.use();
+  glm::mat4 view;
+  view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
+  glm::mat4 model;
+  model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
+
+  glm::mat4 projection;
+  projection = glm::perspective((float)camera.fieldOfView, (GLfloat)1024 / (GLfloat)768, 0.1f, 100.0f);
   glm::mat4 transform;
-  transform = glm::rotate(transform, (GLfloat)glfwGetTime() * 50.0f, glm::vec3(0.2f, 0.5f, 1.0f));
+  transform = projection * view * model;
+  if(camera.xDiff || camera.yDiff)
+  {
+    transform = glm::rotate(transform, 90.0f, glm::vec3((camera.yDiff / 768.0f), (camera.xDiff / 1024.0f), 0.0f));
+  }
   GLint transformLoc = glGetUniformLocation(shp.shader, "transform");
   glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transform));
 
@@ -116,7 +143,6 @@ void      RenderShape(Shape const& shp) // GLuint shaderId)
   glDrawElements(GL_TRIANGLES, size/sizeof(uint32_t), GL_UNSIGNED_INT, 0);
   glBindVertexArray(0);
 }
-
 GLFWwindow*  initGLFW(VizData* vd)
 {
   glfwSetErrorCallback(error_callback);
@@ -130,6 +156,9 @@ GLFWwindow*  initGLFW(VizData* vd)
   glfwGetWindowSize(win, &vd->ui.w, &vd->ui.h);
 
   glfwSetKeyCallback(win, key_callback);
+  glfwSetScrollCallback(win, scroll_callback);
+  glfwSetCursorPosCallback(win, cursor_pos_callback);
+  glfwSetMouseButtonCallback(win, mouse_btn_callback);
 
   return win;
 }
@@ -239,26 +268,32 @@ int    main(void)
 {
   using namespace std;
 
-  VizData vd;                         // nothing should happen here in the 'default' constructor, although msvc's STL implementation might allocate memory in the default constructor of std::map
-  SECTION(initialize single VizData)
+  SECTION(initialize static simdb and VizData)
   {
-    vd.ui.w        =  1024; 
-    vd.ui.h        =   768;
-    vd.ui.bgclr    =  nk_rgb(28,48,62);
-    vd.now         =  nowd();
-    vd.prev        =  vd.now;
-    vd.verRefresh  =  0.1;
+    new (&db) simdb("test", 1024, 64);        // inititialize the DB with placement new into the data segment
+
+    vd.ui.w         =  1024; 
+    vd.ui.h         =   768;
+    vd.ui.bgclr     =  nk_rgb(28,48,62);
+    vd.now          =  nowd();
+    vd.prev         =  vd.now;
+    vd.verRefresh   =  0.1;
     vd.verRefreshClock = 0.0;
-    vd.keyRefresh  =  2.0;
-    vd.keyRefreshClock = vd.keyRefresh;
+    vd.keyRefresh         =  2.0;
+    vd.keyRefreshClock    = vd.keyRefresh;
+    vd.camera.fieldOfView = 45.0f;
+    vd.camera.xDiff       = 0;
+    vd.camera.yDiff       = 0;
+    vd.camera.rightButtonDown = false;
+    vd.camera.leftButtonDown = false;
   }
-
-  simdb   db("test", 1024, 64);        // Create the DB
-  //genTestGeo(&db);
-
-  vd.win = initGLFW( &vd );
-  initGlew();
-  vd.ctx = initNuklear(vd.win);
+  SECTION(initialize glfw window, glew, and nuklear)
+  {
+    vd.win = initGLFW( &vd );
+    glfwSetWindowUserPointer(vd.win, &vd);
+    initGlew();
+    vd.ctx = initNuklear(vd.win);
+  }
 
   while(!glfwWindowShouldClose(vd.win))
   {
@@ -295,8 +330,8 @@ int    main(void)
     }
     SECTION(GLFW input)
     {
-     glfwPollEvents();                                             /* Input */
-     glfwGetWindowSize(vd.win, &vd.ui.w, &vd.ui.h);
+      glfwPollEvents();                                             /* Input */
+      glfwGetWindowSize(vd.win, &vd.ui.w, &vd.ui.h);
     }
     SECTION(draw nuklear)
     {
@@ -318,7 +353,7 @@ int    main(void)
     {
       for(auto& kv : vd.shapes){
         if(kv.second.active)
-          RenderShape( kv.second );
+          RenderShape( kv.second, vd.camera );
       }
     }
 
@@ -339,8 +374,31 @@ int    main(void)
 
 
 
+//void       genTestGeo(simdb* db)
+//{
+//  // Create serialized IndexedVerts
+//  size_t leftLen, rightLen, cubeLen;
+//  vec<ui8>  leftData = makeTriangle(leftLen,   true);
+//  vec<ui8> rightData = makeTriangle(rightLen, false);
+//  vec<ui8>  cubeData = makeCube(cubeLen);
+//
+//  // Store serialized IndexedVerts in the db
+//  str  leftTriangle = "leftTriangle";       // todo: make simdb put() that takes a const char* as key
+//  str rightTriangle = "rightTriangle";
+//  str          cube = "cube";
+//
+//  db->put(leftTriangle,   leftData);
+//  db->put(rightTriangle, rightData);
+//  db->put(cube, cubeData);
+//}
 
+//VizData vd;
+//simdb   db("test", 1024, 8);        // Create the DB
+//genTestGeo(&db);
 
+//db->put(leftTriangle.data(), (ui32)leftTriangle.length(), leftData.data(), (ui32)leftLen);
+//db->put(rightTriangle.data(), (ui32)rightTriangle.length(), rightData.data(), (ui32)rightLen);
+//db->put(cube.data(), (ui32)cube.length(), cubeData.data(), (ui32)cubeLen);
 
 //SECTION(render the previously generated nuklear gui)
 //{
