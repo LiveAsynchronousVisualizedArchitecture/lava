@@ -16,14 +16,14 @@
 // -TODO: Control camera with mouse
 // -todo: make updates by all keys respect previous visibility
 // -todo: make IndexedVerts single header with split declaration and implementation sections
+// -todo: get working uvs and images
+// -TODO: Add all attributes
 
-// TODO: Add all attributes
-// todo: get working uvs and images
 // todo: rename VizDataStructures to just VizData
 // todo: add fps counter in the corner
 // todo: fix camera rotation resetting on mouse down
 // todo: add panning to right mouse button
-// todo: add color under cursor like previous visualizer - use the gl get frame like the previous visualizer - check if the cursor is over the gl window first as an optimization?
+// todo: add color under cursor like previous visualizer - use the gl get frame like the previous visualizer - check if the cursor is over the gl window first as an optimization? - sort of in but not working
 // todo: move and rename project to LavaViz or any non test name
 
 // idea: make IndexedVerts restore without copying bytes? - this would mean that there would need to be a pointer to the head and each member would be pointers filled in on deserialization? 
@@ -62,9 +62,16 @@
 #include "VizGenerators.hpp"
 #include "VizTransforms.hpp"
 
+#define ENTRY_DECLARATION int main(void)
+
 #ifdef _MSC_VER
   #pragma comment(lib, "glfw3dll.lib")
   #pragma comment(lib, "glew32.lib")
+
+  #undef  _CONSOLE
+  #define _WINDOWS
+  #undef ENTRY_DECLARATION
+  #define ENTRY_DECLARATION int WinMain(void)
 #endif
 
 #define MAX_VERTEX_BUFFER  512 * 1024
@@ -178,7 +185,8 @@ void      RenderShape(Shape const& shp, Camera const& camera) // GLuint shaderId
   glBindVertexArray(shp.vertary);
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shp.idxbuf);
   glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);   // todo: keep size with shape instead of querying it
-  glDrawElements(shp.mode, size/sizeof(uint32_t), GL_UNSIGNED_INT, 0);
+  glDrawElements(shp.mode, shp.indsz, GL_UNSIGNED_INT, 0);
+  //glDrawElements(shp.mode, size/sizeof(uint32_t), GL_UNSIGNED_INT, 0);
   //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
   
   glBindVertexArray(0);
@@ -305,7 +313,14 @@ double           nowd()
 
 }
 
-int    main(void)
+//int    main(void)
+//ENTRY_DECLARATION
+int CALLBACK WinMain(
+  _In_ HINSTANCE hInstance,
+  _In_ HINSTANCE hPrevInstance,
+  _In_ LPSTR     lpCmdLine,
+  _In_ int       nCmdShow
+)
 {
   using namespace std;
 
@@ -409,6 +424,11 @@ int    main(void)
         * Make sure to either a.) save and restore or b.) reset your own state after
         * rendering the UI. */
     glfwSwapBuffers(vd.win);
+
+    // todo: mouse position goes here to read back the color under the mouse 
+    //glReadPixels( (GLint)(vd.camera.xDiff * vd.ui.w), (GLint)(vd.camera.yDiff * vd.ui.h), 1, 1, GL_RGB, GL_FLOAT, vd.mouseRGB);
+    glReadPixels( (GLint)(vd.camera.xDiff), (GLint)(vd.camera.yDiff), 1, 1, GL_RGB, GL_FLOAT, vd.mouseRGB);
+    //printf("%f %f: %f %f %f \n", vd.camera.xDiff, vd.camera.yDiff, vd.mouseRGB[0], vd.mouseRGB[1], vd.mouseRGB[2]);
   }
 
   nk_glfw3_shutdown();

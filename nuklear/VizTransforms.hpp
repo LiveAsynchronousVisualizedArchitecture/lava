@@ -71,7 +71,8 @@ inline Shape          ivbuf_to_shape(void* buf, ui64 len)    //IndexedVerts* iv)
   auto iv = (IndexedVerts*)IndexedVertsLoad(buf);
   if(!iv) return shp;
 
-  shp.mode = iv->mode;
+  shp.mode  = iv->mode;
+  shp.indsz = iv->indicesLen;
 
   glGenTextures(1, &shp.tx);
   glBindTexture(GL_TEXTURE_2D, shp.tx);

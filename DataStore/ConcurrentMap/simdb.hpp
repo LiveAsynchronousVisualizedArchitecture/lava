@@ -8,6 +8,7 @@
 // -todo: take out infinite loop possibility in rm
 // -todo: take out any inf loops in runMatch
 
+// todo: change getKeyStrs() to get the number looped through by nxtKey() so it isn't O(n^2)
 // todo: make put give back FAILED_PUT on error
 // todo: make ConcurrentStore get() stop before exceeding maxlen?
 // todo: make put return VerIdx ?
@@ -1577,11 +1578,13 @@ public:
     if(this->get(key, &ret)) return ret;
     else return str("");
   }
-  VerStr    nxtKey()                                  const
+  VerStr    nxtKey(ui64* searched=nullptr)            const
   {
     ui32 klen, vlen;
     bool    ok = false;
-    VerIdx nxt = this->nxt();                           
+    auto  prev = m_nxtChIdx;
+    VerIdx nxt = this->nxt();
+    if(searched) *searched = (nxt.idx-prev)>0?  nxt.idx-prev  :  (m_blkCnt-prev-1) + nxt.idx+1;
     if(nxt.idx==EMPTY_KEY) 
       return {nxt.version, ""};
     
@@ -1599,6 +1602,8 @@ public:
 
     //if(out_version) *out_version = nxt.version;
     //if(ok) 
+
+
     return { nxt.version, key };                    // copy elision 
     //else   return { 0, "" };
   }
@@ -1617,15 +1622,18 @@ public:
 
     set<VerStr> keys;
 
-    ui32  i = 0;
+    //ui32       i = 0;
     //str nxt = nxtKey();
-    auto nxt = nxtKey();
-    while( i<m_blkCnt && keys.find(nxt)==keys.end() )
+    ui64 srchCnt = 0;
+    auto     nxt = nxtKey();                             
+    while( srchCnt<m_blkCnt && keys.find(nxt)==keys.end() )
     {
       if(nxt.s.length()>0) keys.insert(nxt);
     
-      nxt = nxtKey();
-      ++i;
+      ui64 searched = 0;
+      nxt = nxtKey(&searched);
+      srchCnt += searched;
+      //++i;
     }
 
     //if(out_versions) new (out_versions) vec<ui32>()

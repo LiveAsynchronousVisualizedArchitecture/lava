@@ -100,8 +100,8 @@ struct VizData
     struct nk_rect      rect;                // rect is the rectangle of the sidebar gui
     struct nk_color    bgclr;
   } ui;
-
-  double keyRefresh, keyRefreshClock, verRefresh, verRefreshClock, prev, now;
+  double  keyRefresh, keyRefreshClock, verRefresh, verRefreshClock, prev, now;
+  float  mouseRGB[3];
 
   // todo: VizData deconstructor - will need this to clean up shader programs 
 };
@@ -141,8 +141,8 @@ uniform sampler2D tex0; \n \
 void main(){ \
   //Ci = fragC; \n \
   vec4 tClr =  texture2D(tex0, fragUV); \n \
-  //Ci        =  vec4(tClr.xyz*tClr.a,tClr.a) + ( (1-tClr.a)*fragC ); \n \
-  Ci = vec4(tClr.rgb, 1);  \
+  Ci        =  vec4(tClr.xyz*tClr.a,tClr.a) + ( (1-tClr.a)*fragC ); \n \
+  //Ci = vec4(tClr.rgb, 1);  \n \
 }";
 
 static simdb    db;
