@@ -63,15 +63,16 @@
 #include "VizTransforms.hpp"
 
 #define ENTRY_DECLARATION int main(void)
-
 #ifdef _MSC_VER
   #pragma comment(lib, "glfw3dll.lib")
   #pragma comment(lib, "glew32.lib")
 
-  #undef  _CONSOLE
-  #define _WINDOWS
-  #undef ENTRY_DECLARATION
-  #define ENTRY_DECLARATION int WinMain(void)
+  #define USE_CONSOLE                                 // turning this off will use the windows subsystem in the linker and change the entry point to WinMain() so that no command line/console will appear
+  #ifndef USE_CONSOLE
+    #pragma comment( linker, "/subsystem:windows" )
+    #undef ENTRY_DECLARATION
+    #define ENTRY_DECLARATION int CALLBACK WinMain(_In_ HINSTANCE hInstance, _In_ HINSTANCE hPrevInstance, _In_ LPSTR lpCmdLine, _In_ int nCmdShow)
+  #endif
 #endif
 
 #define MAX_VERTEX_BUFFER  512 * 1024
@@ -313,14 +314,7 @@ double           nowd()
 
 }
 
-//int    main(void)
-//ENTRY_DECLARATION
-int CALLBACK WinMain(
-  _In_ HINSTANCE hInstance,
-  _In_ HINSTANCE hPrevInstance,
-  _In_ LPSTR     lpCmdLine,
-  _In_ int       nCmdShow
-)
+ENTRY_DECLARATION
 {
   using namespace std;
 
@@ -438,6 +432,19 @@ int CALLBACK WinMain(
 
 
 
+
+
+//#undef  _CONSOLE
+//#define _WINDOWS
+//#pragma comment( linker, "/subsystem:console" )
+//
+//int    main(void)
+//int CALLBACK WinMain(
+//  _In_ HINSTANCE hInstance,
+//  _In_ HINSTANCE hPrevInstance,
+//  _In_ LPSTR     lpCmdLine,
+//  _In_ int       nCmdShow
+//)
 
 //void       genTestGeo(simdb* db)
 //{
