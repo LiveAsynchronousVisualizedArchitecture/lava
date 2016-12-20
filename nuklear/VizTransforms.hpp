@@ -76,7 +76,22 @@ inline Shape          ivbuf_to_shape(void* buf, ui64 len)    //IndexedVerts* iv)
 
   glGenTextures(1, &shp.tx);
   glBindTexture(GL_TEXTURE_2D, shp.tx);
-  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, iv->imgWidth, iv->imgHeight, 0, GL_RGBA, GL_FLOAT, iv->pixels); 
+  switch(iv->imgChans){
+  case 1:
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R, iv->imgWidth, iv->imgHeight, 0, GL_R, GL_FLOAT, iv->pixels); 
+    break;
+  case 2:
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG, iv->imgWidth, iv->imgHeight, 0, GL_RG, GL_FLOAT, iv->pixels); 
+    break;
+  case 3:
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, iv->imgWidth, iv->imgHeight, 0, GL_RGB, GL_FLOAT, iv->pixels); 
+    break;
+  case 4:
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, iv->imgWidth, iv->imgHeight, 0, GL_RGBA, GL_FLOAT, iv->pixels); 
+    break;
+  default:
+    ;
+  }
   glBindTexture(GL_TEXTURE_2D, 0);
 
   glGenVertexArrays(1, &shp.vertary);

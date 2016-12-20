@@ -139,9 +139,11 @@ out vec4 Ci; \
 uniform sampler2D tex0; \n \
 \
 void main(){ \
-  //Ci = fragC; \n \
+  Ci = fragC; \n \
   vec4 tClr =  texture2D(tex0, fragUV); \n \
-  Ci        =  vec4(tClr.xyz*tClr.a,tClr.a) + ( (1-tClr.a)*fragC ); \n \
+  //Ci        =  vec4(tClr.xyz*tClr.a,tClr.a) + ( (1-tClr.a)*fragC ); \n \
+  //Ci        =  vec4(tClr.rgb*tClr.a,tClr.a) + ( (1-tClr.a)*fragC ); \n \
+  Ci        =  tClr + ( (1-tClr.a)*fragC ); \n \
   //Ci = vec4(tClr.rgb, 1);  \n \
 }";
 

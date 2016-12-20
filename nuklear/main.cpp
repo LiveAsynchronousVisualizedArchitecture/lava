@@ -19,6 +19,8 @@
 // -todo: get working uvs and images
 // -TODO: Add all attributes
 
+// todo: get single pixel images working with compositing
+// todo: figure out why tri key disapears  when using gradient, cube, and tri keys
 // todo: rename VizDataStructures to just VizData
 // todo: add fps counter in the corner
 // todo: fix camera rotation resetting on mouse down
@@ -187,6 +189,7 @@ void      RenderShape(Shape const& shp, Camera const& camera) // GLuint shaderId
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shp.idxbuf);
   glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);   // todo: keep size with shape instead of querying it
   glDrawElements(shp.mode, shp.indsz, GL_UNSIGNED_INT, 0);
+
   //glDrawElements(shp.mode, size/sizeof(uint32_t), GL_UNSIGNED_INT, 0);
   //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
   

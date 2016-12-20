@@ -1,5 +1,7 @@
 
-#include "../IndexedVerts.cpp"               // todo: make IndexedVerts into an hpp file or a single header file style lib
+
+#define LAVA_INDEXED_VERTS_IMPL
+#include "../IndexedVerts.h"               // todo: make IndexedVerts into an hpp file or a single header file style lib
 
 #include <thread>
 #include <chrono>
@@ -80,10 +82,14 @@ int    main(void)
   new (&db) simdb("test", 1024, 1<<12);        // 4096x1024 is 4MB inititialize the DB with placement new into the data segment
   
   ui64 rightLen, cubeLen;
-  vec<ui8> rightData = makeTriangle(rightLen, false);
-  vec<ui8>  cubeData = makeCube(cubeLen);
+  vec<ui8> right = makeTriangle(rightLen, false);
+  vec<ui8>  cube = makeCube(cubeLen);
 
-  //bool ok = db.put("shape", cubeData);
+  i64 idx = simdb::FAILED_PUT;
+  idx = db.put("cube", cube);
+  assert(idx!=simdb::FAILED_PUT);
+  idx = db.put("tri", right);
+  assert(idx!=simdb::FAILED_PUT);
 
   ChanImg grad(256, 256, 4, 0.f);
   auto pxcnt = 256*256*3;
@@ -97,8 +103,8 @@ int    main(void)
   vec<i8> gradIvBuf(sz);
   IndexedVertsSave(iv, gradIvBuf.data(), &sz);
 
-  auto idx = db.put("Image Gradient", gradIvBuf);
-  assert(idx != simdb::FAILED_PUT);
+  idx = db.put("Image Gradient", gradIvBuf);
+  assert(idx!=simdb::FAILED_PUT);
 
   //while(true)
   //{

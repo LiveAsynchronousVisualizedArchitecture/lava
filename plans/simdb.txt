@@ -5,4 +5,41 @@
 - make a separate file for atomic pointers?
 
 
+===========================================================================================
+| Make each parameter passed to a node be an iterator instead of a single data structure? |
+-------------------------------------------------------------------------------------------
+ simdb integrated data structures 
+-----------------------------------
+|- regular data structures, stored one per key
+|- data packs / contiguous memory block array 
+| |- an array of data structures packed into contiguous memory using a table at the start of the binary
+| |- one pack per key, as if the pack is a regular data structure
+|- lock free queue
+| |- the list would need to be a key that points to a block list like any other entry?
+| |- as the entries are used, the blocks containing the old entries could be freed one by one 
+| |- the head of the block list would need to be updated, which means that the key entry in the hash table would need to be updated 
+| |- entries could be atomically changed to be negative once used
+| |- after all the indices in a block are negative, change the next block to be marked as the head  
+| |- any thread can do this, since changing indices to negative is one way
+| |- more than one block could be marked as the head 
+| |- a reading thread would read the block list until they found a block not marked as the head 
+| |- then the previous block would be the real head
+| |- while finding multiple head blocks in a row, the key entry in the hash table can be updated to the real head
+| | |- how do you know you aren't updating to an older head? 
+| | |- is there a way to make sure that eventually the newest head will be in the hash table and when it is an older head, the head hasn't been freed yet? 
+| | | |- on hash table entry read, use the version number to know if you are reading the right entry 
+| | | |- when a block is freed/deallocated, make sure its version is set to 0 before actually freeing  
+| | | |- only try to free/deallocated blocks after the actual work of reading indices is done for a thread
+| | | |- after reading indices, mark next blocks to head
+| | | |- then set the all except the first blocks to have a version of 0
+| | | |- then update the hash key entry to the new head's block index and version combination    
+| | | |- then free the former head blocks
+| | | |- this should work because the state will only go one way for the blocks, if they get allocated again, they're versions will be different
+| | | |- this means that when reading from the hash table, if the version is not correct, you will know that you have an old entry
+| | | |- when you have an old entry from the hash table, you will have to look up from the hash table again, until you are able to get an up to date entry
+| | | |- in practice, if entries are 8 or 16 bytes, and blocks are 4096 bytes, 512 or 256 entries would need to be consumed and that block would need to be marked with version 0 to invalidate a hash table entry 
+|- Taking multiple elements from an iterator limited by both a static array (64-4096) and the total memory it would take to restore those elements
+
+
+
 
