@@ -82,15 +82,15 @@
 
 namespace {
 
-void      error_callback(int e, const char *d) {
+void     errorCallback(int e, const char *d) {
     printf("Error %d: %s\n", e, d);
 }
-void        key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+void       keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
     if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
         glfwSetWindowShouldClose(window, GL_TRUE);
 }
-void     scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
+void    scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
   if(vd->camera.fieldOfView < 45.0f) {
@@ -101,30 +101,33 @@ void     scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
   }
   vd->camera.fieldOfView += (GLfloat)(yoffset / 10);
 }
-void  mouse_btn_callback(GLFWwindow* window, int button, int action, int mods)
+void  mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 {
+  double xpos, ypos;
+  glfwGetCursorPos(window, &xpos, &ypos);
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
+
   if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
   {
-    vd->camera.rightButtonDown = true;
-    printf("Left mouse pressed\n");
+    vd->camera.leftButtonDown = true;
+    vd->camera.xRotationStart = (float)xpos;
+    vd->camera.yRotationStart = (float)ypos;
   }
   if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
   {
-    vd->camera.rightButtonDown = false;
-    printf("Left mouse released\n");
+    vd->camera.leftButtonDown = false;
   }
 }
-void cursor_pos_callback(GLFWwindow* window, double xposition, double yposition)
+void cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
 {
-  VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
-  if(vd->camera.rightButtonDown)
-  {
-    // printf("X: %f\n", xposition);
-    // printf("Y: %f\n", yposition);
+  using namespace glm;
 
-    vd->camera.xDiff = (float)xposition;
-    vd->camera.yDiff = (float)yposition;
+  VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
+  vec2 newMousePosition = vec2((float)xposition, (float)yposition);
+  if(vd->camera.leftButtonDown)
+  {
+    vd->camera.mouseDelta.x = (vd->camera.xRotationStart - (float)xposition) * vd->camera.sensitivity;
+    vd->camera.mouseDelta.y = (vd->camera.yRotationStart - (float)yposition) * vd->camera.sensitivity;
   }
 }
 
@@ -153,27 +156,24 @@ int           sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* sh
 
   return !nk_window_is_closed(ctx, "Overview");
 }
-void      RenderShape(Shape const& shp, Camera const& camera) // GLuint shaderId)
+void      RenderShape(Shape const& shp) // GLuint shaderId)
 {
-  // Camera/View transformation
+  using namespace glm;
   glUseProgram(shp.shader);  //shader.use();
-  glm::mat4 view;
-  view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-  glm::mat4 model;
-  model = glm::translate(model, glm::vec3(0.0f, 0.0f, 0.0f));
 
-  glm::mat4 projection;
-  projection = glm::perspective((float)camera.fieldOfView, (GLfloat)1024 / (GLfloat)768, 0.1f, 100.0f);
-  glm::mat4 transform;
-  transform = projection * view * model;
-  if(camera.xDiff || camera.yDiff)
-  {
-    transform = glm::rotate(transform, 90.0f, glm::vec3((camera.yDiff / 768.0f), (camera.xDiff / 1024.0f), 0.0f));
-  }
-  GLint transformLoc = glGetUniformLocation(shp.shader, "transform");
-  glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(transform));
+  mat4 view;
+  view = lookAt(vd.camera.position, vd.camera.viewDirection, vd.camera.up);
 
-  // Render
+  mat4 projection;
+  projection = perspective((float)vd.camera.fieldOfView, (GLfloat)1024 / (GLfloat)768, 0.1f, 100.0f);
+
+  vd.camera.transformMtx = projection * view;
+  vd.camera.transformMtx = rotate(vd.camera.transformMtx, vd.camera.mouseDelta.x, vec3(0.0f, 1.0f, 0.0f));
+  vd.camera.transformMtx = rotate(vd.camera.transformMtx, vd.camera.mouseDelta.y, vec3(1.0f, 0.0f, 0.0f));
+
+  GLint transformLoc = glGetUniformLocation(vd.shaderId, "transform");
+  glUniformMatrix4fv(transformLoc, 1, GL_FALSE, value_ptr(vd.camera.transformMtx));
+
   int size;
   glActiveTexture(GL_TEXTURE0);	// Activate the texture unit first before binding texture
   glBindTexture(GL_TEXTURE_2D, shp.tx);
@@ -196,9 +196,27 @@ void      RenderShape(Shape const& shp, Camera const& camera) // GLuint shaderId
   glBindVertexArray(0);
   glBindTexture(GL_TEXTURE_2D, 0);
 }
+//void updateCamera(VizData& vd)
+//{
+//  using namespace glm;
+//  glUseProgram(vd.shaderId);
+//
+//  mat4 view;
+//  view = lookAt(vd.camera.position, vd.camera.viewDirection, vd.camera.up);
+//
+//  mat4 projection;
+//  projection = perspective((float)vd.camera.fieldOfView, (GLfloat)1024 / (GLfloat)768, 0.1f, 100.0f);
+//  
+//  mat4 transform;
+//  transform = projection * view;
+//  transform = rotate(transform, vd.camera.xDelta, vec3(0.0f, 1.0f, 0.0f));
+//  transform = rotate(transform, vd.camera.yDelta, vec3(1.0f, 0.0f, 0.0f));
+//  GLint transformLoc = glGetUniformLocation(vd.shaderId, "transform");
+//  glUniformMatrix4fv(transformLoc, 1, GL_FALSE, value_ptr(transform));
+//}
 GLFWwindow*  initGLFW(VizData* vd)
 {
-  glfwSetErrorCallback(error_callback);
+  glfwSetErrorCallback(errorCallback);
   if( !glfwInit() ){
     fprintf(stdout, "[GFLW] failed to init!\n");
     exit(1);
@@ -208,10 +226,10 @@ GLFWwindow*  initGLFW(VizData* vd)
   glfwMakeContextCurrent(win);
   glfwGetWindowSize(win, &vd->ui.w, &vd->ui.h);
 
-  glfwSetKeyCallback(win, key_callback);
-  glfwSetScrollCallback(win, scroll_callback);
-  glfwSetCursorPosCallback(win, cursor_pos_callback);
-  glfwSetMouseButtonCallback(win, mouse_btn_callback);
+  glfwSetKeyCallback(win, keyCallback);
+  glfwSetScrollCallback(win, scrollCallback);
+  glfwSetCursorPosCallback(win, cursorPosCallback);
+  glfwSetMouseButtonCallback(win, mouseBtnCallback);
 
   return win;
 }
@@ -317,12 +335,32 @@ double           nowd()
 
 }
 
+void       genTestGeo(simdb* db)
+{
+  // Create serialized IndexedVerts
+  size_t leftLen, rightLen, cubeLen;
+  vec<ui8>  leftData = makeTriangle(leftLen, true);
+  vec<ui8> rightData = makeTriangle(rightLen, false);
+  vec<ui8>  cubeData = makeCube(cubeLen);
+
+  // Store serialized IndexedVerts in the db
+  str  leftTriangle = "leftTriangle";
+  str rightTriangle = "rightTriangle";
+  str          cube = "cube";
+
+  db->put(leftTriangle, leftData);
+  db->put(rightTriangle, rightData);
+  db->put(cube, cubeData);
+}
+
 ENTRY_DECLARATION
 {
   using namespace std;
 
   SECTION(initialize static simdb and static VizData)
   {
+    using namespace glm;
+
     new (&db) simdb("test", 1024, 1<<12);        // inititialize the DB with placement new into the data segment
 
     vd.ui.w         =  1024; 
@@ -332,14 +370,21 @@ ENTRY_DECLARATION
     vd.prev         =  vd.now;
     vd.verRefresh   =  0.007;                // roughly 144hz
     vd.verRefreshClock = 0.0;
-    vd.keyRefresh         =  2.0;
-    vd.keyRefreshClock    = vd.keyRefresh;
-    vd.camera.fieldOfView = 65.0f;
-    vd.camera.xDiff       = 0;
-    vd.camera.yDiff       = 0;
+    vd.keyRefresh            =  2.0;
+    vd.keyRefreshClock       = vd.keyRefresh;
+    vd.camera.fieldOfView    = 65.0f;
+    vd.camera.mouseDelta     = vec2(0.0f, 0.0f);
+    vd.camera.xRotationStart = 0;
+    vd.camera.yRotationStart = 0;
+    vd.camera.sensitivity    = 0.003f;
+    vd.camera.position       = vec3(0.0f, 0.0f, 3.0f);
+    vd.camera.viewDirection  = vec3(0.0f, 0.0f, 0.0f);
+    vd.camera.up             = vec3(0.0f, 1.0f, 0.0f);
+    vd.camera.oldMousePos    = vec2(0.0f, 0.0f);
     vd.camera.rightButtonDown = false;
     vd.camera.leftButtonDown  = false;
   }
+  genTestGeo(&db);
   SECTION(initialize glfw window, glew, and nuklear)
   {
     vd.win = initGLFW( &vd );
@@ -408,9 +453,10 @@ ENTRY_DECLARATION
     }
     SECTION(render the shapes in VizData::shapes)
     {
+      // updateCamera(vd);
       for(auto& kv : vd.shapes){
         if(kv.second.active)
-          RenderShape( kv.second, vd.camera );
+          RenderShape( kv.second );
       }
     }
 
@@ -424,7 +470,7 @@ ENTRY_DECLARATION
 
     // todo: mouse position goes here to read back the color under the mouse 
     //glReadPixels( (GLint)(vd.camera.xDiff * vd.ui.w), (GLint)(vd.camera.yDiff * vd.ui.h), 1, 1, GL_RGB, GL_FLOAT, vd.mouseRGB);
-    glReadPixels( (GLint)(vd.camera.xDiff), (GLint)(vd.camera.yDiff), 1, 1, GL_RGB, GL_FLOAT, vd.mouseRGB);
+    glReadPixels( (GLint)(vd.camera.mouseDelta.x), (GLint)(vd.camera.mouseDelta.y), 1, 1, GL_RGB, GL_FLOAT, vd.mouseRGB);
     //printf("%f %f: %f %f %f \n", vd.camera.xDiff, vd.camera.yDiff, vd.mouseRGB[0], vd.mouseRGB[1], vd.mouseRGB[2]);
   }
 
@@ -571,7 +617,7 @@ ENTRY_DECLARATION
 
 //int sidebar(struct nk_context *ctx, int width, int height, vec<Key>& keys, const vec<str>& dbKeys);
 //
-//void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
+//void keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods);
 
 //for(auto key : keys) {
 //    if(key.active) {
