@@ -83,14 +83,13 @@ public:
 
 struct Camera
 {
-  float fieldOfView, xRotationStart, yRotationStart, sensitivity;
+  float fieldOfView, sensitivity;
   glm::vec2 mouseDelta;
+  glm::vec2 oldMousePos;
   glm::vec3 position;
   glm::vec3 viewDirection;
   glm::vec3 up;
   glm::mat4 transformMtx;
-
-  glm::vec2 oldMousePos;
   bool rightButtonDown, leftButtonDown;
 };
 
