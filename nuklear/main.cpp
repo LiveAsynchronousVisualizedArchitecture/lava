@@ -58,6 +58,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/constants.hpp>
 #include "glfw3.h"
 
 #include "VizDataStructures.hpp"
@@ -82,6 +83,26 @@
 
 namespace {
 
+float wrapAngleRadians(float angle)
+{
+  using namespace glm;
+  float wrappedAngle = 0;
+
+  if(angle > 2 * pi<float>())
+  {
+    wrappedAngle = 0;
+  }
+  else if(angle < 0)
+  {
+    wrappedAngle = 2 * pi<float>();
+  }
+  else
+  {
+    wrappedAngle = angle;
+  }
+
+  return wrappedAngle;
+}
 void     errorCallback(int e, const char *d) {
     printf("Error %d: %s\n", e, d);
 }
@@ -103,15 +124,11 @@ void    scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 }
 void  mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 {
-  double xpos, ypos;
-  glfwGetCursorPos(window, &xpos, &ypos);
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
 
   if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
   {
     vd->camera.leftButtonDown = true;
-    vd->camera.xRotationStart = (float)xpos;
-    vd->camera.yRotationStart = (float)ypos;
   }
   if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
   {
@@ -124,13 +141,16 @@ void cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
 
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
   vec2 newMousePosition = vec2((float)xposition, (float)yposition);
+
   if(vd->camera.leftButtonDown)
   {
-    vd->camera.mouseDelta.x = (vd->camera.xRotationStart - (float)xposition) * vd->camera.sensitivity;
-    vd->camera.mouseDelta.y = (vd->camera.yRotationStart - (float)yposition) * vd->camera.sensitivity;
+    vd->camera.mouseDelta += (newMousePosition - vd->camera.oldMousePos) * vd->camera.sensitivity;
   }
-}
+  vd->camera.mouseDelta.x = wrapAngleRadians(vd->camera.mouseDelta.x);
+  vd->camera.mouseDelta.y = wrapAngleRadians(vd->camera.mouseDelta.y);
 
+  vd->camera.oldMousePos = newMousePosition;
+}
 int           sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* shps) // VizData* vd)
 {
   using namespace std;
@@ -206,13 +226,13 @@ void      RenderShape(Shape const& shp) // GLuint shaderId)
 //
 //  mat4 projection;
 //  projection = perspective((float)vd.camera.fieldOfView, (GLfloat)1024 / (GLfloat)768, 0.1f, 100.0f);
-//  
-//  mat4 transform;
-//  transform = projection * view;
-//  transform = rotate(transform, vd.camera.xDelta, vec3(0.0f, 1.0f, 0.0f));
-//  transform = rotate(transform, vd.camera.yDelta, vec3(1.0f, 0.0f, 0.0f));
+//
+//  vd.camera.transformMtx = projection * view;
+//  vd.camera.transformMtx = rotate(vd.camera.transformMtx, vd.camera.mouseDelta.x, vec3(0.0f, 1.0f, 0.0f));
+//  vd.camera.transformMtx = rotate(vd.camera.transformMtx, vd.camera.mouseDelta.y, vec3(1.0f, 0.0f, 0.0f));
+//
 //  GLint transformLoc = glGetUniformLocation(vd.shaderId, "transform");
-//  glUniformMatrix4fv(transformLoc, 1, GL_FALSE, value_ptr(transform));
+//  glUniformMatrix4fv(transformLoc, 1, GL_FALSE, value_ptr(vd.camera.transformMtx));
 //}
 GLFWwindow*  initGLFW(VizData* vd)
 {
@@ -370,17 +390,15 @@ ENTRY_DECLARATION
     vd.prev         =  vd.now;
     vd.verRefresh   =  0.007;                // roughly 144hz
     vd.verRefreshClock = 0.0;
-    vd.keyRefresh            =  2.0;
-    vd.keyRefreshClock       = vd.keyRefresh;
-    vd.camera.fieldOfView    = 65.0f;
-    vd.camera.mouseDelta     = vec2(0.0f, 0.0f);
-    vd.camera.xRotationStart = 0;
-    vd.camera.yRotationStart = 0;
-    vd.camera.sensitivity    = 0.003f;
-    vd.camera.position       = vec3(0.0f, 0.0f, 3.0f);
-    vd.camera.viewDirection  = vec3(0.0f, 0.0f, 0.0f);
-    vd.camera.up             = vec3(0.0f, 1.0f, 0.0f);
-    vd.camera.oldMousePos    = vec2(0.0f, 0.0f);
+    vd.keyRefresh             =  2.0;
+    vd.keyRefreshClock        = vd.keyRefresh;
+    vd.camera.fieldOfView     = 65.0f;
+    vd.camera.mouseDelta      = vec2(0.0f, 0.0f);
+    vd.camera.sensitivity     = 0.003f;
+    vd.camera.position        = vec3(0.0f, 0.0f, 3.0f);
+    vd.camera.viewDirection   = vec3(0.0f, 0.0f, 0.0f);
+    vd.camera.up              = vec3(0.0f, 1.0f, 0.0f);
+    vd.camera.oldMousePos     = vec2(0.0f, 0.0f);
     vd.camera.rightButtonDown = false;
     vd.camera.leftButtonDown  = false;
   }
