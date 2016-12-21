@@ -27,6 +27,7 @@
 //       - leftTriangle's return from put() is 0 - this is the block index, not the index in the hash map
 // -todo: fix key strings being cut off before the end of the nuklear sidebar - larger width on nk_layout_row_static doesn't cut off the text, but it adds a horizontal scroll bar and clicking keys no longer works - rect.w-25.f seems to work
 // -todo: fix camera rotation resetting on mouse down
+// -todo: make wrapAngle use modulo operator so that remainder is kept and the angle is not clamped - 2*PI stored as const static, fmodf used to get modulo of two floats, giving the remainer
 
 // todo: fix Y switching rotation if camera is rotated 180 degrees with X
 // todo: add panning to right mouse button
@@ -90,25 +91,32 @@
 
 namespace {
 
-float wrapAngleRadians(float angle)
+//float wrapAngleRadians(float angle)     
+//{
+//  using namespace glm;
+//  float wrappedAngle = 0;
+//
+//  if(angle > 2 * pi<float>())
+//  {
+//    wrappedAngle = 0;
+//  }
+//  else if(angle < 0)
+//  {
+//    wrappedAngle = 2 * pi<float>();
+//  }
+//  else
+//  {
+//    wrappedAngle = angle;
+//  }
+//
+//  return wrappedAngle;
+//}
+float wrapAngleRadians(float angle)     
 {
   using namespace glm;
-  float wrappedAngle = 0;
+  const static float _2PI = 2.f*pi<float>();
 
-  if(angle > 2 * pi<float>())
-  {
-    wrappedAngle = 0;
-  }
-  else if(angle < 0)
-  {
-    wrappedAngle = 2 * pi<float>();
-  }
-  else
-  {
-    wrappedAngle = angle;
-  }
-
-  return wrappedAngle;
+  return fmodf(angle, _2PI);
 }
 void     errorCallback(int e, const char *d) {
     printf("Error %d: %s\n", e, d);
