@@ -18,13 +18,20 @@
 // -todo: make IndexedVerts single header with split declaration and implementation sections
 // -todo: get working uvs and images
 // -TODO: Add all attributes
+// -todo: get single pixel images working with compositing
+// -todo: figure out why tri key disapears  when using gradient - seems like the number of blocks searched was not doing signed math and was returning a bogus large number, meaning that on wrap around, the number searched would go over the number of blocks even if few blocks had actually been searched
+//       - cube, and tri keys 
+//       - leftTriangle also dissapears when using original generators
+//       - if all the keys shows up the first time, why would one not show up the second time?
+//       - off by one error in getKeyStrs() when it loops around?
+//       - leftTriangle's return from put() is 0 - this is the block index, not the index in the hash map
+// -todo: fix key strings being cut off before the end of the nuklear sidebar - larger width on nk_layout_row_static doesn't cut off the text, but it adds a horizontal scroll bar and clicking keys no longer works - rect.w-25.f seems to work
+// -todo: fix camera rotation resetting on mouse down
 
-// todo: get single pixel images working with compositing
-// todo: figure out why tri key disapears  when using gradient, cube, and tri keys
+// todo: fix Y switching rotation if camera is rotated 180 degrees with X
+// todo: add panning to right mouse button
 // todo: rename VizDataStructures to just VizData
 // todo: add fps counter in the corner
-// todo: fix camera rotation resetting on mouse down
-// todo: add panning to right mouse button
 // todo: add color under cursor like previous visualizer - use the gl get frame like the previous visualizer - check if the cursor is over the gl window first as an optimization? - sort of in but not working
 // todo: move and rename project to LavaViz or any non test name
 
@@ -166,7 +173,8 @@ int           sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* sh
 
   if(nk_begin(ctx, &layout, "Overview", rect, window_flags))
   {
-      nk_layout_row_static(ctx, 18, 100, 1);
+      nk_layout_row_static(ctx, 18, (int)(rect.w-25.f), 1);
+      //nk_layout_row_static(ctx, 18, 120, 1);
       for(auto& kv : *shps){
         if(kv.first.s.length()>0)
           nk_selectable_label(ctx, kv.first.s.c_str(), NK_TEXT_LEFT, &kv.second.active);
@@ -357,6 +365,8 @@ double           nowd()
 
 void       genTestGeo(simdb* db)
 {
+  using namespace std;
+  
   // Create serialized IndexedVerts
   size_t leftLen, rightLen, cubeLen;
   vec<ui8>  leftData = makeTriangle(leftLen, true);

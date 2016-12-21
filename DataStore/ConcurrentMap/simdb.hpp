@@ -1582,9 +1582,14 @@ public:
   {
     ui32 klen, vlen;
     bool    ok = false;
-    auto  prev = m_nxtChIdx;
+    i64   prev = (i64)m_nxtChIdx;
     VerIdx nxt = this->nxt();
-    if(searched) *searched = (nxt.idx-prev)>0?  nxt.idx-prev  :  (m_blkCnt-prev-1) + nxt.idx+1;
+
+    if(searched){
+      i64 sidx  = (i64)nxt.idx;       // sidx is signed index
+      i64 sprev = (i64)prev;          // sprev is signed previous
+      *searched = (sidx-sprev)>0?  sidx-sprev  :  (m_blkCnt-sprev-1) + sidx+1;
+    }
     if(nxt.idx==EMPTY_KEY) 
       return {nxt.version, ""};
     

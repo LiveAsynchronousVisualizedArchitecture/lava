@@ -18,7 +18,7 @@ inline vec<ui8>      makeCube(size_t& byteLen)
   const unsigned int NUM_VERTICES = 8;
   const unsigned int NUM_INDICES = 36;
 
-  IndexedVerts* iv = (IndexedVerts*)IndexedVertsCreate(0, 6, IV_TRIANGLES, NUM_VERTICES, NUM_INDICES, 0, 0, 0);
+  IndexedVerts* iv = (IndexedVerts*)IndexedVertsCreate(0, 6, IV_TRIANGLES, NUM_VERTICES, NUM_INDICES, 1, 1, 4);
 
   iv->verts[0] = {
       {-0.5f, -0.5f, 0.5f},     //pos
@@ -93,6 +93,10 @@ inline vec<ui8>      makeCube(size_t& byteLen)
   // Copy index data into IndexedVerts.indices
   memcpy(iv->indices, cubeIndices, sizeof(GLuint) * NUM_INDICES);
 
+  // copy pixel data 
+  //memset(iv->pixels, 0, sizeof(float)*4);                 // 4 floats, all 0, meaning black color and black alpha
+  TO(4,i) iv->pixels[i] = 0.5f;
+
   // Call once to get byteLen
   IndexedVertsSave(iv, nullptr, &byteLen);
   vec<ui8> bytes(byteLen);
@@ -108,7 +112,7 @@ inline vec<ui8>  makeTriangle(size_t& byteLen, bool left)
   const unsigned int NUM_VERTICES = 3;
   const unsigned int NUM_INDICES = 3;
 
-  IndexedVerts* iv = (IndexedVerts*)IndexedVertsCreate(0, 6, IV_TRIANGLES, NUM_VERTICES, 3, 0, 0, 0);
+  IndexedVerts* iv = (IndexedVerts*)IndexedVertsCreate(0, 6, IV_TRIANGLES, NUM_VERTICES, 3, 1, 1, 4);
 
   if(left) {
       iv->verts[0] = {
@@ -155,6 +159,10 @@ inline vec<ui8>  makeTriangle(size_t& byteLen, bool left)
 
   // Copy index data into IndexedVerts.indices
   memcpy(iv->indices, indices, sizeof(GLuint)* NUM_INDICES);
+
+  // copy pixel data 
+  //memset(iv->pixels, 0, sizeof(float)*4);                 // 4 floats, all 0, meaning black color and black alpha
+  TO(4,i) iv->pixels[i] = 0.5f;
 
   // Call once to get byteLen
   IndexedVertsSave(iv, nullptr, &byteLen);

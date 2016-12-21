@@ -86,9 +86,9 @@ int    main(void)
   vec<ui8>  cube = makeCube(cubeLen);
 
   i64 idx = simdb::FAILED_PUT;
-  idx = db.put("cube", cube);
+  idx = db.put("update_test_cube", cube);
   assert(idx!=simdb::FAILED_PUT);
-  idx = db.put("tri", right);
+  idx = db.put("update_test_tri", right);
   assert(idx!=simdb::FAILED_PUT);
 
   ChanImg grad(256, 256, 4, 0.f);
@@ -103,7 +103,7 @@ int    main(void)
   vec<i8> gradIvBuf(sz);
   IndexedVertsSave(iv, gradIvBuf.data(), &sz);
 
-  idx = db.put("Image Gradient", gradIvBuf);
+  idx = db.put("update test Image Gradient", gradIvBuf);
   assert(idx!=simdb::FAILED_PUT);
 
   //while(true)
