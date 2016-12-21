@@ -29,7 +29,11 @@
 // -todo: fix camera rotation resetting on mouse down
 // -todo: make wrapAngle use modulo operator so that remainder is kept and the angle is not clamped - 2*PI stored as const static, fmodf used to get modulo of two floats, giving the remainer
 
-// todo: fix Y switching rotation if camera is rotated 180 degrees with X
+// todo: take camera position directly out of the transformation matrix
+// todo: make mouse delta a per frame change and not an accumulated changed
+// todo: separate mouse delta and camera sensitivity 
+// todo: take camera functions out of render shape
+// todo: fix Y switching rotation if camera is rotated 180 degrees with X - Y rotation needs to be relative to camera position
 // todo: add panning to right mouse button
 // todo: rename VizDataStructures to just VizData
 // todo: add fps counter in the corner
@@ -128,14 +132,19 @@ void       keyCallback(GLFWwindow* window, int key, int scancode, int action, in
 }
 void    scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
+  using namespace std;
+  
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
-  if(vd->camera.fieldOfView < 45.0f) {
-    vd->camera.fieldOfView = 45.0f;
-  }
-  if(vd->camera.fieldOfView > 90.0f) {
-    vd->camera.fieldOfView = 90.0f;
-  }
-  vd->camera.fieldOfView += (GLfloat)(yoffset / 10);
+  vd->camera.fieldOfView += (GLfloat)(yoffset / 10); 
+  vd->camera.fieldOfView  = max(45.f, min(90.f, vd->camera.fieldOfView));
+
+  //if(vd->camera.fieldOfView < 45.0f) {
+  //  vd->camera.fieldOfView = 45.0f;
+  //}
+  //
+  //if(vd->camera.fieldOfView > 90.0f) {
+  //  vd->camera.fieldOfView = 90.0f;
+  //}
 }
 void  mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 {
@@ -153,16 +162,19 @@ void  mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 void cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
 {
   using namespace glm;
+  const static float _2PI = 2.f*pi<float>();
 
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
   vec2 newMousePosition = vec2((float)xposition, (float)yposition);
 
-  if(vd->camera.leftButtonDown)
-  {
+  if(vd->camera.leftButtonDown){
     vd->camera.mouseDelta += (newMousePosition - vd->camera.oldMousePos) * vd->camera.sensitivity;
   }
-  vd->camera.mouseDelta.x = wrapAngleRadians(vd->camera.mouseDelta.x);
-  vd->camera.mouseDelta.y = wrapAngleRadians(vd->camera.mouseDelta.y);
+  vd->camera.mouseDelta.x = fmodf(vd->camera.mouseDelta.x, _2PI);
+  vd->camera.mouseDelta.y = fmodf(vd->camera.mouseDelta.y, _2PI);
+
+  //vd->camera.mouseDelta.x = wrapAngleRadians(vd->camera.mouseDelta.x);
+  //vd->camera.mouseDelta.y = wrapAngleRadians(vd->camera.mouseDelta.y);
 
   vd->camera.oldMousePos = newMousePosition;
 }
@@ -195,6 +207,9 @@ int           sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* sh
 void      RenderShape(Shape const& shp) // GLuint shaderId)
 {
   using namespace glm;
+  const static auto XAXIS = vec4(1.f, 0.f, 0.f, 1.f);
+  const static auto YAXIS = vec4(0.f, 1.f, 0.f, 1.f);
+
   glUseProgram(shp.shader);  //shader.use();
 
   mat4 view;
@@ -203,9 +218,13 @@ void      RenderShape(Shape const& shp) // GLuint shaderId)
   mat4 projection;
   projection = perspective((float)vd.camera.fieldOfView, (GLfloat)1024 / (GLfloat)768, 0.1f, 100.0f);
 
+  // todo: here the coordinate system of the camera will need to be used for the axises 
+  // - Z will be easy, it is the vector pointing at the origin (normalized)  
+  // X and Y will be (I think) the X and Y vectors each multiplied by the camera's current transformation matrix. 
+  // this will create camera transforms always relative to the camera and will hopefully give elegant rotation control
   vd.camera.transformMtx = projection * view;
-  vd.camera.transformMtx = rotate(vd.camera.transformMtx, vd.camera.mouseDelta.x, vec3(0.0f, 1.0f, 0.0f));
-  vd.camera.transformMtx = rotate(vd.camera.transformMtx, vd.camera.mouseDelta.y, vec3(1.0f, 0.0f, 0.0f));
+  vd.camera.transformMtx = rotate(vd.camera.transformMtx, vd.camera.mouseDelta.x, vec3(YAXIS*view) );
+  vd.camera.transformMtx = rotate(vd.camera.transformMtx, vd.camera.mouseDelta.y, vec3(XAXIS*view) ); //vec3(1.0f, 0.0f, 0.0f));
 
   GLint transformLoc = glGetUniformLocation(vd.shaderId, "transform");
   glUniformMatrix4fv(transformLoc, 1, GL_FALSE, value_ptr(vd.camera.transformMtx));
