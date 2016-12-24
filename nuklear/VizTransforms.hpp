@@ -11,7 +11,7 @@
   #define _SCL_SECURE_NO_WARNINGS 1
 #endif
 
-#include <GL/glew.h>
+#include "GL/glew.h"
 #include "glfw3.h"
 #include "IndexedVerts.h"
 #include "VizDataStructures.hpp"

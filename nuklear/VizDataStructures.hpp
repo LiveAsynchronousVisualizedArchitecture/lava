@@ -12,8 +12,8 @@
 #endif
 
 #include <map>
-#include <GL/glew.h>
-#include <glm\glm.hpp>
+#include "GL/glew.h"
+#include "glm/glm.hpp"
 
 #define NK_INCLUDE_FIXED_TYPES
 #define NK_INCLUDE_STANDARD_IO

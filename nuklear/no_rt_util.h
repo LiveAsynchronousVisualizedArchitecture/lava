@@ -36,9 +36,9 @@ using  f64  =              double;
 
 // for open subdiv
 #define M_PI PIf
-#define and &&
-#define not !
-#define or ||
+//#define and &&
+//#define not !
+//#define or ||
 // end open subdiv nonsense
 
 

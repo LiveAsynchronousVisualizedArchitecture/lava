@@ -29,6 +29,8 @@
 // -todo: fix camera rotation resetting on mouse down
 // -todo: make wrapAngle use modulo operator so that remainder is kept and the angle is not clamped - 2*PI stored as const static, fmodf used to get modulo of two floats, giving the remainer
 
+// todo: get visualizer compiling on osx
+// todo: get simdb working on osx - will have to use mmap(SHARED)
 // todo: take camera position directly out of the transformation matrix
 // todo: make mouse delta a per frame change and not an accumulated changed
 // todo: separate mouse delta and camera sensitivity 
@@ -63,14 +65,14 @@
 #include <algorithm>
 #include <fstream>
 #include <sstream>
-#include <GL/glew.h>
+#include "GL/glew.h"
 #include "no_rt_util.h"
 
 #define GLM_FORCE_RADIANS
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtc/type_ptr.hpp>
-#include <glm/gtc/constants.hpp>
+#include "glm/glm.hpp"
+#include "glm/gtc/matrix_transform.hpp"
+#include "glm/gtc/type_ptr.hpp"
+#include "glm/gtc/constants.hpp"
 #include "glfw3.h"
 
 #include "VizDataStructures.hpp"

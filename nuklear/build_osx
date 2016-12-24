@@ -1,0 +1,2 @@
+clang -w -std=c++11 unified.cpp -Wl libglew.so
+

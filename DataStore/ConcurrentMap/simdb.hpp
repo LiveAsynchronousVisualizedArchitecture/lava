@@ -133,10 +133,19 @@
 #include <set>
 #include <algorithm>
 
-#ifdef _WIN32      // windows
+
+
+#if defined(_WIN32)      // windows
  #define NOMINMAX
  #define WIN32_LEAN_AND_MEAN
  #include <windows.h>
+#elif defined(_APPLE_) || defined(__FreeBSD__)    // osx, linux and freebsd
+  // for mmap and munmap
+  // PROT_READ and PROT_WRITE  to allow reading and writing but not executing of the mapped memory pages
+  // MAP_ANONYMOUS | MAP_SHARED for the anonymous shared memory we want
+  // mmap is system call 2 on osx, freebsd, and linux
+  // the apple docs for mmap say "BSD System Calls" so I guess they haven't changed them around
+  #include <sys/mman.h>
 #endif
 
 #ifdef _WIN32
@@ -254,6 +263,7 @@ public:
     //p = addr;
   }
   lava_vec(lava_vec const&) = delete;
+  void operator=(lava_vec const&) = delete;
   lava_vec(lava_vec&& rval)
   {
     p      = rval.p;
@@ -430,7 +440,7 @@ public:
   union VerIdx
   {
     struct {
-      i32      idx;
+      ui32     idx;
       ui32 version;
     };
     ui64 asInt;
@@ -681,7 +691,7 @@ public:
     i32  blocks  =  blocksNeeded(size, &byteRem);
     //if(out_blocks) *out_blocks = blocks;
 
-    i32   st = s_cl.nxt();                                     // stBlk  is starting block
+    ui32   st = s_cl.nxt();                                     // stBlk  is starting block
     if(st==LIST_END){
       if(out_blocks) *out_blocks = 0; 
       return List_End(); // LIST_END; 
@@ -800,7 +810,7 @@ public:
 
     return len;                                           // only one return after the top to make sure readers can be decremented - maybe it should be wrapped in a struct with a destructor
   }
-  ui32       getKey(i32  blkIdx, ui32 version, void *const bytes, ui32 maxlen) const
+  ui32       getKey(ui32  blkIdx, ui32 version, void *const bytes, ui32 maxlen) const
   {
     if(blkIdx == LIST_END){ return 0; }
 
@@ -814,7 +824,7 @@ public:
     ui32    len = 0;
     ui32  rdLen = 0;
     i8*       b = (i8*)bytes;
-    i32     cur = blkIdx;
+    ui32    cur = blkIdx;
     VerIdx  nxt = { blkIdx, version };
 
     if(krem>0) --kblks;
@@ -1176,7 +1186,8 @@ public:
     
     //m_sz      =  nextPowerOf2(sz);
     m_sz      =  sz;
-    m_kvs     =  lava_vec<VerIdx>(m_sz);
+    //m_kvs     =  lava_vec<VerIdx>(m_sz);
+    new (&m_kvs) lava_vec<VerIdx>(m_sz); // placement new because the copy constructor and assignment operator are deleted.  msvc doesn't care, but clang does
     VerIdx defKv  =  empty_kv();
     for(ui64 i=0; i<m_kvs.size(); ++i) m_kvs[i] = defKv;
     
@@ -1225,19 +1236,27 @@ struct       SharedMem       // in a halfway state right now - will need to use 
 public:
   static void        FreeAnon(SharedMem& sm)
   {
-    if(sm.hndlPtr)  UnmapViewOfFile(sm.hndlPtr);
-    if(sm.fileHndl) CloseHandle(sm.fileHndl);
+    if(sm.hndlPtr){
+      #ifdef _WIN32
+        UnmapViewOfFile(sm.hndlPtr);
+      #endif
+    }
+    if(sm.fileHndl){
+      #ifdef _WIN32
+        CloseHandle(sm.fileHndl);
+      #endif
+    }
     sm.clear();
   }
   static SharedMem  AllocAnon(const char* name, ui64 size)
   {
     using namespace std;
     
+    SharedMem sm;
     #ifdef _WIN32      // windows
       char path[512] = "Global\\simdb_15_";
       strcat_s(path, sizeof(path), name);
 
-      SharedMem sm;
       sm.owner = false;
       //sm.size  = size;
       sm.size  = alignment==0? size  :  alignment-(size%alignment);
@@ -1263,7 +1282,12 @@ public:
         0,
         0);
       if(sm.hndlPtr==nullptr){ CloseHandle(sm.fileHndl); sm.clear(); return move(sm); }
-    #endif       // END windows
+      // END windows
+    #elif defined(_APPLE_) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
+      //todo: put in osx stuff here - likely mmmap with shared memory
+      sm.hndlPtr = mmap(NULL, sizeof(message), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+      if(sm.hndlPtr==MAP_FAILED){ /*todo: handle this error*/ }
+    #endif       
   
     ui64      addr = (ui64)(sm.hndlPtr);
     ui64 alignAddr = addr;
@@ -1654,6 +1678,9 @@ public:
   {    
     return put(key.data(), (ui32)key.length(), val.data(), (ui32)(val.size()*sizeof(T)) );
   }
+
+
+  /*
   template<class T>
   i64          get(vec<T> const& key, void*  out_buf) const     // todo: needs to be redone
   {
@@ -1666,6 +1693,7 @@ public:
 
     return len;
   }
+  */
   // end separated C++ functions
 
 };

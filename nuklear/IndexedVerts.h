@@ -2,6 +2,7 @@
 #define __LAVA_INDEXED_VERTS_HEADER_GUARD_H__
 
 #include <stdint.h>
+#include <stdlib.h>
 
 extern "C"
 {
@@ -161,7 +162,7 @@ extern "C"
     }
     void  IndexedVertsSave(void*  ivPtr, void*const  bytes, size_t* byteLen)
     {
-        using namespace std;
+        //using namespace std;
 
         const int params = 6;
 
