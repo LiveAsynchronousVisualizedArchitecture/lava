@@ -7,8 +7,9 @@
 // -todo: test with multiple threads in a loop
 // -todo: take out infinite loop possibility in rm
 // -todo: take out any inf loops in runMatch
+// -todo: change getKeyStrs() to get the number looped through by nxtKey() so it isn't O(n^2)
 
-// todo: change getKeyStrs() to get the number looped through by nxtKey() so it isn't O(n^2)
+// todo: make a macro to have separate windows and unix paths?
 // todo: make put give back FAILED_PUT on error
 // todo: make ConcurrentStore get() stop before exceeding maxlen?
 // todo: make put return VerIdx ?
@@ -145,6 +146,7 @@
   // MAP_ANONYMOUS | MAP_SHARED for the anonymous shared memory we want
   // mmap is system call 2 on osx, freebsd, and linux
   // the apple docs for mmap say "BSD System Calls" so I guess they haven't changed them around
+  #include <fcntl.h>
   #include <sys/mman.h>
 #endif
 
@@ -1236,16 +1238,22 @@ struct       SharedMem       // in a halfway state right now - will need to use 
 public:
   static void        FreeAnon(SharedMem& sm)
   {
-    if(sm.hndlPtr){
-      #ifdef _WIN32
+    #ifdef _WIN32
+      if(sm.hndlPtr){
         UnmapViewOfFile(sm.hndlPtr);
-      #endif
-    }
-    if(sm.fileHndl){
-      #ifdef _WIN32
+      }
+      if(sm.fileHndl){
         CloseHandle(sm.fileHndl);
-      #endif
-    }
+      }
+    #elif defined(_APPLE_) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
+      if(sm.hndlPtr){
+        munmap(sm.hndlPtr);
+      }
+      if(sm.fileHndl){
+        close(sm.fileHndl);
+      }
+    #endif
+
     sm.clear();
   }
   static SharedMem  AllocAnon(const char* name, ui64 size)
@@ -1253,13 +1261,18 @@ public:
     using namespace std;
     
     SharedMem sm;
+    sm.owner = false;
+    sm.size  = alignment==0? size  :  alignment-(size%alignment);
+
     #ifdef _WIN32      // windows
       char path[512] = "Global\\simdb_15_";
-      strcat_s(path, sizeof(path), name);
+    #elif defined(_APPLE_) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
+      char path[512] = "/tmp/simdb_15_";
+    #endif
 
-      sm.owner = false;
-      //sm.size  = size;
-      sm.size  = alignment==0? size  :  alignment-(size%alignment);
+    strcat_s(path, sizeof(path), name);
+
+    #ifdef _WIN32      // windows
 
       sm.fileHndl = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, path);
       if(sm.fileHndl==NULL)
@@ -1284,10 +1297,11 @@ public:
       if(sm.hndlPtr==nullptr){ CloseHandle(sm.fileHndl); sm.clear(); return move(sm); }
       // END windows
     #elif defined(_APPLE_) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
-      //todo: put in osx stuff here - likely mmmap with shared memory
+      sm.fileHndl = open(path, O_CREAT | O_RDWR | O_SHLOCK | O_NONBLOCK );
       sm.hndlPtr = mmap(NULL, sizeof(message), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
       if(sm.hndlPtr==MAP_FAILED){ /*todo: handle this error*/ }
     #endif       
+      //todo: put in osx stuff here - likely mmmap with shared memory
   
     ui64      addr = (ui64)(sm.hndlPtr);
     ui64 alignAddr = addr;
@@ -1744,3 +1758,30 @@ public:
 
 //
 //i  &=  m_sz - 1;
+
+
+/*
+open system call reference from http://www.unix.com/man-page/FreeBSD/2/open/
+
+           O_RDONLY	   open for reading only
+	   O_WRONLY	   open for writing only
+	   O_RDWR	   open for reading and writing
+	   O_EXEC	   open for execute only
+	   O_NONBLOCK	   do not block on open
+	   O_APPEND	   append on each write
+	   O_CREAT	   create file if it does not exist
+	   O_TRUNC	   truncate size to 0
+	   O_EXCL	   error if create and file exists
+	   O_SHLOCK	   atomically obtain a shared lock
+	   O_EXLOCK	   atomically obtain an exclusive lock
+	   O_DIRECT	   eliminate or reduce cache effects
+	   O_FSYNC	   synchronous writes
+	   O_SYNC	   synchronous writes
+	   O_NOFOLLOW	   do not follow symlinks
+	   O_NOCTTY	   don't assign controlling terminal
+	   O_TTY_INIT	   restore default terminal attributes
+	   O_DIRECTORY	   error if file is not a directory
+	   O_CLOEXEC	   set FD_CLOEXEC upon open
+*/
+
+
