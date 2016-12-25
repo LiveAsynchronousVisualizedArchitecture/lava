@@ -1,2 +1,4 @@
-clang -w -std=c++11 unified.cpp -Wl libglew.so
+clang++  -arch x86_64 -w -std=c++11 unified.cpp -framework OpenGL -L/opt/local/lib  -Wl ./libglfw.3.2.dylib  -Wl libGLEW.a
+
+#-Wl ./libGLEW.2.0.0.dylib
 
