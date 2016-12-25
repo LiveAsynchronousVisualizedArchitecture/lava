@@ -134,20 +134,22 @@
 #include <set>
 #include <algorithm>
 
-
-
+// platform specifics - mostly for shared memory mapping and auxillary functions like open, close and the windows equivilents
 #if defined(_WIN32)      // windows
  #define NOMINMAX
  #define WIN32_LEAN_AND_MEAN
  #include <windows.h>
-#elif defined(_APPLE_) || defined(__FreeBSD__)    // osx, linux and freebsd
+#elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
   // for mmap and munmap
   // PROT_READ and PROT_WRITE  to allow reading and writing but not executing of the mapped memory pages
   // MAP_ANONYMOUS | MAP_SHARED for the anonymous shared memory we want
   // mmap is system call 2 on osx, freebsd, and linux
   // the apple docs for mmap say "BSD System Calls" so I guess they haven't changed them around
-  #include <fcntl.h>
   #include <sys/mman.h>
+  #include <sys/fcntl.h>
+  #include <sys/errno.h>
+  #include <sys/unistd.h>
+  #include <unistd.h>
 #endif
 
 #ifdef _WIN32
@@ -1229,7 +1231,12 @@ struct       SharedMem       // in a halfway state right now - will need to use 
 {
   static const int alignment = 0;
   
-  void*      fileHndl;
+  #ifdef _WIN32
+    void*      fileHndl;
+  #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
+    int        fileHndl;
+  #endif
+
   void*       hndlPtr;
   void*           ptr;
   ui64           size;
@@ -1245,12 +1252,13 @@ public:
       if(sm.fileHndl){
         CloseHandle(sm.fileHndl);
       }
-    #elif defined(_APPLE_) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
+    #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
       if(sm.hndlPtr){
-        munmap(sm.hndlPtr);
+        munmap(sm.hndlPtr, sm.size);  // todo: size here needs to be the total size, and errors need to be checked
       }
       if(sm.fileHndl){
-        close(sm.fileHndl);
+        close(sm.fileHndl); // todo: get close to work
+        // todo: deal with errors here as well?
       }
     #endif
 
@@ -1266,11 +1274,14 @@ public:
 
     #ifdef _WIN32      // windows
       char path[512] = "Global\\simdb_15_";
-    #elif defined(_APPLE_) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
+    #elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
       char path[512] = "/tmp/simdb_15_";
     #endif
 
-    strcat_s(path, sizeof(path), name);
+    // todo: need to check that name and path are less than sizeof(path) here
+    ui32 len = strlen(path) + strlen(name);
+    if(len > sizeof(path)-1){ /* todo: handle errors here */ }
+    else{ strcat(path, name); }
 
     #ifdef _WIN32      // windows
 
@@ -1296,10 +1307,15 @@ public:
         0);
       if(sm.hndlPtr==nullptr){ CloseHandle(sm.fileHndl); sm.clear(); return move(sm); }
       // END windows
-    #elif defined(_APPLE_) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
-      sm.fileHndl = open(path, O_CREAT | O_RDWR | O_SHLOCK | O_NONBLOCK );
-      sm.hndlPtr = mmap(NULL, sizeof(message), PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, -1, 0);
-      if(sm.hndlPtr==MAP_FAILED){ /*todo: handle this error*/ }
+    #elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
+      sm.fileHndl = open(path, O_CREAT | O_RDWR | O_SHLOCK ); // | O_NONBLOCK );
+      if(sm.fileHndl == -1){
+        // get the error number and handle the error
+      }else{
+        sm.hndlPtr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, sm.fileHndl, 0);
+
+        if(sm.hndlPtr==MAP_FAILED){ /*todo: handle this error*/ }
+      }
     #endif       
       //todo: put in osx stuff here - likely mmmap with shared memory
   
@@ -1329,7 +1345,7 @@ public:
   }
   void clear()
   {
-    fileHndl  =  nullptr;
+    fileHndl  =  (decltype(fileHndl))0;
     hndlPtr   =  nullptr;
     ptr       =  nullptr;
     size      =  0;
