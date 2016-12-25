@@ -9,6 +9,7 @@
 // -todo: take out any inf loops in runMatch
 // -todo: change getKeyStrs() to get the number looped through by nxtKey() so it isn't O(n^2)
 
+// todo: make windows version have permissions for just read and write
 // todo: make a macro to have separate windows and unix paths?
 // todo: make put give back FAILED_PUT on error
 // todo: make ConcurrentStore get() stop before exceeding maxlen?
@@ -1285,7 +1286,7 @@ public:
 
     #ifdef _WIN32      // windows
 
-      sm.fileHndl = OpenFileMapping(FILE_MAP_ALL_ACCESS, FALSE, path);
+      sm.fileHndl = OpenFileMapping(FILE_MAP_READ | FILE_MAP_WRITE, FALSE, path);
       if(sm.fileHndl==NULL)
       {
         sm.fileHndl = CreateFileMapping(
@@ -1301,7 +1302,7 @@ public:
       if(sm.fileHndl==NULL){return move(sm);}
 
       sm.hndlPtr = MapViewOfFile(sm.fileHndl,   // handle to map object
-        FILE_MAP_ALL_ACCESS,   // read/write permission
+        FILE_MAP_READ | FILE_MAP_WRITE, // FILE_MAP_ALL_ACCESS,   // read/write permission
         0,
         0,
         0);
