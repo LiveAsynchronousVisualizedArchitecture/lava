@@ -1317,8 +1317,10 @@ public:
         // get the error number and handle the error
       }else{
         //sm.hndlPtr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, sm.fileHndl, 0);
-        fstore_t store = {F_ALLOCATECONTIG, F_PEOFPOSMODE, 0, (off_t)size};
-        fcntl( sm.fileHndl, F_PREALLOCATE, &store);
+
+        //fstore_t store = {F_ALLOCATECONTIG, F_PEOFPOSMODE, 0, (off_t)size};
+        fcntl( sm.fileHndl, F_PREALLOCATE ); 
+        ftruncate(sm.fileHndl, size);
 
         //auto zeromem = malloc(size);
         //memset(zeromem, 0, size);
