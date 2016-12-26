@@ -420,7 +420,7 @@ ENTRY_DECLARATION
   {
     using namespace glm;
 
-    new (&db) simdb("test", 1024, 1<<12);        // inititialize the DB with placement new into the data segment
+    new (&db) simdb("test", 1024, 1<<10);        // inititialize the DB with placement new into the data segment
 
     vd.ui.w         =  1024; 
     vd.ui.h         =   768;

@@ -8,6 +8,7 @@
 // -todo: take out infinite loop possibility in rm
 // -todo: take out any inf loops in runMatch
 // -todo: change getKeyStrs() to get the number looped through by nxtKey() so it isn't O(n^2)
+// -todo: put in osx stuff here - likely mmmap with shared memory
 
 // todo: make windows version have permissions for just read and write
 // todo: make a macro to have separate windows and unix paths?
@@ -1311,10 +1312,21 @@ public:
     #elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
       sm.fileHndl = open(path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH ); // O_CREAT | O_SHLOCK ); // | O_NONBLOCK );
       if(sm.fileHndl == -1){
-        printf("open failed, file handle was -1 \nFile name: %s \nError number: %d \n\n", path, errno); fflush(stdout);
+        printf("open failed, file handle was -1 \nFile name: %s \nError number: %d \n\n", path, errno); 
+        fflush(stdout);
         // get the error number and handle the error
       }else{
-        sm.hndlPtr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, sm.fileHndl, 0);
+        //sm.hndlPtr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, sm.fileHndl, 0);
+        fstore_t store = {F_ALLOCATECONTIG, F_PEOFPOSMODE, 0, (off_t)size};
+        fcntl( sm.fileHndl, F_PREALLOCATE, &store);
+
+        //auto zeromem = malloc(size);
+        //memset(zeromem, 0, size);
+        //write(sm.fileHndl, zeromem, size);
+        //free(zeromem);
+        sm.owner   = true; // todo: have to figure out how to detect which process is the owner
+        sm.hndlPtr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED , sm.fileHndl, 0); // MAP_PREFAULT_READ  | MAP_NOSYNC
+        memset(sm.hndlPtr, 0, size);
 
         if(sm.hndlPtr==MAP_FAILED){
           printf("mmap failed\nError number: %d \n\n", errno);
@@ -1323,7 +1335,6 @@ public:
         }
       }
     #endif       
-      //todo: put in osx stuff here - likely mmmap with shared memory
   
     ui64      addr = (ui64)(sm.hndlPtr);
     ui64 alignAddr = addr;
