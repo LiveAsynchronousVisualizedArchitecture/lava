@@ -28,8 +28,9 @@
 // -todo: fix key strings being cut off before the end of the nuklear sidebar - larger width on nk_layout_row_static doesn't cut off the text, but it adds a horizontal scroll bar and clicking keys no longer works - rect.w-25.f seems to work
 // -todo: fix camera rotation resetting on mouse down
 // -todo: make wrapAngle use modulo operator so that remainder is kept and the angle is not clamped - 2*PI stored as const static, fmodf used to get modulo of two floats, giving the remainer
+// -todo: get visualizer compiling on osx
 
-// todo: get visualizer compiling on osx
+// todo: get visualizer running without segfault on osx
 // todo: get simdb working on osx - will have to use mmap(SHARED)
 // todo: take camera position directly out of the transformation matrix
 // todo: make mouse delta a per frame change and not an accumulated changed
@@ -279,7 +280,12 @@ GLFWwindow*  initGLFW(VizData* vd)
     exit(1);
   }
 
-  GLFWwindow* win = glfwCreateWindow(vd->ui.w, vd->ui.h, "Demo", NULL, NULL);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+
+  GLFWwindow* win = glfwCreateWindow(vd->ui.w, vd->ui.h, "Demo", NULL, NULL);    assert(win!=nullptr);
   glfwMakeContextCurrent(win);
   glfwGetWindowSize(win, &vd->ui.w, &vd->ui.h);
 
@@ -292,7 +298,7 @@ GLFWwindow*  initGLFW(VizData* vd)
 }
 void         initGlew()
 {
-  glewExperimental = 1;
+  //glewExperimental = 1;
   if(glewInit() != GLEW_OK) {
     fprintf(stderr, "Failed to setup GLEW\n");
     exit(1);
@@ -333,12 +339,6 @@ void   shapesFromKeys(simdb const& db, vec<VerStr> const& dbKeys, VizData* vd)  
 }
 int  eraseMissingKeys(vec<VerStr> dbKeys, KeyShapes* shps)           // vec<str> dbKeys,
 {
-  //for(auto const& kv : *shps){
-  //  if( !binary_search(ALL(dbKeys),kv.first) ){
-  //    shps->erase(kv.first);
-  //    ++cnt;
-  //  }
-  //}
 
   int cnt = 0;
   sort( ALL(dbKeys) );
@@ -420,7 +420,7 @@ ENTRY_DECLARATION
   {
     using namespace glm;
 
-    new (&db) simdb("test", 1024, 1<<12);        // inititialize the DB with placement new into the data segment
+    //new (&db) simdb("test", 1024, 1<<12);        // inititialize the DB with placement new into the data segment
 
     vd.ui.w         =  1024; 
     vd.ui.h         =   768;
@@ -441,13 +441,13 @@ ENTRY_DECLARATION
     vd.camera.rightButtonDown = false;
     vd.camera.leftButtonDown  = false;
   }
-  genTestGeo(&db);
+  //genTestGeo(&db);
   SECTION(initialize glfw window, glew, and nuklear)
   {
-    vd.win = initGLFW( &vd );
+    vd.win = initGLFW( &vd );                        assert(vd.win!=nullptr);
     glfwSetWindowUserPointer(vd.win, &vd);
     initGlew();
-    vd.ctx = initNuklear(vd.win);
+    //vd.ctx = initNuklear(vd.win);                    assert(vd.ctx!=nullptr);
   }
 
   while(!glfwWindowShouldClose(vd.win))
@@ -463,9 +463,9 @@ ENTRY_DECLARATION
     SECTION(check updates if enough time stored in refresh clock variables)
     {
       if( vd.keyRefreshClock > vd.keyRefresh ){
-        auto dbKeys = db.getKeyStrs();                           // Get all keys in DB - this will need to be ran in the main loop, but not every frame
-        shapesFromKeys(db, dbKeys, &vd);
-        eraseMissingKeys(move(dbKeys), &vd.shapes);
+        //auto dbKeys = db.getKeyStrs();                           // Get all keys in DB - this will need to be ran in the main loop, but not every frame
+        //shapesFromKeys(db, dbKeys, &vd);
+        //eraseMissingKeys(move(dbKeys), &vd.shapes);
 
         vd.keyRefreshClock -= vd.keyRefresh;
         vd.verRefreshClock -= vd.verRefresh;
@@ -474,8 +474,9 @@ ENTRY_DECLARATION
           vd.keyRefreshClock = vd.keyRefresh + fmod(vd.keyRefreshClock, vd.keyRefresh);
       }else if( vd.verRefreshClock > vd.verRefresh ){
         for(auto& kv : vd.shapes){
-          if(kv.second.active)
-            updateKey(db, kv.first, &vd);
+          if(kv.second.active){
+            //updateKey(db, kv.first, &vd);
+          }
         }
         vd.verRefreshClock -= vd.verRefresh;
 
@@ -490,9 +491,9 @@ ENTRY_DECLARATION
     }
     SECTION(draw nuklear)
     {
-      nk_glfw3_new_frame();
+      //nk_glfw3_new_frame();
       vd.ui.rect = winbnd_to_sidebarRect((float)vd.ui.w, (float)vd.ui.h);
-      sidebar(vd.ctx, vd.ui.rect, &vd.shapes);                     // alters the shapes by setting their active flags
+      //sidebar(vd.ctx, vd.ui.rect, &vd.shapes);                     // alters the shapes by setting their active flags
     }
     SECTION(openGL frame setup)
     {
@@ -501,11 +502,11 @@ ENTRY_DECLARATION
       glEnable(GL_TEXTURE_2D);
       glEnable(GL_DEPTH);
       glEnable(GL_DEPTH_TEST);                                   // glDepthFunc(GL_LESS);
-      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+      //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
       float bg[4];
-      nk_color_fv(bg, vd.ui.bgclr);
+      //nk_color_fv(bg, vd.ui.bgclr);
       glClearColor(bg[0], bg[1], bg[2], bg[3]);
     }
     SECTION(render the shapes in VizData::shapes)
@@ -517,7 +518,8 @@ ENTRY_DECLARATION
       }
     }
 
-    nk_glfw3_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_BUFFER, MAX_ELEMENT_BUFFER);        /* 
+    //nk_glfw3_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_BUFFER, MAX_ELEMENT_BUFFER);        
+       /* 
         * IMPORTANT: `nk_glfw_render` modifies some global OpenGL state
         * with blending, scissor, face culling, depth test and viewport and
         * defaults everything back into a default state.
@@ -531,7 +533,7 @@ ENTRY_DECLARATION
     //printf("%f %f: %f %f %f \n", vd.camera.xDiff, vd.camera.yDiff, vd.mouseRGB[0], vd.mouseRGB[1], vd.mouseRGB[2]);
   }
 
-  nk_glfw3_shutdown();
+  //nk_glfw3_shutdown();
   glfwTerminate();
   return 0;
 }
@@ -539,6 +541,14 @@ ENTRY_DECLARATION
 
 
 
+
+
+  //for(auto const& kv : *shps){
+  //  if( !binary_search(ALL(dbKeys),kv.first) ){
+  //    shps->erase(kv.first);
+  //    ++cnt;
+  //  }
+  //}
 
 //#undef  _CONSOLE
 //#define _WINDOWS

@@ -116,7 +116,7 @@ struct VizData
 static const char*  vShaderPath  =  "../vertexShader.vert";
 static const char*  fShaderPath  =  "../fragmentShader.frag";
 static const char*  vertShader   = 
-"#version 330 core \n \
+"#version 320 core \n \
 \
 layout(location = 0) in vec3  P; \
 layout(location = 1) in vec3  N; \
@@ -135,7 +135,7 @@ void main(){ \
   fragUV = UV; \
 }";
 static const char*  fragShader   = 
-"#version 330 core \n \
+"#version 320 core \n \
 \
 in vec3 fragN;  \
 in vec4 fragC;  \

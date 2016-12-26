@@ -28,9 +28,9 @@ inline GLuint  shadersrc_to_shaderid(const char* vert, const char* frag)
   GLint success;
   glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &success);
   if(!success) {
-      GLchar infoLog[1024];
-      glGetShaderInfoLog(vertexShader, 1024, NULL, infoLog);
-      printf("Compiling vertex shader failed: %s\n", infoLog);
+    GLchar infoLog[1024];
+    glGetShaderInfoLog(vertexShader, 1024, NULL, infoLog);
+    printf("Compiling vertex shader failed: %s\n", infoLog);
   }
 
   GLuint fragmentShader;

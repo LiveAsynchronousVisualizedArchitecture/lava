@@ -1,5 +1,7 @@
 
-clang++  -arch x86_64 -w -std=c++11 -stdlib=libc++ unified.cpp -framework OpenGL -L/opt/local/lib  -Wl ./libglfw.3.2.dylib  -Wl libGLEW.a
+clang++ -g -arch x86_64 -w -std=c++11 -stdlib=libc++ \
+ unified.cpp -framework OpenGL \
+ -L/opt/local/lib  -Wl ./libglfw.3.2.dylib  -Wl libGLEW.a -o nuklear_test.app
 
 #-Wl ./libGLEW.2.0.0.dylib
 

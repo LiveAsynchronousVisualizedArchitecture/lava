@@ -1285,7 +1285,6 @@ public:
     else{ strcat(path, name); }
 
     #ifdef _WIN32      // windows
-
       sm.fileHndl = OpenFileMapping(FILE_MAP_READ | FILE_MAP_WRITE, FALSE, path);
       if(sm.fileHndl==NULL)
       {
@@ -1311,11 +1310,12 @@ public:
     #elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
       sm.fileHndl = open(path, O_CREAT | O_RDWR | O_SHLOCK ); // | O_NONBLOCK );
       if(sm.fileHndl == -1){
+        printf("file handle was -1");
         // get the error number and handle the error
       }else{
         sm.hndlPtr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, sm.fileHndl, 0);
 
-        if(sm.hndlPtr==MAP_FAILED){ /*todo: handle this error*/ }
+        if(sm.hndlPtr==MAP_FAILED){ printf("mmap failed"); /*todo: handle this error*/ }
       }
     #endif       
       //todo: put in osx stuff here - likely mmmap with shared memory
