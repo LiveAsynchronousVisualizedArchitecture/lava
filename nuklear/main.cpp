@@ -447,7 +447,7 @@ ENTRY_DECLARATION
     vd.win = initGLFW( &vd );                        assert(vd.win!=nullptr);
     glfwSetWindowUserPointer(vd.win, &vd);
     initGlew();
-    //vd.ctx = initNuklear(vd.win);                    assert(vd.ctx!=nullptr);
+    vd.ctx = initNuklear(vd.win);                    assert(vd.ctx!=nullptr);
   }
 
   while(!glfwWindowShouldClose(vd.win))
@@ -491,9 +491,9 @@ ENTRY_DECLARATION
     }
     SECTION(draw nuklear)
     {
-      //nk_glfw3_new_frame();
+      nk_glfw3_new_frame();
       vd.ui.rect = winbnd_to_sidebarRect((float)vd.ui.w, (float)vd.ui.h);
-      //sidebar(vd.ctx, vd.ui.rect, &vd.shapes);                     // alters the shapes by setting their active flags
+      sidebar(vd.ctx, vd.ui.rect, &vd.shapes);                     // alters the shapes by setting their active flags
     }
     SECTION(openGL frame setup)
     {
@@ -506,7 +506,7 @@ ENTRY_DECLARATION
 
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
       float bg[4];
-      //nk_color_fv(bg, vd.ui.bgclr);
+      nk_color_fv(bg, vd.ui.bgclr);
       glClearColor(bg[0], bg[1], bg[2], bg[3]);
     }
     SECTION(render the shapes in VizData::shapes)
@@ -518,7 +518,7 @@ ENTRY_DECLARATION
       }
     }
 
-    //nk_glfw3_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_BUFFER, MAX_ELEMENT_BUFFER);        
+    nk_glfw3_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_BUFFER, MAX_ELEMENT_BUFFER);        
        /* 
         * IMPORTANT: `nk_glfw_render` modifies some global OpenGL state
         * with blending, scissor, face culling, depth test and viewport and
