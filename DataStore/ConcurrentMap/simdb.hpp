@@ -1276,7 +1276,8 @@ public:
     #ifdef _WIN32      // windows
       char path[512] = "Global\\simdb_15_";
     #elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
-      char path[512] = "/tmp/simdb_15_";
+      //char path[512] = "/tmp/simdb_15_";
+      char path[512] = "simdb_15_";
     #endif
 
     // todo: need to check that name and path are less than sizeof(path) here
@@ -1308,14 +1309,18 @@ public:
       if(sm.hndlPtr==nullptr){ CloseHandle(sm.fileHndl); sm.clear(); return move(sm); }
       // END windows
     #elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
-      sm.fileHndl = open(path, O_CREAT | O_RDWR | O_SHLOCK ); // | O_NONBLOCK );
+      sm.fileHndl = open(path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH ); // O_CREAT | O_SHLOCK ); // | O_NONBLOCK );
       if(sm.fileHndl == -1){
-        printf("file handle was -1");
+        printf("open failed, file handle was -1 \nFile name: %s \nError number: %d \n\n", path, errno); fflush(stdout);
         // get the error number and handle the error
       }else{
         sm.hndlPtr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, sm.fileHndl, 0);
 
-        if(sm.hndlPtr==MAP_FAILED){ printf("mmap failed"); /*todo: handle this error*/ }
+        if(sm.hndlPtr==MAP_FAILED){
+          printf("mmap failed\nError number: %d \n\n", errno);
+          fflush(stdout);
+          /*todo: handle this error*/ 
+        }
       }
     #endif       
       //todo: put in osx stuff here - likely mmmap with shared memory
