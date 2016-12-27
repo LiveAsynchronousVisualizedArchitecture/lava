@@ -86,3 +86,5 @@ nuklear/nuklear_test/nuklear_test/
 *.swp
 
 nuklear/.VizDataStructures.hpp.swp
+
+nuklear/simdb_15_test
