@@ -116,8 +116,33 @@ struct VizData
 static const char*  vShaderPath  =  "../vertexShader.vert";
 static const char*  fShaderPath  =  "../fragmentShader.frag";
 static const char*  vertShader   = 
-"#version 320 core \n \
+"#version 330 core\n"
+"\n"
+"uniform mat4 transform; \n"
+"\n"
+//"attribute vec3  P;\n"
+//"attribute vec3  N;\n"
+//"attribute vec4  C;\n"
+//"attribute vec2 UV;\n"
+"layout(location = 0) in vec3  P; \n"
+"layout(location = 1) in vec3  N; \n"
+"layout(location = 2) in vec4  C; \n"
+"layout(location = 3) in vec2 UV; \n"
+"\n"
+"out vec3  fragN; \
+out vec4  fragC; \
+out vec2 fragUV; \
 \
+void main(){ \
+  gl_Position = transform * vec4(P, 1.0f); \
+  fragN  =  N; \
+  fragC  =  C; \
+  fragUV = UV; \
+}";
+/*
+static const char*  vertShader   = 
+"#version 140\n"
+"\
 layout(location = 0) in vec3  P; \
 layout(location = 1) in vec3  N; \
 layout(location = 2) in vec4  C; \
@@ -134,9 +159,10 @@ void main(){ \
   fragC  =  C; \
   fragUV = UV; \
 }";
+*/
 static const char*  fragShader   = 
-"#version 320 core \n \
-\
+"#version 140\n"
+"\
 in vec3 fragN;  \
 in vec4 fragC;  \
 in vec2 fragUV; \
@@ -147,7 +173,7 @@ uniform sampler2D tex0; \n \
 \
 void main(){ \
   Ci = fragC; \n \
-  vec4 tClr =  texture2D(tex0, fragUV); \n \
+  vec4 tClr =  texture(tex0, fragUV); \n \
   //Ci        =  vec4(tClr.xyz*tClr.a,tClr.a) + ( (1-tClr.a)*fragC ); \n \
   //Ci        =  vec4(tClr.rgb*tClr.a,tClr.a) + ( (1-tClr.a)*fragC ); \n \
   Ci        =  tClr + ( (1-tClr.a)*fragC ); \n \

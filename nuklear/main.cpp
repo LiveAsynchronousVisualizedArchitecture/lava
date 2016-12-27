@@ -126,7 +126,8 @@ float wrapAngleRadians(float angle)
   return fmodf(angle, _2PI);
 }
 void     errorCallback(int e, const char *d) {
-    printf("Error %d: %s\n", e, d);
+  printf("Error %d: %s\n", e, d);
+  fflush(stdout);
 }
 void       keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -281,7 +282,7 @@ GLFWwindow*  initGLFW(VizData* vd)
   }
 
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
@@ -441,12 +442,12 @@ ENTRY_DECLARATION
     vd.camera.rightButtonDown = false;
     vd.camera.leftButtonDown  = false;
   }
-  //genTestGeo(&db);
+  genTestGeo(&db);
   SECTION(initialize glfw window, glew, and nuklear)
   {
     vd.win = initGLFW( &vd );                        assert(vd.win!=nullptr);
-    glfwSetWindowUserPointer(vd.win, &vd);
     initGlew();
+    glfwSetWindowUserPointer(vd.win, &vd);
     vd.ctx = initNuklear(vd.win);                    assert(vd.ctx!=nullptr);
   }
 
@@ -463,9 +464,9 @@ ENTRY_DECLARATION
     SECTION(check updates if enough time stored in refresh clock variables)
     {
       if( vd.keyRefreshClock > vd.keyRefresh ){
-        //auto dbKeys = db.getKeyStrs();                           // Get all keys in DB - this will need to be ran in the main loop, but not every frame
-        //shapesFromKeys(db, dbKeys, &vd);
-        //eraseMissingKeys(move(dbKeys), &vd.shapes);
+        auto dbKeys = db.getKeyStrs();                           // Get all keys in DB - this will need to be ran in the main loop, but not every frame
+        shapesFromKeys(db, dbKeys, &vd);
+        eraseMissingKeys(move(dbKeys), &vd.shapes);
 
         vd.keyRefreshClock -= vd.keyRefresh;
         vd.verRefreshClock -= vd.verRefresh;
@@ -475,7 +476,7 @@ ENTRY_DECLARATION
       }else if( vd.verRefreshClock > vd.verRefresh ){
         for(auto& kv : vd.shapes){
           if(kv.second.active){
-            //updateKey(db, kv.first, &vd);
+            updateKey(db, kv.first, &vd);
           }
         }
         vd.verRefreshClock -= vd.verRefresh;
