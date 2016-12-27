@@ -1328,7 +1328,7 @@ public:
         sm.owner   = true; // todo: have to figure out how to detect which process is the owner
 
         //fstore_t store = {F_ALLOCATECONTIG, F_PEOFPOSMODE, 0, (off_t)size};
-        fcntl( sm.fileHndl, F_PREALLOCATE ); 
+        fcntl( sm.fileHndl, F_PREALLOCATE ); //  todo: try F_ALLOCATECONTIG at some point
         ftruncate(sm.fileHndl, size);   // todo: don't truncate if not the owner, and don't pre-allocate either ?
 
         //auto zeromem = malloc(size);

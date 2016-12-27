@@ -288,7 +288,6 @@ GLFWwindow*  initGLFW(VizData* vd)
   glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
   glfwWindowHint(GLFW_SAMPLES, 32);
 
-
   GLFWwindow* win = glfwCreateWindow(vd->ui.w, vd->ui.h, "Demo", NULL, NULL);    assert(win!=nullptr);
   glfwMakeContextCurrent(win);
   glfwGetWindowSize(win, &vd->ui.w, &vd->ui.h);
@@ -297,6 +296,13 @@ GLFWwindow*  initGLFW(VizData* vd)
   glfwSetScrollCallback(win, scrollCallback);
   glfwSetCursorPosCallback(win, cursorPosCallback);
   glfwSetMouseButtonCallback(win, mouseBtnCallback);
+
+  #ifdef _WIN32
+    GLFWimage images[2];
+    images[0] = load_icon("lava.jpg");
+    images[1] = load_icon("lava.jpg");
+    glfwSetWindowIcon(win, 2, images);
+  #endif
 
   return win;
 }
@@ -1179,4 +1185,4 @@ public:
     }
     void visible(bool b) { m_visible = b; }
     bool visible() const { return m_visible; }
-};*/
+*/
