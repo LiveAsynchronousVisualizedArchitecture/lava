@@ -285,6 +285,9 @@ GLFWwindow*  initGLFW(VizData* vd)
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
   glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
   glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+  glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
+  glfwWindowHint(GLFW_SAMPLES, 32);
+
 
   GLFWwindow* win = glfwCreateWindow(vd->ui.w, vd->ui.h, "Demo", NULL, NULL);    assert(win!=nullptr);
   glfwMakeContextCurrent(win);

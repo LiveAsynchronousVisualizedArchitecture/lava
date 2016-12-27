@@ -10,8 +10,11 @@
 // -todo: change getKeyStrs() to get the number looped through by nxtKey() so it isn't O(n^2)
 // -todo: put in osx stuff here - likely mmmap with shared memory
 
+// todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths 
 // todo: make windows version have permissions for just read and write
 // todo: make a macro to have separate windows and unix paths?
+// todo: make realloc that changes the size of a block list
+// todo: check if memset to 0 is still anywhere in the release build - line 1827 still has a memset to 0 on free
 // todo: make put give back FAILED_PUT on error
 // todo: make ConcurrentStore get() stop before exceeding maxlen?
 // todo: make put return VerIdx ?
@@ -1278,9 +1281,10 @@ public:
 
     #ifdef _WIN32      // windows
       char path[512] = "Global\\simdb_15_";
-    #elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
-      //char path[512] = "/tmp/simdb_15_";
-      char path[512] = "simdb_15_";
+    //#elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
+    #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
+      char path[512] = "/tmp/simdb_15_";
+      //char path[512] = "simdb_15_";
     #endif
 
     // todo: need to check that name and path are less than sizeof(path) here
@@ -1311,24 +1315,26 @@ public:
         0);
       if(sm.hndlPtr==nullptr){ CloseHandle(sm.fileHndl); sm.clear(); return move(sm); }
       // END windows
-    #elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
-      sm.fileHndl = open(path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH ); // O_CREAT | O_SHLOCK ); // | O_NONBLOCK );
+    //#elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
+    #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
+      //sm.fileHndl = open(path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH ); // O_CREAT | O_SHLOCK ); // | O_NONBLOCK );
+      sm.fileHndl = open(path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR |S_IRGRP|S_IWGRP | S_IROTH|S_IWOTH ); // O_CREAT | O_SHLOCK ); // | O_NONBLOCK );
       if(sm.fileHndl == -1){
         printf("open failed, file handle was -1 \nFile name: %s \nError number: %d \n\n", path, errno); 
         fflush(stdout);
         // get the error number and handle the error
       }else{
         //sm.hndlPtr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, sm.fileHndl, 0);
+        sm.owner   = true; // todo: have to figure out how to detect which process is the owner
 
         //fstore_t store = {F_ALLOCATECONTIG, F_PEOFPOSMODE, 0, (off_t)size};
         fcntl( sm.fileHndl, F_PREALLOCATE ); 
-        ftruncate(sm.fileHndl, size);
+        ftruncate(sm.fileHndl, size);   // todo: don't truncate if not the owner, and don't pre-allocate either ?
 
         //auto zeromem = malloc(size);
         //memset(zeromem, 0, size);
         //write(sm.fileHndl, zeromem, size);
         //free(zeromem);
-        sm.owner   = true; // todo: have to figure out how to detect which process is the owner
         sm.hndlPtr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED , sm.fileHndl, 0); // MAP_PREFAULT_READ  | MAP_NOSYNC
         memset(sm.hndlPtr, 0, size);
 
