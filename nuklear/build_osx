@@ -5,3 +5,7 @@ clang++ -g -arch x86_64 -w -std=c++11 -stdlib=libc++ \
 
 #-Wl ./libGLEW.2.0.0.dylib
 
+clang++ -g -arch x86_64 -w -std=c++11 -stdlib=libc++ \
+ ./update_test/update_test.cpp  \
+ -o update_test.app
+

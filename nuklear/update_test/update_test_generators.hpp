@@ -13,7 +13,7 @@
 
 #include "update_test_data.hpp"
 
-inline vec<ui8>      makeCube(size_t& byteLen)
+inline vec<ui8>      makeCube()
 {
   const unsigned int NUM_VERTICES = 8;
   const unsigned int NUM_INDICES = 36;
@@ -99,6 +99,7 @@ inline vec<ui8>      makeCube(size_t& byteLen)
 
 
   // Call once to get byteLen
+  size_t byteLen = 0;
   IndexedVertsSave(iv, nullptr, &byteLen);
   vec<ui8> bytes(byteLen);
   // Call again to serialize
@@ -107,7 +108,7 @@ inline vec<ui8>      makeCube(size_t& byteLen)
 
   return bytes;
 }
-inline vec<ui8>  makeTriangle(size_t& byteLen, bool left)
+inline vec<ui8>  makeTriangle(bool left)
 {
   // Create triangle Vertex data
   const unsigned int NUM_VERTICES = 3;
@@ -166,6 +167,7 @@ inline vec<ui8>  makeTriangle(size_t& byteLen, bool left)
   TO(4,i) iv->pixels[i] = 1.f;
 
   // Call once to get byteLen
+  size_t byteLen = 0;
   IndexedVertsSave(iv, nullptr, &byteLen);
   vec<ui8> bytes(byteLen);
   // Call again to serialize

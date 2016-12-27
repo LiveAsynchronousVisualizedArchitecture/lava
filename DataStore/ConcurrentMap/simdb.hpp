@@ -132,9 +132,11 @@
 #include <mutex>
 #include <memory>
 #include <vector>
+#include <string>
 #include <unordered_set>
 #include <set>
 #include <algorithm>
+#include <cassert>
 
 // platform specifics - mostly for shared memory mapping and auxillary functions like open, close and the windows equivilents
 #if defined(_WIN32)      // windows
@@ -545,13 +547,13 @@ private:
   ui64                 m_szBytes;
   mutable ai32      m_blocksUsed;      // todo: this is a mistake and does no good unless it is in the shared memory
 
-  i32             stPtr(i32  blkIdx)  const
-  {
+  //i32             stPtr(i32  blkIdx)  const
+  //{
     //return (i32*)( ((i8*)m_blksAddr) + blkIdx*m_blockSize );
     //return (i32*)&(m_bls.data()[blkIdx]);
     //return m_bls[blkIdx].idx;
     //return m_bls[blkIdx].idx;
-  }
+  //}
   VerIdx       nxtBlock(i32  blkIdx)  const
   {
     BlkLst bl = s_bls[blkIdx];
@@ -1719,7 +1721,7 @@ public:
   }
   bool          rm(str const& key)
   {
-    return this->rm( key.data(), (ui32)key.length() );
+    return this->rm( (void const* const)key.data(), (ui32)key.length() );
   }
 
   template<class T>

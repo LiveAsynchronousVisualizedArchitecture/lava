@@ -78,3 +78,11 @@ ipch/
 
 
 nuklear/nuklear_test/nuklear_test/
+
+*.swp
+
+*.swp
+
+*.swp
+
+nuklear/.VizDataStructures.hpp.swp
