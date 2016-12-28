@@ -156,6 +156,7 @@
   #include <sys/fcntl.h>
   #include <sys/errno.h>
   #include <sys/unistd.h>
+  #include <sys/file.h>         // for flock
   #include <unistd.h>
 #endif
 
@@ -1249,6 +1250,15 @@ struct       SharedMem       // in a halfway state right now - will need to use 
   ui64           size;
   bool          owner;
 
+  static  bool file_exists(char const* filename)
+  {
+    if(FILE* file = fopen(filename, "r")){
+      fclose(file);
+      return true;
+    }
+    return false;
+  }
+
 public:
   static void        FreeAnon(SharedMem& sm)
   {
@@ -1318,31 +1328,45 @@ public:
     //#elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
     #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
       //sm.fileHndl = open(path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH ); // O_CREAT | O_SHLOCK ); // | O_NONBLOCK );
-      sm.fileHndl = open(path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR |S_IRGRP|S_IWGRP | S_IROTH|S_IWOTH ); // O_CREAT | O_SHLOCK ); // | O_NONBLOCK );
-      if(sm.fileHndl == -1){
-        printf("open failed, file handle was -1 \nFile name: %s \nError number: %d \n\n", path, errno); 
-        fflush(stdout);
-        // get the error number and handle the error
+      sm.owner   = true; // todo: have to figure out how to detect which process is the owner
+
+      FILE* fp = fopen(path,"rw");
+      if(fp){
+        fclose(fp);
+        sm.fileHndl = open(path, O_RDWR);
+        sm.owner = false;
       }else{
-        //sm.hndlPtr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, sm.fileHndl, 0);
-        sm.owner   = true; // todo: have to figure out how to detect which process is the owner
-
-        //fstore_t store = {F_ALLOCATECONTIG, F_PEOFPOSMODE, 0, (off_t)size};
-        fcntl( sm.fileHndl, F_PREALLOCATE ); //  todo: try F_ALLOCATECONTIG at some point
-        ftruncate(sm.fileHndl, size);   // todo: don't truncate if not the owner, and don't pre-allocate either ?
-
-        //auto zeromem = malloc(size);
-        //memset(zeromem, 0, size);
-        //write(sm.fileHndl, zeromem, size);
-        //free(zeromem);
-        sm.hndlPtr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED , sm.fileHndl, 0); // MAP_PREFAULT_READ  | MAP_NOSYNC
-        memset(sm.hndlPtr, 0, size);
-
-        if(sm.hndlPtr==MAP_FAILED){
-          printf("mmap failed\nError number: %d \n\n", errno);
+        sm.fileHndl = open(path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR |S_IRGRP|S_IWGRP | S_IROTH|S_IWOTH ); // O_CREAT | O_SHLOCK ); // | O_NONBLOCK );
+        if(sm.fileHndl == -1){
+          printf("open failed, file handle was -1 \nFile name: %s \nError number: %d \n\n", path, errno); 
           fflush(stdout);
-          /*todo: handle this error*/ 
         }
+      }
+
+      if(sm.owner){  // todo: still need more concrete race protection
+        //fstore_t store = {F_ALLOCATECONTIG, F_PEOFPOSMODE, 0, (off_t)size};
+
+        //struct flock lck = {0,0,0};
+        //fcntl(F_GETLK, 
+
+        //flock(sm.fileHndl, LOCK_EX);   // exclusive lock  // LOCK_NB
+        fcntl(sm.fileHndl, F_PREALLOCATE); //  todo: try F_ALLOCATECONTIG at some point
+        ftruncate(sm.fileHndl, size);   // todo: don't truncate if not the owner, and don't pre-allocate either ?
+        // get the error number and handle the error
+      }
+      //sm.hndlPtr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, sm.fileHndl, 0);
+
+      //auto zeromem = malloc(size);
+      //memset(zeromem, 0, size);
+      //write(sm.fileHndl, zeromem, size);
+      //free(zeromem);
+      sm.hndlPtr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED , sm.fileHndl, 0); // MAP_PREFAULT_READ  | MAP_NOSYNC
+      // memset(sm.hndlPtr, 0, size);
+ 
+      if(sm.hndlPtr==MAP_FAILED){
+        printf("mmap failed\nError number: %d \n\n", errno);
+        fflush(stdout);
+        /*todo: handle this error*/ 
       }
     #endif       
   

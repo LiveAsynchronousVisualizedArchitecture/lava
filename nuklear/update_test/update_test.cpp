@@ -79,7 +79,7 @@ IndexedVerts* ChanImgToIndexedVerts(ChanImg ci, std::initializer_list<i64> chns=
 
 int    main(void)
 {
-  new (&db) simdb("test", 1024, 1<<12);        // 4096x1024 is 4MB inititialize the DB with placement new into the data segment
+  new (&db) simdb("test", 1024, 1<<14);        // 4096x1024 is 4MB inititialize the DB with placement new into the data segment
   
   ui64 rightLen, cubeLen;
   vec<ui8> right = makeTriangle(false);  // rightLen,
