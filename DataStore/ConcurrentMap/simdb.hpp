@@ -1341,17 +1341,21 @@ public:
           printf("open failed, file handle was -1 \nFile name: %s \nError number: %d \n\n", path, errno); 
           fflush(stdout);
         }
+        else{
+          //flock(sm.fileHndl, LOCK_EX);   // exclusive lock  // LOCK_NB
+        }
       }
 
       if(sm.owner){  // todo: still need more concrete race protection
         //fstore_t store = {F_ALLOCATECONTIG, F_PEOFPOSMODE, 0, (off_t)size};
 
         //struct flock lck = {0,0,0};
-        //fcntl(F_GETLK, 
+        fcntl(sm.fileHndl, F_GETLK, &flock);
 
-        //flock(sm.fileHndl, LOCK_EX);   // exclusive lock  // LOCK_NB
+        flock(sm.fileHndl, LOCK_EX);   // exclusive lock  // LOCK_NB
         fcntl(sm.fileHndl, F_PREALLOCATE); //  todo: try F_ALLOCATECONTIG at some point
         ftruncate(sm.fileHndl, size);   // todo: don't truncate if not the owner, and don't pre-allocate either ?
+        flock(sm.fileHndl, LOCK_EX);
         // get the error number and handle the error
       }
       //sm.hndlPtr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, sm.fileHndl, 0);
@@ -1361,6 +1365,8 @@ public:
       //write(sm.fileHndl, zeromem, size);
       //free(zeromem);
       sm.hndlPtr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED , sm.fileHndl, 0); // MAP_PREFAULT_READ  | MAP_NOSYNC
+      close(sm.fileHndl);
+      sm.fileHndl = 0;
       // memset(sm.hndlPtr, 0, size);
  
       if(sm.hndlPtr==MAP_FAILED){

@@ -29,9 +29,13 @@
 // -todo: fix camera rotation resetting on mouse down
 // -todo: make wrapAngle use modulo operator so that remainder is kept and the angle is not clamped - 2*PI stored as const static, fmodf used to get modulo of two floats, giving the remainer
 // -todo: get visualizer compiling on osx
+// -todo: get visualizer running without segfault on osx
+// -todo: get simdb working on osx - will have to use mmap(SHARED)
+// -todo: try closing file after mmap - seems to work
 
-// todo: get visualizer running without segfault on osx
-// todo: get simdb working on osx - will have to use mmap(SHARED)
+// todo: work out file locking so there is no race condition on two programs creating mmaped files
+// todo: figure out reference counting so that files are cleaned up on exit
+// todo: try debugging gradient plane object in update_test
 // todo: take camera position directly out of the transformation matrix
 // todo: make mouse delta a per frame change and not an accumulated changed
 // todo: separate mouse delta and camera sensitivity 
