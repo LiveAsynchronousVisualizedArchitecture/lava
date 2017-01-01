@@ -81,7 +81,7 @@ int    main(void)
 {
   new (&db) simdb("test", 1024, 1<<14);        // 4096x1024 is 4MB inititialize the DB with placement new into the data segment
   
-  ui64 rightLen, cubeLen;
+  //ui64 rightLen, cubeLen;
   vec<ui8> right = makeTriangle(false);  // rightLen,
   vec<ui8>  cube = makeCube();           // (cubeLen);
 

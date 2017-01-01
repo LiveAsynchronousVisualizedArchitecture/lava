@@ -6,10 +6,10 @@
 #ifndef __VIZ_GENERATORS_HEADERGUARD_HPP__
 #define __VIZ_GENERATORS_HEADERGUARD_HPP__
 
-#ifdef _MSC_VER
-  #define _CRT_SECURE_NO_WARNINGS 1
-  #define _SCL_SECURE_NO_WARNINGS 1
-#endif
+//#ifdef _MSC_VER
+//  #define _CRT_SECURE_NO_WARNINGS 1
+//  #define _SCL_SECURE_NO_WARNINGS 1
+//#endif
 
 #include "VizDataStructures.hpp"
 

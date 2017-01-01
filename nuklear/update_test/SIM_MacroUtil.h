@@ -8,9 +8,18 @@
 #ifndef __MACROUTIL_HEADERGUARD_H__
 #define __MACROUTIL_HEADERGUARD_H__
 
+//#ifdef _MSC_VER
+//  #define _CRT_SECURE_NO_WARNINGS 1
+//  #define _SCL_SECURE_NO_WARNINGS 1
+//#endif
 #ifdef _MSC_VER
-  #define _CRT_SECURE_NO_WARNINGS 1
-  #define _SCL_SECURE_NO_WARNINGS 1
+  #if !defined(_CRT_SECURE_NO_WARNINGS)
+    #define _CRT_SECURE_NO_WARNINGS
+  #endif
+
+  #if !defined(_SCL_SECURE_NO_WARNINGS)
+    #define _SCL_SECURE_NO_WARNINGS
+  #endif
 #endif
 
 

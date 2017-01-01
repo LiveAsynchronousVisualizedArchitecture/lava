@@ -7,6 +7,7 @@ Every data structure is flat linear memory throughout the dataflow
       -Though this takes a dereference, it will pull in the next 120 bytes which are likely to be read from anyway
     -The next 64 bits are a pointer to the function to deallocate the memory?
       -Can this be done purely through types?  Does unique_ptr do it purely through types?
+    -The 64 bits after the size could be the type. 8 bytes creating a 64 bit unsigned integer, possibly created by 8 ascii characters
   -Need a static sizeBytes function that takes constructor arguments and returns the amount of memory needed to store them
   -SizeBytes can cast any pointer to a ui64*, dereference it and return the size in bytes 
   -operators can still be overloaded since the single pointer data on the stack will still have a type

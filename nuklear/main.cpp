@@ -302,10 +302,10 @@ GLFWwindow*  initGLFW(VizData* vd)
   glfwSetMouseButtonCallback(win, mouseBtnCallback);
 
   #ifdef _WIN32
-    GLFWimage images[2];
-    images[0] = load_icon("lava.jpg");
-    images[1] = load_icon("lava.jpg");
-    glfwSetWindowIcon(win, 2, images);
+    //GLFWimage images[2];
+    //images[0] = LoadIcon("lava.jpg");
+    //images[1] = LoadIcon("lava.jpg");
+    //glfwSetWindowIcon(win, 2, images);
   #endif
 
   return win;

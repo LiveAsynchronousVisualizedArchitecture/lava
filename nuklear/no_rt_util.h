@@ -10,10 +10,20 @@ This file is meant to be made up of utilities that avoid using the C runtime
 #ifndef __NO_RT_UTIL_HEADERGUARD_H__
 #define __NO_RT_UTIL_HEADERGUARD_H__
 
+//#ifdef _MSC_VER
+//  #define _CRT_SECURE_NO_WARNINGS
+//  #define _SCL_SECURE_NO_WARNINGS
+//#endif
 #ifdef _MSC_VER
-  #define _CRT_SECURE_NO_WARNINGS 1
-  #define _SCL_SECURE_NO_WARNINGS 1
+  #if !defined(_CRT_SECURE_NO_WARNINGS)
+    #define _CRT_SECURE_NO_WARNINGS
+  #endif
+
+  #if !defined(_SCL_SECURE_NO_WARNINGS)
+    #define _SCL_SECURE_NO_WARNINGS
+  #endif
 #endif
+
 
 #ifdef _MSC_VER  // taken from Cereal 
 #  define NO_RT_DLL_EXPORT extern "C" __declspec(dllexport)

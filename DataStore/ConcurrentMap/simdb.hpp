@@ -126,6 +126,10 @@
 
 */
 
+#ifdef _MSC_VER
+  #pragma once
+#endif
+
 #ifndef __SIMDB_HEADER_GUARD__
 #define __SIMDB_HEADER_GUARD__
 
@@ -142,7 +146,29 @@
 #include <cassert>
 
 // platform specifics - mostly for shared memory mapping and auxillary functions like open, close and the windows equivilents
+#ifdef _MSC_VER
+  #if !defined(_CRT_SECURE_NO_WARNINGS)
+    #define _CRT_SECURE_NO_WARNINGS
+  #endif
+
+  #if !defined(_SCL_SECURE_NO_WARNINGS)
+    #define _SCL_SECURE_NO_WARNINGS
+  #endif
+#endif
+
 #if defined(_WIN32)      // windows
+
+ //#if defined(_CRT_SECURE_NO_WARNINGS)
+ //  #undef _CRT_SECURE_NO_WARNINGS
+ //  #define _CRT_SECURE_NO_WARNINGS
+ //#endif
+ //#undef _CRT_SECURE_NO_WARNINGS
+ //#define _CRT_SECURE_NO_WARNINGS 1       // msvc mandatory error nonsense when using some standard C functions like fopen 
+
+ //#if !defined(_CRT_SECURE_NO_WARNINGS)
+ //  #define _CRT_SECURE_NO_WARNINGS        // msvc mandatory error nonsense when using some standard C functions like fopen 
+ //#endif
+
  #define NOMINMAX
  #define WIN32_LEAN_AND_MEAN
  #include <windows.h>
@@ -452,7 +478,7 @@ public:
   union VerIdx
   {
     struct {
-      ui32     idx;
+      i32      idx;
       ui32 version;
     };
     ui64 asInt;
@@ -591,9 +617,9 @@ private:
 
     return blocks;
   }
-  i32          blockLen(i32  blkIdx)
+  i32          blockLen(i32  blkIdx)     // todo: change this to be either i64 or a 'BlkLen' struct that has the flag if nxt isn't valid?
   {
-    auto nxt = nxtBlock(blkIdx);
+    VerIdx nxt = nxtBlock(blkIdx);
     if(nxt.idx < 0) return -(nxt.idx);
 
     return blockFreeSize();
@@ -1298,7 +1324,7 @@ public:
     #endif
 
     // todo: need to check that name and path are less than sizeof(path) here
-    ui32 len = strlen(path) + strlen(name);
+    size_t len = strlen(path) + strlen(name);
     if(len > sizeof(path)-1){ /* todo: handle errors here */ }
     else{ strcat(path, name); }
 
