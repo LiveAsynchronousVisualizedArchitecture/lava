@@ -84,9 +84,9 @@
 #include "glm/gtc/constants.hpp"
 #include "glfw3.h"
 
-#include "VizDataStructures.hpp"
-#include "VizGenerators.hpp"
-#include "VizTransforms.hpp"
+#include "VizData.hpp"
+#include "VizGen.hpp"
+#include "VizTfm.hpp"
 
 #define ENTRY_DECLARATION int main(void)
 #ifdef _MSC_VER

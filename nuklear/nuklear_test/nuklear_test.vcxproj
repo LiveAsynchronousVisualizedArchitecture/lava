@@ -147,9 +147,9 @@
     <ClInclude Include="..\nuklear.h" />
     <ClInclude Include="..\nuklear_glfw_gl3.h" />
     <ClInclude Include="..\IndexedVerts.h" />
-    <ClInclude Include="..\VizDataStructures.hpp" />
-    <ClInclude Include="..\VizGenerators.hpp" />
-    <ClInclude Include="..\VizTransforms.hpp" />
+    <ClInclude Include="..\VizData.hpp" />
+    <ClInclude Include="..\VizGen.hpp" />
+    <ClInclude Include="..\VizTfm.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

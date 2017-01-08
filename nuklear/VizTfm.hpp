@@ -14,7 +14,7 @@
 #include "GL/glew.h"
 #include "glfw3.h"
 #include "IndexedVerts.h"
-#include "VizDataStructures.hpp"
+#include "VizData.hpp"
 
 // todo: put into a util file?
 namespace{

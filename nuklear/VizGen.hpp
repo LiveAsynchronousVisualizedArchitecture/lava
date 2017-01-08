@@ -11,7 +11,7 @@
 //  #define _SCL_SECURE_NO_WARNINGS 1
 //#endif
 
-#include "VizDataStructures.hpp"
+#include "VizData.hpp"
 
 inline vec<ui8>      makeCube(size_t& byteLen)
 {
