@@ -16,6 +16,19 @@
 #include "IndexedVerts.h"
 #include "VizDataStructures.hpp"
 
+// todo: put into a util file?
+namespace{
+
+void       print_gl_errors(int line)
+{
+  for(GLenum err; (err = glGetError()) != GL_NO_ERROR;){
+    printf("OpenGL Error: 0x%04x - %d \n", err, line);
+  }
+}
+
+}
+#define PRINT_GL_ERRORS print_gl_errors(__LINE__);
+
 inline GLuint  shadersrc_to_shaderid(const char* vert, const char* frag)
 {
   using namespace std;
@@ -32,6 +45,7 @@ inline GLuint  shadersrc_to_shaderid(const char* vert, const char* frag)
     glGetShaderInfoLog(vertexShader, 1024, NULL, infoLog);
     printf("Compiling vertex shader failed: %s\n", infoLog);
   }
+  PRINT_GL_ERRORS
 
   GLuint fragmentShader;
   fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
@@ -44,17 +58,20 @@ inline GLuint  shadersrc_to_shaderid(const char* vert, const char* frag)
       glGetShaderInfoLog(fragmentShader, 1024, NULL, infoLog);
       printf("Compiling fragment shader failed: %s\n", infoLog);
   }
+  PRINT_GL_ERRORS
 
   GLuint shaderProgramId = glCreateProgram();
   glAttachShader(shaderProgramId, vertexShader);
   glAttachShader(shaderProgramId, fragmentShader);
   glLinkProgram(shaderProgramId);
-  glGetShaderiv(fragmentShader, GL_LINK_STATUS, &success);
+  glGetProgramiv(shaderProgramId, GL_LINK_STATUS, &success);
   if(!success) {
       GLchar infoLog[1024];
       glGetProgramInfoLog(shaderProgramId, 1024, NULL, infoLog);
       printf("Linking failed: %s\n", infoLog);
   }
+  PRINT_GL_ERRORS
+
   glDeleteShader(vertexShader);
   glDeleteShader(fragmentShader);
 
@@ -71,6 +88,7 @@ inline Shape          ivbuf_to_shape(void* buf, ui64 len)    //IndexedVerts* iv)
   auto iv = (IndexedVerts*)IndexedVertsLoad(buf);
   if(!iv) return shp;
 
+  shp.owner = true;
   shp.mode  = iv->mode;
   shp.indsz = iv->indicesLen;
 

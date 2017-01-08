@@ -117,7 +117,7 @@ inline vec<ui8>  makeTriangle(bool left)
 {
   // Create triangle Vertex data
   const unsigned int NUM_VERTICES = 3;
-  const unsigned int NUM_INDICES = 3;
+  const unsigned int NUM_INDICES  = 3;
 
   IndexedVerts* iv = (IndexedVerts*)IndexedVertsCreate(0, 6, IV_TRIANGLES, NUM_VERTICES, 3, 1, 1, 4);
 

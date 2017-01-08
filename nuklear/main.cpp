@@ -32,15 +32,19 @@
 // -todo: get visualizer running without segfault on osx
 // -todo: get simdb working on osx - will have to use mmap(SHARED)
 // -todo: try closing file after mmap - seems to work
+// -todo: take camera position directly out of the transformation matrix
+// -todo: make mouse delta a per frame change and not an accumulated changed
+// -todo: separate mouse delta and camera sensitivity 
+// -todo: take camera functions out of render shape
+// -todo: fix Y switching rotation if camera is rotated 180 degrees with X - Y rotation needs to be relative to camera position
+// -todo: scale sensitivity based on the circumfrence of a circle with the radius of the camera distance to origin
+// -todo: figure out why quads don't work - quads don't work with drawElements, ChanImg conversion changed to use triangles
+// -todo: figure out why location returns -1 - now returns 0
+// -todo: try debugging gradient plane object in update_test - quads no drawn by glDrawElements
 
+// todo: fix far clipping plane
 // todo: work out file locking so there is no race condition on two programs creating mmaped files
 // todo: figure out reference counting so that files are cleaned up on exit
-// todo: try debugging gradient plane object in update_test
-// todo: take camera position directly out of the transformation matrix
-// todo: make mouse delta a per frame change and not an accumulated changed
-// todo: separate mouse delta and camera sensitivity 
-// todo: take camera functions out of render shape
-// todo: fix Y switching rotation if camera is rotated 180 degrees with X - Y rotation needs to be relative to camera position
 // todo: add panning to right mouse button
 // todo: rename VizDataStructures to just VizData
 // todo: add fps counter in the corner
@@ -102,26 +106,14 @@
 
 namespace {
 
-//float wrapAngleRadians(float angle)     
-//{
-//  using namespace glm;
-//  float wrappedAngle = 0;
-//
-//  if(angle > 2 * pi<float>())
-//  {
-//    wrappedAngle = 0;
-//  }
-//  else if(angle < 0)
-//  {
-//    wrappedAngle = 2 * pi<float>();
-//  }
-//  else
-//  {
-//    wrappedAngle = angle;
-//  }
-//
-//  return wrappedAngle;
-//}
+vec3               pos(mat4 const& m)
+{ return vec3(m[0].w, m[1].w, m[2].w); }
+void           set_pos(mat4* m, vec3 const p)
+{
+  (*m)[0].w = p.x;
+  (*m)[1].w = p.y;
+  (*m)[2].w = p.z;
+}
 float wrapAngleRadians(float angle)     
 {
   using namespace glm;
@@ -142,9 +134,20 @@ void    scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
   using namespace std;
   
+  const float dollySens = 0.9f;
+
+  float sense = (float)(yoffset * dollySens);
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
-  vd->camera.fieldOfView += (GLfloat)(yoffset / 10); 
-  vd->camera.fieldOfView  = max(45.f, min(90.f, vd->camera.fieldOfView));
+  if(yoffset>0)
+    vd->camera.P( vd->camera.P()*sense );
+  else
+    vd->camera.P( vd->camera.P() * (1.f/abs(sense)) );
+
+  //auto P = -vd->camera.P();
+  //P /= 
+
+  //vd->camera.fov += (GLfloat)(yoffset / 10); 
+  //vd->camera.fov  = max(45.f, min(90.f, vd->camera.fov));
 
   //if(vd->camera.fieldOfView < 45.0f) {
   //  vd->camera.fieldOfView = 45.0f;
@@ -169,17 +172,17 @@ void  mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 }
 void cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
 {
-  using namespace glm;
-  const static float _2PI = 2.f*pi<float>();
+  //using namespace glm;
+  const static float _2PI = 2.f* PIf; //  pi<float>();
 
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
   vec2 newMousePosition = vec2((float)xposition, (float)yposition);
 
   if(vd->camera.leftButtonDown){
-    vd->camera.mouseDelta += (newMousePosition - vd->camera.oldMousePos) * vd->camera.sensitivity;
-  }
-  vd->camera.mouseDelta.x = fmodf(vd->camera.mouseDelta.x, _2PI);
-  vd->camera.mouseDelta.y = fmodf(vd->camera.mouseDelta.y, _2PI);
+    vd->camera.mouseDelta = (newMousePosition - vd->camera.oldMousePos);
+  }else{ vd->camera.mouseDelta = vec2(0,0); }
+  //vd->camera.mouseDelta.x = fmodf(vd->camera.mouseDelta.x, _2PI);
+  //vd->camera.mouseDelta.y = fmodf(vd->camera.mouseDelta.y, _2PI);
 
   //vd->camera.mouseDelta.x = wrapAngleRadians(vd->camera.mouseDelta.x);
   //vd->camera.mouseDelta.y = wrapAngleRadians(vd->camera.mouseDelta.y);
@@ -212,30 +215,12 @@ int           sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* sh
 
   return !nk_window_is_closed(ctx, "Overview");
 }
-void      RenderShape(Shape const& shp) // GLuint shaderId)
+void      RenderShape(Shape const& shp, mat4 const& m) // GLuint shaderId)
 {
-  using namespace glm;
-  const static auto XAXIS = vec4(1.f, 0.f, 0.f, 1.f);
-  const static auto YAXIS = vec4(0.f, 1.f, 0.f, 1.f);
-
   glUseProgram(shp.shader);  //shader.use();
 
-  mat4 view;
-  view = lookAt(vd.camera.position, vd.camera.viewDirection, vd.camera.up);
-
-  mat4 projection;
-  projection = perspective((float)vd.camera.fieldOfView, (GLfloat)1024 / (GLfloat)768, 0.1f, 100.0f);
-
-  // todo: here the coordinate system of the camera will need to be used for the axises 
-  // - Z will be easy, it is the vector pointing at the origin (normalized)  
-  // X and Y will be (I think) the X and Y vectors each multiplied by the camera's current transformation matrix. 
-  // this will create camera transforms always relative to the camera and will hopefully give elegant rotation control
-  vd.camera.transformMtx = projection * view;
-  vd.camera.transformMtx = rotate(vd.camera.transformMtx, vd.camera.mouseDelta.x, vec3(YAXIS*view) );
-  vd.camera.transformMtx = rotate(vd.camera.transformMtx, vd.camera.mouseDelta.y, vec3(XAXIS*view) ); //vec3(1.0f, 0.0f, 0.0f));
-
   GLint transformLoc = glGetUniformLocation(vd.shaderId, "transform");
-  glUniformMatrix4fv(transformLoc, 1, GL_FALSE, value_ptr(vd.camera.transformMtx));
+  glUniformMatrix4fv(transformLoc, 1, GL_FALSE, value_ptr(m));
 
   int size;
   glActiveTexture(GL_TEXTURE0);	// Activate the texture unit first before binding texture
@@ -244,39 +229,21 @@ void      RenderShape(Shape const& shp) // GLuint shaderId)
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); // GL_LINEAR);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); // GL_LINEAR);
+  PRINT_GL_ERRORS
 
   auto loc = glGetUniformLocation(shp.shader, "tex0");
   glUniform1i(loc, 0);
 
   glBindVertexArray(shp.vertary);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shp.idxbuf);
-  glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);   // todo: keep size with shape instead of querying it
-  glDrawElements(shp.mode, shp.indsz, GL_UNSIGNED_INT, 0);
-
-  //glDrawElements(shp.mode, size/sizeof(uint32_t), GL_UNSIGNED_INT, 0);
-  //glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shp.idxbuf);                       PRINT_GL_ERRORS
+  glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);  PRINT_GL_ERRORS   // todo: keep size with shape instead of querying it
+  glDrawElements(shp.mode, shp.indsz, GL_UNSIGNED_INT, 0);                 PRINT_GL_ERRORS   // todo: can't use quads with glDrawElements?
+  
+  //glDrawElements(GL_QUADS, 4, GL_UNSIGNED_INT, 0);
   
   glBindVertexArray(0);
   glBindTexture(GL_TEXTURE_2D, 0);
 }
-//void updateCamera(VizData& vd)
-//{
-//  using namespace glm;
-//  glUseProgram(vd.shaderId);
-//
-//  mat4 view;
-//  view = lookAt(vd.camera.position, vd.camera.viewDirection, vd.camera.up);
-//
-//  mat4 projection;
-//  projection = perspective((float)vd.camera.fieldOfView, (GLfloat)1024 / (GLfloat)768, 0.1f, 100.0f);
-//
-//  vd.camera.transformMtx = projection * view;
-//  vd.camera.transformMtx = rotate(vd.camera.transformMtx, vd.camera.mouseDelta.x, vec3(0.0f, 1.0f, 0.0f));
-//  vd.camera.transformMtx = rotate(vd.camera.transformMtx, vd.camera.mouseDelta.y, vec3(1.0f, 0.0f, 0.0f));
-//
-//  GLint transformLoc = glGetUniformLocation(vd.shaderId, "transform");
-//  glUniformMatrix4fv(transformLoc, 1, GL_FALSE, value_ptr(vd.camera.transformMtx));
-//}
 GLFWwindow*  initGLFW(VizData* vd)
 {
   glfwSetErrorCallback(errorCallback);
@@ -327,12 +294,11 @@ auto      initNuklear(GLFWwindow* win) -> struct nk_context*
 
   return ctx;
 }
-
 void   shapesFromKeys(simdb const& db, vec<VerStr> const& dbKeys, VizData* vd)  // vec<str> const& dbKeys
 {
   using namespace std;
 
-  vd->shaderId = shadersrc_to_shaderid(vertShader, fragShader);
+  vd->shaderId = shadersrc_to_shaderid(vertShader, fragShader);   PRINT_GL_ERRORS
   for(auto& k : dbKeys)
   {
     auto cur = vd->shapes.find(k);
@@ -345,10 +311,10 @@ void   shapesFromKeys(simdb const& db, vec<VerStr> const& dbKeys, VizData* vd)  
     vec<i8> ivbuf(vlen);
     db.get(k.s.data(), (ui32)k.s.length(), ivbuf.data(), (ui32)ivbuf.size());
 
-    Shape  s = ivbuf_to_shape(ivbuf.data(), len);
+    Shape  s = ivbuf_to_shape(ivbuf.data(), len);      PRINT_GL_ERRORS
     s.shader = vd->shaderId;
     s.active = vd->shapes[k].active;
-    vd->shapes[k] = move(s);
+    vd->shapes[k] = move(s);                           PRINT_GL_ERRORS
   };
 }
 int  eraseMissingKeys(vec<VerStr> dbKeys, KeyShapes* shps)           // vec<str> dbKeys,
@@ -393,7 +359,6 @@ bool        updateKey(simdb const& db, VerStr const& key, VizData* vd)
 
   return false;
 }
-
 double           nowd()
 {
   using namespace std;
@@ -429,11 +394,10 @@ void       genTestGeo(simdb* db)
 ENTRY_DECLARATION
 {
   using namespace std;
+  //using namespace glm;
 
   SECTION(initialize static simdb and static VizData)
   {
-    using namespace glm;
-
     new (&db) simdb("test", 1024, 1<<14);        // inititialize the DB with placement new into the data segment
 
     vd.ui.w         =  1024; 
@@ -445,15 +409,24 @@ ENTRY_DECLARATION
     vd.verRefreshClock = 0.0;
     vd.keyRefresh             =  2.0;
     vd.keyRefreshClock        = vd.keyRefresh;
-    vd.camera.fieldOfView     = 65.0f;
+    vd.camera.fov             = 55.0f;
     vd.camera.mouseDelta      = vec2(0.0f, 0.0f);
-    vd.camera.sensitivity     = 0.003f;
-    vd.camera.position        = vec3(0.0f, 0.0f, 3.0f);
+    vd.camera.sensitivity     = 0.001f;
+    //vd.camera.position        = vec3(0.0f, 0.0f, 3.0f);
     vd.camera.viewDirection   = vec3(0.0f, 0.0f, 0.0f);
     vd.camera.up              = vec3(0.0f, 1.0f, 0.0f);
     vd.camera.oldMousePos     = vec2(0.0f, 0.0f);
     vd.camera.rightButtonDown = false;
     vd.camera.leftButtonDown  = false;
+    vd.camera.nearClip        = 0.1f;
+    vd.camera.farClip         = 1000.0f;
+    
+    mat4 view, projection;
+    view       = lookAt(vec3(0.f, 0.f, 1.f), vd.camera.viewDirection, vd.camera.up);
+    projection = perspective(vd.camera.fov, (GLfloat)1024 / (GLfloat)768, vd.camera.nearClip, vd.camera.farClip);
+    //vd.camera.tfm = projection * view;
+    vd.camera.tfm = view;
+    set_pos( &vd.camera.tfm, vec3(0.f,0.f,3.f) );
   }
   genTestGeo(&db);
   SECTION(initialize glfw window, glew, and nuklear)
@@ -462,10 +435,12 @@ ENTRY_DECLARATION
     initGlew();
     glfwSetWindowUserPointer(vd.win, &vd);
     vd.ctx = initNuklear(vd.win);                    assert(vd.ctx!=nullptr);
+    PRINT_GL_ERRORS
   }
 
   while(!glfwWindowShouldClose(vd.win))
   {
+    PRINT_GL_ERRORS
     SECTION(add the time passed to refresh clocks)
     {
       vd.now  = nowd();
@@ -497,24 +472,29 @@ ENTRY_DECLARATION
         if(vd.verRefreshClock > vd.verRefresh)                 // if there is already enough time saved up for another update make sure that less that two updates worth of time is kept 
           vd.verRefreshClock = vd.verRefresh + fmod(vd.verRefreshClock, vd.verRefresh);
       } // end of updates to shapes 
+      PRINT_GL_ERRORS
     }
     SECTION(GLFW input)
     {
+      vd.camera.mouseDelta = vec2(0,0);
       glfwPollEvents();                                             /* Input */
       glfwGetWindowSize(vd.win, &vd.ui.w, &vd.ui.h);
+      PRINT_GL_ERRORS
     }
     SECTION(draw nuklear)
     {
       nk_glfw3_new_frame();
       vd.ui.rect = winbnd_to_sidebarRect((float)vd.ui.w, (float)vd.ui.h);
       sidebar(vd.ctx, vd.ui.rect, &vd.shapes);                     // alters the shapes by setting their active flags
+      PRINT_GL_ERRORS
     }
     SECTION(openGL frame setup)
     {
       glViewport(0, 0, vd.ui.w, vd.ui.h);
+      glDisable(GL_CULL_FACE);
       glEnable(GL_BLEND);
-      glEnable(GL_TEXTURE_2D);
-      glEnable(GL_DEPTH);
+      //glEnable(GL_TEXTURE_2D);
+      //glEnable(GL_DEPTH);
       glEnable(GL_DEPTH_TEST);                                   // glDepthFunc(GL_LESS);
       //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
@@ -522,14 +502,52 @@ ENTRY_DECLARATION
       float bg[4];
       nk_color_fv(bg, vd.ui.bgclr);
       glClearColor(bg[0], bg[1], bg[2], bg[3]);
+      PRINT_GL_ERRORS
     }
     SECTION(render the shapes in VizData::shapes)
     {
+      mat4 camMtx;
+      SECTION(create camera matrix)
+      {
+        const static auto XAXIS = vec4(1.f, 0.f, 0.f, 1.f);
+        const static auto YAXIS = vec4(0.f, 1.f, 0.f, 1.f);
+
+        mat4 view;
+        auto tfm   =  vd.camera.tfm;
+        auto P     =  pos(tfm);
+        auto plen  =  length(P);
+        view       =  lookAt(P, vd.camera.viewDirection, vd.camera.up);
+        set_pos(&view, P);
+        
+        auto sens  =  plen*2.f*PIf * vd.camera.sensitivity;
+        auto xrot  =  -vd.camera.mouseDelta.x * sens;
+        auto yrot  =  -vd.camera.mouseDelta.y * sens;
+        view       =  rotate(view, xrot, vec3(YAXIS*view) );  // todo: these need to be moved to the cursor callback, although input updates are only called once per frame so it likely doesn't matter
+        view       =  rotate(view, yrot, vec3(XAXIS*view) );
+        auto viewP =  pos(view);
+        tfm        =  lookAt(viewP, vd.camera.viewDirection, vd.camera.up);
+        set_pos(&tfm, viewP);
+        vd.camera.tfm = tfm;
+
+        mat4 projection;
+        projection = perspective(vd.camera.fov,
+                                 (GLfloat)vd.ui.w / (GLfloat)vd.ui.h, 
+                                 vd.camera.nearClip, 
+                                 vd.camera.farClip);
+        camMtx = projection * vd.camera.tfm;
+
+        PRINT_GL_ERRORS
+
+        //vec3 dbgP = pos(vd.camera.tfm);
+        //Printf("%f  %f  %f\n", dbgP.x, dbgP.y, dbgP.z);
+      }
+
       // updateCamera(vd);
       for(auto& kv : vd.shapes){
         if(kv.second.active)
-          RenderShape( kv.second );
+          RenderShape(kv.second, camMtx);
       }
+      PRINT_GL_ERRORS
     }
 
     nk_glfw3_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_BUFFER, MAX_ELEMENT_BUFFER);        
@@ -540,6 +558,7 @@ ENTRY_DECLARATION
         * Make sure to either a.) save and restore or b.) reset your own state after
         * rendering the UI. */
     glfwSwapBuffers(vd.win);
+    PRINT_GL_ERRORS
 
     // todo: mouse position goes here to read back the color under the mouse 
     //glReadPixels( (GLint)(vd.camera.xDiff * vd.ui.w), (GLint)(vd.camera.yDiff * vd.ui.h), 1, 1, GL_RGB, GL_FLOAT, vd.mouseRGB);
@@ -557,12 +576,99 @@ ENTRY_DECLARATION
 
 
 
-  //for(auto const& kv : *shps){
-  //  if( !binary_search(ALL(dbKeys),kv.first) ){
-  //    shps->erase(kv.first);
-  //    ++cnt;
-  //  }
-  //}
+////using namespace glm;
+//const static auto XAXIS = vec4(1.f, 0.f, 0.f, 1.f);
+//const static auto YAXIS = vec4(0.f, 1.f, 0.f, 1.f);
+
+//mat4 view;
+////auto tfm = vd.camera.transformMtx;
+//auto tfm =  vd.camera.tfm;
+//auto P   = -vd.camera.P();   // vec3(-tfm[0].w, -tfm[1].w, -tfm[2].w);   // sbassett - not sure why these need to be negated, I'm guessing the projection turns them negative
+//auto len =  length(P);
+////view = lookAt(vd.camera.position, vd.camera.viewDirection, vd.camera.up);
+//view = lookAt(P, vd.camera.viewDirection, vd.camera.up);
+//set_pos(&view, P);
+//view = rotate(view, vd.camera.mouseDelta.x, vec3(YAXIS*view) );  // todo: these need to be moved to the cursor callback
+//view = rotate(view, vd.camera.mouseDelta.y, vec3(XAXIS*view) ); //vec3(1.0f, 0.0f, 0.0f));
+//
+////auto scaledP = pos(view)*len;
+////set_pos(&view, scaledP );
+//
+//mat4 projection;
+//projection = perspective(vd.camera.fov, (GLfloat)1024 / (GLfloat)768, 0.01f, 100.0f);
+//
+//// todo: here the coordinate system of the camera will need to be used for the axises 
+//// - Z will be easy, it is the vector pointing at the origin (normalized)  
+//// X and Y will be (I think) the X and Y vectors each multiplied by the camera's current transformation matrix. 
+//// this will create camera transforms always relative to the camera and will hopefully give elegant rotation control  
+//vd.camera.tfm = projection * view;
+////vd.camera.tfm = view;
+//
+////auto tfm = vd.camera.transformMtx;
+////Printf("%f  %f  %f\n", tfm[0].w, tfm[1].w, tfm[2].w);
+
+//glDrawElements(shp.mode, size/sizeof(uint32_t), GL_UNSIGNED_INT, 0);
+//glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
+
+// sbassett - not sure why these need to be negated, I'm guessing the projection turns them negative
+//
+//auto scaledP = pos(view)*len;
+//set_pos(&view, scaledP );
+//projection = perspective(vd.camera.fov, (GLfloat)1024 / (GLfloat)768, 0.01f, 100.0f);
+//
+//vd.camera.proj = perspective(vd.camera.fov, (GLfloat)1024 / (GLfloat)768, 0.01f, 100.0f);
+//
+// todo: here the coordinate system of the camera will need to be used for the axises 
+// - Z will be easy, it is the vector pointing at the origin (normalized)  
+// X and Y will be (I think) the X and Y vectors each multiplied by the camera's current transformation matrix. 
+// this will create camera transforms always relative to the camera and will hopefully give elegant rotation control  
+
+//float wrapAngleRadians(float angle)     
+//{
+//  using namespace glm;
+//  float wrappedAngle = 0;
+//
+//  if(angle > 2 * pi<float>())
+//  {
+//    wrappedAngle = 0;
+//  }
+//  else if(angle < 0)
+//  {
+//    wrappedAngle = 2 * pi<float>();
+//  }
+//  else
+//  {
+//    wrappedAngle = angle;
+//  }
+//
+//  return wrappedAngle;
+//}
+//
+//void updateCamera(VizData& vd)
+//{
+//  using namespace glm;
+//  glUseProgram(vd.shaderId);
+//
+//  mat4 view;
+//  view = lookAt(vd.camera.position, vd.camera.viewDirection, vd.camera.up);
+//
+//  mat4 projection;
+//  projection = perspective((float)vd.camera.fieldOfView, (GLfloat)1024 / (GLfloat)768, 0.1f, 100.0f);
+//
+//  vd.camera.transformMtx = projection * view;
+//  vd.camera.transformMtx = rotate(vd.camera.transformMtx, vd.camera.mouseDelta.x, vec3(0.0f, 1.0f, 0.0f));
+//  vd.camera.transformMtx = rotate(vd.camera.transformMtx, vd.camera.mouseDelta.y, vec3(1.0f, 0.0f, 0.0f));
+//
+//  GLint transformLoc = glGetUniformLocation(vd.shaderId, "transform");
+//  glUniformMatrix4fv(transformLoc, 1, GL_FALSE, value_ptr(vd.camera.transformMtx));
+//}
+
+//for(auto const& kv : *shps){
+//  if( !binary_search(ALL(dbKeys),kv.first) ){
+//    shps->erase(kv.first);
+//    ++cnt;
+//  }
+//}
 
 //#undef  _CONSOLE
 //#define _WINDOWS

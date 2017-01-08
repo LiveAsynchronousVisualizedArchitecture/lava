@@ -35,8 +35,15 @@
 enum AtrId : GLuint { POSITION=0, NORMAL=1, COLOR=2, TEXCOORD=3 };  // this coresponds to the the Vertex struct in IndexedVerts
 
 using std::map;
-using str    = std::string;
-using VerStr = simdb::VerStr;
+using str     =  std::string;
+using VerStr  =  simdb::VerStr;
+using vec2    =  glm::vec2;
+using vec3    =  glm::vec3;
+using vec4    =  glm::vec4;
+using mat4    =  glm::mat4;
+using glm::perspective;
+using glm::rotate;
+using glm::length;
 
 struct Shape {                     // todo: make rvalue constructor - make all constructors?
 private:
@@ -44,9 +51,11 @@ private:
   {
     memcpy(this, &rval, sizeof(Shape));
     memset(&rval,    0, sizeof(Shape));
+    rval.owner = false;
   }
 
 public:
+  bool      owner;
   int      active;
   ui32    version, mode, indsz;          // mode is the openGL type of geometry to draw, indsz is the number of indices
   GLuint  vertbuf, vertary, idxbuf, tx;  // normals, colors, uvcoords, image data 
@@ -75,22 +84,35 @@ public:
   ~Shape()  // todo: put in checking to make sure that indices to delete are ok
   { 
     // todo: need to build in ownership to not run the destructor twice?
-    glDeleteVertexArrays(1, &vertary);
-    glDeleteBuffers(1,       &idxbuf);
-    glDeleteTextures(1,          &tx);
+    if(owner){
+      glDeleteVertexArrays(1, &vertary);
+      glDeleteBuffers(1,       &idxbuf);
+      glDeleteTextures(1,          &tx);
+    }
+    owner = false;
   }
 };
 
 struct Camera
 {
-  float fieldOfView, sensitivity;
-  glm::vec2 mouseDelta;
-  glm::vec2 oldMousePos;
-  glm::vec3 position;
-  glm::vec3 viewDirection;
-  glm::vec3 up;
-  glm::mat4 transformMtx;
+  float fov, sensitivity, nearClip, farClip;                     // field of view is fov
+  vec2 mouseDelta;
+  vec2 oldMousePos;
+  //vec3 position;
+  vec3 viewDirection;
+  vec3 up;
+  mat4 tfm;     //glm::mat4 transformMtx;
+  mat4 proj;
   bool rightButtonDown, leftButtonDown;
+
+  vec3 P() const 
+  { return vec3(tfm[0].w, tfm[1].w, tfm[2].w); }
+  void P(const vec3 p) 
+  {
+    tfm[0].w = p.x;
+    tfm[1].w = p.y;
+    tfm[2].w = p.z;
+  }
 };
 
 using  KeyShapes = map<VerStr, Shape>;
@@ -120,10 +142,6 @@ static const char*  vertShader   =
 "\n"
 "uniform mat4 transform; \n"
 "\n"
-//"attribute vec3  P;\n"
-//"attribute vec3  N;\n"
-//"attribute vec4  C;\n"
-//"attribute vec2 UV;\n"
 "layout(location = 0) in vec3  P; \n"
 "layout(location = 1) in vec3  N; \n"
 "layout(location = 2) in vec4  C; \n"
@@ -139,29 +157,8 @@ void main(){ \
   fragC  =  C; \
   fragUV = UV; \
 }";
-/*
-static const char*  vertShader   = 
-"#version 140\n"
-"\
-layout(location = 0) in vec3  P; \
-layout(location = 1) in vec3  N; \
-layout(location = 2) in vec4  C; \
-layout(location = 3) in vec2 UV; \
-\
-out vec3  fragN; \
-out vec4  fragC; \
-out vec2 fragUV; \
-\
-uniform mat4 transform; \
-void main(){ \
-  gl_Position = transform * vec4(P, 1.0f); \
-  fragN  =  N; \
-  fragC  =  C; \
-  fragUV = UV; \
-}";
-*/
 static const char*  fragShader   = 
-"#version 140\n"
+"#version 330 core\n"
 "\
 in vec3 fragN;  \
 in vec4 fragC;  \
@@ -187,7 +184,32 @@ static VizData  vd;
 
 
 
+/*
+static const char*  vertShader   = 
+"#version 140\n"
+"\
+layout(location = 0) in vec3  P; \
+layout(location = 1) in vec3  N; \
+layout(location = 2) in vec4  C; \
+layout(location = 3) in vec2 UV; \
+\
+out vec3  fragN; \
+out vec4  fragC; \
+out vec2 fragUV; \
+\
+uniform mat4 transform; \
+void main(){ \
+  gl_Position = transform * vec4(P, 1.0f); \
+  fragN  =  N; \
+  fragC  =  C; \
+  fragUV = UV; \
+}";
+*/
 
+//"attribute vec3  P;\n"
+//"attribute vec3  N;\n"
+//"attribute vec4  C;\n"
+//"attribute vec2 UV;\n"
 
 //template<class KEY, class VALUE,
 //  class _Compare = std::less<KEY>,

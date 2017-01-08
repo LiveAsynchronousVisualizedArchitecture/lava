@@ -27,19 +27,25 @@ IndexedVerts* ChanImgToIndexedVerts(ChanImg ci, std::initializer_list<i64> chns=
   auto _chans  =  chns.size()>0? chns.size() : ci.chans();
   auto chans   =  max<size_t>(4, _chans);
   auto sz      =  4;
-  auto iv      =  (IndexedVerts*)IndexedVertsCreate(0,6,IV_QUADS,sz,sz,w,h,chans);
+  auto inds    =  6;
+  //auto iv      =  (IndexedVerts*)IndexedVertsCreate(0,6,IV_QUADS,sz,sz,w,h,chans);
+  auto iv      =  (IndexedVerts*)IndexedVertsCreate(0,6,IV_TRIANGLES,sz,inds,w,h,chans);  // 6 indices to make two triangles
   
   TO(sz,i)
   {
     Vertex& v = iv->verts[i];
     TO(4,c) v.color[c]    = 1.f;
     TO(3,p) v.position[p] = 0.f;
-    iv->indices[i] = i;
   }
   iv->verts[1].texCoord[0] = iv->verts[1].position[0] = 1.f;
   iv->verts[2].texCoord[0] = iv->verts[2].position[0] = 1.f;
   iv->verts[0].texCoord[1] = iv->verts[2].position[1] = 1.f;
   iv->verts[1].texCoord[1] = iv->verts[3].position[1] = 1.f;
+
+  TO(3,i){ iv->indices[i] = i; }
+  iv->indices[3] = 0;
+  iv->indices[4] = 2;
+  iv->indices[5] = 3;
 
   if( chns.size() > 0 )
   {
@@ -91,8 +97,8 @@ int    main(void)
   idx = db.put("update_test_tri", right);
   assert(idx!=simdb::FAILED_PUT);
 
-  ChanImg grad(256, 256, 4, 0.f);
-  auto pxcnt = 256*256*3;
+  ChanImg grad(256, 256, 4, 0.5f);
+  auto pxcnt = 256*256*4;
   TO(pxcnt,i) grad[i] = i/(float)pxcnt;
   //TO(pxcnt,i) grad[i] = 0.5f;
 
