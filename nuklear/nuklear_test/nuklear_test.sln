@@ -7,6 +7,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "nuklear_test", "nuklear_tes
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "update_test", "..\update_test\update_test.vcxproj", "{008004D4-2ED6-4E9C-B542-FC036DB63768}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "nuklear_example", "..\nuklear_example\nuklear_example.vcxproj", "{753FDFF4-B6FD-4A4A-98D0-71FA8821521C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Mixed Platforms = Debug|Mixed Platforms
@@ -43,6 +45,18 @@ Global
 		{008004D4-2ED6-4E9C-B542-FC036DB63768}.Release|Win32.Build.0 = Release|Win32
 		{008004D4-2ED6-4E9C-B542-FC036DB63768}.Release|x64.ActiveCfg = Release|x64
 		{008004D4-2ED6-4E9C-B542-FC036DB63768}.Release|x64.Build.0 = Release|x64
+		{753FDFF4-B6FD-4A4A-98D0-71FA8821521C}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
+		{753FDFF4-B6FD-4A4A-98D0-71FA8821521C}.Debug|Mixed Platforms.Build.0 = Debug|Win32
+		{753FDFF4-B6FD-4A4A-98D0-71FA8821521C}.Debug|Win32.ActiveCfg = Debug|Win32
+		{753FDFF4-B6FD-4A4A-98D0-71FA8821521C}.Debug|Win32.Build.0 = Debug|Win32
+		{753FDFF4-B6FD-4A4A-98D0-71FA8821521C}.Debug|x64.ActiveCfg = Debug|x64
+		{753FDFF4-B6FD-4A4A-98D0-71FA8821521C}.Debug|x64.Build.0 = Debug|x64
+		{753FDFF4-B6FD-4A4A-98D0-71FA8821521C}.Release|Mixed Platforms.ActiveCfg = Release|Win32
+		{753FDFF4-B6FD-4A4A-98D0-71FA8821521C}.Release|Mixed Platforms.Build.0 = Release|Win32
+		{753FDFF4-B6FD-4A4A-98D0-71FA8821521C}.Release|Win32.ActiveCfg = Release|Win32
+		{753FDFF4-B6FD-4A4A-98D0-71FA8821521C}.Release|Win32.Build.0 = Release|Win32
+		{753FDFF4-B6FD-4A4A-98D0-71FA8821521C}.Release|x64.ActiveCfg = Release|x64
+		{753FDFF4-B6FD-4A4A-98D0-71FA8821521C}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

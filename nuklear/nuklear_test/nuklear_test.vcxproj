@@ -138,11 +138,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\glfw.c" />
     <ClCompile Include="..\unified.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\glfw3.h" />
     <ClInclude Include="..\glfw3native.h" />
+    <ClInclude Include="..\glfw_3.2.1.h" />
     <ClInclude Include="..\no_rt_util.h" />
     <ClInclude Include="..\nuklear.h" />
     <ClInclude Include="..\nuklear_glfw_gl3.h" />

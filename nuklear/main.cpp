@@ -41,12 +41,12 @@
 // -todo: figure out why quads don't work - quads don't work with drawElements, ChanImg conversion changed to use triangles
 // -todo: figure out why location returns -1 - now returns 0
 // -todo: try debugging gradient plane object in update_test - quads no drawn by glDrawElements
+// -todo: rename VizDataStructures to just VizData
 
 // todo: fix far clipping plane
 // todo: work out file locking so there is no race condition on two programs creating mmaped files
 // todo: figure out reference counting so that files are cleaned up on exit
-// todo: add panning to right mouse button
-// todo: rename VizDataStructures to just VizData
+// todo: add panning to right mouse button - probably by multing x and y vectors by the cameras transformation matrix, then adding those vectors to the cameras position
 // todo: add fps counter in the corner
 // todo: add color under cursor like previous visualizer - use the gl get frame like the previous visualizer - check if the cursor is over the gl window first as an optimization? - sort of in but not working
 // todo: move and rename project to LavaViz or any non test name
@@ -82,6 +82,7 @@
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
 #include "glm/gtc/constants.hpp"
+
 #include "glfw3.h"
 
 #include "VizData.hpp"
@@ -92,8 +93,9 @@
 #ifdef _MSC_VER
   #pragma comment(lib, "glfw3dll.lib")
   #pragma comment(lib, "glew32.lib")
+  #pragma comment(lib, "opengl32.lib")
 
-  #define USE_CONSOLE                                 // turning this off will use the windows subsystem in the linker and change the entry point to WinMain() so that no command line/console will appear
+  //#define USE_CONSOLE                                 // turning this off will use the windows subsystem in the linker and change the entry point to WinMain() so that no command line/console will appear
   #ifndef USE_CONSOLE
     #pragma comment( linker, "/subsystem:windows" )
     #undef ENTRY_DECLARATION
@@ -203,13 +205,15 @@ int           sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* sh
   }
 
   if(nk_begin(ctx, &layout, "Overview", rect, window_flags))
+  //if(nk_group_begin(ctx, &layout, "Overview", window_flags))
   {
-      nk_layout_row_static(ctx, 18, (int)(rect.w-25.f), 1);
-      //nk_layout_row_static(ctx, 18, 120, 1);
-      for(auto& kv : *shps){
-        if(kv.first.s.length()>0)
-          nk_selectable_label(ctx, kv.first.s.c_str(), NK_TEXT_LEFT, &kv.second.active);
-      }
+    nk_layout_row_static(ctx, 18, (int)(rect.w-25.f), 1);
+    //nk_layout_row_static(ctx, 18, 120, 1);
+    for(auto& kv : *shps){
+      if(kv.first.s.length()>0)
+        nk_selectable_label(ctx, kv.first.s.c_str(), NK_TEXT_RIGHT, &kv.second.active);
+    }
+    //nk_group_end(ctx);
   }
   nk_end(ctx);
 
@@ -394,7 +398,6 @@ void       genTestGeo(simdb* db)
 ENTRY_DECLARATION
 {
   using namespace std;
-  //using namespace glm;
 
   SECTION(initialize static simdb and static VizData)
   {
@@ -402,17 +405,16 @@ ENTRY_DECLARATION
 
     vd.ui.w         =  1024; 
     vd.ui.h         =   768;
-    vd.ui.bgclr     =  nk_rgb(16,16,16);     // darker than this may risk not seeing the difference between black and the background
+    vd.ui.bgclr     =  nk_rgb(16,16,16);         // darker than this may risk not seeing the difference between black and the background
     vd.now          =  nowd();
     vd.prev         =  vd.now;
-    vd.verRefresh   =  0.007;                // roughly 144hz
+    vd.verRefresh   =  0.007;                    // roughly 144hz
     vd.verRefreshClock = 0.0;
     vd.keyRefresh             =  2.0;
     vd.keyRefreshClock        = vd.keyRefresh;
     vd.camera.fov             = 55.0f;
     vd.camera.mouseDelta      = vec2(0.0f, 0.0f);
     vd.camera.sensitivity     = 0.001f;
-    //vd.camera.position        = vec3(0.0f, 0.0f, 3.0f);
     vd.camera.viewDirection   = vec3(0.0f, 0.0f, 0.0f);
     vd.camera.up              = vec3(0.0f, 1.0f, 0.0f);
     vd.camera.oldMousePos     = vec2(0.0f, 0.0f);
@@ -424,7 +426,6 @@ ENTRY_DECLARATION
     mat4 view, projection;
     view       = lookAt(vec3(0.f, 0.f, 1.f), vd.camera.viewDirection, vd.camera.up);
     projection = perspective(vd.camera.fov, (GLfloat)1024 / (GLfloat)768, vd.camera.nearClip, vd.camera.farClip);
-    //vd.camera.tfm = projection * view;
     vd.camera.tfm = view;
     set_pos( &vd.camera.tfm, vec3(0.f,0.f,3.f) );
   }
@@ -435,6 +436,38 @@ ENTRY_DECLARATION
     initGlew();
     glfwSetWindowUserPointer(vd.win, &vd);
     vd.ctx = initNuklear(vd.win);                    assert(vd.ctx!=nullptr);
+
+    struct nk_color table[NK_COLOR_COUNT];
+    table[NK_COLOR_TEXT] = nk_rgba(210, 210, 210, 255);
+    table[NK_COLOR_WINDOW] = nk_rgba(0, 0, 0, 0);
+    table[NK_COLOR_HEADER] = nk_rgba(51, 51, 56, 220);
+    table[NK_COLOR_BORDER] = nk_rgba(46, 46, 46, 255);
+    table[NK_COLOR_BUTTON] = nk_rgba(48, 83, 111, 255);
+    table[NK_COLOR_BUTTON_HOVER] = nk_rgba(58, 93, 121, 255);
+    table[NK_COLOR_BUTTON_ACTIVE] = nk_rgba(63, 98, 126, 255);
+    table[NK_COLOR_TOGGLE] = nk_rgba(50, 58, 61, 255);
+    table[NK_COLOR_TOGGLE_HOVER] = nk_rgba(45, 53, 56, 255);
+    table[NK_COLOR_TOGGLE_CURSOR] = nk_rgba(48, 83, 111, 255);
+    table[NK_COLOR_SELECT] = nk_rgba(57, 67, 61, 0);
+    table[NK_COLOR_SELECT_ACTIVE] = nk_rgba(48, 83, 111, 128);
+    table[NK_COLOR_SLIDER] = nk_rgba(50, 58, 61, 255);
+    table[NK_COLOR_SLIDER_CURSOR] = nk_rgba(48, 83, 111, 245);
+    table[NK_COLOR_SLIDER_CURSOR_HOVER] = nk_rgba(53, 88, 116, 255);
+    table[NK_COLOR_SLIDER_CURSOR_ACTIVE] = nk_rgba(58, 93, 121, 255);
+    table[NK_COLOR_PROPERTY] = nk_rgba(50, 58, 61, 255);
+    table[NK_COLOR_EDIT] = nk_rgba(50, 58, 61, 225);
+    table[NK_COLOR_EDIT_CURSOR] = nk_rgba(210, 210, 210, 255);
+    table[NK_COLOR_COMBO] = nk_rgba(50, 58, 61, 255);
+    table[NK_COLOR_CHART] = nk_rgba(50, 58, 61, 255);
+    table[NK_COLOR_CHART_COLOR] = nk_rgba(48, 83, 111, 255);
+    table[NK_COLOR_CHART_COLOR_HIGHLIGHT] = nk_rgba(255, 0, 0, 255);
+    table[NK_COLOR_SCROLLBAR] = nk_rgba(50, 58, 61, 255);
+    table[NK_COLOR_SCROLLBAR_CURSOR] = nk_rgba(48, 83, 111, 255);
+    table[NK_COLOR_SCROLLBAR_CURSOR_HOVER] = nk_rgba(53, 88, 116, 255);
+    table[NK_COLOR_SCROLLBAR_CURSOR_ACTIVE] = nk_rgba(58, 93, 121, 255);
+    table[NK_COLOR_TAB_HEADER] = nk_rgba(48, 83, 111, 255);
+    nk_style_from_table(vd.ctx, table);
+
     PRINT_GL_ERRORS
   }
 
@@ -485,7 +518,27 @@ ENTRY_DECLARATION
     {
       nk_glfw3_new_frame();
       vd.ui.rect = winbnd_to_sidebarRect((float)vd.ui.w, (float)vd.ui.h);
-      sidebar(vd.ctx, vd.ui.rect, &vd.shapes);                     // alters the shapes by setting their active flags
+      //struct nk_panel layout;
+      //if(nk_begin(vd.ctx, &layout, "fps", vd.ui.rect, NK_WINDOW_BACKGROUND))
+      //{
+        sidebar(vd.ctx, vd.ui.rect, &vd.shapes);                     // alters the shapes by setting their active flags
+
+        //nk_flags window_flags = NK_WINDOW_DYNAMIC;                 /* window flags */
+        //struct nk_rect fpsRect;
+        //struct nk_panel fpsLayout;
+        //fpsRect.x = fpsRect.y = 0.f;
+        //fpsRect.w = fpsRect.h = 256.f;
+        //if(nk_group_begin(vd.ctx, &fpsLayout, "fps", window_flags)){
+        //  nk_layout_row_begin(vd.ctx, NK_DYNAMIC, 20, 3);
+        //    nk_layout_row_push(vd.ctx, 1.f);
+        //    nk_label(vd.ctx, "Frames Per Second: ", NK_TEXT_LEFT);
+        //  nk_layout_row_end(vd.ctx);
+        //
+        //  nk_group_end(vd.ctx);
+        //}
+      //}  
+      //nk_end(vd.ctx);
+    
       PRINT_GL_ERRORS
     }
     SECTION(openGL frame setup)
@@ -575,6 +628,10 @@ ENTRY_DECLARATION
 
 
 
+
+//using namespace glm;
+//vd.camera.tfm = projection * view;
+//vd.camera.position        = vec3(0.0f, 0.0f, 3.0f);
 
 ////using namespace glm;
 //const static auto XAXIS = vec4(1.f, 0.f, 0.f, 1.f);
