@@ -114,7 +114,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
-      <Optimization>MaxSpeed</Optimization>
+      <Optimization>Full</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
@@ -138,10 +138,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\glew.c" />
     <ClCompile Include="..\glfw.c" />
     <ClCompile Include="..\unified.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\glew_2.0.0.h" />
     <ClInclude Include="..\glfw3.h" />
     <ClInclude Include="..\glfw3native.h" />
     <ClInclude Include="..\glfw_3.2.1.h" />
