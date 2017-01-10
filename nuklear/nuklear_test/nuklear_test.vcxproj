@@ -140,6 +140,9 @@
   <ItemGroup>
     <ClCompile Include="..\glew.c" />
     <ClCompile Include="..\glfw.c" />
+    <ClCompile Include="..\main.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\unified.cpp" />
   </ItemGroup>
   <ItemGroup>
