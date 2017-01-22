@@ -137,8 +137,8 @@ struct VizData
   // todo: VizData deconstructor - will need this to clean up shader programs 
 };
 
-static const char*  vShaderPath  =  "../vertexShader.vert";
-static const char*  fShaderPath  =  "../fragmentShader.frag";
+//static const char*  vShaderPath  =  "../vertexShader.vert";
+//static const char*  fShaderPath  =  "../fragmentShader.frag";
 static const char*  vertShader   = 
 "#version 330 core\n"
 "\n"
@@ -154,7 +154,7 @@ out vec4  fragC; \
 out vec2 fragUV; \
 \
 void main(){ \
-  gl_Position = transform * vec4(P, 1.0f); \
+  gl_Position = transform * vec4(P, 1.0f);  \
   fragN  =  N; \
   fragC  =  C; \
   fragUV = UV; \
