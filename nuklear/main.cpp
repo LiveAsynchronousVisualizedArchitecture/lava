@@ -183,6 +183,7 @@ void cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
   if(vd->camera.leftButtonDown){
     vd->camera.mouseDelta = (newMousePosition - vd->camera.oldMousePos);
   }else{ vd->camera.mouseDelta = vec2(0,0); }
+
   //vd->camera.mouseDelta.x = fmodf(vd->camera.mouseDelta.x, _2PI);
   //vd->camera.mouseDelta.y = fmodf(vd->camera.mouseDelta.y, _2PI);
 
@@ -575,7 +576,7 @@ ENTRY_DECLARATION
         auto sens  =  plen*2.f*PIf * vd.camera.sensitivity;
         auto xrot  =  -vd.camera.mouseDelta.x * sens;
         auto yrot  =  -vd.camera.mouseDelta.y * sens;
-        view       =  rotate(view, xrot, vec3(YAXIS*view) );  // todo: these need to be moved to the cursor callback, although input updates are only called once per frame so it likely doesn't matter
+        view       =  rotate(view, xrot, vec3(YAXIS*view) );                // todo: these need to be moved to the cursor callback, although input updates are only called once per frame so it likely doesn't matter
         view       =  rotate(view, yrot, vec3(XAXIS*view) );
         auto viewP =  pos(view);
         tfm        =  lookAt(viewP, vd.camera.viewDirection, vd.camera.up);
