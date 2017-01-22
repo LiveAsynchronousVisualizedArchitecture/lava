@@ -163,13 +163,21 @@ void  mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 {
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
 
-  if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
-  {
-    vd->camera.leftButtonDown = true;
+  //if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS){
+  //  vd->camera.leftButtonDown = true;
+  //}
+  //if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE){
+  //  vd->camera.leftButtonDown = false;
+  //}
+
+  if(button==GLFW_MOUSE_BUTTON_LEFT){
+    if(action==GLFW_PRESS) vd->camera.leftButtonDown = true;
+    else if(action==GLFW_RELEASE) vd->camera.leftButtonDown = false;
   }
-  if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
-  {
-    vd->camera.leftButtonDown = false;
+
+  if(button==GLFW_MOUSE_BUTTON_RIGHT){
+    if(action==GLFW_PRESS) vd->camera.rightButtonDown = true;
+    else if(action==GLFW_RELEASE) vd->camera.rightButtonDown = false;
   }
 }
 void cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
@@ -183,6 +191,14 @@ void cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
   if(vd->camera.leftButtonDown){
     vd->camera.mouseDelta = (newMousePosition - vd->camera.oldMousePos);
   }else{ vd->camera.mouseDelta = vec2(0,0); }
+    
+  if(vd->camera.rightButtonDown){
+    vd->camera.btn2Delta = (newMousePosition - vd->camera.oldMousePos);
+  }else{ vd->camera.btn2Delta  = vec2(0,0); }
+
+  //if(vd->camera.leftButtonDown){
+  //  vd->camera.mouseDelta = (newMousePosition - vd->camera.oldMousePos);
+  //}else{ vd->camera.btn2Delta = vec2(0,0); }
 
   //vd->camera.mouseDelta.x = fmodf(vd->camera.mouseDelta.x, _2PI);
   //vd->camera.mouseDelta.y = fmodf(vd->camera.mouseDelta.y, _2PI);
@@ -415,8 +431,11 @@ ENTRY_DECLARATION
     vd.keyRefreshClock        = vd.keyRefresh;
     vd.camera.fov             = 55.0f;
     vd.camera.mouseDelta      = vec2(0.0f, 0.0f);
+    vd.camera.btn2Delta       = vec2(0.0f, 0.0f);
     vd.camera.sensitivity     = 0.001f;
-    vd.camera.viewDirection   = vec3(0.0f, 0.0f, 0.0f);
+    vd.camera.pansense        = 0.05f;
+    //vd.camera.viewDirection   = vec3(0.0f, 0.0f, 0.0f);
+    vd.camera.lookAt          = vec3(0.0f, 0.0f, 0.0f);
     vd.camera.up              = vec3(0.0f, 1.0f, 0.0f);
     vd.camera.oldMousePos     = vec2(0.0f, 0.0f);
     vd.camera.rightButtonDown = false;
@@ -425,7 +444,7 @@ ENTRY_DECLARATION
     vd.camera.farClip         = 1000.0f;
     
     mat4 view, projection;
-    view       = lookAt(vec3(0.f, 0.f, 1.f), vd.camera.viewDirection, vd.camera.up);
+    view       = lookAt(vec3(0.f, 0.f, 1.f), vd.camera.lookAt, vd.camera.up);
     projection = perspective(vd.camera.fov, (GLfloat)1024 / (GLfloat)768, vd.camera.nearClip, vd.camera.farClip);
     vd.camera.tfm = view;
     set_pos( &vd.camera.tfm, vec3(0.f,0.f,3.f) );
@@ -511,6 +530,7 @@ ENTRY_DECLARATION
     SECTION(GLFW input)
     {
       vd.camera.mouseDelta = vec2(0,0);
+      vd.camera.btn2Delta  = vec2(0,0);
       glfwPollEvents();                                             /* Input */
       glfwGetWindowSize(vd.win, &vd.ui.w, &vd.ui.h);
       PRINT_GL_ERRORS
@@ -519,12 +539,14 @@ ENTRY_DECLARATION
     {
       nk_glfw3_new_frame();
       vd.ui.rect = winbnd_to_sidebarRect((float)vd.ui.w, (float)vd.ui.h);
+
       //struct nk_panel layout;
       //if(nk_begin(vd.ctx, &layout, "fps", vd.ui.rect, NK_WINDOW_BACKGROUND))
       //{
-        sidebar(vd.ctx, vd.ui.rect, &vd.shapes);                     // alters the shapes by setting their active flags
 
-        //nk_flags window_flags = NK_WINDOW_DYNAMIC;                 /* window flags */
+      sidebar(vd.ctx, vd.ui.rect, &vd.shapes);                     // alters the shapes by setting their active flags
+
+      //nk_flags window_flags = NK_WINDOW_DYNAMIC;                 /* window flags */
         //struct nk_rect fpsRect;
         //struct nk_panel fpsLayout;
         //fpsRect.x = fpsRect.y = 0.f;
@@ -570,19 +592,42 @@ ENTRY_DECLARATION
         auto tfm   =  vd.camera.tfm;
         auto P     =  pos(tfm);
         auto plen  =  length(P);
-        view       =  lookAt(P, vd.camera.viewDirection, vd.camera.up);
+        auto lkmtx =  lookAt(P, vd.camera.lookAt, vd.camera.up);
+        view = lkmtx;
         set_pos(&view, P);
         
+        vec3 yview = vec3(YAXIS * lkmtx);
+        vec3 xview = vec3(XAXIS * lkmtx);
+
         auto sens  =  plen*2.f*PIf * vd.camera.sensitivity;
         auto xrot  =  -vd.camera.mouseDelta.x * sens;
         auto yrot  =  -vd.camera.mouseDelta.y * sens;
-        view       =  rotate(view, xrot, vec3(YAXIS*view) );                // todo: these need to be moved to the cursor callback, although input updates are only called once per frame so it likely doesn't matter
-        view       =  rotate(view, yrot, vec3(XAXIS*view) );
+        view       =  rotate(view, yrot, xview );
+        view       =  rotate(view, xrot, yview );                // todo: these need to be moved to the cursor callback, although input updates are only called once per frame so it likely doesn't matter
         auto viewP =  pos(view);
-        tfm        =  lookAt(viewP, vd.camera.viewDirection, vd.camera.up);
+        tfm        =  lookAt(viewP, vd.camera.lookAt, vd.camera.up);
         set_pos(&tfm, viewP);
         vd.camera.tfm = tfm;
 
+        //vec3 yview = YAXIS * lkmtx;
+        mat4 panmtx = vd.camera.tfm;
+        set_pos(&panmtx, vec3(0));
+        vec3 xpan   = vec3(XAXIS * panmtx);
+        vec3 ypan   = vec3(YAXIS * panmtx) * -1.f;
+        vec3 xofst  = normalize(xpan) * vd.camera.btn2Delta.x * vd.camera.pansense;
+        vec3 yofst  = normalize(ypan) * vd.camera.btn2Delta.y * vd.camera.pansense;
+        //vd.camera.lookAt += normalize(xpan) * vd.camera.btn2Delta.x * vd.camera.pansense;
+        //vd.camera.lookAt += normalize(ypan) * vd.camera.btn2Delta.y * vd.camera.pansense;
+        vd.camera.lookAt += xofst;
+        vd.camera.lookAt += yofst;
+        vec3 panpos = pos(vd.camera.tfm);
+        //panpos     += normalize(xpan) * vd.camera.btn2Delta.x * vd.camera.pansense;
+        //panpos     c+= normalize(ypan) * vd.camera.btn2Delta.y * vd.camera.pansense;
+        panpos += xofst;
+        panpos += yofst;
+        set_pos(&vd.camera.tfm, panpos);
+        //viewP += yview * vd.camera.btn2Delta.y;
+        
         mat4 projection;
         projection = perspective(vd.camera.fov,
                                  (GLfloat)vd.ui.w / (GLfloat)vd.ui.h, 

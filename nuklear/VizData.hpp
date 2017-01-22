@@ -95,11 +95,13 @@ public:
 
 struct Camera
 {
-  float fov, sensitivity, nearClip, farClip;                     // field of view is fov
+  float fov, pansense, sensitivity, nearClip, farClip;                     // field of view is fov
   vec2 mouseDelta;
+  vec2 btn2Delta;
   vec2 oldMousePos;
   //vec3 position;
-  vec3 viewDirection;
+  //vec3 viewDirection;
+  vec3 lookAt;
   vec3 up;
   mat4 tfm;     //glm::mat4 transformMtx;
   mat4 proj;
