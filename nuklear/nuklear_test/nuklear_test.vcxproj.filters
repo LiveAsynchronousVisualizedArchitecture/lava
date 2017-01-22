@@ -1,0 +1,74 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Source Files\libc">
+      <UniqueIdentifier>{14888a9f-5934-49c0-a905-f992e989e979}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="hpp">
+      <UniqueIdentifier>{d7a7e0d2-d752-48af-92b2-bd6e9b6db612}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="src_libs">
+      <UniqueIdentifier>{20d17ab6-8a23-408f-8af9-ae20a07caa32}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="unified">
+      <UniqueIdentifier>{e22355bb-80f1-40a9-b263-2c9c730ab978}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\nuklear.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\glfw3.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\glfw3native.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\no_rt_util.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nuklear_glfw_gl3.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\VizData.hpp">
+      <Filter>hpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\VizGen.hpp">
+      <Filter>hpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\VizTfm.hpp">
+      <Filter>hpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\glfw_3.2.1.h">
+      <Filter>src_libs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\glew_2.0.0.h">
+      <Filter>src_libs</Filter>
+    </ClInclude>
+    <ClInclude Include="..\IndexedVerts.h">
+      <Filter>unified</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\unified.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glfw.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\glew.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\main.cpp">
+      <Filter>unified</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

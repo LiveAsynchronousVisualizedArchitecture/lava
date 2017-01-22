@@ -37,7 +37,7 @@
 *.log
 *.ilk
 *.user
-*.filters
+#*.filters
 *.opensdf
 *.suo
 *.psess

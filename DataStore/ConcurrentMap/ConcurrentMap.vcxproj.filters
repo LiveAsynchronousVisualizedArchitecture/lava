@@ -1,0 +1,17 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="ConcurrentMap.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="hpp">
+      <UniqueIdentifier>{c5b3feee-5ce4-4c6e-a50f-61e98456f639}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="ConcurrentMap.hpp">
+      <Filter>hpp</Filter>
+    </ClInclude>
+    <ClInclude Include="simdb.hpp" />
+  </ItemGroup>
+</Project>
