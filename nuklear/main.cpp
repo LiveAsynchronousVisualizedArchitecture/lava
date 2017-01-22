@@ -92,8 +92,8 @@
 #define ENTRY_DECLARATION int main(void)
 #ifdef _MSC_VER
   #pragma comment(lib, "glfw3dll.lib")
-  #pragma comment(lib, "glew32.lib")
   #pragma comment(lib, "opengl32.lib")
+  //#pragma comment(lib, "glew32.lib")
 
   //#define USE_CONSOLE                                 // turning this off will use the windows subsystem in the linker and change the entry point to WinMain() so that no command line/console will appear
   #ifndef USE_CONSOLE
