@@ -412,7 +412,7 @@ ENTRY_DECLARATION
     vd.verRefreshClock = 0.0;
     vd.keyRefresh             =  2.0;
     vd.keyRefreshClock        = vd.keyRefresh;
-    vd.camera.fov             = 35.0f;
+    vd.camera.fov             = 75.0f;
     vd.camera.mouseDelta      = vec2(0.0f, 0.0f);
     vd.camera.btn2Delta       = vec2(0.0f, 0.0f);
     vd.camera.sensitivity     = 0.001f;
@@ -575,7 +575,8 @@ ENTRY_DECLARATION
         auto tfm   =  vd.camera.tfm;
         auto P     =  pos(tfm);
         auto plen  =  length(P);
-        auto lkmtx =  lookAt(P, vd.camera.lookAt, vec3(vec4(vd.camera.up,1.f)*tfm) );
+        //auto lkmtx =  lookAt(P, vd.camera.lookAt, normalize(vec3(vec4(vd.camera.up,1.f)*tfm)) );
+        auto lkmtx =  lookAt(P, vd.camera.lookAt, vd.camera.up);
         view       =  lkmtx;
         set_pos(&view, P);
         
@@ -588,7 +589,8 @@ ENTRY_DECLARATION
         view       =  rotate(view, yrot, xview);
         view       =  rotate(view, xrot, yview);                // todo: these need to be moved to the cursor callback, although input updates are only called once per frame so it likely doesn't matter
         auto viewP =  pos(view);
-        tfm        =  lookAt(viewP, vd.camera.lookAt, vec3(vec4(vd.camera.up,1.f) * lkmtx) );
+        //tfm        =  lookAt(viewP, vd.camera.lookAt, normalize(vec3(vec4(vd.camera.up,1.f)*lkmtx)) );
+        tfm        =  lookAt(viewP, vd.camera.lookAt, vd.camera.up);
         set_pos(&tfm, viewP);
         vd.camera.tfm = tfm;
 

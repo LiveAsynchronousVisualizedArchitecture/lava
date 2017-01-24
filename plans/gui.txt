@@ -18,7 +18,19 @@ GUI:
 - make connecting wires try to avoid being behind nodes
 
 
+---------
+| NODES |
+---------
+
+- overall premise is that the gui should be clear yet uncluttered
+  |- this can be accomplished by different levels of detail
+  |- zooming out simplifies what is shown
+  |- mousing over shows more detail
+  |- mouse over plus space shows more controls and/or stats and info
+
 - node controls hidden until mouse over, or possibly mouse over plus space or some mouse button?
+  |- mouse over animates a border fattening up around the pill to show in and out slots
+  |- mouse over animates labeled lines with circles on the end coming out of the node to show available IO ? 
 - nodes shapes as pills with borders that give information or show connections
 - when snapping together vertically or horizontally, change to boxes with rounded corners
 - when connecting two different types, give a choice of nodes that take the src type in and give the dest type out
@@ -27,6 +39,19 @@ GUI:
 - on new node creation, use a template so that new nodes work out of the box
   |- need to have the correct function signature
   |- need to have an exported static struct list that gives the information for the function call
+- nodes show more detail when zooming in, less when zoomed out
+  |- node without text
+  |- node with text
+  |- node with border showing outputs and inputs
+  |- node showing labels on inputs and outputs
+  |- connections showing labels 
+- connections have labels written along the noodle/line when zoomed in
+- connections evade going behind nodes or overlapping other connections
+  |- can connections be a blend of noodle/manhatten/straight ?
+- shape change based on straight macro style sequence vs graph
+  |- when connected as a vertical or horizontal list, nodes shift to being more square with slightly rounded corners (like nuke or scratch)
+  |- when floating as part of a general graph nodes have a fat pill shape (like shake crossed with flame)
+
 
 
 - have message passing nodes be a separate window partition
@@ -37,6 +62,7 @@ GUI:
 - wires have to be created during runtime or at least by running once?
 - shift arrows forward by roughly a pixel on every message to show further what messages are passed
 - wires get thicker with multiple lanes if one node sends multiple different messages to the same node?
+
 
 
 
