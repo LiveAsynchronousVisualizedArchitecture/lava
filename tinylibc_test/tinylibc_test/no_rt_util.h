@@ -83,44 +83,43 @@ using  f64  =              double;
 
 
 // BEGIN printf
-#define PRINTF_BUF_SZ 4096
-#if defined (_MSC_VER)  // Visual studio
-  //==========================================
-  // LIBCTINY - Matt Pietrek 2001
-  // MSDN Magazine, January 2001
-  //==========================================
-  #define  WIN32_LEAN_AND_MEAN
-  #define  NOMINMAX
-  #include <windows.h>
-  #include <strsafe.h>
-  #include <stdio.h>
-  #include <stdarg.h>
-
-  // Force the linker to include USER32.LIB
-  #pragma comment(linker, "/defaultlib:user32.lib")
-
-  //extern "C" int __cdecl Printf(const char * format, ...)
-  inline int __cdecl Printf(const char * format, ...)
-  {
-      char szBuf[PRINTF_BUF_SZ];
-      int retValue;
-      DWORD cbWritten;
-      va_list argptr;
-          
-      va_start( argptr, format );
-      //retValue = wvsprintf( szBuff, format, argptr );
-      retValue = StringCchVPrintf(szBuf, PRINTF_BUF_SZ, format, argptr );
-      va_end( argptr );
-
-      auto len=strlen(szBuf);
-
-      WriteFile(  GetStdHandle(STD_OUTPUT_HANDLE), szBuf, (DWORD)len,
-                  &cbWritten, 0 );
-
-      return retValue;
-  }
-#endif
-
+//#define PRINTF_BUF_SZ 4096
+//#if defined (_MSC_VER)  // Visual studio
+//  //==========================================
+//  // LIBCTINY - Matt Pietrek 2001
+//  // MSDN Magazine, January 2001
+//  //==========================================
+//  #define  WIN32_LEAN_AND_MEAN
+//  #define  NOMINMAX
+//  #include <windows.h>
+//  #include <strsafe.h>
+//  #include <stdio.h>
+//  #include <stdarg.h>
+//
+//  // Force the linker to include USER32.LIB
+//  #pragma comment(linker, "/defaultlib:user32.lib")
+//
+//  //extern "C" int __cdecl Printf(const char * format, ...)
+//  inline int __cdecl Printf(const char * format, ...)
+//  {
+//      char szBuf[PRINTF_BUF_SZ];
+//      int retValue;
+//      DWORD cbWritten;
+//      va_list argptr;
+//          
+//      va_start( argptr, format );
+//      //retValue = wvsprintf( szBuff, format, argptr );
+//      retValue = StringCchVPrintf(szBuf, PRINTF_BUF_SZ, format, argptr );
+//      va_end( argptr );
+//
+//      auto len=strlen(szBuf);
+//
+//      WriteFile(  GetStdHandle(STD_OUTPUT_HANDLE), szBuf, (DWORD)len,
+//                  &cbWritten, 0 );
+//
+//      return retValue;
+//  }
+//#endif
 
 
 #endif
