@@ -18,12 +18,23 @@
 
 extern "C" int __cdecl main(int, char **, char **);    // In user's code
 
+//sbassett
+//extern "C"
+ HANDLE _heapHndl;
+
 //
 // Modified version of the Visual C++ startup code.  Simplified to
 // make it easier to read.  Only supports ANSI programs.
 //
 extern "C" void __cdecl mainCRTStartup( void )
 {
+  //sbassett
+  _heapHndl = HeapCreate(
+    0,    // _In_ DWORD  flOptions,        // heap is not executable, doesn't generate exceptions and is serialized (thread safe through locks)
+    0,    // _In_ SIZE_T dwInitialSize,    // 0 is default which is one page 
+    0 );  // _In_ SIZE_T dwMaximumSize);   // 0 is default which means the heap can grow to available memory
+
+
     int mainret, argc;
 
     argc = _ConvertCommandLineToArgcArgv( );
@@ -35,6 +46,9 @@ extern "C" void __cdecl mainCRTStartup( void )
     _initterm( __xc_a, __xc_z );
 
     mainret = main( argc, _ppszArgv, 0 );
+
+    // sbassett 
+    // HeapDestroy(_heapHndl) ?
 
     _DoExit();
 

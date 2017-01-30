@@ -15,36 +15,18 @@
     <Filter Include="Header Files\libctiny">
       <UniqueIdentifier>{1cb56856-e375-40b0-b373-d0bad08772f9}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\libctiny_excluded">
+      <UniqueIdentifier>{60d8583a-1ec0-4389-ab50-c6a07de87399}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\dlmalloc">
+      <UniqueIdentifier>{19694fea-e762-4da3-aeea-63fffaee28ff}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ALLOC.cpp">
-      <Filter>Source Files\libctiny</Filter>
-    </ClCompile>
-    <ClCompile Include="ALLOCSUP.cpp">
-      <Filter>Source Files\libctiny</Filter>
-    </ClCompile>
-    <ClCompile Include="ATOL.cpp">
-      <Filter>Source Files\libctiny</Filter>
-    </ClCompile>
-    <ClCompile Include="CRT0TWIN.cpp">
-      <Filter>Source Files\libctiny</Filter>
-    </ClCompile>
-    <ClCompile Include="ISCTYPE.cpp">
-      <Filter>Source Files\libctiny</Filter>
-    </ClCompile>
     <ClCompile Include="NEWDEL.CPP">
-      <Filter>Source Files\libctiny</Filter>
-    </ClCompile>
-    <ClCompile Include="puts.cpp">
-      <Filter>Source Files\libctiny</Filter>
-    </ClCompile>
-    <ClCompile Include="stricmp.cpp">
-      <Filter>Source Files\libctiny</Filter>
-    </ClCompile>
-    <ClCompile Include="ALLOC2.cpp">
       <Filter>Source Files\libctiny</Filter>
     </ClCompile>
     <ClCompile Include="argcargv.cpp">
@@ -56,14 +38,41 @@
     <ClCompile Include="initterm.cpp">
       <Filter>Source Files\libctiny</Filter>
     </ClCompile>
+    <ClCompile Include="ALLOC.cpp">
+      <Filter>Source Files\libctiny_excluded</Filter>
+    </ClCompile>
+    <ClCompile Include="ALLOC2.cpp">
+      <Filter>Source Files\libctiny_excluded</Filter>
+    </ClCompile>
+    <ClCompile Include="ALLOCSUP.cpp">
+      <Filter>Source Files\libctiny_excluded</Filter>
+    </ClCompile>
+    <ClCompile Include="ATOL.cpp">
+      <Filter>Source Files\libctiny_excluded</Filter>
+    </ClCompile>
+    <ClCompile Include="CRT0TWIN.cpp">
+      <Filter>Source Files\libctiny_excluded</Filter>
+    </ClCompile>
+    <ClCompile Include="ISCTYPE.cpp">
+      <Filter>Source Files\libctiny_excluded</Filter>
+    </ClCompile>
     <ClCompile Include="printf.cpp">
-      <Filter>Source Files\libctiny</Filter>
+      <Filter>Source Files\libctiny_excluded</Filter>
+    </ClCompile>
+    <ClCompile Include="puts.cpp">
+      <Filter>Source Files\libctiny_excluded</Filter>
     </ClCompile>
     <ClCompile Include="sprintf.cpp">
-      <Filter>Source Files\libctiny</Filter>
+      <Filter>Source Files\libctiny_excluded</Filter>
+    </ClCompile>
+    <ClCompile Include="stricmp.cpp">
+      <Filter>Source Files\libctiny_excluded</Filter>
     </ClCompile>
     <ClCompile Include="struplwr.cpp">
-      <Filter>Source Files\libctiny</Filter>
+      <Filter>Source Files\libctiny_excluded</Filter>
+    </ClCompile>
+    <ClCompile Include="malloc.c">
+      <Filter>Source Files\dlmalloc</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
