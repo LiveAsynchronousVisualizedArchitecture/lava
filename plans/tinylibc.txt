@@ -1,0 +1,9 @@
+
+
+
+Goal: 
+-Create a minimal libc substitute that has malloc and printf.  
+-Use system calls and built in OS functions as much as possible 
+-Make library as a single header file using inline functions for easy import, 
+ minimal compilation size and no dependencies.
+
