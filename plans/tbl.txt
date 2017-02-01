@@ -1,0 +1,33 @@
+
+
+----------------------------------------------------
+| tbl: a combination vector, string and hash table |
+----------------------------------------------------
+data needed:
+ - total size in bytes
+ - length of vector/string memory
+ - length of hash table memory
+
+attributes:
+ - single pointer on stack or pointer+sizeBytes on stack?
+ - flat in memory 
+ - first 8 bytes is the size in bytes
+ - next 8 bytes is the position of the split between the vector and table
+ - one free byte kept in the middle and set to 0 to make c_string() work
+ - memory storage should be largely untemplated
+ - template types only used to cast void* and i8* pointers to the given type
+ - zero overhead serialization due to always being in serialized state?
+   - slight overhead serialization from copying sizeBytes and vector/hash table divider to and from the stack?
+   - this is fine because it can be used from the serialized state easily?
+ - use a flag bit on the pointer for ownership?
+ - use separate types for serialized and unserialized? 
+
+dependencies: 
+ - malloc
+ - realloc
+ - memcpy
+
+
+
+ // - template only for working on top of raw memory vector 
+
