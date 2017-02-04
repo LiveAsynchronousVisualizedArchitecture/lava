@@ -245,7 +245,8 @@ ENTRY_DECLARATION
       SECTION(input)
       {
   	    glfwGetCursorPos(win, &cx, &cy);
-        px=cx*winWidth; py=cy*winHeight;
+        //px=cx*winWidth; py=cy*winHeight;
+        px=cx; py=cy;
 
         sprintf(winTitle, "%.4f  %.4f", px, py);  
         glfwSetWindowTitle(win, winTitle);
@@ -274,7 +275,7 @@ ENTRY_DECLARATION
 
         auto nclr = nvgRGBf(.1f,.4f,.5f);
         if( isIn(px,py,nbnd) ) nclr = nvgRGBf(.5f,.4f,.1f);
-        nbnd = node(vg, 0, "BUTTON TIME", 384,384,256,64, nvgRGBf(.1f,.4f,.5f) );
+        nbnd = node(vg, 0, "BUTTON TIME", 384,384,256,64, nclr); // nvgRGBf(.1f,.4f,.5f) );
       }
       nvgEndFrame(vg);
 
