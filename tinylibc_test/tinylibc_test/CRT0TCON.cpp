@@ -20,7 +20,7 @@ extern "C" int __cdecl main(int, char **, char **);    // In user's code
 
 //sbassett
 //extern "C"
- HANDLE _heapHndl;
+ //HANDLE _heapHndl;
 
 //
 // Modified version of the Visual C++ startup code.  Simplified to
@@ -29,10 +29,10 @@ extern "C" int __cdecl main(int, char **, char **);    // In user's code
 extern "C" void __cdecl mainCRTStartup( void )
 {
   //sbassett
-  _heapHndl = HeapCreate(
-    0,    // _In_ DWORD  flOptions,        // heap is not executable, doesn't generate exceptions and is serialized (thread safe through locks)
-    0,    // _In_ SIZE_T dwInitialSize,    // 0 is default which is one page 
-    0 );  // _In_ SIZE_T dwMaximumSize);   // 0 is default which means the heap can grow to available memory
+  //_heapHndl = HeapCreate(
+  //  0,    // _In_ DWORD  flOptions,        // heap is not executable, doesn't generate exceptions and is serialized (thread safe through locks)
+  //  0,    // _In_ SIZE_T dwInitialSize,    // 0 is default which is one page 
+  //  0 );  // _In_ SIZE_T dwMaximumSize);   // 0 is default which means the heap can grow to available memory
 
 
     int mainret, argc;

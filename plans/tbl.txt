@@ -9,7 +9,7 @@ data needed:
  - length of hash table memory
 
 attributes:
- - single pointer on stack or pointer+sizeBytes on stack?
+ - single pointer on stack or pointer+sizeBytes+split on stack?
  - flat in memory 
  - first 8 bytes is the size in bytes
  - next 8 bytes is the position of the split between the vector and table
@@ -21,6 +21,8 @@ attributes:
    - this is fine because it can be used from the serialized state easily?
  - use a flag bit on the pointer for ownership?
  - use separate types for serialized and unserialized? 
+ - make an implicit cast operator for integer types to cast the type to the size automically? 
+ - make hash map start from the highest memory and work down
 
 dependencies: 
  - malloc

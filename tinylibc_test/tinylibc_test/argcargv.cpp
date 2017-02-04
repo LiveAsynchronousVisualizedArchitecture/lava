@@ -5,9 +5,10 @@
 #include <windows.h>
 #include "argcargv.h"
 
+
 #define _MAX_CMD_LINE_ARGS  128
 
-char * _ppszArgv[_MAX_CMD_LINE_ARGS+1];
+char* _ppszArgv[_MAX_CMD_LINE_ARGS+1];
 
 int __cdecl _ConvertCommandLineToArgcArgv( void )
 {
@@ -18,8 +19,7 @@ int __cdecl _ConvertCommandLineToArgcArgv( void )
     // Set to no argv elements, in case we have to bail out
     _ppszArgv[0] = 0;
 
-    // First get a pointer to the system's version of the command line, and
-    // figure out how long it is.
+    // First get a pointer to the system's version of the command line, and figure out how long it is.
     pszSysCmdLine = GetCommandLine();
     cbCmdLine = lstrlen( pszSysCmdLine );
 

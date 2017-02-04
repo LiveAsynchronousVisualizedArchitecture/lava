@@ -1,217 +1,334 @@
 
-// todo: pack into one file
+// -todo: use GetProcessHeap instead of heapHndl
+// -todo: pack into separate header file
+// -todo: put windows CRT header in header
+// -todo: try initial window
+
+// todo: put initterm into header
+// todo: put console CRT header in header
+// todo: make header have separate declaration and implementation sections
+// todo: make header have console and windows CRT #define controls
 // todo: make preprocessor mechanics for subsystem
 
-#include <cstdint>
-#include <cstring>
-//#include <float.h>
-
-#if defined(_WIN32)
-// begin printf
-extern "C" int __cdecl printf(const char * format, ...);
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
-#pragma comment(linker, "/defaultlib:user32.lib")
-extern "C" int __cdecl printf(const char * format, ...)
-{
-    char szBuff[1024];
-    int retValue;
-    DWORD cbWritten;
-    va_list argptr;
-          
-    va_start( argptr, format );
-    retValue = wvsprintf( szBuff, format, argptr );
-    va_end( argptr );
-
-    WriteFile(  GetStdHandle(STD_OUTPUT_HANDLE), szBuff, retValue,
-                &cbWritten, 0 );
-
-    return retValue;
-}
-// end printf
-
-// begin malloc, calloc and free
-extern HANDLE _heapHndl;
-extern "C" void* __cdecl malloc(size_t bytes)
-{
-  return (void*)HeapAlloc(_heapHndl, 0, bytes);
-}
-extern "C" void  __cdecl   free(_Pre_maybenull_ _Post_invalid_ void*    mem)
-{
-  HeapFree(_heapHndl, 0, mem);
-}
-extern "C" void* __cdecl calloc(size_t nitems, size_t size)
-{
-    return HeapAlloc( _heapHndl, HEAP_ZERO_MEMORY, nitems * size );
-}
-//extern "C" void * __cdecl calloc(size_t nitems, size_t size)
-//{
-//    return HeapAlloc( GetProcessHeap(), HEAP_ZERO_MEMORY, nitems * size );
-//}
-
-// end malloc and free
-
-// begin hypot function from musl (needed by std::vector for some reason)
-//#if FLT_EVAL_METHOD > 1U && LDBL_MANT_DIG == 64
-//#define SPLIT (0x1p32 + 1)
-//#else
-//#define SPLIT (0x1p27 + 1)
-//#endif
-
-//static void sq(double_t *hi, double_t *lo, double x)
-//{
-//	double_t xh, xl, xc;
-//
-//	xc = (double_t)x*SPLIT;
-//	xh = x - xc + xc;
-//	xl = x - xh;
-//	*hi = (double_t)x*x;
-//	*lo = xh*xh - *hi + 2*xh*xl + xl*xl;
-//}
-//extern "C" double _hypot(double x, double y)
-//{
-//	union {double f; uint64_t i;} ux = {x}, uy = {y}, ut;
-//	int ex, ey;
-//	double_t hx, lx, hy, ly, z;
-//
-//	/* arrange |x| >= |y| */
-//	ux.i &= -1ULL>>1;
-//	uy.i &= -1ULL>>1;
-//	if (ux.i < uy.i) {
-//		ut = ux;
-//		ux = uy;
-//		uy = ut;
-//	}
-//
-//	/* special cases */
-//	ex = ux.i>>52;
-//	ey = uy.i>>52;
-//	x = ux.f;
-//	y = uy.f;
-//	/* note: hypot(inf,nan) == inf */
-//	if (ey == 0x7ff)
-//		return y;
-//	if (ex == 0x7ff || uy.i == 0)
-//		return x;
-//	/* note: hypot(x,y) ~= x + y*y/x/2 with inexact for small y/x */
-//	/* 64 difference is enough for ld80 double_t */
-//	if (ex - ey > 64)
-//		return x + y;
-//
-//	/* precise sqrt argument in nearest rounding mode without overflow */
-//	/* xh*xh must not overflow and xl*xl must not underflow in sq */
-//	z = 1;
-//	if (ex > 0x3ff+510) {
-//		z = 0x1p700;
-//		x *= 0x1p-700;
-//		y *= 0x1p-700;
-//	} else if (ey < 0x3ff-450) {
-//		z = 0x1p-700;
-//		x *= 0x1p700;
-//		y *= 0x1p700;
-//	}
-//	sq(&hx, &lx, x);
-//	sq(&hy, &ly, y);
-//	return z*sqrt(ly+lx+hy+hx);
-//}
-
-//#if !defined(_DEBUG) 
-//extern "C" 
-//uint8_t __fltused;
-extern "C" double   _hypot(double x, double y){ return 0; }
-extern "C" void     _fltused(){}
-//#endif
-
-// end hypot function from musl (needed by std::vector for some reason)
-
-//extern "C" void* memset(void *dest, int c, size_t n);
-
-// begin memcpy and memset (from musl)
-//#if defined(_DEBUG) 
-void* memcpy(void* dest, const void* src, size_t n)
-{
-  unsigned char* d = (unsigned char*)dest;
-  const unsigned char* s = (const unsigned char*)src;
-
-  for(; n; n--) *d++ = *s++;
-	return dest;
-}
-
-#pragma warning(disable:4146)
-void* memset(void *dest, int c, size_t n)
-{
-	unsigned char* s = (unsigned char*)dest;
-	size_t k;
-
-	/* Fill head and tail with minimal branching. Each
-	 * conditional ensures that all the subsequently used
-	 * offsets are well-defined and in the dest region. */
-	if (!n) return dest;
-	s[0] = s[n-1] = c;
-	if (n <= 2) return dest;
-	s[1] = s[n-2] = c;
-	s[2] = s[n-3] = c;
-	if (n <= 6) return dest;
-	s[3] = s[n-4] = c;
-	if (n <= 8) return dest;
-
-	/* Advance pointer to align it at a 4-byte boundary,
-	 * and truncate n to a multiple of 4. The previous code
-	 * already took care of any head/tail that get cut off
-	 * by the alignment. */
-  	k = -(uintptr_t)s & 3;
-
-  //k = (-((uintptr_t)s)) & 3;
-	s += k;
-	n -= k;
-	n &= -4;
-
-  /* Pure C fallback with no aliasing violations. */
-	for(; n; n--, s++) *s = c;
-
-	return dest;
-}
-#pragma warning(default:4146)  
-//#endif
-// end memcpy and memset (from musl)
-
-// begin various windows entry points
-void entry();
-
-void DllMain(){}
-void main(){ entry(); }
-int WINAPI WinMain (
-    _In_ HINSTANCE hInstance,
-    _In_opt_ HINSTANCE hPrevInstance,
-    _In_ LPSTR lpCmdLine,
-    _In_ int nShowCmd
-    )
-{
-  entry();
-}
-//void WinMain(){ entry(); }
-
-// end various windows entry points
-#endif
-
+#include "tinylib_win.h"
 #include "no_rt_util.h"
-#include <vector>
+#include <WinUser.h>
+
+//#include <vector>
 //#define EASTL_EABASE_DISABLED
 //#include <EASTL/string.h>
+//
+//template<class T> using vec = std::vector<T>; 
 
-template<class T> using vec = std::vector<T>; 
+
+template<class T> class tbl
+{
+private:
+  void* p;
+
+  void       set_size(ui64  s)
+  { 
+    *((ui64*)clearBits(p) + 1) = s;
+  }
+  void  set_sizeBytes(ui64 sb)
+  {
+    *((ui64*)clearBits(p)) = sb;      // first 8 bytes should be the total size of the buffer in bytes
+  } 
+
+public:
+  static void*  setDestructorBit(void* p)
+  {
+    //return (void*)((ui64)p ^ (((ui64)1l)<<63));
+    return (void*)((ui64)p | (1llu<<63));
+  }
+  static bool   getDestructorBit(void* p)
+  {
+    return (((ui64)p)>>63)!=0;
+  }
+  static void*         clearBits(void* p)
+  {
+    return (void*)( ((ui64)p) & 0x0000FFFFFFFFFFFF);
+  }
+  static ui64          sizeBytes(ui64 count)  // sizeBytes is meant to take the same arguments as a constructor and return the total number of bytes to hold the entire stucture given those arguments 
+  {
+    return sizeof(ui64)*2 + count*sizeof(T);
+  }
+
+  tbl(){}
+  tbl(ui64  count)
+  {
+    ui64 sb = tbl::sizeBytes(count);
+    p       = Allocator().allocate(sb);
+    p       = setDestructorBit(p);
+    set_size(count);
+    set_sizeBytes(sb);
+  }
+  tbl(void*  addr, ui64 count, bool owner=true) :
+    p(addr)
+  {
+    //ui64 sb = tbl::sizeBytes(count);
+    //p       = addr;
+    if(owner){
+      set_sizeBytes( tbl::sizeBytes(count) );
+      set_size(count);
+    }
+  }
+  tbl(void*  addr) :
+    p(addr)
+  {
+    //ui64 sb = tbl::sizeBytes(count);
+    //set_size(count);
+    //set_sizeBytes(sb);
+    //
+    //p = addr;
+  }
+  tbl(tbl const&) = delete;
+  void operator=(tbl const&) = delete;
+  tbl(tbl&& rval)
+  {
+    p      = rval.p;
+    rval.p = nullptr;
+  }
+  ~tbl()
+  {
+    if(p && getDestructorBit(p)){
+      Deleter().operator()((T*)clearBits(p));  //free(p);
+      p = nullptr;
+    }
+  }
+
+  T& operator[](ui64 i)
+  {
+    return data()[i];
+  }
+
+  T*         data()
+  {
+    //ui64 pnum = 
+    ui64* maskptr = (ui64*)clearBits(p); // (ui64*)( ((ui64)p) & 0x0000FFFFFFFFFFFF);
+    return (T*)(maskptr+2);
+    //return (void*)((ui64*)p+2);
+  }
+  ui64   capacity() const
+  {
+    return (sizeBytes() - sizeof(ui64)*2) / sizeof(T);
+  }
+  ui64       size() const
+  {
+    return *((ui64*)clearBits(p) + 1);   // second 8 bytes should be the number of elements
+  } 
+  ui64  sizeBytes() const
+  {
+    return *((ui64*)clearBits(p));   // first 8 bytes should be the total size of the buffer in bytes
+  } 
+  auto       addr() const -> void*
+  {
+    return p;
+  }
+};
+
 
 static char* strmsg = "hello tiny world";
-void entry()
+void entry(int argc, char** argv)
 {
-  char* mem = (char*)malloc(17);
+  //char* mem = (char*)malloc(17);
+  char* mem = new char[17];
+
   memcpy(mem, strmsg, 17);
-  memset(mem+4, 0, 17);
+  memset(mem+4, 0, 17-4);
   //vec<char> mem(17);  
   printf(mem);
-  free(mem);
+
+  delete mem;
+  //free(mem);
 }
+
+
+
+HWND       hwnd;
+HWND   hWndList;
+HWND hwndButton;
+
+const char g_szClassName[] = "min_win";
+
+LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+  switch(msg)
+  {
+    case WM_CLOSE:
+      DestroyWindow(hwnd);
+    break;
+    case WM_DESTROY:
+      PostQuitMessage(0);
+    break;
+    case WM_COMMAND:
+      SendMessage(hWndList, LB_ADDSTRING, 0, (LPARAM)"name");
+    break;
+    default:
+      return DefWindowProc(hwnd, msg, wParam, lParam);
+  }
+  return 0;
+}
+
+//INT_PTR CALLBACK ListBoxExampleProc(HWND hDlg, UINT message, 
+//        WPARAM wParam, LPARAM lParam)
+//{
+//  switch (message)
+//  {
+//  case WM_INITDIALOG:
+//      {
+//          // Add items to list. 
+//          HWND hwndList = GetDlgItem(hDlg, IDC_LISTBOX_EXAMPLE);  
+//          for (int i = 0; i < ARRAYSIZE(Roster); i++) 
+//          { 
+//              int pos = (int)SendMessage(hwndList, LB_ADDSTRING, 0, 
+//                  (LPARAM) Roster[i].achName); 
+//              // Set the array index of the player as item data.
+//              // This enables us to retrieve the item from the array
+//              // even after the items are sorted by the list box.
+//              SendMessage(hwndList, LB_SETITEMDATA, pos, (LPARAM) i); 
+//          } 
+//          // Set input focus to the list box.
+//          SetFocus(hwndList); 
+//          return TRUE;               
+//      } 
+//
+//  case WM_COMMAND:
+//      switch (LOWORD(wParam))
+//      {
+//      case IDOK:
+//      case IDCANCEL:
+//          EndDialog(hDlg, LOWORD(wParam));
+//          return TRUE;
+//
+//      case IDC_LISTBOX_EXAMPLE:
+//          {
+//              switch (HIWORD(wParam)) 
+//              { 
+//              case LBN_SELCHANGE:
+//                  {
+//                      HWND hwndList = GetDlgItem(hDlg, IDC_LISTBOX_EXAMPLE); 
+//
+//                      // Get selected index.
+//                      int lbItem = (int)SendMessage(hwndList, LB_GETCURSEL, 0, 0); 
+//
+//                      // Get item data.
+//                      int i = (int)SendMessage(hwndList, LB_GETITEMDATA, lbItem, 0);
+//
+//                      // Do something with the data from Roster[i]
+//                      TCHAR buff[MAX_PATH];
+//                      StringCbPrintf (buff, ARRAYSIZE(buff),  
+//                          TEXT("Position: %s\nGames played: %d\nGoals: %d"), 
+//                          Roster[i].achPosition, Roster[i].nGamesPlayed, 
+//                          Roster[i].nGoalsScored);
+//
+//                      SetDlgItemText(hDlg, IDC_STATISTICS, buff); 
+//                      return TRUE; 
+//                  } 
+//              }
+//          }
+//          return TRUE;
+//      }
+//  }
+//  return FALSE;
+//}
+
+//void entry(int argc, char** argv)
+int WINAPI WinMain(HINSTANCE     hInstance, 
+                   HINSTANCE hPrevInstance,
+                   LPSTR         lpCmdLine, 
+                   int            nCmdShow)
+{
+
+  SECTION(register window class)
+  { //Step 1: Registering the Window Class
+    WNDCLASSEX wc; 
+
+    wc.cbSize        = sizeof(WNDCLASSEX);
+    wc.style         = 0;
+    wc.lpfnWndProc   = WndProc;
+    wc.cbClsExtra    = 0;
+    wc.cbWndExtra    = 0;
+    wc.hInstance     = hInstance;
+    wc.hIcon         = LoadIcon(NULL, IDI_APPLICATION);
+    wc.hCursor       = LoadCursor(NULL, IDC_ARROW);
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW+1);
+    wc.lpszMenuName  = NULL;
+    wc.lpszClassName = g_szClassName;
+    wc.hIconSm       = LoadIcon(NULL, IDI_APPLICATION);
+
+    if(!RegisterClassEx(&wc)){
+      MessageBox(NULL, "Window Registration Failed!", "Error!",
+          MB_ICONEXCLAMATION | MB_OK);
+      return 0;
+    }
+  }
+
+  SECTION(create main window)
+  {
+    // Step 2: Creating the Window
+    hwnd = CreateWindowEx(
+        WS_EX_CLIENTEDGE,
+        g_szClassName,
+        "Tiny Windows GUI",
+        WS_OVERLAPPEDWINDOW,
+        CW_USEDEFAULT, CW_USEDEFAULT, 512, 256,
+        NULL, NULL, hInstance, NULL);
+
+    if(hwnd == NULL){
+      MessageBox(NULL, "Window Creation Failed!", "Error!",
+          MB_ICONEXCLAMATION | MB_OK);
+      return 0;
+    }
+    ShowWindow(hwnd, nCmdShow);
+    UpdateWindow(hwnd);
+  }
+  SECTION(create a button)
+  {
+    //HWND lb = CreateWindowEx()
+    hwndButton = CreateWindow(
+      "BUTTON",  // Predefined class; Unicode assumed 
+      "PRESS HERE FOR NOTHING",      // Button text 
+      WS_TABSTOP | WS_VISIBLE | WS_CHILD | BS_DEFPUSHBUTTON,  // Styles 
+      10,         // x position 
+      10,         // y position 
+      100,        // Button width
+      100,        // Button height
+      hwnd,     // Parent window
+      NULL,       // No menu.
+      hInstance, //(HINSTANCE)GetWindowLong(hwnd, GWL_HINSTANCE), 
+      NULL);      // Pointer not needed.
+  }
+  SECTION(list box)
+  {
+    hWndList = CreateWindowEx(
+      WS_EX_CLIENTEDGE, 
+      TEXT("listbox"), 
+      "", 
+      WS_CHILD | WS_VISIBLE | WS_VSCROLL | ES_AUTOVSCROLL, 
+      240, 40, 150, 200, 
+      hwnd, 
+      (HMENU)105, 
+      NULL, NULL);
+    SendMessage(hWndList, LB_ADDSTRING, 0, (LPARAM)"name");
+    SendMessage(hWndList, LB_ADDSTRING, 0, (LPARAM)"extension");
+    SendMessage(hWndList, LB_ADDSTRING, 0, (LPARAM)"date");
+    SendMessage(hWndList, LB_ADDSTRING, 0, (LPARAM)"size");
+  }
+
+  MSG Msg;
+  SECTION(message loop)
+  {
+    while(GetMessage(&Msg, NULL, 0, 0) > 0){    // Message Loop
+      TranslateMessage(&Msg);
+      DispatchMessage(&Msg);
+    }
+  }
+
+  return (int)Msg.wParam;
+}
+
+
 
 
 //extern int WINAPI WinMain (

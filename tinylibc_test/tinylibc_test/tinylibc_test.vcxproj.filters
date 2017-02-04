@@ -21,16 +21,13 @@
     <Filter Include="Source Files\dlmalloc">
       <UniqueIdentifier>{19694fea-e762-4da3-aeea-63fffaee28ff}</UniqueIdentifier>
     </Filter>
+    <Filter Include="hpp">
+      <UniqueIdentifier>{6e34e42e-2fb3-4bd9-bedf-f9f7b41f72de}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="NEWDEL.CPP">
-      <Filter>Source Files\libctiny</Filter>
-    </ClCompile>
-    <ClCompile Include="argcargv.cpp">
-      <Filter>Source Files\libctiny</Filter>
     </ClCompile>
     <ClCompile Include="CRT0TCON.cpp">
       <Filter>Source Files\libctiny</Filter>
@@ -48,9 +45,6 @@
       <Filter>Source Files\libctiny_excluded</Filter>
     </ClCompile>
     <ClCompile Include="ATOL.cpp">
-      <Filter>Source Files\libctiny_excluded</Filter>
-    </ClCompile>
-    <ClCompile Include="CRT0TWIN.cpp">
       <Filter>Source Files\libctiny_excluded</Filter>
     </ClCompile>
     <ClCompile Include="ISCTYPE.cpp">
@@ -74,6 +68,15 @@
     <ClCompile Include="malloc.c">
       <Filter>Source Files\dlmalloc</Filter>
     </ClCompile>
+    <ClCompile Include="argcargv.cpp">
+      <Filter>Source Files\libctiny_excluded</Filter>
+    </ClCompile>
+    <ClCompile Include="NEWDEL.CPP">
+      <Filter>Source Files\libctiny_excluded</Filter>
+    </ClCompile>
+    <ClCompile Include="CRT0TWIN.cpp">
+      <Filter>Source Files\libctiny</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="no_rt_util.h">
@@ -84,6 +87,9 @@
     </ClInclude>
     <ClInclude Include="argcargv.h">
       <Filter>Header Files\libctiny</Filter>
+    </ClInclude>
+    <ClInclude Include="tinylib_win.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
