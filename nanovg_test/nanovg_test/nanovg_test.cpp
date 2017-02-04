@@ -1,16 +1,19 @@
 
-//#include <GL/GL.h>
-//#include "glfw_3.2.1.h"
+// -todo: make click and drag node position relative to click position
+
+// todo: bring in vecf from lighting in a bottle
+// todo: make global state 
+// todo: make vector of bnds, nodes, etc.
+// todo: make node struct 
 
 #include "glew_2.0.0.h"
 #include "glfw3.h"
-
 #include "nanovg.h"
+
 #define NANOVG_GL3_IMPLEMENTATION   // Use GL2 implementation.
 #include "nanovg_gl.h"
 
-#include "../nanovg-master/example/demo.h"
-//#include "../nanovg-master/example/perf.h"
+//#include "../nanovg-master/example/demo.h"
 
 #define ENTRY_DECLARATION int main(void)
 #ifdef _MSC_VER
@@ -26,8 +29,12 @@
   #endif
 #endif
 
-#include "no_rt_util.h"
 #include <cstdio>
+//#include "glm/vec2.hpp"
+#include "no_rt_util.h"
+#include "vec.hpp"
+
+//using v2 = glm::vec2;
 
 const int TITLE_MAX_LEN = 256;
 
@@ -43,6 +50,10 @@ float                prevY;
 bool                  rtDn = false;    // right mouse button down
 bool                 lftDn = false;    // left mouse button down
 bool                   drg = true;
+float              ndOfstX;
+float              ndOfstY;
+float                  ndx = 512.f;
+float                  ndy = 512.f;
 
 namespace{
 
@@ -92,24 +103,6 @@ static char*    cpToUTF8(int cp, char* str)
 	}
 	return str;
 }
-
-//void cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
-//{
-//  const static float _2PI = 2.f* PIf;
-//
-//  glfwGetWindowUserPointer(window);
-//  vec2 newMousePosition = vec2((float)xposition, (float)yposition);
-//
-//  if(vd->camera.leftButtonDown){
-//    vd->camera.mouseDelta = (newMousePosition - vd->camera.oldMousePos);
-//  }else{ vd->camera.mouseDelta = vec2(0,0); }
-//    
-//  if(vd->camera.rightButtonDown){
-//    vd->camera.btn2Delta = (newMousePosition - vd->camera.oldMousePos);
-//  }else{ vd->camera.btn2Delta  = vec2(0,0); }
-//
-//  vd->camera.oldMousePos = newMousePosition;
-//}
 
 void    mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 {
@@ -325,21 +318,29 @@ ENTRY_DECLARATION
 		  nvgBeginFrame(vg, ww, wh, pxRatio);
       SECTION(nanovg drawing)
       {
+        auto    nclr = nvgRGBf(.1f,.4f,.5f);
+        bool inNode = isIn(px,py,nbnd);
+        if(inNode){
+          nclr = nvgRGBf(.5f, .4f, .1f);
+          if(!lftDn){ ndOfstX = ndOfstY = 0; }
+          else if(!drg){ 
+            ndOfstX = px-nbnd.xmn; 
+            ndOfstY = py-nbnd.ymn;
+          }
+        }
+        drg = (drg || inNode) && lftDn;
+
         nvgBeginPath(vg);
         nvgFillColor(vg, nvgRGBA(0xFF,0,0,0));
    	    nvgFill(vg);
+        if(drg){
+          ndx = px-ndOfstX;
+          ndy = py-ndOfstY;
+        }
 
-        auto    nclr = nvgRGBf(.1f,.4f,.5f);
-        bool ovrNode = isIn(px,py,nbnd);
-        if(ovrNode) nclr = nvgRGBf(.5f, .4f, .1f);
-        drg = (drg || ovrNode) && lftDn;
-        if(drg)
-          nbnd = drw_node(vg, 0, "BUTTON TIME", px,py,256,64, nclr, linNorm(px, 0,ww) ); // nvgRGBf(.1f,.4f,.5f) );
-        else
-          nbnd = drw_node(vg, 0, "BUTTON TIME", 384,384,256,64, nclr, linNorm(px, 0,ww) ); // nvgRGBf(.1f,.4f,.5f) );
+        nbnd = drw_node(vg, 0, "BUTTON TIME", ndx,ndy, 256,64, nclr, linNorm(px, 0,ww) );
       }
       nvgEndFrame(vg);
-
 
       glfwSwapBuffers(win);
       glfwPollEvents();
@@ -351,6 +352,27 @@ ENTRY_DECLARATION
 }
 
 
+
+
+
+
+//void cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
+//{
+//  const static float _2PI = 2.f* PIf;
+//
+//  glfwGetWindowUserPointer(window);
+//  vec2 newMousePosition = vec2((float)xposition, (float)yposition);
+//
+//  if(vd->camera.leftButtonDown){
+//    vd->camera.mouseDelta = (newMousePosition - vd->camera.oldMousePos);
+//  }else{ vd->camera.mouseDelta = vec2(0,0); }
+//    
+//  if(vd->camera.rightButtonDown){
+//    vd->camera.btn2Delta = (newMousePosition - vd->camera.oldMousePos);
+//  }else{ vd->camera.btn2Delta  = vec2(0,0); }
+//
+//  vd->camera.oldMousePos = newMousePosition;
+//}
 
 //
 // 32.f); // max(0.f, 48.f-dt*16.f ) );

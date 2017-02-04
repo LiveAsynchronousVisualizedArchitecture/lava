@@ -10,6 +10,8 @@ This file is meant to be made up of utilities that avoid using the C runtime
 #ifndef __NO_RT_UTIL_HEADERGUARD_H__
 #define __NO_RT_UTIL_HEADERGUARD_H__
 
+#include <type_traits>
+
 //#ifdef _MSC_VER
 //  #define _CRT_SECURE_NO_WARNINGS
 //  #define _SCL_SECURE_NO_WARNINGS
