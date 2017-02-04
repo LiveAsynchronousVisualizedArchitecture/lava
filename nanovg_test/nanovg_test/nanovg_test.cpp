@@ -40,6 +40,20 @@ bnd nbnd;
 
 namespace{
 
+float               lerp(float p, float lo, float hi)
+{
+  return lo*(1-p) + hi*p;
+}
+float            linNorm(float n, float lo, float hi)
+{
+  return (n-lo) / (hi-lo);
+}
+float              remap(float n, float lo, float hi, float toLo, float toHi)
+{
+  //float p = (n-lo) / (hi-lo);
+  float p = linNorm(n, lo, hi);
+  return lerp(p, toLo, toHi);
+}
 bool                isIn(float x, float y, bnd const& b)
 {
   return x>b.xmn && x<b.xmx && y>b.ymn && y<b.ymx;
@@ -78,16 +92,16 @@ bnd                 node(NVGcontext* vg,
                        const char* text, 
                        float x, float y, 
                        float w, float h, 
-                           NVGcolor col)
-                     //float cornerRad)
+                           NVGcolor col,
+                        float       rnd)   // rnd is corner rounding
 {
   const int   border = 2;
   const float   rthk = 8.f;    // rw is rail thickness
 
 	NVGpaint bg;
 	char icon[8];
-	float rad = h / 2.f;         // rad is corner radius
-	float tw = 0, iw = 0;
+	float rad = lerp(rnd, 0.f, h/2.f);         // rad is corner radius
+	float  tw = 0, iw = 0;
 
   SECTION(grey border)
   {
@@ -101,7 +115,8 @@ bnd                 node(NVGcontext* vg,
   }
   SECTION(shaded color inside)
   {
-	  bg = nvgLinearGradient(vg, x,y,x,y+h, nvgRGBA(255,255,255,isBlack(col)?16:48), nvgRGBA(0,0,0,isBlack(col)?16:48));
+    int grad = (int)lerp(rnd, 0, 48);
+	  bg = nvgLinearGradient(vg, x,y,x,y+h, nvgRGBA(255,255,255,isBlack(col)?16:grad), nvgRGBA(0,0,0,isBlack(col)?16:grad));
 	  nvgBeginPath(vg);
 	    nvgRoundedRect(vg, x+border,y+border, w-(border*2),h-(border*2), rad); //-1);
 	    if(!isBlack(col)){
@@ -232,7 +247,7 @@ ENTRY_DECLARATION
   {
     while(!glfwWindowShouldClose(win))
     {
-		  int winWidth, winHeight, fbWidth, fbHeight;
+		  int ww, wh, fbWidth, fbHeight;
       double cx, cy, t, dt, prevt=0;
       float px, py, pxRatio;
 
@@ -245,16 +260,16 @@ ENTRY_DECLARATION
       SECTION(input)
       {
   	    glfwGetCursorPos(win, &cx, &cy);
-        //px=cx*winWidth; py=cy*winHeight;
+        //px=cx*ww; py=cy*wh;
         px=cx; py=cy;
 
-        sprintf(winTitle, "%.4f  %.4f", px, py);  
+        sprintf(winTitle, "%.4f  %.4f", px, py);
         glfwSetWindowTitle(win, winTitle);
 
-		    glfwGetWindowSize(win, &winWidth, &winHeight);
+		    glfwGetWindowSize(win, &ww, &wh);
 		    glfwGetFramebufferSize(win, &fbWidth, &fbHeight);
 		    // Calculate pixel ration for hi-dpi devices.
-		    pxRatio = (float)fbWidth / (float)winWidth;
+		    pxRatio = (float)fbWidth / (float)ww;
       }
       SECTION(gl frame setup)
       {
@@ -266,7 +281,7 @@ ENTRY_DECLARATION
 		    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
       }
 
-		  nvgBeginFrame(vg, winWidth, winHeight, pxRatio);
+		  nvgBeginFrame(vg, ww, wh, pxRatio);
       SECTION(nanovg drawing)
       {
         nvgBeginPath(vg);
@@ -274,8 +289,8 @@ ENTRY_DECLARATION
    	    nvgFill(vg);
 
         auto nclr = nvgRGBf(.1f,.4f,.5f);
-        if( isIn(px,py,nbnd) ) nclr = nvgRGBf(.5f,.4f,.1f);
-        nbnd = node(vg, 0, "BUTTON TIME", 384,384,256,64, nclr); // nvgRGBf(.1f,.4f,.5f) );
+        if( isIn(px,py,nbnd) ) nclr = nvgRGBf(.5f, .4f, .1f);
+        nbnd = node(vg, 0, "BUTTON TIME", 384,384,256,64, nclr, linNorm(px, 0,ww) ); // nvgRGBf(.1f,.4f,.5f) );
       }
       nvgEndFrame(vg);
 
