@@ -31,12 +31,18 @@
 
 const int TITLE_MAX_LEN = 256;
 
-struct bnd { float xmn, ymn, xmx, ymx; };
+struct bnd  { float xmn, ymn, xmx, ymx; };
+struct node {  };
 
-GLFWwindow* win;
-char winTitle[TITLE_MAX_LEN];
-int premult = 0;
-bnd nbnd;
+GLFWwindow*            win;
+char              winTitle[TITLE_MAX_LEN];
+int                premult = 0;
+bnd                   nbnd;
+float                prevX;
+float                prevY;
+bool                  rtDn = false;    // right mouse button down
+bool                 lftDn = false;    // left mouse button down
+bool                   drg = true;
 
 namespace{
 
@@ -87,7 +93,38 @@ static char*    cpToUTF8(int cp, char* str)
 	return str;
 }
 
-bnd                 node(NVGcontext* vg, 
+//void cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
+//{
+//  const static float _2PI = 2.f* PIf;
+//
+//  glfwGetWindowUserPointer(window);
+//  vec2 newMousePosition = vec2((float)xposition, (float)yposition);
+//
+//  if(vd->camera.leftButtonDown){
+//    vd->camera.mouseDelta = (newMousePosition - vd->camera.oldMousePos);
+//  }else{ vd->camera.mouseDelta = vec2(0,0); }
+//    
+//  if(vd->camera.rightButtonDown){
+//    vd->camera.btn2Delta = (newMousePosition - vd->camera.oldMousePos);
+//  }else{ vd->camera.btn2Delta  = vec2(0,0); }
+//
+//  vd->camera.oldMousePos = newMousePosition;
+//}
+
+void    mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
+{
+  if(button==GLFW_MOUSE_BUTTON_LEFT){
+    if(action==GLFW_PRESS) lftDn = true;
+    else if(action==GLFW_RELEASE) lftDn = false;
+  }
+
+  if(button==GLFW_MOUSE_BUTTON_RIGHT){
+    if(action==GLFW_PRESS) rtDn = true;
+    else if(action==GLFW_RELEASE) rtDn = false;
+  }
+}
+
+bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
                             int preicon, 
                        const char* text, 
                        float x, float y, 
@@ -133,12 +170,12 @@ bnd                 node(NVGcontext* vg,
     //float cntrX=x+border+rad, cntrY=y+border+h/2, rr=rad;        // rr is rail radius
     float cntrX=x+rad, cntrY=y+h/2, rr=rad;        // rr is rail radius
     
-    float bthk = rthk+1;
+    float bthk = rthk+2;
     nvgBeginPath(vg);
      nvgMoveTo(vg, x-bthk/2, cntrY);
      nvgArc(vg, cntrX, cntrY, rr, PIf*1, PIf*1.5, NVG_CW);
      nvgStrokeWidth(vg, bthk);
-    nvgStrokeColor(vg, nvgRGBAf(0, 0, 0, 1.f) );
+    nvgStrokeColor(vg, nvgRGBAf(0, 0, 0, .5f) );
 	  nvgStroke(vg);
 
     nvgBeginPath(vg);
@@ -180,7 +217,7 @@ bnd                 node(NVGcontext* vg,
   return {x,y, x+w, y+h};
 }
 
-}
+} // end namespace
 
 ENTRY_DECLARATION
 {
@@ -243,7 +280,7 @@ ENTRY_DECLARATION
 	  }
   }
 
-  double prevt = 0, cpuTime = 0;
+  double prevt=0, cpuTime=0;
   glfwSetTime(0);
   SECTION(main loop)
   {
@@ -262,15 +299,17 @@ ENTRY_DECLARATION
       SECTION(input)
       {
   	    glfwGetCursorPos(win, &cx, &cy);
+        prevX=px; px=cx; prevY=py; py=cy;
         //px=cx*ww; py=cy*wh;
-        px=cx; py=cy;
 
         sprintf(winTitle, "%.4f  %.4f", px, py);
         glfwSetWindowTitle(win, winTitle);
 
 		    glfwGetWindowSize(win, &ww, &wh);
 		    glfwGetFramebufferSize(win, &fbWidth, &fbHeight);
-		    // Calculate pixel ration for hi-dpi devices.
+		    glfwSetMouseButtonCallback(win, mouseBtnCallback);
+
+        // Calculate pixel ration for hi-dpi devices.
 		    pxRatio = (float)fbWidth / (float)ww;
       }
       SECTION(gl frame setup)
@@ -290,9 +329,14 @@ ENTRY_DECLARATION
         nvgFillColor(vg, nvgRGBA(0xFF,0,0,0));
    	    nvgFill(vg);
 
-        auto nclr = nvgRGBf(.1f,.4f,.5f);
-        if( isIn(px,py,nbnd) ) nclr = nvgRGBf(.5f, .4f, .1f);
-        nbnd = node(vg, 0, "BUTTON TIME", 384,384,256,64, nclr, linNorm(px, 0,ww) ); // nvgRGBf(.1f,.4f,.5f) );
+        auto    nclr = nvgRGBf(.1f,.4f,.5f);
+        bool ovrNode = isIn(px,py,nbnd);
+        if(ovrNode) nclr = nvgRGBf(.5f, .4f, .1f);
+        drg = (drg || ovrNode) && lftDn;
+        if(drg)
+          nbnd = drw_node(vg, 0, "BUTTON TIME", px,py,256,64, nclr, linNorm(px, 0,ww) ); // nvgRGBf(.1f,.4f,.5f) );
+        else
+          nbnd = drw_node(vg, 0, "BUTTON TIME", 384,384,256,64, nclr, linNorm(px, 0,ww) ); // nvgRGBf(.1f,.4f,.5f) );
       }
       nvgEndFrame(vg);
 
