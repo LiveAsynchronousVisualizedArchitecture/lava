@@ -115,8 +115,10 @@ bnd                 node(NVGcontext* vg,
   }
   SECTION(shaded color inside)
   {
-    int grad = (int)lerp(rnd, 0, 48);
-	  bg = nvgLinearGradient(vg, x,y,x,y+h, nvgRGBA(255,255,255,isBlack(col)?16:grad), nvgRGBA(0,0,0,isBlack(col)?16:grad));
+    int    grad = (int)lerp(rnd, 0, 48);
+    auto topClr = nvgRGBA(255,255,255,isBlack(col)?16:grad);
+    auto botClr = nvgRGBA(0,0,0,isBlack(col)?16:grad);
+	  bg = nvgLinearGradient(vg, x,y,x,y+h, topClr, botClr);
 	  nvgBeginPath(vg);
 	    nvgRoundedRect(vg, x+border,y+border, w-(border*2),h-(border*2), rad); //-1);
 	    if(!isBlack(col)){
