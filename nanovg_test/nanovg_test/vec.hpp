@@ -8,6 +8,104 @@
 
 #include "no_rt_util.h"
 
+union  vec4
+{
+  struct { float x,y,z,w;  };
+  struct { float r,g,b,a;  };
+  float c[4];
+
+  float&       operator[](int i)       {return c[i];}
+  float const& operator[](int i) const {return c[i];}
+};
+inline vec4   Vec4(float x=0, float y=0, float z=0)
+{
+  vec4 v; v.x=x; v.y=y, v.z=z; return v;
+}
+inline vec4   operator+(vec4 const& a, vec4 const& b)
+{
+  vec4 ret;
+  ret.x = a.x + b.x;
+  ret.y = a.y + b.y;
+  ret.z = a.z + b.z;
+  return ret;
+}
+inline vec4   operator-(vec4 const& a, vec4 const& b)
+{
+  vec4 ret;
+  ret.x = a.x - b.x;
+  ret.y = a.y - b.y;
+  ret.z = a.z - b.z;
+  return ret;
+}
+inline vec4   operator*(float a, vec4 const& b)
+{
+  vec4 ret;
+  ret.x = a*b.x;
+  ret.y = a*b.y;
+  ret.z = a*b.z;
+  return ret;
+}
+inline vec4   operator*(vec4 const& a, vec4 const& b)
+{
+  vec4 ret;
+  ret.x = a.x * b.x;
+  ret.y = a.y * b.y;
+  ret.z = a.z * b.z;
+  return ret;
+}
+inline vec4   operator/(vec4 const& a, vec4 const& b)
+{
+  vec4 ret;
+  ret.x = a.x / b.x;
+  ret.y = a.y / b.y;
+  ret.z = a.z / b.z;
+  return ret;
+}
+inline bool   operator<(vec4 const& a, vec4 const& b)
+{
+  if(a.x<b.x) return true; if(a.x>b.x) return false;
+  if(a.y<b.y) return true; if(a.y>b.y) return false;
+  if(a.z<b.z) return true; if(a.z>b.z) return false;
+  return false;
+}
+inline bool   operator==(vec4 const& a, vec4 const& b)
+{
+  if(a.x!=b.x || a.y!=b.y || a.z!=b.z) return false;
+  return true;
+}
+inline float  dot(vec4 const& a, vec4 const& b)
+{
+  return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
+}
+inline float  sqrlen(vec4 const& a)
+{
+  return dot(a,a);
+}
+inline float  length(vec4 const& a)
+{
+  return sqrtf(dot(a,a));
+}
+inline vec4   PtOnLine(vec4 pt, vec4 AA, vec4 BB, float* t=nullptr)
+{
+  vec4  AB      =  BB  - AA;
+  vec4  AP      =  pt  - AA;
+  float AB_dot  =  dot(AB,AB);
+  float AP_AB   =  dot(AP,AB);
+  float _t      =  AB_dot==0? 0 : AP_AB / AB_dot;
+  
+  if(t) *t=_t;
+  return vec4(_t*AB + AA);
+}
+inline vec4   extractSign(vec4* inout)
+{
+  vec4 ret;
+  TO(3,d) ret[d]      = copysign(1.f,(*inout)[d]);
+  TO(3,d) (*inout)[d] = abs( (*inout)[d] );
+  return ret;
+}
+using  v4    = vec4;
+using  v4f   = vec4;
+
 union  vec3i
 {
   struct { int v0, v1, v2; };
@@ -148,6 +246,60 @@ union  vec2
   float&       operator[](int i)       {return c[i];}
   float const& operator[](int i) const {return c[i];}
 };
+inline vec2   Vec2(float x=0, float y=0, float z=0)
+{
+  vec2 v; v.x=x; v.y=y;
+  return v;
+}
+inline vec2   operator+(vec2 const& a, vec2 const& b)
+{
+  vec2 ret;
+  //ret.x = a.x + b.x;
+  //ret.y = a.y + b.y;
+
+  TO(2,i) ret[i] = a[i] + b[i];
+  return ret;
+}
+inline vec2   operator-(vec2 const& a, vec2 const& b)
+{
+  vec2 ret;
+  ret.x = a.x - b.x;
+  ret.y = a.y - b.y;
+  return ret;
+}
+inline vec2   operator*(float a, vec2 const& b)
+{
+  vec2 ret;
+  ret.x = a*b.x;
+  ret.y = a*b.y;
+  return ret;
+}
+inline vec2   operator*(vec2 const& a, vec2 const& b)
+{
+  vec2 ret;
+  ret.x = a.x * b.x;
+  ret.y = a.y * b.y;
+  return ret;
+}
+inline vec2   operator/(vec2 const& a, vec2 const& b)
+{
+  vec2 ret;
+  ret.x = a.x / b.x;
+  ret.y = a.y / b.y;
+  return ret;
+}
+inline bool   operator<(vec2 const& a, vec2 const& b)
+{
+  if(a.x<b.x) return true; if(a.x>b.x) return false;
+  if(a.y<b.y) return true; if(a.y>b.y) return false;
+  return false;
+}
+inline bool   operator==(vec2 const& a, vec2 const& b)
+{
+  if(a.x!=b.x || a.y!=b.y) return false;
+  return true;
+}
+
 using  v2  = vec2;
 using  v2f = vec2;
 

@@ -2,13 +2,19 @@
 // -todo: make click and drag node position relative to click position
 // -todo: bring in vecf from lighting in a bottle
 // -todo: try bezier
+// -todo: make vector of bnds, nodes, etc.
+// -todo: make ability to select node out of multiple nodes
+// -todo: make node struct 
+// -todo: make click and drag work with multple nodes
+// -todo: make dragged node swap with top node
+// -todo: make dragged node insert at top and keep sorted order
 
+// todo: make click and drag draw a box
+// todo: make selection a vector 
+// todo: make selection by drag box
 // todo: make global state 
-// todo: make vector of bnds, nodes, etc.
-// todo: make ability to select node out of multiple nodes
-// todo: make node struct 
 // todo: make circle on outer border of node
-// todo: make bezier point at normal of node
+// todo: make bezier point at normal of node border
 // todo: make one node snap to another node
 // todo: make two snapped nodes group together and be dragged together
 // todo: make snapped/grouped nodes separate with right mouse button
@@ -53,11 +59,25 @@ const auto NODE_CLR      = nvgRGBf(.1f,.4f,.5f);
 template<class T> using vec = std::vector<T>;
 using str = std::string;
 
-struct bnd  { float xmn, ymn, xmx, ymx; };  // todo: make into a union?
+union bnd {
+  struct { float xmn, ymn, xmx, ymx; };  // todo: make into a union?
+  struct { v2 mn; v2 mx; };
+  struct { v4 mnmx; };
+  float c[4];
+
+  float&       operator[](int i)       {return c[i];}
+  float const& operator[](int i) const {return c[i];}
+  operator v4&(){ return mnmx; }
+
+  float w(){return xmx-xmn;}
+  float h(){return ymx-ymn;}
+};
+
 struct node { v2 P; str txt; };
 
 using   vec_nd  =  vec<node>;
-using vec_nbnd  =  vec<bnd>;
+using vec_nbnd  =   vec<bnd>;
+using   vec_v2  =    vec<v2>;
 
 GLFWwindow*            win;
 char              winTitle[TITLE_MAX_LEN];
@@ -67,13 +87,18 @@ float                prevX;
 float                prevY;
 bool                  rtDn = false;    // right mouse button down
 bool                 lftDn = false;    // left mouse button down
-bool                   drg = true;
+//bool                   drg = true;
 float              ndOfstX;
 float              ndOfstY;
 float                  ndx = 512.f;
 float                  ndy = 512.f;
 vec_nd               nodes;
 vec_nbnd             nbnds;
+vec<bool>             sels;           // bitfield for selected nodes
+vec<bool>             drgs;
+vec<v2>           drgOfsts;
+int                    drg = -1;
+v2                 drgofst;
 
 namespace{
 
@@ -234,15 +259,22 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
 
 ENTRY_DECLARATION
 {
+  using namespace std;
+  
   SECTION(test data init)
   {
-    nodes.push_back( { {100.f,100.f},"one" } );
-    nodes.push_back( { {200.f,200.f},"two" } );
+    nodes.push_back( { {100.f,100.f},"one"   } );
+    nodes.push_back( { {200.f,200.f},"two"   } );
     nodes.push_back( { {300.f,300.f},"three" } );
 
     for(auto& n : nodes){
       nbnds.push_back( {n.P.x, n.P.y, n.P.x+NODE_SZ.x, n.P.y+NODE_SZ.y} );
     }
+
+    auto sz = nodes.size();
+    sels.resize(sz, false);
+    drgOfsts.resize(sz, {0,0} );
+    drgs.resize(sz, false);
   }
 
   SECTION(init glfw)
@@ -313,6 +345,7 @@ ENTRY_DECLARATION
 		  int ww, wh, fbWidth, fbHeight;
       double cx, cy, t, dt, prevt=0;
       float px=0, py=0, pxRatio;
+      v2 pntr;
 
       SECTION(time)
       {
@@ -324,10 +357,11 @@ ENTRY_DECLARATION
       {
   	    glfwGetCursorPos(win, &cx, &cy);
         prevX=px; px=(float)cx; prevY=py; py=(float)cy;
+        pntr = Vec2(px, py);
         //px=cx*ww; py=cy*wh;
 
-        sprintf(winTitle, "%.4f  %.4f", px, py);
-        glfwSetWindowTitle(win, winTitle);
+        //sprintf(winTitle, "%.4f  %.4f", px, py);
+        //glfwSetWindowTitle(win, winTitle);
 
 		    glfwGetWindowSize(win, &ww, &wh);
 		    glfwGetFramebufferSize(win, &fbWidth, &fbHeight);
@@ -349,29 +383,55 @@ ENTRY_DECLARATION
 		  nvgBeginFrame(vg, ww, wh, pxRatio);
       SECTION(nanovg drawing)
       {
-        auto    nclr = nvgRGBf(.1f,.4f,.5f);
-        bool  inNode = isIn(px,py,nbnd);
-        if(inNode){
-          nclr = nvgRGBf(.5f, .4f, .1f);
-          if(!lftDn){ ndOfstX = ndOfstY = 0; }
-          else if(!drg){ 
-            ndOfstX = px - nbnd.xmn;
-            ndOfstY = py - nbnd.ymn;
+        TO(nodes.size(),i)
+        {
+          //SECTION(select and drag)
+          //{
+          //  bool inNode = isIn(px,py,nbnds[i]);
+          //  if(inNode){
+          //    if(!lftDn){ drgOfsts[i]={0,0}; }
+          //    else if(!drgs[i]){ drgOfsts[i] = pntr - nbnds[i].mn; }
+          //  }
+          //  drgs[i] = (drgs[i] || inNode) && lftDn;
+          //}
+
+          SECTION(select and drag)
+          {
+            bool inNode = isIn(px,py,nbnds[i]);
+            if(inNode){
+              if(!lftDn){
+                drgOfsts[i]={0,0};
+                drg  = -1;
+              }
+            }
+            if( (drg<0) && inNode && lftDn ){
+              auto  sz = nodes.size();
+              auto tmp = nodes[i];
+              for(int j=i; j<sz-1; ++j) nodes[j] = nodes[j+1];
+              nodes[sz-1] = tmp;
+
+              drg     = (int)(nodes.size())-1;                               // make the dragged node the last node and the drag index the last index 
+              drgofst = pntr - nbnds[i].mn;
+            }
           }
-        }
-        drg = (drg || inNode) && lftDn;
 
-        if(drg){
-          ndx = px-ndOfstX;
-          ndy = py-ndOfstY;
+          node&  n = nodes[i];
+          if(drg==i){
+            nodes[i].P = pntr - drgofst;
+          }
+
+          auto clr = sels[i]?nvgRGBf(.5f,.4f,.1f) : NODE_CLR;
+          nbnds[i] = drw_node(vg, 0, n.txt.c_str(), nodes[i].P.x,nodes[i].P.y, NODE_SZ.x,NODE_SZ.y, clr, 1.f);
+
+          sels[i]  = isIn(px,py,nbnds[i]);
+
+          nodes[i] = n;
         }
 
-        TO(nodes.size(),i){
-          auto& n = nodes[i];
-          nbnds[i] = drw_node(vg, 0, n.txt.c_str(), n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, NODE_CLR, 1.f);
-        }
+        sprintf(winTitle, "%.2f  %.2f", pntr.x, pntr.y);  //nodes[0].P.x, nodes[0].P.y );
+        glfwSetWindowTitle(win, winTitle);
 
-        nbnd = drw_node(vg, 0, "BUTTON TIME", ndx,ndy, NODE_SZ.x,NODE_SZ.y, nclr, linNorm(px, 0,(float)ww) );
+        //nbnd = drw_node(vg, 0, "BUTTON TIME", ndx,ndy, NODE_SZ.x,NODE_SZ.y, nclr, linNorm(px, 0,(float)ww) );
 
         nvgBeginPath(vg);
          nvgMoveTo(vg, 0,0);
@@ -394,6 +454,45 @@ ENTRY_DECLARATION
 
 
 
+
+
+
+
+//auto   nclr = nvgRGBf(.1f,.4f,.5f);
+//bool inNode = isIn(px,py,nbnd);
+//if(inNode){
+//  nclr = nvgRGBf(.5f, .4f, .1f);
+//  if(!lftDn){ ndOfstX = ndOfstY = 0; }
+//  else if(!drg){ 
+//    ndOfstX = px - nbnd.xmn;
+//    ndOfstY = py - nbnd.ymn;
+//  }
+//}
+//drg = (drg || inNode) && lftDn;
+//
+//if(drg){
+//  ndx = px-ndOfstX;
+//  ndy = py-ndOfstY;
+//}
+
+//if(!lftDn && drg<0) drgP = pntr;
+//v2   ndP = n.P;
+// drgOfsts[i];
+
+//else if( !(drg==i) ){ drgP }
+//else if( !(drg==i) ){ drgOfsts[i] = pntr - nbnds[i].mn; }
+//if( drg>-1 && drg)
+//
+//auto tmp = nodes.back();
+//auto  sz = nodes.size();
+//nodes[sz-1] = nodes[i];
+//for(int j=i; j<sz-1; ++j) nodes[j] = nodes[j+1];
+//nodes[sz-2];
+//
+//swap( nodes.back(), nodes[i] );
+
+//drgOfsts[i].x = px - nbnds[i].xmn;
+//drgOfsts[i].y = py - nbnds[i].ymn;
 
 //void cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
 //{
