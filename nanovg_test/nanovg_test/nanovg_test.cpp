@@ -9,15 +9,18 @@
 // -todo: make dragged node swap with top node
 // -todo: make dragged node insert at top and keep sorted order
 
+// todo: make connections data
+// todo: make connections structure
+// todo: draw connections
 // todo: make click and drag draw a box
 // todo: make selection a vector 
 // todo: make selection by drag box
-// todo: make global state 
-// todo: make circle on outer border of node
-// todo: make bezier point at normal of node border
 // todo: make one node snap to another node
 // todo: make two snapped nodes group together and be dragged together
 // todo: make snapped/grouped nodes separate with right mouse button
+// todo: make global state 
+// todo: make circle on outer border of node
+// todo: make bezier point at normal of node border
 
 #include "glew_2.0.0.h"
 #include "glfw3.h"
@@ -73,11 +76,14 @@ union bnd {
   float h(){return ymx-ymn;}
 };
 
-struct node { v2 P; str txt; };
+struct   node { v2 P; str txt; };
+struct conect { int src; int dest; };
 
-using   vec_nd  =  vec<node>;
-using vec_nbnd  =   vec<bnd>;
-using   vec_v2  =    vec<v2>;
+using     veci  =     vec<int>;
+using   vec_nd  =    vec<node>;
+using vec_nbnd  =     vec<bnd>;
+using   vec_v2  =      vec<v2>;
+using  vec_con  =  vec<conect>;
 
 GLFWwindow*            win;
 char              winTitle[TITLE_MAX_LEN];
@@ -99,8 +105,26 @@ vec<bool>             drgs;
 vec<v2>           drgOfsts;
 int                    drg = -1;
 v2                 drgofst;
+vec_con            conects;
+veci               nd_ordr;
+
 
 namespace{
+
+template<class T> 
+void MoveToBack(T* v, ui64 i)
+{
+  using namespace std;
+  
+  auto&  a = *v;
+  auto  sz = a.size();
+  auto tmp = move(a[i]);
+
+  for(auto j=i; j<sz-1; ++j)
+    a[j] = move( a[j+1] );
+  
+  a[sz-1] = tmp;
+}
 
 float               lerp(float p, float lo, float hi)
 {
@@ -275,6 +299,12 @@ ENTRY_DECLARATION
     sels.resize(sz, false);
     drgOfsts.resize(sz, {0,0} );
     drgs.resize(sz, false);
+
+    nd_ordr.resize(sz);
+    TO((int)sz,i) nd_ordr[i]=i;
+
+    conects.push_back( {0,1} );
+    conects.push_back( {1,2} );
   }
 
   SECTION(init glfw)
@@ -383,61 +413,58 @@ ENTRY_DECLARATION
 		  nvgBeginFrame(vg, ww, wh, pxRatio);
       SECTION(nanovg drawing)
       {
-        TO(nodes.size(),i)
+        SECTION(nodes)
         {
-          //SECTION(select and drag)
-          //{
-          //  bool inNode = isIn(px,py,nbnds[i]);
-          //  if(inNode){
-          //    if(!lftDn){ drgOfsts[i]={0,0}; }
-          //    else if(!drgs[i]){ drgOfsts[i] = pntr - nbnds[i].mn; }
-          //  }
-          //  drgs[i] = (drgs[i] || inNode) && lftDn;
-          //}
-
-          SECTION(select and drag)
+          //TO(nodes.size(),i)
+          int sz = (int)nd_ordr.size();
+          TO(sz,i)
           {
-            bool inNode = isIn(px,py,nbnds[i]);
-            if(inNode){
-              if(!lftDn){
-                drgOfsts[i]={0,0};
-                drg  = -1;
+            node& n = nodes[nd_ordr[i]];
+            SECTION(select and drag)
+            {
+              bool inNode = isIn(px,py,nbnds[i]);
+              if(inNode && !lftDn){
+                drgOfsts[i] = {0,0};
+                drg = -1;
               }
+
+              if( (drg<0) && inNode && lftDn ){
+                MoveToBack( &nd_ordr, i);
+                //auto tmp = nd_ordr[i];
+                //for(int j=i; j<sz-1; ++j) nd_ordr[j] = nd_ordr[j+1];
+                //nd_ordr[sz-1] = tmp;
+
+                drg     = (int)(sz-1);                               // make the dragged node the last node and the drag index the last index 
+                drgofst = pntr - nbnds[i].mn;
+              }
+            
+              if(drg==i){ n.P = pntr - drgofst; }
             }
-            if( (drg<0) && inNode && lftDn ){
-              auto  sz = nodes.size();
-              auto tmp = nodes[i];
-              for(int j=i; j<sz-1; ++j) nodes[j] = nodes[j+1];
-              nodes[sz-1] = tmp;
 
-              drg     = (int)(nodes.size())-1;                               // make the dragged node the last node and the drag index the last index 
-              drgofst = pntr - nbnds[i].mn;
-            }
+            auto clr = sels[i]?nvgRGBf(.5f,.4f,.1f) : NODE_CLR;
+            nbnds[i] = drw_node(vg, 0, n.txt.c_str(), n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, clr, 1.f);
+            sels[i]  = isIn(px,py,nbnds[i]);
           }
-
-          node&  n = nodes[i];
-          if(drg==i){
-            nodes[i].P = pntr - drgofst;
-          }
-
-          auto clr = sels[i]?nvgRGBf(.5f,.4f,.1f) : NODE_CLR;
-          nbnds[i] = drw_node(vg, 0, n.txt.c_str(), nodes[i].P.x,nodes[i].P.y, NODE_SZ.x,NODE_SZ.y, clr, 1.f);
-
-          sels[i]  = isIn(px,py,nbnds[i]);
-
-          nodes[i] = n;
         }
 
         sprintf(winTitle, "%.2f  %.2f", pntr.x, pntr.y);  //nodes[0].P.x, nodes[0].P.y );
         glfwSetWindowTitle(win, winTitle);
 
-        //nbnd = drw_node(vg, 0, "BUTTON TIME", ndx,ndy, NODE_SZ.x,NODE_SZ.y, nclr, linNorm(px, 0,(float)ww) );
+        SECTION(connections)
+        {
+          TO(conects.size(),i)
+          {
+            auto& cn = conects[i];
+            v2   src = nodes[cn.src].P;
+            v2  dest = nodes[cn.dest].P;
 
-        nvgBeginPath(vg);
-         nvgMoveTo(vg, 0,0);
-         nvgBezierTo(vg, px/2,0, px/2,py, px,py);
-        nvgStrokeColor(vg, nvgRGBAf(0,1.f,0,1.f));
-   	    nvgStroke(vg);
+            nvgBeginPath(vg);
+             nvgMoveTo(vg,   src.x,src.y);
+             nvgBezierTo(vg, dest.x/2,dest.y, dest.x/2,dest.y, dest.x,dest.y);
+            nvgStrokeColor(vg, nvgRGBAf(0,1.f,0,1.f));
+   	        nvgStroke(vg);
+          }
+        }
       }
       nvgEndFrame(vg);
 
@@ -457,6 +484,18 @@ ENTRY_DECLARATION
 
 
 
+//
+//nbnd = drw_node(vg, 0, "BUTTON TIME", ndx,ndy, NODE_SZ.x,NODE_SZ.y, nclr, linNorm(px, 0,(float)ww) );
+
+//SECTION(select and drag)
+//{
+//  bool inNode = isIn(px,py,nbnds[i]);
+//  if(inNode){
+//    if(!lftDn){ drgOfsts[i]={0,0}; }
+//    else if(!drgs[i]){ drgOfsts[i] = pntr - nbnds[i].mn; }
+//  }
+//  drgs[i] = (drgs[i] || inNode) && lftDn;
+//}
 
 //auto   nclr = nvgRGBf(.1f,.4f,.5f);
 //bool inNode = isIn(px,py,nbnd);
