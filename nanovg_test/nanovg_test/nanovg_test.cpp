@@ -1,10 +1,17 @@
 
 // -todo: make click and drag node position relative to click position
+// -todo: bring in vecf from lighting in a bottle
+// -todo: try bezier
 
-// todo: bring in vecf from lighting in a bottle
 // todo: make global state 
 // todo: make vector of bnds, nodes, etc.
+// todo: make ability to select node out of multiple nodes
 // todo: make node struct 
+// todo: make circle on outer border of node
+// todo: make bezier point at normal of node
+// todo: make one node snap to another node
+// todo: make two snapped nodes group together and be dragged together
+// todo: make snapped/grouped nodes separate with right mouse button
 
 #include "glew_2.0.0.h"
 #include "glfw3.h"
@@ -13,6 +20,7 @@
 #define NANOVG_GL3_IMPLEMENTATION   // Use GL2 implementation.
 #include "nanovg_gl.h"
 
+//
 //#include "../nanovg-master/example/demo.h"
 
 #define ENTRY_DECLARATION int main(void)
@@ -29,17 +37,27 @@
   #endif
 #endif
 
-#include <cstdio>
 //#include "glm/vec2.hpp"
+//using v2 = glm::vec2;
+
+#include <cstdio>
+#include <vector>
+#include <string>
 #include "no_rt_util.h"
 #include "vec.hpp"
 
-//using v2 = glm::vec2;
+const int  TITLE_MAX_LEN = 256;
+const v2   NODE_SZ       = { 256.f, 64.f };
+const auto NODE_CLR      = nvgRGBf(.1f,.4f,.5f);
 
-const int TITLE_MAX_LEN = 256;
+template<class T> using vec = std::vector<T>;
+using str = std::string;
 
-struct bnd  { float xmn, ymn, xmx, ymx; };
-struct node {  };
+struct bnd  { float xmn, ymn, xmx, ymx; };  // todo: make into a union?
+struct node { v2 P; str txt; };
+
+using   vec_nd  =  vec<node>;
+using vec_nbnd  =  vec<bnd>;
 
 GLFWwindow*            win;
 char              winTitle[TITLE_MAX_LEN];
@@ -54,6 +72,8 @@ float              ndOfstX;
 float              ndOfstY;
 float                  ndx = 512.f;
 float                  ndy = 512.f;
+vec_nd               nodes;
+vec_nbnd             nbnds;
 
 namespace{
 
@@ -166,14 +186,14 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
     float bthk = rthk+2;
     nvgBeginPath(vg);
      nvgMoveTo(vg, x-bthk/2, cntrY);
-     nvgArc(vg, cntrX, cntrY, rr, PIf*1, PIf*1.5, NVG_CW);
+     nvgArc(vg, cntrX, cntrY, rr, PIf*1.f, PIf*1.5f, NVG_CW);
      nvgStrokeWidth(vg, bthk);
     nvgStrokeColor(vg, nvgRGBAf(0, 0, 0, .5f) );
 	  nvgStroke(vg);
 
     nvgBeginPath(vg);
      nvgMoveTo(vg, x-rthk/2, cntrY);
-     nvgArc(vg, cntrX, cntrY, rr, PIf*1, PIf*1.5, NVG_CW);
+     nvgArc(vg, cntrX, cntrY, rr, PIf*1.f, PIf*1.5f, NVG_CW);
      nvgStrokeWidth(vg, rthk);
     nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
 	  nvgStroke(vg);
@@ -214,6 +234,17 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
 
 ENTRY_DECLARATION
 {
+  SECTION(test data init)
+  {
+    nodes.push_back( { {100.f,100.f},"one" } );
+    nodes.push_back( { {200.f,200.f},"two" } );
+    nodes.push_back( { {300.f,300.f},"three" } );
+
+    for(auto& n : nodes){
+      nbnds.push_back( {n.P.x, n.P.y, n.P.x+NODE_SZ.x, n.P.y+NODE_SZ.y} );
+    }
+  }
+
   SECTION(init glfw)
   {
     //glfwSetErrorCallback(errorCallback);
@@ -281,7 +312,7 @@ ENTRY_DECLARATION
     {
 		  int ww, wh, fbWidth, fbHeight;
       double cx, cy, t, dt, prevt=0;
-      float px, py, pxRatio;
+      float px=0, py=0, pxRatio;
 
       SECTION(time)
       {
@@ -292,7 +323,7 @@ ENTRY_DECLARATION
       SECTION(input)
       {
   	    glfwGetCursorPos(win, &cx, &cy);
-        prevX=px; px=cx; prevY=py; py=cy;
+        prevX=px; px=(float)cx; prevY=py; py=(float)cy;
         //px=cx*ww; py=cy*wh;
 
         sprintf(winTitle, "%.4f  %.4f", px, py);
@@ -319,26 +350,34 @@ ENTRY_DECLARATION
       SECTION(nanovg drawing)
       {
         auto    nclr = nvgRGBf(.1f,.4f,.5f);
-        bool inNode = isIn(px,py,nbnd);
+        bool  inNode = isIn(px,py,nbnd);
         if(inNode){
           nclr = nvgRGBf(.5f, .4f, .1f);
           if(!lftDn){ ndOfstX = ndOfstY = 0; }
           else if(!drg){ 
-            ndOfstX = px-nbnd.xmn; 
-            ndOfstY = py-nbnd.ymn;
+            ndOfstX = px - nbnd.xmn;
+            ndOfstY = py - nbnd.ymn;
           }
         }
         drg = (drg || inNode) && lftDn;
 
-        nvgBeginPath(vg);
-        nvgFillColor(vg, nvgRGBA(0xFF,0,0,0));
-   	    nvgFill(vg);
         if(drg){
           ndx = px-ndOfstX;
           ndy = py-ndOfstY;
         }
 
-        nbnd = drw_node(vg, 0, "BUTTON TIME", ndx,ndy, 256,64, nclr, linNorm(px, 0,ww) );
+        TO(nodes.size(),i){
+          auto& n = nodes[i];
+          nbnds[i] = drw_node(vg, 0, n.txt.c_str(), n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, NODE_CLR, 1.f);
+        }
+
+        nbnd = drw_node(vg, 0, "BUTTON TIME", ndx,ndy, NODE_SZ.x,NODE_SZ.y, nclr, linNorm(px, 0,(float)ww) );
+
+        nvgBeginPath(vg);
+         nvgMoveTo(vg, 0,0);
+         nvgBezierTo(vg, px/2,0, px/2,py, px,py);
+        nvgStrokeColor(vg, nvgRGBAf(0,1.f,0,1.f));
+   	    nvgStroke(vg);
       }
       nvgEndFrame(vg);
 

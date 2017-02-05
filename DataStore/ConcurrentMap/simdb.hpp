@@ -206,6 +206,7 @@ using   f64   =   double;
 using aui32   =   std::atomic<ui32>;
 using aui64   =   std::atomic<ui64>;
 using  ai32   =   std::atomic<i64>;
+using   ai8   =   std::atomic<i8>;
 using  cstr   =   const char*;
 using   str   =   std::string;
 
@@ -1434,7 +1435,7 @@ public:
     size      =  0;
     owner     =  false;
   }
-  auto data() -> void*
+  auto  data() -> void*
   {
     return ptr;
   }
@@ -1523,6 +1524,7 @@ public:
     m_blkCnt = s_blockCount->load();
     m_blkSz  = s_blockSize->load();
 
+    // todo: initialized flag and reference count
     if(isOwner()) s_flags->store(1);                                        // set to 1 to signal construction is done
   }
 
