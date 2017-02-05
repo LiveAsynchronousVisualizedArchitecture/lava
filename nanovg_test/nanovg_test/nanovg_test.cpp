@@ -8,9 +8,10 @@
 // -todo: make click and drag work with multple nodes
 // -todo: make dragged node swap with top node
 // -todo: make dragged node insert at top and keep sorted order
+// -todo: make connections data
 
-// todo: make connections data
-// todo: make connections structure
+// todo: separate node drag and selection from nanovg drawing
+// todo: make node referenceable connections structure - have two connection vectors, one for 
 // todo: draw connections
 // todo: make click and drag draw a box
 // todo: make selection a vector 
@@ -104,6 +105,7 @@ vec<bool>             sels;           // bitfield for selected nodes
 vec<bool>             drgs;
 vec<v2>           drgOfsts;
 int                    drg = -1;
+v2                    drgP;
 v2                 drgofst;
 vec_con            conects;
 veci               nd_ordr;
@@ -410,46 +412,49 @@ ENTRY_DECLARATION
 		    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
       }
 
+      SECTION(selection box)
+      {
+        if(!lftDn){ drgP=pntr; }
+      }
+      SECTION(select and drag)
+      {
+        int sz = (int)nd_ordr.size();
+        TO(sz,i)
+        {
+          node& n = nodes[nd_ordr[i]];
+          bool inNode = isIn(px,py,nbnds[i]);
+          if(inNode && !lftDn){
+            drgOfsts[i] = {0,0};
+            drg = -1;
+          }
+
+          if( (drg<0) && inNode && lftDn ){
+            MoveToBack( &nd_ordr, i);
+
+            drg     = (int)(sz-1);                               // make the dragged node the last node and the drag index the last index 
+            drgofst = pntr - nbnds[i].mn;
+          }
+            
+          if(drg==i){ n.P = pntr - drgofst; }
+        }
+      }
+      
+
 		  nvgBeginFrame(vg, ww, wh, pxRatio);
       SECTION(nanovg drawing)
       {
         SECTION(nodes)
         {
-          //TO(nodes.size(),i)
           int sz = (int)nd_ordr.size();
           TO(sz,i)
           {
             node& n = nodes[nd_ordr[i]];
-            SECTION(select and drag)
-            {
-              bool inNode = isIn(px,py,nbnds[i]);
-              if(inNode && !lftDn){
-                drgOfsts[i] = {0,0};
-                drg = -1;
-              }
-
-              if( (drg<0) && inNode && lftDn ){
-                MoveToBack( &nd_ordr, i);
-                //auto tmp = nd_ordr[i];
-                //for(int j=i; j<sz-1; ++j) nd_ordr[j] = nd_ordr[j+1];
-                //nd_ordr[sz-1] = tmp;
-
-                drg     = (int)(sz-1);                               // make the dragged node the last node and the drag index the last index 
-                drgofst = pntr - nbnds[i].mn;
-              }
-            
-              if(drg==i){ n.P = pntr - drgofst; }
-            }
 
             auto clr = sels[i]?nvgRGBf(.5f,.4f,.1f) : NODE_CLR;
             nbnds[i] = drw_node(vg, 0, n.txt.c_str(), n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, clr, 1.f);
-            sels[i]  = isIn(px,py,nbnds[i]);
+            //sels[i]  = isIn(px,py,nbnds[i]);
           }
         }
-
-        sprintf(winTitle, "%.2f  %.2f", pntr.x, pntr.y);  //nodes[0].P.x, nodes[0].P.y );
-        glfwSetWindowTitle(win, winTitle);
-
         SECTION(connections)
         {
           TO(conects.size(),i)
@@ -462,6 +467,24 @@ ENTRY_DECLARATION
              nvgMoveTo(vg,   src.x,src.y);
              nvgBezierTo(vg, dest.x/2,dest.y, dest.x/2,dest.y, dest.x,dest.y);
             nvgStrokeColor(vg, nvgRGBAf(0,1.f,0,1.f));
+   	        nvgStroke(vg);
+          }
+        }
+        SECTION(selection box)
+        {
+          if(lftDn){
+            nvgBeginPath(vg);
+              float x,y,w,h;
+              x = min(drgP.x, pntr.x); 
+              y = min(drgP.y, pntr.y); 
+              w = abs(drgP.x - pntr.x);
+              h = abs(drgP.y - pntr.y);
+              nvgRect(vg, x,y, w,h);
+              //nvgMoveTo(vg,  drgP.x,drgP.y);
+              //nvgLineTo(vg, pntr.x, pntr.y);
+              //nvgBezierTo(vg, dest.x/2,dest.y, dest.x/2,dest.y, dest.x,dest.y);
+            nvgStrokeWidth(vg, 2.f);
+            nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, .5f));
    	        nvgStroke(vg);
           }
         }
@@ -483,6 +506,15 @@ ENTRY_DECLARATION
 
 
 
+//sprintf(winTitle, "%.2f  %.2f", pntr.x, pntr.y);  //nodes[0].P.x, nodes[0].P.y );
+//glfwSetWindowTitle(win, winTitle);
+
+//
+//TO(nodes.size(),i)
+
+//auto tmp = nd_ordr[i];
+//for(int j=i; j<sz-1; ++j) nd_ordr[j] = nd_ordr[j+1];
+//nd_ordr[sz-1] = tmp;
 
 //
 //nbnd = drw_node(vg, 0, "BUTTON TIME", ndx,ndy, NODE_SZ.x,NODE_SZ.y, nclr, linNorm(px, 0,(float)ww) );
