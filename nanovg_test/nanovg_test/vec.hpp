@@ -246,9 +246,11 @@ union  vec2
   float&       operator[](int i)       {return c[i];}
   float const& operator[](int i) const {return c[i];}
 };
-inline vec2   Vec2(float x=0, float y=0, float z=0)
+inline vec2   Vec2(float x, float y)
 {
-  vec2 v; v.x=x; v.y=y;
+  vec2 v; 
+  v.x=x; 
+  v.y=y;
   return v;
 }
 inline vec2   operator+(vec2 const& a, vec2 const& b)
@@ -274,6 +276,10 @@ inline vec2   operator*(float a, vec2 const& b)
   ret.y = a*b.y;
   return ret;
 }
+inline vec2   operator*(vec2 const& a, float b)
+{
+  return operator*(b,a);
+}
 inline vec2   operator*(vec2 const& a, vec2 const& b)
 {
   vec2 ret;
@@ -288,6 +294,27 @@ inline vec2   operator/(vec2 const& a, vec2 const& b)
   ret.y = a.y / b.y;
   return ret;
 }
+inline vec2   operator/(vec2 const& a, float b)
+{
+  vec2 ret;
+  TO(2,i) ret[i] = a[i] / b;
+  return ret;
+}
+inline vec2&  operator+=(vec2& a, vec2 const& b)
+{
+  TO(2,i) a[i] += b[i];
+  return a;
+}
+inline vec2&  operator/=(vec2& a, vec2 const& b)
+{
+  TO(2,i) a[i] /= b[i];
+  return a;
+}
+inline vec2&  operator/=(vec2& a, float b)
+{
+  TO(2,i) a[i] /= b;
+  return a;
+}
 inline bool   operator<(vec2 const& a, vec2 const& b)
 {
   if(a.x<b.x) return true; if(a.x>b.x) return false;
@@ -298,6 +325,20 @@ inline bool   operator==(vec2 const& a, vec2 const& b)
 {
   if(a.x!=b.x || a.y!=b.y) return false;
   return true;
+}
+inline float  dot(vec2 const& a, vec2 const& b)
+{
+  float ret = 0;
+  TO(2,i) ret += a[i]*b[i];
+  return ret;
+}
+inline float  len(vec2 const& a)
+{
+  return sqrtf(dot(a,a));
+}
+inline vec2   norm(vec2 const& a)
+{
+  return a / len(a);
 }
 
 using  v2  = vec2;

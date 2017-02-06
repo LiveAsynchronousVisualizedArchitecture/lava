@@ -17,18 +17,34 @@
 // -todo: make drag not pick up nodes
 // -todo: make selection drag box highlight fully inside nodes
 // -todo: make selection by drag box
+// -todo: use std::move_back in MoveToBack()? 
+// -todo: make click drag short circuit on the top (back) node - need to loop in reverse? - yes, just FROM instead of TO
+// -todo: make node referenceable connections structure - have two connection vectors, one for in and one for out? - need to be able to get all in and/or out connections for a node - need two heaps?
+// -todo: make connections structure use sorted vectors of indices and and lower_bound + upper_bound - can just use one simple  multi-map?
+// -todo: make all selected nodes drag - need a starting position for the pntr - that is what drgP is?
+// -todo: take out px, py - just use vector v2
+// -todo: make vector from center to a square border
 
-// todo: take out px, py - just use vector v2
-// todo: make node referenceable connections structure - have two connection vectors, one for 
-// todo: make selection a vector for multi-selection
+// todo: make circle on outer border of node
+// todo: make dragging selected nodes work after the first time 
+// todo: draw inputs
+// todo: make function to find the normal of a rounded rect
+// todo: make a function to find the position of a rounded rect border
+// todo: make bezier point at normal of node border
+// todo: make connections between nodes
+// todo: change drg to primary selection
+// todo: group ui state variables together - drg, connecting
+// todo: change node drawing function to take v2 and str
+// todo: make selection a vector for multi-selection - if the vector capacity is 3x the size, use reserve to shrink it down to 1.5x the size?
+// todo: make nodes and connections save to json file
+// todo: make nodes load from json file
 // todo: make one node snap to another node
 // todo: make two snapped nodes group together and be dragged together
 // todo: make snapped/grouped nodes separate with right mouse button
 // todo: make global state 
-// todo: make circle on outer border of node
-// todo: make function to find the normal of a rounded rect
-// todo: make a function to find the position of a rounded rect border
-// todo: make bezier point at normal of node border
+// todo: make nodes different shapes? 
+// todo: make connections have different shapes? draw three thin lines for a scatter connection?
+// todo: make selected indication a border effect and not a color change
 
 #define  WIN32_LEAN_AND_MEAN
 #define  NOMINMAX
@@ -59,13 +75,16 @@
 #include <cstdio>
 #include <vector>
 #include <string>
+#include <unordered_map>
 #include <algorithm>
 #include "no_rt_util.h"
 #include "vec.hpp"
 
-const int  TITLE_MAX_LEN = 256;
-const v2   NODE_SZ       = { 256.f, 64.f };
-const auto NODE_CLR      = nvgRGBf(.1f,.4f,.5f);
+const int   TITLE_MAX_LEN = 256;
+const v2    NODE_SZ       = { 256.f, 64.f };
+const auto  NODE_CLR      = nvgRGBf(.1f,.4f,.5f);
+const float INFf          = std::numeric_limits<float>::infinity();
+//const float INFf          = std::numeric_limits<float>:infinity();
 
 template<class T> using vec = std::vector<T>;
 using str = std::string;
@@ -77,7 +96,7 @@ union bnd
   struct { v4 mnmx; };
   float c[4];
 
-  bnd() : xmn(INFINITY), ymn(INFINITY), xmx(-INFINITY), ymx(-INFINITY) {}
+  bnd() : xmn(INFf), ymn(INFf), xmx(-INFf), ymx(-INFf) {}
   bnd(float Xmn, float Ymn, float Xmx, float Ymx) :
     xmn(Xmn), ymn(Ymn), xmx(Xmx), ymx(Ymx)
   {}
@@ -95,20 +114,28 @@ union bnd
 };
 
 struct   node { v2 P; str txt; };
-struct conect { int src; int dest; };
+struct   cnct { 
+  int src; int dest;
+  bool operator<(cnct const& r){ return src < r.src; }
 
-using     veci  =     vec<int>;
-using   vec_nd  =    vec<node>;
-using vec_nbnd  =     vec<bnd>;
-using   vec_v2  =      vec<v2>;
-using  vec_con  =  vec<conect>;
+  static bool lessDest(cnct const& l, cnct const& r){
+    return l.dest < r.dest;
+  }
+};
+
+
+using     veci     =     vec<int>;
+using   vec_nd     =    vec<node>;
+using vec_nbnd     =     vec<bnd>;
+using   vec_v2     =      vec<v2>;
+using  vec_con     =    vec<cnct>;
+using cnct_tbl     =    std::unordered_multimap<int, cnct>;
 
 GLFWwindow*            win;
 char              winTitle[TITLE_MAX_LEN];
 int                premult = 0;
 bnd                   nbnd;
-float                prevX;
-float                prevY;
+v2                prevPntr;
 bool                  rtDn = false;    // right mouse button down
 bool                 lftDn = false;    // left mouse button down
 bool              prevRtDn = false;    // right mouse button down
@@ -119,16 +146,22 @@ float                  ndx = 512.f;
 float                  ndy = 512.f;
 vec_nd               nodes;
 vec_nbnd             nbnds;
-vec<bool>             sels;           // bitfield for selected nodes
+vec<bool>             sels;             // bitfield for selected nodes
 vec<bool>             drgs;
 vec<v2>           drgOfsts;
 int                    drg = -1;
+bool                 drgNd = false;
 v2                    drgP;
 v2                 drgofst;
-vec_con            conects;
 veci               nd_ordr;
 bool                drgbox = false;
+vec_con              cncts;             // cncts is connections - the vector of connection structures
+cnct_tbl           cnctTbl;
+cnct_tbl           cnct_in;
+cnct_tbl          cnct_out;
 //bnd                 drgbnd;   // this is calculated data, not fundamental data
+//float                prevX;
+//float                prevY;
 
 
 namespace{
@@ -142,6 +175,7 @@ void MoveToBack(T* v, ui64 i)
   auto  sz = a.size();
   auto tmp = move(a[i]);
 
+  //move_backward(a.front()+i+1ul, a.back(), a.back()-1);
   for(auto j=i; j<sz-1; ++j)
     a[j] = move( a[j+1] );
   
@@ -329,8 +363,16 @@ ENTRY_DECLARATION
     nd_ordr.resize(sz);
     TO((int)sz,i) nd_ordr[i]=i;
 
-    conects.push_back( {0,1} );
-    conects.push_back( {1,2} );
+    cncts.push_back( {0,1} );
+    cncts.push_back( {1,2} );
+
+    //cnct_in.insert( cnct_in.end(), ALL(cncts) );
+    
+    TO(cncts.size(),i){
+      cnctTbl.insert( { (int)i, cncts[i] } );
+    //  lower_bound( ALL(cnct_in), cncts[i], cnct::lessDest);
+    //  lower_bound( ALL(cnct_in), cncts[i], cnct::lessDest);
+    }
   }
 
   SECTION(init glfw)
@@ -395,9 +437,10 @@ ENTRY_DECLARATION
   glfwSetTime(0);
   SECTION(main loop)
   {
-    v2 pntr;
+    v2 pntr = {0,0};
     double cx, cy, t, dt, prevt=0, cpuTime=0;
-    float px=0, py=0, pxRatio;
+    //float px=0, py=0;
+    float pxRatio;
 		int ww, wh, fbWidth, fbHeight;
 
     while(!glfwWindowShouldClose(win))
@@ -413,8 +456,10 @@ ENTRY_DECLARATION
       SECTION(input)
       {
   	    glfwGetCursorPos(win, &cx, &cy);
-        px=(float)cx; py=(float)cy;
-        prevX=px; prevY=py; pntr=Vec2(px, py);
+        //px=(float)cx; py=(float)cy;
+        //prevX=px; prevY=py; 
+        prevPntr = pntr;
+        pntr=Vec2((float)cx, (float)cy);
 
         //sprintf(winTitle, "%.4f  %.4f", px, py);
         //glfwSetWindowTitle(win, winTitle);
@@ -446,34 +491,36 @@ ENTRY_DECLARATION
                       max(drgP.x, pntr.x),
                       max(drgP.y, pntr.y) );
       }
-      SECTION(select and drag)
+      SECTION(select)
       {
         if(drgbox){
-          TO(sz,i)
-          {
+          TO(sz,i){
             sels[i] = isIn(nbnds[i],drgbnd);
             //sels[ndOrdr] = inNode;
           }
         }
-
-        TO(sz,i) // drag
+      }
+      SECTION(drag)
+      {
+        FROM(sz,i)                                                // loop backwards so that the top nodes are dealt with first
         {
           int  ndOrdr = nd_ordr[i];
           node&     n = nodes[ndOrdr];
-          bool inNode = isIn(px,py,nbnds[i]);
+          bool inNode = isIn(pntr.x,pntr.y, nbnds[i]);
 
-          if(inNode && !lftDn){
+          //if(inNode && !lftDn){
+          if(!lftDn){
             drgOfsts[i] = {0,0};
-            drg = -1;
+            drg         = -1;
           }
 
           if( (drg<0) && inNode && lftDn && !prevLftDn){
             MoveToBack( &nd_ordr, i);
             drg     = (int)(sz-1);                               // make the dragged node the last node and the drag index the last index 
-            drgofst = pntr - nbnds[i].mn;
+            //drgofst = pntr - nbnds[i].mn;
           } 
                      
-          if(drg==i){ n.P = pntr - drgofst; }
+          //if(drg==i){ n.P = pntr - drgofst; }
         }
       }
       
@@ -488,21 +535,57 @@ ENTRY_DECLARATION
             int ndOrdr = nd_ordr[i];
             node&    n = nodes[ndOrdr];
 
-            auto clr = sels[ndOrdr]?nvgRGBf(.5f,.4f,.1f) : NODE_CLR;
-            nbnds[i] = drw_node(vg, 0, n.txt.c_str(), n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, clr, 1.f);
+            auto clr = NODE_CLR;
+            if(sels[ndOrdr]){
+              if(drg>-1) n.P +=  pntr - prevPntr;
+              clr = nvgRGBf(.5f,.4f,.1f);
+              drw_node(vg, 0, n.txt.c_str(), n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, clr, 1.f);
+            }else{
+              nbnds[i] = drw_node(vg, 0, n.txt.c_str(), n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, NODE_CLR, 1.f);              
+            }
+
+            SECTION(border test)
+            {
+              v2 ncntr = n.P + NODE_SZ/2.f;
+              v2  pdir = norm(pntr - ncntr);
+
+              if( abs(pdir.x) > abs(pdir.y) ){
+                pdir /= abs(pdir.x);
+              }else{
+                pdir /= abs(pdir.y);
+              }
+
+              nvgBeginPath(vg);
+               nvgCircle(vg, ncntr.x,ncntr.y, 10.f);
+              nvgFill(vg);
+
+
+              v2 dirEnd = ncntr + pdir*100.f;
+              nvgBeginPath(vg);
+               nvgMoveTo(vg, ncntr.x,ncntr.y);
+               nvgLineTo(vg, dirEnd.x, dirEnd.y);
+              nvgStrokeWidth(vg, 3.f);
+              nvgStroke(vg);
+            }
+
           }
         }
         SECTION(connections)
         {
-          TO(conects.size(),i)
+          TO(cncts.size(),i)
           {
-            auto& cn = conects[i];
+            auto& cn = cncts[i];
             v2   src = nodes[cn.src].P;
             v2  dest = nodes[cn.dest].P;
+            //v2  ofst = (sels[i] && drg>-1)?  (pntr-drgP) : Vec2(0,0);
 
             nvgBeginPath(vg);
+             //v2 d = dest+ofst, s = src+ofst;
+             //nvgMoveTo(vg,   s.x,s.y);
+             //f32 halfx = lerp(.5f, d.x, s.x);
+             //f32 halfy = lerp(.5f, d.y, s.y); 
+             //nvgBezierTo(vg, halfx,s.y, halfx,d.y, d.x,d.y);
              nvgMoveTo(vg,   src.x,src.y);
-
              f32 halfx = lerp(.5f, dest.x, src.x);
              f32 halfy = lerp(.5f, dest.y, src.y); 
              nvgBezierTo(vg, halfx,src.y, halfx,dest.y, dest.x,dest.y);
@@ -548,6 +631,19 @@ ENTRY_DECLARATION
 
 
 
+
+
+//v2 ncntr = (NODE_SZ/Vec2(2.f,2.f)) + n.P;
+//f32 side = dot( pdir, norm(Vec2(1.f,1.f)) );
+//if(pdir.x>0) pdir /= pdir.x;
+//else         pdir /= abs(pdir.y);
+//if(pdir.y>0) pdir /= pdir.y;
+//else         pdir /= abs(pdir.x);                
+//ncntr.x += NODE_SZ.x / 2.f;
+
+//v2    nP = sels[ndOrdr]?(n.P+(pntr-drgP))  :  n.P;
+//v2 nP = drg>-1?(n.P+(pntr-drgP))  :  n.P;
+//if(drg>-1) n.P = n.P + (pntr-drgP);
 
 //px=(float)cx; 
 //py=(float)cy;
