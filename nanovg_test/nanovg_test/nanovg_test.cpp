@@ -9,20 +9,29 @@
 // -todo: make dragged node swap with top node
 // -todo: make dragged node insert at top and keep sorted order
 // -todo: make connections data
+// -todo: take out windows min and max
+// -todo: draw connections
+// -todo: make click and drag draw a box
+// -todo: separate node drag and selection from nanovg drawing
+// -todo: lerp connection bezier instad of divide by 2
+// -todo: make drag not pick up nodes
+// -todo: make selection drag box highlight fully inside nodes
+// -todo: make selection by drag box
 
-// todo: separate node drag and selection from nanovg drawing
+// todo: take out px, py - just use vector v2
 // todo: make node referenceable connections structure - have two connection vectors, one for 
-// todo: draw connections
-// todo: make click and drag draw a box
-// todo: make selection a vector 
-// todo: make selection by drag box
+// todo: make selection a vector for multi-selection
 // todo: make one node snap to another node
 // todo: make two snapped nodes group together and be dragged together
 // todo: make snapped/grouped nodes separate with right mouse button
 // todo: make global state 
 // todo: make circle on outer border of node
+// todo: make function to find the normal of a rounded rect
+// todo: make a function to find the position of a rounded rect border
 // todo: make bezier point at normal of node border
 
+#define  WIN32_LEAN_AND_MEAN
+#define  NOMINMAX
 #include "glew_2.0.0.h"
 #include "glfw3.h"
 #include "nanovg.h"
@@ -47,12 +56,10 @@
   #endif
 #endif
 
-//#include "glm/vec2.hpp"
-//using v2 = glm::vec2;
-
 #include <cstdio>
 #include <vector>
 #include <string>
+#include <algorithm>
 #include "no_rt_util.h"
 #include "vec.hpp"
 
@@ -63,18 +70,28 @@ const auto NODE_CLR      = nvgRGBf(.1f,.4f,.5f);
 template<class T> using vec = std::vector<T>;
 using str = std::string;
 
-union bnd {
+union bnd 
+{
   struct { float xmn, ymn, xmx, ymx; };  // todo: make into a union?
   struct { v2 mn; v2 mx; };
   struct { v4 mnmx; };
   float c[4];
 
+  bnd() : xmn(INFINITY), ymn(INFINITY), xmx(-INFINITY), ymx(-INFINITY) {}
+  bnd(float Xmn, float Ymn, float Xmx, float Ymx) :
+    xmn(Xmn), ymn(Ymn), xmx(Xmx), ymx(Ymx)
+  {}
+
   float&       operator[](int i)       {return c[i];}
   float const& operator[](int i) const {return c[i];}
+  bnd& operator()(float Xmn, float Ymn, float Xmx, float Ymx)
+  {
+    xmn=Xmn; ymn=Ymn; xmx=Xmx; ymx=Ymx; return *this;
+  }
   operator v4&(){ return mnmx; }
 
-  float w(){return xmx-xmn;}
-  float h(){return ymx-ymn;}
+  float w(){return abs(xmx-xmn);}
+  float h(){return abs(ymx-ymn);}
 };
 
 struct   node { v2 P; str txt; };
@@ -94,7 +111,8 @@ float                prevX;
 float                prevY;
 bool                  rtDn = false;    // right mouse button down
 bool                 lftDn = false;    // left mouse button down
-//bool                   drg = true;
+bool              prevRtDn = false;    // right mouse button down
+bool             prevLftDn = false;    // left mouse button down
 float              ndOfstX;
 float              ndOfstY;
 float                  ndx = 512.f;
@@ -109,6 +127,8 @@ v2                    drgP;
 v2                 drgofst;
 vec_con            conects;
 veci               nd_ordr;
+bool                drgbox = false;
+//bnd                 drgbnd;   // this is calculated data, not fundamental data
 
 
 namespace{
@@ -145,6 +165,10 @@ float              remap(float n, float lo, float hi, float toLo, float toHi)
 bool                isIn(float x, float y, bnd const& b)
 {
   return x>b.xmn && x<b.xmx && y>b.ymn && y<b.ymx;
+}
+bool                isIn(bnd const& a, bnd const& b)
+{
+  return b.xmn<a.xmn && b.xmx>a.xmx && b.ymn<a.ymn && b.ymx>a.ymx;
 }
 int              isBlack(NVGcolor col)
 {
@@ -368,16 +392,17 @@ ENTRY_DECLARATION
 	  }
   }
 
-  double prevt=0, cpuTime=0;
   glfwSetTime(0);
   SECTION(main loop)
   {
+    v2 pntr;
+    double cx, cy, t, dt, prevt=0, cpuTime=0;
+    float px=0, py=0, pxRatio;
+		int ww, wh, fbWidth, fbHeight;
+
     while(!glfwWindowShouldClose(win))
     {
-		  int ww, wh, fbWidth, fbHeight;
-      double cx, cy, t, dt, prevt=0;
-      float px=0, py=0, pxRatio;
-      v2 pntr;
+      int sz = (int)nd_ordr.size();
 
       SECTION(time)
       {
@@ -388,9 +413,8 @@ ENTRY_DECLARATION
       SECTION(input)
       {
   	    glfwGetCursorPos(win, &cx, &cy);
-        prevX=px; px=(float)cx; prevY=py; py=(float)cy;
-        pntr = Vec2(px, py);
-        //px=cx*ww; py=cy*wh;
+        px=(float)cx; py=(float)cy;
+        prevX=px; prevY=py; pntr=Vec2(px, py);
 
         //sprintf(winTitle, "%.4f  %.4f", px, py);
         //glfwSetWindowTitle(win, winTitle);
@@ -400,7 +424,7 @@ ENTRY_DECLARATION
 		    glfwSetMouseButtonCallback(win, mouseBtnCallback);
 
         // Calculate pixel ration for hi-dpi devices.
-		    pxRatio = (float)fbWidth / (float)ww;
+        pxRatio = (float)fbWidth / (float)ww;
       }
       SECTION(gl frame setup)
       {
@@ -408,38 +432,51 @@ ENTRY_DECLARATION
 		    if(premult)
 			    glClearColor(0,0,0,0);
 		    else
-			    glClearColor(0.3f, 0.3f, 0.32f, 1.0f);
+			    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 		    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
       }
 
+      bnd drgbnd;
       SECTION(selection box)
       {
-        if(!lftDn){ drgP=pntr; }
+        if(!lftDn){ drgP=pntr; drgbox=false; }
+
+        drgbnd = bnd( min(drgP.x, pntr.x),
+                      min(drgP.y, pntr.y),
+                      max(drgP.x, pntr.x),
+                      max(drgP.y, pntr.y) );
       }
       SECTION(select and drag)
       {
-        int sz = (int)nd_ordr.size();
-        TO(sz,i)
+        if(drgbox){
+          TO(sz,i)
+          {
+            sels[i] = isIn(nbnds[i],drgbnd);
+            //sels[ndOrdr] = inNode;
+          }
+        }
+
+        TO(sz,i) // drag
         {
-          node& n = nodes[nd_ordr[i]];
+          int  ndOrdr = nd_ordr[i];
+          node&     n = nodes[ndOrdr];
           bool inNode = isIn(px,py,nbnds[i]);
+
           if(inNode && !lftDn){
             drgOfsts[i] = {0,0};
             drg = -1;
           }
 
-          if( (drg<0) && inNode && lftDn ){
+          if( (drg<0) && inNode && lftDn && !prevLftDn){
             MoveToBack( &nd_ordr, i);
-
             drg     = (int)(sz-1);                               // make the dragged node the last node and the drag index the last index 
             drgofst = pntr - nbnds[i].mn;
-          }
-            
+          } 
+                     
           if(drg==i){ n.P = pntr - drgofst; }
         }
       }
       
-
 		  nvgBeginFrame(vg, ww, wh, pxRatio);
       SECTION(nanovg drawing)
       {
@@ -448,11 +485,11 @@ ENTRY_DECLARATION
           int sz = (int)nd_ordr.size();
           TO(sz,i)
           {
-            node& n = nodes[nd_ordr[i]];
+            int ndOrdr = nd_ordr[i];
+            node&    n = nodes[ndOrdr];
 
-            auto clr = sels[i]?nvgRGBf(.5f,.4f,.1f) : NODE_CLR;
+            auto clr = sels[ndOrdr]?nvgRGBf(.5f,.4f,.1f) : NODE_CLR;
             nbnds[i] = drw_node(vg, 0, n.txt.c_str(), n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, clr, 1.f);
-            //sels[i]  = isIn(px,py,nbnds[i]);
           }
         }
         SECTION(connections)
@@ -465,14 +502,21 @@ ENTRY_DECLARATION
 
             nvgBeginPath(vg);
              nvgMoveTo(vg,   src.x,src.y);
-             nvgBezierTo(vg, dest.x/2,dest.y, dest.x/2,dest.y, dest.x,dest.y);
-            nvgStrokeColor(vg, nvgRGBAf(0,1.f,0,1.f));
+
+             f32 halfx = lerp(.5f, dest.x, src.x);
+             f32 halfy = lerp(.5f, dest.y, src.y); 
+             nvgBezierTo(vg, halfx,src.y, halfx,dest.y, dest.x,dest.y);
+             nvgStrokeWidth(vg, 8.f);
+            nvgStrokeColor(vg, nvgRGBAf(0, .25f, 1.f, 1.f));
    	        nvgStroke(vg);
           }
         }
         SECTION(selection box)
         {
-          if(lftDn){
+          if(lftDn && drg<0)
+          {
+            drgbox = true;
+
             nvgBeginPath(vg);
               float x,y,w,h;
               x = min(drgP.x, pntr.x); 
@@ -480,16 +524,16 @@ ENTRY_DECLARATION
               w = abs(drgP.x - pntr.x);
               h = abs(drgP.y - pntr.y);
               nvgRect(vg, x,y, w,h);
-              //nvgMoveTo(vg,  drgP.x,drgP.y);
-              //nvgLineTo(vg, pntr.x, pntr.y);
-              //nvgBezierTo(vg, dest.x/2,dest.y, dest.x/2,dest.y, dest.x,dest.y);
             nvgStrokeWidth(vg, 2.f);
-            nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, .5f));
+            nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, .75f));
    	        nvgStroke(vg);
           }
         }
       }
       nvgEndFrame(vg);
+
+      prevRtDn  =  rtDn;
+      prevLftDn = lftDn;
 
       glfwSwapBuffers(win);
       glfwPollEvents();
@@ -505,6 +549,16 @@ ENTRY_DECLARATION
 
 
 
+//px=(float)cx; 
+//py=(float)cy;
+//px=cx*ww; py=cy*wh;
+
+//#include "glm/vec2.hpp"
+//using v2 = glm::vec2;
+
+//nvgMoveTo(vg,  drgP.x,drgP.y);
+//nvgLineTo(vg, pntr.x, pntr.y);
+//nvgBezierTo(vg, dest.x/2,dest.y, dest.x/2,dest.y, dest.x,dest.y);
 
 //sprintf(winTitle, "%.2f  %.2f", pntr.x, pntr.y);  //nodes[0].P.x, nodes[0].P.y );
 //glfwSetWindowTitle(win, winTitle);
