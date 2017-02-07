@@ -27,16 +27,18 @@
 // -todo: make line from center of node obey node ratio when clamped to 
 // -todo: turn circle collision into stand alone function
 // -todo: make direction vector from center clamp to rounded corners
-// -todo: make function to find the normal of a rounded rect - just means wrapping circle collison function
 // -todo: make circle on outer border of node
+// -todo: fix bounds being swapped - ndOrdr instead of i is correct?
+// -todo: make circle collision keep signs and work on both sides - actually needed to switch the center point of the circle
+// -todo: make dragging selected nodes work after the first time 
+// -todo: make secondary selection with right mouse button
 
-// todo: make circle collision keep signs and work on both sides
-// todo: fix bounds being swapped
-// todo: make dragging selected nodes work after the first time 
-// todo: make a function to find the position of a rounded rect border
-// todo: make bezier point at normal of node border
+// todo: fix negative x border
 // todo: make connections between nodes
-// todo: change drg to primary selection
+// todo: make a function to find the position of a rounded rect border
+// todo: make function to find the normal of a rounded rect - just means wrapping circle collison function
+// todo: make bezier point at normal of node border
+// todo: change drg variable to primary selection
 // todo: group ui state variables together - drg, connecting
 // todo: change node drawing function to take v2 and str
 // todo: make selection a vector for multi-selection - if the vector capacity is 3x the size, use reserve to shrink it down to 1.5x the size?
@@ -155,6 +157,8 @@ vec<bool>             sels;             // bitfield for selected nodes
 vec<bool>             drgs;
 vec<v2>           drgOfsts;
 int                    drg = -1;
+int                 priSel = -1;
+int                 secSel = -1;
 bool                 drgNd = false;
 v2                    drgP;
 v2                 drgofst;
@@ -243,7 +247,6 @@ bool              hasInf(v2 v)
   TO(2,i) if(v[i]==INFf || v[i]==-INFf) return true;
   return false;
 }
-
 v2      lineCircleIntsct(v2 P, v2 dir, v2 crcl, f32 r)
 {
   //f32       r = NODE_SZ.y/2.f;
@@ -389,8 +392,8 @@ ENTRY_DECLARATION
   
   SECTION(test data init)
   {
-    //nodes.push_back( { {100.f,100.f},"one"   } );
-    //nodes.push_back( { {200.f,200.f},"two"   } );
+    nodes.push_back( { {100.f,100.f},"one"   } );
+    nodes.push_back( { {200.f,200.f},"two"   } );
     nodes.push_back( { {300.f,300.f},"three" } );
 
     for(auto& n : nodes){
@@ -405,8 +408,8 @@ ENTRY_DECLARATION
     nd_ordr.resize(sz);
     TO((int)sz,i) nd_ordr[i]=i;
 
-    //cncts.push_back( {0,1} );
-    //cncts.push_back( {1,2} );
+    cncts.push_back( {0,1} );
+    cncts.push_back( {1,2} );
 
     //cnct_in.insert( cnct_in.end(), ALL(cncts) );
     
@@ -481,7 +484,6 @@ ENTRY_DECLARATION
   {
     v2 pntr = {0,0};
     double cx, cy, t, dt, prevt=0, cpuTime=0;
-    //float px=0, py=0;
     float pxRatio;
 		int ww, wh, fbWidth, fbHeight;
 
@@ -542,13 +544,15 @@ ENTRY_DECLARATION
           }
         }
       }
-      SECTION(drag)
+      SECTION(nodes)
       {
+        bool inAny = false;
         FROM(sz,i)                                                // loop backwards so that the top nodes are dealt with first
         {
           int  ndOrdr = nd_ordr[i];
           node&     n = nodes[ndOrdr];
           bool inNode = isIn(pntr.x,pntr.y, nbnds[i]);
+          inAny      |= inNode;
 
           //if(inNode && !lftDn){
           if(!lftDn){
@@ -563,9 +567,19 @@ ENTRY_DECLARATION
           } 
                      
           //if(drg==i){ n.P = pntr - drgofst; }
+
+          if(inNode && rtDn && !prevRtDn){
+            if(secSel<0) secSel=i;
+          }
+        }
+        
+        if(!inAny){
+          if(lftDn && drg<0){ drgbox = true; }
+
+          if(rtDn && !prevRtDn){ secSel = -1; }
         }
       }
-      
+
 		  nvgBeginFrame(vg, ww, wh, pxRatio);
       SECTION(nanovg drawing)
       {
@@ -581,10 +595,14 @@ ENTRY_DECLARATION
             if(sels[ndOrdr]){
               if(drg>-1) n.P +=  pntr - prevPntr;
               clr = nvgRGBf(.5f,.4f,.1f);
-              drw_node(vg, 0, n.txt.c_str(), n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, clr, 1.f);
-            }else{
-              nbnds[i] = drw_node(vg, 0, n.txt.c_str(), n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, NODE_CLR, 1.f);              
             }
+            //  drw_node(vg, 0, n.txt.c_str(), n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, clr, 1.f);
+            //}else{
+            //  nbnds[ndOrdr] = drw_node(vg, 0, n.txt.c_str(), n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, NODE_CLR, 1.f);              
+            //}
+
+            float round = secSel==i? 0 : 1.f;
+            nbnds[ndOrdr] = drw_node(vg, 0, n.txt, n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, clr, round);              
 
 
             SECTION(border test)
@@ -599,7 +617,6 @@ ENTRY_DECLARATION
               }else{
                 pdir /= abs(pdir.y)/hlfsz.y;
               }
-              //pdir.x *= ds.x;
               
               f32        r = NODE_SZ.y/2.f;
               v2  circCntr = (pdir.x<0)? n.P+r  :  n.P+NODE_SZ-r;
@@ -692,8 +709,6 @@ ENTRY_DECLARATION
         {
           if(lftDn && drg<0)
           {
-            drgbox = true;
-
             nvgBeginPath(vg);
               float x,y,w,h;
               x = min(drgP.x, pntr.x); 
@@ -726,6 +741,8 @@ ENTRY_DECLARATION
 
 
 
+//
+//float px=0, py=0;
 
 //nvgBeginPath(vg);
 // nvgCircle(vg, ncntr.x,ncntr.y, 10.f);
