@@ -254,7 +254,7 @@ v2      lineCircleIntsct(v2 P, v2 dir, v2 crcl, f32 r)
   //v2 circCntr = n.P + NODE_SZ - r;
 
   v2       st = (P - crcl) / r;
-  f32     mlt = abs(st.x) / abs(dir.x);                 // mlt = multiplier - the multiplier to get st.x to 0
+  f32     mlt = abs(st.x) / dir.x;                 // mlt = multiplier - the multiplier to get dir.x to equal st.x 
   f32       C = (st + dir*mlt).y;
   if(C > r) return v2(INFf, INFf);
   f32       m = dir.y / dir.x;
@@ -263,9 +263,9 @@ v2      lineCircleIntsct(v2 P, v2 dir, v2 crcl, f32 r)
   f32       c = SQR(C) - 1.f;
   f32      q2 = SQR(b) - 4.f*a*c;
   if(q2 < 0) return v2(INFf, INFf);
-  f32       x = sign(dir.x) * ((-b + sqrt(q2)) / 2.f*a);
-  f32       y = sign(dir.y) * sin(acos(x));
-  v2  intrsct = v2(x,y)*r + crcl;
+  f32       x = ((-b + sqrt(q2)) / 2.f*a);
+  f32       y = sin(acos(x));
+  v2  intrsct = v2( sign(dir.x)*x, sign(dir.y)*y)*r + crcl;
 
   return intrsct;
 }
@@ -392,8 +392,8 @@ ENTRY_DECLARATION
   
   SECTION(test data init)
   {
-    nodes.push_back( { {100.f,100.f},"one"   } );
-    nodes.push_back( { {200.f,200.f},"two"   } );
+    //nodes.push_back( { {100.f,100.f},"one"   } );
+    //nodes.push_back( { {200.f,200.f},"two"   } );
     nodes.push_back( { {300.f,300.f},"three" } );
 
     for(auto& n : nodes){
@@ -408,8 +408,8 @@ ENTRY_DECLARATION
     nd_ordr.resize(sz);
     TO((int)sz,i) nd_ordr[i]=i;
 
-    cncts.push_back( {0,1} );
-    cncts.push_back( {1,2} );
+    //cncts.push_back( {0,1} );
+    //cncts.push_back( {1,2} );
 
     //cnct_in.insert( cnct_in.end(), ALL(cncts) );
     
@@ -607,22 +607,27 @@ ENTRY_DECLARATION
 
             SECTION(border test)
             {
+              if(lftDn){ 
+                printf("wat");
+              }
+
               v2 ncntr = n.P + NODE_SZ/2.f;
               v2 hlfsz = NODE_SZ / 2.f;
-              v2  pdir = norm(pntr - ncntr) * len(NODE_SZ);         // * normsz;
+              v2  pdir = norm(pntr - ncntr) * len(hlfsz);         // * normsz;
               
               v2 ds = sign(pdir);                                  // ds is direction sign
-              if( abs(pdir.x) > NODE_SZ.x ){
+              if( abs(pdir.x) > hlfsz.x ){
                 pdir /= abs(pdir.x)/hlfsz.x;
               }else{
                 pdir /= abs(pdir.y)/hlfsz.y;
               }
               
               f32        r = NODE_SZ.y/2.f;
-              v2  circCntr = (pdir.x<0)? n.P+r  :  n.P+NODE_SZ-r;
+              v2  circCntr = (pdir.x<0)? n.P+v2(r,r)  :  n.P+NODE_SZ-r;
               v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, r);
               bool     hit = !hasInf(intrsct);
-              if(hit) pdir = intrsct - ncntr;
+              //if(hit) pdir = intrsct - ncntr;
+              //else continue;
 
               //v2  dirCirc = abs(pdir) / r;
               //v2       st = (ncntr - circCntr) / r;

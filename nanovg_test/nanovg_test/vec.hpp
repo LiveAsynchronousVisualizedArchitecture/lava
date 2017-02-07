@@ -269,6 +269,12 @@ inline vec2   operator+(vec2 const& a, vec2 const& b)
   TO(2,i) ret[i] = a[i] + b[i];
   return ret;
 }
+inline vec2   operator+(vec2 const& a, float b)
+{
+  vec2 ret;
+  TO(2,i) ret[i] = a[i] + b;
+  return ret;
+}
 
 inline vec2   operator-(vec2 const& a, vec2 const& b)
 {
