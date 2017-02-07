@@ -25,14 +25,14 @@
 // -todo: take out px, py - just use vector v2
 // -todo: make vector from center to a square border
 // -todo: make line from center of node obey node ratio when clamped to 
+// -todo: turn circle collision into stand alone function
+// -todo: make direction vector from center clamp to rounded corners
+// -todo: make function to find the normal of a rounded rect - just means wrapping circle collison function
 
-// todo: turn circle collision into stand alone function
-// todo: make direction vector from center clamp to rounded corners
+// -todo: make circle on outer border of node
+// todo: make circle collision keep signs and work on both sides
 // todo: fix bounds being swapped
-// todo: make circle on outer border of node
 // todo: make dragging selected nodes work after the first time 
-// todo: draw inputs
-// todo: make function to find the normal of a rounded rect
 // todo: make a function to find the position of a rounded rect border
 // todo: make bezier point at normal of node border
 // todo: make connections between nodes
@@ -49,6 +49,7 @@
 // todo: make nodes different shapes? 
 // todo: make connections have different shapes? draw three thin lines for a scatter connection?
 // todo: make selected indication a border effect and not a color change
+// todo: draw inputs
 
 #define  WIN32_LEAN_AND_MEAN
 #define  NOMINMAX
@@ -236,6 +237,34 @@ static char*    cpToUTF8(int cp, char* str)
 	case 1: str[0] = cp;
 	}
 	return str;
+}
+bool              hasInf(v2 v)
+{
+  TO(2,i) if(v[i]==INFf || v[i]==-INFf) return true;
+  return false;
+}
+
+v2      lineCircleIntsct(v2 P, v2 dir, v2 crcl, f32 r)
+{
+  //f32       r = NODE_SZ.y/2.f;
+  //v2  dirCirc = abs(pdir) / r;
+  //v2 circCntr = n.P + NODE_SZ - r;
+
+  v2       st = (P - crcl) / r;
+  f32     mlt = abs(st.x) / abs(dir.x);                 // mlt = multiplier - the multiplier to get st.x to 0
+  f32       C = (st + dir*mlt).y;
+  if(C > r) return v2(INFf, INFf);
+  f32       m = dir.y / dir.x;
+  f32       a = SQR(m) + 1;
+  f32       b = 2.f * m * C;
+  f32       c = SQR(C) - 1.f;
+  f32      q2 = SQR(b) - 4.f*a*c;
+  if(q2 < 0) return v2(INFf, INFf);
+  f32       x = (-b + sqrt(q2)) / 2.f*a;
+  f32       y =  sign(dir.y) * sin(acos(x));
+  v2  intrsct = v2(x,y)*r + crcl;
+
+  return intrsct;
 }
 
 void    mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
@@ -557,11 +586,12 @@ ENTRY_DECLARATION
               nbnds[i] = drw_node(vg, 0, n.txt.c_str(), n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, NODE_CLR, 1.f);              
             }
 
+
             SECTION(border test)
             {
               v2 ncntr = n.P + NODE_SZ/2.f;
               v2 hlfsz = NODE_SZ / 2.f;
-              v2  pdir = norm(pntr - ncntr) * len(NODE_SZ);       // * normsz;
+              v2  pdir = norm(pntr - ncntr) * len(NODE_SZ);         // * normsz;
               
               v2 ds = sign(pdir);                                  // ds is direction sign
               if( abs(pdir.x) > NODE_SZ.x ){
@@ -570,23 +600,26 @@ ENTRY_DECLARATION
                 pdir /= abs(pdir.y)/hlfsz.y;
               }
 
-              f32       r = NODE_SZ.y/2.f;
-              //v2  dirCirc = abs(pdir) / r;
-              v2 circCntr = n.P + NODE_SZ - r;
-              v2       st = (ncntr - circCntr) / r;
-              f32     mlt = abs(st.x) / abs(pdir.x);                                // mlt = multiplier - the multiplier to get st.x to 0
-              f32       C = (st + pdir*mlt).y;
-              if(C > r) continue;
-              f32       m = pdir.y / pdir.x;
-              f32       a = SQR(m) + 1;
-              f32       b = 2.f * m * C;
-              f32       c = SQR(C) - 1.f;
-              f32      q2 = SQR(b) - 4.f*a*c;
-              if(q2 < 0) continue;
-              f32       x = (-b + sqrt(q2)) / 2.f*a;
-              f32       y =  sign(pdir.y) * sin(acos(x));
-              v2  intrsct = v2(x,y)*r + circCntr;
+              f32        r = NODE_SZ.y/2.f;
+              v2  circCntr = n.P + NODE_SZ - r;
+              v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, r);
+              bool     hit = !hasInf(intrsct);
+              if(hit) pdir = intrsct - ncntr;
 
+              //v2  dirCirc = abs(pdir) / r;
+              //v2       st = (ncntr - circCntr) / r;
+              //f32     mlt = abs(st.x) / abs(pdir.x);                                // mlt = multiplier - the multiplier to get st.x to 0
+              //f32       C = (st + pdir*mlt).y;
+              //if(C > r) continue;
+              //f32       m = pdir.y / pdir.x;
+              //f32       a = SQR(m) + 1;
+              //f32       b = 2.f * m * C;
+              //f32       c = SQR(C) - 1.f;
+              //f32      q2 = SQR(b) - 4.f*a*c;
+              //if(q2 < 0) continue;
+              //f32       x = (-b + sqrt(q2)) / 2.f*a;
+              //f32       y =  sign(pdir.y) * sin(acos(x));
+              //v2  intrsct = v2(x,y)*r + circCntr;
 
               v2 dirEnd = ncntr + pdir*1.f;
               nvgBeginPath(vg);
@@ -603,12 +636,18 @@ ENTRY_DECLARATION
               nvgBeginPath(vg);
                nvgCircle(vg, intrsct.x,intrsct.y, 4.f);
               nvgFill(vg);
-
+              
+              v2 brdr = ncntr + pdir + norm(pdir)*8.f;
               nvgBeginPath(vg);
-               nvgMoveTo(vg, intrsct.x, 0);
-               nvgLineTo(vg, intrsct.x, 1024.f);
-              nvgStrokeWidth(vg, 1.f);
-              nvgStroke(vg);
+               nvgCircle(vg, brdr.x,brdr.y, 8.f);
+              nvgFill(vg);
+
+
+              //nvgBeginPath(vg);
+              // nvgMoveTo(vg, intrsct.x, 0);
+              // nvgLineTo(vg, intrsct.x, 1024.f);
+              //nvgStrokeWidth(vg, 1.f);
+              //nvgStroke(vg);
 
               //v2 scrnMid = v2(ww,wh)/2.f;
               //v2 stmid = st + scrnMid;
