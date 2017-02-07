@@ -24,7 +24,10 @@
 // -todo: make all selected nodes drag - need a starting position for the pntr - that is what drgP is?
 // -todo: take out px, py - just use vector v2
 // -todo: make vector from center to a square border
+// -todo: make line from center of node obey node ratio when clamped to 
 
+// todo: make direction vector from center clamp to rounded corners
+// todo: fix bounds being swapped
 // todo: make circle on outer border of node
 // todo: make dragging selected nodes work after the first time 
 // todo: draw inputs
@@ -248,7 +251,9 @@ void    mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 
 bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
                             int preicon, 
-                       const char* text, 
+                       //const char* text, 
+                       str const& text,
+                           //v2 P, v2 sz, 
                        float x, float y, 
                        float w, float h, 
                            NVGcolor col,
@@ -311,7 +316,7 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
   {
 	  nvgFontSize(vg, 30.0f);
 	  nvgFontFace(vg, "sans-bold");
-	  tw = nvgTextBounds(vg, 0,0, text, NULL, NULL);
+	  tw = nvgTextBounds(vg, 0,0, text.c_str(), NULL, NULL);
 	  if(preicon != 0){
 		  nvgFontSize(vg, h*1.3f);
 		  nvgFontFace(vg, "icons");
@@ -331,9 +336,9 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
 	  nvgFontFace(vg, "sans-bold");
 	  nvgTextAlign(vg, NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
 	  nvgFillColor(vg, nvgRGBA(0,0,0,160));
-	  nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f-1,text, NULL);
+	  nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f-1,text.c_str(), NULL);
 	  nvgFillColor(vg, nvgRGBA(255,255,255,255));
-	  nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f,text, NULL);
+	  nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f,text.c_str(), NULL);
   }
 
   return {x,y, x+w, y+h};
@@ -547,20 +552,41 @@ ENTRY_DECLARATION
             SECTION(border test)
             {
               v2 ncntr = n.P + NODE_SZ/2.f;
-              v2  pdir = norm(pntr - ncntr);
 
-              if( abs(pdir.x) > abs(pdir.y) ){
-                pdir /= abs(pdir.x);
+              //nvgBeginPath(vg);
+              // nvgCircle(vg, ncntr.x,ncntr.y, 10.f);
+              //nvgFill(vg);
+
+              //v2 normsz = NODE_SZ / max(NODE_SZ.x, NODE_SZ.y);
+              v2  hlfsz = NODE_SZ / 2.f;
+              v2   pdir = norm(pntr - ncntr) * len(NODE_SZ);       // * normsz;
+              //pdir      = clamp_hi(pdir, normsz);
+              
+              v2 ds = sign(pdir);                                  // ds is direction sign
+              if( abs(pdir.x) > NODE_SZ.x ){
+                pdir /= abs(pdir.x)/hlfsz.x;
               }else{
-                pdir /= abs(pdir.y);
+                pdir /= abs(pdir.y)/hlfsz.y;
               }
 
-              nvgBeginPath(vg);
-               nvgCircle(vg, ncntr.x,ncntr.y, 10.f);
-              nvgFill(vg);
+              //pdir = clamp_hi(abs(pdir), NODE_SZ) * dirSign;
+
+              //if( abs(pdir.x * normsz.x) > abs(pdir.y * normsz.y) ){
+              //  pdir = pdir / abs(pdir.x) * NODE_SZ.x;
+              //}else{
+              //  pdir = pdir / abs(pdir.y) * NODE_SZ.y;
+              //}
+
+              //if( abs(pdir.x * normsz.x) > abs(pdir.y * normsz.y) ){
+              //  pdir = pdir / abs(pdir.x) * NODE_SZ.x;
+              //}else{
+              //  pdir = pdir / abs(pdir.y) * NODE_SZ.y;
+              //}
+
+              //pdir *= NODE_SZ;
 
 
-              v2 dirEnd = ncntr + pdir*100.f;
+              v2 dirEnd = ncntr + pdir*1.f;
               nvgBeginPath(vg);
                nvgMoveTo(vg, ncntr.x,ncntr.y);
                nvgLineTo(vg, dirEnd.x, dirEnd.y);

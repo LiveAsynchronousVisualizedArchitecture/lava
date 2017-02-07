@@ -246,6 +246,9 @@ union  vec2
   float&       operator[](int i)       {return c[i];}
   float const& operator[](int i) const {return c[i];}
 };
+using  v2  = vec2;
+using  v2f = vec2;
+
 inline vec2   Vec2(float x, float y)
 {
   vec2 v; 
@@ -305,6 +308,11 @@ inline vec2&  operator+=(vec2& a, vec2 const& b)
   TO(2,i) a[i] += b[i];
   return a;
 }
+inline vec2&  operator*=(vec2& a, vec2 const& b)
+{
+  TO(2,i) a[i] *= b[i];
+  return a;
+}
 inline vec2&  operator/=(vec2& a, vec2 const& b)
 {
   TO(2,i) a[i] /= b[i];
@@ -326,23 +334,53 @@ inline bool   operator==(vec2 const& a, vec2 const& b)
   if(a.x!=b.x || a.y!=b.y) return false;
   return true;
 }
-inline float  dot(vec2 const& a, vec2 const& b)
+inline float     dot(vec2 const& a, vec2 const& b)
 {
   float ret = 0;
   TO(2,i) ret += a[i]*b[i];
   return ret;
 }
-inline float  len(vec2 const& a)
+inline float     len(vec2 const& a)
 {
   return sqrtf(dot(a,a));
 }
-inline vec2   norm(vec2 const& a)
+inline vec2     norm(vec2 const& a)
 {
   return a / len(a);
 }
+inline vec2 clamp_hi(vec2 const& a, float hi)
+{
+  using namespace std;
+  
+  vec2 ret;
+  TO(2,i) ret[i] = min(a[i],hi);
+  return ret;
+}
+inline vec2 clamp_hi(vec2 const& a, vec2 const& hi)
+{
+  using namespace std;
+  
+  vec2 ret;
+  TO(2,i) ret[i] = min(a[i], hi[i]);
+  return ret;
+}
+inline vec2     sign(vec2 const& a)
+{
+  using namespace std;
+  
+  vec2 ret;
+  TO(2,i) ret[i] = a[i]<0?-1.f:1.f;
+  return ret;
+}
+inline vec2      abs(vec2 const& a)
+{
+  using namespace std;
+  
+  vec2 ret;
+  TO(2,i) ret[i] = abs(a[i]);
+  return ret;
+}
 
-using  v2  = vec2;
-using  v2f = vec2;
 
 
 #endif
