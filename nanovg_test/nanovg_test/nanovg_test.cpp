@@ -28,8 +28,8 @@
 // -todo: turn circle collision into stand alone function
 // -todo: make direction vector from center clamp to rounded corners
 // -todo: make function to find the normal of a rounded rect - just means wrapping circle collison function
-
 // -todo: make circle on outer border of node
+
 // todo: make circle collision keep signs and work on both sides
 // todo: fix bounds being swapped
 // todo: make dragging selected nodes work after the first time 
@@ -260,8 +260,8 @@ v2      lineCircleIntsct(v2 P, v2 dir, v2 crcl, f32 r)
   f32       c = SQR(C) - 1.f;
   f32      q2 = SQR(b) - 4.f*a*c;
   if(q2 < 0) return v2(INFf, INFf);
-  f32       x = (-b + sqrt(q2)) / 2.f*a;
-  f32       y =  sign(dir.y) * sin(acos(x));
+  f32       x = sign(dir.x) * ((-b + sqrt(q2)) / 2.f*a);
+  f32       y = sign(dir.y) * sin(acos(x));
   v2  intrsct = v2(x,y)*r + crcl;
 
   return intrsct;
@@ -599,9 +599,10 @@ ENTRY_DECLARATION
               }else{
                 pdir /= abs(pdir.y)/hlfsz.y;
               }
-
+              //pdir.x *= ds.x;
+              
               f32        r = NODE_SZ.y/2.f;
-              v2  circCntr = n.P + NODE_SZ - r;
+              v2  circCntr = (pdir.x<0)? n.P+r  :  n.P+NODE_SZ-r;
               v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, r);
               bool     hit = !hasInf(intrsct);
               if(hit) pdir = intrsct - ncntr;

@@ -269,6 +269,7 @@ inline vec2   operator+(vec2 const& a, vec2 const& b)
   TO(2,i) ret[i] = a[i] + b[i];
   return ret;
 }
+
 inline vec2   operator-(vec2 const& a, vec2 const& b)
 {
   vec2 ret;
@@ -288,6 +289,7 @@ inline vec2   operator-(vec2 const& a, float b)
   TO(2,i) ret[i] = a[i] - b;
   return ret;
 }
+
 inline vec2   operator*(vec2 const& a, vec2 const& b)
 {
   vec2 ret;
@@ -306,6 +308,7 @@ inline vec2   operator*(vec2 const& a, float b)
 {
   return operator*(b,a);
 }
+
 inline vec2   operator/(vec2 const& a, vec2 const& b)
 {
   vec2 ret;
@@ -325,6 +328,7 @@ inline vec2   operator/(float a, vec2 const& b)
   TO(2,i) ret[i] = a / b[i];
   return ret;
 }
+
 inline vec2&  operator+=(vec2& a, vec2 const& b)
 {
   TO(2,i) a[i] += b[i];
@@ -335,6 +339,11 @@ inline vec2&  operator*=(vec2& a, vec2 const& b)
   TO(2,i) a[i] *= b[i];
   return a;
 }
+//inline vec2&  operator*=(vec2& a, float b)
+//{
+//  TO(2,i) a[i] *= b;
+//  return a;
+//}
 inline vec2&  operator/=(vec2& a, vec2 const& b)
 {
   TO(2,i) a[i] /= b[i];
