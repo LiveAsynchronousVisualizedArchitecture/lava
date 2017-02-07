@@ -48,6 +48,8 @@ using  f64  =              double;
 #define PIf 3.141592653589f
 #define PId 3.14159265358979323846264338327
 
+#define SQR(x) ((x)*(x))
+
 // for open subdiv
 #define M_PI PIf
 //#define and &&

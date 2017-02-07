@@ -245,6 +245,10 @@ union  vec2
 
   float&       operator[](int i)       {return c[i];}
   float const& operator[](int i) const {return c[i];}
+  vec2(){} 
+  vec2(float x, float y) : r(x), g(y) {} 
+  vec2(float a[2]) : x(a[0]), y(a[1]) {}
+  vec2(float x) : r(x), g(x) {} 
 };
 using  v2  = vec2;
 using  v2f = vec2;
@@ -313,6 +317,12 @@ inline vec2   operator/(vec2 const& a, float b)
 {
   vec2 ret;
   TO(2,i) ret[i] = a[i] / b;
+  return ret;
+}
+inline vec2   operator/(float a, vec2 const& b)
+{
+  vec2 ret;
+  TO(2,i) ret[i] = a / b[i];
   return ret;
 }
 inline vec2&  operator+=(vec2& a, vec2 const& b)
@@ -393,6 +403,13 @@ inline vec2      abs(vec2 const& a)
   return ret;
 }
 
+
+inline float    sign(float a)
+{
+  using namespace std;
+  
+  return a<0?-1.f:1.f;
+}
 
 
 #endif

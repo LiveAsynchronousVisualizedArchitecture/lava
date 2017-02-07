@@ -26,6 +26,7 @@
 // -todo: make vector from center to a square border
 // -todo: make line from center of node obey node ratio when clamped to 
 
+// todo: turn circle collision into stand alone function
 // todo: make direction vector from center clamp to rounded corners
 // todo: fix bounds being swapped
 // todo: make circle on outer border of node
@@ -162,6 +163,7 @@ vec_con              cncts;             // cncts is connections - the vector of 
 cnct_tbl           cnctTbl;
 cnct_tbl           cnct_in;
 cnct_tbl          cnct_out;
+
 //bnd                 drgbnd;   // this is calculated data, not fundamental data
 //float                prevX;
 //float                prevY;
@@ -344,6 +346,12 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
   return {x,y, x+w, y+h};
 }
 
+void        debug_coords(v2 a)
+{
+  sprintf(winTitle, "%.2f  %.2f", a.x, a.y);
+  glfwSetWindowTitle(win, winTitle);
+}
+
 } // end namespace
 
 ENTRY_DECLARATION
@@ -352,8 +360,8 @@ ENTRY_DECLARATION
   
   SECTION(test data init)
   {
-    nodes.push_back( { {100.f,100.f},"one"   } );
-    nodes.push_back( { {200.f,200.f},"two"   } );
+    //nodes.push_back( { {100.f,100.f},"one"   } );
+    //nodes.push_back( { {200.f,200.f},"two"   } );
     nodes.push_back( { {300.f,300.f},"three" } );
 
     for(auto& n : nodes){
@@ -368,8 +376,8 @@ ENTRY_DECLARATION
     nd_ordr.resize(sz);
     TO((int)sz,i) nd_ordr[i]=i;
 
-    cncts.push_back( {0,1} );
-    cncts.push_back( {1,2} );
+    //cncts.push_back( {0,1} );
+    //cncts.push_back( {1,2} );
 
     //cnct_in.insert( cnct_in.end(), ALL(cncts) );
     
@@ -562,8 +570,23 @@ ENTRY_DECLARATION
                 pdir /= abs(pdir.y)/hlfsz.y;
               }
 
-              v2 circCntr = n.P + NODE_SZ - (NODE_SZ.y/2.f);
-              v2 circst = ncntr - circCntr;
+              f32       r = NODE_SZ.y/2.f;
+              //v2  dirCirc = abs(pdir) / r;
+              v2 circCntr = n.P + NODE_SZ - r;
+              v2       st = (ncntr - circCntr) / r;
+              f32     mlt = abs(st.x) / abs(pdir.x);                                // mlt = multiplier - the multiplier to get st.x to 0
+              f32       C = (st + pdir*mlt).y;
+              if(C > r) continue;
+              f32       m = pdir.y / pdir.x;
+              f32       a = SQR(m) + 1;
+              f32       b = 2.f * m * C;
+              f32       c = SQR(C) - 1.f;
+              f32      q2 = SQR(b) - 4.f*a*c;
+              if(q2 < 0) continue;
+              f32       x = (-b + sqrt(q2)) / 2.f*a;
+              f32       y =  sign(pdir.y) * sin(acos(x));
+              v2  intrsct = v2(x,y)*r + circCntr;
+
 
               v2 dirEnd = ncntr + pdir*1.f;
               nvgBeginPath(vg);
@@ -573,9 +596,30 @@ ENTRY_DECLARATION
               nvgStroke(vg);
 
               nvgBeginPath(vg);
-               nvgCircle(vg, circCntr.x,circCntr.y, NODE_SZ.y/2.f);
-              nvgStrokeWidth(vg, 2.f);
+               nvgCircle(vg, circCntr.x,circCntr.y, r);
+              nvgStrokeWidth(vg, 1.f);
               nvgStroke(vg);
+
+              nvgBeginPath(vg);
+               nvgCircle(vg, intrsct.x,intrsct.y, 4.f);
+              nvgFill(vg);
+
+              nvgBeginPath(vg);
+               nvgMoveTo(vg, intrsct.x, 0);
+               nvgLineTo(vg, intrsct.x, 1024.f);
+              nvgStrokeWidth(vg, 1.f);
+              nvgStroke(vg);
+
+              //v2 scrnMid = v2(ww,wh)/2.f;
+              //v2 stmid = st + scrnMid;
+              //v2 dirmid = (v2(x,y) + scrnMid) * r; 
+              //nvgBeginPath(vg);
+              // nvgMoveTo(vg, stmid.x, stmid.y);
+              // nvgLineTo(vg, dirmid.x, dirmid.y);
+              //nvgStrokeWidth(vg, 2.f);
+              //nvgStroke(vg);
+
+              if(i==0) debug_coords(intrsct);
             }
 
           }
