@@ -552,15 +552,8 @@ ENTRY_DECLARATION
             SECTION(border test)
             {
               v2 ncntr = n.P + NODE_SZ/2.f;
-
-              //nvgBeginPath(vg);
-              // nvgCircle(vg, ncntr.x,ncntr.y, 10.f);
-              //nvgFill(vg);
-
-              //v2 normsz = NODE_SZ / max(NODE_SZ.x, NODE_SZ.y);
-              v2  hlfsz = NODE_SZ / 2.f;
-              v2   pdir = norm(pntr - ncntr) * len(NODE_SZ);       // * normsz;
-              //pdir      = clamp_hi(pdir, normsz);
+              v2 hlfsz = NODE_SZ / 2.f;
+              v2  pdir = norm(pntr - ncntr) * len(NODE_SZ);       // * normsz;
               
               v2 ds = sign(pdir);                                  // ds is direction sign
               if( abs(pdir.x) > NODE_SZ.x ){
@@ -569,28 +562,19 @@ ENTRY_DECLARATION
                 pdir /= abs(pdir.y)/hlfsz.y;
               }
 
-              //pdir = clamp_hi(abs(pdir), NODE_SZ) * dirSign;
-
-              //if( abs(pdir.x * normsz.x) > abs(pdir.y * normsz.y) ){
-              //  pdir = pdir / abs(pdir.x) * NODE_SZ.x;
-              //}else{
-              //  pdir = pdir / abs(pdir.y) * NODE_SZ.y;
-              //}
-
-              //if( abs(pdir.x * normsz.x) > abs(pdir.y * normsz.y) ){
-              //  pdir = pdir / abs(pdir.x) * NODE_SZ.x;
-              //}else{
-              //  pdir = pdir / abs(pdir.y) * NODE_SZ.y;
-              //}
-
-              //pdir *= NODE_SZ;
-
+              v2 circCntr = n.P + NODE_SZ - (NODE_SZ.y/2.f);
+              v2 circst = ncntr - circCntr;
 
               v2 dirEnd = ncntr + pdir*1.f;
               nvgBeginPath(vg);
                nvgMoveTo(vg, ncntr.x,ncntr.y);
                nvgLineTo(vg, dirEnd.x, dirEnd.y);
               nvgStrokeWidth(vg, 3.f);
+              nvgStroke(vg);
+
+              nvgBeginPath(vg);
+               nvgCircle(vg, circCntr.x,circCntr.y, NODE_SZ.y/2.f);
+              nvgStrokeWidth(vg, 2.f);
               nvgStroke(vg);
             }
 
@@ -658,6 +642,29 @@ ENTRY_DECLARATION
 
 
 
+
+//nvgBeginPath(vg);
+// nvgCircle(vg, ncntr.x,ncntr.y, 10.f);
+//nvgFill(vg);
+//
+//v2 normsz = NODE_SZ / max(NODE_SZ.x, NODE_SZ.y);
+//pdir      = clamp_hi(pdir, normsz);
+//
+//pdir = clamp_hi(abs(pdir), NODE_SZ) * dirSign;
+//
+//if( abs(pdir.x * normsz.x) > abs(pdir.y * normsz.y) ){
+//  pdir = pdir / abs(pdir.x) * NODE_SZ.x;
+//}else{
+//  pdir = pdir / abs(pdir.y) * NODE_SZ.y;
+//}
+//
+//if( abs(pdir.x * normsz.x) > abs(pdir.y * normsz.y) ){
+//  pdir = pdir / abs(pdir.x) * NODE_SZ.x;
+//}else{
+//  pdir = pdir / abs(pdir.y) * NODE_SZ.y;
+//}
+//
+//pdir *= NODE_SZ;
 
 //v2 ncntr = (NODE_SZ/Vec2(2.f,2.f)) + n.P;
 //f32 side = dot( pdir, norm(Vec2(1.f,1.f)) );

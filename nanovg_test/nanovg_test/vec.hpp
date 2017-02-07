@@ -272,6 +272,25 @@ inline vec2   operator-(vec2 const& a, vec2 const& b)
   ret.y = a.y - b.y;
   return ret;
 }
+inline vec2   operator-(float a, vec2 const& b)
+{
+  vec2 ret;
+  TO(2,i) ret[i] = a - b[i];
+  return ret;
+}
+inline vec2   operator-(vec2 const& a, float b)
+{
+  vec2 ret;
+  TO(2,i) ret[i] = a[i] - b;
+  return ret;
+}
+inline vec2   operator*(vec2 const& a, vec2 const& b)
+{
+  vec2 ret;
+  ret.x = a.x * b.x;
+  ret.y = a.y * b.y;
+  return ret;
+}
 inline vec2   operator*(float a, vec2 const& b)
 {
   vec2 ret;
@@ -282,13 +301,6 @@ inline vec2   operator*(float a, vec2 const& b)
 inline vec2   operator*(vec2 const& a, float b)
 {
   return operator*(b,a);
-}
-inline vec2   operator*(vec2 const& a, vec2 const& b)
-{
-  vec2 ret;
-  ret.x = a.x * b.x;
-  ret.y = a.y * b.y;
-  return ret;
 }
 inline vec2   operator/(vec2 const& a, vec2 const& b)
 {
