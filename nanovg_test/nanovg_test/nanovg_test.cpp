@@ -32,12 +32,17 @@
 // -todo: make circle collision keep signs and work on both sides - actually needed to switch the center point of the circle
 // -todo: make dragging selected nodes work after the first time 
 // -todo: make secondary selection with right mouse button
+// -todo: fix negative x border - needed to keep the sign of the dir.x vector
+// -todo: fix selections hitting the wrong nodes - just need ndOrdr in bounds array index?
+// -todo: make connections between nodes
 
-// todo: fix negative x border
-// todo: make connections between nodes
+// todo: put back click select of node
+// todo: check to see if there is already a connection
+
 // todo: make a function to find the position of a rounded rect border
 // todo: make function to find the normal of a rounded rect - just means wrapping circle collison function
 // todo: make bezier point at normal of node border
+
 // todo: change drg variable to primary selection
 // todo: group ui state variables together - drg, connecting
 // todo: change node drawing function to take v2 and str
@@ -392,8 +397,8 @@ ENTRY_DECLARATION
   
   SECTION(test data init)
   {
-    //nodes.push_back( { {100.f,100.f},"one"   } );
-    //nodes.push_back( { {200.f,200.f},"two"   } );
+    nodes.push_back( { {100.f,100.f},"one"   } );
+    nodes.push_back( { {200.f,200.f},"two"   } );
     nodes.push_back( { {300.f,300.f},"three" } );
 
     for(auto& n : nodes){
@@ -551,7 +556,7 @@ ENTRY_DECLARATION
         {
           int  ndOrdr = nd_ordr[i];
           node&     n = nodes[ndOrdr];
-          bool inNode = isIn(pntr.x,pntr.y, nbnds[i]);
+          bool inNode = isIn(pntr.x,pntr.y, nbnds[ndOrdr]);
           inAny      |= inNode;
 
           //if(inNode && !lftDn){
@@ -569,7 +574,11 @@ ENTRY_DECLARATION
           //if(drg==i){ n.P = pntr - drgofst; }
 
           if(inNode && rtDn && !prevRtDn){
-            if(secSel<0) secSel=i;
+            if(secSel<0) secSel=ndOrdr;
+            else{ // create a connection between secSel and i
+              cncts.push_back( {ndOrdr, secSel} );
+              secSel = -1;
+            }
           }
         }
         
@@ -583,6 +592,25 @@ ENTRY_DECLARATION
 		  nvgBeginFrame(vg, ww, wh, pxRatio);
       SECTION(nanovg drawing)
       {
+        SECTION(connections)
+        {
+          TO(cncts.size(),i)
+          {
+            const v2 hlfsz = NODE_SZ/2.f;
+            auto& cn = cncts[i];
+            v2   src = nodes[cn.src].P + hlfsz;
+            v2  dest = nodes[cn.dest].P + hlfsz;
+
+            nvgBeginPath(vg);
+             nvgMoveTo(vg,   src.x,src.y);
+             f32 halfx = lerp(.5f, dest.x, src.x);
+             f32 halfy = lerp(.5f, dest.y, src.y); 
+             nvgBezierTo(vg, halfx,src.y, halfx,dest.y, dest.x,dest.y);
+             nvgStrokeWidth(vg, 3.f);
+            nvgStrokeColor(vg, nvgRGBAf(0.35, .5f, .45f, 1.f));
+   	        nvgStroke(vg);
+          }
+        }
         SECTION(nodes)
         {
           int sz = (int)nd_ordr.size();
@@ -596,14 +624,9 @@ ENTRY_DECLARATION
               if(drg>-1) n.P +=  pntr - prevPntr;
               clr = nvgRGBf(.5f,.4f,.1f);
             }
-            //  drw_node(vg, 0, n.txt.c_str(), n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, clr, 1.f);
-            //}else{
-            //  nbnds[ndOrdr] = drw_node(vg, 0, n.txt.c_str(), n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, NODE_CLR, 1.f);              
-            //}
 
             float round = secSel==i? 0 : 1.f;
             nbnds[ndOrdr] = drw_node(vg, 0, n.txt, n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, clr, round);              
-
 
             SECTION(border test)
             {
@@ -626,8 +649,8 @@ ENTRY_DECLARATION
               v2  circCntr = (pdir.x<0)? n.P+v2(r,r)  :  n.P+NODE_SZ-r;
               v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, r);
               bool     hit = !hasInf(intrsct);
-              //if(hit) pdir = intrsct - ncntr;
-              //else continue;
+              if(hit) pdir = intrsct - ncntr;
+              else continue;
 
               //v2  dirCirc = abs(pdir) / r;
               //v2       st = (ncntr - circCntr) / r;
@@ -686,30 +709,6 @@ ENTRY_DECLARATION
 
           }
         }
-        SECTION(connections)
-        {
-          TO(cncts.size(),i)
-          {
-            auto& cn = cncts[i];
-            v2   src = nodes[cn.src].P;
-            v2  dest = nodes[cn.dest].P;
-            //v2  ofst = (sels[i] && drg>-1)?  (pntr-drgP) : Vec2(0,0);
-
-            nvgBeginPath(vg);
-             //v2 d = dest+ofst, s = src+ofst;
-             //nvgMoveTo(vg,   s.x,s.y);
-             //f32 halfx = lerp(.5f, d.x, s.x);
-             //f32 halfy = lerp(.5f, d.y, s.y); 
-             //nvgBezierTo(vg, halfx,s.y, halfx,d.y, d.x,d.y);
-             nvgMoveTo(vg,   src.x,src.y);
-             f32 halfx = lerp(.5f, dest.x, src.x);
-             f32 halfy = lerp(.5f, dest.y, src.y); 
-             nvgBezierTo(vg, halfx,src.y, halfx,dest.y, dest.x,dest.y);
-             nvgStrokeWidth(vg, 8.f);
-            nvgStrokeColor(vg, nvgRGBAf(0, .25f, 1.f, 1.f));
-   	        nvgStroke(vg);
-          }
-        }
         SECTION(selection box)
         {
           if(lftDn && drg<0)
@@ -745,6 +744,18 @@ ENTRY_DECLARATION
 
 
 
+//v2  ofst = (sels[i] && drg>-1)?  (pntr-drgP) : Vec2(0,0);
+//
+//v2 d = dest+ofst, s = src+ofst;
+//nvgMoveTo(vg,   s.x,s.y);
+//f32 halfx = lerp(.5f, d.x, s.x);
+//f32 halfy = lerp(.5f, d.y, s.y); 
+//nvgBezierTo(vg, halfx,s.y, halfx,d.y, d.x,d.y);
+
+//  drw_node(vg, 0, n.txt.c_str(), n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, clr, 1.f);
+//}else{
+//  nbnds[ndOrdr] = drw_node(vg, 0, n.txt.c_str(), n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, NODE_CLR, 1.f);              
+//}
 
 //
 //float px=0, py=0;
