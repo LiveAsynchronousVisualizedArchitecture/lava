@@ -90,8 +90,6 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <algorithm>
-//#include "json.hpp"
-//#include "picojson.h"
 #include "jzon.h"
 #include "no_rt_util.h"
 #include "vec.hpp"
@@ -742,16 +740,12 @@ ENTRY_DECLARATION
         }
         SECTION(fps - frames per second counter)
         {
-          //f32 fps = (float)(t-prevt);
-          //f32 fps = (float)( 1/dt );
           avgFps *= 0.9;
           avgFps += (1.0/dt)*0.1;
-          //double fps = 1.0/dt;
           int fps = (int)avgFps;
 
           char fpsStr[TITLE_MAX_LEN];
           sprintf(fpsStr, "%d", fps);
-          //glfwSetWindowTitle(win, fpsStr);
            
           f32 tb = nvgTextBounds(vg, -100,0, fpsStr, NULL, NULL);
           nvgFontSize(vg, 20.0f);
@@ -759,15 +753,9 @@ ENTRY_DECLARATION
 	        nvgTextAlign(vg,  NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
 	        nvgFillColor(vg, nvgRGBA(255,255,255,255));
 	        nvgText(vg, tb, 20.f, fpsStr, NULL);
-	        //nvgFillColor(vg, nvgRGBA(255,255,255,255));
-	        //nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f,text.c_str(), NULL);
         }
       }
       nvgEndFrame(vg);
-
-      //SECTION(move primary selection to top)
-      //{
-      //}
 
       prevRtDn  =  rtDn;
       prevLftDn = lftDn;
@@ -784,6 +772,17 @@ ENTRY_DECLARATION
 
 
 
+//#include "json.hpp"
+//#include "picojson.h"
+
+//f32 fps = (float)(t-prevt);
+//f32 fps = (float)( 1/dt );
+//double fps = 1.0/dt;
+//glfwSetWindowTitle(win, fpsStr);
+
+//SECTION(move primary selection to top)
+//{
+//}
 
 //picojson::value  j;
 //picojson::value::object n;
