@@ -35,28 +35,31 @@
 // -todo: fix negative x border - needed to keep the sign of the dir.x vector
 // -todo: fix selections hitting the wrong nodes - just need ndOrdr in bounds array index?
 // -todo: make connections between nodes
+// -todo: fix secSel again - was comparing secSel to i instead of ndOrdr
+// -todo: check to see if there is already a connection
+// -todo: change drg variable to primary selection
+// -todo: put back click select of node - primary selection needed to be set to ndOrdr on click
+// -todo: change node drawing function to str
+// -todo: make fps counter
+// -todo: make left click on non-selected clear selection
 
-// todo: put back click select of node
-// todo: check to see if there is already a connection
-
-// todo: make a function to find the position of a rounded rect border
-// todo: make function to find the normal of a rounded rect - just means wrapping circle collison function
-// todo: make bezier point at normal of node border
-
-// todo: change drg variable to primary selection
-// todo: group ui state variables together - drg, connecting
-// todo: change node drawing function to take v2 and str
-// todo: make selection a vector for multi-selection - if the vector capacity is 3x the size, use reserve to shrink it down to 1.5x the size?
 // todo: make nodes and connections save to json file
 // todo: make nodes load from json file
 // todo: make one node snap to another node
 // todo: make two snapped nodes group together and be dragged together
 // todo: make snapped/grouped nodes separate with right mouse button
 // todo: make global state 
-// todo: make nodes different shapes? 
+// todo: make nodes different shapes? - make data input into vertical columns?
 // todo: make connections have different shapes? draw three thin lines for a scatter connection?
 // todo: make selected indication a border effect and not a color change
 // todo: draw inputs
+// todo: separate finding node the pointer is inside from the action to take
+// todo: group ui state variables together - priSel, connecting
+// todo: make a function to find the position of a rounded rect border
+// todo: make function to find the normal of a rounded rect - just means wrapping circle collison function
+// todo: make bezier point at normal of node border
+// todo: make selection a vector for multi-selection - if the vector capacity is 3x the size, use reserve to shrink it down to 1.5x the size?
+
 
 #define  WIN32_LEAN_AND_MEAN
 #define  NOMINMAX
@@ -66,9 +69,6 @@
 
 #define NANOVG_GL3_IMPLEMENTATION   // Use GL2 implementation.
 #include "nanovg_gl.h"
-
-//
-//#include "../nanovg-master/example/demo.h"
 
 #define ENTRY_DECLARATION int main(void)
 #ifdef _MSC_VER
@@ -88,7 +88,11 @@
 #include <vector>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <algorithm>
+//#include "json.hpp"
+//#include "picojson.h"
+#include "jzon.h"
 #include "no_rt_util.h"
 #include "vec.hpp"
 
@@ -141,7 +145,7 @@ using   vec_nd     =    vec<node>;
 using vec_nbnd     =     vec<bnd>;
 using   vec_v2     =      vec<v2>;
 using  vec_con     =    vec<cnct>;
-using cnct_tbl     =    std::unordered_multimap<int, cnct>;
+using cnct_tbl     =    std::unordered_multimap<int,int>;
 
 GLFWwindow*            win;
 char              winTitle[TITLE_MAX_LEN];
@@ -161,7 +165,6 @@ vec_nbnd             nbnds;
 vec<bool>             sels;             // bitfield for selected nodes
 vec<bool>             drgs;
 vec<v2>           drgOfsts;
-int                    drg = -1;
 int                 priSel = -1;
 int                 secSel = -1;
 bool                 drgNd = false;
@@ -170,13 +173,8 @@ v2                 drgofst;
 veci               nd_ordr;
 bool                drgbox = false;
 vec_con              cncts;             // cncts is connections - the vector of connection structures
-cnct_tbl           cnctTbl;
-cnct_tbl           cnct_in;
-cnct_tbl          cnct_out;
-
-//bnd                 drgbnd;   // this is calculated data, not fundamental data
-//float                prevX;
-//float                prevY;
+cnct_tbl          cnct_src;
+cnct_tbl         cnct_dest;
 
 
 namespace{
@@ -274,7 +272,38 @@ v2      lineCircleIntsct(v2 P, v2 dir, v2 crcl, f32 r)
 
   return intrsct;
 }
+bool              insUnq(cnct_tbl* cnct, int a, int b)   // insUnq is insert unique - this inserts into a multi-set only if the combination of int key and int val does not already exist
+{
+  using namespace std;
+  
+  auto rnge = cnct->equal_range(a);
+  if(rnge.first != rnge.second){
+    for(auto i=rnge.first; i!=rnge.second; ++i){
+      if( i->second == b ) return false;
+    }
+  }
+  cnct->insert( {a, b} );
 
+  return true;
+
+  //auto bkt = find(rnge.first, rnge.second, );
+  //if(bkt!=rnge.second){
+  //  cnct->insert( {a, b} );
+  //  return true;
+  //} 
+}
+
+void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
+{
+  using namespace std;
+  
+  Jzon::Node n = Jzon::object();
+  n.add("txt", nodes[0].txt);
+  Jzon::Writer w;
+  str s;
+  w.writeString(n, s);
+  glfwSetWindowTitle(win, s.c_str() );
+}
 void    mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 {
   if(button==GLFW_MOUSE_BUTTON_LEFT){
@@ -395,106 +424,111 @@ ENTRY_DECLARATION
 {
   using namespace std;
   
-  SECTION(test data init)
+	NVGcontext* vg = NULL;
+  SECTION(initialization)
   {
-    nodes.push_back( { {100.f,100.f},"one"   } );
-    nodes.push_back( { {200.f,200.f},"two"   } );
-    nodes.push_back( { {300.f,300.f},"three" } );
+    SECTION(test data init)
+    {
+      //nodes.push_back( { {100.f,100.f},"one"   } );
+      nodes.push_back( { {200.f,200.f},"two"   } );
+      nodes.push_back( { {300.f,300.f},"three" } );
 
-    for(auto& n : nodes){
-      nbnds.push_back( {n.P.x, n.P.y, n.P.x+NODE_SZ.x, n.P.y+NODE_SZ.y} );
-    }
+      for(auto& n : nodes){
+        nbnds.push_back( {n.P.x, n.P.y, n.P.x+NODE_SZ.x, n.P.y+NODE_SZ.y} );
+      }
 
-    auto sz = nodes.size();
-    sels.resize(sz, false);
-    drgOfsts.resize(sz, {0,0} );
-    drgs.resize(sz, false);
+      auto sz = nodes.size();
+      sels.resize(sz, false);
+      drgOfsts.resize(sz, {0,0} );
+      drgs.resize(sz, false);
 
-    nd_ordr.resize(sz);
-    TO((int)sz,i) nd_ordr[i]=i;
+      nd_ordr.resize(sz);
+      TO((int)sz,i) nd_ordr[i]=i;
 
-    //cncts.push_back( {0,1} );
-    //cncts.push_back( {1,2} );
+      //cncts.push_back( {0,1} );
+      //cncts.push_back( {1,2} );
 
-    //cnct_in.insert( cnct_in.end(), ALL(cncts) );
+      //cnct_in.insert( cnct_in.end(), ALL(cncts) );
     
-    TO(cncts.size(),i){
-      cnctTbl.insert( { (int)i, cncts[i] } );
-    //  lower_bound( ALL(cnct_in), cncts[i], cnct::lessDest);
-    //  lower_bound( ALL(cnct_in), cncts[i], cnct::lessDest);
+      TO(cncts.size(),i){
+        //cnctTbl.insert( { (int)i, cncts[i] } );
+      //  lower_bound( ALL(cnct_in), cncts[i], cnct::lessDest);
+      //  lower_bound( ALL(cnct_in), cncts[i], cnct::lessDest);
+      }
     }
-  }
+    SECTION(init glfw)
+    {
+      //glfwSetErrorCallback(errorCallback);
+      if( !glfwInit() ){
+        fprintf(stdout, "[GFLW] failed to init!\n");
+        exit(1);
+      }
 
-  SECTION(init glfw)
-  {
-    //glfwSetErrorCallback(errorCallback);
-    if( !glfwInit() ){
-      fprintf(stdout, "[GFLW] failed to init!\n");
-      exit(1);
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+      glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+      glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
+      glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
+      glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
+      //glfwWindowHint(GLFW_DOUBLEBUFFER, GL_FALSE);
+      glfwWindowHint(GLFW_SAMPLES, 16);
+
+      //GLFWwindow* win = glfwCreateWindow(vd->ui.w, vd->ui.h, "Demo", NULL, NULL);    assert(win!=nullptr);
+      win = glfwCreateWindow(1024, 1024, "Demo", NULL, NULL);    //assert(win!=nullptr);
+      glfwMakeContextCurrent(win);
+      glfwSetWindowPos(win, 384, 1800);
+
+      //glfwGetWindowSize(win, &vd->ui.w, &vd->ui.h);
+      glfwSetKeyCallback(win, keyCallback);
+      //glfwSetScrollCallback(win, scrollCallback);
+      //glfwSetCursorPosCallback(win, cursorPosCallback);
+      glfwSetMouseButtonCallback(win, mouseBtnCallback);
+
+      #ifdef _WIN32
+        //GLFWimage images[2];
+        //images[0] = LoadIcon("lava.jpg");
+        //images[1] = LoadIcon("lava.jpg");
+        //glfwSetWindowIcon(win, 2, images);
+      #endif
+
+      glfwSwapInterval(1);
     }
-
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-    glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
-    glfwWindowHint(GLFW_SAMPLES, 32);
-
-    //GLFWwindow* win = glfwCreateWindow(vd->ui.w, vd->ui.h, "Demo", NULL, NULL);    assert(win!=nullptr);
-    win = glfwCreateWindow(1024, 1024, "Demo", NULL, NULL);    //assert(win!=nullptr);
-    glfwMakeContextCurrent(win);
-    glfwSetWindowPos(win, 384, 1800);
-
-    //glfwGetWindowSize(win, &vd->ui.w, &vd->ui.h);
-    //glfwSetKeyCallback(win, keyCallback);
-    //glfwSetScrollCallback(win, scrollCallback);
-    //glfwSetCursorPosCallback(win, cursorPosCallback);
-    //glfwSetMouseButtonCallback(win, mouseBtnCallback);
-
-    #ifdef _WIN32
-      //GLFWimage images[2];
-      //images[0] = LoadIcon("lava.jpg");
-      //images[1] = LoadIcon("lava.jpg");
-      //glfwSetWindowIcon(win, 2, images);
-    #endif
-
-    glfwSwapInterval(0);
-  }
-  SECTION(init glew)
-  {
-    //glewExperimental = 1;
-    if(glewInit() != GLEW_OK) {
-      fprintf(stderr, "Failed to setup GLEW\n");
-      exit(1);
+    SECTION(init glew)
+    {
+      //glewExperimental = 1;
+      if(glewInit() != GLEW_OK) {
+        fprintf(stderr, "Failed to setup GLEW\n");
+        exit(1);
+      }
     }
-  }
-
-	NVGcontext*    vg = NULL;
-  SECTION(init nanovg and font)
-  {
-    vg = nvgCreateGL3(NVG_ANTIALIAS | NVG_STENCIL_STROKES | NVG_DEBUG);
-	  if(vg == NULL) {
-      printf("Could not init nanovg.\n");
-		  return -1;
-	  }
-    int font = nvgCreateFont(vg, "sans-bold", "Roboto-Bold.ttf");
-    if(font == -1) {
-		  printf("Could not add font bold.\n");
-		  return -1;
-	  }
+    SECTION(init nanovg and font)
+    {
+      vg = nvgCreateGL3(NVG_ANTIALIAS | NVG_STENCIL_STROKES | NVG_DEBUG);
+	    if(vg == NULL) {
+        printf("Could not init nanovg.\n");
+		    return -1;
+	    }
+      int font = nvgCreateFont(vg, "sans-bold", "Roboto-Bold.ttf");
+      if(font == -1) {
+		    printf("Could not add font bold.\n");
+		    return -1;
+	    }
+    }
   }
 
   glfwSetTime(0);
   SECTION(main loop)
   {
     v2 pntr = {0,0};
-    double cx, cy, t, dt, prevt=0, cpuTime=0;
+    double cx, cy, t, dt, avgFps=60, prevt=0, cpuTime=0;
     float pxRatio;
 		int ww, wh, fbWidth, fbHeight;
 
     while(!glfwWindowShouldClose(win))
     {
-      int sz = (int)nd_ordr.size();
+      bool lftClk = (lftDn && !prevLftDn);
+      bool  rtClk = (rtDn  && !prevRtDn);
+      bool    clk = lftClk || rtClk;
+      int      sz = (int)nd_ordr.size();
 
       SECTION(time)
       {
@@ -515,7 +549,6 @@ ENTRY_DECLARATION
 
 		    glfwGetWindowSize(win, &ww, &wh);
 		    glfwGetFramebufferSize(win, &fbWidth, &fbHeight);
-		    glfwSetMouseButtonCallback(win, mouseBtnCallback);
 
         // Calculate pixel ration for hi-dpi devices.
         pxRatio = (float)fbWidth / (float)ww;
@@ -548,6 +581,10 @@ ENTRY_DECLARATION
             //sels[ndOrdr] = inNode;
           }
         }
+        
+        if(!lftDn){
+          priSel = -1;
+        }
       }
       SECTION(nodes)
       {
@@ -558,33 +595,45 @@ ENTRY_DECLARATION
           node&     n = nodes[ndOrdr];
           bool inNode = isIn(pntr.x,pntr.y, nbnds[ndOrdr]);
           inAny      |= inNode;
-
-          //if(inNode && !lftDn){
-          if(!lftDn){
-            drgOfsts[i] = {0,0};
-            drg         = -1;
-          }
-
-          if( (drg<0) && inNode && lftDn && !prevLftDn){
-            MoveToBack( &nd_ordr, i);
-            drg     = (int)(sz-1);                               // make the dragged node the last node and the drag index the last index 
-            //drgofst = pntr - nbnds[i].mn;
-          } 
                      
-          //if(drg==i){ n.P = pntr - drgofst; }
+          SECTION(secondary selection (for connections) )
+          {
+            if(inNode && rtDn && !prevRtDn)
+            {
+              if(secSel<0) secSel=ndOrdr;
+              else{ // create a connection between secSel and i
+                if( insUnq(&cnct_src,  ndOrdr, secSel) &&
+                    insUnq(&cnct_dest, secSel, ndOrdr) ){
+                  cncts.push_back( {ndOrdr, secSel} );
+                }
 
-          if(inNode && rtDn && !prevRtDn){
-            if(secSel<0) secSel=ndOrdr;
-            else{ // create a connection between secSel and i
-              cncts.push_back( {ndOrdr, secSel} );
-              secSel = -1;
+                secSel = -1;
+              }
+              break;
             }
           }
+          SECTION(primary selection and group selection effects)
+          {
+            if(inNode && clk && (priSel<0||priSel!=ndOrdr) )
+            {
+              MoveToBack( &nd_ordr, i);
+              priSel     = ndOrdr;
+              drgP       = pntr;
+
+              if(!sels[ndOrdr]){
+                TO(sels.size(),i) sels[i]=false;
+                sels[ndOrdr] = true;
+              }
+              break;                                                  // without breaking from the loop, a node could be moved down and hit again
+            }
+          } 
         }
+
+        //auto cs = (float)cncts.size();
+        //debug_coords(cs);
         
         if(!inAny){
-          if(lftDn && drg<0){ drgbox = true; }
-
+          if(lftDn && priSel<0){ drgbox = true; }
           if(rtDn && !prevRtDn){ secSel = -1; }
         }
       }
@@ -607,7 +656,7 @@ ENTRY_DECLARATION
              f32 halfy = lerp(.5f, dest.y, src.y); 
              nvgBezierTo(vg, halfx,src.y, halfx,dest.y, dest.x,dest.y);
              nvgStrokeWidth(vg, 3.f);
-            nvgStrokeColor(vg, nvgRGBAf(0.35, .5f, .45f, 1.f));
+            nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
    	        nvgStroke(vg);
           }
         }
@@ -620,19 +669,19 @@ ENTRY_DECLARATION
             node&    n = nodes[ndOrdr];
 
             auto clr = NODE_CLR;
-            if(sels[ndOrdr]){
-              if(drg>-1) n.P +=  pntr - prevPntr;
+            if(ndOrdr==priSel || sels[ndOrdr]){
+              if(priSel>-1) n.P +=  pntr - prevPntr;
               clr = nvgRGBf(.5f,.4f,.1f);
             }
 
-            float round = secSel==i? 0 : 1.f;
+            float round = secSel==ndOrdr? 0 : 1.f;
             nbnds[ndOrdr] = drw_node(vg, 0, n.txt, n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, clr, round);              
 
             SECTION(border test)
             {
-              if(lftDn){ 
-                printf("wat");
-              }
+              //if(lftDn){ 
+              //  printf("wat");
+              //}
 
               v2 ncntr = n.P + NODE_SZ/2.f;
               v2 hlfsz = NODE_SZ / 2.f;
@@ -651,21 +700,6 @@ ENTRY_DECLARATION
               bool     hit = !hasInf(intrsct);
               if(hit) pdir = intrsct - ncntr;
               else continue;
-
-              //v2  dirCirc = abs(pdir) / r;
-              //v2       st = (ncntr - circCntr) / r;
-              //f32     mlt = abs(st.x) / abs(pdir.x);                                // mlt = multiplier - the multiplier to get st.x to 0
-              //f32       C = (st + pdir*mlt).y;
-              //if(C > r) continue;
-              //f32       m = pdir.y / pdir.x;
-              //f32       a = SQR(m) + 1;
-              //f32       b = 2.f * m * C;
-              //f32       c = SQR(C) - 1.f;
-              //f32      q2 = SQR(b) - 4.f*a*c;
-              //if(q2 < 0) continue;
-              //f32       x = (-b + sqrt(q2)) / 2.f*a;
-              //f32       y =  sign(pdir.y) * sin(acos(x));
-              //v2  intrsct = v2(x,y)*r + circCntr;
 
               v2 dirEnd = ncntr + pdir*1.f;
               nvgBeginPath(vg);
@@ -687,31 +721,12 @@ ENTRY_DECLARATION
               nvgBeginPath(vg);
                nvgCircle(vg, brdr.x,brdr.y, 8.f);
               nvgFill(vg);
-
-
-              //nvgBeginPath(vg);
-              // nvgMoveTo(vg, intrsct.x, 0);
-              // nvgLineTo(vg, intrsct.x, 1024.f);
-              //nvgStrokeWidth(vg, 1.f);
-              //nvgStroke(vg);
-
-              //v2 scrnMid = v2(ww,wh)/2.f;
-              //v2 stmid = st + scrnMid;
-              //v2 dirmid = (v2(x,y) + scrnMid) * r; 
-              //nvgBeginPath(vg);
-              // nvgMoveTo(vg, stmid.x, stmid.y);
-              // nvgLineTo(vg, dirmid.x, dirmid.y);
-              //nvgStrokeWidth(vg, 2.f);
-              //nvgStroke(vg);
-
-              if(i==0) debug_coords(intrsct);
             }
-
           }
         }
         SECTION(selection box)
         {
-          if(lftDn && drg<0)
+          if(lftDn && priSel<0)
           {
             nvgBeginPath(vg);
               float x,y,w,h;
@@ -725,8 +740,34 @@ ENTRY_DECLARATION
    	        nvgStroke(vg);
           }
         }
+        SECTION(fps - frames per second counter)
+        {
+          //f32 fps = (float)(t-prevt);
+          //f32 fps = (float)( 1/dt );
+          avgFps *= 0.9;
+          avgFps += (1.0/dt)*0.1;
+          //double fps = 1.0/dt;
+          int fps = (int)avgFps;
+
+          char fpsStr[TITLE_MAX_LEN];
+          sprintf(fpsStr, "%d", fps);
+          //glfwSetWindowTitle(win, fpsStr);
+           
+          f32 tb = nvgTextBounds(vg, -100,0, fpsStr, NULL, NULL);
+          nvgFontSize(vg, 20.0f);
+	        nvgFontFace(vg, "sans-bold");
+	        nvgTextAlign(vg,  NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
+	        nvgFillColor(vg, nvgRGBA(255,255,255,255));
+	        nvgText(vg, tb, 20.f, fpsStr, NULL);
+	        //nvgFillColor(vg, nvgRGBA(255,255,255,255));
+	        //nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f,text.c_str(), NULL);
+        }
       }
       nvgEndFrame(vg);
+
+      //SECTION(move primary selection to top)
+      //{
+      //}
 
       prevRtDn  =  rtDn;
       prevLftDn = lftDn;
@@ -743,6 +784,78 @@ ENTRY_DECLARATION
 
 
 
+
+//picojson::value  j;
+//picojson::value::object n;
+//n["txt"].set( nodes[0].txt );
+//picojson::value::serialize(n);
+////j.set<picojson::object>(move(n));
+//j.set(n);
+
+//
+//#include "../nanovg-master/example/demo.h"
+
+//int                    drg = -1;
+//cnct_tbl           cnctTbl;
+//bnd                 drgbnd;   // this is calculated data, not fundamental data
+//float                prevX;
+//float                prevY;
+
+// (int)(sz-1);                               // make the dragged node the last node and the drag index the last index 
+//drgofst = pntr - nbnds[i].mn;
+
+//v2  dirCirc = abs(pdir) / r;
+//v2       st = (ncntr - circCntr) / r;
+//f32     mlt = abs(st.x) / abs(pdir.x);                                // mlt = multiplier - the multiplier to get st.x to 0
+//f32       C = (st + pdir*mlt).y;
+//if(C > r) continue;
+//f32       m = pdir.y / pdir.x;
+//f32       a = SQR(m) + 1;
+//f32       b = 2.f * m * C;
+//f32       c = SQR(C) - 1.f;
+//f32      q2 = SQR(b) - 4.f*a*c;
+//if(q2 < 0) continue;
+//f32       x = (-b + sqrt(q2)) / 2.f*a;
+//f32       y =  sign(pdir.y) * sin(acos(x));
+//v2  intrsct = v2(x,y)*r + circCntr;
+
+//nvgBeginPath(vg);
+// nvgMoveTo(vg, intrsct.x, 0);
+// nvgLineTo(vg, intrsct.x, 1024.f);
+//nvgStrokeWidth(vg, 1.f);
+//nvgStroke(vg);
+
+//v2 scrnMid = v2(ww,wh)/2.f;
+//v2 stmid = st + scrnMid;
+//v2 dirmid = (v2(x,y) + scrnMid) * r; 
+//nvgBeginPath(vg);
+// nvgMoveTo(vg, stmid.x, stmid.y);
+// nvgLineTo(vg, dirmid.x, dirmid.y);
+//nvgStrokeWidth(vg, 2.f);
+//nvgStroke(vg);
+
+//
+//if(i==0) debug_coords(intrsct);
+
+//using cnct_tbl     =    std::unordered_multimap<int, cnct>;
+//using cnct_tbl     =    std::unordered_multimap<int, int>;
+
+//if(inNode && !lftDn){
+//drgOfsts[i] = {0,0};
+//
+//if(drg==i){ n.P = pntr - drgofst; }
+    //int last = (int)cncts.size()-1;
+//cnctTbl.insert( {ndOrdr, cncts.back()} );
+//cnctTbl.insert( {ndOrdr, cncts.back()} );
+//auto rnge = cnct_src.equal_range(ndOrdr);
+//if(rnge.first!=rnge.second){
+//  auto bkt = find(rnge.first, rnge.second, secSel);
+//  if(bkt!=rnge.second) 
+//    cnct_src.insert( {ndOrdr, secSel} ); 
+//}
+//find(rnge, secSel);
+//              
+//cnct_dest.insert( {secSel, ndOrdr} );
 
 //v2  ofst = (sels[i] && drg>-1)?  (pntr-drgP) : Vec2(0,0);
 //

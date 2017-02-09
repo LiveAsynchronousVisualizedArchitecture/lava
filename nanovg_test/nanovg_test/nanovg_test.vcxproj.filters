@@ -35,6 +35,9 @@
     <ClCompile Include="..\nanovg-master\src\nanovg.c">
       <Filter>Source Files\nanovg</Filter>
     </ClCompile>
+    <ClCompile Include="Jzon.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\nanovg-master\src\fontstash.h">
@@ -66,6 +69,9 @@
     </ClInclude>
     <ClInclude Include="vec.hpp">
       <Filter>hpp</Filter>
+    </ClInclude>
+    <ClInclude Include="picojson.h">
+      <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

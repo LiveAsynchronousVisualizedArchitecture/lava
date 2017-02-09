@@ -82,9 +82,11 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
-      <SDLCheck>false</SDLCheck>
+      <SDLCheck>
+      </SDLCheck>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -135,6 +137,7 @@
     <ClCompile Include="glfw.c">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
     </ClCompile>
+    <ClCompile Include="Jzon.cpp" />
     <ClCompile Include="nanovg_test.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -147,6 +150,7 @@
     <ClInclude Include="..\nanovg-master\src\stb_truetype.h" />
     <ClInclude Include="glew_2.0.0.h" />
     <ClInclude Include="glfw_3.2.1.h" />
+    <ClInclude Include="picojson.h" />
     <ClInclude Include="vec.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
