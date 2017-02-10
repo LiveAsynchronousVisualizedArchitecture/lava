@@ -42,9 +42,14 @@
 // -todo: change node drawing function to str
 // -todo: make fps counter
 // -todo: make left click on non-selected clear selection
+// -todo: make nodes and connections save to json string
+// -todo: make nodes load from json string
+// -todo: save json to file
+// -todo: load json to file
 
-// todo: make nodes and connections save to json file
-// todo: make nodes load from json file
+// todo: load .dll and name node 
+// todo: make a menu bar
+// todo: add file to menu bar
 // todo: make one node snap to another node
 // todo: make two snapped nodes group together and be dragged together
 // todo: make snapped/grouped nodes separate with right mouse button
@@ -368,7 +373,7 @@ void          strToGraph(str const& s)
   }
 }
 
-str _s;
+str _s; // very temp variable 
 
 void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
 {
@@ -378,12 +383,23 @@ void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int
 
   switch(key){
   case 'J':
+  {
     _s = graphToStr();
     glfwSetWindowTitle(win, _s.c_str() );
-  break;
+    FILE* f = fopen("nanovg_test.lava", "w");
+    fwrite(_s.c_str(), 1, _s.size(), f);
+    fclose(f);
+  }break;
   case 'K':
+  {
+    FILE* f = fopen("nanovg_test.lava", "r");
+    fseek(f, 0, SEEK_END);
+    _s.resize( ftell(f) );
+    fseek(f, 0, SEEK_SET);
+    fread( (void*)_s.data(), 1, _s.size(), f);
+    fclose(f);
     strToGraph(_s);
-  break;
+  }break;
   default:
     ;
   }
@@ -403,9 +419,7 @@ void    mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 
 bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
                             int preicon, 
-                       //const char* text, 
                         str const& text,
-                           //v2 P, v2 sz, 
                        float x, float y, 
                        float w, float h, 
                            NVGcolor col,
@@ -501,6 +515,9 @@ void        debug_coords(v2 a)
   sprintf(winTitle, "%.2f  %.2f", a.x, a.y);
   glfwSetWindowTitle(win, winTitle);
 }
+
+//const char* text, 
+//v2 P, v2 sz, 
 
 } // end namespace
 
