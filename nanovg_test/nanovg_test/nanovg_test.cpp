@@ -291,16 +291,86 @@ bool              insUnq(cnct_tbl* cnct, int a, int b)   // insUnq is insert uni
   //} 
 }
 
-void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
+str           graphToStr()
 {
   using namespace std;
   
-  Jzon::Node n = Jzon::object();
-  n.add("txt", nodes[0].txt);
+  Jzon::Node nds = Jzon::object();
+  SECTION(nodes)
+  {
+    auto sz = nodes.size();
+
+    Jzon::Node nd_txt = Jzon::array();
+    TO(sz,i) nd_txt.add(nodes[i].txt);
+
+    Jzon::Node   nd_x = Jzon::array();
+    TO(sz,i) nd_x.add(nodes[i].P.x);
+
+    Jzon::Node   nd_y = Jzon::array();
+    TO(sz,i) nd_y.add(nodes[i].P.y);
+
+    nds.add("x",     nd_x);
+    nds.add("y",     nd_y);
+    nds.add("txt", nd_txt);
+  }
+  Jzon::Node jcncts = Jzon::object();
+  SECTION(connections)
+  {
+    auto sz = cncts.size();
+    Jzon::Node src  = Jzon::array();
+    Jzon::Node dest = Jzon::array();
+
+    TO(sz,i) src.add(cncts[i].src);
+    TO(sz,i) dest.add(cncts[i].dest);
+
+    jcncts.add("src",   src);
+    jcncts.add("dest", dest);
+  }
+  
+  Jzon::Node graph = Jzon::object();
+  graph.add("nodes", nds);
+  graph.add("connections", jcncts);
+
   Jzon::Writer w;
   str s;
-  w.writeString(n, s);
-  glfwSetWindowTitle(win, s.c_str() );
+  w.writeString(graph, s);
+
+  return s;
+}
+void          strToGraph(str const& s)
+{
+  Jzon::Parser prs;
+  auto graph = prs.parseString(s);
+
+  auto nd_x = graph.get("nodes").get("x");
+  
+  //int i=0;
+  //while(true) 
+  
+  auto cnt = nd_x.getCount();
+  nodes.resize(cnt);
+  TO(cnt,i) nodes[i].P.x = nd_x.get(i).toFloat();
+}
+
+str _s;
+
+void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
+{
+  char sngl[2] = {'\0', '\0'};
+  sngl[0] = key;
+  glfwSetWindowTitle(win, sngl);
+
+  switch(key){
+  case 'J':
+    _s = graphToStr();
+    glfwSetWindowTitle(win, _s.c_str() );
+  break;
+  case 'K':
+    strToGraph(_s);
+  break;
+  default:
+    ;
+  }
 }
 void    mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 {
@@ -318,7 +388,7 @@ void    mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
                             int preicon, 
                        //const char* text, 
-                       str const& text,
+                        str const& text,
                            //v2 P, v2 sz, 
                        float x, float y, 
                        float w, float h, 
@@ -427,7 +497,7 @@ ENTRY_DECLARATION
   {
     SECTION(test data init)
     {
-      //nodes.push_back( { {100.f,100.f},"one"   } );
+      nodes.push_back( { {100.f,100.f},"one"   } );
       nodes.push_back( { {200.f,200.f},"two"   } );
       nodes.push_back( { {300.f,300.f},"three" } );
 
