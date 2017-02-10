@@ -46,8 +46,10 @@
 // -todo: make nodes load from json string
 // -todo: save json to file
 // -todo: load json to file
+// -todo: load .dll and name node 
+// -todo: figure out why new nodes don't load from json - nd_ordr was not being set
 
-// todo: load .dll and name node 
+// todo: save node order in json
 // todo: make a menu bar
 // todo: add file to menu bar
 // todo: make one node snap to another node
@@ -65,7 +67,7 @@
 // todo: make bezier point at normal of node border
 // todo: make selection a vector for multi-selection - if the vector capacity is 3x the size, use reserve to shrink it down to 1.5x the size?
 
-
+// glew? includes windows.h
 #define  WIN32_LEAN_AND_MEAN
 #define  NOMINMAX
 #include "glew_2.0.0.h"
@@ -98,6 +100,7 @@
 #include "jzon.h"
 #include "no_rt_util.h"
 #include "vec.hpp"
+#include "../Transform.h"
 
 const int   TITLE_MAX_LEN = 256;
 const v2    NODE_SZ       = { 256.f, 64.f };
@@ -166,19 +169,19 @@ float                  ndy = 512.f;
 vec_nd               nodes;
 vec_nbnd             nbnds;
 vec<bool>             sels;             // bitfield for selected nodes
-vec<bool>             drgs;
-vec<v2>           drgOfsts;
+veci               nd_ordr;
+vec_con              cncts;             // cncts is connections - the vector of connection structures
+cnct_tbl          cnct_src;
 int                 priSel = -1;
 int                 secSel = -1;
 bool                 drgNd = false;
 v2                    drgP;
 v2                 drgofst;
-veci               nd_ordr;
 bool                drgbox = false;
-vec_con              cncts;             // cncts is connections - the vector of connection structures
-cnct_tbl          cnct_src;
 cnct_tbl         cnct_dest;
 
+//vec<bool>             drgs;
+//vec<v2>           drgOfsts;
 
 namespace{
 
@@ -295,7 +298,14 @@ bool              insUnq(cnct_tbl* cnct, int a, int b)   // insUnq is insert uni
   //  return true;
   //} 
 }
-
+void            node_add(str txt)
+{
+  v2 P = v2(512,512);
+  nodes.push_back( {P,txt} );
+  sels.push_back(false);
+  nbnds.emplace_back();
+  nd_ordr.push_back(nodes.size()-1);
+}
 str           graphToStr()
 {
   using namespace std;
@@ -357,7 +367,7 @@ void          strToGraph(str const& s)
   auto dest   = graph.get("connections").get("dest");
     
   auto cnt = nd_x.getCount();
-  nodes.resize(cnt);
+  nodes.resize(cnt);  
   TO(cnt,i) nodes[i].P.x = nd_x.get(i).toFloat();
   TO(cnt,i) nodes[i].P.y = nd_y.get(i).toFloat();
   TO(cnt,i) nodes[i].txt = nd_txt.get(i).toString();
@@ -371,16 +381,25 @@ void          strToGraph(str const& s)
     cnct_src.insert( {c.src, c.dest} );
     cnct_dest.insert( {c.dest, c.src} );
   }
+
+  sels.resize(cnt);
+  nbnds.resize(cnt);
+  nd_ordr.resize(cnt);
+  TO(cnt,i) nd_ordr[i] = i;
+
 }
 
 str _s; // very temp variable 
 
 void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
 {
-  char sngl[2] = {'\0', '\0'};
+  if(action==GLFW_RELEASE) return;
+
+  char sngl[256]; // = {'\0', '\0'};
+  memset(sngl, 0, 256);
   sngl[0] = key;
   glfwSetWindowTitle(win, sngl);
-
+  
   switch(key){
   case 'J':
   {
@@ -399,6 +418,22 @@ void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int
     fread( (void*)_s.data(), 1, _s.size(), f);
     fclose(f);
     strToGraph(_s);
+  }break;
+  case 'L':
+  {
+    #ifdef _WIN32
+      HMODULE lib = LoadLibrary(TEXT("TfmTestLib.dll"));
+      if(lib){
+        auto getTfms = (GetTransforms_t)GetProcAddress(lib, TEXT("GetTransforms") );
+        Transform* tfms = getTfms();
+        sprintf(sngl, "%s    %s    %s", tfms[0].in_type, tfms[0].out_type, tfms[0].name );
+        //sprintf(sngl, "0x%016x", (ui64)tfms);
+        while(tfms && tfms->in_type)
+          node_add( (tfms++)->name );
+      }else{ sprintf(sngl, "zero", lib); }
+
+      glfwSetWindowTitle(win, sngl);
+    #endif
   }break;
   default:
     ;
@@ -530,9 +565,9 @@ ENTRY_DECLARATION
   {
     SECTION(test data init)
     {
-      nodes.push_back( { {100.f,100.f},"one"   } );
-      nodes.push_back( { {200.f,200.f},"two"   } );
-      nodes.push_back( { {300.f,300.f},"three" } );
+      //nodes.push_back( { {100.f,100.f},"one"   } );
+      //nodes.push_back( { {200.f,200.f},"two"   } );
+      //nodes.push_back( { {300.f,300.f},"three" } );
 
       for(auto& n : nodes){
         nbnds.push_back( {n.P.x, n.P.y, n.P.x+NODE_SZ.x, n.P.y+NODE_SZ.y} );
@@ -540,8 +575,8 @@ ENTRY_DECLARATION
 
       auto sz = nodes.size();
       sels.resize(sz, false);
-      drgOfsts.resize(sz, {0,0} );
-      drgs.resize(sz, false);
+      //drgOfsts.resize(sz, {0,0} );
+      //drgs.resize(sz, false);
 
       nd_ordr.resize(sz);
       TO((int)sz,i) nd_ordr[i]=i;

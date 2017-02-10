@@ -12,14 +12,17 @@
     <Filter Include="libh">
       <UniqueIdentifier>{c4768e6a-40b5-45b2-90a9-36cd6cdb8099}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\libs">
-      <UniqueIdentifier>{ebf7be5b-8478-4fc6-a440-80c180284a8a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\nanovg">
-      <UniqueIdentifier>{f5c0f4e2-e42f-4d4d-b7ec-ccb440b72fd5}</UniqueIdentifier>
-    </Filter>
     <Filter Include="hpp">
       <UniqueIdentifier>{596426ab-f120-4f4f-814d-e66299b805e1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\libh">
+      <UniqueIdentifier>{ebf7be5b-8478-4fc6-a440-80c180284a8a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\libs">
+      <UniqueIdentifier>{e2df391f-1db1-41d0-ab93-1c39becde07b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\libs\nanovg">
+      <UniqueIdentifier>{f5c0f4e2-e42f-4d4d-b7ec-ccb440b72fd5}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -27,16 +30,16 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="glew.c">
-      <Filter>Source Files\libs</Filter>
+      <Filter>Source Files\libh</Filter>
     </ClCompile>
     <ClCompile Include="glfw.c">
-      <Filter>Source Files\libs</Filter>
+      <Filter>Source Files\libh</Filter>
     </ClCompile>
     <ClCompile Include="..\nanovg-master\src\nanovg.c">
-      <Filter>Source Files\nanovg</Filter>
+      <Filter>Source Files\libs\nanovg</Filter>
     </ClCompile>
     <ClCompile Include="Jzon.cpp">
-      <Filter>Source Files</Filter>
+      <Filter>Source Files\libs</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
