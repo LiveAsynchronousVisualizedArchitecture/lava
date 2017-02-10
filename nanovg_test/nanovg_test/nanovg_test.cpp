@@ -304,7 +304,7 @@ void            node_add(str txt)
   nodes.push_back( {P,txt} );
   sels.push_back(false);
   nbnds.emplace_back();
-  nd_ordr.push_back(nodes.size()-1);
+  nd_ordr.push_back( (int)(nodes.size()-1) );
 }
 str           graphToStr()
 {
@@ -324,9 +324,13 @@ str           graphToStr()
     Jzon::Node   nd_y = Jzon::array();
     TO(sz,i) nd_y.add(nodes[i].P.y);
 
-    nds.add("x",     nd_x);
-    nds.add("y",     nd_y);
-    nds.add("txt", nd_txt);
+    Jzon::Node ordr = Jzon::array();
+    TO(sz,i) ordr.add(nd_ordr[i]);
+
+    nds.add("x",      nd_x);
+    nds.add("y",      nd_y);
+    nds.add("txt",  nd_txt);
+    nds.add("order",  ordr);
   }
   Jzon::Node jcncts = Jzon::object();
   SECTION(connections)
@@ -363,6 +367,7 @@ void          strToGraph(str const& s)
   auto nd_x   = graph.get("nodes").get("x");
   auto nd_y   = graph.get("nodes").get("y");
   auto nd_txt = graph.get("nodes").get("txt");
+  auto ordr   = graph.get("nodes").get("order");
   auto src    = graph.get("connections").get("src");
   auto dest   = graph.get("connections").get("dest");
     
@@ -385,8 +390,9 @@ void          strToGraph(str const& s)
   sels.resize(cnt);
   nbnds.resize(cnt);
   nd_ordr.resize(cnt);
-  TO(cnt,i) nd_ordr[i] = i;
+  TO(cnt,i) nd_ordr[i] = ordr.get(i).toInt();
 
+  //TO(cnt,i) nd_ordr[i] = (int)i;
 }
 
 str _s; // very temp variable 
