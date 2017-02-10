@@ -1,6 +1,9 @@
 # svn
 *.svn
 
+# json node graphs
+*.lava
+
 # Compiled Object files
 *.slo
 *.lo
