@@ -339,17 +339,33 @@ str           graphToStr()
 }
 void          strToGraph(str const& s)
 {
+  cnct_src.clear();
+  cnct_dest.clear();
+
   Jzon::Parser prs;
   auto graph = prs.parseString(s);
 
-  auto nd_x = graph.get("nodes").get("x");
-  
-  //int i=0;
-  //while(true) 
-  
+  auto nd_x   = graph.get("nodes").get("x");
+  auto nd_y   = graph.get("nodes").get("y");
+  auto nd_txt = graph.get("nodes").get("txt");
+  auto src    = graph.get("connections").get("src");
+  auto dest   = graph.get("connections").get("dest");
+    
   auto cnt = nd_x.getCount();
   nodes.resize(cnt);
   TO(cnt,i) nodes[i].P.x = nd_x.get(i).toFloat();
+  TO(cnt,i) nodes[i].P.y = nd_y.get(i).toFloat();
+  TO(cnt,i) nodes[i].txt = nd_txt.get(i).toString();
+
+  auto cnct_cnt = src.getCount();
+  cncts.resize(cnct_cnt);
+  TO(cnct_cnt,i) cncts[i].src  = src.get(i).toInt();
+  TO(cnct_cnt,i) cncts[i].dest = dest.get(i).toInt();
+
+  for(auto c : cncts){
+    cnct_src.insert( {c.src, c.dest} );
+    cnct_dest.insert( {c.dest, c.src} );
+  }
 }
 
 str _s;
