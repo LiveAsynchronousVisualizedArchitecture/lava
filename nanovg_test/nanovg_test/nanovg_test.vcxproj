@@ -145,6 +145,7 @@
     <ClCompile Include="nanovg_test.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\LavaNode.h" />
     <ClInclude Include="..\nanovg-master\example\demo.h" />
     <ClInclude Include="..\nanovg-master\src\fontstash.h" />
     <ClInclude Include="..\nanovg-master\src\nanovg.h" />
@@ -152,6 +153,7 @@
     <ClInclude Include="..\nanovg-master\src\nanovg_gl_utils.h" />
     <ClInclude Include="..\nanovg-master\src\stb_image.h" />
     <ClInclude Include="..\nanovg-master\src\stb_truetype.h" />
+    <ClInclude Include="..\Transform.h" />
     <ClInclude Include="glew_2.0.0.h" />
     <ClInclude Include="glfw_3.2.1.h" />
     <ClInclude Include="picojson.h" />

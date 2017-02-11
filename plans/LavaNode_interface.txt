@@ -1,0 +1,52 @@
+
+
+
+Questions:
+ - What data needs to be embedded in the .dll ?
+ - How to reference data? 64 bits that hold an index, a type, and if that type is a pack* of that type
+ - Need one bit to signal whether the index is an address in memory or an index into the database?
+ - Need to use a key string instead so that indices can be swapped out inside the data base?
+ - Index into database would be the index of a hash table slot instead of the index of the first block?
+
+Handling Inputs and Outputs:
+ - On the function level use an array of 64 bit integers
+   - How large? Intel xeon phi has 288 threads - 512 64 bit integers would be 4,096 bytes which would be one page
+   - Declared as const this should incur 8KB of storage, one for input and one for output?
+   - Is a limit neccesary? could the memory be a pointer that uses either stack storage or a thread local allocation if the stack storage is not enough? 
+ - number of inputs and outputs both given as arguments
+ - wrap the arguments pointers and lengths in a LavaArgs struct?
+
+
+Should data flow nodes have a separate function from the main that runs first?
+ - Gives the number of allocations along with each of their sizes
+ - Then one thread local allocation could be done
+ - Would be difficult for larger nodes to give the maximum amount of memory needed if they had the potential to re-use memory. - need to write why 
+
+
+Pack:
+ - A serialized table of individual serialized data
+ - Must be all the same type?
+ - Can be different sizes 
+ - Starting bytes of a pack is the total size in bytes, then a table of offsets - length can be derived from the offsets and data types would have size bytes at the front anyway? 
+ - Should packs / lists be used always?
+
+
+
+
+
+-------------------------------------------------------------------------------------------
+Simplicity does not precede complexity, but follows it.
+
+LISP programmers know the value of everything and the cost of nothing.
+
+One man's constant is another man's variable.
+
+Greenspun's tenth rule: Any sufficiently complicated C or Fortran program contains an ad hoc, informally-specified, bug-ridden, slow implementation of half of Common Lisp
+
+Fools ignore complexity. Pragmatists suffer it. Some can avoid it. Geniuses remove it.
+
+A programming language is low level when its programs require attention to the irrelevant.
+------------------------------------------------------------------------------------------
+
+
+

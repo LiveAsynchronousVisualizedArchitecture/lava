@@ -48,8 +48,9 @@
 // -todo: load json to file
 // -todo: load .dll and name node 
 // -todo: figure out why new nodes don't load from json - nd_ordr was not being set
+// -todo: save node order in json
 
-// todo: save node order in json
+// todo: design node format
 // todo: make a menu bar
 // todo: add file to menu bar
 // todo: make one node snap to another node
@@ -101,6 +102,7 @@
 #include "no_rt_util.h"
 #include "vec.hpp"
 #include "../Transform.h"
+#include "../LavaNode.h"
 
 const int   TITLE_MAX_LEN = 256;
 const v2    NODE_SZ       = { 256.f, 64.f };
@@ -179,9 +181,6 @@ v2                    drgP;
 v2                 drgofst;
 bool                drgbox = false;
 cnct_tbl         cnct_dest;
-
-//vec<bool>             drgs;
-//vec<v2>           drgOfsts;
 
 namespace{
 
@@ -440,6 +439,11 @@ void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int
 
       glfwSetWindowTitle(win, sngl);
     #endif
+  }break;
+  case 'Y':
+  {
+    sprintf(sngl, "sizeof LavaData %d", sizeof(LavaData) );
+    glfwSetWindowTitle(win, sngl);    
   }break;
   default:
     ;
@@ -915,6 +919,10 @@ ENTRY_DECLARATION
 
 
 
+
+
+//vec<bool>             drgs;
+//vec<v2>           drgOfsts;
 
 //#include "json.hpp"
 //#include "picojson.h"
