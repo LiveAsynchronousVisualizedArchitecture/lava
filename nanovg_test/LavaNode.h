@@ -8,7 +8,7 @@
 extern "C"
 {
 
-enum LavaTypes
+enum   LavaTypes
 {
   LAVA_EMPTY     =  0,
   LAVA_IDX_VRTS,
@@ -26,15 +26,12 @@ struct LavaArgs
   void* out;
   uint64_t in_len, out_len;
 };
-
-union LavaData
+union  LavaData
 {
   uint64_t  pack :  1;
   uint64_t  type : 17;                             // 131 thousand types - use a type map of strings to indices ?
   uint64_t   idx : 46;
 };
-
-
 struct LavaNode
 {
   const char*       in_type;

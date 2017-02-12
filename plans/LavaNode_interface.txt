@@ -15,6 +15,24 @@ Handling Inputs and Outputs:
    - Is a limit neccesary? could the memory be a pointer that uses either stack storage or a thread local allocation if the stack storage is not enough? 
  - number of inputs and outputs both given as arguments
  - wrap the arguments pointers and lengths in a LavaArgs struct?
+ - make custom functions to iterate over arguements and the packs they contain?
+ - should gather and scatter arguments be different somehow?
+ - should gather and scatter be something integrated into the pack format?
+ - gather and scatter are additional data and don't need to be individual node types?
+ - only data flow and message passing nodes are different types and the inputs and outputs are where the differentiation lies?
+ - this means that inputs need extra data for their 'flow type' or 'format' etc
+   - split and join need to be node types since they deal with what is taken from the queue?
+
+Data Flow Types:
+ - are they all data transformations?
+ - should scatter and gather be combined into one underlying technique? 
+ - would that mean a switch between parallel and serial? 
+ - scatter
+ - gather
+ - split
+ - join
+ - generator create data out of nowhere? even a file read should take data from a message passing node?
+ - 
 
 
 Should data flow nodes have a separate function from the main that runs first?
