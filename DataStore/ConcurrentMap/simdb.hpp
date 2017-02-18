@@ -743,7 +743,7 @@ public:
     for(i32 i=0; i<blocks-1; ++i)
     {
       nxt    = s_cl.nxt();
-      if(nxt==LIST_END){ free(st, ver); VerIdx empty={LIST_END,0}; return empty; }
+      if(nxt==LIST_END){ free(st, ver); VerIdx empty={(i32)LIST_END,0}; return empty; }
 
       if(i==0)  s_bls[cur] =  make_BlkLst(true,  0, nxt, ver, size, klen);
       else      s_bls[cur] =  make_BlkLst(false, 0, nxt, ver, 0, 0);
@@ -1033,9 +1033,6 @@ public:
   }
 
 private:
-  using i8        =  int8_t;
-  using ui32      =  uint32_t;
-  using ui64      =  uint64_t;
   using Aui32     =  std::atomic<ui32>;
   using Aui64     =  std::atomic<ui64>;  
   using VerIdxs   =  lava_vec<VerIdx>;
@@ -1380,7 +1377,11 @@ public:
         fcntl(sm.fileHndl, F_GETLK, &flock);
 
         flock(sm.fileHndl, LOCK_EX);   // exclusive lock  // LOCK_NB
-        fcntl(sm.fileHndl, F_PREALLOCATE); //  todo: try F_ALLOCATECONTIG at some point
+        #if defined(__APPLE__) || defined(__MACH__)
+          fcntl(sm.fileHndl, F_PREALLOCATE); //  todo: try F_ALLOCATECONTIG at some point
+        #elif defined(__linux__)
+          posix_fallocate(sm.fileHndl, 0, size);
+        #endif
         ftruncate(sm.fileHndl, size);   // todo: don't truncate if not the owner, and don't pre-allocate either ?
         flock(sm.fileHndl, LOCK_EX);
         // get the error number and handle the error
