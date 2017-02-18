@@ -36,6 +36,8 @@ Data Flow Types:
  - does each data pack need to have a version of some sort anyway?
  - if ordering is taken care of due to a version/id number then scatter needs a lane/tile number or should this be taken care of by the data structure?
    - lane/tile number could be neccesary so that normal nodes put after a scatter are all getting the same 'section'/'tile' of data
+ - if every parameter is a list of indices, would scatter be just a matter of how the parameter is treated? 
+   - does gather need to guarantee it see data on every lane? 
 
 
 Should data flow nodes have a separate function from the main that runs first?

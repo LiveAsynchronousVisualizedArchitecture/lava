@@ -1,11 +1,12 @@
 
 
-#include "../Transform.h"
+//#include "../Transform.h"
+#include "../LavaNode.h"
 
 extern "C"
 {
 
-void* TfmTest(void* in)
+LavaArg* TfmTest(LavaArg* in)
 {
   //auto  cs     =  (CS*)in;
   //auto& clrs   =  cs->colors();
@@ -43,21 +44,51 @@ void* TfmTest(void* in)
   return nullptr;
 }
 
+const char* SplitLinesIn[]  = {"string"};
+const char* SplitLinesOut[] = {"string"};
 
-Transform transforms[] =
+LavaNode nodes[] =
 {
-  {"InType", "OutType", "NodeName", 
-   TfmTest, 0, 0},                         // function, version, id
+  {TfmTest, "SplitLines",                    // function, name
+  1, SplitLinesIn, 1, SplitLinesOut,         // inputs, in_types, outputs, out_types 
+  0, 0},                                     // version, id
 
-  {"Second In", "Second Out", "Other Name", 
-   TfmTest, 0, 0},                         // function, version, id
-
-  {nullptr, nullptr, nullptr, nullptr, 0, 0}
+  {nullptr, nullptr, 0, nullptr, 0, nullptr, 0, 0}
 };
 
-__declspec(dllexport) Transform* GetTransforms()
+__declspec(dllexport) LavaNode* GetNodes()
 {
-  return (Transform*)transforms;
+  return (LavaNode*)nodes;
 }
+
+
+
+//struct LavaNode
+//{
+//  LavaFunc             func;
+//  const char*          name;
+//  uint8_t            inputs;
+//  const char**     in_types;
+//  uint8_t           outputs;
+//  const char**    out_types;
+//  uint64_t          version;
+//  uint64_t               id;
+//};
+
+//Transform transforms[] =
+//{
+//  {"InType", "OutType", "NodeName", 
+//   TfmTest, 0, 0},                         // function, version, id
+//
+//  {"Second In", "Second Out", "Other Name", 
+//   TfmTest, 0, 0},                         // function, version, id
+//
+//  {nullptr, nullptr, nullptr, nullptr, 0, 0}
+//};
+//
+//__declspec(dllexport) Transform* GetTransforms()
+//{
+//  return (Transform*)transforms;
+//}
 
 }

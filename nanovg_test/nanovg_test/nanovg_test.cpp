@@ -49,10 +49,21 @@
 // -todo: load .dll and name node 
 // -todo: figure out why new nodes don't load from json - nd_ordr was not being set
 // -todo: save node order in json
+// -todo: design node format
+// -todo: draw single input and output
+// -todo: make function to get position of middle of input or out
+// -todo: draw connections from an input to an output
+// -todo: fix lag of node and connections to pointers - fixed by changing node positions before drawing, which lets connections go to the correct position
 
-// todo: design node format
+// todo: make a node to read text from a file name 
+// todo: make a node to split text into lines and scatter the result
+// todo: add data to node for inputs
+// todo: add data to connection for input and output indices
+// todo: draw arrows (triangles) to show direction with connections
+// todo: make input and output circles roll towards their connection
 // todo: make a menu bar
 // todo: add file to menu bar
+// todo: add save to menu bar
 // todo: make one node snap to another node
 // todo: make two snapped nodes group together and be dragged together
 // todo: make snapped/grouped nodes separate with right mouse button
@@ -108,12 +119,14 @@ const int   TITLE_MAX_LEN = 256;
 const v2    NODE_SZ       = { 256.f, 64.f };
 const auto  NODE_CLR      = nvgRGBf(.1f,.4f,.5f);
 const float INFf          = std::numeric_limits<float>::infinity();
+const f32   IORAD         = 10.f;
+
 //const float INFf          = std::numeric_limits<float>:infinity();
 
 template<class T> using vec = std::vector<T>;
 using str = std::string;
 
-union bnd 
+union   bnd 
 {
   struct { float xmn, ymn, xmx, ymx; };  // todo: make into a union?
   struct { v2 mn; v2 mx; };
@@ -136,10 +149,10 @@ union bnd
   float w(){return abs(xmx-xmn);}
   float h(){return abs(ymx-ymn);}
 };
-
-struct   node { v2 P; str txt; };
-struct   cnct { 
-  int src; int dest;
+struct  node { v2 P; str txt; LavaNode ln; };
+struct  cnct { 
+  int src, dest;
+  ui8 src_out, dest_in;
   bool operator<(cnct const& r){ return src < r.src; }
 
   static bool lessDest(cnct const& l, cnct const& r){
@@ -429,12 +442,11 @@ void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int
     #ifdef _WIN32
       HMODULE lib = LoadLibrary(TEXT("TfmTestLib.dll"));
       if(lib){
-        auto getTfms = (GetTransforms_t)GetProcAddress(lib, TEXT("GetTransforms") );
-        Transform* tfms = getTfms();
-        sprintf(sngl, "%s    %s    %s", tfms[0].in_type, tfms[0].out_type, tfms[0].name );
-        //sprintf(sngl, "0x%016x", (ui64)tfms);
-        while(tfms && tfms->in_type)
-          node_add( (tfms++)->name );
+        auto   getNds = (GetLavaNodes_t)GetProcAddress(lib, TEXT("GetNodes") );
+        LavaNode* nds = getNds();
+        sprintf(sngl, "%s    %s    %s", nds[0].name, nds[0].in_types[0], nds[0].out_types[0] );
+        while(nds && nds->name)
+          node_add( (nds++)->name );
       }else{ sprintf(sngl, "zero", lib); }
 
       glfwSetWindowTitle(win, sngl);
@@ -462,21 +474,29 @@ void    mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
   }
 }
 
+v2               in_cntr(node const& n, f32 r)
+{
+  return v2(n.P.x + NODE_SZ.x/2, n.P.y-r);
+}
+v2              out_cntr(node const& n, f32 r)
+{
+  return v2(n.P.x + NODE_SZ.x/2, n.P.y + NODE_SZ.y + r);
+}
 bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
-                            int preicon, 
-                        str const& text,
-                       float x, float y, 
-                       float w, float h, 
+                            int preicon,
+                          node const& n, 
                            NVGcolor col,
-                        float       rnd)   // rnd is corner rounding
+                        float       rnd)     // rnd is corner rounding
 {
   const int   border = 2;
   const float   rthk = 8.f;    // rw is rail thickness
 
 	NVGpaint bg;
 	char icon[8];
-	float rad = lerp(rnd, 0.f, h/2.f);         // rad is corner radius
-	float  tw = 0, iw = 0;
+  float tw=0, iw=0, x=n.P.x, y=n.P.y, w=NODE_SZ.x, h=NODE_SZ.y;
+	float rad = lerp(rnd, 0.f, h/2.f);           // rad is corner radius
+  float cntrX=x+w/2, cntrY=y+h/2, rr=rad;        // rr is rail radius
+  float io_rad=10.f;
 
   SECTION(grey border)
   {
@@ -505,15 +525,14 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
   }
   SECTION(rounded rails)
   {
-    //float cntrX=x+border+rad, cntrY=y+border+h/2, rr=rad;        // rr is rail radius
-    float cntrX=x+rad, cntrY=y+h/2, rr=rad;        // rr is rail radius
+    float cntrX=x+border+rad, cntrY=y+border+h/2, rr=rad;        // rr is rail radius
     
     float bthk = rthk+2;
     nvgBeginPath(vg);
      nvgMoveTo(vg, x-bthk/2, cntrY);
      nvgArc(vg, cntrX, cntrY, rr, PIf*1.f, PIf*1.5f, NVG_CW);
      nvgStrokeWidth(vg, bthk);
-    nvgStrokeColor(vg, nvgRGBAf(0, 0, 0, .5f) );
+    nvgStrokeColor(vg, nvgRGBAf(0, 0, 0, 1.f) );
 	  nvgStroke(vg);
 
     nvgBeginPath(vg);
@@ -527,7 +546,7 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
   {
 	  nvgFontSize(vg, 30.0f);
 	  nvgFontFace(vg, "sans-bold");
-	  tw = nvgTextBounds(vg, 0,0, text.c_str(), NULL, NULL);
+	  tw = nvgTextBounds(vg, 0,0, n.txt.c_str(), NULL, NULL);
 	  if(preicon != 0){
 		  nvgFontSize(vg, h*1.3f);
 		  nvgFontFace(vg, "icons");
@@ -547,9 +566,27 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
 	  nvgFontFace(vg, "sans-bold");
 	  nvgTextAlign(vg, NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
 	  nvgFillColor(vg, nvgRGBA(0,0,0,160));
-	  nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f-1,text.c_str(), NULL);
+	  nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f-1, n.txt.c_str(), NULL);
 	  nvgFillColor(vg, nvgRGBA(255,255,255,255));
-	  nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f,text.c_str(), NULL);
+	  nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f,n.txt.c_str(), NULL);
+  }
+
+  SECTION(inputs and outputs)
+  {
+    v2 out = out_cntr(n, io_rad);
+    v2  in = in_cntr(n, io_rad);
+    nvgBeginPath(vg);
+     //nvgCircle(vg, cntrX, cntrY+h/2+io_rad, io_rad);
+     nvgCircle(vg, out.x, out.y, io_rad);
+    nvgFillColor(vg, nvgRGBAf(.18f, .5f, .18f, 1.f));
+    nvgFill(vg);
+
+    nvgBeginPath(vg);
+     //nvgCircle(vg, cntrX, y-io_rad, io_rad);
+     nvgCircle(vg, in.x, in.y, io_rad);
+    //nvgStrokeWidth(vg, 1.f);
+    nvgFillColor(vg, nvgRGBAf(.18f, .4f, .6f, 1.f));
+    nvgFill(vg);
   }
 
   return {x,y, x+w, y+h};
@@ -575,9 +612,9 @@ ENTRY_DECLARATION
   {
     SECTION(test data init)
     {
-      //nodes.push_back( { {100.f,100.f},"one"   } );
-      //nodes.push_back( { {200.f,200.f},"two"   } );
-      //nodes.push_back( { {300.f,300.f},"three" } );
+      nodes.push_back( { {100.f,100.f},"one"   } );
+      nodes.push_back( { {200.f,200.f},"two"   } );
+      nodes.push_back( { {300.f,300.f},"three" } );
 
       for(auto& n : nodes){
         nbnds.push_back( {n.P.x, n.P.y, n.P.x+NODE_SZ.x, n.P.y+NODE_SZ.y} );
@@ -621,7 +658,7 @@ ENTRY_DECLARATION
       //GLFWwindow* win = glfwCreateWindow(vd->ui.w, vd->ui.h, "Demo", NULL, NULL);    assert(win!=nullptr);
       win = glfwCreateWindow(1024, 1024, "Demo", NULL, NULL);    //assert(win!=nullptr);
       glfwMakeContextCurrent(win);
-      glfwSetWindowPos(win, 384, 1800);
+      //glfwSetWindowPos(win, 384, 1800);
 
       //glfwGetWindowSize(win, &vd->ui.w, &vd->ui.h);
       glfwSetKeyCallback(win, keyCallback);
@@ -732,7 +769,7 @@ ENTRY_DECLARATION
           priSel = -1;
         }
       }
-      SECTION(nodes)
+      SECTION(node selection)
       {
         bool inAny = false;
         FROM(sz,i)                                                // loop backwards so that the top nodes are dealt with first
@@ -774,9 +811,6 @@ ENTRY_DECLARATION
             }
           } 
         }
-
-        //auto cs = (float)cncts.size();
-        //debug_coords(cs);
         
         if(!inAny){
           if(lftDn && priSel<0){ drgbox = true; }
@@ -784,10 +818,25 @@ ENTRY_DECLARATION
         }
       }
 
+      SECTION(node movement)
+      {
+        int sz = (int)nd_ordr.size();
+        TO(sz,i)
+        {
+          int  ndOrdr = nd_ordr[i];
+          node&     n = nodes[ndOrdr];
+          bool selctd = ndOrdr==priSel || sels[ndOrdr];
+
+          if( priSel>-1 && selctd ){           // if a node is primary selected (left mouse down on a node) or the selected flag is set
+            n.P +=  pntr - prevPntr;
+          }
+        }
+      }
+
 		  nvgBeginFrame(vg, ww, wh, pxRatio);
       SECTION(nanovg drawing)
       {
-        SECTION(connections)
+        SECTION(draw connections)
         {
           TO(cncts.size(),i)
           {
@@ -795,33 +844,45 @@ ENTRY_DECLARATION
             auto& cn = cncts[i];
             v2   src = nodes[cn.src].P + hlfsz;
             v2  dest = nodes[cn.dest].P + hlfsz;
+            v2   out = out_cntr(nodes[cn.src], IORAD);
+            v2    in = in_cntr(nodes[cn.dest], IORAD);
 
             nvgBeginPath(vg);
-             nvgMoveTo(vg,   src.x,src.y);
-             f32 halfx = lerp(.5f, dest.x, src.x);
-             f32 halfy = lerp(.5f, dest.y, src.y); 
-             nvgBezierTo(vg, halfx,src.y, halfx,dest.y, dest.x,dest.y);
+             //nvgMoveTo(vg,   src.x,src.y);
+             //f32 halfx = lerp(.5f, dest.x, src.x);
+             //f32 halfy = lerp(.5f, dest.y, src.y); 
+             //nvgBezierTo(vg, halfx,src.y, halfx,dest.y, dest.x,dest.y);
+             nvgMoveTo(vg,   out.x,out.y);
+             f32 halfx = lerp(.5f, in.x, out.x);
+             f32 halfy = lerp(.5f, in.y, out.y); 
+             nvgBezierTo(vg, halfx,out.y, halfx,in.y, in.x,in.y);
              nvgStrokeWidth(vg, 3.f);
             nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
    	        nvgStroke(vg);
           }
         }
-        SECTION(nodes)
+        SECTION(draw nodes)
         {
           int sz = (int)nd_ordr.size();
           TO(sz,i)
           {
-            int ndOrdr = nd_ordr[i];
-            node&    n = nodes[ndOrdr];
+            int  ndOrdr = nd_ordr[i];
+            node&     n = nodes[ndOrdr];
+            bool selctd = ndOrdr==priSel || sels[ndOrdr];
+
+            //auto clr = NODE_CLR;
+            //if(ndOrdr==priSel || sels[ndOrdr]){
+            //  if(priSel>-1) n.P +=  pntr - prevPntr;
+            //  clr = nvgRGBf(.5f,.4f,.1f);
+            //}
 
             auto clr = NODE_CLR;
-            if(ndOrdr==priSel || sels[ndOrdr]){
-              if(priSel>-1) n.P +=  pntr - prevPntr;
+            if(selctd){
               clr = nvgRGBf(.5f,.4f,.1f);
             }
 
             float round = secSel==ndOrdr? 0 : 1.f;
-            nbnds[ndOrdr] = drw_node(vg, 0, n.txt, n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, clr, round);              
+            nbnds[ndOrdr] = drw_node(vg, 0, n, clr, round);              
 
             SECTION(border test)
             {
@@ -870,7 +931,7 @@ ENTRY_DECLARATION
             }
           }
         }
-        SECTION(selection box)
+        SECTION(draw selection box)
         {
           if(lftDn && priSel<0)
           {
@@ -886,7 +947,7 @@ ENTRY_DECLARATION
    	        nvgStroke(vg);
           }
         }
-        SECTION(fps - frames per second counter)
+        SECTION(draw fps - frames per second counter)
         {
           avgFps *= 0.9;
           avgFps += (1.0/dt)*0.1;
@@ -919,7 +980,24 @@ ENTRY_DECLARATION
 
 
 
+//
+//nbnds[ndOrdr] = drw_node(vg, 0, n.txt, n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, clr, round);              
 
+//auto cs = (float)cncts.size();
+//debug_coords(cs);
+
+//bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
+//                            int preicon, 
+//                        str const& text,
+//                       float x, float y, 
+//                       float w, float h, 
+//                           NVGcolor col,
+//                        float       rnd)   // rnd is corner rounding
+
+//auto getTfms = (GetTransforms_t)GetProcAddress(lib, TEXT("GetTransforms") );
+//Transform* tfms = getTfms();
+//sprintf(sngl, "%s    %s    %s", tfms[0].in_type, tfms[0].out_type, tfms[0].name );
+//sprintf(sngl, "0x%016x", (ui64)tfms);
 
 //vec<bool>             drgs;
 //vec<v2>           drgOfsts;
