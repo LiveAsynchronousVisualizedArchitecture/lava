@@ -33,3 +33,27 @@ dependencies:
 
  // - template only for working on top of raw memory vector 
 
+
+    tbl something;
+    something("wat");
+    something[85];
+    something("wat").asInt();
+    int wat = something("wat");
+
+    class wat
+    {
+      enum type { i32, ui64, u8, tbl, float, double };
+      short data;
+      operator int()
+      {
+        switch(type)
+        case u8:
+          return (int)data;
+        case tbl:
+          return ((tbl)data).size();
+      }
+    };
+
+ tbl ~ tbl 
+ tbl + tbl  - add all elemnts in the vectors together and returns a new table
+

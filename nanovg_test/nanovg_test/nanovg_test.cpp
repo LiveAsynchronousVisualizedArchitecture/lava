@@ -54,7 +54,11 @@
 // -todo: make function to get position of middle of input or out
 // -todo: draw connections from an input to an output
 // -todo: fix lag of node and connections to pointers - fixed by changing node positions before drawing, which lets connections go to the correct position
+// -todo: put back console 
+// -todo: test console
 
+// todo: print to console with ReadFile.cpp function
+// todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
 // todo: make a node to split text into lines and scatter the result
 // todo: add data to node for inputs
@@ -95,7 +99,7 @@
   #pragma comment(lib, "opengl32.lib")
   //#pragma comment(lib, "glew32.lib")
 
-  //#define USE_CONSOLE                                 // turning this off will use the windows subsystem in the linker and change the entry point to WinMain() so that no command line/console will appear
+  #define USE_CONSOLE                                 // turning this off will use the windows subsystem in the linker and change the entry point to WinMain() so that no command line/console will appear
   #ifndef USE_CONSOLE
     #pragma comment( linker, "/subsystem:windows" )
     #undef ENTRY_DECLARATION
@@ -110,8 +114,8 @@
 #include <unordered_set>
 #include <algorithm>
 #include "jzon.h"
-#include "no_rt_util.h"
 #include "vec.hpp"
+#include "../no_rt_util.h"
 #include "../Transform.h"
 #include "../LavaNode.h"
 
@@ -439,23 +443,38 @@ void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int
   }break;
   case 'L':
   {
+    //#ifdef _WIN32
+    //  HMODULE lib = LoadLibrary(TEXT("TfmTestLib.dll"));
+    //  if(lib){
+    //    auto   getNds = (GetLavaNodes_t)GetProcAddress(lib, TEXT("GetNodes") );
+    //    LavaNode* nds = getNds();
+    //    sprintf(sngl, "%s    %s    %s", nds[0].name, nds[0].in_types[0], nds[0].out_types[0] );
+    //    while(nds && nds->name)
+    //      node_add( (nds++)->name );
+    //  }else{ sprintf(sngl, "zero", lib); }
+    //
+    //  glfwSetWindowTitle(win, sngl);
+    //#endif
+
+
     #ifdef _WIN32
-      HMODULE lib = LoadLibrary(TEXT("TfmTestLib.dll"));
+      HMODULE lib = LoadLibrary(TEXT("ReadFile.dll"));
       if(lib){
         auto   getNds = (GetLavaNodes_t)GetProcAddress(lib, TEXT("GetNodes") );
         LavaNode* nds = getNds();
-        sprintf(sngl, "%s    %s    %s", nds[0].name, nds[0].in_types[0], nds[0].out_types[0] );
+        printf("%s    %s    %s", nds[0].name, nds[0].in_types[0], nds[0].out_types[0] );
         while(nds && nds->name)
           node_add( (nds++)->name );
-      }else{ sprintf(sngl, "zero", lib); }
+      }else{ printf("zero", lib); }
 
-      glfwSetWindowTitle(win, sngl);
+
     #endif
   }break;
   case 'Y':
   {
-    sprintf(sngl, "sizeof LavaData %d", sizeof(LavaData) );
-    glfwSetWindowTitle(win, sngl);    
+    //sprintf(sngl, "sizeof LavaData %d", sizeof(LavaData) );
+    //glfwSetWindowTitle(win, sngl);    
+    printf("sizeof LavaData %d \n", sizeof(LavaData) );
   }break;
   default:
     ;

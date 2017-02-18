@@ -6,7 +6,7 @@
 #ifndef __VEC_HEADER_GUARD__
 #define __VEC_HEADER_GUARD__
 
-#include "no_rt_util.h"
+#include "../no_rt_util.h"
 
 union  vec4
 {

@@ -6,3 +6,8 @@ Should data flow nodes have a separate function from the main that runs first?
  - Would be difficult for larger nodes to give the maximum amount of memory needed if they had the potential to re-use memory.
 
 
+Is scatter needed?
+ - The real synchronization should come from data
+ - Ordering can be done at any point by sorting on the version number
+ - any list should be able to be 'scattered' and processed by different threads because the data is separate
+
