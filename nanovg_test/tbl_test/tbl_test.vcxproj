@@ -119,6 +119,10 @@
   <ItemGroup>
     <ClCompile Include="tbl_test.cpp" />
   </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\no_rt_util.h" />
+    <ClInclude Include="tbl.hpp" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
