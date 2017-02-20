@@ -60,6 +60,16 @@ public:
   {
     return memberBytes() + sizeof(T)*count;
   }
+  static tbl     concat(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
+  {
+    auto sz = a.size();
+    tbl ret(sz + b.size());
+    
+    TO(sz,i) ret[i]    = a[i];
+    TO(b, i) ret[sz+i] = b[i];
+
+    return ret;
+  }
     
   union  hsh
   {
@@ -98,6 +108,10 @@ public:
   {
     return ((T*)m_mem)[i];
   }
+  auto  operator[](ui64 i) const -> T const&
+  {
+    return ((T*)m_mem)[i];
+  }
   var&  operator()(const char*)                             // todo: future hash map interface
   {
     Var nonsense;
@@ -105,7 +119,11 @@ public:
   }
   tbl   operator>>(tbl const& l)
   {
-    
+    return tbl::concat(*this, l);
+  }
+  tbl   operator<<(tbl const& l)
+  {
+    return tbl::concat(*this, l);
   }
 
   bool        push(T const& value)
@@ -177,35 +195,45 @@ public:
   }
   void*     expand()
   {
-    //if(m_mem==nullptr){                            // can just use realloc here
-    //  auto szBytes  =  tbl::sizeBytes(1);
-    //  i8*    memst  =  (i8*)malloc(szBytes);                 // memst is memory start
-    //  m_mem         =  memst + memberBytes();
-    //  //m_mem         = (i8*)malloc( szBytes );
-    //  set_sizeBytes( szBytes );
-    //  set_size(0);
-    //  //if(mem) m_mem = mem;
-    //  //new (this) tbl(1);
-    //  return m_mem;
-    //}
-
     ui64    sz = size();
     ui64 nxtSz = (sz/2)? sz+sz/2 : sz+1;
     return reserve(nxtSz);
-
-    //auto szBytes  =  sizeBytes();
-    //auto   extra  =    szBytes/2;
-    //extra         =  extra>sizeof(T)? extra : sizeof(T);
-    //auto    nxtSz =  szBytes + extra;
-    //void*     re  =  realloc(memStart(), nxtSz);
-    //if(re){
-    //  m_mem = ((i8*)re) + memberBytes();
-    //  set_sizeBytes(nxtSz);
-    //}
-    //
-    //return re;
   }
 };
 
 
 #endif
+
+
+
+//if(m_mem==nullptr){                            // can just use realloc here
+//  auto szBytes  =  tbl::sizeBytes(1);
+//  i8*    memst  =  (i8*)malloc(szBytes);                 // memst is memory start
+//  m_mem         =  memst + memberBytes();
+//  //m_mem         = (i8*)malloc( szBytes );
+//  set_sizeBytes( szBytes );
+//  set_size(0);
+//  //if(mem) m_mem = mem;
+//  //new (this) tbl(1);
+//  return m_mem;
+//}
+//
+//auto szBytes  =  sizeBytes();
+//auto   extra  =    szBytes/2;
+//extra         =  extra>sizeof(T)? extra : sizeof(T);
+//auto    nxtSz =  szBytes + extra;
+//void*     re  =  realloc(memStart(), nxtSz);
+//if(re){
+//  m_mem = ((i8*)re) + memberBytes();
+//  set_sizeBytes(nxtSz);
+//}
+//
+//return re;
+
+//auto sz = size();
+//tbl ret(sz + l.size());
+//
+//TO(sz,i) ret[i]    = (*this)[i];
+//TO(l, i) ret[sz+i] = l[i];
+//
+//return ret;
