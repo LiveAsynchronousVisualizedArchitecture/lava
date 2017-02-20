@@ -43,6 +43,10 @@ public:
     //return m_size;
     return *(((ui64*)m_mem)-1);
   }
+  T*   data() const
+  {
+    return (T*)m_mem;
+  }
 };
 
 int main()
@@ -59,6 +63,8 @@ int main()
   //for(ui64 i=0; i<t; ++i) t[i] = (int)i;
   TO(t,i) printf(" %d \n", t[i]);
 
+  //float*  pos = t("pos").data();
+  //float* norm = t("normals").data();
 
   int a; cin >> a;
   return 0;
