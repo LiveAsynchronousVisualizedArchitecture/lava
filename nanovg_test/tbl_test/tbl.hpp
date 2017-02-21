@@ -15,11 +15,15 @@
 // -todo: make template specialization strings to print out types - possible but opted for a switch jump table at run time since it should only be used during debugging and run time type strings will be needed for hsh.type anyway
 // -todo: make tbl_assert a function - can't make it a function because of expression printing and line numbers
 // -todo: make tbl assert have error message
+// -todo: make tbl_assert back into a macro
+// -todo: fill out the rest of the type nums
+// -todo: fill out the rest of the type strings
+// -todo: make as<>() template function
 
-// todo: make tbl_assert back into a macro
-// todo: fill out the rest of the types
-// todo: make destructor
-// todo: make bool implicit cast
+// todo: make and test destructor
+// todo: make bool implicit cast that evaluates pointer?
+// todo: make 1 bit always indicate signed, 1 bit always indicate table, 1 bit indicate integer, and 2 bits indicate the bit depth as 3,4,5, or 6 - same 5 bits as discreet 21 types if unsigned & not integer is used for empty!
+// todo: make switch statement to have flexible number casts (a ui8 can be cast without error to a ui32)
 // todo: make kv have implicit casts to the different number types
 // todo: make variant structure
 // todo: make enum with number types and table-number types
@@ -62,7 +66,6 @@
       tbl_PRNT((msgB)) tbl_PRNT((varB)) tbl_PRNT("\n\n") \
       assert( (exp) ); \
     }  
-
 #else
   #define tbl_assert(exp, varA, varB) ;
 #endif
@@ -116,8 +119,27 @@ public:
     tUI8, tI8, tUI16, tI16, tUI32, tI32, tUI64, tI64, tF32, tF64
   };
   template<class N> struct typenum { static const ui8 num = EMPTY; };
-  template<> struct typenum<f32>   { static const ui8 num =   F32; };
-  template<> struct typenum<i32>   { static const ui8 num =   I32; };
+  template<> struct typenum<ui8>   { static const ui8 num = UI8;   }; 
+  template<> struct typenum<ui16>  { static const ui8 num = UI16;  }; 
+  template<> struct typenum<ui32>  { static const ui8 num = UI32;  }; 
+  template<> struct typenum<ui64>  { static const ui8 num = UI64;  }; 
+  template<> struct typenum<i8>    { static const ui8 num = I8;    }; 
+  template<> struct typenum<i16>   { static const ui8 num = I16;   }; 
+  template<> struct typenum<i32>   { static const ui8 num = I32;   }; 
+  template<> struct typenum<i64>   { static const ui8 num = I64;   }; 
+  template<> struct typenum<f32>   { static const ui8 num = F32;   }; 
+  template<> struct typenum<f64>   { static const ui8 num = F64;   }; 
+  //template<> struct typenum<tui8>  { static const ui8 num = tUI8;  }; 
+  //template<> struct typenum<tui16> { static const ui8 num = tUI16; }; 
+  //template<> struct typenum<tui32> { static const ui8 num = tUI32; }; 
+  //template<> struct typenum<tui64> { static const ui8 num = tUI64; }; 
+  //template<> struct typenum<ti8>   { static const ui8 num = tI8;   }; 
+  //template<> struct typenum<ti16>  { static const ui8 num = tI16;  }; 
+  //template<> struct typenum<ti32>  { static const ui8 num = tI32;  }; 
+  //template<> struct typenum<ti64>  { static const ui8 num = tI64;  }; 
+  //template<> struct typenum<tf32>  { static const ui8 num = tF32;  }; 
+  //template<> struct typenum<tf64>  { static const ui8 num = tF64;  }; 
+
   //template<> struct typenum<ui8>   { static const ui8 num =   UI8; static const char* namestr =   "ui8"; };
 
   //template<class N> union type
@@ -125,16 +147,16 @@ public:
   //  struct<
   //};
 
-  union       HshType
+  union   HshType
   {
     struct { ui32 type : 5; ui32 : 27; };
     ui32 as_ui32;
   };
-  struct kv
+  struct       kv
   {
-    HshType      hsh;
-    char     key[19];
-    ui64         val;
+    HshType   hsh;
+    char      key[19];
+    ui64      val;
 
     template<class N> void operator=(N n)
     {
@@ -143,12 +165,13 @@ public:
     }
     template<class N> operator N()
     { 
-      tbl_msg_assert(hsh.type==typenum<N>::num, " - tbl TYPE ERROR -\nInternal type was: ", tbl::type_str((Type)hsh.type), "Desired  type was: ", tbl::type_str((Type)typenum<N>::num) );
-      //tbl_msg_assert(hsh.type == typenum<N>::num, "Internal type was: ", "", "Desired type was: ", "");
-      //tbl_msg_assert(hsh.type == typenum<N>::num, "Internal type was: ");
-
+      tbl_msg_assert(
+        hsh.type==typenum<N>::num, 
+        " - tbl TYPE ERROR -\nInternal type was: ", tbl::type_str((Type)hsh.type), 
+        "Desired  type was: ",                      tbl::type_str((Type)typenum<N>::num) );
       return *((N*)&val);
     }
+    template<class T> T as(){ return (T)(*this); }
   };
   struct      Var
   {
@@ -177,6 +200,7 @@ public:
     set_sizeBytes(szBytes);
     set_size(count);
   }
+  ~tbl(){ if(!m_mem) free(memStart()); }
 
   operator    ui64() const { return size(); }
   T&    operator[](ui64 i){ return ((T*)m_mem)[i]; }
@@ -269,33 +293,35 @@ private:
   {
     return sizeof(ui64) * 2;
   }
-
 public:
   static char const* const type_str(Type t)
   {
     switch(t)
     {
     case EMPTY: return "Empty";
-    case   UI8: return "";
-    case    I8: return "";
-    case  UI16: return "";
-    case   I16: return "";
-    case  UI32: return "";
-    case   I32: return "i32";
-    case  UI64: return "";
-    case   I64: return "";
-    case   F32: return "f32";
-    case   F64: return "";
-    case  tUI8: return "";
-    case   tI8: return "";
-    case tUI16: return "";
-    case  tI16: return "";
-    case tUI32: return "";
-    case  tI32: return "";
-    case tUI64: return "";
-    case  tI64: return "";
-    case  tF32: return "";
-    case  tF64: return "";
+    
+    case   UI8: return  "ui8";
+    case  UI16: return "ui16";
+    case  UI32: return "ui32";
+    case  UI64: return "ui64";
+    case    I8: return   "i8";
+    case   I16: return  "i16";
+    case   I32: return  "i32";
+    case   I64: return  "i16";
+    case   F32: return  "f32";
+    case   F64: return  "f64";
+
+    case  tUI8: return  "table ui8";
+    case tUI16: return "table ui16";
+    case tUI32: return "table ui32";
+    case tUI64: return "table ui64";
+    case   tI8: return   "table i8";
+    case  tI16: return  "table i16";
+    case  tI32: return  "table i32";
+    case  tI64: return  "table i16";
+    case  tF32: return  "table f32";
+    case  tF64: return  "table f64";
+
     default: return "Unknown Type";
     }
     //return "Empty";
@@ -321,6 +347,31 @@ public:
 
 
 
+
+
+//case   UI8: return "";
+//case  UI16: return "";
+//case  UI32: return "";
+//case  UI64: return "";
+//case    I8: return "";
+//case   I16: return "";
+//case   I32: return "i32";
+//case   I64: return "";
+//case   F32: return "f32";
+//case   F64: return "";
+//case  tUI8: return "";
+//case tUI16: return "";
+//case tUI32: return "";
+//case tUI64: return "";
+//case   tI8: return "";
+//case  tI16: return "";
+//case  tI32: return "";
+//case  tI64: return "";
+//case  tF32: return "";
+//case  tF64: return "";
+
+//tbl_msg_assert(hsh.type == typenum<N>::num, "Internal type was: ", "", "Desired type was: ", "");
+//tbl_msg_assert(hsh.type == typenum<N>::num, "Internal type was: ");
 
 //#define tbl_msg_assert(exp, msgA, varA, msgB, varB) if((exp)==false){ tbl_PRNT((msgA)) tbl_PRNT((varA)) tbl_PRNT((msgA)) tbl_PRNT((varA)) assert( (exp) ); }  
 //

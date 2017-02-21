@@ -16,7 +16,8 @@ int main()
   tbl::kv num;
   num    =  85.0f;  // 85.0f;
   //ui32 n = num; // assert fails
-  f32 n = num;
+  //f32 n = (f32)(num.as<f32>());
+  f32 n = num.as<f32>();
   printf("int:   %d   \n",  n);
   printf("float: %.5f \n",  n);
   printf("\n");
@@ -44,14 +45,16 @@ int main()
   //  TO(t,j) printf("     %d %lld %lld %lld \n", t[j], t.size(), t.capacity(), t.sizeBytes() );
   //}
 
-  tbl t;
-  TO(5,i) t.push( (int)i );
-  //TO(t,i){ printf(" %d \n", t.back() ); t.pop(); } 
+  {
+    tbl t;
+    TO(5,i) t.push( (int)i );
+    //TO(t,i){ printf(" %d \n", t.back() ); t.pop(); } 
 
-  tbl t2;
-  TO(5,i) t2.push( (int)(i*i) );
-  tbl t3 = t >> t2;
-  TO(t3,i){ printf(" %d \n", t3.back() ); t3.pop(); } 
+    tbl t2;
+    TO(5,i) t2.push( (int)(i*i) );
+    tbl t3 = t >> t2;
+    TO(t3,i){ printf(" %d \n", t3.back() ); t3.pop(); } 
+  }
 
   //float*  pos = t("pos").data();
   //float* norm = t("normals").data();
