@@ -8,6 +8,19 @@ int main()
 {
   using namespace std;
   
+  //printf("\n variant size: %d \n\n\n", sizeof(tbl::Var) );
+  printf("\n");
+  printf("kv size: %d \n", sizeof(tbl::kv) );
+  printf("\n");
+
+  tbl::kv num;
+  num    =  85.0f;  // 85.0f;
+  //ui32 n = num; // assert fails
+  f32 n = num;
+  printf("int:   %d   \n",  n);
+  printf("float: %.5f \n",  n);
+  printf("\n");
+
   //void* wat =  malloc(100);
   //void*  re = realloc(wat, (ui64)1 << 9);
   //
@@ -17,7 +30,6 @@ int main()
   //
   //for(ui64 i=0; i<t; ++i) t[i] = (int)i;
 
-  tbl t;
   //printf(" %d %lld %lld %lld \n", 0, t.size(), t.capacity(), t.sizeBytes() );
   //t.push( (int)85 );
   //printf(" %d %lld %lld %lld \n", t[0], t.size(), t.capacity(), t.sizeBytes() );
@@ -32,6 +44,7 @@ int main()
   //  TO(t,j) printf("     %d %lld %lld %lld \n", t[j], t.size(), t.capacity(), t.sizeBytes() );
   //}
 
+  tbl t;
   TO(5,i) t.push( (int)i );
   //TO(t,i){ printf(" %d \n", t.back() ); t.pop(); } 
 
