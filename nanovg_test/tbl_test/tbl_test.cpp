@@ -45,14 +45,27 @@ int main()
   //  TO(t,j) printf("     %d %lld %lld %lld \n", t[j], t.size(), t.capacity(), t.sizeBytes() );
   //}
 
+  //tbl nul;
+  //if(nul) printf("\n bool: %d \n\n", (bool)nul );
+  //int bin = 0b10000;
+  printf("\n 1<<: %d \n\n", 1<<4 );
+
+  //TO(1000000, leak)
   {
     tbl t;
     TO(5,i) t.push( (int)i );
-    //TO(t,i){ printf(" %d \n", t.back() ); t.pop(); } 
+    //TO(t,i){ printf(" %d \n", t[i] ); } 
+    TO(t-2,i){
+      printf(" %d \n", t.back() );
+      t.pop();
+    } 
+    printf("\n", t.back() );
 
     tbl t2;
     TO(5,i) t2.push( (int)(i*i) );
     tbl t3 = t >> t2;
+    auto t4 = t >> t2;
+    
     TO(t3,i){ printf(" %d \n", t3.back() ); t3.pop(); } 
   }
 

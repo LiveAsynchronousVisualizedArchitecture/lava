@@ -19,26 +19,34 @@
 // -todo: fill out the rest of the type nums
 // -todo: fill out the rest of the type strings
 // -todo: make as<>() template function
+// -todo: make and test destructor
+// -todo: make move constructor
+// -todo: make hash union
+// -todo: try in release mode - find and fix release mode crash - first try at destructors didn't work
+// -todo: make copy constructor and assignment operator
+// -todo: test and fix destructor crash - reversed boolean of m_mem
+// -todo: make bool implicit cast that evaluates pointer
 
-// todo: make and test destructor
-// todo: make bool implicit cast that evaluates pointer?
 // todo: make 1 bit always indicate signed, 1 bit always indicate table, 1 bit indicate integer, and 2 bits indicate the bit depth as 3,4,5, or 6 - same 5 bits as discreet 21 types if unsigned & not integer is used for empty!
 // todo: make switch statement to have flexible number casts (a ui8 can be cast without error to a ui32)
 // todo: make kv have implicit casts to the different number types
 // todo: make variant structure
 // todo: make enum with number types and table-number types
 // todo: make a table hold any type, but a map hold only numbers and table-number types
-// todo: make hash union
+// todo: make copy use resize
+// todo: make sure destructor is being run on objects being held once turned into a template
+// todo: make resize()
 // todo: make begin and end iterators to go with C++11 for loops - loop through keys value pairs?
 // todo: make emplace and emplace_back()
-// todo: make resize()
 // todo: make shrink_to_fit()
+// todo: make constructor with default value
 // todo: make operator~ return just the vector
 // todo: make different unary operator return just the map?
 // todo: try template constructor that returns a tbl<type> with a default value set?
 // todo: use binary bit operators to make tbl act like a set
 // todo: make operator-- be shrink_to_fit() and ++ be resize() ?
 // todo: robin hood hashing
+// todo: make visualization for table as a tree that shows arrays, key-values and their types, then sub tables - make various visualizations for arrays - histogram, graph, ???
 
 
 #ifndef __TBL_HEADERGUARD_H__
@@ -67,7 +75,9 @@
       assert( (exp) ); \
     }  
 #else
-  #define tbl_assert(exp, varA, varB) ;
+  //#define tbl_assert(exp, varA, varB) ;
+  #define tbl_msg_assert(exp, msgA, varA, msgB, varB)
+  #define tbl_PRNT(msg)
 #endif
 
 //namespace wat
@@ -87,7 +97,7 @@
 
 class tbl
 {
-public:                                                              // forward declarations
+public:                                                                       // forward declarations
   enum Type;
 
 private:
@@ -104,17 +114,35 @@ private:
   {
     return (void*)(m_mem - memberBytes());
   }
+  void             del()
+  { 
+    // todo: needs to loop through and run destructors here
+    if(m_mem) free(memStart());
+  }
   void              cp(tbl const& l)
   {
+    tbl_PRNT(" copied ");
+    del();
+    reserve(l.size());    // todo: can be done with resize, which could use realloc instead of free and malloc?
+    //resize(l.size());
+
+    TO(l,i) push(l[i]); 
   }
-  void              mv(tbl&& r)
+  void              mv(tbl& r)
   {
+    tbl_PRNT(" moved ");
+    m_mem   = r.m_mem;
+    r.m_mem = nullptr;
   }
 
 public:  
   enum Type
-  {                                                                 // 10 number types, 10 table variants + empty = 21 total - at least 5 bits needed
-    EMPTY = 0,
+  {                                                                           // 10 number types, 10 table variants + empty = 21 total - at least 5 bits needed
+    TABLE     =  1<<4,
+    SIGNED    =  1<<3,
+    INTEGER   =  1<<2,
+    POWEROF2  =  1<<1 | 1,
+    EMPTY     =  ~INTEGER & ~SIGNED,                                         // a floating point number can't be unsigned, so this scenario is used for an 'empty' state
     UI8,   I8,  UI16,  I16,  UI32,  I32,  UI64,  I64,  F32,  F64,
     tUI8, tI8, tUI16, tI16, tUI32, tI32, tUI64, tI64, tF32, tF64
   };
@@ -139,13 +167,6 @@ public:
   //template<> struct typenum<ti64>  { static const ui8 num = tI64;  }; 
   //template<> struct typenum<tf32>  { static const ui8 num = tF32;  }; 
   //template<> struct typenum<tf64>  { static const ui8 num = tF64;  }; 
-
-  //template<> struct typenum<ui8>   { static const ui8 num =   UI8; static const char* namestr =   "ui8"; };
-
-  //template<class N> union type
-  //{
-  //  struct<
-  //};
 
   union   HshType
   {
@@ -175,8 +196,8 @@ public:
   };
   struct      Var
   {
-    ui8 type;
-    ui64 data; 
+    ui8   type;
+    ui64  data; 
   };
 
   using T    =  int;
@@ -200,9 +221,15 @@ public:
     set_sizeBytes(szBytes);
     set_size(count);
   }
-  ~tbl(){ if(!m_mem) free(memStart()); }
+  ~tbl(){ del(); }
+
+  tbl(tbl const& l){ cp(l); }
+  tbl& operator=(tbl const& l){ cp(l); return *this; }
+  tbl(tbl&& r){ mv(r); }
+  tbl& operator=(tbl&& r){ mv(r); return *this; }
 
   operator    ui64() const { return size(); }
+  operator    bool() const { return m_mem!=nullptr; }
   T&    operator[](ui64 i){ return ((T*)m_mem)[i]; }
   auto  operator[](ui64 i) const -> T const& { return ((T*)m_mem)[i]; }
   //var&  operator()(const char*)                             // todo: future hash map interface
@@ -225,7 +252,7 @@ public:
     return true;
   }
   bool   push_back(T const& value){ return push(value); }
-  void         pop(){ set_size(size()-1); }
+  void         pop(){ /*delete &(back());*/ set_size(size()-1); }  // todo: needs to run the destructor here
   void    pop_back(){ pop(); }
   T&         front(){ return (*this)[0]; }
   T&          back(){ return (*this)[size()-1]; }
@@ -348,6 +375,14 @@ public:
 
 
 
+
+
+//template<> struct typenum<ui8>   { static const ui8 num =   UI8; static const char* namestr =   "ui8"; };
+//
+//template<class N> union type
+//{
+//  struct<
+//};
 
 //case   UI8: return "";
 //case  UI16: return "";
