@@ -92,31 +92,16 @@ public:
     set_size(count);
   }
 
-  operator    ui64() const
-  {
-    return size();
-  }
-  T&    operator[](ui64 i)
-  {
-    return ((T*)m_mem)[i];
-  }
-  auto  operator[](ui64 i) const -> T const&
-  {
-    return ((T*)m_mem)[i];
-  }
+  operator    ui64() const { return size(); }
+  T&    operator[](ui64 i){ return ((T*)m_mem)[i]; }
+  auto  operator[](ui64 i) const -> T const& { return ((T*)m_mem)[i]; }
   var&  operator()(const char*)                             // todo: future hash map interface
   {
     Var nonsense;
     return nonsense;
   }
-  tbl   operator>>(tbl const& l)
-  {
-    return tbl::concat(*this, l);
-  }
-  tbl   operator<<(tbl const& l)
-  {
-    return tbl::concat(*this, l);
-  }
+  tbl   operator>>(tbl const& l){ return tbl::concat(*this, l); }
+  tbl   operator<<(tbl const& l){ return tbl::concat(*this, l); }
 
   bool        push(T const& value)
   {
