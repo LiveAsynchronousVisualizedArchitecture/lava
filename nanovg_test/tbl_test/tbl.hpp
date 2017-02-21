@@ -28,6 +28,7 @@
 // -todo: make bool implicit cast that evaluates pointer
 
 // todo: make 1 bit always indicate signed, 1 bit always indicate table, 1 bit indicate integer, and 2 bits indicate the bit depth as 3,4,5, or 6 - same 5 bits as discreet 21 types if unsigned & not integer is used for empty!
+// todo: re-test type assertions after structuring enum bits
 // todo: make switch statement to have flexible number casts (a ui8 can be cast without error to a ui32)
 // todo: make kv have implicit casts to the different number types
 // todo: make variant structure
@@ -136,15 +137,43 @@ private:
   }
 
 public:  
-  enum Type
-  {                                                                           // 10 number types, 10 table variants + empty = 21 total - at least 5 bits needed
-    TABLE     =  1<<4,
-    SIGNED    =  1<<3,
-    INTEGER   =  1<<2,
-    POWEROF2  =  1<<1 | 1,
-    EMPTY     =  ~INTEGER & ~SIGNED,                                         // a floating point number can't be unsigned, so this scenario is used for an 'empty' state
-    UI8,   I8,  UI16,  I16,  UI32,  I32,  UI64,  I64,  F32,  F64,
-    tUI8, tI8, tUI16, tI16, tUI32, tI32, tUI64, tI64, tF32, tF64
+  enum Type{                                                                           // 10 number types, 10 table variants + empty = 21 total - at least 5 bits needed
+    TABLE       =  1<<4,
+    SIGNED      =  1<<3,
+    INTEGER     =  1<<2,
+    //POWEROF2_3  =     0,                    // 2^3 is  8 for  8 bit depth
+    //POWEROF2_4  =     1,                    // 2^4 is 16 for 16 bit depth
+    //POWEROF2_5  =  1<<1,                    // 2^5 is 32 for 32 bit depth
+    //POWEROF2_6  =  1<<1 | 1,                // 2^6 is 64 for 64 bit depth
+    BITS_8      =     0,                    // 2^3 is  8 for  8 bit depth
+    BITS_16     =     1,                    // 2^4 is 16 for 16 bit depth
+    BITS_32     =  1<<1,                    // 2^5 is 32 for 32 bit depth
+    BITS_64     =  1<<1 | 1,                // 2^6 is 64 for 64 bit depth
+
+    EMPTY       =  ~INTEGER & ~SIGNED,                                         // a floating point number can't be unsigned, so this scenario is used for an 'empty' state
+      UI8       =  INTEGER | BITS_8,   
+     UI16       =  INTEGER | BITS_16,
+     UI32       =  INTEGER | BITS_32,
+     UI64       =  INTEGER | BITS_64,
+       I8       =  INTEGER | BITS_8  | SIGNED,
+      I16       =  INTEGER | BITS_16 | SIGNED,
+      I32       =  INTEGER | BITS_32 | SIGNED,
+      I64       =  INTEGER | BITS_64 | SIGNED,
+      F32       =  BITS_32,
+      F64       =  BITS_64,
+
+     tUI8       =  TABLE | INTEGER | BITS_8,   
+    tUI16       =  TABLE | INTEGER | BITS_16,
+    tUI32       =  TABLE | INTEGER | BITS_32,
+    tUI64       =  TABLE | INTEGER | BITS_64,
+      tI8       =  TABLE | INTEGER | BITS_8  | SIGNED,
+     tI16       =  TABLE | INTEGER | BITS_16 | SIGNED,
+     tI32       =  TABLE | INTEGER | BITS_32 | SIGNED,
+     tI64       =  TABLE | INTEGER | BITS_64 | SIGNED,
+     tF32       =  TABLE | BITS_32,
+     tF64       =  TABLE | BITS_64,
+
+     //tUI8, tI8, tUI16, tI16, tUI32, tI32, tUI64, tI64, tF32, tF64
   };
   template<class N> struct typenum { static const ui8 num = EMPTY; };
   template<> struct typenum<ui8>   { static const ui8 num = UI8;   }; 
