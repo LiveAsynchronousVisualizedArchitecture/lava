@@ -1,18 +1,20 @@
 
 // -todo: make push and push_back
 // -todo: make pop() and pop_back()
+// -todo: fix realloc to be resize based on element count
+// -todo: operator >> for concatenation with left keys as priority
+// -todo: operator << for concatenation with right keys as priority
+// -todo: make reserve()
+// -todo: keep track of capacity and make capacity() const function
+// -todo: make front() and back()
 
-// todo: fix realloc to be resize based on element count
-// todo: operator >> for concatenation with left keys as priority
-// todo: operator << for concatenation with right keys as priority
+// todo: make enum with number types and table-number types
+// todo: make a table hold any type, but a map hold only numbers and table-number types
+// todo: make variant structure
+// todo: make hash union
 // todo: make emplace and emplace_back()
 // todo: make resize()
 // todo: make shrink_to_fit()
-// todo: make reserve()
-// todo: keep track of capacity and make capacity() const function
-// todo: make front() and back()
-// todo: make variant structure
-// todo: make hash union
 // todo: make key value pair be 4 bytes for hash, 18 + 1 for c_str(), and 8 + 1 for variant + type
 // todo: make operator~ return just the vector
 // todo: make different unary operator return just the map?
@@ -55,28 +57,18 @@ private:
   {
   }
 
-public:
-  static ui64 sizeBytes(ui64 count)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
-  {
-    return memberBytes() + sizeof(T)*count;
-  }
-  static tbl     concat(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
-  {
-    auto sz = a.size();
-    tbl ret(sz + b.size());
-    
-    TO(sz,i) ret[i]    = a[i];
-    TO(b, i) ret[sz+i] = b[i];
-
-    return ret;
-  }
-    
-  union  hsh
+public:    
+  enum class type {
+    EMPTY = 0,
+    ui8, i8, ui16, i16, ui32, i32, ui64, i64, f32, f64,
+    ui8t,i8t,ui16t,i16t,ui32t,i32t,ui64t,i64t,f32t,f64t
+  };
+  union       hsh
   {
     struct { ui32 type : 4; ui32 : 28; };
     ui32 as_ui32;
   };
-  struct Var{};        // todo: future variant type
+  struct      Var{};        // todo: future variant type
 
   using T    =  int;
   using var  =  Var;
@@ -198,6 +190,22 @@ public:
     ui64    sz = size();
     ui64 nxtSz = (sz/2)? sz+sz/2 : sz+1;
     return reserve(nxtSz);
+  }
+
+  
+  static ui64 sizeBytes(ui64 count)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
+  {
+    return memberBytes() + sizeof(T)*count;
+  }
+  static tbl     concat(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
+  {
+    auto sz = a.size();
+    tbl ret(sz + b.size());
+    
+    TO(sz,i) ret[i]    = a[i];
+    TO(b, i) ret[sz+i] = b[i];
+
+    return ret;
   }
 };
 
