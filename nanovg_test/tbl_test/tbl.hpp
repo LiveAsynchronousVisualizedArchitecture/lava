@@ -36,13 +36,17 @@
 // -todo: change reserve to use both size and elems 
 // -todo: start on map
 // -todo: store needed map data on heap - map elements and ????
+// -todo: test operator()
+// -todo: fix hash comparison check
+// -todo: make operator() access the map
+// -todo: check for a full loop around of a hash map search
+// -todo: return a reference to a NONE KV if there was no space and the map search had to loop around to the end
 
-
-// todo: fix hash comparison check
+// todo: fold HashType into KV ?
+// todo: increase elems and mark type as a default (I32?) instead of EMPTY
+// todo: fix reference return to just copy the key when the key is empty and not create a new KV
+// todo: turn operator() into a template
 // todo: test types to make sure EMPTY and NONE are not duplicated
-// todo: make operator() access the map
-// todo: check for a full loop around of a hash map search
-// todo: return a reference to a NONE KV if there was no space and the map search had to loop around to the end
 // todo: make reserve rehash and reinsert all elements
 // todo: make all elements initialize to zeroed out with EMPTY enum set
 // todo: make instert() function 
@@ -114,10 +118,15 @@ private:
   {
     *( ((ui64*)memStart()) + 1 ) = size;
   }
+  void    set_capacity(ui64   cap)
+  {
+    *( ((ui64*)memStart()) + 2) = cap;
+  }
   void       set_elems(ui64 elems)
   {
-    *( ((ui64*)memStart()) + 2 ) = elems;
+    *( ((ui64*)memStart()) + 3) = elems;
   }
+
   void*       memStart()
   {
     return (void*)(m_mem - memberBytes());
@@ -182,17 +191,17 @@ public:
      tF32       =  TABLE | BITS_32,
      tF64       =  TABLE | BITS_64,
   };
-  template<class N> struct typenum { static const ui8 num = EMPTY; };
-  template<> struct typenum<ui8>   { static const ui8 num = UI8;   }; 
-  template<> struct typenum<ui16>  { static const ui8 num = UI16;  }; 
-  template<> struct typenum<ui32>  { static const ui8 num = UI32;  }; 
-  template<> struct typenum<ui64>  { static const ui8 num = UI64;  }; 
-  template<> struct typenum<i8>    { static const ui8 num = I8;    }; 
-  template<> struct typenum<i16>   { static const ui8 num = I16;   }; 
-  template<> struct typenum<i32>   { static const ui8 num = I32;   }; 
-  template<> struct typenum<i64>   { static const ui8 num = I64;   }; 
-  template<> struct typenum<f32>   { static const ui8 num = F32;   }; 
-  template<> struct typenum<f64>   { static const ui8 num = F64;   }; 
+  template<class N> struct typenum { static const Type num = EMPTY; };
+  template<> struct typenum<ui8>   { static const Type num =   UI8; }; 
+  template<> struct typenum<ui16>  { static const Type num =  UI16; }; 
+  template<> struct typenum<ui32>  { static const Type num =  UI32; }; 
+  template<> struct typenum<ui64>  { static const Type num =  UI64; }; 
+  template<> struct typenum<i8>    { static const Type num =    I8; }; 
+  template<> struct typenum<i16>   { static const Type num =   I16; }; 
+  template<> struct typenum<i32>   { static const Type num =   I32; }; 
+  template<> struct typenum<i64>   { static const Type num =   I64; }; 
+  template<> struct typenum<f32>   { static const Type num =   F32; }; 
+  template<> struct typenum<f64>   { static const Type num =   F64; }; 
   //template<> struct typenum<tui8>  { static const ui8 num = tUI8;  }; 
   //template<> struct typenum<tui16> { static const ui8 num = tUI16; }; 
   //template<> struct typenum<tui32> { static const ui8 num = tUI32; }; 
@@ -206,7 +215,7 @@ public:
 
   union   HshType
   {
-    struct { ui32 type : 5; ui32 hash: 27; };
+    struct { Type type : 5; ui32 hash: 27; };
     ui32 as_ui32;
 
     HshType() : 
@@ -221,6 +230,8 @@ public:
     HshType   hsh;
     Key       key;
     ui64      val;
+
+    //KV(){}
 
     KV& operator=(KV const& l)
     {
@@ -259,8 +270,7 @@ public:
       return kv;
     }
   };
-  static KV KV_NONE; // = KV::none_kv();
-
+  //static KV KV_NONE; // = KV::none_kv();
 
   using T    =  int;
 
@@ -270,13 +280,14 @@ public:
     m_mem(nullptr)
   {
   }
-  tbl(ui64 size) 
+  tbl(ui64 size)           // have to run default constructor here?
   {    
     ui64   szBytes  =  tbl::sizeBytes(size);
     i8*      memst  =  (i8*)malloc(szBytes);                 // memst is memory start
     m_mem           =  memst + memberBytes();
     set_sizeBytes(szBytes);
     set_elems(0);
+    set_capacity(size);
     set_size(size);
   }
   ~tbl(){ del(); }
@@ -292,33 +303,39 @@ public:
   auto  operator[](ui64 i) const -> T const& { return ((T*)m_mem)[i]; }
   KV&     operator()(const char* key) // todo: just needs to return a kv reference since the kv can be set with operator=() ?
   {
+    if( !(map_capacity()>elems()) )
+      if(!expand()) return KV::none_kv();
+
     //HshType ht;                                   // ht is hash type
     //ht.hash  =  HashStr(key);
     //ht.type  =  NONE; // typenum<decltype(val)>::num;      // todo: need to remove const and reference here?
 
-    KV  kv;
-    //kv       =  val;
-    kv.hsh.hash  =  HashStr(key);
-    strcpy_s(kv.key, sizeof(kv.key), key);
+    //KV  kv;
+    ////kv       =  val;
+    //kv.hsh.hash  =  HashStr(key);
+    //strcpy_s(kv.key, sizeof(kv.key), key);
 
+    ui32   hsh  =  HashStr(key);
     KV*  elems  =  (KV*)elemStart();
     ui64   cap  =  map_capacity();  
-    ui64     i  =  kv.hsh.hash;
-    ui64  wrap  =  kv.hsh.hash % cap - 1;
+    ui64     i  =  hsh;
+    ui64  wrap  =  hsh % cap - 1;
     ui64    en  =  wrap<(cap-1)? wrap : cap-1;     // min(ht.hash % cap - 1, cap-1);   // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap?   // % m_sz;   //>0? hash-1  :  m_sz  
     for(;;++i)
     {
-      i %= cap;                                                          // get idx within map_capacity
-      HshType eh = elems[i].hsh;                                         // eh is element hash
+      i %= cap;                                                           // get idx within map_capacity
+      HshType eh = elems[i].hsh;                                          // eh is element hash
       if(elems[i].hsh.type==EMPTY){ 
-        return elems[i] = kv; 
+        strcpy_s(elems[i].key, sizeof(KV::Key), key);
+        elems[i].hsh.hash = hsh;
+        return elems[i];
         //return true;
-      }else if(kv.hsh.hash == eh.hash){                                  // if the hashes aren't the same, the keys can't be the same
-        auto cmp = strncmp(elems[i].key, kv.key, sizeof(KV::Key)-1);   // check if the keys are the same 
-        if(cmp==0) return elems[i] = kv;
+      }else if(hsh == eh.hash){                                           // if the hashes aren't the same, the keys can't be the same
+        auto cmp = strncmp(elems[i].key, key, sizeof(KV::Key)-1);         // check if the keys are the same 
+        if(cmp==0) return elems[i];
       }
 
-      if(i==en) break;                                                   // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+      if(i==en) break;                                                    // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
     }
     
     //KV kv;
@@ -408,19 +425,23 @@ public:
   {
     if(!m_mem) return 0;
 
-    return (sizeBytes() - memberBytes()) / sizeof(T);  // - size()*sizeof(T)
+    return *( ((ui64*)memStart()) + 2);
+
+    //if(!m_mem) return 0;
+    //
+    //return (sizeBytes() - memberBytes()) / sizeof(T);  // - size()*sizeof(T)
   }
   ui64         elems() const
   {
     if(!m_mem) return 0;
 
-    return *( ((ui64*)memStart()) + 2);
+    return *( ((ui64*)memStart()) + 3);
   }
   ui64  map_capacity() const
   {
     if(!m_mem) return 0;
 
-    return sizeBytes() - memberBytes() - size()*sizeof(T);
+    return (sizeBytes()-memberBytes()-capacity()*sizeof(T)) / sizeof(KV);
   }
   void*      reserve(ui64 size, ui64 elems)
   {
@@ -433,6 +454,7 @@ public:
     if(re){
       m_mem = ((i8*)re) + memberBytes();
       set_sizeBytes(nxtBytes);
+      set_capacity(size);
 
       // todo: take this out so that hashes aren't wiped
       KV* el = elemStart();
@@ -462,9 +484,11 @@ public:
 
 
 private:
+  static const ui32 HASH_MASK = 0x07FFFFFF;
+
   static ui64  memberBytes()
   {
-    return sizeof(ui64) * 3;
+    return sizeof(ui64) * 4;
   }
   static ui64  fnv_64a_buf(void const* const buf, ui64 len)
   {
@@ -492,7 +516,9 @@ private:
   static ui32      HashStr(const char* s)
   {
     ui32 len = (ui32)strlen(s);
-    return HashBytes(s, len);
+    ui32 hsh = HashBytes(s, len);
+     
+    return hsh & HASH_MASK;
   }
 public:
   static char const* const type_str(Type t)
@@ -512,16 +538,16 @@ public:
     case   F32: return  "f32";
     case   F64: return  "f64";
 
-    case  tUI8: return  "table ui8";
-    case tUI16: return "table ui16";
-    case tUI32: return "table ui32";
-    case tUI64: return "table ui64";
-    case   tI8: return   "table i8";
-    case  tI16: return  "table i16";
-    case  tI32: return  "table i32";
-    case  tI64: return  "table i16";
-    case  tF32: return  "table f32";
-    case  tF64: return  "table f64";
+    case  tUI8: return  "table  ui8";
+    case tUI16: return  "table ui16";
+    case tUI32: return  "table ui32";
+    case tUI64: return  "table ui64";
+    case   tI8: return  "table   i8";
+    case  tI16: return  "table  i16";
+    case  tI32: return  "table  i32";
+    case  tI64: return  "table  i16";
+    case  tF32: return  "table  f32";
+    case  tF64: return  "table  f64";
 
     default: return "Unknown Type";
     }
@@ -543,7 +569,7 @@ public:
   }
 };
 
-tbl::KV tbl::KV_NONE = tbl::KV::none_kv();
+//tbl::KV tbl::KV_NONE = tbl::KV::none_kv();
 
 
 #endif

@@ -35,14 +35,14 @@ int main()
   //  printf("\n");
   //}
 
-  SECTION(same types)
-  {
-    tbl::KV num;
-    num    =  85;
-    i32 n  =  num;
-    printf("int:   %d   \n",  n);
-    printf("\n");
-  }
+  //SECTION(same types)
+  //{
+  //  tbl::KV num;
+  //  num    =  85;
+  //  i32 n  =  num;
+  //  printf("int:   %d   \n",  n);
+  //  printf("\n");
+  //}
 
 
   //void* wat =  malloc(100);
@@ -76,20 +76,27 @@ int main()
   //TO(1000000, leak)
   {
     tbl t;
-    TO(5,i) t.push( (int)i );
-    //TO(t,i){ printf(" %d \n", t[i] ); } 
-    TO(t-2,i){
-      printf(" %d \n", t.back() );
-      t.pop();
-    } 
-    printf("\n", t.back() );
+    t("wat") = 185;
+    int wat = t("wat");
+    printf("\n wat: %d \n\n", wat);
 
-    tbl t2;
-    TO(5,i) t2.push( (int)(i*i) );
-    tbl t3 = t >> t2;
-    auto t4 = t >> t2;
-    
-    TO(t3,i){ printf(" %d \n", t3.back() ); t3.pop(); } 
+    //SECTION(vector testing)
+    //{
+    //  TO(5,i) t.push( (int)i );
+    //  //TO(t,i){ printf(" %d \n", t[i] ); } 
+    //  TO(t-2,i){
+    //    printf(" %d \n", t.back() );
+    //    t.pop();
+    //  } 
+    //  printf("\n", t.back() );
+    //
+    //  tbl t2;
+    //  TO(5,i) t2.push( (int)(i*i) );
+    //  tbl t3 = t >> t2;
+    //  auto t4 = t >> t2;
+    //
+    //  TO(t3,i){ printf(" %d \n", t3.back() ); t3.pop(); } 
+    //}
   }
 
   //float*  pos = t("pos").data();
