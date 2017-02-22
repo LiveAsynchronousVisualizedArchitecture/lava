@@ -37,7 +37,14 @@
 // -todo: start on map
 // -todo: store needed map data on heap - map elements and ????
 
+
+// todo: fix hash comparison check
+// todo: test types to make sure EMPTY and NONE are not duplicated
 // todo: make operator() access the map
+// todo: check for a full loop around of a hash map search
+// todo: return a reference to a NONE KV if there was no space and the map search had to loop around to the end
+// todo: make reserve rehash and reinsert all elements
+// todo: make all elements initialize to zeroed out with EMPTY enum set
 // todo: make instert() function 
 // todo: make has() function or STL equivilent
 // todo: make emplace and emplace_back()
@@ -96,6 +103,7 @@ class tbl
 {
 public:                                                                       // forward declarations
   enum Type;
+  struct KV;
 
 private:
   void   set_sizeBytes(ui64 bytes) // -> ui64
@@ -114,9 +122,9 @@ private:
   {
     return (void*)(m_mem - memberBytes());
   }
-  void*      elemStart()
+  KV*        elemStart()
   {
-    return data() + capacity();
+    return (KV*)(data() + capacity());
   }
   void             del()
   { 
@@ -149,7 +157,9 @@ public:
     BITS_32     =  1<<1,                    // 2^5 is 32 for 32 bit depth
     BITS_64     =  1<<1 | 1,                // 2^6 is 64 for 64 bit depth
 
-    EMPTY       =  ~INTEGER & ~SIGNED,                                         // a floating point number can't be unsigned, so this scenario is used for an 'empty' state
+     NONE       =  ~INTEGER & ~SIGNED & ~TABLE,                              // INTEGER bit turned off, SIGNED bit turned off and TABLE bit turned off, meanin unsigned float table, which is not a viable real type of course
+    EMPTY       =  ~INTEGER & ~SIGNED,                                       // a floating point number can't be unsigned, so this scenario is used for an 'empty' state
+
       UI8       =  INTEGER | BITS_8,   
      UI16       =  INTEGER | BITS_16,
      UI32       =  INTEGER | BITS_32,
@@ -198,6 +208,11 @@ public:
   {
     struct { ui32 type : 5; ui32 hash: 27; };
     ui32 as_ui32;
+
+    HshType() : 
+      type(EMPTY),
+      hash(0)
+    {}
   };
   struct       KV
   {
@@ -226,7 +241,26 @@ public:
       return *((N*)&val);
     }
     template<class T> T as(){ return (T)(*this); }
+
+    static KV     empty_kv()
+    {
+      KV kv;
+      memset(&kv, 0, sizeof(KV));
+      kv.hsh.type = EMPTY;
+      return kv;
+    }
+    static KV&     none_kv()
+    {
+      static KV kv;
+      //KV kv;
+      memset(&kv, 0, sizeof(KV));
+      kv.hsh.type = NONE;
+
+      return kv;
+    }
   };
+  static KV KV_NONE; // = KV::none_kv();
+
 
   using T    =  int;
 
@@ -256,11 +290,41 @@ public:
   operator    bool() const { return m_mem!=nullptr; }
   T&    operator[](ui64 i){ return ((T*)m_mem)[i]; }
   auto  operator[](ui64 i) const -> T const& { return ((T*)m_mem)[i]; }
-  //KV&  operator()(const char* key) // todo: just needs to return a kv reference since the kv can be set with operator=() ?
-  //{
-  //  
-  //  return;
-  //}
+  KV&     operator()(const char* key) // todo: just needs to return a kv reference since the kv can be set with operator=() ?
+  {
+    //HshType ht;                                   // ht is hash type
+    //ht.hash  =  HashStr(key);
+    //ht.type  =  NONE; // typenum<decltype(val)>::num;      // todo: need to remove const and reference here?
+
+    KV  kv;
+    //kv       =  val;
+    kv.hsh.hash  =  HashStr(key);
+    strcpy_s(kv.key, sizeof(kv.key), key);
+
+    KV*  elems  =  (KV*)elemStart();
+    ui64   cap  =  map_capacity();  
+    ui64     i  =  kv.hsh.hash;
+    ui64  wrap  =  kv.hsh.hash % cap - 1;
+    ui64    en  =  wrap<(cap-1)? wrap : cap-1;     // min(ht.hash % cap - 1, cap-1);   // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap?   // % m_sz;   //>0? hash-1  :  m_sz  
+    for(;;++i)
+    {
+      i %= cap;                                                          // get idx within map_capacity
+      HshType eh = elems[i].hsh;                                         // eh is element hash
+      if(elems[i].hsh.type==EMPTY){ 
+        return elems[i] = kv; 
+        //return true;
+      }else if(kv.hsh.hash == eh.hash){                                  // if the hashes aren't the same, the keys can't be the same
+        auto cmp = strncmp(elems[i].key, kv.key, sizeof(KV::Key)-1);   // check if the keys are the same 
+        if(cmp==0) return elems[i] = kv;
+      }
+
+      if(i==en) break;                                                   // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+    }
+    
+    //KV kv;
+    //kv.hsh.type = NONE;
+    return KV::none_kv();
+  }
   tbl   operator>>(tbl const& l){ return tbl::concat(*this, l); }
   tbl   operator<<(tbl const& l){ return tbl::concat(*this, l); }
 
@@ -296,19 +360,25 @@ public:
     strcpy_s(kv.key, sizeof(kv.key), key);
 
     // get start of elems
-    // get idx within map_capacity
-
     KV* elems  =  (KV*)elemStart();
-    ui64  cap  =  map_capacity();
+    ui64  cap  =  map_capacity();  
     ui64    i  =  ht.hash;  
     for(;;++i)
     {
-      i %= cap;
-      if(elems[i].hsh.type == EMPTY){ elems[i] = kv; return true; }
-      else{    // check if the keys are the same 
-        strncmp(elems[i].key, kv.key, sizeof(KV::Key)-1);
+      i %= cap;                                                         // get idx within map_capacity
+      HshType eh = elems[i].hsh;                                        // eh is element hash
+      if(elems[i].hsh.type==EMPTY){ 
+        elems[i] = kv; 
+        return true;
+      }else{                                                            // check if the keys are the same 
+        if(ht.hash!=eh.hash) continue;                                  // if the hashes aren't the same, the keys can't be the same
+        
+        auto cmp = strncmp(elems[i].key, kv.key, sizeof(KV::Key)-1);
+        if(cmp!=0) continue;
+        
+        elems[i] = kv;
+        return true;
       }
-
     }
     
     return true;
@@ -363,9 +433,13 @@ public:
     if(re){
       m_mem = ((i8*)re) + memberBytes();
       set_sizeBytes(nxtBytes);
-    }    
 
-    if(fresh){ set_size(0); set_elems(0); }
+      // todo: take this out so that hashes aren't wiped
+      KV* el = elemStart();
+      TO(elems, i) el[i] = KV();
+    }
+
+    if(re && fresh){ set_size(0); set_elems(0); }
     
     return re;
     
@@ -468,6 +542,8 @@ public:
     return ret;
   }
 };
+
+tbl::KV tbl::KV_NONE = tbl::KV::none_kv();
 
 
 #endif
