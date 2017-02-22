@@ -116,7 +116,7 @@ private:
   }
   void*      elemStart()
   {
-    return data() + capacity()*sizeof(T);
+    return data() + capacity();
   }
   void             del()
   { 
@@ -201,10 +201,17 @@ public:
   };
   struct       KV
   {
+    using Key = char[19]; 
+
     HshType   hsh;
-    char      key[19];
+    Key       key;
     ui64      val;
 
+    KV& operator=(KV const& l)
+    {
+      memcpy(this, &l, sizeof(KV));
+      return *this;
+    }
     template<class N> void operator=(N n)
     {
       hsh.type = typenum<N>::num;
@@ -242,8 +249,8 @@ public:
 
   tbl(tbl const& l){ cp(l); }
   tbl& operator=(tbl const& l){ cp(l); return *this; }
-  tbl(tbl&& r){ mv(r); }
-  tbl& operator=(tbl&& r){ mv(r); return *this; }
+  tbl(tbl&&      r){ mv(r); }
+  tbl& operator=(tbl&&      r){ mv(r); return *this; }
 
   operator    ui64() const { return size(); }
   operator    bool() const { return m_mem!=nullptr; }
@@ -273,8 +280,12 @@ public:
   void      pop_back(){ pop(); }
   T&           front(){ return (*this)[0]; }
   T&            back(){ return (*this)[size()-1]; }
-  void        insert(const char* key, int const& val)
+  bool        insert(const char* key, int const& val)
   {
+    if( !(map_capacity()>elems()) )
+      if(!expand()) return false;
+
+
     HshType ht;                                   // ht is hash type
     ht.hash  =  HashStr(key);
     ht.type  =  typenum<decltype(val)>::num;      // todo: need to remove const and reference here?
@@ -286,10 +297,21 @@ public:
 
     // get start of elems
     // get idx within map_capacity
-    kv* elemSt = elem_start();
-     ht.hash % map_capacity();
+
+    KV* elems  =  (KV*)elemStart();
+    ui64  cap  =  map_capacity();
+    ui64    i  =  ht.hash;  
+    for(;;++i)
+    {
+      i %= cap;
+      if(elems[i].hsh.type == EMPTY){ elems[i] = kv; return true; }
+      else{    // check if the keys are the same 
+        strncmp(elems[i].key, kv.key, sizeof(KV::Key)-1);
+      }
+
+    }
     
-    return;
+    return true;
   }
 
   ui64          size() const
