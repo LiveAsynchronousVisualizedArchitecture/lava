@@ -78,7 +78,7 @@ int main()
     tbl t;
     t("wat") = 185;
     int wat = t("wat");
-    printf("\n wat: %d \n\n", wat);
+    printf("\n wat: %d elems: %d \n\n", wat, t.elems() );
 
     //SECTION(vector testing)
     //{

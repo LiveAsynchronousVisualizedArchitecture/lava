@@ -41,10 +41,12 @@
 // -todo: make operator() access the map
 // -todo: check for a full loop around of a hash map search
 // -todo: return a reference to a NONE KV if there was no space and the map search had to loop around to the end
+// -todo: fix reference return to just copy the key when the key is empty and not create a new KV
+// -todo: increase elems and mark type as a default (I32?) instead of EMPTY
 
+
+// todo: add type string for NONE
 // todo: fold HashType into KV ?
-// todo: increase elems and mark type as a default (I32?) instead of EMPTY
-// todo: fix reference return to just copy the key when the key is empty and not create a new KV
 // todo: turn operator() into a template
 // todo: test types to make sure EMPTY and NONE are not duplicated
 // todo: make reserve rehash and reinsert all elements
@@ -297,53 +299,43 @@ public:
   tbl(tbl&&      r){ mv(r); }
   tbl& operator=(tbl&&      r){ mv(r); return *this; }
 
-  operator    ui64() const { return size(); }
-  operator    bool() const { return m_mem!=nullptr; }
-  T&    operator[](ui64 i){ return ((T*)m_mem)[i]; }
-  auto  operator[](ui64 i) const -> T const& { return ((T*)m_mem)[i]; }
+  operator      ui64() const { return size(); }
+  operator      bool() const { return m_mem!=nullptr; }
+  T&      operator[](ui64 i){ return ((T*)m_mem)[i]; }
+  auto    operator[](ui64 i) const -> T const& { return ((T*)m_mem)[i]; }
   KV&     operator()(const char* key) // todo: just needs to return a kv reference since the kv can be set with operator=() ?
   {
     if( !(map_capacity()>elems()) )
       if(!expand()) return KV::none_kv();
 
-    //HshType ht;                                   // ht is hash type
-    //ht.hash  =  HashStr(key);
-    //ht.type  =  NONE; // typenum<decltype(val)>::num;      // todo: need to remove const and reference here?
-
-    //KV  kv;
-    ////kv       =  val;
-    //kv.hsh.hash  =  HashStr(key);
-    //strcpy_s(kv.key, sizeof(kv.key), key);
-
     ui32   hsh  =  HashStr(key);
-    KV*  elems  =  (KV*)elemStart();
+    KV*     el  =  (KV*)elemStart();                                   // el is a pointer to the elements 
     ui64   cap  =  map_capacity();  
     ui64     i  =  hsh;
     ui64  wrap  =  hsh % cap - 1;
-    ui64    en  =  wrap<(cap-1)? wrap : cap-1;     // min(ht.hash % cap - 1, cap-1);   // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap?   // % m_sz;   //>0? hash-1  :  m_sz  
+    ui64    en  =  wrap<(cap-1)? wrap : cap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
     for(;;++i)
     {
-      i %= cap;                                                           // get idx within map_capacity
-      HshType eh = elems[i].hsh;                                          // eh is element hash
-      if(elems[i].hsh.type==EMPTY){ 
-        strcpy_s(elems[i].key, sizeof(KV::Key), key);
-        elems[i].hsh.hash = hsh;
-        return elems[i];
-        //return true;
-      }else if(hsh == eh.hash){                                           // if the hashes aren't the same, the keys can't be the same
-        auto cmp = strncmp(elems[i].key, key, sizeof(KV::Key)-1);         // check if the keys are the same 
-        if(cmp==0) return elems[i];
+      i %= cap;                                                        // get idx within map_capacity
+      HshType eh = el[i].hsh;                                          // eh is element hash
+      if(el[i].hsh.type==EMPTY){ 
+        strcpy_s(el[i].key, sizeof(KV::Key), key);
+        el[i].hsh.hash = hsh;
+        el[i].hsh.type = NONE;                                         // this makes this slot no longer empty. When an assignment occurs it will overwrite this type.
+        set_elems( elems()+1 );
+        return el[i];
+      }else if(hsh == eh.hash){                                        // if the hashes aren't the same, the keys can't be the same
+        auto cmp = strncmp(el[i].key, key, sizeof(KV::Key)-1);         // check if the keys are the same 
+        if(cmp==0) return el[i];
       }
 
-      if(i==en) break;                                                    // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+      if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
     }
     
-    //KV kv;
-    //kv.hsh.type = NONE;
     return KV::none_kv();
   }
-  tbl   operator>>(tbl const& l){ return tbl::concat(*this, l); }
-  tbl   operator<<(tbl const& l){ return tbl::concat(*this, l); }
+  tbl     operator>>(tbl const& l){ return tbl::concat(*this, l); }
+  tbl     operator<<(tbl const& l){ return tbl::concat(*this, l); }
 
   bool          push(T const& value)
   {
@@ -521,10 +513,11 @@ private:
     return hsh & HASH_MASK;
   }
 public:
-  static char const* const type_str(Type t)
+  static auto     type_str(Type t) -> char const* const 
   {
     switch(t)
     {
+    case  NONE: return  "None";
     case EMPTY: return "Empty";
     
     case   UI8: return  "ui8";
@@ -553,11 +546,11 @@ public:
     }
     //return "Empty";
   }
-  static ui64 sizeBytes(ui64 count)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
+  static ui64    sizeBytes(ui64 count)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
   {
     return memberBytes() + sizeof(T)*count;
   }
-  static tbl     concat(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
+  static tbl        concat(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
   {
     auto sz = a.size();
     tbl ret(sz + b.size());
@@ -576,6 +569,22 @@ public:
 
 
 
+
+
+
+
+
+//HshType ht;                                   // ht is hash type
+//ht.hash  =  HashStr(key);
+//ht.type  =  NONE; // typenum<decltype(val)>::num;      // todo: need to remove const and reference here?
+
+//KV  kv;
+////kv       =  val;
+//kv.hsh.hash  =  HashStr(key);
+//strcpy_s(kv.key, sizeof(kv.key), key);
+
+//KV kv;
+//kv.hsh.type = NONE;
 
 //struct      Var
 //{
