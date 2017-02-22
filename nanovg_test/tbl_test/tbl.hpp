@@ -26,28 +26,39 @@
 // -todo: make copy constructor and assignment operator
 // -todo: test and fix destructor crash - reversed boolean of m_mem
 // -todo: make bool implicit cast that evaluates pointer
+// -todo: make vector expand to 8 elements minimum
+// -todo: make 1 bit always indicate signed, 1 bit always indicate table, 1 bit indicate integer, and 2 bits indicate the bit depth as 3,4,5, or 6 - same 5 bits as discreet 21 types if unsigned & not integer is used for empty!
+// -todo: re-test type assertions after structuring enum bits
+// -todo: make variant structure
+// -todo: make enum with number types and table-number types
+// -todo: copy in hash function from simdb
+// -todo: make elems() the number of elements in the map
+// -todo: change reserve to use both size and elems 
+// -todo: start on map
+// -todo: store needed map data on heap - map elements and ????
 
-// todo: make 1 bit always indicate signed, 1 bit always indicate table, 1 bit indicate integer, and 2 bits indicate the bit depth as 3,4,5, or 6 - same 5 bits as discreet 21 types if unsigned & not integer is used for empty!
-// todo: re-test type assertions after structuring enum bits
+// todo: make operator() access the map
+// todo: make instert() function 
+// todo: make has() function or STL equivilent
+// todo: make emplace and emplace_back()
 // todo: make switch statement to have flexible number casts (a ui8 can be cast without error to a ui32)
 // todo: make kv have implicit casts to the different number types
-// todo: make variant structure
-// todo: make enum with number types and table-number types
-// todo: make a table hold any type, but a map hold only numbers and table-number types
 // todo: make copy use resize
 // todo: make sure destructor is being run on objects being held once turned into a template
 // todo: make resize()
 // todo: make begin and end iterators to go with C++11 for loops - loop through keys value pairs?
-// todo: make emplace and emplace_back()
 // todo: make shrink_to_fit()
 // todo: make constructor with default value
 // todo: make operator~ return just the vector
 // todo: make different unary operator return just the map?
-// todo: try template constructor that returns a tbl<type> with a default value set?
 // todo: use binary bit operators to make tbl act like a set
 // todo: make operator-- be shrink_to_fit() and ++ be resize() ?
 // todo: robin hood hashing
 // todo: make visualization for table as a tree that shows arrays, key-values and their types, then sub tables - make various visualizations for arrays - histogram, graph, ???
+// todo: make a table hold any type, but a map hold only numbers and table-number types
+// todo: try template constructor that returns a tbl<type> with a default value set?
+// todo: add ability to use a function in the template type declaration to give a custom accessor by making operator() a variadic template?
+// todo: make key length a constant so that key functions that work on C strings can be limited in length
 
 
 #ifndef __TBL_HEADERGUARD_H__
@@ -81,29 +92,13 @@
   #define tbl_PRNT(msg)
 #endif
 
-//namespace wat
-//{
-//  enum Type
-//  {                                                           // 10 number types, 10 table variants + empty = 21 total - at least 5 bits needed
-//    EMPTY = 0,
-//    UI8,   I8,  UI16,  I16,  UI32,  I32,  UI64,  I64,  F32,  F64,
-//    tUI8, tI8, tUI16, tI16, tUI32, tI32, tUI64, tI64, tF32, tF64
-//  };
-//}
-
-//static const char EMPTYs[] = "EMPTY";
-//static const char   F32s[] =   "f32";
-//static const ui64 namestr;
-//char const* const typenum<f32>::namestr = "f32";
-
 class tbl
 {
 public:                                                                       // forward declarations
   enum Type;
 
 private:
-
-  void   set_sizeBytes(ui64 bytes) const // -> ui64
+  void   set_sizeBytes(ui64 bytes) // -> ui64
   {
     *( (ui64*)memStart() ) = bytes;
   }
@@ -111,9 +106,17 @@ private:
   {
     *( ((ui64*)memStart()) + 1 ) = size;
   }
+  void       set_elems(ui64 elems)
+  {
+    *( ((ui64*)memStart()) + 2 ) = elems;
+  }
   void*       memStart()
   {
     return (void*)(m_mem - memberBytes());
+  }
+  void*      elemStart()
+  {
+    return data() + capacity()*sizeof(T);
   }
   void             del()
   { 
@@ -124,7 +127,7 @@ private:
   {
     tbl_PRNT(" copied ");
     del();
-    reserve(l.size());    // todo: can be done with resize, which could use realloc instead of free and malloc?
+    reserve(l.size(), l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
     //resize(l.size());
 
     TO(l,i) push(l[i]); 
@@ -141,10 +144,6 @@ public:
     TABLE       =  1<<4,
     SIGNED      =  1<<3,
     INTEGER     =  1<<2,
-    //POWEROF2_3  =     0,                    // 2^3 is  8 for  8 bit depth
-    //POWEROF2_4  =     1,                    // 2^4 is 16 for 16 bit depth
-    //POWEROF2_5  =  1<<1,                    // 2^5 is 32 for 32 bit depth
-    //POWEROF2_6  =  1<<1 | 1,                // 2^6 is 64 for 64 bit depth
     BITS_8      =     0,                    // 2^3 is  8 for  8 bit depth
     BITS_16     =     1,                    // 2^4 is 16 for 16 bit depth
     BITS_32     =  1<<1,                    // 2^5 is 32 for 32 bit depth
@@ -172,8 +171,6 @@ public:
      tI64       =  TABLE | INTEGER | BITS_64 | SIGNED,
      tF32       =  TABLE | BITS_32,
      tF64       =  TABLE | BITS_64,
-
-     //tUI8, tI8, tUI16, tI16, tUI32, tI32, tUI64, tI64, tF32, tF64
   };
   template<class N> struct typenum { static const ui8 num = EMPTY; };
   template<> struct typenum<ui8>   { static const ui8 num = UI8;   }; 
@@ -199,10 +196,10 @@ public:
 
   union   HshType
   {
-    struct { ui32 type : 5; ui32 : 27; };
+    struct { ui32 type : 5; ui32 hash: 27; };
     ui32 as_ui32;
   };
-  struct       kv
+  struct       KV
   {
     HshType   hsh;
     char      key[19];
@@ -223,14 +220,8 @@ public:
     }
     template<class T> T as(){ return (T)(*this); }
   };
-  struct      Var
-  {
-    ui8   type;
-    ui64  data; 
-  };
 
   using T    =  int;
-  using var  =  Var;
 
   i8*     m_mem;
  
@@ -238,17 +229,14 @@ public:
     m_mem(nullptr)
   {
   }
-  tbl(ui64 count) 
-  {
-    //m_size(count),
-    //ui64  cntBytes  =  count*sizeof(T);
-    //ui64   szBytes  =  cntBytes + memberBytes();             // sizeof(ui64)*2;
-    
-    ui64   szBytes  =  tbl::sizeBytes(count);
+  tbl(ui64 size) 
+  {    
+    ui64   szBytes  =  tbl::sizeBytes(size);
     i8*      memst  =  (i8*)malloc(szBytes);                 // memst is memory start
     m_mem           =  memst + memberBytes();
     set_sizeBytes(szBytes);
-    set_size(count);
+    set_elems(0);
+    set_size(size);
   }
   ~tbl(){ del(); }
 
@@ -261,15 +249,15 @@ public:
   operator    bool() const { return m_mem!=nullptr; }
   T&    operator[](ui64 i){ return ((T*)m_mem)[i]; }
   auto  operator[](ui64 i) const -> T const& { return ((T*)m_mem)[i]; }
-  //var&  operator()(const char*)                             // todo: future hash map interface
+  //KV&  operator()(const char* key) // todo: just needs to return a kv reference since the kv can be set with operator=() ?
   //{
-  //  Var nonsense;
-  //  return nonsense;
+  //  
+  //  return;
   //}
   tbl   operator>>(tbl const& l){ return tbl::concat(*this, l); }
   tbl   operator<<(tbl const& l){ return tbl::concat(*this, l); }
 
-  bool        push(T const& value)
+  bool          push(T const& value)
   {
     if( !(capacity()>size()) )
       if(!expand()) return false;
@@ -280,46 +268,71 @@ public:
 
     return true;
   }
-  bool   push_back(T const& value){ return push(value); }
-  void         pop(){ /*delete &(back());*/ set_size(size()-1); }  // todo: needs to run the destructor here
-  void    pop_back(){ pop(); }
-  T&         front(){ return (*this)[0]; }
-  T&          back(){ return (*this)[size()-1]; }
+  bool     push_back(T const& value){ return push(value); }
+  void           pop(){ /*delete &(back());*/ set_size(size()-1); }  // todo: needs to run the destructor here
+  void      pop_back(){ pop(); }
+  T&           front(){ return (*this)[0]; }
+  T&            back(){ return (*this)[size()-1]; }
+  void        insert(const char* key, int const& val)
+  {
+    HshType ht;                                   // ht is hash type
+    ht.hash  =  HashStr(key);
+    ht.type  =  typenum<decltype(val)>::num;      // todo: need to remove const and reference here?
+    
+    KV  kv;
+    kv       =  val;
+    kv.hsh   =   ht;
+    strcpy_s(kv.key, sizeof(kv.key), key);
 
-  ui64        size() const
+    // get start of elems
+    // get idx within map_capacity
+    kv* elemSt = elem_start();
+     ht.hash % map_capacity();
+    
+    return;
+  }
+
+  ui64          size() const
   {
     if(!m_mem) return 0;
 
     return *( ((ui64*)memStart()) + 1 );
   }
-  T*          data() const
+  T*            data() const
   {
     return (T*)m_mem;
   }
-  void*   memStart() const
+  void*     memStart() const
   {
     return (void*)(m_mem - memberBytes());
   }
-  ui64   sizeBytes() const // -> ui64
+  ui64     sizeBytes() const // -> ui64
   {
     if(!m_mem) return 0;
 
     return *( (ui64 const*)memStart() );
   }
-  ui64    capacity() const
+  ui64      capacity() const
   {
     if(!m_mem) return 0;
 
     return (sizeBytes() - memberBytes()) / sizeof(T);  // - size()*sizeof(T)
   }
-  ui64       count() const
+  ui64         elems() const
   {
-    // todo: make this the number of elements in the map
-    //return *( ((ui64*)memStart()) - 1 );
+    if(!m_mem) return 0;
+
+    return *( ((ui64*)memStart()) + 2);
   }
-  void*    reserve(ui64 size)
+  ui64  map_capacity() const
   {
-    auto  nxtBytes  =  memberBytes() + sizeof(T)*size;
+    if(!m_mem) return 0;
+
+    return sizeBytes() - memberBytes() - size()*sizeof(T);
+  }
+  void*      reserve(ui64 size, ui64 elems)
+  {
+    auto  nxtBytes  =  memberBytes() + sizeof(T)*size + sizeof(KV)*elems;
     void*       re;
     bool     fresh  = !m_mem;
     if(fresh) re = malloc(nxtBytes);
@@ -330,24 +343,60 @@ public:
       set_sizeBytes(nxtBytes);
     }    
 
-    if(fresh) set_size(0);
+    if(fresh){ set_size(0); set_elems(0); }
     
     return re;
     
     //set_sizeBytes(nxtBytes);
   }
-  void*     expand()
+  void*       expand()
   {
+    //ui64 nxtSz = (sz/2)? sz+sz/2 : sz+1;
+
     ui64    sz = size();
-    ui64 nxtSz = (sz/2)? sz+sz/2 : sz+1;
-    return reserve(nxtSz);
+    ui64 nxtSz = sz + sz/2;
+    nxtSz      = nxtSz<8? 8 : nxtSz;
+
+    ui64    el = elems();
+    ui64 nxtEl = el + el/2;
+    nxtEl      = nxtEl<8? 8 : nxtEl;
+
+    return reserve(nxtSz, nxtEl);
   }
 
 
 private:
-  static ui64 memberBytes()
+  static ui64  memberBytes()
   {
-    return sizeof(ui64) * 2;
+    return sizeof(ui64) * 3;
+  }
+  static ui64  fnv_64a_buf(void const* const buf, ui64 len)
+  {
+    // const ui64 FNV_64_PRIME = 0x100000001b3;
+    ui64 hval = 0xcbf29ce484222325;    // FNV1_64_INIT;  // ((Fnv64_t)0xcbf29ce484222325ULL)
+    ui8*   bp = (ui8*)buf;	           /* start of buffer */
+    ui8*   be = bp + len;		           /* beyond end of buffer */
+
+    while(bp < be)                     // FNV-1a hash each octet of the buffer
+    {
+      hval ^= (ui64)*bp++;             /* xor the bottom with the current octet */
+
+      //hval *= FNV_64_PRIME; // does this do the same thing?  /* multiply by the 64 bit FNV magic prime mod 2^64 */
+      hval += (hval << 1) + (hval << 4) + (hval << 5) +
+              (hval << 7) + (hval << 8) + (hval << 40);
+    }
+    return hval;
+  }
+  static ui32    HashBytes(const void *const buf, ui32 len)
+  {
+    ui64 hsh = fnv_64a_buf(buf, len);
+
+    return (ui32)( (hsh>>32) ^ ((ui32)hsh));        // fold the 64 bit hash onto itself
+  }
+  static ui32      HashStr(const char* s)
+  {
+    ui32 len = (ui32)strlen(s);
+    return HashBytes(s, len);
   }
 public:
   static char const* const type_str(Type t)
@@ -404,7 +453,38 @@ public:
 
 
 
+//struct      Var
+//{
+//  ui8   type;
+//  ui64  data; 
+//};
+//using var  =  Var;
 
+//m_size(count),
+//ui64  cntBytes  =  count*sizeof(T);
+//ui64   szBytes  =  cntBytes + memberBytes();             // sizeof(ui64)*2;
+
+//namespace wat
+//{
+//  enum Type
+//  {                                                           // 10 number types, 10 table variants + empty = 21 total - at least 5 bits needed
+//    EMPTY = 0,
+//    UI8,   I8,  UI16,  I16,  UI32,  I32,  UI64,  I64,  F32,  F64,
+//    tUI8, tI8, tUI16, tI16, tUI32, tI32, tUI64, tI64, tF32, tF64
+//  };
+//}
+
+//static const char EMPTYs[] = "EMPTY";
+//static const char   F32s[] =   "f32";
+//static const ui64 namestr;
+//char const* const typenum<f32>::namestr = "f32";
+
+//POWEROF2_3  =     0,                    // 2^3 is  8 for  8 bit depth
+//POWEROF2_4  =     1,                    // 2^4 is 16 for 16 bit depth
+//POWEROF2_5  =  1<<1,                    // 2^5 is 32 for 32 bit depth
+//POWEROF2_6  =  1<<1 | 1,                // 2^6 is 64 for 64 bit depth
+//
+//tUI8, tI8, tUI16, tI16, tUI32, tI32, tUI64, tI64, tF32, tF64
 
 //template<> struct typenum<ui8>   { static const ui8 num =   UI8; static const char* namestr =   "ui8"; };
 //

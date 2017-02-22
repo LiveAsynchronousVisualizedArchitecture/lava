@@ -9,18 +9,41 @@ int main()
   using namespace std;
   
   //printf("\n variant size: %d \n\n\n", sizeof(tbl::Var) );
-  printf("\n");
-  printf("kv size: %d \n", sizeof(tbl::kv) );
+  //printf("\n");
+  //printf("kv size: %d \n", sizeof(tbl::kv) );
+  
   printf("\n");
 
-  tbl::kv num;
-  num    =  85.0f;  // 85.0f;
-  //ui32 n = num; // assert fails
-  //f32 n = (f32)(num.as<f32>());
-  f32 n = num.as<f32>();
-  printf("int:   %d   \n",  n);
-  printf("float: %.5f \n",  n);
-  printf("\n");
+  //SECTION(assigning a double and extracting a float fails)
+  //{
+  //  tbl::kv num;
+  //  num    =  85.0;
+  //  //ui32 n = num; // assert fails
+  //  //f32 n = (f32)(num.as<f32>());
+  //  f32 n  =  num.as<f32>();
+  //  printf("int:   %d   \n",  n);
+  //  printf("float: %.5f \n",  n);
+  //  printf("\n");
+  //}
+
+  //SECTION(assigning a ui16 and extrating a i32 fails for now)
+  //{
+  //  tbl::kv num;
+  //  num     =  (ui16)85;
+  //  ui32 n  =  num;
+  //  printf("int:   %d   \n",  n);
+  //  printf("\n");
+  //}
+
+  SECTION(same types)
+  {
+    tbl::KV num;
+    num    =  85;
+    i32 n  =  num;
+    printf("int:   %d   \n",  n);
+    printf("\n");
+  }
+
 
   //void* wat =  malloc(100);
   //void*  re = realloc(wat, (ui64)1 << 9);
