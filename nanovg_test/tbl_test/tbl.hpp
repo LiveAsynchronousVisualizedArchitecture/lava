@@ -59,6 +59,7 @@
 // -todo: figure out casting from integer to float but not float to integer - just check for float to integer scenario
 // -todo: make switch statement to have flexible number casts (a ui8 can be cast without error to a ui32)
 
+// todo: make signed to unsigned debug catch for implicit casts
 // todo: make constructor with default value
 // todo: make reserve rehash and reinsert all elements
 // todo: test putting more than 8 elements into map
@@ -265,12 +266,12 @@ public:
     { 
       if(hsh.type==typenum<N>::num) return *((N*)&val);    // if the types are the same, return it as the cast directly
       
-      ui8   both = hsh.type | typenum<N>::num;              // both bits
+      //ui8   both = hsh.type | typenum<N>::num;              // both bits
 
-      if( (both & TABLE) ){
+      if( (hsh.type & SIGNED) && !(typenum<N>::num & SIGNED)  ){
         tbl_msg_assert(
           hsh.type==typenum<N>::num, 
-          " - tbl TYPE ERROR -\nTables can not be implicitly cast, even to a larger bit depth.\nInternal type was: ", 
+          " - tbl TYPE ERROR -\nSigned integers can not be implicitly cast to unsigned integers.\nInternal type was: ", 
           tbl::type_str((Type)hsh.type), 
           "Desired  type was: ",
           tbl::type_str((Type)typenum<N>::num) );
@@ -279,6 +280,14 @@ public:
         tbl_msg_assert(
           hsh.type==typenum<N>::num, 
           " - tbl TYPE ERROR -\nFloats can not be implicitly cast to integers.\nInternal type was: ", 
+          tbl::type_str((Type)hsh.type), 
+          "Desired  type was: ",
+          tbl::type_str((Type)typenum<N>::num) );
+      }
+      if( (hsh.type|typenum<N>::num) & TABLE ){
+        tbl_msg_assert(
+          hsh.type==typenum<N>::num, 
+          " - tbl TYPE ERROR -\nTables can not be implicitly cast, even to a larger bit depth.\nInternal type was: ", 
           tbl::type_str((Type)hsh.type), 
           "Desired  type was: ",
           tbl::type_str((Type)typenum<N>::num) );
@@ -353,7 +362,8 @@ public:
   }
   tbl(ui64 size, int const& value)
   {
-
+    tbl::tbl(size);
+    TO(size, i) (*this)[i] = value;
   }
   ~tbl(){ del(); }
 

@@ -124,9 +124,19 @@ int main()
     double e = t("e");
     printf("\n e: %.3f \n\n", e);
 
-    t("f") = 85.0;                       // fails in debug mode
-    i64 f = t("f");
-    printf("\n f: %d \n\n", f);
+    //t("f") = 85.0;                      // fails in debug mode, prints 0 in release mode
+    //i64 f = t("f");
+    //printf("\n f: %d \n\n", f);
+
+    //t("g") = -85;                         // fails in debug mode, prints a huge unsigned number in release mode
+    //ui64 g = t("g");
+    //printf("\n g: %ull \n\n", g);
+  }
+
+  SECTION(test default value for vector)
+  {
+    tbl t(10, 85);
+    printf();
   }
 
   //float*  pos = t("pos").data();
