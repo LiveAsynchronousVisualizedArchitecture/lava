@@ -136,7 +136,7 @@ int main()
   SECTION(test default value for vector)
   {
     tbl t(10, 85);
-    printf();
+    TO(t,i) printf(" %d ", t[i]);
   }
 
   //float*  pos = t("pos").data();

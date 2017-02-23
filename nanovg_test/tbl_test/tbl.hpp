@@ -147,6 +147,16 @@ private:
   {
     return (KV*)(data() + capacity());
   }
+  void            init(ui64 size)
+  {
+    ui64   szBytes  =  tbl::sizeBytes(size);
+    i8*      memst  =  (i8*)malloc(szBytes);                 // memst is memory start
+    m_mem           =  memst + memberBytes();
+    set_sizeBytes(szBytes);
+    set_elems(0);
+    set_capacity(size);
+    set_size(size);
+  }
   void             del()
   { 
     // todo: needs to loop through and run destructors here
@@ -352,17 +362,19 @@ public:
   }
   tbl(ui64 size)                                 // have to run default constructor here?
   {    
-    ui64   szBytes  =  tbl::sizeBytes(size);
-    i8*      memst  =  (i8*)malloc(szBytes);                 // memst is memory start
-    m_mem           =  memst + memberBytes();
-    set_sizeBytes(szBytes);
-    set_elems(0);
-    set_capacity(size);
-    set_size(size);
+    //ui64   szBytes  =  tbl::sizeBytes(size);
+    //i8*      memst  =  (i8*)malloc(szBytes);                 // memst is memory start
+    //m_mem           =  memst + memberBytes();
+    //set_sizeBytes(szBytes);
+    //set_elems(0);
+    //set_capacity(size);
+    //set_size(size);
+
+    init(size);
   }
-  tbl(ui64 size, int const& value)
+  tbl(ui64 size, T const& value)
   {
-    tbl::tbl(size);
+    init(size);
     TO(size, i) (*this)[i] = value;
   }
   ~tbl(){ del(); }
