@@ -58,10 +58,11 @@
 // -todo: make a double cast template function - template<class FROM, class TO> 
 // -todo: figure out casting from integer to float but not float to integer - just check for float to integer scenario
 // -todo: make switch statement to have flexible number casts (a ui8 can be cast without error to a ui32)
+// -todo: make signed to unsigned debug catch for implicit casts
+// -todo: make constructor with default value
 
-// todo: make signed to unsigned debug catch for implicit casts
-// todo: make constructor with default value
 // todo: make reserve rehash and reinsert all elements
+// todo: revisit concactenation to make sure map elems are copied
 // todo: test putting more than 8 elements into map
 // todo: test KV with key string above character length  
 // todo: fold HashType into KV? - would have to make an internal struct/union?
@@ -69,7 +70,6 @@
 // todo: make emplace and emplace_back()
 // todo: make resize()
 // todo: make copy use resize
-// todo: revisit concactenation to make sure map elems are copied
 // todo: make sure destructor is being run on objects being held once turned into a template
 // todo: make shrink_to_fit()
 // todo: make begin and end iterators to go with C++11 for loops - loop through keys value pairs?
