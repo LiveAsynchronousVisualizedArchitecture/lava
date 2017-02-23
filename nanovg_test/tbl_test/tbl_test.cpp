@@ -10,7 +10,7 @@ int main()
   
   //printf("\n variant size: %d \n\n\n", sizeof(tbl::Var) );
   //printf("\n");
-  //printf("kv size: %d \n", sizeof(tbl::kv) );
+  printf("KV size: %d \n", sizeof(tbl::KV) );
   
   printf("\n");
 
@@ -71,32 +71,62 @@ int main()
   //tbl nul;
   //if(nul) printf("\n bool: %d \n\n", (bool)nul );
   //int bin = 0b10000;
-  printf("\n 1<<: %d \n\n", 1<<4 );
+  //printf("\n 1<<: %d \n\n", 1<<4 );
 
-  //TO(1000000, leak)
+  //SECTION(test map and vector inserts)
+  ////TO(1000000, leak)
+  //{
+  //  tbl t;
+  //  printf("\n has wat: %d \n\n", t.has("wat") );
+  //  //t("wat") = 185;
+  //  t.insert("wat", 185);
+  //  int wat = t("wat");
+  //  printf("\n wat: %d elems: %d \n\n", wat, t.elems() );
+  //  printf("\n has wat: %d \n\n", t.has("wat") );
+  //  //printf("\n EMPTY: %d NONE: %d ERROR: %d \n\n", tbl::EMPTY, tbl::NONE, tbl::ERROR );
+  //
+  //  //SECTION(vector testing)
+  //  //{
+  //  //  TO(5,i) t.push( (int)i );
+  //  //  //TO(t,i){ printf(" %d \n", t[i] ); } 
+  //  //  TO(t-2,i){
+  //  //    printf(" %d \n", t.back() );
+  //  //    t.pop();
+  //  //  } 
+  //  //  printf("\n", t.back() );
+  //  //
+  //  //  tbl t2;
+  //  //  TO(5,i) t2.push( (int)(i*i) );
+  //  //  tbl t3 = t >> t2;
+  //  //  auto t4 = t >> t2;
+  //  //
+  //  //  TO(t3,i){ printf(" %d \n", t3.back() ); t3.pop(); } 
+  //  //}
+  //}
+
+  SECTION(test implicit casting to higher bit depths)
   {
     tbl t;
-    t("wat") = 185;
-    int wat = t("wat");
-    printf("\n wat: %d elems: %d \n\n", wat, t.elems() );
 
-    //SECTION(vector testing)
-    //{
-    //  TO(5,i) t.push( (int)i );
-    //  //TO(t,i){ printf(" %d \n", t[i] ); } 
-    //  TO(t-2,i){
-    //    printf(" %d \n", t.back() );
-    //    t.pop();
-    //  } 
-    //  printf("\n", t.back() );
-    //
-    //  tbl t2;
-    //  TO(5,i) t2.push( (int)(i*i) );
-    //  tbl t3 = t >> t2;
-    //  auto t4 = t >> t2;
-    //
-    //  TO(t3,i){ printf(" %d \n", t3.back() ); t3.pop(); } 
-    //}
+    t("a") = (ui8)85;
+    int a = t("a");
+    printf("\n a: %d \n\n", a);
+
+    t("b") = (ui16)85;
+    int b = t("b");
+    printf("\n b: %d \n\n", b);
+
+    t("c") = (ui32)85;
+    i64 c  = t("c");
+    printf("\n c: %d \n\n", c);
+
+    t("e") = 85.0f;
+    double e = t("e");
+    printf("\n e: %.3f \n\n", e);
+
+    t("f") = 85.0;                       // fails in debug mode
+    i64 f = t("f");
+    printf("\n f: %d \n\n", f);
   }
 
   //float*  pos = t("pos").data();

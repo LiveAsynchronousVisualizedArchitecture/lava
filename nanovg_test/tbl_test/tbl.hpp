@@ -43,35 +43,44 @@
 // -todo: return a reference to a NONE KV if there was no space and the map search had to loop around to the end
 // -todo: fix reference return to just copy the key when the key is empty and not create a new KV
 // -todo: increase elems and mark type as a default (I32?) instead of EMPTY
+// -todo: add type string for NONE
+// -todo: make kv have implicit casts to the different number types
+// -todo: make another enum type for ERROR?
+// -todo: make has() function or STL equivilent - test has()
+// -todo: make insert() function 
+// -todo: turn operator() into a template - not needed because the reference to kv use the templated operator=
+// -todo: turn insert() into a template
+// -todo: test types to make sure EMPTY and NONE and ERROR are not duplicated
+// -todo: make all elements initialize to zeroed out with EMPTY enum set - just need EMPTY to be default constructor
+// -todo: make operator() return type ERROR if space isn't found 
+// -todo: make a table hold any type, but a map hold only numbers and table-number types
+// -todo: make key length a constant so that key functions that work on C strings can be limited in length
+// -todo: make a double cast template function - template<class FROM, class TO> 
+// -todo: figure out casting from integer to float but not float to integer - just check for float to integer scenario
+// -todo: make switch statement to have flexible number casts (a ui8 can be cast without error to a ui32)
 
-
-// todo: add type string for NONE
-// todo: fold HashType into KV ?
-// todo: turn operator() into a template
-// todo: test types to make sure EMPTY and NONE are not duplicated
-// todo: make reserve rehash and reinsert all elements
-// todo: make all elements initialize to zeroed out with EMPTY enum set
-// todo: make instert() function 
-// todo: make has() function or STL equivilent
-// todo: make emplace and emplace_back()
-// todo: make switch statement to have flexible number casts (a ui8 can be cast without error to a ui32)
-// todo: make kv have implicit casts to the different number types
-// todo: make copy use resize
-// todo: make sure destructor is being run on objects being held once turned into a template
-// todo: make resize()
-// todo: make begin and end iterators to go with C++11 for loops - loop through keys value pairs?
-// todo: make shrink_to_fit()
 // todo: make constructor with default value
-// todo: make operator~ return just the vector
-// todo: make different unary operator return just the map?
-// todo: use binary bit operators to make tbl act like a set
-// todo: make operator-- be shrink_to_fit() and ++ be resize() ?
+// todo: make reserve rehash and reinsert all elements
+// todo: test putting more than 8 elements into map
+// todo: test KV with key string above character length  
+// todo: fold HashType into KV? - would have to make an internal struct/union?
+// todo: give KV a default constructor and copy constructor so that the c_str key is copied?
+// todo: make emplace and emplace_back()
+// todo: make resize()
+// todo: make copy use resize
+// todo: revisit concactenation to make sure map elems are copied
+// todo: make sure destructor is being run on objects being held once turned into a template
+// todo: make shrink_to_fit()
+// todo: make begin and end iterators to go with C++11 for loops - loop through keys value pairs?
 // todo: robin hood hashing
 // todo: make visualization for table as a tree that shows arrays, key-values and their types, then sub tables - make various visualizations for arrays - histogram, graph, ???
-// todo: make a table hold any type, but a map hold only numbers and table-number types
-// todo: try template constructor that returns a tbl<type> with a default value set?
+// todo: try template constructor that returns a tbl<type> with a default value set? - can't have a constructor that reserves elems with this? would need a reserve_elems() function?
+// todo: make reserve_elems() function
 // todo: add ability to use a function in the template type declaration to give a custom accessor by making operator() a variadic template?
-// todo: make key length a constant so that key functions that work on C strings can be limited in length
+// todo: use binary bit operators to make tbl act like a set?
+// todo: make operator~ return just the vector
+// todo: make different unary operator return just the map?
+// todo: make operator-- be shrink_to_fit() and ++ be expand() ?
 
 
 #ifndef __TBL_HEADERGUARD_H__
@@ -167,8 +176,10 @@ public:
     BITS_16     =     1,                    // 2^4 is 16 for 16 bit depth
     BITS_32     =  1<<1,                    // 2^5 is 32 for 32 bit depth
     BITS_64     =  1<<1 | 1,                // 2^6 is 64 for 64 bit depth
+    BITS_MASK   =  BITS_64,
 
-     NONE       =  ~INTEGER & ~SIGNED & ~TABLE,                              // INTEGER bit turned off, SIGNED bit turned off and TABLE bit turned off, meanin unsigned float table, which is not a viable real type of course
+    ERROR       =  ~INTEGER & ~SIGNED & ~BITS_32,
+     NONE       =  ~INTEGER & ~SIGNED & ~BITS_16,          // ~TABLE,                              // INTEGER bit turned off, SIGNED bit turned off and TABLE bit turned off, meanin unsigned float table, which is not a viable real type of course
     EMPTY       =  ~INTEGER & ~SIGNED,                                       // a floating point number can't be unsigned, so this scenario is used for an 'empty' state
 
       UI8       =  INTEGER | BITS_8,   
@@ -227,13 +238,14 @@ public:
   };
   struct       KV
   {
+    template<class DEST, class SRC> 
+    static DEST cast_mem(ui64* src){ return (DEST)(*((SRC*)src)); }
+
     using Key = char[19]; 
 
     HshType   hsh;
     Key       key;
     ui64      val;
-
-    //KV(){}
 
     KV& operator=(KV const& l)
     {
@@ -247,13 +259,52 @@ public:
     }
     template<class N> operator N()
     { 
+      return as<N>();
+    }
+    template<class N> N as()
+    { 
+      if(hsh.type==typenum<N>::num) return *((N*)&val);    // if the types are the same, return it as the cast directly
+      
+      ui8   both = hsh.type | typenum<N>::num;              // both bits
+
+      if( (both & TABLE) ){
+        tbl_msg_assert(
+          hsh.type==typenum<N>::num, 
+          " - tbl TYPE ERROR -\nTables can not be implicitly cast, even to a larger bit depth.\nInternal type was: ", 
+          tbl::type_str((Type)hsh.type), 
+          "Desired  type was: ",
+          tbl::type_str((Type)typenum<N>::num) );
+      }
+      if( !(hsh.type & INTEGER) && (typenum<N>::num & INTEGER) ){
+        tbl_msg_assert(
+          hsh.type==typenum<N>::num, 
+          " - tbl TYPE ERROR -\nFloats can not be implicitly cast to integers.\nInternal type was: ", 
+          tbl::type_str((Type)hsh.type), 
+          "Desired  type was: ",
+          tbl::type_str((Type)typenum<N>::num) );
+      }
+
+      ui8 destbits = typenum<N>::num & BITS_MASK;
+      ui8  srcbits = hsh.type        & BITS_MASK;
+      if( destbits > srcbits ){
+        switch(hsh.type){
+          case  UI8: return cast_mem<N, ui8>(&val);
+          case UI16: return cast_mem<N,ui16>(&val);
+          case UI32: return cast_mem<N,ui32>(&val);
+          case   I8: return cast_mem<N,  i8>(&val);
+          case  I16: return cast_mem<N, i16>(&val);
+          case  I32: return cast_mem<N, i32>(&val);
+          case  F32: return cast_mem<N, f32>(&val);
+        }
+      }
+
       tbl_msg_assert(
         hsh.type==typenum<N>::num, 
         " - tbl TYPE ERROR -\nInternal type was: ", tbl::type_str((Type)hsh.type), 
         "Desired  type was: ",                      tbl::type_str((Type)typenum<N>::num) );
-      return *((N*)&val);
+
+      return N();
     }
-    template<class T> T as(){ return (T)(*this); }
 
     static KV     empty_kv()
     {
@@ -271,8 +322,16 @@ public:
 
       return kv;
     }
+    static KV&    error_kv()
+    {
+      static KV kv;
+      //KV kv;
+      memset(&kv, 0, sizeof(KV));
+      kv.hsh.type = ERROR;
+
+      return kv;
+    }
   };
-  //static KV KV_NONE; // = KV::none_kv();
 
   using T    =  int;
 
@@ -282,7 +341,7 @@ public:
     m_mem(nullptr)
   {
   }
-  tbl(ui64 size)           // have to run default constructor here?
+  tbl(ui64 size)                                 // have to run default constructor here?
   {    
     ui64   szBytes  =  tbl::sizeBytes(size);
     i8*      memst  =  (i8*)malloc(szBytes);                 // memst is memory start
@@ -291,6 +350,10 @@ public:
     set_elems(0);
     set_capacity(size);
     set_size(size);
+  }
+  tbl(ui64 size, int const& value)
+  {
+
   }
   ~tbl(){ del(); }
 
@@ -303,10 +366,10 @@ public:
   operator      bool() const { return m_mem!=nullptr; }
   T&      operator[](ui64 i){ return ((T*)m_mem)[i]; }
   auto    operator[](ui64 i) const -> T const& { return ((T*)m_mem)[i]; }
-  KV&     operator()(const char* key) // todo: just needs to return a kv reference since the kv can be set with operator=() ?
+  KV&     operator()(const char* key, bool make_new=true)              // todo: just needs to return a kv reference since the kv can be set with operator=() ?
   {
     if( !(map_capacity()>elems()) )
-      if(!expand()) return KV::none_kv();
+      if(!expand()) return KV::error_kv();
 
     ui32   hsh  =  HashStr(key);
     KV*     el  =  (KV*)elemStart();                                   // el is a pointer to the elements 
@@ -319,10 +382,13 @@ public:
       i %= cap;                                                        // get idx within map_capacity
       HshType eh = el[i].hsh;                                          // eh is element hash
       if(el[i].hsh.type==EMPTY){ 
-        strcpy_s(el[i].key, sizeof(KV::Key), key);
-        el[i].hsh.hash = hsh;
-        el[i].hsh.type = NONE;                                         // this makes this slot no longer empty. When an assignment occurs it will overwrite this type.
-        set_elems( elems()+1 );
+
+        if(make_new){
+          strcpy_s(el[i].key, sizeof(KV::Key), key);
+          el[i].hsh.hash = hsh;
+          el[i].hsh.type = NONE;                                       // this makes this slot no longer empty. When an assignment occurs it will overwrite this type.
+          set_elems( elems()+1 );
+        }
         return el[i];
       }else if(hsh == eh.hash){                                        // if the hashes aren't the same, the keys can't be the same
         auto cmp = strncmp(el[i].key, key, sizeof(KV::Key)-1);         // check if the keys are the same 
@@ -332,7 +398,7 @@ public:
       if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
     }
     
-    return KV::none_kv();
+    return KV::error_kv();
   }
   tbl     operator>>(tbl const& l){ return tbl::concat(*this, l); }
   tbl     operator<<(tbl const& l){ return tbl::concat(*this, l); }
@@ -353,44 +419,19 @@ public:
   void      pop_back(){ pop(); }
   T&           front(){ return (*this)[0]; }
   T&            back(){ return (*this)[size()-1]; }
-  bool        insert(const char* key, int const& val)
+
+  template<class N> bool insert(const char* key, N const& val)
   {
-    if( !(map_capacity()>elems()) )
-      if(!expand()) return false;
+    KV& kv = (*this)(key, true);
+    if(kv.hsh.type==ERROR) return false;
 
-
-    HshType ht;                                   // ht is hash type
-    ht.hash  =  HashStr(key);
-    ht.type  =  typenum<decltype(val)>::num;      // todo: need to remove const and reference here?
-    
-    KV  kv;
-    kv       =  val;
-    kv.hsh   =   ht;
-    strcpy_s(kv.key, sizeof(kv.key), key);
-
-    // get start of elems
-    KV* elems  =  (KV*)elemStart();
-    ui64  cap  =  map_capacity();  
-    ui64    i  =  ht.hash;  
-    for(;;++i)
-    {
-      i %= cap;                                                         // get idx within map_capacity
-      HshType eh = elems[i].hsh;                                        // eh is element hash
-      if(elems[i].hsh.type==EMPTY){ 
-        elems[i] = kv; 
-        return true;
-      }else{                                                            // check if the keys are the same 
-        if(ht.hash!=eh.hash) continue;                                  // if the hashes aren't the same, the keys can't be the same
-        
-        auto cmp = strncmp(elems[i].key, kv.key, sizeof(KV::Key)-1);
-        if(cmp!=0) continue;
-        
-        elems[i] = kv;
-        return true;
-      }
-    }
-    
+    kv = val;
     return true;
+  }
+  bool           has(const char* key)
+  {
+    KV& kv = (*this)(key, false);
+    return kv.hsh.type != EMPTY;
   }
 
   ui64          size() const
@@ -473,7 +514,6 @@ public:
 
     return reserve(nxtSz, nxtEl);
   }
-
 
 private:
   static const ui32 HASH_MASK = 0x07FFFFFF;
@@ -562,9 +602,6 @@ public:
   }
 };
 
-//tbl::KV tbl::KV_NONE = tbl::KV::none_kv();
-
-
 #endif
 
 
@@ -573,6 +610,61 @@ public:
 
 
 
+//tbl_msg_assert(
+//  hsh.type==typenum<N>::num, 
+//  " - tbl TYPE ERROR -\nInternal type was: ", tbl::type_str((Type)hsh.type), 
+//  "Desired  type was: ",                      tbl::type_str((Type)typenum<N>::num) );
+//
+//return *((N*)&val);
+
+//ui8 typnum = typenum<N>::num;
+//ui8    shr = hsh.type & typnum;    // the shared bits
+//ui8    dif = hsh.type ^ typnum;    // the different bits
+//
+//if(dif & TABLE)   /*error*/ ;                        // don't cast a table, just error if the types are different 
+//if(dif & INTEGER) /*error*/ ;                        // 
+
+//KV(){}
+//
+//static KV KV_NONE; // = KV::none_kv();
+//
+//tbl::KV tbl::KV_NONE = tbl::KV::none_kv();
+
+//if( !(map_capacity()>elems()) )
+//  if(!expand()) return false;
+//
+//HshType ht;                                   // ht is hash type
+//ht.hash  =  HashStr(key);
+//ht.type  =  typenum<decltype(val)>::num;      // todo: need to remove const and reference here?
+//
+//KV  kv;
+//kv       =  val;
+//kv.hsh   =   ht;
+//strcpy_s(kv.key, sizeof(kv.key), key);
+//
+//// get start of elems
+//KV* elems  =  (KV*)elemStart();
+//ui64  cap  =  map_capacity();  
+//ui64    i  =  ht.hash;  
+//for(;;++i)
+//{
+//  i %= cap;                                                         // get idx within map_capacity
+//  HshType eh = elems[i].hsh;                                        // eh is element hash
+//  if(elems[i].hsh.type==EMPTY){ 
+//    elems[i] = kv; 
+//    return true;
+//  }else{                                                            // check if the keys are the same 
+//    if(ht.hash!=eh.hash) continue;                                  // if the hashes aren't the same, the keys can't be the same
+//    
+//    auto cmp = strncmp(elems[i].key, kv.key, sizeof(KV::Key)-1);
+//    if(cmp!=0) continue;
+//    
+//    elems[i] = kv;
+//    return true;
+//  }
+//}
+//
+//return true;
 
 //HshType ht;                                   // ht is hash type
 //ht.hash  =  HashStr(key);
