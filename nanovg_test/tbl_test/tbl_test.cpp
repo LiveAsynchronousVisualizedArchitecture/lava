@@ -104,39 +104,107 @@ int main()
   //  //}
   //}
 
-  SECTION(test implicit casting to higher bit depths)
+  //SECTION(test implicit casting to higher bit depths)
+  //{
+  //  tbl t;
+  //
+  //  t("a") = (ui8)85;
+  //  int a = t("a");
+  //  printf("\n a: %d \n\n", a);
+  //
+  //  t("b") = (ui16)85;
+  //  int b = t("b");
+  //  printf("\n b: %d \n\n", b);
+  //
+  //  t("c") = (ui32)85;
+  //  i64 c  = t("c");
+  //  printf("\n c: %d \n\n", c);
+  //
+  //  t("e") = 85.0f;
+  //  double e = t("e");
+  //  printf("\n e: %.3f \n\n", e);
+  //
+  //  //t("f") = 85.0;                      // fails in debug mode, prints 0 in release mode
+  //  //i64 f = t("f");
+  //  //printf("\n f: %d \n\n", f);
+  //
+  //  //t("g") = -85;                         // fails in debug mode, prints a huge unsigned number in release mode
+  //  //ui64 g = t("g");
+  //  //printf("\n g: %ull \n\n", g);
+  //}
+
+  //SECTION(test default value for vector)
+  //{
+  //  TO(100000000, leak)
+  //  {
+  //    tbl t(10, 85);
+  //    //TO(t,i) printf(" %d ", t[i]);
+  //  }
+  //}
+
+  //SECTION(test math operators across vector)
+  //{
+  //  tbl a(7); TO(a,i) a[i] = (int)(i+1);
+  //  tbl b(5); TO(b,i) b[i] = (int)((i+1)*(i+1));
+  //  TO(a,i) printf(" %d ", a[i]);
+  //  printf("\n\n");
+  //  TO(b,i) printf(" %d ", b[i]);
+  //  printf("\n\n");
+  //
+  //  tbl c = b % a;
+  //
+  //  a %= b;
+  //  TO(a,i) printf(" %d ", a[i]);
+  //  printf("\n\n");
+  //
+  //  TO(c,i) printf(" %d ", c[i]);
+  //  printf("\n\n");
+  //}
+
+  //SECTION(test math operators with single left side number)
+  //{
+  //  tbl a(7); TO(a,i) a[i] = (int)(i+1);
+  //  tbl b(5); TO(b,i) b[i] = (int)((i+1)*(i+1));
+  //  TO(a,i) printf(" %d ", a[i]);
+  //  printf("\n\n");
+  //  TO(b,i) printf(" %d ", b[i]);
+  //  printf("\n\n");
+  //
+  //  tbl c = b % 10;
+  //
+  //  a %= 100;
+  //  TO(a,i) printf(" %d ", a[i]);
+  //  printf("\n\n");
+  //
+  //  TO(c,i) printf(" %d ", c[i]);
+  //  printf("\n\n");
+  //}
+
+  //SECTION(test out of range debug assertion)
+  //{
+  //  tbl t(5);
+  //  TO(t+1,i) printf(" %d ", t[i]);
+  //}
+
+  SECTION(test reserve rehashing)
   {
     tbl t;
+    t("one")   = 1;
+    t("two")   = 2;
+    t("three") = 3;
+    //int _1 = t("1");
+    //printf(" mapcap: %d  %d  %d  %d ", t.map_capacity(), _1, (int)t("2"), (int)t("3") );
 
-    t("a") = (ui8)85;
-    int a = t("a");
-    printf("\n a: %d \n\n", a);
+    auto kv = t.elemStart();
+    TO(t.map_capacity(), i) printf(" %s:%d ", kv[i].key, (int)(kv[i].val) );
+    printf("\n\n");
 
-    t("b") = (ui16)85;
-    int b = t("b");
-    printf("\n b: %d \n\n", b);
+    t.reserve(0,23);
+    TO(t.map_capacity(), i) printf(" %s:%d ", kv[i].key, (int)(kv[i].val) );
+    printf("\n\n");
 
-    t("c") = (ui32)85;
-    i64 c  = t("c");
-    printf("\n c: %d \n\n", c);
-
-    t("e") = 85.0f;
-    double e = t("e");
-    printf("\n e: %.3f \n\n", e);
-
-    //t("f") = 85.0;                      // fails in debug mode, prints 0 in release mode
-    //i64 f = t("f");
-    //printf("\n f: %d \n\n", f);
-
-    //t("g") = -85;                         // fails in debug mode, prints a huge unsigned number in release mode
-    //ui64 g = t("g");
-    //printf("\n g: %ull \n\n", g);
-  }
-
-  SECTION(test default value for vector)
-  {
-    tbl t(10, 85);
-    TO(t,i) printf(" %d ", t[i]);
+    //int _1 = t("1");
+    //printf(" mapcap: %d  %d  %d  %d ", t.map_capacity(), _1, (int)t("2"), (int)t("3") );
   }
 
   //float*  pos = t("pos").data();

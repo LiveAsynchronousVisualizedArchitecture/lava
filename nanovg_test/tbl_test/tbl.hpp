@@ -60,12 +60,23 @@
 // -todo: make switch statement to have flexible number casts (a ui8 can be cast without error to a ui32)
 // -todo: make signed to unsigned debug catch for implicit casts
 // -todo: make constructor with default value
+// -todo: specialize del() function for being owned or not - template specialization of functions seems to work well
+// -todo: make sure an owned tbl from a non-owned tbl copies, but a non-owned from a non-owned does not? - forget this and always copy unless there is a move?
+// -todo: make operator+= 
+// -todo: test operator+ with mismatched sizes
+// -todo: fill out other numeric and binary operators
+// -todo: make numeric operators that take a single right side number
+// -todo: put in assert to check for bounds errors on debug
+// -todo: make bounds checks during debug
+// -todo: specialize offset type somehow?  tbl inside a tbl is given by being an offset/child and owned type. the tbl then gives up a reference/non-owned type that is not a child/offset type  - not neccesary with owned and non-owned tables
+// -todo: make operator[] and operator() call template specialized functions that jump by an offset if they are a child type? - shouldn't be neccesary, because acessing a child tbl can just construct a reference type each time, using the held offset to the tbl children segment (!) - not neccesary with owned and non-owned tables
 
+// todo: make error messages for ERROR and NONE
 // todo: make reserve rehash and reinsert all elements
 // todo: revisit concactenation to make sure map elems are copied
 // todo: test putting more than 8 elements into map
 // todo: test KV with key string above character length  
-// todo: fold HashType into KV? - would have to make an internal struct/union?
+// todo: fold HashType into KV? - would have to make an internal struct/union? - just change HashType hsh to HashType ht?
 // todo: give KV a default constructor and copy constructor so that the c_str key is copied?
 // todo: make emplace and emplace_back()
 // todo: make resize()
@@ -82,6 +93,18 @@
 // todo: make operator~ return just the vector
 // todo: make different unary operator return just the map?
 // todo: make operator-- be shrink_to_fit() and ++ be expand() ?
+// todo: specialize cp() and mv() as well?
+// todo: make constructor that takes only an address to the start of a tbl memory span - just has to offset it by memberBytes()
+// todo: figure out what happens when doing anything that effects the size of a child tbl - child tbl cannot have it's size changed? need two different internal tbl types, one for references(non owned) and one for children(owned) ?
+// todo: make flatten method that has creates a new tbl with no extra capacity and takes all tbl references and makes them into offset/children tbls that are stored in the sub-tbl segment - instead of child type, make a read only type? read only could have template specializations or static asserts that prevent changing the tbl or the KV objects from it
+// todo: make non owned type always read only? - still need owned and non-owned types within tbl
+// todo: make macro to allocate memory on the stack and use it for a table
+// todo: make function to delete empty keys?
+
+// todo: make visual studio visualization?
+// todo: make TBL_USE_JSON and TBL_USE_STL to have json serialization and stl integraton?
+// todo: make separate 'iota' function for a sequential tbl - maybe tbl_seq<T>()
+// todo: make separate accum(tbl<T> t) function for accumulating a tbl
 
 
 #ifndef __TBL_HEADERGUARD_H__
@@ -121,7 +144,12 @@ public:                                                                       //
   enum Type;
   struct KV;
 
+  using T    =  int;
+
 private:
+  template<bool OWNED=true> void typed_del(){ if(m_mem) free(memStart()); };   // explicit template specialization to make an owned tbl free it's memory and a non-owned tbl not free it's memory
+  template<> void typed_del<false>(){}; 
+
   void   set_sizeBytes(ui64 bytes) // -> ui64
   {
     *( (ui64*)memStart() ) = bytes;
@@ -138,15 +166,24 @@ private:
   {
     *( ((ui64*)memStart()) + 3) = elems;
   }
+  void        place_kv(KV kv, ui64 kvidx, KV* elems, ui64 i, ui64 mod)
+  {
+    if(elems[i].hsh.type==EMPTY){ elems[i] = kv; return; }
 
-  void*       memStart()
-  {
-    return (void*)(m_mem - memberBytes());
+    ui64  elidx = elems[i].hsh.hash % mod;
+
+    //while(i-kvidx < i-elidx  && elems[i].hsh.type==NONE){
+    //  swap( &(elems[i]), &kv );
+    //  ++i;
+    //  ui64 elidx = elems[i].hsh.hash % mod;
+    //}
+
+    if(i-kvidx < i-elidx){
+      swap( &(elems[i]), &kv );
+      place_kv(kv, elidx, elems, elidx, mod);
+    }
   }
-  KV*        elemStart()
-  {
-    return (KV*)(data() + capacity());
-  }
+
   void            init(ui64 size)
   {
     ui64   szBytes  =  tbl::sizeBytes(size);
@@ -160,7 +197,12 @@ private:
   void             del()
   { 
     // todo: needs to loop through and run destructors here
-    if(m_mem) free(memStart());
+    //if(m_mem) free(memStart());
+
+    //typed_del<true>::del();
+    
+    typed_del<true>();
+    //typed_del<false>();
   }
   void              cp(tbl const& l)
   {
@@ -173,9 +215,39 @@ private:
   }
   void              mv(tbl& r)
   {
-    tbl_PRNT(" moved ");
+    tbl_PRNT("\n moved \n");
     m_mem   = r.m_mem;
     r.m_mem = nullptr;
+  }
+  template<class OP> void op_asn(tbl const& l, OP op)
+  {
+    ui64     mx_sz = size();
+    ui64     mn_sz = l.size();
+    if(mx_sz<mn_sz){ auto tmp=mx_sz; mx_sz=mn_sz; mn_sz=tmp; }
+    TO(mn_sz,i) op( (*this)[i], l[i] );
+  }
+  template<class OP> tbl  bin_op(tbl const& l, OP op)
+  {     
+    ui64     mx_sz = size();
+    ui64     mn_sz = l.size();
+    tbl const* lrg = this;
+    if(mx_sz<mn_sz){ auto tmp=mx_sz; mx_sz=mn_sz; mn_sz=tmp; lrg = &l; }        // swap mx_sz, mn_sz, and the pointer to the larger tbl if mismatched
+    tbl ret(mx_sz); 
+    TO(mn_sz, i) ret[i] = op( (*this)[i], l[i] );
+    TO(mx_sz-mn_sz, i) ret[i+mn_sz] = (*lrg)[i+mn_sz];
+
+    return ret;
+  }
+  template<class OP> void op_asn(T   const& l, OP op)
+  {
+    TO(size(),i) op( (*this)[i], l);
+  }
+  template<class OP> tbl  bin_op(T   const& l, OP op)
+  {     
+    tbl ret( size() ); 
+    TO(ret, i) ret[i] = op( (*this)[i], l );
+
+    return ret;
   }
 
 public:  
@@ -257,6 +329,8 @@ public:
     HshType   hsh;
     Key       key;
     ui64      val;
+
+    KV() : hsh(), val(0) { memset(key, 0, sizeof(Key)); }
 
     KV& operator=(KV const& l)
     {
@@ -352,8 +426,6 @@ public:
     }
   };
 
-  using T    =  int;
-
   i8*     m_mem;
  
   tbl() : 
@@ -362,14 +434,6 @@ public:
   }
   tbl(ui64 size)                                 // have to run default constructor here?
   {    
-    //ui64   szBytes  =  tbl::sizeBytes(size);
-    //i8*      memst  =  (i8*)malloc(szBytes);                 // memst is memory start
-    //m_mem           =  memst + memberBytes();
-    //set_sizeBytes(szBytes);
-    //set_elems(0);
-    //set_capacity(size);
-    //set_size(size);
-
     init(size);
   }
   tbl(ui64 size, T const& value)
@@ -386,8 +450,16 @@ public:
 
   operator      ui64() const { return size(); }
   operator      bool() const { return m_mem!=nullptr; }
-  T&      operator[](ui64 i){ return ((T*)m_mem)[i]; }
-  auto    operator[](ui64 i) const -> T const& { return ((T*)m_mem)[i]; }
+  T&      operator[](ui64 i)
+  {
+    tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
+    return ((T*)m_mem)[i];
+  }
+  auto    operator[](ui64 i) const -> T const& 
+  {
+    tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
+    return ((T*)m_mem)[i];
+  }
   KV&     operator()(const char* key, bool make_new=true)              // todo: just needs to return a kv reference since the kv can be set with operator=() ?
   {
     if( !(map_capacity()>elems()) )
@@ -404,7 +476,6 @@ public:
       i %= cap;                                                        // get idx within map_capacity
       HshType eh = el[i].hsh;                                          // eh is element hash
       if(el[i].hsh.type==EMPTY){ 
-
         if(make_new){
           strcpy_s(el[i].key, sizeof(KV::Key), key);
           el[i].hsh.hash = hsh;
@@ -424,6 +495,26 @@ public:
   }
   tbl     operator>>(tbl const& l){ return tbl::concat(*this, l); }
   tbl     operator<<(tbl const& l){ return tbl::concat(*this, l); }
+  void    operator+=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
+  void    operator-=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }
+  void    operator*=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a *= b; } ); }
+  void    operator/=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a /= b; } ); }
+  void    operator%=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a %= b; } ); }
+  tbl     operator+ (tbl const& l){ return bin_op(l,[](T const& a, T const& b){return a + b;}); }
+  tbl     operator- (tbl const& l){ return bin_op(l,[](T const& a, T const& b){return a - b;}); }
+  tbl     operator* (tbl const& l){ return bin_op(l,[](T const& a, T const& b){return a * b;}); }
+  tbl     operator/ (tbl const& l){ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
+  tbl     operator% (tbl const& l){ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
+  void    operator+=(T   const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
+  void    operator-=(T   const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }
+  void    operator*=(T   const& l){ op_asn(l, [](T& a, T const& b){ a *= b; } ); }
+  void    operator/=(T   const& l){ op_asn(l, [](T& a, T const& b){ a /= b; } ); }
+  void    operator%=(T   const& l){ op_asn(l, [](T& a, T const& b){ a %= b; } ); }
+  tbl     operator+ (T   const& l){ return bin_op(l,[](T const& a, T const& b){return a + b;}); }
+  tbl     operator- (T   const& l){ return bin_op(l,[](T const& a, T const& b){return a - b;}); }
+  tbl     operator* (T   const& l){ return bin_op(l,[](T const& a, T const& b){return a * b;}); }
+  tbl     operator/ (T   const& l){ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
+  tbl     operator% (T   const& l){ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
 
   bool          push(T const& value)
   {
@@ -498,22 +589,85 @@ public:
 
     return (sizeBytes()-memberBytes()-capacity()*sizeof(T)) / sizeof(KV);
   }
-  void*      reserve(ui64 size, ui64 elems)
+  auto     elemStart() -> KV* 
   {
-    auto  nxtBytes  =  memberBytes() + sizeof(T)*size + sizeof(KV)*elems;
-    void*       re;
-    bool     fresh  = !m_mem;
+    if(!m_mem) return nullptr;
+
+    return (KV*)(data() + capacity());
+  }
+  void*      reserve(ui64 count, ui64 mapcount)
+  {
+    count    = mx(count, capacity());
+    mapcount = mx(mapcount, elems());
+    ui64   prevElems  =  (ui64)(elemStart());
+    ui64   prevMemSt  =  (ui64)memStart();
+    ui64    prevOfst  =  prevElems? prevElems-prevMemSt  :  0;
+    ui64 prevSzBytes  =  sizeBytes();
+    ui64  prevMapCap  =  map_capacity();
+    ui64    nxtBytes  =  memberBytes() + sizeof(T)*count +  sizeof(KV)*mapcount;
+    void*        re;
+    bool      fresh  = !m_mem;
     if(fresh) re = malloc(nxtBytes);
     else      re = realloc(memStart(), nxtBytes);
 
     if(re){
       m_mem = ((i8*)re) + memberBytes();
       set_sizeBytes(nxtBytes);
-      set_capacity(size);
+      set_capacity(count);
+      set_elems(mapcount);
 
-      // todo: take this out so that hashes aren't wiped
+      // todo: need to move the element memory the previous range to the new range
+      //(KV*)( ((i8*)re)+prevOfst+prevMapCap*sizeof(KV) ) 
+
       KV* el = elemStart();
-      TO(elems, i) el[i] = KV();
+      if(prevElems){
+        void* prevEl = ((i8*)memStart()) + prevOfst;
+        memcpy(el, prevEl, prevMapCap*sizeof(KV));
+      }
+
+      ui64  mapcap = map_capacity();
+      i64   extcap = mapcap - prevMapCap;
+      if(extcap>0) TO(extcap,i) el[i+prevMapCap] = KV();
+
+      //KV*   curEnd = el + mapcap;
+      //KV*  prevEnd = prevElems?  (KV*)( ((i8*)re)+prevSzBytes ) :  el;
+      //for(KV* kv=prevEnd; kv!=curEnd; ++kv){                                  // excap is extra capacity
+      //  *kv = KV();
+      //}
+      //for(auto i=prevMapCap; i<elems; ++i){
+      //  el[i] = 
+      //}
+      //TO(elems-prevMapCap,i) 
+
+      //ui64 curOfst = (i8*)el - (i8*)re;
+      //memcpy(el, (i8*)re + prevOfst, prevMapCap*sizeof(KV) );
+      //
+      // rehash, make sure that the differences in indexes include a linear search that would wrap around
+      //KV      tmp = KV();
+      //ui64 tmpidx = 0;
+
+      if(prevElems)
+      {
+        ui64    mod = mapcap - 1;
+        TO(prevMapCap, i){
+          KV kv = el[i];
+          if(kv.hsh.type != EMPTY){
+            ui64 nxtIdx = kv.hsh.hash % mod;
+            if(nxtIdx!=i){
+              el[i] = KV();
+              place_kv(kv, nxtIdx, el, nxtIdx, mod);
+            }
+          }
+        } 
+      }
+
+      //if(tmp.hsh.type==NONE){ tmp = el[i]; tmpidx = tmp.hsh.hash%mod; continue; }
+      //ui64  elidx = el[i].hsh.hash % mod;
+      //if(i-tmpidx < elidx-i) swap( &(el[i]), &tmp );
+      //
+      // todo: take this out so that hashes aren't wiped
+      //KV* el = elemStart();
+      //TO(elems, i) el[i] = KV();
     }
 
     if(re && fresh){ set_size(0); set_elems(0); }
@@ -532,7 +686,7 @@ public:
 
     ui64    el = elems();
     ui64 nxtEl = el + el/2;
-    nxtEl      = nxtEl<8? 8 : nxtEl;
+    nxtEl      = nxtEl<4? 4 : nxtEl;
 
     return reserve(nxtSz, nxtEl);
   }
@@ -574,6 +728,15 @@ private:
      
     return hsh & HASH_MASK;
   }
+
+  template<class S> static void swap(S* a, S* b) 
+  { // here to avoid a depencies
+    S tmp = *a;
+    *a    = *b;
+    *b    = tmp;
+  }
+  template<class N> static    N   mx(N a, N b){return a<b?b:a;}
+  template<class N> static    N   mn(N a, N b){return a<b?a:b;}
 public:
   static auto     type_str(Type t) -> char const* const 
   {
@@ -631,6 +794,44 @@ public:
 
 
 
+//  KV tmp2 = el[i];
+//  el[i] = tmp;
+//  tmp = tmp2;
+//} 
+//
+//if(el[i].hsh.type != NONE){
+
+//void    operator+=(tbl const& l)
+//{
+//  ui64     mx_sz = size();
+//  ui64     mn_sz = l.size();
+//  if(mx_sz<mn_sz){ auto tmp=mx_sz; mx_sz=mn_sz; mn_sz=tmp; }
+//  TO(mn_sz,i) (*this)[i] += l[i];
+//}
+
+//ui64     mx_sz = size();
+//ui64     mn_sz = l.size();
+//tbl const* lrg = this;
+//if(mx_sz<mn_sz){ auto tmp=mx_sz; mx_sz=mn_sz; mn_sz=tmp; lrg = &l; }        // swap mx_sz, mn_sz, and the pointer to the larger tbl if mismatched
+//tbl ret(mx_sz); 
+//TO(mn_sz, i) ret[i] = (*this)[i] + l[i];
+//TO(mx_sz-mn_sz, i) ret[i+mn_sz] = (*lrg)[i+mn_sz];
+//
+//return ret;
+
+//
+//template<bool OWNED=true> struct typed_del{ static void del(){ if(m_mem) free(memStart()); } }; 
+
+//
+//mx_sz = lsz>mx_sz? lsz : mx_sz;
+
+//ui64   szBytes  =  tbl::sizeBytes(size);
+//i8*      memst  =  (i8*)malloc(szBytes);                 // memst is memory start
+//m_mem           =  memst + memberBytes();
+//set_sizeBytes(szBytes);
+//set_elems(0);
+//set_capacity(size);
+//set_size(size);
 
 //tbl_msg_assert(
 //  hsh.type==typenum<N>::num, 
