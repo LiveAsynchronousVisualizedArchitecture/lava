@@ -186,15 +186,15 @@ int main()
   //  TO(t+1,i) printf(" %d ", t[i]);
   //}
 
-  SECTION(test reserve rehashing)
+  SECTION(test reserve placement)
   {
     tbl::KV* kv;
     
     tbl t;
-    t("0") = 0;
-    t("1") = 1;
-    //t("2") = 2;
-    //t("3") = 3;
+    t("0") = 85;
+    t("1") = 85;
+    t("2") = 85;
+    t("3") = 85;
     //t("zero")  = 85;
     //t("one")   = 85;
     //t("two")   = 85;
@@ -203,32 +203,37 @@ int main()
     TO(t.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
     printf("\n\n");
 
-    t.reserve(0,5);
-    //t.expand();
-    //t.expand();
-    //t("4") = 4;
-    //t("5") = 5;
-
-    //tbl t2;
-    //t2("2")   = 85;
-
-    kv = t.elemStart();
-    TO(t.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
-    printf("\n\n");
-
-    ////t2("zero")  = 0;
-    ////t2("one")   = 1;
-    //t2("two")   = 2;
-    ////t2("three") = 3;
-    ////t2("four")  = 4;
-    ////t2("five")  = 5;
-    ////t2("six")   = 6;
-
-    //tbl t3 = t << t2;
-
-    //kv = t3.elemStart();
-    //TO(t3.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
+    //t.reserve(0,5);
+    ////t.expand();
+    //////t.expand();
+    //////t("4") = 4;
+    //////t("5") = 5;
+    ////kv = t.elemStart();
+    //TO(t.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
     //printf("\n\n");
+
+    tbl t2;
+    //t2("0")   = 0;
+    //t2("1")   = 1;
+    t2("2")   = 2;
+    //t2("3")   = 3;
+    //t2("zero")  = 0;
+    //t2("one")   = 1;
+    //t2("two")   = 2;
+    ////t2("2")   = 2;
+    //t2("three") = 3;
+    //t2("four")  = 4;
+    //t2("five")  = 5;
+    //t2("six")   = 6;
+    //kv = t2.elemStart();
+    //TO(t2.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
+    //printf("\n\n");
+
+    tbl t3 = t << t2;
+
+    kv = t3.elemStart();
+    TO(t3.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
+    printf("\n\n");
 
     //printf(" %d ", (int)t("one hundred") );   // for testing out an error on NONE type
 

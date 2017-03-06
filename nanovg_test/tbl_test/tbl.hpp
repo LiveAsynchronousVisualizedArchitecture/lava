@@ -75,17 +75,22 @@
 // -todo: debug expand()  /  reserve with more vector capacity - not vector capacity, but mapcap with 6 instead of 4 causing problems?
 // -todo: test putting more than 8 elements into map - seems broken - debug 5th element insertion - is it reserve or the collision that is the problem? - expand is the problem? it enlarges the capacity AND map_cap?
 // -todo: make error messages for ERROR and NONE
+// -todo: fix comapact_all removing elements - empty index wasn't being set to the current index when moving an element
+// -todo: resolve 'two' conflict with duplicate keys - have to make sure each element has not empty space between its ideal position and its final position
+// -todo: split operator() into a find function that returns the index of the element with the given key
 
-// todo: fix comapact_all removing elements
+// todo: debug duplicate entries - possibly because of expand() being run
+// todo: make comapct function increment empty index instead of setting it to the moved index
+// todo: make a del(const char* key) function that sets the type to empty, then moves back elements until either an empty space or an element aleady in its ideal position is found  
+// todo: simplify test case and debug duplicates in concatenation - should reserve use a del() function combined with reinsertion? 
+// todo: revisit concactenation to make sure map elems are copied
+// todo: robin hood hashing
 // todo: try reserve again - without recursion? - if curKV's ideal idx is the same, loop on the next idx. - problem, robin hood hashing would mean swapping if curKV's ideal is larger than the element at i, but if an element hasn't been moved, its distance to ideal could be large, meaning it wouldn't move even though it should 
 //       | solution: don't do robbin hood hasing at first, just make sure all the elements that hash to the same bucket are linearly packed
 //       |   problem: are there scenarios that will trigger infinite recursion? - yes, if only comparing ideal indices
 //       |   problem: moving an element creates a hole - does that mean the elements in front should be moved back if it would make them closer to their ideal index?
 //       |     solution: make a delete function that removes a key and checks elements forward to see if moving them one back would get them closer to their ideal position
 //       |     solution: make a compact function that scans through looking for empty spaces and moves elements backwards if it would be more ideal - make the function start at an index and go until it hits an element already in its ideal position, returning the number of elements moved
-// todo: resolve 'two' conflict with duplicate keys - have to make sure each element has not empty space between its ideal position and its final position
-// todo: revisit concactenation to make sure map elems are copied
-// todo: robin hood hashing
 // todo: test KV with key string above character length  
 // todo: give KV a default constructor and copy constructor so that the c_str key is copied?
 // todo: make resize()
@@ -190,7 +195,7 @@ private:
     if(idx>=ideal) return idx - ideal;
     else return idx + (mod-ideal);
   }
-  ui64        wrapDist(KV* elems, ui64 idx, ui64 mod)
+  ui64        wrapDist(KV*  elems, ui64 idx, ui64 mod)
   {
     ui64 ideal = elems[idx].hsh.hash % mod;
     return wrapDist(ideal,idx,mod);
@@ -205,15 +210,21 @@ private:
       i = nxt(i,mapcap);
       ++cnt;
     } // finds the first empty slot
+    empty = i;
     while(el[i].hsh.type==EMPTY && i!=en){
-      empty = i;
       i = nxt(i,mapcap);
       ++cnt;
     } // find the first non-empty slot after finding an empty slot
     while(el[i].hsh.type!=EMPTY && i!=en){
-      if( wrapDist(el,i,mapcap)>0 ){ 
-        el[empty] = el[i];
-        el[i]     = KV();
+      ui64 elemDst = wrapDist(el,i,mapcap);
+      if( elemDst>0 ){ 
+        ui64 emptyDst = wrapDist(empty,i,mapcap);           // emptyDst is empty distance - the distance to the empty slot - this can probably be optimized to just be an increment
+        ui64    mnDst = mn(elemDst, emptyDst);               // mnDst is the minimum distances
+        ui64    mvIdx = i;
+        TO(mnDst,ii) mvIdx=prev(mvIdx,mapcap);
+        el[mvIdx] = el[i];
+        el[i]       = KV();
+        empty       = i;                                     //++empty; // empty = i;  if empty was just the current index or if there are lots of empty elements in between, empty can be incremented by one
       }
       i = nxt(i,mapcap);
       ++cnt;
@@ -228,7 +239,7 @@ private:
     // while(el[i].hsh.type==EMPTY && cnt<mapcap){
     // while(el[i].hsh.type!=EMPTY && cnt<mapcap){
   }
-  void         compact_all(ui64 st, ui64 mapcap)
+  void     compact_all(ui64 st, ui64 mapcap)
   {
     //ui64  wrap  =  st - 1;
     //ui64    en  =  wrap<(mapcap-1)? wrap : mapcap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
@@ -266,20 +277,33 @@ private:
     set_capacity(size);
     set_size(size);
   }
-  void             del()
+  bool             del(const char* key)
   { 
+    ui64 i = find(key);
+    KV* el = elemStart();
+    if(el[i].hsh.type==EMPTY) return false;
+
+    el[i] = KV();
+    ui64 mapcap = map_capacity();
+    ui64     en = prev(i, mapcap);
+    compact(i, en, mapcap);
+
+    return true;
+  }
+  void         destroy()
+  {
     // todo: needs to loop through and run destructors here
     //if(m_mem) free(memStart());
-
+    //
     //typed_del<true>::del();
-    
-    typed_del<true>();
+    //
+    //typed_del<true>();
     //typed_del<false>();
   }
   void              cp(tbl const& l)
   {
     tbl_PRNT(" copied ");
-    del();
+    //del();
     reserve(l.size(), l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
     //resize(l.size());
 
@@ -520,7 +544,7 @@ public:
     init(size);
     TO(size, i) (*this)[i] = value;
   }
-  ~tbl(){ del(); }
+  ~tbl(){ /*del()*/; }
 
   tbl(tbl const& l){ cp(l); }
   tbl& operator=(tbl const& l){ cp(l); return *this; }
@@ -544,32 +568,53 @@ public:
     if( !(map_capacity()>elems()) )
       if(!expand()) return KV::error_kv();
 
-    //ui32   hsh  =  HashStr(key);
-    ui32   hsh  =  *((ui32*)(key));
-    KV*     el  =  (KV*)elemStart();                                   // el is a pointer to the elements 
-    ui64   cap  =  map_capacity();  
-    ui64     i  =  hsh;
-    ui64  wrap  =  hsh % cap - 1;
-    ui64    en  =  wrap<(cap-1)? wrap : cap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
-    for(;;++i)
-    {
-      i %= cap;                                                        // get idx within map_capacity
-      HshType eh = el[i].hsh;                                          // eh is element hash
-      if(el[i].hsh.type==EMPTY){ 
-        if(make_new){
-          strcpy_s(el[i].key, sizeof(KV::Key), key);
-          el[i].hsh.hash = hsh;
-          el[i].hsh.type = NONE;                                       // this makes this slot no longer empty. When an assignment occurs it will overwrite this type.
-          set_elems( elems()+1 );
-        }
-        return el[i];
-      }else if(hsh == eh.hash){                                        // if the hashes aren't the same, the keys can't be the same
-        auto cmp = strncmp(el[i].key, key, sizeof(KV::Key)-1);         // check if the keys are the same 
-        if(cmp==0) return el[i];
-      }
+    KV*    el  =  (KV*)elemStart();                                     // el is a pointer to the elements 
+    ui32 hash  =  0;
+    i64     i  =  find(key, &hash);
+    if(i<0) return KV::error_kv();
 
-      if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+    if(el[i].hsh.type==EMPTY){ 
+      if(make_new){
+        strcpy_s(el[i].key, sizeof(KV::Key), key);
+        el[i].hsh.hash = hash;
+        el[i].hsh.type = NONE;                                         // this makes this slot no longer empty. When an assignment occurs it will overwrite this type.
+        set_elems( elems()+1 );
+      }
+      return el[i];
     }
+      
+    if(hash == el[i].hsh.hash){                                        // if the hashes aren't the same, the keys can't be the same
+      auto cmp = strncmp(el[i].key, key, sizeof(KV::Key)-1);           // check if the keys are the same 
+      if(cmp==0) return el[i];
+    }
+
+    //ui32   hsh  =  HashStr(key);
+    ////ui32   hsh  =  (ui32)(*key); // & HASH_MASK );
+    //
+    //KV*     el  =  (KV*)elemStart();                                   // el is a pointer to the elements 
+    //ui64   cap  =  map_capacity();  
+    //ui64     i  =  hsh;
+    //ui64  wrap  =  hsh % cap - 1;
+    //ui64    en  =  wrap<(cap-1)? wrap : cap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
+    //for(;;++i)
+    //{
+    //  i %= cap;                                                        // get idx within map_capacity
+    //  HshType eh = el[i].hsh;                                          // eh is element hash
+    //  if(el[i].hsh.type==EMPTY){ 
+    //    if(make_new){
+    //      strcpy_s(el[i].key, sizeof(KV::Key), key);
+    //      el[i].hsh.hash = hsh;
+    //      el[i].hsh.type = NONE;                                       // this makes this slot no longer empty. When an assignment occurs it will overwrite this type.
+    //      set_elems( elems()+1 );
+    //    }
+    //    return el[i];
+    //  }else if(hsh == eh.hash){                                        // if the hashes aren't the same, the keys can't be the same
+    //    auto cmp = strncmp(el[i].key, key, sizeof(KV::Key)-1);         // check if the keys are the same 
+    //    if(cmp==0) return el[i];
+    //  }
+    //
+    //  if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+    //}
     
     return KV::error_kv();
   }
@@ -727,22 +772,22 @@ public:
         TO(extcap,i) 
           new (&el[i+prevMapCap]) KV();
 
-      //if(prevElems)
-      //{
-      //  ui64    mod = mapcap; // - 1;
-      //  TO(prevMapCap, i){
-      //    KV kv = el[i];
-      //    if(kv.hsh.type != EMPTY){
-      //      ui64 nxtIdx = kv.hsh.hash % mod;
-      //      if(nxtIdx!=i){
-      //        el[i] = KV();
-      //        place_kv(kv, el, nxtIdx, mod);
-      //      }
-      //    }
-      //  } 
-      //}
-
-      compact_all(prevMapCap,mapcap);
+      if(prevElems)
+      {
+        //ui64    mod = mapcap; // - 1;
+        //TO(prevMapCap, i){
+        //  KV kv = el[i];
+        //  if(kv.hsh.type != EMPTY){
+        //    ui64 nxtIdx = kv.hsh.hash % mod;
+        //    if(nxtIdx!=i){
+        //      el[i] = KV();
+        //      place_kv(kv, el, nxtIdx, mod);
+        //    }
+        //  }
+        //}
+         
+        compact_all( prev(prevMapCap,mapcap), mapcap);                      // start where the loop above left off
+      }
     }
 
     if(re && fresh){ set_size(0); set_elems(0); }
@@ -762,6 +807,42 @@ public:
     nxtEl      = nxtEl<4? 4 : nxtEl;
 
     return reserve(nxtSz, nxtEl);
+  }
+  i64           find(const char* key, ui32* hash=nullptr)
+  {
+    ui32   hsh  =  HashStr(key);
+    //ui32   hsh  =  (ui32)(*key); // & HASH_MASK );
+    if(hash) *hash = hsh;
+
+    KV*     el  =  (KV*)elemStart();                                   // el is a pointer to the elements 
+    ui64   cap  =  map_capacity();  
+    ui64     i  =  hsh;
+    ui64  wrap  =  hsh % cap - 1;
+    ui64    en  =  wrap<(cap-1)? wrap : cap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
+    for(;;++i)
+    {
+      i %= cap;                                                        // get idx within map_capacity
+      HshType eh = el[i].hsh;                                          // eh is element hash
+      if(el[i].hsh.type==EMPTY){ 
+        return i;
+      }else if(hsh == eh.hash){                                        // if the hashes aren't the same, the keys can't be the same
+        auto cmp = strncmp(el[i].key, key, sizeof(KV::Key)-1);         // check if the keys are the same 
+        if(cmp==0) return i;
+      }
+
+      if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+    }
+    
+    return -1;
+  }
+  ui64         ideal(ui64 i)
+  {
+    return elemStart()[i].hsh.hash % map_capacity();
+  }
+  ui64      distance(ui64 i)
+  {
+    //ui64 idl = ideal(i);
+    return wrapDist( ideal(i), i, map_capacity() );
   }
 
 private:
