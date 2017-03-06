@@ -76,34 +76,41 @@
 // -todo: test putting more than 8 elements into map - seems broken - debug 5th element insertion - is it reserve or the collision that is the problem? - expand is the problem? it enlarges the capacity AND map_cap?
 // -todo: make error messages for ERROR and NONE
 
+// todo: fix comapact_all removing elements
+// todo: try reserve again - without recursion? - if curKV's ideal idx is the same, loop on the next idx. - problem, robin hood hashing would mean swapping if curKV's ideal is larger than the element at i, but if an element hasn't been moved, its distance to ideal could be large, meaning it wouldn't move even though it should 
+//       | solution: don't do robbin hood hasing at first, just make sure all the elements that hash to the same bucket are linearly packed
+//       |   problem: are there scenarios that will trigger infinite recursion? - yes, if only comparing ideal indices
+//       |   problem: moving an element creates a hole - does that mean the elements in front should be moved back if it would make them closer to their ideal index?
+//       |     solution: make a delete function that removes a key and checks elements forward to see if moving them one back would get them closer to their ideal position
+//       |     solution: make a compact function that scans through looking for empty spaces and moves elements backwards if it would be more ideal - make the function start at an index and go until it hits an element already in its ideal position, returning the number of elements moved
 // todo: resolve 'two' conflict with duplicate keys - have to make sure each element has not empty space between its ideal position and its final position
 // todo: revisit concactenation to make sure map elems are copied
 // todo: robin hood hashing
 // todo: test KV with key string above character length  
 // todo: give KV a default constructor and copy constructor so that the c_str key is copied?
-// todo: make emplace and emplace_back()
 // todo: make resize()
-// todo: make copy use resize
+// todo: make copy use resize? - should it just be a memcpy?
 // todo: make sure destructor is being run on objects being held once turned into a template
 // todo: make shrink_to_fit()
 // todo: make begin and end iterators to go with C++11 for loops - loop through keys value pairs?
 // todo: make visualization for table as a tree that shows arrays, key-values and their types, then sub tables - make various visualizations for arrays - histogram, graph, ???
 // todo: try template constructor that returns a tbl<type> with a default value set? - can't have a constructor that reserves elems with this? would need a reserve_elems() function?
-// todo: make reserve_elems() function or reserve_map() function?
-// todo: add ability to use a function in the template type declaration to give a custom accessor by making operator() a variadic template?
-// todo: use binary bit operators to make tbl act like a set?
-// todo: make operator~ return just the vector
-// todo: make different unary operator return just the map?
-// todo: make operator-- be shrink_to_fit() and ++ be expand() ?
-// todo: specialize cp() and mv() as well?
 // todo: make constructor that takes only an address to the start of a tbl memory span - just has to offset it by memberBytes()
 // todo: figure out what happens when doing anything that effects the size of a child tbl - child tbl cannot have it's size changed? need two different internal tbl types, one for references(non owned) and one for children(owned) ?
 // todo: make flatten method that has creates a new tbl with no extra capacity and takes all tbl references and makes them into offset/children tbls that are stored in the sub-tbl segment - instead of child type, make a read only type? read only could have template specializations or static asserts that prevent changing the tbl or the KV objects from it
 // todo: make non owned type always read only? - still need owned and non-owned types within tbl
-// todo: make macro to allocate memory on the stack and use it for a table
 // todo: make function to delete keys with NONE type? set NONE to empty?
 // todo: fold HashType into KV? - would have to make an internal struct/union? - just change HashType hsh to HashType ht?
 
+// todo: make reserve_elems() function or reserve_map() function? - if reserve 
+// todo: use binary bit operators to make tbl act like a set?
+// todo: make operator~ return just the vector
+// todo: make different unary operator return just the map?
+// todo: make operator-- be shrink_to_fit() and ++ be expand() ?
+// todo: make macro to allocate memory on the stack and use it for a table
+// todo: make emplace and emplace_back()
+// todo: specialize cp() and mv() as well?
+// todo: add ability to use a function in the template type declaration to give a custom accessor by making operator() a variadic template?
 // todo: make visual studio visualization?
 // todo: make TBL_USE_JSON and TBL_USE_STL to have json serialization and stl integraton?
 // todo: make separate 'iota' function for a sequential tbl - maybe tbl_seq<T>()
@@ -169,24 +176,84 @@ private:
   {
     *( ((ui64*)memStart()) + 3) = elems;
   }
+  ui64             nxt(ui64 i, ui64 mod)
+  {
+    return ++i % mod;
+  }
+  ui64            prev(ui64 i, ui64 mod)
+  {
+    if(mod==0) return 0;
+    return i==0?  mod-1  :  i-1;
+  }
   ui64        wrapDist(ui64 ideal, ui64 idx, ui64 mod)
   {
     if(idx>=ideal) return idx - ideal;
     else return idx + (mod-ideal);
+  }
+  ui64        wrapDist(KV* elems, ui64 idx, ui64 mod)
+  {
+    ui64 ideal = elems[idx].hsh.hash % mod;
+    return wrapDist(ideal,idx,mod);
+  }
+  ui64         compact(ui64 st, ui64 en, ui64 mapcap) //ui64 mapcap)
+  {
+    ui64   cnt = 0;                                   // cnt is count which counts the number of loops, making sure the entire map capacity (mapcap) has not bene exceeded
+    KV*     el = elemStart(); 
+    ui64     i = st;
+    ui64 empty;
+    while(el[i].hsh.type!=EMPTY && i!=en){ 
+      i = nxt(i,mapcap);
+      ++cnt;
+    } // finds the first empty slot
+    while(el[i].hsh.type==EMPTY && i!=en){
+      empty = i;
+      i = nxt(i,mapcap);
+      ++cnt;
+    } // find the first non-empty slot after finding an empty slot
+    while(el[i].hsh.type!=EMPTY && i!=en){
+      if( wrapDist(el,i,mapcap)>0 ){ 
+        el[empty] = el[i];
+        el[i]     = KV();
+      }
+      i = nxt(i,mapcap);
+      ++cnt;
+    } // moves elements backwards if they would end up closer to their ideal position
+
+    return i;
+
+    //ui64  mved = 0;                                 // mved is moved which is the number of elements that have been moved
+    //ui64    en = st;                                  // en is ending index which is the index that the loops end up on - it is one after the last index looked at
+    //
+    // while(el[i].hsh.type!=EMPTY && cnt<mapcap){ 
+    // while(el[i].hsh.type==EMPTY && cnt<mapcap){
+    // while(el[i].hsh.type!=EMPTY && cnt<mapcap){
+  }
+  void         compact_all(ui64 st, ui64 mapcap)
+  {
+    //ui64  wrap  =  st - 1;
+    //ui64    en  =  wrap<(mapcap-1)? wrap : mapcap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
+
+    ui64    en = prev(st,mapcap);
+    ui64 cmpct;
+    do{
+      cmpct = compact(st,en,mapcap);
+    }while( cmpct != en );
+    
   }
   void        place_kv(KV kv, KV* elems, ui64 idx, ui64 mod)
   {
     ui64     i = idx % mod;
     ui64 elidx = i;
     do{
-      i = i % mod;
+      //i = i % mod;
       if(elems[i].hsh.type==EMPTY){ elems[i]=kv; break; }
       elidx = elems[i].hsh.hash % mod;
         i64  eldist = wrapDist(elidx,i,mod);
         i64    dist = wrapDist(idx,i,mod);
         if(dist>eldist)
           swap( &(elems[i]), &kv );                     //  robin hood hashing?
-      ++i;
+      i = nxt(i,mod);
+      //++i;
     }while(true);
   }
   void            init(ui64 size)
@@ -477,8 +544,8 @@ public:
     if( !(map_capacity()>elems()) )
       if(!expand()) return KV::error_kv();
 
-    ui32   hsh  =  HashStr(key);
-    //ui32   hsh  =  *((ui32*)(key));
+    //ui32   hsh  =  HashStr(key);
+    ui32   hsh  =  *((ui32*)(key));
     KV*     el  =  (KV*)elemStart();                                   // el is a pointer to the elements 
     ui64   cap  =  map_capacity();  
     ui64     i  =  hsh;
@@ -660,21 +727,22 @@ public:
         TO(extcap,i) 
           new (&el[i+prevMapCap]) KV();
 
-      if(prevElems)
-      {
-        ui64    mod = mapcap; // - 1;
-        TO(prevMapCap, i){
-          KV kv = el[i];
-          if(kv.hsh.type != EMPTY){
-            ui64 nxtIdx = kv.hsh.hash % mod;
-            if(nxtIdx!=i){
-              el[i] = KV();
-              place_kv(kv, el, nxtIdx, mod);
-            }
-          }
-        } 
-      }
+      //if(prevElems)
+      //{
+      //  ui64    mod = mapcap; // - 1;
+      //  TO(prevMapCap, i){
+      //    KV kv = el[i];
+      //    if(kv.hsh.type != EMPTY){
+      //      ui64 nxtIdx = kv.hsh.hash % mod;
+      //      if(nxtIdx!=i){
+      //        el[i] = KV();
+      //        place_kv(kv, el, nxtIdx, mod);
+      //      }
+      //    }
+      //  } 
+      //}
 
+      compact_all(prevMapCap,mapcap);
     }
 
     if(re && fresh){ set_size(0); set_elems(0); }
