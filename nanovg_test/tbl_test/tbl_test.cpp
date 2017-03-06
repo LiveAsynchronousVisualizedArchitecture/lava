@@ -4,6 +4,13 @@
 
 #include "tbl.hpp"
 
+void prnt_elems(tbl& t)
+{
+  tbl::KV* kv = t.elemStart();
+  TO(t.map_capacity(), i) printf(" %s:%d:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type, t.distance(i) );
+  printf("\n\n");
+}
+
 int main()
 {
   using namespace std;
@@ -199,16 +206,18 @@ int main()
     //t("one")   = 85;
     //t("two")   = 85;
     //t("three") = 85;
-    kv = t.elemStart();
-    TO(t.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
-    printf("\n\n");
+    prnt_elems(t);
+    //kv = t.elemStart();
+    //TO(t.map_capacity(), i) printf(" %s:%d:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type, t.distance(i) );
+    //printf("\n\n");
 
     //t.reserve(0,5);
-    ////t.expand();
+    t.expand();
     //////t.expand();
     //////t("4") = 4;
     //////t("5") = 5;
-    ////kv = t.elemStart();
+    prnt_elems(t);
+    //kv = t.elemStart();
     //TO(t.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
     //printf("\n\n");
 
@@ -231,9 +240,10 @@ int main()
 
     tbl t3 = t << t2;
 
-    kv = t3.elemStart();
-    TO(t3.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
-    printf("\n\n");
+    prnt_elems(t3);
+    //kv = t3.elemStart();
+    //TO(t3.map_capacity(), i) printf(" %s:%d:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type, t3.distance(i)  );
+    //printf("\n\n");
 
     //printf(" %d ", (int)t("one hundred") );   // for testing out an error on NONE type
 

@@ -79,8 +79,9 @@
 // -todo: resolve 'two' conflict with duplicate keys - have to make sure each element has not empty space between its ideal position and its final position
 // -todo: split operator() into a find function that returns the index of the element with the given key
 
+// todo: make a compact function that searches backwards to move and element back as far as possible?
 // todo: debug duplicate entries - possibly because of expand() being run
-// todo: make comapct function increment empty index instead of setting it to the moved index
+// todo: make comapct function increment empty index instead of setting it to the moved index? - instead, make move element as far back as possible
 // todo: make a del(const char* key) function that sets the type to empty, then moves back elements until either an empty space or an element aleady in its ideal position is found  
 // todo: simplify test case and debug duplicates in concatenation - should reserve use a del() function combined with reinsertion? 
 // todo: revisit concactenation to make sure map elems are copied
@@ -837,7 +838,10 @@ public:
   }
   ui64         ideal(ui64 i)
   {
-    return elemStart()[i].hsh.hash % map_capacity();
+    auto el = elemStart();
+    if(el[i].hsh.type==EMPTY) return i;
+     
+    return el[i].hsh.hash % map_capacity();
   }
   ui64      distance(ui64 i)
   {
