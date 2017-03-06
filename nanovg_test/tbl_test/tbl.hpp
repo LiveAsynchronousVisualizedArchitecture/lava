@@ -70,13 +70,16 @@
 // -todo: make bounds checks during debug
 // -todo: specialize offset type somehow?  tbl inside a tbl is given by being an offset/child and owned type. the tbl then gives up a reference/non-owned type that is not a child/offset type  - not neccesary with owned and non-owned tables
 // -todo: make operator[] and operator() call template specialized functions that jump by an offset if they are a child type? - shouldn't be neccesary, because acessing a child tbl can just construct a reference type each time, using the held offset to the tbl children segment (!) - not neccesary with owned and non-owned tables
+// -todo: make reserve rehash and reinsert all elements - works?
+// -todo: factor in wrap aroun
+// -todo: debug expand()  /  reserve with more vector capacity - not vector capacity, but mapcap with 6 instead of 4 causing problems?
+// -todo: test putting more than 8 elements into map - seems broken - debug 5th element insertion - is it reserve or the collision that is the problem? - expand is the problem? it enlarges the capacity AND map_cap?
+// -todo: make error messages for ERROR and NONE
 
-// todo: make error messages for ERROR and NONE
-// todo: make reserve rehash and reinsert all elements
+// todo: resolve 'two' conflict with duplicate keys - have to make sure each element has not empty space between its ideal position and its final position
 // todo: revisit concactenation to make sure map elems are copied
-// todo: test putting more than 8 elements into map
+// todo: robin hood hashing
 // todo: test KV with key string above character length  
-// todo: fold HashType into KV? - would have to make an internal struct/union? - just change HashType hsh to HashType ht?
 // todo: give KV a default constructor and copy constructor so that the c_str key is copied?
 // todo: make emplace and emplace_back()
 // todo: make resize()
@@ -84,10 +87,9 @@
 // todo: make sure destructor is being run on objects being held once turned into a template
 // todo: make shrink_to_fit()
 // todo: make begin and end iterators to go with C++11 for loops - loop through keys value pairs?
-// todo: robin hood hashing
 // todo: make visualization for table as a tree that shows arrays, key-values and their types, then sub tables - make various visualizations for arrays - histogram, graph, ???
 // todo: try template constructor that returns a tbl<type> with a default value set? - can't have a constructor that reserves elems with this? would need a reserve_elems() function?
-// todo: make reserve_elems() function
+// todo: make reserve_elems() function or reserve_map() function?
 // todo: add ability to use a function in the template type declaration to give a custom accessor by making operator() a variadic template?
 // todo: use binary bit operators to make tbl act like a set?
 // todo: make operator~ return just the vector
@@ -99,7 +101,8 @@
 // todo: make flatten method that has creates a new tbl with no extra capacity and takes all tbl references and makes them into offset/children tbls that are stored in the sub-tbl segment - instead of child type, make a read only type? read only could have template specializations or static asserts that prevent changing the tbl or the KV objects from it
 // todo: make non owned type always read only? - still need owned and non-owned types within tbl
 // todo: make macro to allocate memory on the stack and use it for a table
-// todo: make function to delete empty keys?
+// todo: make function to delete keys with NONE type? set NONE to empty?
+// todo: fold HashType into KV? - would have to make an internal struct/union? - just change HashType hsh to HashType ht?
 
 // todo: make visual studio visualization?
 // todo: make TBL_USE_JSON and TBL_USE_STL to have json serialization and stl integraton?
@@ -166,24 +169,26 @@ private:
   {
     *( ((ui64*)memStart()) + 3) = elems;
   }
-  void        place_kv(KV kv, ui64 kvidx, KV* elems, ui64 i, ui64 mod)
+  ui64        wrapDist(ui64 ideal, ui64 idx, ui64 mod)
   {
-    if(elems[i].hsh.type==EMPTY){ elems[i] = kv; return; }
-
-    ui64  elidx = elems[i].hsh.hash % mod;
-
-    //while(i-kvidx < i-elidx  && elems[i].hsh.type==NONE){
-    //  swap( &(elems[i]), &kv );
-    //  ++i;
-    //  ui64 elidx = elems[i].hsh.hash % mod;
-    //}
-
-    if(i-kvidx < i-elidx){
-      swap( &(elems[i]), &kv );
-      place_kv(kv, elidx, elems, elidx, mod);
-    }
+    if(idx>=ideal) return idx - ideal;
+    else return idx + (mod-ideal);
   }
-
+  void        place_kv(KV kv, KV* elems, ui64 idx, ui64 mod)
+  {
+    ui64     i = idx % mod;
+    ui64 elidx = i;
+    do{
+      i = i % mod;
+      if(elems[i].hsh.type==EMPTY){ elems[i]=kv; break; }
+      elidx = elems[i].hsh.hash % mod;
+        i64  eldist = wrapDist(elidx,i,mod);
+        i64    dist = wrapDist(idx,i,mod);
+        if(dist>eldist)
+          swap( &(elems[i]), &kv );                     //  robin hood hashing?
+      ++i;
+    }while(true);
+  }
   void            init(ui64 size)
   {
     ui64   szBytes  =  tbl::sizeBytes(size);
@@ -288,16 +293,16 @@ public:
      tF64       =  TABLE | BITS_64,
   };
   template<class N> struct typenum { static const Type num = EMPTY; };
-  template<> struct typenum<ui8>   { static const Type num =   UI8; }; 
-  template<> struct typenum<ui16>  { static const Type num =  UI16; }; 
-  template<> struct typenum<ui32>  { static const Type num =  UI32; }; 
-  template<> struct typenum<ui64>  { static const Type num =  UI64; }; 
-  template<> struct typenum<i8>    { static const Type num =    I8; }; 
-  template<> struct typenum<i16>   { static const Type num =   I16; }; 
-  template<> struct typenum<i32>   { static const Type num =   I32; }; 
-  template<> struct typenum<i64>   { static const Type num =   I64; }; 
-  template<> struct typenum<f32>   { static const Type num =   F32; }; 
-  template<> struct typenum<f64>   { static const Type num =   F64; }; 
+  template<> struct typenum<ui8>   { static const Type num =   UI8; };
+  template<> struct typenum<ui16>  { static const Type num =  UI16; };
+  template<> struct typenum<ui32>  { static const Type num =  UI32; };
+  template<> struct typenum<ui64>  { static const Type num =  UI64; };
+  template<> struct typenum<i8>    { static const Type num =    I8; };
+  template<> struct typenum<i16>   { static const Type num =   I16; };
+  template<> struct typenum<i32>   { static const Type num =   I32; };
+  template<> struct typenum<i64>   { static const Type num =   I64; };
+  template<> struct typenum<f32>   { static const Type num =   F32; };
+  template<> struct typenum<f64>   { static const Type num =   F64; };
   //template<> struct typenum<tui8>  { static const ui8 num = tUI8;  }; 
   //template<> struct typenum<tui16> { static const ui8 num = tUI16; }; 
   //template<> struct typenum<tui32> { static const ui8 num = tUI32; }; 
@@ -334,7 +339,7 @@ public:
 
     KV& operator=(KV const& l)
     {
-      memcpy(this, &l, sizeof(KV));
+      memmove(this, &l, sizeof(KV));
       return *this;
     }
     template<class N> void operator=(N n)
@@ -348,10 +353,17 @@ public:
     }
     template<class N> N as()
     { 
-      if(hsh.type==typenum<N>::num) return *((N*)&val);    // if the types are the same, return it as the cast directly
+      if(hsh.type==typenum<N>::num) return *((N*)&val);       // if the types are the same, return it as the cast directly
       
       //ui8   both = hsh.type | typenum<N>::num;              // both bits
-
+      if( (hsh.type & NONE) || (hsh.type & ERROR) ){
+        tbl_msg_assert(
+          hsh.type==typenum<N>::num, 
+          " - tbl TYPE ERROR -\nInternal type was: ", 
+          tbl::type_str((Type)hsh.type), 
+          "Desired  type was: ",
+          tbl::type_str((Type)typenum<N>::num) );        
+      } 
       if( (hsh.type & SIGNED) && !(typenum<N>::num & SIGNED)  ){
         tbl_msg_assert(
           hsh.type==typenum<N>::num, 
@@ -466,6 +478,7 @@ public:
       if(!expand()) return KV::error_kv();
 
     ui32   hsh  =  HashStr(key);
+    //ui32   hsh  =  *((ui32*)(key));
     KV*     el  =  (KV*)elemStart();                                   // el is a pointer to the elements 
     ui64   cap  =  map_capacity();  
     ui64     i  =  hsh;
@@ -493,8 +506,8 @@ public:
     
     return KV::error_kv();
   }
-  tbl     operator>>(tbl const& l){ return tbl::concat(*this, l); }
-  tbl     operator<<(tbl const& l){ return tbl::concat(*this, l); }
+  tbl     operator>>(tbl const& l){ return tbl::concat_l(*this, l); }
+  tbl     operator<<(tbl const& l){ return tbl::concat_r(*this, l); }
   void    operator+=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
   void    operator-=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }
   void    operator*=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a *= b; } ); }
@@ -587,9 +600,20 @@ public:
   {
     if(!m_mem) return 0;
 
-    return (sizeBytes()-memberBytes()-capacity()*sizeof(T)) / sizeof(KV);
+    auto    sz = sizeBytes();
+    auto membr = memberBytes();
+    auto   cap = capacity();
+    auto   szT = sizeof(T);
+    auto  szKV = sizeof(KV);
+    return (sz - membr - cap*szT) / szKV;
   }
   auto     elemStart() -> KV* 
+  {
+    if(!m_mem) return nullptr;
+
+    return (KV*)(data() + capacity());
+  }
+  auto     elemStart() const -> KV const* 
   {
     if(!m_mem) return nullptr;
 
@@ -598,11 +622,11 @@ public:
   void*      reserve(ui64 count, ui64 mapcount)
   {
     count    = mx(count, capacity());
-    mapcount = mx(mapcount, elems());
-    ui64   prevElems  =  (ui64)(elemStart());
+    mapcount = mx(mapcount, map_capacity());
+    KV*    prevElems  =  elemStart();
     ui64   prevMemSt  =  (ui64)memStart();
-    ui64    prevOfst  =  prevElems? prevElems-prevMemSt  :  0;
-    ui64 prevSzBytes  =  sizeBytes();
+    ui64    prevOfst  =  prevElems? ((ui64)prevElems)-prevMemSt  :  0;
+    ui64   prevBytes  =  sizeBytes();
     ui64  prevMapCap  =  map_capacity();
     ui64    nxtBytes  =  memberBytes() + sizeof(T)*count +  sizeof(KV)*mapcount;
     void*        re;
@@ -610,71 +634,52 @@ public:
     if(fresh) re = malloc(nxtBytes);
     else      re = realloc(memStart(), nxtBytes);
 
+    //if(prevBytes<nxtBytes) 
+    //  memset(re, 0, nxtBytes);
+      //memset( (i8*)re + prevBytes, 0, nxtBytes-prevBytes );
+
     if(re){
       m_mem = ((i8*)re) + memberBytes();
       set_sizeBytes(nxtBytes);
       set_capacity(count);
-      set_elems(mapcount);
-
-      // todo: need to move the element memory the previous range to the new range
-      //(KV*)( ((i8*)re)+prevOfst+prevMapCap*sizeof(KV) ) 
+      //set_elems(mapcount);
 
       KV* el = elemStart();
       if(prevElems){
-        void* prevEl = ((i8*)memStart()) + prevOfst;
-        memcpy(el, prevEl, prevMapCap*sizeof(KV));
+        KV* prevEl = (KV*)( ((i8*)re) + prevOfst );
+        //ui64   len = prevMapCap*sizeof(KV);
+        if(el!=prevEl) TO(prevMapCap,i) el[i] = prevEl[i];
+        //memmove(el, prevEl, len);
       }
+
+      //TO(map_capacity(),i) new (&el[i]) KV();
 
       ui64  mapcap = map_capacity();
       i64   extcap = mapcap - prevMapCap;
-      if(extcap>0) TO(extcap,i) el[i+prevMapCap] = KV();
-
-      //KV*   curEnd = el + mapcap;
-      //KV*  prevEnd = prevElems?  (KV*)( ((i8*)re)+prevSzBytes ) :  el;
-      //for(KV* kv=prevEnd; kv!=curEnd; ++kv){                                  // excap is extra capacity
-      //  *kv = KV();
-      //}
-      //for(auto i=prevMapCap; i<elems; ++i){
-      //  el[i] = 
-      //}
-      //TO(elems-prevMapCap,i) 
-
-      //ui64 curOfst = (i8*)el - (i8*)re;
-      //memcpy(el, (i8*)re + prevOfst, prevMapCap*sizeof(KV) );
-      //
-      // rehash, make sure that the differences in indexes include a linear search that would wrap around
-      //KV      tmp = KV();
-      //ui64 tmpidx = 0;
+      if(extcap>0) 
+        TO(extcap,i) 
+          new (&el[i+prevMapCap]) KV();
 
       if(prevElems)
       {
-        ui64    mod = mapcap - 1;
+        ui64    mod = mapcap; // - 1;
         TO(prevMapCap, i){
           KV kv = el[i];
           if(kv.hsh.type != EMPTY){
             ui64 nxtIdx = kv.hsh.hash % mod;
             if(nxtIdx!=i){
               el[i] = KV();
-              place_kv(kv, nxtIdx, el, nxtIdx, mod);
+              place_kv(kv, el, nxtIdx, mod);
             }
           }
         } 
       }
 
-      //if(tmp.hsh.type==NONE){ tmp = el[i]; tmpidx = tmp.hsh.hash%mod; continue; }
-      //ui64  elidx = el[i].hsh.hash % mod;
-      //if(i-tmpidx < elidx-i) swap( &(el[i]), &tmp );
-      //
-      // todo: take this out so that hashes aren't wiped
-      //KV* el = elemStart();
-      //TO(elems, i) el[i] = KV();
     }
 
     if(re && fresh){ set_size(0); set_elems(0); }
     
     return re;
-    
-    //set_sizeBytes(nxtBytes);
   }
   void*       expand()
   {
@@ -742,8 +747,9 @@ public:
   {
     switch(t)
     {
-    case  NONE: return  "None";
+    case ERROR: return "Error";
     case EMPTY: return "Empty";
+    case  NONE: return  "None";
     
     case   UI8: return  "ui8";
     case  UI16: return "ui16";
@@ -775,13 +781,41 @@ public:
   {
     return memberBytes() + sizeof(T)*count;
   }
-  static tbl        concat(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
+  static tbl       concat_l(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
   {
     auto sz = a.size();
     tbl ret(sz + b.size());
     
     TO(sz,i) ret[i]    = a[i];
     TO(b, i) ret[sz+i] = b[i];
+
+    KV const* el = b.elemStart();
+    TO(b.map_capacity(),i) ret( el[i].key ) = el[i];
+
+    el = a.elemStart();
+    TO(a.map_capacity(),i) ret( el[i].key ) = el[i];
+
+    return ret;
+  }
+  static tbl       concat_r(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
+  {
+    auto sz = a.size();
+    tbl ret(sz + b.size());
+    
+    TO(sz,i) ret[i]    = a[i];
+    TO(b, i) ret[sz+i] = b[i];
+
+    KV const* el = a.elemStart();
+    TO(a.map_capacity(),i){
+      if(el[i].hsh.type!=EMPTY) 
+        ret( el[i].key ) = el[i];
+    }
+
+    el = b.elemStart();
+    TO(b.map_capacity(),i){
+      if(el[i].hsh.type!=EMPTY) 
+        ret( el[i].key ) = el[i];
+    }
 
     return ret;
   }
@@ -793,6 +827,79 @@ public:
 
 
 
+
+//ui64           mod0(ui64 n, ui64 mod)
+//{
+//  n==mod? (n%mod - 1) : n;
+//}
+    
+//place_kv(kv, elems, elidx, mod);
+//    }
+//
+//}else{
+//  swap( &(elems[i]), &kv );                     //  robin hood hashing?
+//  place_kv(kv, elems, elidx, mod);
+//}
+
+//
+//void        place_kv(KV kv, ui64 kvidx, KV* elems, ui64 i, ui64 mod)
+
+//if(elems[i].hsh.type==EMPTY){ elems[i] = kv; return; }
+//i64  idist = 0;
+
+//swap( &(elems[i]), &kv );
+//if(kv.hsh.type!=EMPTY)
+//place_kv(kv, elems, elidx, mod);
+
+//if(elidx!=i){
+//
+//}
+//if( elems[elidx].hsh.hash%mod == i ){ ++i; continue; }
+
+//do{
+//  ui64 elidx = elems[i].hsh.hash % mod;
+//  if(elidx!=i) break;
+//  ++i;
+//}while(true);
+
+//while(i-kvidx < i-elidx  && elems[i].hsh.type==NONE){
+//  swap( &(elems[i]), &kv );
+//  ++i;
+//  ui64 elidx = elems[i].hsh.hash % mod;
+//}
+
+//if( i-kvidx < i-elidx){
+//}
+
+//if(tmp.hsh.type==NONE){ tmp = el[i]; tmpidx = tmp.hsh.hash%mod; continue; }
+//ui64  elidx = el[i].hsh.hash % mod;
+//if(i-tmpidx < elidx-i) swap( &(el[i]), &tmp );
+//
+// todo: take this out so that hashes aren't wiped
+//KV* el = elemStart();
+//TO(elems, i) el[i] = KV();
+//    
+//set_sizeBytes(nxtBytes);
+
+// todo: need to move the element memory the previous range to the new range
+//(KV*)( ((i8*)re)+prevOfst+prevMapCap*sizeof(KV) ) 
+
+//KV*   curEnd = el + mapcap;
+//KV*  prevEnd = prevElems?  (KV*)( ((i8*)re)+prevSzBytes ) :  el;
+//for(KV* kv=prevEnd; kv!=curEnd; ++kv){                                  // excap is extra capacity
+//  *kv = KV();
+//}
+//for(auto i=prevMapCap; i<elems; ++i){
+//  el[i] = 
+//}
+//TO(elems-prevMapCap,i) 
+
+//ui64 curOfst = (i8*)el - (i8*)re;
+//memcpy(el, (i8*)re + prevOfst, prevMapCap*sizeof(KV) );
+//
+// rehash, make sure that the differences in indexes include a linear search that would wrap around
+//KV      tmp = KV();
+//ui64 tmpidx = 0;
 
 //  KV tmp2 = el[i];
 //  el[i] = tmp;

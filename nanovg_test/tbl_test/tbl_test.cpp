@@ -188,20 +188,60 @@ int main()
 
   SECTION(test reserve rehashing)
   {
+    tbl::KV* kv;
+    
     tbl t;
-    t("one")   = 1;
-    t("two")   = 2;
-    t("three") = 3;
+    //t("0") = 0;
+    //t("1") = 1;
+    //t("2") = 2;
+    //t("3") = 3;
+    t("zero")  = 85;
+    t("one")   = 85;
+    t("two")   = 85;
+    t("three") = 85;
+    kv = t.elemStart();
+    TO(t.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
+    printf("\n\n");
+
+    //t.reserve(0,5);
+    //t.expand();
+    //t("4") = 4;
+    //t("5") = 5;
+
+    tbl t2;
+    t2("2")   = 85;
+
+    kv = t2.elemStart();
+    TO(t2.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
+    printf("\n\n");
+
+    //t2("zero")  = 0;
+    //t2("one")   = 1;
+    t2("two")   = 2;
+    //t2("three") = 3;
+    //t2("four")  = 4;
+    //t2("five")  = 5;
+    //t2("six")   = 6;
+
+    tbl t3 = t << t2;
+
+    kv = t3.elemStart();
+    TO(t3.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
+    printf("\n\n");
+
+    //printf(" %d ", (int)t("one hundred") );   // for testing out an error on NONE type
+
     //int _1 = t("1");
     //printf(" mapcap: %d  %d  %d  %d ", t.map_capacity(), _1, (int)t("2"), (int)t("3") );
 
-    auto kv = t.elemStart();
-    TO(t.map_capacity(), i) printf(" %s:%d ", kv[i].key, (int)(kv[i].val) );
-    printf("\n\n");
+    //kv = t.elemStart();
+    //TO(t.map_capacity(), i) printf(" %s:%d ", kv[i].key, (int)(kv[i].val) );
+    //printf("\n\n");
 
-    t.reserve(0,23);
-    TO(t.map_capacity(), i) printf(" %s:%d ", kv[i].key, (int)(kv[i].val) );
-    printf("\n\n");
+    //t.reserve(0,23);
+    //kv = t.elemStart();
+    //TO(t.map_capacity(), i) printf(" %s:%d ", kv[i].key, (int)(kv[i].val) );
+    //printf("\n\n");
 
     //int _1 = t("1");
     //printf(" mapcap: %d  %d  %d  %d ", t.map_capacity(), _1, (int)t("2"), (int)t("3") );
