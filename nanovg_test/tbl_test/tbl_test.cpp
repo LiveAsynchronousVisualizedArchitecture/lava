@@ -7,7 +7,20 @@
 void prnt_elems(tbl& t)
 {
   tbl::KV* kv = t.elemStart();
-  TO(t.map_capacity(), i) printf(" %s:%d:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type, t.distance(i) );
+  TO(t.map_capacity(), i)
+  {
+    if(kv[i].hsh.type==tbl::EMPTY)
+      printf(" EMPTY ");
+    else
+      printf(" %s:%d:%d:%d:%d ", 
+        kv[i].key, 
+        (int)(kv[i].val), 
+        kv[i].hsh.type, 
+        t.distance(i),
+        t.holeOfst(i)
+      );
+  }
+  
   printf("\n\n");
 }
 
@@ -195,7 +208,7 @@ int main()
 
   SECTION(test reserve placement)
   {
-    tbl::KV* kv;
+    //tbl::KV* kv;
     
     tbl t;
     t("0") = 85;
@@ -222,10 +235,10 @@ int main()
     //printf("\n\n");
 
     tbl t2;
-    //t2("0")   = 0;
-    //t2("1")   = 1;
+    t2("0")   = 0;
+    t2("1")   = 1;
     t2("2")   = 2;
-    //t2("3")   = 3;
+    t2("3")   = 3;
     //t2("zero")  = 0;
     //t2("one")   = 1;
     //t2("two")   = 2;

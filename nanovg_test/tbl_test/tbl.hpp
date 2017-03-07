@@ -78,11 +78,17 @@
 // -todo: fix comapact_all removing elements - empty index wasn't being set to the current index when moving an element
 // -todo: resolve 'two' conflict with duplicate keys - have to make sure each element has not empty space between its ideal position and its final position
 // -todo: split operator() into a find function that returns the index of the element with the given key
+// -todo: make a compact function that searches backwards to move and element back as far as possible?
+// -todo: debug duplicate entries - possibly because of expand() being run
+// -todo: make comapct function increment empty index instead of setting it to the moved index? - instead, make move element as far back as possible
+// -todo: make a del(const char* key) function that sets the type to empty, then moves back elements until either an empty space or an element aleady in its ideal position is found  
+// -todo: make function to detect holes between a key and its empty position
+// -todo: try using operator() instead of place_kv
 
-// todo: make a compact function that searches backwards to move and element back as far as possible?
-// todo: debug duplicate entries - possibly because of expand() being run
-// todo: make comapct function increment empty index instead of setting it to the moved index? - instead, make move element as far back as possible
-// todo: make a del(const char* key) function that sets the type to empty, then moves back elements until either an empty space or an element aleady in its ideal position is found  
+// todo: make placement loop reset the end point and always loop to the end index
+// todo: make function to move an index forward or backward
+// todo: make a function to remove any holes between an element and its ideal position
+// todo: make function to find spans of non-empty blocks, sort them and move them
 // todo: simplify test case and debug duplicates in concatenation - should reserve use a del() function combined with reinsertion? 
 // todo: revisit concactenation to make sure map elems are copied
 // todo: robin hood hashing
@@ -201,6 +207,26 @@ private:
     ui64 ideal = elems[idx].hsh.hash % mod;
     return wrapDist(ideal,idx,mod);
   }
+  void    compact_back(ui64 st, ui64 mod)
+  {
+    //ui64   cnt = 0;                                   // cnt is count which counts the number of loops, making sure the entire map capacity (mapcap) has not bene exceeded
+    KV*      el = elemStart(); 
+    ui64  mvIdx = st;
+    ui64  elDst = wrapDist(el, st, mod);
+    if(elDst==0) return;
+
+    ui64      i = prev(st, mod);
+    ui64     en = st; //nxt(st, mapcap);
+    ui64  mvDst = 0;
+    while(el[i].hsh.type==EMPTY && mvDst<elDst && i!=en){ 
+      ++mvDst;
+      i = prev(i,mod);
+    }
+    i = nxt(i,mod);
+    el[i]  = el[st];
+    el[st] = KV();
+    //TO(mvDst,ii) mvIdx=prev(mvIdx,mod);      // todo: do this with a function that doesn't loop
+  }
   ui64         compact(ui64 st, ui64 en, ui64 mapcap) //ui64 mapcap)
   {
     ui64   cnt = 0;                                   // cnt is count which counts the number of loops, making sure the entire map capacity (mapcap) has not bene exceeded
@@ -246,27 +272,37 @@ private:
     //ui64    en  =  wrap<(mapcap-1)? wrap : mapcap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
 
     ui64    en = prev(st,mapcap);
-    ui64 cmpct;
+    ui64 cmpct = st;
     do{
-      cmpct = compact(st,en,mapcap);
+      cmpct = compact(cmpct,en,mapcap);
     }while( cmpct != en );
     
   }
-  void        place_kv(KV kv, KV* elems, ui64 idx, ui64 mod)
+  i64            place(KV kv, KV* elems, ui64 mod)
   {
-    ui64     i = idx % mod;
-    ui64 elidx = i;
-    do{
-      //i = i % mod;
-      if(elems[i].hsh.type==EMPTY){ elems[i]=kv; break; }
-      elidx = elems[i].hsh.hash % mod;
-        i64  eldist = wrapDist(elidx,i,mod);
-        i64    dist = wrapDist(idx,i,mod);
-        if(dist>eldist)
-          swap( &(elems[i]), &kv );                     //  robin hood hashing?
+    //ui64     i = idx % mod;
+    //ui64 elidx = i;
+    //do{
+    //  //i = i % mod;
+    //  if(elems[i].hsh.type==EMPTY){ elems[i]=kv; break; }
+    //  elidx = elems[i].hsh.hash % mod;
+    //    i64  eldist = wrapDist(elidx,i,mod);
+    //    i64    dist = wrapDist(idx,i,mod);
+    //    if(dist>eldist)
+    //      swap( &(elems[i]), &kv );                     //  robin hood hashing?
+    //  i = nxt(i,mod);
+    //  //++i;
+    //}while(true);
+
+    ui64  i = kv.hsh.hash % mod;
+    ui64 en = prev(i,mod);
+    while(elems[i].hsh.type!=EMPTY){
+      if(i==en) return -1;
       i = nxt(i,mod);
-      //++i;
-    }while(true);
+    }
+
+    elems[i] = kv;
+    return i;
   }
   void            init(ui64 size)
   {
@@ -281,6 +317,19 @@ private:
   bool             del(const char* key)
   { 
     ui64 i = find(key);
+    KV* el = elemStart();
+    if(el[i].hsh.type==EMPTY) return false;
+
+    el[i] = KV();
+    ui64 mapcap = map_capacity();
+    ui64     en = prev(i, mapcap);
+    compact(i, en, mapcap);
+
+    return true;
+  }
+  bool             del(ui64 i)
+  { 
+    //ui64 i = find(key);
     KV* el = elemStart();
     if(el[i].hsh.type==EMPTY) return false;
 
@@ -755,7 +804,7 @@ public:
       m_mem = ((i8*)re) + memberBytes();
       set_sizeBytes(nxtBytes);
       set_capacity(count);
-      //set_elems(mapcount);
+      //set_elems(0);
 
       KV* el = elemStart();
       if(prevElems){
@@ -774,21 +823,71 @@ public:
           new (&el[i+prevMapCap]) KV();
 
       if(prevElems)
-      {
-        //ui64    mod = mapcap; // - 1;
-        //TO(prevMapCap, i){
-        //  KV kv = el[i];
-        //  if(kv.hsh.type != EMPTY){
-        //    ui64 nxtIdx = kv.hsh.hash % mod;
-        //    if(nxtIdx!=i){
-        //      el[i] = KV();
-        //      place_kv(kv, el, nxtIdx, mod);
-        //    }
+      { 
+        ui64  i  = 0;
+        ui64 en  = prev(i,mapcap);
+        ui64 cnt = 0; 
+        do{
+          ui64 nxti = nxt(i,mapcap); 
+          if(el[i].hsh.type != EMPTY){
+            KV kv  = el[i];
+            el[i]  = KV();
+            ui64 p = place(kv,el,mapcap);
+            if(p!=i) en = i;
+          }
+          i = nxti;
+          ++cnt;
+        }while(i!=en);
+        printf("\n loop count: %d \n", cnt);
+
+        //for(ui64 mvcnt=1; mvcnt>0;)
+        //{
+        //  mvcnt=0;
+        //  TO(mapcap, i) if(el[i].hsh.type != EMPTY){
+        //    KV kv = el[i];
+        //    el[i] = KV();
+        //    ui64 p = place(kv,el,mapcap);
+        //    if(p!=i) ++mvcnt;
         //  }
+        //  printf("\n move count: %d \n", mvcnt);
         //}
-         
-        compact_all( prev(prevMapCap,mapcap), mapcap);                      // start where the loop above left off
+
+        //TO(mapcap, i) if(el[i].hsh.type != EMPTY){
+        //  KV kv = el[i];
+        //  el[i] = KV();
+        //  place(kv,el,mapcap);
+        //}
+
+        //TO(prevMapCap, i) if(el[i].hsh.type != EMPTY){
+        //  KV kv = el[i];
+        //  el[i] = KV();
+        //  (*this)(kv.key) = kv;                    
+        //}
+
+        //TO(prevMapCap, i) if(el[i].hsh.type != EMPTY){
+        //  ui64 h = holeOfst(i);
+        //  if(h>0) 
+        //}
       }
+
+      //if(prevElems)
+      //{
+      //  ui64    mod = mapcap; // - 1;
+      //  TO(prevMapCap, i){
+      //    KV kv = el[i];
+      //    if(kv.hsh.type != EMPTY){
+      //      ui64 nxtIdx = kv.hsh.hash % mod;
+      //      if(nxtIdx!=i){
+      //        //el[i] = KV();
+      //        //compact_back( nxt(i,mod), mod);
+      //        del(i);
+      //        place_kv(kv, el, nxtIdx, mod);
+      //      }
+      //    }
+      //  }
+      //   
+      //  compact_all( prev(prevMapCap,mapcap), mapcap);                      // start where the loop above left off
+      //}
     }
 
     if(re && fresh){ set_size(0); set_elems(0); }
@@ -847,6 +946,24 @@ public:
   {
     //ui64 idl = ideal(i);
     return wrapDist( ideal(i), i, map_capacity() );
+  }
+  i64       holeOfst(ui64 i)
+  { // finds the closes hole from an element, but not the furthest hole
+    KV*   el = elemStart();
+    ui64 mod = map_capacity();
+    //if(el[i].hsh.type==EMPTY) return -1;
+    
+    i64    h = -1;
+    //ui64 idl = ideal(i);
+    ui64 dst = distance(i);
+    ui64 cnt = 0;
+    //while(el[i].hsh.type!=EMPTY && cnt!=dst){
+    while(dst >= cnt){ // count can equal distance
+      if(el[i].hsh.type==EMPTY) h = i;
+      i = prev(i,mod);
+      ++cnt;
+    }
+    return h;
   }
 
 private:
@@ -934,7 +1051,7 @@ public:
   {
     return memberBytes() + sizeof(T)*count;
   }
-  static tbl       concat_l(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
+  static tbl      concat_l(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
   {
     auto sz = a.size();
     tbl ret(sz + b.size());
@@ -950,7 +1067,7 @@ public:
 
     return ret;
   }
-  static tbl       concat_r(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
+  static tbl      concat_r(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
   {
     auto sz = a.size();
     tbl ret(sz + b.size());
