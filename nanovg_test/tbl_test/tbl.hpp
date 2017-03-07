@@ -84,14 +84,16 @@
 // -todo: make a del(const char* key) function that sets the type to empty, then moves back elements until either an empty space or an element aleady in its ideal position is found  
 // -todo: make function to detect holes between a key and its empty position
 // -todo: try using operator() instead of place_kv
+// -todo: with robin-hood hashing, would it be possible to re-insert elements, then deal with them in spans? - no because all movement creates holes
+// -todo: make placement loop reset the end point and always loop to the end index
+// -todo: make function to move an index forward or backward? - not needed with rolling placement reordering
+// -todo: make a function to remove any holes between an element and its ideal position
+// -todo: make function to find spans of non-empty blocks, sort them and move them - not needed
+// -todo: simplify test case and debug duplicates in concatenation - should reserve use a del() function combined with reinsertion? 
+// -todo: revisit concactenation to make sure map elems are copied
 
-// todo: make placement loop reset the end point and always loop to the end index
-// todo: make function to move an index forward or backward
-// todo: make a function to remove any holes between an element and its ideal position
-// todo: make function to find spans of non-empty blocks, sort them and move them
-// todo: simplify test case and debug duplicates in concatenation - should reserve use a del() function combined with reinsertion? 
-// todo: revisit concactenation to make sure map elems are copied
 // todo: robin hood hashing
+// todo: make rolling reshuffle and put into delete function
 // todo: try reserve again - without recursion? - if curKV's ideal idx is the same, loop on the next idx. - problem, robin hood hashing would mean swapping if curKV's ideal is larger than the element at i, but if an element hasn't been moved, its distance to ideal could be large, meaning it wouldn't move even though it should 
 //       | solution: don't do robbin hood hasing at first, just make sure all the elements that hash to the same bucket are linearly packed
 //       |   problem: are there scenarios that will trigger infinite recursion? - yes, if only comparing ideal indices
@@ -113,7 +115,10 @@
 // todo: make non owned type always read only? - still need owned and non-owned types within tbl
 // todo: make function to delete keys with NONE type? set NONE to empty?
 // todo: fold HashType into KV? - would have to make an internal struct/union? - just change HashType hsh to HashType ht?
+// todo: keep the max distance through every loop and use that to short-circuit the reorder loop? - have place_kv return the the distance from ideal in a separate variable, keep track of the index... is there a way to take the max distance back down? does it need to go back down? does the end point only need to be prevMapcap elements forward? - no because there could still be holes?
 
+// todo: is an optimization possible where the index of the largest distance from ideal position is kept so the loop doesn't have to go all the way back around? - no because moving the largest distance means the next largest would have to be found again 
+// todo: is it possible to deal with spans of keys that go to the same bucket? would it be more efficient?
 // todo: make reserve_elems() function or reserve_map() function? - if reserve 
 // todo: use binary bit operators to make tbl act like a set?
 // todo: make operator~ return just the vector
@@ -207,93 +212,8 @@ private:
     ui64 ideal = elems[idx].hsh.hash % mod;
     return wrapDist(ideal,idx,mod);
   }
-  void    compact_back(ui64 st, ui64 mod)
-  {
-    //ui64   cnt = 0;                                   // cnt is count which counts the number of loops, making sure the entire map capacity (mapcap) has not bene exceeded
-    KV*      el = elemStart(); 
-    ui64  mvIdx = st;
-    ui64  elDst = wrapDist(el, st, mod);
-    if(elDst==0) return;
-
-    ui64      i = prev(st, mod);
-    ui64     en = st; //nxt(st, mapcap);
-    ui64  mvDst = 0;
-    while(el[i].hsh.type==EMPTY && mvDst<elDst && i!=en){ 
-      ++mvDst;
-      i = prev(i,mod);
-    }
-    i = nxt(i,mod);
-    el[i]  = el[st];
-    el[st] = KV();
-    //TO(mvDst,ii) mvIdx=prev(mvIdx,mod);      // todo: do this with a function that doesn't loop
-  }
-  ui64         compact(ui64 st, ui64 en, ui64 mapcap) //ui64 mapcap)
-  {
-    ui64   cnt = 0;                                   // cnt is count which counts the number of loops, making sure the entire map capacity (mapcap) has not bene exceeded
-    KV*     el = elemStart(); 
-    ui64     i = st;
-    ui64 empty;
-    while(el[i].hsh.type!=EMPTY && i!=en){ 
-      i = nxt(i,mapcap);
-      ++cnt;
-    } // finds the first empty slot
-    empty = i;
-    while(el[i].hsh.type==EMPTY && i!=en){
-      i = nxt(i,mapcap);
-      ++cnt;
-    } // find the first non-empty slot after finding an empty slot
-    while(el[i].hsh.type!=EMPTY && i!=en){
-      ui64 elemDst = wrapDist(el,i,mapcap);
-      if( elemDst>0 ){ 
-        ui64 emptyDst = wrapDist(empty,i,mapcap);           // emptyDst is empty distance - the distance to the empty slot - this can probably be optimized to just be an increment
-        ui64    mnDst = mn(elemDst, emptyDst);               // mnDst is the minimum distances
-        ui64    mvIdx = i;
-        TO(mnDst,ii) mvIdx=prev(mvIdx,mapcap);
-        el[mvIdx] = el[i];
-        el[i]       = KV();
-        empty       = i;                                     //++empty; // empty = i;  if empty was just the current index or if there are lots of empty elements in between, empty can be incremented by one
-      }
-      i = nxt(i,mapcap);
-      ++cnt;
-    } // moves elements backwards if they would end up closer to their ideal position
-
-    return i;
-
-    //ui64  mved = 0;                                 // mved is moved which is the number of elements that have been moved
-    //ui64    en = st;                                  // en is ending index which is the index that the loops end up on - it is one after the last index looked at
-    //
-    // while(el[i].hsh.type!=EMPTY && cnt<mapcap){ 
-    // while(el[i].hsh.type==EMPTY && cnt<mapcap){
-    // while(el[i].hsh.type!=EMPTY && cnt<mapcap){
-  }
-  void     compact_all(ui64 st, ui64 mapcap)
-  {
-    //ui64  wrap  =  st - 1;
-    //ui64    en  =  wrap<(mapcap-1)? wrap : mapcap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
-
-    ui64    en = prev(st,mapcap);
-    ui64 cmpct = st;
-    do{
-      cmpct = compact(cmpct,en,mapcap);
-    }while( cmpct != en );
-    
-  }
   i64            place(KV kv, KV* elems, ui64 mod)
   {
-    //ui64     i = idx % mod;
-    //ui64 elidx = i;
-    //do{
-    //  //i = i % mod;
-    //  if(elems[i].hsh.type==EMPTY){ elems[i]=kv; break; }
-    //  elidx = elems[i].hsh.hash % mod;
-    //    i64  eldist = wrapDist(elidx,i,mod);
-    //    i64    dist = wrapDist(idx,i,mod);
-    //    if(dist>eldist)
-    //      swap( &(elems[i]), &kv );                     //  robin hood hashing?
-    //  i = nxt(i,mod);
-    //  //++i;
-    //}while(true);
-
     ui64  i = kv.hsh.hash % mod;
     ui64 en = prev(i,mod);
     while(elems[i].hsh.type!=EMPTY){
@@ -323,7 +243,8 @@ private:
     el[i] = KV();
     ui64 mapcap = map_capacity();
     ui64     en = prev(i, mapcap);
-    compact(i, en, mapcap);
+    //compact(i, en, mapcap);  
+    // todo: need rolling reshuffle here
 
     return true;
   }
@@ -336,7 +257,7 @@ private:
     el[i] = KV();
     ui64 mapcap = map_capacity();
     ui64     en = prev(i, mapcap);
-    compact(i, en, mapcap);
+    //compact(i, en, mapcap);
 
     return true;
   }
@@ -838,7 +759,7 @@ public:
           i = nxti;
           ++cnt;
         }while(i!=en);
-        printf("\n loop count: %d \n", cnt);
+        printf("\n loop count: %d mapcap: %d  ratio: %.4f \n", cnt, mapcap, cnt/(float)mapcap );
 
         //for(ui64 mvcnt=1; mvcnt>0;)
         //{
@@ -1097,6 +1018,93 @@ public:
 
 
 
+
+//void    compact_back(ui64 st, ui64 mod)
+//{
+//  //ui64   cnt = 0;                                   // cnt is count which counts the number of loops, making sure the entire map capacity (mapcap) has not bene exceeded
+//  KV*      el = elemStart(); 
+//  ui64  mvIdx = st;
+//  ui64  elDst = wrapDist(el, st, mod);
+//  if(elDst==0) return;
+//
+//  ui64      i = prev(st, mod);
+//  ui64     en = st; //nxt(st, mapcap);
+//  ui64  mvDst = 0;
+//  while(el[i].hsh.type==EMPTY && mvDst<elDst && i!=en){ 
+//    ++mvDst;
+//    i = prev(i,mod);
+//  }
+//  i = nxt(i,mod);
+//  el[i]  = el[st];
+//  el[st] = KV();
+//  //TO(mvDst,ii) mvIdx=prev(mvIdx,mod);      // todo: do this with a function that doesn't loop
+//}
+//ui64         compact(ui64 st, ui64 en, ui64 mapcap) //ui64 mapcap)
+//{
+//  ui64   cnt = 0;                                   // cnt is count which counts the number of loops, making sure the entire map capacity (mapcap) has not bene exceeded
+//  KV*     el = elemStart(); 
+//  ui64     i = st;
+//  ui64 empty;
+//  while(el[i].hsh.type!=EMPTY && i!=en){ 
+//    i = nxt(i,mapcap);
+//    ++cnt;
+//  } // finds the first empty slot
+//  empty = i;
+//  while(el[i].hsh.type==EMPTY && i!=en){
+//    i = nxt(i,mapcap);
+//    ++cnt;
+//  } // find the first non-empty slot after finding an empty slot
+//  while(el[i].hsh.type!=EMPTY && i!=en){
+//    ui64 elemDst = wrapDist(el,i,mapcap);
+//    if( elemDst>0 ){ 
+//      ui64 emptyDst = wrapDist(empty,i,mapcap);           // emptyDst is empty distance - the distance to the empty slot - this can probably be optimized to just be an increment
+//      ui64    mnDst = mn(elemDst, emptyDst);               // mnDst is the minimum distances
+//      ui64    mvIdx = i;
+//      TO(mnDst,ii) mvIdx=prev(mvIdx,mapcap);
+//      el[mvIdx] = el[i];
+//      el[i]       = KV();
+//      empty       = i;                                     //++empty; // empty = i;  if empty was just the current index or if there are lots of empty elements in between, empty can be incremented by one
+//    }
+//    i = nxt(i,mapcap);
+//    ++cnt;
+//  } // moves elements backwards if they would end up closer to their ideal position
+//
+//  return i;
+//
+//  //ui64  mved = 0;                                 // mved is moved which is the number of elements that have been moved
+//  //ui64    en = st;                                  // en is ending index which is the index that the loops end up on - it is one after the last index looked at
+//  //
+//  // while(el[i].hsh.type!=EMPTY && cnt<mapcap){ 
+//  // while(el[i].hsh.type==EMPTY && cnt<mapcap){
+//  // while(el[i].hsh.type!=EMPTY && cnt<mapcap){
+//}
+//void     compact_all(ui64 st, ui64 mapcap)
+//{
+//  //ui64  wrap  =  st - 1;
+//  //ui64    en  =  wrap<(mapcap-1)? wrap : mapcap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
+//
+//  ui64    en = prev(st,mapcap);
+//  ui64 cmpct = st;
+//  do{
+//    cmpct = compact(cmpct,en,mapcap);
+//  }while( cmpct != en );
+//  
+//}
+
+//i64            place(KV kv, KV* elems, ui64 mod)
+//ui64     i = idx % mod;
+//ui64 elidx = i;
+//do{
+//  //i = i % mod;
+//  if(elems[i].hsh.type==EMPTY){ elems[i]=kv; break; }
+//  elidx = elems[i].hsh.hash % mod;
+//    i64  eldist = wrapDist(elidx,i,mod);
+//    i64    dist = wrapDist(idx,i,mod);
+//    if(dist>eldist)
+//      swap( &(elems[i]), &kv );                     //  robin hood hashing?
+//  i = nxt(i,mod);
+//  //++i;
+//}while(true);
 
 //ui64           mod0(ui64 n, ui64 mod)
 //{
