@@ -240,8 +240,9 @@ private:
     {
       if(i==en){ return KV::error_kv(); }
       else if(elems[i].hsh.type==EMPTY){
+        elems[i] = kv;
         if(ret) return *ret;
-        else    return elems[i] = kv;
+        else    return elems[i];
       }else if( dist > (eldst=wrapDist(elems,i,mod)) ){
         swap( &kv, &elems[i] );
         dist = eldst;
@@ -442,6 +443,11 @@ public:
       hsh.hash = hash;
     }
 
+    bool operator==(KV const& l)
+    {
+      return hsh.hash==l.hsh.hash && 
+             strncmp(l.key,key,sizeof(KV::Key)-1)==0;
+    }
     KV& operator=(KV const& l)
     {
       memmove(this, &l, sizeof(KV));
@@ -933,7 +939,7 @@ public:
 
     ui64    el = elems();
     ui64 nxtEl = el + el/2;
-    nxtEl      = nxtEl<8? 8 : nxtEl;
+    nxtEl      = nxtEl<4? 4 : nxtEl;
 
     return reserve(nxtSz, nxtEl);
   }
@@ -1113,11 +1119,11 @@ public:
         ret( el[i].key ) = el[i];
     }
 
-    //el = b.elemStart();
-    //TO(b.map_capacity(),i){
-    //  if(el[i].hsh.type!=EMPTY) 
-    //    ret( el[i].key ) = el[i];
-    //}
+    el = b.elemStart();
+    TO(b.map_capacity(),i){
+      if(el[i].hsh.type!=EMPTY) 
+        ret( el[i].key ) = el[i];
+    }
 
     return ret;
   }
