@@ -91,15 +91,16 @@
 // -todo: make function to find spans of non-empty blocks, sort them and move them - not needed
 // -todo: simplify test case and debug duplicates in concatenation - should reserve use a del() function combined with reinsertion? 
 // -todo: revisit concactenation to make sure map elems are copied
-
-// todo: robin hood hashing
-// todo: make rolling reshuffle and put into delete function
-// todo: try reserve again - without recursion? - if curKV's ideal idx is the same, loop on the next idx. - problem, robin hood hashing would mean swapping if curKV's ideal is larger than the element at i, but if an element hasn't been moved, its distance to ideal could be large, meaning it wouldn't move even though it should 
+// -todo: try reserve again - without recursion? - if curKV's ideal idx is the same, loop on the next idx. - problem, robin hood hashing would mean swapping if curKV's ideal is larger than the element at i, but if an element hasn't been moved, its distance to ideal could be large, meaning it wouldn't move even though it should 
 //       | solution: don't do robbin hood hasing at first, just make sure all the elements that hash to the same bucket are linearly packed
 //       |   problem: are there scenarios that will trigger infinite recursion? - yes, if only comparing ideal indices
 //       |   problem: moving an element creates a hole - does that mean the elements in front should be moved back if it would make them closer to their ideal index?
 //       |     solution: make a delete function that removes a key and checks elements forward to see if moving them one back would get them closer to their ideal position
 //       |     solution: make a compact function that scans through looking for empty spaces and moves elements backwards if it would be more ideal - make the function start at an index and go until it hits an element already in its ideal position, returning the number of elements moved
+
+// todo: robin hood hashing
+// todo: make rolling reshuffle and put into delete function
+// todo: make internal and external KV structs, with the external having a this ptr that can modify the table?
 // todo: test KV with key string above character length  
 // todo: give KV a default constructor and copy constructor so that the c_str key is copied?
 // todo: make resize()
@@ -223,6 +224,28 @@ private:
 
     elems[i] = kv;
     return i;
+  }
+  i64         place_rh(KV kv, KV* elems, ui64 st, ui64 dist, ui64 mod)   // place_rh is place with robin hood hashing 
+  {
+    ui64     i = st;
+    ui64    en = prev(st,mod);
+    ui64 eldst = dist;
+    while(true)
+    {
+      if(i==en){ return -1; }
+      else if(elems[i].hsh.type==EMPTY){
+        elems[i] = kv;
+        return i;
+      }else if( (eldst=wrapDist(elems,i,mod)) < dist){
+        swap( &kv, &elems[i] );
+        dist = eldst;
+      }
+
+      i = nxt(i,mod);
+      ++dist;
+    }
+  
+    return -1;
   }
   void            init(ui64 size)
   {
@@ -612,6 +635,51 @@ public:
   tbl     operator/ (T   const& l){ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
   tbl     operator% (T   const& l){ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
 
+  KV&            put(const char* key, i32 val)
+  {
+    if( !(map_capacity()>elems()) )
+       if(!expand()) return KV::error_kv();
+
+    //ui32   hsh  =  (ui32)(*key); // & HASH_MASK );
+    //ui64   cap  =  map_capacity();  
+    //ui64  wrap  =  hsh % cap - 1;
+    //ui64    en  =  wrap<(cap-1)? wrap : cap-1;                       // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
+    ui32  hsh  =  HashStr(key);    
+    KV*    el  =  (KV*)elemStart();                                    // el is a pointer to the elements 
+    ui64    i  =  hsh;
+    ui64  mod  =  map_capacity();
+    ui64   en  =  prev(i,mod);
+    ui64 dist  =  0;
+    for(;;++i,++dist)
+    {
+      i %= mod;                                                        // get idx within map_capacity
+      HshType eh = el[i].hsh;                                          // eh is element hash
+      if(el[i].hsh.type==EMPTY){ 
+        //if(make_new){
+          strcpy_s(el[i].key, sizeof(KV::Key), key);
+          el[i].hsh.hash = hsh;
+          el[i] = val;                                                 // this makes this slot no longer empty. When an assignment occurs it will overwrite this type.
+          set_elems( elems()+1 );
+        //}
+        return el[i];
+      }else if(hsh==eh.hash  && 
+        strncmp(el[i].key,key,sizeof(KV::Key)-1)==0 )
+      { // if the hashes aren't the same, the keys can't be the same
+        return el[i];
+      }else if( wrapDist(el,i,mod) < dist ){
+        KV kv;
+        strcpy_s(kv.key, sizeof(KV::Key), key);
+        kv.hsh.hash = hsh;
+        kv = val;
+        set_elems( elems()+1 );
+        place_rh(kv, el, i, dist, mod);
+      }
+    
+      if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+    }
+
+  }
+
   bool          push(T const& value)
   {
     if( !(capacity()>size()) )
@@ -817,15 +885,13 @@ public:
   }
   void*       expand()
   {
-    //ui64 nxtSz = (sz/2)? sz+sz/2 : sz+1;
-
     ui64    sz = size();
     ui64 nxtSz = sz + sz/2;
     nxtSz      = nxtSz<8? 8 : nxtSz;
 
     ui64    el = elems();
     ui64 nxtEl = el + el/2;
-    nxtEl      = nxtEl<4? 4 : nxtEl;
+    nxtEl      = nxtEl<8? 8 : nxtEl;
 
     return reserve(nxtSz, nxtEl);
   }
@@ -840,12 +906,15 @@ public:
     ui64     i  =  hsh;
     ui64  wrap  =  hsh % cap - 1;
     ui64    en  =  wrap<(cap-1)? wrap : cap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
-    for(;;++i)
+    //ui64  dist  =  0;
+    for(;;++i/*,++dist*/)
     {
       i %= cap;                                                        // get idx within map_capacity
       HshType eh = el[i].hsh;                                          // eh is element hash
       if(el[i].hsh.type==EMPTY){ 
         return i;
+      //}else if(ideal(i)<dist){
+      //  return i;
       }else if(hsh == eh.hash){                                        // if the hashes aren't the same, the keys can't be the same
         auto cmp = strncmp(el[i].key, key, sizeof(KV::Key)-1);         // check if the keys are the same 
         if(cmp==0) return i;
@@ -1018,6 +1087,8 @@ public:
 
 
 
+//
+//ui64 nxtSz = (sz/2)? sz+sz/2 : sz+1;
 
 //void    compact_back(ui64 st, ui64 mod)
 //{

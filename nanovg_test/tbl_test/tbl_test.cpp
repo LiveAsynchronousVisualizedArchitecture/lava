@@ -251,7 +251,7 @@ int main()
     //TO(t2.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
     //printf("\n\n");
 
-    tbl t3 = t >> t2;
+    tbl t3 = t << t2;
 
     prnt_elems(t3);
 
