@@ -232,25 +232,28 @@ private:
   }
   KV&         place_rh(KV kv, KV* elems, ui64 st, ui64 dist, ui64 mod)   // place_rh is place with robin hood hashing 
   {
-    ui64     i = st;
-    ui64    en = prev(st,mod);
-    ui64 eldst = dist;
+    ui64      i = st;
+    ui64     en = prev(st,mod);
+    ui64  eldst = dist;
+    KV*     ret = nullptr;
     while(true)
     {
       if(i==en){ return KV::error_kv(); }
       else if(elems[i].hsh.type==EMPTY){
-        return elems[i] = kv;
-        //return i;
-      }else if( (eldst=wrapDist(elems,i,mod)) < dist){
+        if(ret) return *ret;
+        else    return elems[i] = kv;
+      }else if( dist > (eldst=wrapDist(elems,i,mod)) ){
         swap( &kv, &elems[i] );
         dist = eldst;
+        if(!ret) ret = &elems[i];
       }
 
       i = nxt(i,mod);
       ++dist;
     }
-  
-    return KV::error_kv();
+
+    if(ret) return *ret;
+    else    return KV::error_kv();
   }
   void            init(ui64 size)
   {
@@ -426,13 +429,14 @@ public:
     ui64      val;
 
     KV() : hsh(), val(0) { memset(key, 0, sizeof(Key)); }
-    template<class V> KV(const char* key, ui32 hash, V val)
-    {
-      *this = val;
-      strcpy_s(this->key, sizeof(KV::Key), key);
-      hsh.hash = hash;
-    }
-    KV(const char* key, ui32 hash)
+    //template<class V> KV(const char* key, ui32 hash, V val)
+    //{
+    //  *this = val;
+    //  strcpy_s(this->key, sizeof(KV::Key), key);
+    //  hsh.hash = hash;
+    //}
+    KV(const char* key, ui32 hash) :
+      hsh(), val(0)
     {
       strcpy_s(this->key, sizeof(KV::Key), key);
       hsh.hash = hash;
@@ -1109,11 +1113,11 @@ public:
         ret( el[i].key ) = el[i];
     }
 
-    el = b.elemStart();
-    TO(b.map_capacity(),i){
-      if(el[i].hsh.type!=EMPTY) 
-        ret( el[i].key ) = el[i];
-    }
+    //el = b.elemStart();
+    //TO(b.map_capacity(),i){
+    //  if(el[i].hsh.type!=EMPTY) 
+    //    ret( el[i].key ) = el[i];
+    //}
 
     return ret;
   }

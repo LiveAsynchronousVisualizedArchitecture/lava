@@ -227,7 +227,7 @@ int main()
     t("one")   = 850;
     t("two")   = 850;
     t("three") = 850;
-    prnt_elems(t);
+    //prnt_elems(t);
     //kv = t.elemStart();
     //TO(t.map_capacity(), i) printf(" %s:%d:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type, t.distance(i) );
     //printf("\n\n");
@@ -237,7 +237,7 @@ int main()
     ////////t.expand();
     ////////t("4") = 4;
     ////////t("5") = 5;
-    prnt_elems(t);
+    //prnt_elems(t);
     ////kv = t.elemStart();
     ////TO(t.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
     ////printf("\n\n");
@@ -259,7 +259,7 @@ int main()
     ////t2("four")  = 4;
     ////t2("five")  = 5;
     ////t2("six")   = 6;
-    prnt_elems(t2);
+    //prnt_elems(t2);
     ////kv = t2.elemStart();
     ////TO(t2.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
     ////printf("\n\n");
