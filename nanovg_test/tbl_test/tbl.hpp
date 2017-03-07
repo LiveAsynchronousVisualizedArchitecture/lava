@@ -97,10 +97,15 @@
 //       |   problem: moving an element creates a hole - does that mean the elements in front should be moved back if it would make them closer to their ideal index?
 //       |     solution: make a delete function that removes a key and checks elements forward to see if moving them one back would get them closer to their ideal position
 //       |     solution: make a compact function that scans through looking for empty spaces and moves elements backwards if it would be more ideal - make the function start at an index and go until it hits an element already in its ideal position, returning the number of elements moved
+// -todo: robin hood hashing
+// -todo: make put into a template
 
-// todo: robin hood hashing
+// todo: change place_rh to return reference
+// todo: change operator() to use put
+// todo: change concatenation to use put()
+// todo: make a KV constructor that takes a key, hash and a value
 // todo: make rolling reshuffle and put into delete function
-// todo: make internal and external KV structs, with the external having a this ptr that can modify the table?
+// todo: make KVRef struct with a *this ptr and an index - make internal and external KV structs, with the external having a this ptr that can modify the table?
 // todo: test KV with key string above character length  
 // todo: give KV a default constructor and copy constructor so that the c_str key is copied?
 // todo: make resize()
@@ -225,17 +230,17 @@ private:
     elems[i] = kv;
     return i;
   }
-  i64         place_rh(KV kv, KV* elems, ui64 st, ui64 dist, ui64 mod)   // place_rh is place with robin hood hashing 
+  KV&         place_rh(KV kv, KV* elems, ui64 st, ui64 dist, ui64 mod)   // place_rh is place with robin hood hashing 
   {
     ui64     i = st;
     ui64    en = prev(st,mod);
     ui64 eldst = dist;
     while(true)
     {
-      if(i==en){ return -1; }
+      if(i==en){ return KV::error_kv(); }
       else if(elems[i].hsh.type==EMPTY){
-        elems[i] = kv;
-        return i;
+        return elems[i] = kv;
+        //return i;
       }else if( (eldst=wrapDist(elems,i,mod)) < dist){
         swap( &kv, &elems[i] );
         dist = eldst;
@@ -245,7 +250,7 @@ private:
       ++dist;
     }
   
-    return -1;
+    return KV::error_kv();
   }
   void            init(ui64 size)
   {
@@ -421,6 +426,17 @@ public:
     ui64      val;
 
     KV() : hsh(), val(0) { memset(key, 0, sizeof(Key)); }
+    template<class V> KV(const char* key, ui32 hash, V val)
+    {
+      *this = val;
+      strcpy_s(this->key, sizeof(KV::Key), key);
+      hsh.hash = hash;
+    }
+    KV(const char* key, ui32 hash)
+    {
+      strcpy_s(this->key, sizeof(KV::Key), key);
+      hsh.hash = hash;
+    }
 
     KV& operator=(KV const& l)
     {
@@ -557,61 +573,94 @@ public:
     tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
     return ((T*)m_mem)[i];
   }
-  KV&     operator()(const char* key, bool make_new=true)              // todo: just needs to return a kv reference since the kv can be set with operator=() ?
+  KV&     operator()(const char* key, bool make_new=true)
   {
     if( !(map_capacity()>elems()) )
-      if(!expand()) return KV::error_kv();
+       if(!expand()) return KV::error_kv();
 
-    KV*    el  =  (KV*)elemStart();                                     // el is a pointer to the elements 
-    ui32 hash  =  0;
-    i64     i  =  find(key, &hash);
-    if(i<0) return KV::error_kv();
-
-    if(el[i].hsh.type==EMPTY){ 
-      if(make_new){
-        strcpy_s(el[i].key, sizeof(KV::Key), key);
-        el[i].hsh.hash = hash;
-        el[i].hsh.type = NONE;                                         // this makes this slot no longer empty. When an assignment occurs it will overwrite this type.
+    ui32  hsh  =  HashStr(key);    
+    KV*    el  =  (KV*)elemStart();                                    // el is a pointer to the elements 
+    ui64  mod  =  map_capacity();
+    ui64    i  =  hsh % mod;
+    ui64   en  =  prev(i,mod);
+    ui64 dist  =  0;
+    for(;;++i,++dist)
+    {
+      i %= mod;                                                        // get idx within map_capacity
+      HshType eh = el[i].hsh;                                          // eh is element hash
+      if(el[i].hsh.type==EMPTY){ 
         set_elems( elems()+1 );
+        return el[i] = KV(key, hsh);
+      }else if(hsh==eh.hash  && 
+        strncmp(el[i].key,key,sizeof(KV::Key)-1)==0 )
+      { // if the hashes aren't the same, the keys can't be the same
+        return el[i] = KV(key, hsh);
+      }else if(dist > wrapDist(el,i,mod) ){
+        KV kv(key, hsh);
+        set_elems( elems()+1 );
+        return place_rh(kv, el, i, dist, mod);
       }
-      return el[i];
-    }
-      
-    if(hash == el[i].hsh.hash){                                        // if the hashes aren't the same, the keys can't be the same
-      auto cmp = strncmp(el[i].key, key, sizeof(KV::Key)-1);           // check if the keys are the same 
-      if(cmp==0) return el[i];
+    
+      if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
     }
 
-    //ui32   hsh  =  HashStr(key);
-    ////ui32   hsh  =  (ui32)(*key); // & HASH_MASK );
-    //
-    //KV*     el  =  (KV*)elemStart();                                   // el is a pointer to the elements 
-    //ui64   cap  =  map_capacity();  
-    //ui64     i  =  hsh;
-    //ui64  wrap  =  hsh % cap - 1;
-    //ui64    en  =  wrap<(cap-1)? wrap : cap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
-    //for(;;++i)
-    //{
-    //  i %= cap;                                                        // get idx within map_capacity
-    //  HshType eh = el[i].hsh;                                          // eh is element hash
-    //  if(el[i].hsh.type==EMPTY){ 
-    //    if(make_new){
-    //      strcpy_s(el[i].key, sizeof(KV::Key), key);
-    //      el[i].hsh.hash = hsh;
-    //      el[i].hsh.type = NONE;                                       // this makes this slot no longer empty. When an assignment occurs it will overwrite this type.
-    //      set_elems( elems()+1 );
-    //    }
-    //    return el[i];
-    //  }else if(hsh == eh.hash){                                        // if the hashes aren't the same, the keys can't be the same
-    //    auto cmp = strncmp(el[i].key, key, sizeof(KV::Key)-1);         // check if the keys are the same 
-    //    if(cmp==0) return el[i];
-    //  }
-    //
-    //  if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
-    //}
-    
     return KV::error_kv();
   }
+  //KV&     operator()(const char* key, bool make_new=true)              // todo: just needs to return a kv reference since the kv can be set with operator=() ?
+  //{
+  //  if( !(map_capacity()>elems()) )
+  //    if(!expand()) return KV::error_kv();
+  //
+  //  KV*    el  =  (KV*)elemStart();                                     // el is a pointer to the elements 
+  //  ui32 hash  =  0;
+  //  i64     i  =  find(key, &hash);
+  //  if(i<0) return KV::error_kv();
+  //
+  //  if(el[i].hsh.type==EMPTY){ 
+  //    if(make_new){
+  //      strcpy_s(el[i].key, sizeof(KV::Key), key);
+  //      el[i].hsh.hash = hash;
+  //      el[i].hsh.type = NONE;                                         // this makes this slot no longer empty. When an assignment occurs it will overwrite this type.
+  //      set_elems( elems()+1 );
+  //    }
+  //    return el[i];
+  //  }
+  //    
+  //  if(hash == el[i].hsh.hash){                                        // if the hashes aren't the same, the keys can't be the same
+  //    auto cmp = strncmp(el[i].key, key, sizeof(KV::Key)-1);           // check if the keys are the same 
+  //    if(cmp==0) return el[i];
+  //  }
+  //
+  //  //ui32   hsh  =  HashStr(key);
+  //  ////ui32   hsh  =  (ui32)(*key); // & HASH_MASK );
+  //  //
+  //  //KV*     el  =  (KV*)elemStart();                                   // el is a pointer to the elements 
+  //  //ui64   cap  =  map_capacity();  
+  //  //ui64     i  =  hsh;
+  //  //ui64  wrap  =  hsh % cap - 1;
+  //  //ui64    en  =  wrap<(cap-1)? wrap : cap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
+  //  //for(;;++i)
+  //  //{
+  //  //  i %= cap;                                                        // get idx within map_capacity
+  //  //  HshType eh = el[i].hsh;                                          // eh is element hash
+  //  //  if(el[i].hsh.type==EMPTY){ 
+  //  //    if(make_new){
+  //  //      strcpy_s(el[i].key, sizeof(KV::Key), key);
+  //  //      el[i].hsh.hash = hsh;
+  //  //      el[i].hsh.type = NONE;                                       // this makes this slot no longer empty. When an assignment occurs it will overwrite this type.
+  //  //      set_elems( elems()+1 );
+  //  //    }
+  //  //    return el[i];
+  //  //  }else if(hsh == eh.hash){                                        // if the hashes aren't the same, the keys can't be the same
+  //  //    auto cmp = strncmp(el[i].key, key, sizeof(KV::Key)-1);         // check if the keys are the same 
+  //  //    if(cmp==0) return el[i];
+  //  //  }
+  //  //
+  //  //  if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+  //  //}
+  //  
+  //  return KV::error_kv();
+  //}
   tbl     operator>>(tbl const& l){ return tbl::concat_l(*this, l); }
   tbl     operator<<(tbl const& l){ return tbl::concat_r(*this, l); }
   void    operator+=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
@@ -635,15 +684,11 @@ public:
   tbl     operator/ (T   const& l){ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
   tbl     operator% (T   const& l){ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
 
-  KV&            put(const char* key, i32 val)
+  template<class V> KV&   put(const char* key, V val)
   {
     if( !(map_capacity()>elems()) )
        if(!expand()) return KV::error_kv();
 
-    //ui32   hsh  =  (ui32)(*key); // & HASH_MASK );
-    //ui64   cap  =  map_capacity();  
-    //ui64  wrap  =  hsh % cap - 1;
-    //ui64    en  =  wrap<(cap-1)? wrap : cap-1;                       // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
     ui32  hsh  =  HashStr(key);    
     KV*    el  =  (KV*)elemStart();                                    // el is a pointer to the elements 
     ui64    i  =  hsh;
@@ -655,29 +700,22 @@ public:
       i %= mod;                                                        // get idx within map_capacity
       HshType eh = el[i].hsh;                                          // eh is element hash
       if(el[i].hsh.type==EMPTY){ 
-        //if(make_new){
-          strcpy_s(el[i].key, sizeof(KV::Key), key);
-          el[i].hsh.hash = hsh;
-          el[i] = val;                                                 // this makes this slot no longer empty. When an assignment occurs it will overwrite this type.
-          set_elems( elems()+1 );
-        //}
-        return el[i];
+        set_elems( elems()+1 );
+        return el[i] = KV(key, hsh, val);
       }else if(hsh==eh.hash  && 
         strncmp(el[i].key,key,sizeof(KV::Key)-1)==0 )
       { // if the hashes aren't the same, the keys can't be the same
-        return el[i];
+        return el[i] = KV(key, hsh, val);
       }else if( wrapDist(el,i,mod) < dist ){
-        KV kv;
-        strcpy_s(kv.key, sizeof(KV::Key), key);
-        kv.hsh.hash = hsh;
-        kv = val;
+        KV kv(key, hsh, val);
         set_elems( elems()+1 );
-        place_rh(kv, el, i, dist, mod);
+        return place_rh(kv, el, i, dist, mod);
       }
     
       if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
     }
 
+    return KV::error_kv();
   }
 
   bool          push(T const& value)
@@ -1086,6 +1124,34 @@ public:
 
 
 
+
+
+
+//strcpy_s(el[i].key, sizeof(KV::Key), key);
+//el[i].hsh.hash = hsh;
+//el[i] = val;                                                 // this makes this slot no longer empty. When an assignment occurs it will overwrite this type.
+//el[i]       =  kv;
+//strcpy_s(kv.key, sizeof(KV::Key), key);
+//kv.hsh.hash = hsh;
+//
+//KV kv;
+//strcpy_s(kv.key, sizeof(KV::Key), key);
+//kv.hsh.hash = hsh;
+//kv = val;
+//strcpy_s(kv.key, sizeof(KV::Key), key);
+//kv.hsh.hash = hsh;
+//el[i]       =  kv;
+//return el[i] = kv;
+//
+//KV kv;
+//kv = val;
+//strcpy_s(kv.key, sizeof(KV::Key), key);
+//kv.hsh.hash = hsh;
+
+//ui32   hsh  =  (ui32)(*key); // & HASH_MASK );
+//ui64   cap  =  map_capacity();  
+//ui64  wrap  =  hsh % cap - 1;
+//ui64    en  =  wrap<(cap-1)? wrap : cap-1;                       // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
 
 //
 //ui64 nxtSz = (sz/2)? sz+sz/2 : sz+1;

@@ -211,6 +211,14 @@ int main()
     //tbl::KV* kv;
     
     tbl t;
+    //t.put("0", 850);
+    //t.put("1", 850);
+    //t.put("2", 850);
+    //t.put("3", 850);
+    //t.put("4", 850);
+    //t.put("0", 851);
+    //t.put("1", 851);
+
     t("0") = 850;
     t("1") = 850;
     t("2") = 850;
@@ -224,35 +232,39 @@ int main()
     //TO(t.map_capacity(), i) printf(" %s:%d:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type, t.distance(i) );
     //printf("\n\n");
 
-    //t.reserve(0,5);
+    ////t.reserve(0,5);
     t.expand();
-    //////t.expand();
-    //////t("4") = 4;
-    //////t("5") = 5;
+    ////////t.expand();
+    ////////t("4") = 4;
+    ////////t("5") = 5;
     prnt_elems(t);
-    //kv = t.elemStart();
-    //TO(t.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
-    //printf("\n\n");
+    ////kv = t.elemStart();
+    ////TO(t.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
+    ////printf("\n\n");
 
     tbl t2;
+    ////t2.put("0", 0);
+    ////t2.put("1", 1);
+    ////t2.put("2", 2);
+    ////t2.put("3", 3);
     t2("0")   = 0;
     t2("1")   = 1;
     t2("2")   = 2;
-    t2("3")   = 3;
+    ////t2("3")   = 3;
     t2("zero")  = 0;
     t2("one")   = 1;
     t2("two")   = 2;
-    //t2("2")   = 2;
-    t2("three") = 3;
-    t2("four")  = 4;
-    t2("five")  = 5;
-    t2("six")   = 6;
-    //kv = t2.elemStart();
-    //TO(t2.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
-    //printf("\n\n");
+    //////t2("2")   = 2;
+    ////t2("three") = 3;
+    ////t2("four")  = 4;
+    ////t2("five")  = 5;
+    ////t2("six")   = 6;
+    prnt_elems(t2);
+    ////kv = t2.elemStart();
+    ////TO(t2.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
+    ////printf("\n\n");
 
     tbl t3 = t << t2;
-
     prnt_elems(t3);
 
     //kv = t3.elemStart();
