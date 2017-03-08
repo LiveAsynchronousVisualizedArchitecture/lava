@@ -206,92 +206,124 @@ int main()
   //  TO(t+1,i) printf(" %d ", t[i]);
   //}
 
-  SECTION(test reserve placement)
-  {
-    //tbl::KV* kv;
-    
-    tbl t;
-    //t.put("0", 850);
-    //t.put("1", 850);
-    //t.put("2", 850);
-    //t.put("3", 850);
-    //t.put("4", 850);
-    //t.put("0", 851);
-    //t.put("1", 851);
+  //SECTION(test reserve placement and concatenation)
+  //{
+  //  //tbl::KV* kv;
+  //  
+  //  tbl t;
+  //  //t.put("0", 850);
+  //  //t.put("1", 850);
+  //  //t.put("2", 850);
+  //  //t.put("3", 850);
+  //  //t.put("4", 850);
+  //  //t.put("0", 851);
+  //  //t.put("1", 851);
+  //
+  //  t("0") = 850;
+  //  t("1") = 850;
+  //  t("2") = 850;
+  //  t("3") = 850;
+  //  t("zero")  = 850;
+  //  t("one")   = 850;
+  //  t("two")   = 850;
+  //  t("three") = 850;
+  //  t("long_key_to_test_") = 999;
+  //  prnt_elems(t);
+  //  //kv = t.elemStart();
+  //  //TO(t.map_capacity(), i) printf(" %s:%d:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type, t.distance(i) );
+  //  //printf("\n\n");
+  //
+  //  ////t.reserve(0,5);
+  //  t.expand();
+  //  //////////t("4") = 4;
+  //  //////////t("5") = 5;
+  //  prnt_elems(t);
+  //  //////kv = t.elemStart();
+  //  //////TO(t.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
+  //  //////printf("\n\n");
+  //
+  //  tbl t2;
+  //  ////t2.put("0", 0);
+  //  ////t2.put("1", 1);
+  //  ////t2.put("2", 2);
+  //  ////t2.put("3", 3);
+  //  t2("0")   = 0;
+  //  t2("1")   = 1;
+  //  t2("2")   = 2;
+  //  t2("3")   = 3;
+  //  t2("zero")  = 0;
+  //  t2("one")   = 1;
+  //  t2("two")   = 2;
+  //  //////t2("2")   = 2;
+  //  t2("three") = 3;
+  //  t2("four")  = 4;
+  //  t2("five")  = 5;
+  //  t2("six")   = 6;
+  //  prnt_elems(t2);
+  //  ////kv = t2.elemstart();
+  //  ////to(t2.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
+  //  ////printf("\n\n");
+  //
+  //  tbl t3 = t << t2;
+  //  t3.reserve(0,32);
+  //  prnt_elems(t3);
+  //
+  //  //kv = t3.elemStart();
+  //  //TO(t3.map_capacity(), i) printf(" %s:%d:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type, t3.distance(i)  );
+  //  //printf("\n\n");
+  //
+  //  //printf(" %d ", (int)t("one hundred") );   // for testing out an error on NONE type
+  //
+  //  //int _1 = t("1");
+  //  //printf(" mapcap: %d  %d  %d  %d ", t.map_capacity(), _1, (int)t("2"), (int)t("3") );
+  //
+  //  //kv = t.elemStart();
+  //  //TO(t.map_capacity(), i) printf(" %s:%d ", kv[i].key, (int)(kv[i].val) );
+  //  //printf("\n\n");
+  //
+  //  //t.reserve(0,23);
+  //  //kv = t.elemStart();
+  //  //TO(t.map_capacity(), i) printf(" %s:%d ", kv[i].key, (int)(kv[i].val) );
+  //  //printf("\n\n");
+  //
+  //  //int _1 = t("1");
+  //  //printf(" mapcap: %d  %d  %d  %d ", t.map_capacity(), _1, (int)t("2"), (int)t("3") );
+  //}
 
+  //float*  pos = t("pos").data();
+  //float* norm = t("normals").data();
+
+  SECTION(test del function)
+  {
+    tbl t;
     t("0") = 850;
-    t("1") = 850;
-    t("2") = 850;
-    t("3") = 850;
+    t("1") = 1;
+    t("2") = 2;
+    t("3") = 3;
     t("zero")  = 850;
     t("one")   = 850;
     t("two")   = 850;
     t("three") = 850;
-    t("long_key_to_test_") = 999;
+    t("super_extra_mega_long_key_to_test_the_fifty_charac") = 999;
+
+    //prnt_elems(t);
+
+    t("4") = 4;
     prnt_elems(t);
-    //kv = t.elemStart();
-    //TO(t.map_capacity(), i) printf(" %s:%d:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type, t.distance(i) );
-    //printf("\n\n");
 
-    ////t.reserve(0,5);
-    t.expand();
-    //////////t("4") = 4;
-    //////////t("5") = 5;
+    t.del("zero");
     prnt_elems(t);
-    //////kv = t.elemStart();
-    //////TO(t.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
-    //////printf("\n\n");
 
-    tbl t2;
-    ////t2.put("0", 0);
-    ////t2.put("1", 1);
-    ////t2.put("2", 2);
-    ////t2.put("3", 3);
-    t2("0")   = 0;
-    t2("1")   = 1;
-    t2("2")   = 2;
-    t2("3")   = 3;
-    t2("zero")  = 0;
-    t2("one")   = 1;
-    t2("two")   = 2;
-    //////t2("2")   = 2;
-    t2("three") = 3;
-    t2("four")  = 4;
-    t2("five")  = 5;
-    t2("six")   = 6;
-    prnt_elems(t2);
-    ////kv = t2.elemstart();
-    ////to(t2.map_capacity(), i) printf(" %s:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type );
-    ////printf("\n\n");
+    //t.del("4");
+    //prnt_elems(t);
 
-    tbl t3 = t << t2;
-    t3.reserve(0,32);
-    prnt_elems(t3);
+    t("5") = 5;
+    prnt_elems(t);
 
-    //kv = t3.elemStart();
-    //TO(t3.map_capacity(), i) printf(" %s:%d:%d:%d ", kv[i].key, (int)(kv[i].val), kv[i].hsh.type, t3.distance(i)  );
-    //printf("\n\n");
+    //t.del("1");
+    //prnt_elems(t);
 
-    //printf(" %d ", (int)t("one hundred") );   // for testing out an error on NONE type
-
-    //int _1 = t("1");
-    //printf(" mapcap: %d  %d  %d  %d ", t.map_capacity(), _1, (int)t("2"), (int)t("3") );
-
-    //kv = t.elemStart();
-    //TO(t.map_capacity(), i) printf(" %s:%d ", kv[i].key, (int)(kv[i].val) );
-    //printf("\n\n");
-
-    //t.reserve(0,23);
-    //kv = t.elemStart();
-    //TO(t.map_capacity(), i) printf(" %s:%d ", kv[i].key, (int)(kv[i].val) );
-    //printf("\n\n");
-
-    //int _1 = t("1");
-    //printf(" mapcap: %d  %d  %d  %d ", t.map_capacity(), _1, (int)t("2"), (int)t("3") );
   }
-
-  //float*  pos = t("pos").data();
-  //float* norm = t("normals").data();
 
   int a; cin >> a;
   return 0;

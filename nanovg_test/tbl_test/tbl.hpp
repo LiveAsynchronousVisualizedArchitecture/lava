@@ -109,9 +109,14 @@
 // -todo: put comparison into place_rh
 // -todo: test KV with key string above character length - fails with an assert
 // -todo: make extend() enlarge based on map_capacity() instead of elems
+// -todo: make and test del() function
+// -todo: make capacity be increased when elems is within 75% or 4-6 of the map capacity
+// -todo: make rolling reshuffle and put into delete function - not needed, but robin hood hasing will be needed
+// -todo: integrate robin hood hasing into compact() - short circuiting 
+// -todo: debug del() compact() not filling in holes after first call - only short circuit after prevElemDist is lower than elemDist, not lower of equal
+// -todo: test with 64 byte KV and long key strings - seems to work fine
 
 // todo: work on flattening table - put in table data segment
-// todo: make rolling reshuffle and put into delete function
 // todo: make resize()
 // todo: make copy use resize? - should it just be a memcpy?
 // todo: make sure destructor is being run on objects being held once turned into a template
@@ -123,9 +128,9 @@
 // todo: make flatten method that has creates a new tbl with no extra capacity and takes all tbl references and makes them into offset/children tbls that are stored in the sub-tbl segment - instead of child type, make a read only type? read only could have template specializations or static asserts that prevent changing the tbl or the KV objects from it
 // todo: make non owned type always read only? - still need owned and non-owned types within tbl
 // todo: make function to delete keys with NONE type? set NONE to empty?
+
 // todo: fold HashType into KV? - would have to make an internal struct/union? - just change HashType hsh to HashType ht?
 // todo: keep the max distance through every loop and use that to short-circuit the reorder loop? - have place_kv return the the distance from ideal in a separate variable, keep track of the index... is there a way to take the max distance back down? does it need to go back down? does the end point only need to be prevMapcap elements forward? - no because there could still be holes?
-
 // todo: make visualization for table as a tree that shows arrays, key-values and their types, then sub tables - make various visualizations for arrays - histogram, graph, ???
 // todo: is an optimization possible where the index of the largest distance from ideal position is kept so the loop doesn't have to go all the way back around? - no because moving the largest distance means the next largest would have to be found again 
 // todo: is it possible to deal with spans of keys that go to the same bucket? would it be more efficient?
@@ -222,18 +227,6 @@ private:
     ui64 ideal = elems[idx].hsh.hash % mod;
     return wrapDist(ideal,idx,mod);
   }
-  i64            place(KV kv, KV* elems, ui64 mod)
-  {
-    ui64  i = kv.hsh.hash % mod;
-    ui64 en = prev(i,mod);
-    while(elems[i].hsh.type!=EMPTY){
-      if(i==en) return -1;
-      i = nxt(i,mod);
-    }
-
-    elems[i] = kv;
-    return i;
-  }
   KV&         place_rh(KV kv, KV* elems, ui64 st, ui64 dist, ui64 mod, ui64* placement=nullptr)   // place_rh is place with robin hood hashing 
   {
     ui64      i = st;
@@ -262,6 +255,42 @@ private:
     if(ret) return *ret;
     else    return KV::error_kv();
   }
+  ui64         compact(ui64 st, ui64 en, ui64 mapcap)
+  {
+    ui64   cnt = 0;                                   // cnt is count which counts the number of loops, making sure the entire map capacity (mapcap) has not bene exceeded
+    KV*     el = elemStart(); 
+    ui64     i = st;
+    ui64 empty;
+    while(i!=en && el[i].hsh.type!=EMPTY){ 
+      i = nxt(i,mapcap);
+      ++cnt;
+    } // finds the first empty slot
+    empty = i;
+    while(i!=en && el[i].hsh.type==EMPTY){
+      i = nxt(i,mapcap);
+      ++cnt;
+    } // find the first non-empty slot after finding an empty slot
+    ui64 prevElemDst = 0;
+    while(i!=en && el[i].hsh.type!=EMPTY){
+      ui64 elemDst = wrapDist(el,i,mapcap);
+      if(elemDst<prevElemDst) return i;
+
+      prevElemDst = elemDst; // short circuiting based on robin hood hashing - as soon as the distance to the ideal position goes down, its ideal position must be further forward than the current empty position. Because no other EMPTY elements have been found, it must not be able to be moved to the current empty position, and this compact() is done
+      if( elemDst>0 ){ 
+        ui64 emptyDst = wrapDist(empty,i,mapcap);           // emptyDst is empty distance - the distance to the empty slot - this can probably be optimized to just be an increment
+        ui64    mnDst = mn(elemDst, emptyDst);               // mnDst is the minimum distances
+        ui64    mvIdx = i;
+        TO(mnDst,ii) mvIdx=prev(mvIdx,mapcap);
+        el[mvIdx] = el[i];
+        el[i]       = KV();
+        empty       = i;                                     //++empty; // empty = i;  if empty was just the current index or if there are lots of empty elements in between, empty can be incremented by one
+      }
+      i = nxt(i,mapcap);
+      ++cnt;
+    } // moves elements backwards if they would end up closer to their ideal position
+
+    return i;
+  }
   void            init(ui64 size)
   {
     ui64   szBytes  =  tbl::sizeBytes(size);
@@ -272,33 +301,19 @@ private:
     set_capacity(size);
     set_size(size);
   }
-  bool             del(const char* key)
-  { 
-    ui64 i = find(key);
-    KV* el = elemStart();
-    if(el[i].hsh.type==EMPTY) return false;
-
-    el[i] = KV();
-    ui64 mapcap = map_capacity();
-    ui64     en = prev(i, mapcap);
-    //compact(i, en, mapcap);  
-    // todo: need rolling reshuffle here
-
-    return true;
-  }
-  bool             del(ui64 i)
-  { 
-    //ui64 i = find(key);
-    KV* el = elemStart();
-    if(el[i].hsh.type==EMPTY) return false;
-
-    el[i] = KV();
-    ui64 mapcap = map_capacity();
-    ui64     en = prev(i, mapcap);
-    //compact(i, en, mapcap);
-
-    return true;
-  }
+  //bool             del(ui64 i)
+  //{ 
+  //  //ui64 i = find(key);
+  //  KV* el = elemStart();
+  //  if(el[i].hsh.type==EMPTY) return false;
+  //
+  //  el[i] = KV();
+  //  ui64 mapcap = map_capacity();
+  //  ui64     en = prev(i, mapcap);
+  //  //compact(i, en, mapcap);
+  //
+  //  return true;
+  //}
   void         destroy()
   {
     // todo: needs to loop through and run destructors here
@@ -429,7 +444,7 @@ public:
     template<class DEST, class SRC> 
     static DEST cast_mem(ui64* src){ return (DEST)(*((SRC*)src)); }
 
-    using Key = char[19]; 
+    using Key = char[51];  // using Key = char[19]; 
 
     HshType   hsh;
     Key       key;
@@ -593,7 +608,7 @@ public:
   }
   KV&     operator()(const char* key, bool make_new=true)
   {
-    if( !(map_capacity()>elems()) )
+    if( !( map_capacity()*0.75f > (float)elems() ) )
        if(!expand()) return KV::error_kv();
 
     ui32  hsh  =  HashStr(key);
@@ -897,11 +912,11 @@ public:
     //ui64 nxtEl = el + el/2;
     //nxtEl      = nxtEl<4? 4 : nxtEl;
 
-    ui64    el = map_capacity();
-    ui64 nxtEl = el + el/2;
-    nxtEl      = nxtEl<8? 8 : nxtEl;
+    ui64    cap = map_capacity();
+    ui64 nxtCap = cap + cap/2;
+    nxtCap      = nxtCap<4? 4 : nxtCap;
 
-    return reserve(nxtSz, nxtEl);
+    return reserve(nxtSz, nxtCap);
   }
   i64           find(const char* key, ui32* hash=nullptr)
   {
@@ -963,6 +978,26 @@ public:
     }
     return h;
   }
+  bool           del(const char* key)
+  { 
+    ui64 i = find(key);
+    KV* el = elemStart();
+    if(el[i].hsh.type==EMPTY) return false;
+
+    el[i] = KV();
+    ui64 mapcap = map_capacity();
+    ui64     en = prev(i, mapcap);
+
+    ui64 cnt=0;
+    while( (i=compact(i,en,mapcap))!=en ){ ++cnt; } 
+
+    set_elems( elems()-1 );
+
+    printf("\ncount: %d\n", cnt);
+
+    return true;
+  }
+
 
 private:
   static const ui32 HASH_MASK = 0x07FFFFFF;
@@ -1095,6 +1130,20 @@ public:
 
 
 
+
+
+//i64            place(KV kv, KV* elems, ui64 mod)
+//{
+//  ui64  i = kv.hsh.hash % mod;
+//  ui64 en = prev(i,mod);
+//  while(elems[i].hsh.type!=EMPTY){
+//    if(i==en) return -1;
+//    i = nxt(i,mod);
+//  }
+//
+//  elems[i] = kv;
+//  return i;
+//}
 
 //KV&     operator()(const char* key, bool make_new=true)              // todo: just needs to return a kv reference since the kv can be set with operator=() ?
 //{
