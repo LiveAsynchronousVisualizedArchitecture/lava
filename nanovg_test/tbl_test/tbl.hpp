@@ -99,21 +99,24 @@
 //       |     solution: make a compact function that scans through looking for empty spaces and moves elements backwards if it would be more ideal - make the function start at an index and go until it hits an element already in its ideal position, returning the number of elements moved
 // -todo: robin hood hashing
 // -todo: make put into a template
+// -todo: change place_rh to return reference
+// -todo: change operator() to use put - not neccesary 
+// -todo: change concatenation to use put() - not needed
+// -todo: make a KV constructor that takes a key, hash and a value
+// -todo: debug duplicate "two" entries - rolling placement wasn't using robin hood hasing
+// -todo: make KVRef struct with a *this ptr and an index - make internal and external KV structs, with the external having a this ptr that can modify the table? - not needed
+// -todo: give KV a default constructor and copy constructor so that the c_str key is copied?
+// -todo: put comparison into place_rh
+// -todo: test KV with key string above character length - fails with an assert
+// -todo: make extend() enlarge based on map_capacity() instead of elems
 
-// todo: change place_rh to return reference
-// todo: change operator() to use put
-// todo: change concatenation to use put()
-// todo: make a KV constructor that takes a key, hash and a value
+// todo: work on flattening table - put in table data segment
 // todo: make rolling reshuffle and put into delete function
-// todo: make KVRef struct with a *this ptr and an index - make internal and external KV structs, with the external having a this ptr that can modify the table?
-// todo: test KV with key string above character length  
-// todo: give KV a default constructor and copy constructor so that the c_str key is copied?
 // todo: make resize()
 // todo: make copy use resize? - should it just be a memcpy?
 // todo: make sure destructor is being run on objects being held once turned into a template
 // todo: make shrink_to_fit()
 // todo: make begin and end iterators to go with C++11 for loops - loop through keys value pairs?
-// todo: make visualization for table as a tree that shows arrays, key-values and their types, then sub tables - make various visualizations for arrays - histogram, graph, ???
 // todo: try template constructor that returns a tbl<type> with a default value set? - can't have a constructor that reserves elems with this? would need a reserve_elems() function?
 // todo: make constructor that takes only an address to the start of a tbl memory span - just has to offset it by memberBytes()
 // todo: figure out what happens when doing anything that effects the size of a child tbl - child tbl cannot have it's size changed? need two different internal tbl types, one for references(non owned) and one for children(owned) ?
@@ -123,6 +126,7 @@
 // todo: fold HashType into KV? - would have to make an internal struct/union? - just change HashType hsh to HashType ht?
 // todo: keep the max distance through every loop and use that to short-circuit the reorder loop? - have place_kv return the the distance from ideal in a separate variable, keep track of the index... is there a way to take the max distance back down? does it need to go back down? does the end point only need to be prevMapcap elements forward? - no because there could still be holes?
 
+// todo: make visualization for table as a tree that shows arrays, key-values and their types, then sub tables - make various visualizations for arrays - histogram, graph, ???
 // todo: is an optimization possible where the index of the largest distance from ideal position is kept so the loop doesn't have to go all the way back around? - no because moving the largest distance means the next largest would have to be found again 
 // todo: is it possible to deal with spans of keys that go to the same bucket? would it be more efficient?
 // todo: make reserve_elems() function or reserve_map() function? - if reserve 
@@ -230,7 +234,7 @@ private:
     elems[i] = kv;
     return i;
   }
-  KV&         place_rh(KV kv, KV* elems, ui64 st, ui64 dist, ui64 mod)   // place_rh is place with robin hood hashing 
+  KV&         place_rh(KV kv, KV* elems, ui64 st, ui64 dist, ui64 mod, ui64* placement=nullptr)   // place_rh is place with robin hood hashing 
   {
     ui64      i = st;
     ui64     en = prev(st,mod);
@@ -239,8 +243,9 @@ private:
     while(true)
     {
       if(i==en){ return KV::error_kv(); }
-      else if(elems[i].hsh.type==EMPTY){
+      else if(elems[i].hsh.type==EMPTY || kv==elems[i]){
         elems[i] = kv;
+        if(placement) *placement = i;
         if(ret) return *ret;
         else    return elems[i];
       }else if( dist > (eldst=wrapDist(elems,i,mod)) ){
@@ -253,6 +258,7 @@ private:
       ++dist;
     }
 
+    if(placement) *placement = i;
     if(ret) return *ret;
     else    return KV::error_kv();
   }
@@ -429,18 +435,20 @@ public:
     Key       key;
     ui64      val;
 
-    KV() : hsh(), val(0) { memset(key, 0, sizeof(Key)); }
     //template<class V> KV(const char* key, ui32 hash, V val)
     //{
     //  *this = val;
     //  strcpy_s(this->key, sizeof(KV::Key), key);
     //  hsh.hash = hash;
     //}
+
+    KV() : hsh(), val(0) { memset(key, 0, sizeof(Key)); }
     KV(const char* key, ui32 hash) :
       hsh(), val(0)
     {
       strcpy_s(this->key, sizeof(KV::Key), key);
       hsh.hash = hash;
+      hsh.type = NONE;
     }
 
     bool operator==(KV const& l)
@@ -588,7 +596,7 @@ public:
     if( !(map_capacity()>elems()) )
        if(!expand()) return KV::error_kv();
 
-    ui32  hsh  =  HashStr(key);    
+    ui32  hsh  =  HashStr(key);
     KV*    el  =  (KV*)elemStart();                                    // el is a pointer to the elements 
     ui64  mod  =  map_capacity();
     ui64    i  =  hsh % mod;
@@ -616,61 +624,6 @@ public:
 
     return KV::error_kv();
   }
-  //KV&     operator()(const char* key, bool make_new=true)              // todo: just needs to return a kv reference since the kv can be set with operator=() ?
-  //{
-  //  if( !(map_capacity()>elems()) )
-  //    if(!expand()) return KV::error_kv();
-  //
-  //  KV*    el  =  (KV*)elemStart();                                     // el is a pointer to the elements 
-  //  ui32 hash  =  0;
-  //  i64     i  =  find(key, &hash);
-  //  if(i<0) return KV::error_kv();
-  //
-  //  if(el[i].hsh.type==EMPTY){ 
-  //    if(make_new){
-  //      strcpy_s(el[i].key, sizeof(KV::Key), key);
-  //      el[i].hsh.hash = hash;
-  //      el[i].hsh.type = NONE;                                         // this makes this slot no longer empty. When an assignment occurs it will overwrite this type.
-  //      set_elems( elems()+1 );
-  //    }
-  //    return el[i];
-  //  }
-  //    
-  //  if(hash == el[i].hsh.hash){                                        // if the hashes aren't the same, the keys can't be the same
-  //    auto cmp = strncmp(el[i].key, key, sizeof(KV::Key)-1);           // check if the keys are the same 
-  //    if(cmp==0) return el[i];
-  //  }
-  //
-  //  //ui32   hsh  =  HashStr(key);
-  //  ////ui32   hsh  =  (ui32)(*key); // & HASH_MASK );
-  //  //
-  //  //KV*     el  =  (KV*)elemStart();                                   // el is a pointer to the elements 
-  //  //ui64   cap  =  map_capacity();  
-  //  //ui64     i  =  hsh;
-  //  //ui64  wrap  =  hsh % cap - 1;
-  //  //ui64    en  =  wrap<(cap-1)? wrap : cap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
-  //  //for(;;++i)
-  //  //{
-  //  //  i %= cap;                                                        // get idx within map_capacity
-  //  //  HshType eh = el[i].hsh;                                          // eh is element hash
-  //  //  if(el[i].hsh.type==EMPTY){ 
-  //  //    if(make_new){
-  //  //      strcpy_s(el[i].key, sizeof(KV::Key), key);
-  //  //      el[i].hsh.hash = hsh;
-  //  //      el[i].hsh.type = NONE;                                       // this makes this slot no longer empty. When an assignment occurs it will overwrite this type.
-  //  //      set_elems( elems()+1 );
-  //  //    }
-  //  //    return el[i];
-  //  //  }else if(hsh == eh.hash){                                        // if the hashes aren't the same, the keys can't be the same
-  //  //    auto cmp = strncmp(el[i].key, key, sizeof(KV::Key)-1);         // check if the keys are the same 
-  //  //    if(cmp==0) return el[i];
-  //  //  }
-  //  //
-  //  //  if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
-  //  //}
-  //  
-  //  return KV::error_kv();
-  //}
   tbl     operator>>(tbl const& l){ return tbl::concat_l(*this, l); }
   tbl     operator<<(tbl const& l){ return tbl::concat_r(*this, l); }
   void    operator+=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
@@ -869,7 +822,10 @@ public:
           if(el[i].hsh.type != EMPTY){
             KV kv  = el[i];
             el[i]  = KV();
-            ui64 p = place(kv,el,mapcap);
+            //ui64 p = place(kv,el,mapcap);
+            ui64 st = kv.hsh.hash%mapcap;
+            ui64  p = i; 
+            place_rh(kv,el,st,0,mapcap,&p);
             if(p!=i) en = i;
           }
           i = nxti;
@@ -937,9 +893,13 @@ public:
     ui64 nxtSz = sz + sz/2;
     nxtSz      = nxtSz<8? 8 : nxtSz;
 
-    ui64    el = elems();
+    //ui64    el = elems();
+    //ui64 nxtEl = el + el/2;
+    //nxtEl      = nxtEl<4? 4 : nxtEl;
+
+    ui64    el = map_capacity();
     ui64 nxtEl = el + el/2;
-    nxtEl      = nxtEl<4? 4 : nxtEl;
+    nxtEl      = nxtEl<8? 8 : nxtEl;
 
     return reserve(nxtSz, nxtEl);
   }
@@ -1136,6 +1096,61 @@ public:
 
 
 
+//KV&     operator()(const char* key, bool make_new=true)              // todo: just needs to return a kv reference since the kv can be set with operator=() ?
+//{
+//  if( !(map_capacity()>elems()) )
+//    if(!expand()) return KV::error_kv();
+//
+//  KV*    el  =  (KV*)elemStart();                                     // el is a pointer to the elements 
+//  ui32 hash  =  0;
+//  i64     i  =  find(key, &hash);
+//  if(i<0) return KV::error_kv();
+//
+//  if(el[i].hsh.type==EMPTY){ 
+//    if(make_new){
+//      strcpy_s(el[i].key, sizeof(KV::Key), key);
+//      el[i].hsh.hash = hash;
+//      el[i].hsh.type = NONE;                                         // this makes this slot no longer empty. When an assignment occurs it will overwrite this type.
+//      set_elems( elems()+1 );
+//    }
+//    return el[i];
+//  }
+//    
+//  if(hash == el[i].hsh.hash){                                        // if the hashes aren't the same, the keys can't be the same
+//    auto cmp = strncmp(el[i].key, key, sizeof(KV::Key)-1);           // check if the keys are the same 
+//    if(cmp==0) return el[i];
+//  }
+//
+//  //ui32   hsh  =  HashStr(key);
+//  ////ui32   hsh  =  (ui32)(*key); // & HASH_MASK );
+//  //
+//  //KV*     el  =  (KV*)elemStart();                                   // el is a pointer to the elements 
+//  //ui64   cap  =  map_capacity();  
+//  //ui64     i  =  hsh;
+//  //ui64  wrap  =  hsh % cap - 1;
+//  //ui64    en  =  wrap<(cap-1)? wrap : cap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
+//  //for(;;++i)
+//  //{
+//  //  i %= cap;                                                        // get idx within map_capacity
+//  //  HshType eh = el[i].hsh;                                          // eh is element hash
+//  //  if(el[i].hsh.type==EMPTY){ 
+//  //    if(make_new){
+//  //      strcpy_s(el[i].key, sizeof(KV::Key), key);
+//  //      el[i].hsh.hash = hsh;
+//  //      el[i].hsh.type = NONE;                                       // this makes this slot no longer empty. When an assignment occurs it will overwrite this type.
+//  //      set_elems( elems()+1 );
+//  //    }
+//  //    return el[i];
+//  //  }else if(hsh == eh.hash){                                        // if the hashes aren't the same, the keys can't be the same
+//  //    auto cmp = strncmp(el[i].key, key, sizeof(KV::Key)-1);         // check if the keys are the same 
+//  //    if(cmp==0) return el[i];
+//  //  }
+//  //
+//  //  if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+//  //}
+//  
+//  return KV::error_kv();
+//}
 
 //strcpy_s(el[i].key, sizeof(KV::Key), key);
 //el[i].hsh.hash = hsh;
