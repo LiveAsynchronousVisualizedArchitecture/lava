@@ -118,9 +118,9 @@
 // -todo: make rolling reorder into a function
 // -todo: make function to delete KV with NONE type? set NONE to empty? - make delete type function?
 // -todo: make shrink_to_fit()
+// -todo: change find() ideal() distance() and holeOfst to const
 
 // todo: work on flattening table - put in table data segment
-// todo: change find() ideal() distance() and holeOfst to const
 // todo: take out reorder from shrink_to_fit() and make a function to sort the elements into robin hood order without any EMPTY slots - already there with place_rh ?
 // todo: make resize()
 // todo: make copy use resize? - should it just be a memcpy?
@@ -211,21 +211,21 @@ private:
   {
     *( ((ui64*)memStart()) + 3) = elems;
   }
-  ui64             nxt(ui64 i, ui64 mod)
+  ui64             nxt(ui64 i, ui64 mod) const
   {
     return ++i % mod;
   }
-  ui64            prev(ui64 i, ui64 mod)
+  ui64            prev(ui64 i, ui64 mod) const
   {
     if(mod==0) return 0;
     return i==0?  mod-1  :  i-1;
   }
-  ui64        wrapDist(ui64 ideal, ui64 idx, ui64 mod)
+  ui64        wrapDist(ui64 ideal, ui64 idx, ui64 mod) const
   {
     if(idx>=ideal) return idx - ideal;
     else return idx + (mod-ideal);
   }
-  ui64        wrapDist(KV*  elems, ui64 idx, ui64 mod)
+  ui64        wrapDist(KV*  elems, ui64 idx, ui64 mod) const
   {
     ui64 ideal = elems[idx].hsh.hash % mod;
     return wrapDist(ideal,idx,mod);
@@ -359,7 +359,7 @@ private:
     if(mx_sz<mn_sz){ auto tmp=mx_sz; mx_sz=mn_sz; mn_sz=tmp; }
     TO(mn_sz,i) op( (*this)[i], l[i] );
   }
-  template<class OP> tbl  bin_op(tbl const& l, OP op)
+  template<class OP> tbl  bin_op(tbl const& l, OP op) const
   {     
     ui64     mx_sz = size();
     ui64     mn_sz = l.size();
@@ -375,7 +375,7 @@ private:
   {
     TO(size(),i) op( (*this)[i], l);
   }
-  template<class OP> tbl  bin_op(T   const& l, OP op)
+  template<class OP> tbl  bin_op(T   const& l, OP op) const
   {     
     tbl ret( size() ); 
     TO(ret, i) ret[i] = op( (*this)[i], l );
@@ -607,8 +607,8 @@ public:
   tbl(tbl&&      r){ mv(r); }
   tbl& operator=(tbl&&      r){ mv(r); return *this; }
 
-  operator      ui64() const { return size(); }
-  operator      bool() const { return m_mem!=nullptr; }
+  operator      ui64() const{ return size(); }
+  operator      bool() const{ return m_mem!=nullptr; }
   T&      operator[](ui64 i)
   {
     tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
@@ -659,21 +659,21 @@ public:
   void    operator*=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a *= b; } ); }
   void    operator/=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a /= b; } ); }
   void    operator%=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a %= b; } ); }
-  tbl     operator+ (tbl const& l){ return bin_op(l,[](T const& a, T const& b){return a + b;}); }
-  tbl     operator- (tbl const& l){ return bin_op(l,[](T const& a, T const& b){return a - b;}); }
-  tbl     operator* (tbl const& l){ return bin_op(l,[](T const& a, T const& b){return a * b;}); }
-  tbl     operator/ (tbl const& l){ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
-  tbl     operator% (tbl const& l){ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
+  tbl     operator+ (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a + b;}); }
+  tbl     operator- (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a - b;}); }
+  tbl     operator* (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a * b;}); }
+  tbl     operator/ (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
+  tbl     operator% (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
   void    operator+=(T   const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
   void    operator-=(T   const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }
   void    operator*=(T   const& l){ op_asn(l, [](T& a, T const& b){ a *= b; } ); }
   void    operator/=(T   const& l){ op_asn(l, [](T& a, T const& b){ a /= b; } ); }
   void    operator%=(T   const& l){ op_asn(l, [](T& a, T const& b){ a %= b; } ); }
-  tbl     operator+ (T   const& l){ return bin_op(l,[](T const& a, T const& b){return a + b;}); }
-  tbl     operator- (T   const& l){ return bin_op(l,[](T const& a, T const& b){return a - b;}); }
-  tbl     operator* (T   const& l){ return bin_op(l,[](T const& a, T const& b){return a * b;}); }
-  tbl     operator/ (T   const& l){ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
-  tbl     operator% (T   const& l){ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
+  tbl     operator+ (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a + b;}); }
+  tbl     operator- (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a - b;}); }
+  tbl     operator* (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a * b;}); }
+  tbl     operator/ (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
+  tbl     operator% (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
 
   template<class V> KV&   put(const char* key, V val)
   {
@@ -723,8 +723,8 @@ public:
   bool      push_back(T const& value){ return push(value); }
   void            pop(){ /*delete &(back());*/ set_size(size()-1); }  // todo: needs to run the destructor here
   void       pop_back(){ pop(); }
-  T&            front(){ return (*this)[0]; }
-  T&             back(){ return (*this)[size()-1]; }
+  T const&      front() const{ return (*this)[0]; }
+  T const&       back() const{ return (*this)[size()-1]; }
 
   template<class N> bool insert(const char* key, N const& val)
   {
@@ -736,7 +736,7 @@ public:
   }
   bool            has(const char* key)
   {
-    KV& kv = (*this)(key, false);
+    KV const& kv = (*this)(key, false);
     return kv.hsh.type != EMPTY;
   }
 
@@ -991,29 +991,26 @@ public:
     
     return -1;
   }
-  ui64          ideal(ui64 i)
+  ui64          ideal(ui64 i) const
   {
     auto el = elemStart();
     if(el[i].hsh.type==EMPTY) return i;
      
     return el[i].hsh.hash % map_capacity();
   }
-  ui64       distance(ui64 i)
+  ui64       distance(ui64 i) const
   {
     //ui64 idl = ideal(i);
     return wrapDist( ideal(i), i, map_capacity() );
   }
-  i64        holeOfst(ui64 i)
+  i64        holeOfst(ui64 i) const
   { // finds the closes hole from an element, but not the furthest hole
-    KV*   el = elemStart();
-    ui64 mod = map_capacity();
-    //if(el[i].hsh.type==EMPTY) return -1;
+    KV const* el = elemStart();
+    ui64     mod = map_capacity();
     
     i64    h = -1;
-    //ui64 idl = ideal(i);
     ui64 dst = distance(i);
     ui64 cnt = 0;
-    //while(el[i].hsh.type!=EMPTY && cnt!=dst){
     while(dst >= cnt){ // count can equal distance
       if(el[i].hsh.type==EMPTY) h = i;
       i = prev(i,mod);
@@ -1187,6 +1184,10 @@ public:
 
 
 
+
+//if(el[i].hsh.type==EMPTY) return -1;
+//ui64 idl = ideal(i);
+//while(el[i].hsh.type!=EMPTY && cnt!=dst){
 
 //ui64  dist  =  0;
 // ,++dist
