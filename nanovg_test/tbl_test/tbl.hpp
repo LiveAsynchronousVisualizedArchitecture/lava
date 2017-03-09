@@ -120,18 +120,22 @@
 // -todo: make shrink_to_fit()
 // -todo: change find() ideal() distance() and holeOfst to const
 
+// todo: update reserve() and constructor to set map capacity
 // todo: work on flattening table - put in table data segment
-// todo: take out reorder from shrink_to_fit() and make a function to sort the elements into robin hood order without any EMPTY slots - already there with place_rh ?
-// todo: make resize()
-// todo: make copy use resize? - should it just be a memcpy?
-// todo: make sure destructor is being run on objects being held once turned into a template
-// todo: make begin and end iterators to go with C++11 for loops - loop through keys value pairs?
-// todo: try template constructor that returns a tbl<type> with a default value set? - can't have a constructor that reserves elems with this? would need a reserve_elems() function?
-// todo: make constructor that takes only an address to the start of a tbl memory span - just has to offset it by memberBytes()
+//       - change map_capacity to be a variable in memory
+//       - tbl segment would be calculated from other variables - internal tbl would be an offset from m_mem
 // todo: figure out what happens when doing anything that effects the size of a child tbl - child tbl cannot have it's size changed? need two different internal tbl types, one for references(non owned) and one for children(owned) ?
+//       - changing size or deleting an internal tbl means re-making the memory with another allocation and memcpy
+// todo: make resize()
+// todo: make sure destructor is being run on objects being held once turned into a template
+// todo: make constructor that takes only an address to the start of a tbl memory span - just has to offset it by memberBytes()
 // todo: make flatten method that has creates a new tbl with no extra capacity and takes all tbl references and makes them into offset/children tbls that are stored in the sub-tbl segment - instead of child type, make a read only type? read only could have template specializations or static asserts that prevent changing the tbl or the KV objects from it
 // todo: make non owned type always read only? - still need owned and non-owned types within tbl
 
+// todo: try template constructor that returns a tbl<type> with a default value set? - can't have a constructor that reserves elems with this? would need a reserve_elems() function? reserve_elems() not needed since adding a key will allocate map_capacity memory  - will have to try after turning into a template
+// todo: make copy use resize? - should it just be a memcpy?
+// todo: make begin and end iterators to go with C++11 for loops - loop through keys value pairs?
+// todo: take out reorder from shrink_to_fit() and make a function to sort the elements into robin hood order without any EMPTY slots - already there with place_rh ?
 // todo: fold HashType into KV? - would have to make an internal struct/union? - just change HashType hsh to HashType ht?
 // todo: keep the max distance through every loop and use that to short-circuit the reorder loop? - have place_kv return the the distance from ideal in a separate variable, keep track of the index... is there a way to take the max distance back down? does it need to go back down? does the end point only need to be prevMapcap elements forward? - no because there could still be holes?
 // todo: make visualization for table as a tree that shows arrays, key-values and their types, then sub tables - make various visualizations for arrays - histogram, graph, ???
@@ -195,6 +199,8 @@ private:
   template<bool OWNED=true> void typed_del(){ if(m_mem) free(memStart()); };   // explicit template specialization to make an owned tbl free it's memory and a non-owned tbl not free it's memory
   template<> void typed_del<false>(){}; 
 
+  auto      mapcap_ptr()       -> ui64*       { return (ui64*)memStart() + 4;  }
+  auto      mapcap_ptr() const -> ui64 const* { return (ui64*)memStart() + 4;  }
   void   set_sizeBytes(ui64 bytes) // -> ui64
   {
     *( (ui64*)memStart() ) = bytes;
@@ -211,6 +217,7 @@ private:
   {
     *( ((ui64*)memStart()) + 3) = elems;
   }
+  void      set_mapcap(ui64   cap){ *mapcap_ptr() = cap; }
   ui64             nxt(ui64 i, ui64 mod) const
   {
     return ++i % mod;
@@ -584,6 +591,7 @@ public:
       return kv;
     }
   };
+  //struct iterator
 
   i8*     m_mem;
  
@@ -779,13 +787,7 @@ public:
   ui64   map_capacity() const
   {
     if(!m_mem) return 0;
-
-    auto    sz = sizeBytes();
-    auto membr = memberBytes();
-    auto   cap = capacity();
-    auto   szT = sizeof(T);
-    auto  szKV = sizeof(KV);
-    return (sz - membr - cap*szT) / szKV;
+    else       return *mapcap_ptr();
   }
   auto      elemStart() -> KV* 
   {
@@ -814,27 +816,19 @@ public:
     if(fresh) re = malloc(nxtBytes);
     else      re = realloc(memStart(), nxtBytes);
 
-    //if(prevBytes<nxtBytes) 
-    //  memset(re, 0, nxtBytes);
-      //memset( (i8*)re + prevBytes, 0, nxtBytes-prevBytes );
-
     if(re){
       m_mem = ((i8*)re) + memberBytes();
       set_sizeBytes(nxtBytes);
       set_capacity(count);
-      //set_elems(0);
+      set_mapcap(mapcount);
 
       KV* el = elemStart();
       if(prevElems){
         KV* prevEl = (KV*)( ((i8*)re) + prevOfst );
-        //ui64   len = prevMapCap*sizeof(KV);
         if(el!=prevEl) TO(prevMapCap,i) el[i] = prevEl[i];
-        //memmove(el, prevEl, len);
       }
 
-      //TO(map_capacity(),i) new (&el[i]) KV();
-
-      ui64  mapcap = map_capacity();
+      ui64  mapcap = mapcount; //map_capacity();
       i64   extcap = mapcap - prevMapCap;
       if(extcap>0) 
         TO(extcap,i) 
@@ -844,73 +838,7 @@ public:
       { 
         ui64 cnt = reorder();
         printf("\n loop count: %d mapcap: %d  ratio: %.4f \n", cnt, mapcap, cnt/(float)mapcap );
-
-        //ui64  i  = 0;
-        //ui64 en  = prev(i,mapcap);
-        //ui64 cnt = 0; 
-        //do{
-        //  ui64 nxti = nxt(i,mapcap); 
-        //  if(el[i].hsh.type != EMPTY){
-        //    KV kv  = el[i];
-        //    el[i]  = KV();
-        //    //ui64 p = place(kv,el,mapcap);
-        //    ui64 st = kv.hsh.hash%mapcap;
-        //    ui64  p = i; 
-        //    place_rh(kv,el,st,0,mapcap,&p);
-        //    if(p!=i) en = i;
-        //  }
-        //  i = nxti;
-        //  ++cnt;
-        //}while(i!=en);
-
-        //for(ui64 mvcnt=1; mvcnt>0;)
-        //{
-        //  mvcnt=0;
-        //  TO(mapcap, i) if(el[i].hsh.type != EMPTY){
-        //    KV kv = el[i];
-        //    el[i] = KV();
-        //    ui64 p = place(kv,el,mapcap);
-        //    if(p!=i) ++mvcnt;
-        //  }
-        //  printf("\n move count: %d \n", mvcnt);
-        //}
-
-        //TO(mapcap, i) if(el[i].hsh.type != EMPTY){
-        //  KV kv = el[i];
-        //  el[i] = KV();
-        //  place(kv,el,mapcap);
-        //}
-
-        //TO(prevMapCap, i) if(el[i].hsh.type != EMPTY){
-        //  KV kv = el[i];
-        //  el[i] = KV();
-        //  (*this)(kv.key) = kv;                    
-        //}
-
-        //TO(prevMapCap, i) if(el[i].hsh.type != EMPTY){
-        //  ui64 h = holeOfst(i);
-        //  if(h>0) 
-        //}
       }
-
-      //if(prevElems)
-      //{
-      //  ui64    mod = mapcap; // - 1;
-      //  TO(prevMapCap, i){
-      //    KV kv = el[i];
-      //    if(kv.hsh.type != EMPTY){
-      //      ui64 nxtIdx = kv.hsh.hash % mod;
-      //      if(nxtIdx!=i){
-      //        //el[i] = KV();
-      //        //compact_back( nxt(i,mod), mod);
-      //        del(i);
-      //        place_kv(kv, el, nxtIdx, mod);
-      //      }
-      //    }
-      //  }
-      //   
-      //  compact_all( prev(prevMapCap,mapcap), mapcap);                      // start where the loop above left off
-      //}
     }
 
     if(re && fresh){ set_size(0); set_elems(0); }
@@ -1055,9 +983,15 @@ public:
 private:
   static const ui32 HASH_MASK = 0x07FFFFFF;
 
-  static ui64  memberBytes()
+  static ui64 memberBytes()
   {
-    return sizeof(ui64) * 4;
+    return sizeof(ui64) * 5;
+    // Memory Layout (5 ui64 variables before m_mem)
+    // sizeBytes     -  total number of bytes of the entire memory span
+    // size          -  vector entries
+    // capacity      -  number of elements already allocated in the vector
+    // elems         -  number of map entries 
+    // map_capacity  -  number of elements already allocated for the mapp 
   }
   static ui64  fnv_64a_buf(void const* const buf, ui64 len)
   {
@@ -1181,9 +1115,93 @@ public:
 
 
 
+//if(prevBytes<nxtBytes) 
+//  memset(re, 0, nxtBytes);
+  //memset( (i8*)re + prevBytes, 0, nxtBytes-prevBytes );
+//
+  //set_elems(0);
+    //ui64   len = prevMapCap*sizeof(KV);
+    //memmove(el, prevEl, len);
+//
+//TO(map_capacity(),i) new (&el[i]) KV();
 
+//ui64  i  = 0;
+//ui64 en  = prev(i,mapcap);
+//ui64 cnt = 0; 
+//do{
+//  ui64 nxti = nxt(i,mapcap); 
+//  if(el[i].hsh.type != EMPTY){
+//    KV kv  = el[i];
+//    el[i]  = KV();
+//    //ui64 p = place(kv,el,mapcap);
+//    ui64 st = kv.hsh.hash%mapcap;
+//    ui64  p = i; 
+//    place_rh(kv,el,st,0,mapcap,&p);
+//    if(p!=i) en = i;
+//  }
+//  i = nxti;
+//  ++cnt;
+//}while(i!=en);
 
+//for(ui64 mvcnt=1; mvcnt>0;)
+//{
+//  mvcnt=0;
+//  TO(mapcap, i) if(el[i].hsh.type != EMPTY){
+//    KV kv = el[i];
+//    el[i] = KV();
+//    ui64 p = place(kv,el,mapcap);
+//    if(p!=i) ++mvcnt;
+//  }
+//  printf("\n move count: %d \n", mvcnt);
+//}
 
+//TO(mapcap, i) if(el[i].hsh.type != EMPTY){
+//  KV kv = el[i];
+//  el[i] = KV();
+//  place(kv,el,mapcap);
+//}
+
+//TO(prevMapCap, i) if(el[i].hsh.type != EMPTY){
+//  KV kv = el[i];
+//  el[i] = KV();
+//  (*this)(kv.key) = kv;                    
+//}
+
+//TO(prevMapCap, i) if(el[i].hsh.type != EMPTY){
+//  ui64 h = holeOfst(i);
+//  if(h>0) 
+//}
+
+//if(prevElems)
+//{
+//  ui64    mod = mapcap; // - 1;
+//  TO(prevMapCap, i){
+//    KV kv = el[i];
+//    if(kv.hsh.type != EMPTY){
+//      ui64 nxtIdx = kv.hsh.hash % mod;
+//      if(nxtIdx!=i){
+//        //el[i] = KV();
+//        //compact_back( nxt(i,mod), mod);
+//        del(i);
+//        place_kv(kv, el, nxtIdx, mod);
+//      }
+//    }
+//  }
+//   
+//  compact_all( prev(prevMapCap,mapcap), mapcap);                      // start where the loop above left off
+//}
+
+//if(!m_mem) return 0;
+//
+//auto    sz = sizeBytes();
+//auto membr = memberBytes();
+//auto   cap = capacity();
+//auto   szT = sizeof(T);
+//auto  szKV = sizeof(KV);
+//return (sz - membr - cap*szT) / szKV;
+
+//
+//*( ((ui64*)memStart()) + 4) = cap;
 
 //if(el[i].hsh.type==EMPTY) return -1;
 //ui64 idl = ideal(i);

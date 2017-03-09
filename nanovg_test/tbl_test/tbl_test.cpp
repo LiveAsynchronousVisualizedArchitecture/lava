@@ -24,7 +24,7 @@ void prnt_elems(tbl& t)
   printf("\n\n");
 }
 
-int main()
+int  main()
 {
   using namespace std;
   
@@ -331,20 +331,27 @@ int main()
   //  //prnt_elems(t);
   //}
 
-  SECTION(test shrink_to_fit)
+  //SECTION(test shrink_to_fit)
+  //{
+  //  tbl t;
+  //  t("0") = 0;
+  //  t("1") = 1;
+  //  t("2") = 2;
+  //  t("3") = 3;
+  //  t("4") = 4;
+  //  prnt_elems(t);
+  //
+  //  t.shrink_to_fit();
+  //  prnt_elems(t);
+  //}
+
+  SECTION(test default value type deduction constructor)
   {
-    tbl t;
-    t("0") = 0;
-    t("1") = 1;
-    t("2") = 2;
-    t("3") = 3;
-    t("4") = 4;
-    prnt_elems(t);
-
-    t.shrink_to_fit();
-    prnt_elems(t);
-
+    auto t = tbl(10,0);
+    TO(t,i) printf(" %d ", t[i]);
   }
+
+
 
   int a; cin >> a;
   return 0;
