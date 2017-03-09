@@ -1,5 +1,5 @@
 
-#include <iostream>
+//#include <iostream>
 #include <cstdio>
 
 #include "tbl.hpp"
@@ -347,13 +347,14 @@ int  main()
 
   SECTION(test default value type deduction constructor)
   {
-    auto t = tbl(10,0);
+    auto t = tbl(10, (int)0.0f);
     TO(t,i) printf(" %d ", t[i]);
   }
 
 
 
-  int a; cin >> a;
+  //int a; cin >> a;
+  scanf_s("%d");
   return 0;
 }
 

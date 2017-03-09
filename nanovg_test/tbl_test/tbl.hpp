@@ -160,12 +160,13 @@
 #define __TBL_HEADERGUARD_H__
 
 #include <cstdlib>
-#include <cassert>
+#include <cstring>
 #include "../no_rt_util.h"
 
 #if defined(_MSC_VER) && defined(_DEBUG)
   #include <iostream>
   #include <iomanip>
+  #include <cassert>
   #define tbl_TELL(var) ::std::cout \
                         << ::std::setprecision(4) \
                         << #var ## ": " \
@@ -333,6 +334,7 @@ private:
     set_elems(0);
     set_capacity(size);
     set_size(size);
+    *mapcap_ptr() = 0;
   }
   void         destroy()
   {
@@ -801,16 +803,16 @@ public:
 
     return (KV*)(data() + capacity());
   }
-  void*       reserve(ui64 count, ui64 mapcount)
+  void*       reserve(ui64 count, ui64 mapcap)
   {
-    count    = mx(count, capacity());
-    mapcount = mx(mapcount, map_capacity());
+    count   =  mx(count, capacity());
+    mapcap  =  mx(mapcap, map_capacity());
     KV*    prevElems  =  elemStart();
     ui64   prevMemSt  =  (ui64)memStart();
     ui64    prevOfst  =  prevElems? ((ui64)prevElems)-prevMemSt  :  0;
     ui64   prevBytes  =  sizeBytes();
     ui64  prevMapCap  =  map_capacity();
-    ui64    nxtBytes  =  memberBytes() + sizeof(T)*count +  sizeof(KV)*mapcount;
+    ui64    nxtBytes  =  memberBytes() + sizeof(T)*count +  sizeof(KV)*mapcap;
     void*        re;
     bool      fresh  = !m_mem;
     if(fresh) re = malloc(nxtBytes);
@@ -820,7 +822,7 @@ public:
       m_mem = ((i8*)re) + memberBytes();
       set_sizeBytes(nxtBytes);
       set_capacity(count);
-      set_mapcap(mapcount);
+      set_mapcap(mapcap);
 
       KV* el = elemStart();
       if(prevElems){
@@ -828,11 +830,12 @@ public:
         if(el!=prevEl) TO(prevMapCap,i) el[i] = prevEl[i];
       }
 
-      ui64  mapcap = mapcount; //map_capacity();
+      //ui64  mapcap = mapcap; //map_capacity();
       i64   extcap = mapcap - prevMapCap;
       if(extcap>0) 
         TO(extcap,i) 
-          new (&el[i+prevMapCap]) KV();
+          el[i+prevMapCap] = KV();
+          //new (&el[i+prevMapCap]) KV();
 
       if(prevElems)
       { 
@@ -863,10 +866,11 @@ public:
   }
   bool  shrink_to_fit()
   {
-    ui64    sz = size();
-    ui64 vecsz = memberBytes() + sz*sizeof(T);
-    ui64 mapsz = elems()*sizeof(KV);
-    ui64 nxtsz = vecsz + mapsz;
+    ui64      sz = size();
+    ui64   vecsz = memberBytes() + sz*sizeof(T);
+    ui64 elemcnt = elems();
+    ui64   mapsz = elemcnt*sizeof(KV);
+    ui64   nxtsz = vecsz + mapsz;
     
     KV const* el = elemStart();
     i8* nxtp = (i8*)malloc(nxtsz);
@@ -885,6 +889,8 @@ public:
       set_sizeBytes(nxtsz);
       set_size(sz);
       set_capacity(sz);
+      set_elems(elemcnt);
+      *mapcap_ptr() = elemcnt;
 
       //reorder();
 
@@ -1112,6 +1118,7 @@ public:
 };
 
 #endif
+
 
 
 
