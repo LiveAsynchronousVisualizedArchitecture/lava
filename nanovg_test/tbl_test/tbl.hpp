@@ -115,19 +115,22 @@
 // -todo: integrate robin hood hasing into compact() - short circuiting 
 // -todo: debug del() compact() not filling in holes after first call - only short circuit after prevElemDist is lower than elemDist, not lower of equal
 // -todo: test with 64 byte KV and long key strings - seems to work fine
+// -todo: make rolling reorder into a function
+// -todo: make function to delete KV with NONE type? set NONE to empty? - make delete type function?
+// -todo: make shrink_to_fit()
 
 // todo: work on flattening table - put in table data segment
+// todo: change find() ideal() distance() and holeOfst to const
+// todo: take out reorder from shrink_to_fit() and make a function to sort the elements into robin hood order without any EMPTY slots - already there with place_rh ?
 // todo: make resize()
 // todo: make copy use resize? - should it just be a memcpy?
 // todo: make sure destructor is being run on objects being held once turned into a template
-// todo: make shrink_to_fit()
 // todo: make begin and end iterators to go with C++11 for loops - loop through keys value pairs?
 // todo: try template constructor that returns a tbl<type> with a default value set? - can't have a constructor that reserves elems with this? would need a reserve_elems() function?
 // todo: make constructor that takes only an address to the start of a tbl memory span - just has to offset it by memberBytes()
 // todo: figure out what happens when doing anything that effects the size of a child tbl - child tbl cannot have it's size changed? need two different internal tbl types, one for references(non owned) and one for children(owned) ?
 // todo: make flatten method that has creates a new tbl with no extra capacity and takes all tbl references and makes them into offset/children tbls that are stored in the sub-tbl segment - instead of child type, make a read only type? read only could have template specializations or static asserts that prevent changing the tbl or the KV objects from it
 // todo: make non owned type always read only? - still need owned and non-owned types within tbl
-// todo: make function to delete keys with NONE type? set NONE to empty?
 
 // todo: fold HashType into KV? - would have to make an internal struct/union? - just change HashType hsh to HashType ht?
 // todo: keep the max distance through every loop and use that to short-circuit the reorder loop? - have place_kv return the the distance from ideal in a separate variable, keep track of the index... is there a way to take the max distance back down? does it need to go back down? does the end point only need to be prevMapcap elements forward? - no because there could still be holes?
@@ -291,6 +294,29 @@ private:
 
     return i;
   }
+  ui64         reorder()
+  {
+    ui64 mod  =  map_capacity(); 
+    KV*   el  =  elemStart();
+    ui64   i  =  0;
+    ui64  en  =  prev(i,mod);
+    ui64  cnt =  0; 
+    do{
+      ui64 nxti = nxt(i,mod); 
+      if(el[i].hsh.type != EMPTY){
+        KV kv  = el[i];
+        el[i]  = KV();
+        ui64 st = kv.hsh.hash % mod;
+        ui64  p = i; 
+        place_rh(kv,el,st,0,mod,&p);
+        if(p!=i) en = i;
+      }
+      i = nxti;
+      ++cnt;
+    }while(i!=en);
+
+    return cnt;
+  }
   void            init(ui64 size)
   {
     ui64   szBytes  =  tbl::sizeBytes(size);
@@ -301,19 +327,6 @@ private:
     set_capacity(size);
     set_size(size);
   }
-  //bool             del(ui64 i)
-  //{ 
-  //  //ui64 i = find(key);
-  //  KV* el = elemStart();
-  //  if(el[i].hsh.type==EMPTY) return false;
-  //
-  //  el[i] = KV();
-  //  ui64 mapcap = map_capacity();
-  //  ui64     en = prev(i, mapcap);
-  //  //compact(i, en, mapcap);
-  //
-  //  return true;
-  //}
   void         destroy()
   {
     // todo: needs to loop through and run destructors here
@@ -696,7 +709,7 @@ public:
     return KV::error_kv();
   }
 
-  bool          push(T const& value)
+  bool           push(T const& value)
   {
     if( !(capacity()>size()) )
       if(!expand()) return false;
@@ -707,11 +720,11 @@ public:
 
     return true;
   }
-  bool     push_back(T const& value){ return push(value); }
-  void           pop(){ /*delete &(back());*/ set_size(size()-1); }  // todo: needs to run the destructor here
-  void      pop_back(){ pop(); }
-  T&           front(){ return (*this)[0]; }
-  T&            back(){ return (*this)[size()-1]; }
+  bool      push_back(T const& value){ return push(value); }
+  void            pop(){ /*delete &(back());*/ set_size(size()-1); }  // todo: needs to run the destructor here
+  void       pop_back(){ pop(); }
+  T&            front(){ return (*this)[0]; }
+  T&             back(){ return (*this)[size()-1]; }
 
   template<class N> bool insert(const char* key, N const& val)
   {
@@ -721,33 +734,33 @@ public:
     kv = val;
     return true;
   }
-  bool           has(const char* key)
+  bool            has(const char* key)
   {
     KV& kv = (*this)(key, false);
     return kv.hsh.type != EMPTY;
   }
 
-  ui64          size() const
+  ui64           size() const
   {
     if(!m_mem) return 0;
 
     return *( ((ui64*)memStart()) + 1 );
   }
-  T*            data() const
+  T*             data() const
   {
     return (T*)m_mem;
   }
-  void*     memStart() const
+  void*      memStart() const
   {
     return (void*)(m_mem - memberBytes());
   }
-  ui64     sizeBytes() const // -> ui64
+  ui64      sizeBytes() const // -> ui64
   {
     if(!m_mem) return 0;
 
     return *( (ui64 const*)memStart() );
   }
-  ui64      capacity() const
+  ui64       capacity() const
   {
     if(!m_mem) return 0;
 
@@ -757,13 +770,13 @@ public:
     //
     //return (sizeBytes() - memberBytes()) / sizeof(T);  // - size()*sizeof(T)
   }
-  ui64         elems() const
+  ui64          elems() const
   {
     if(!m_mem) return 0;
 
     return *( ((ui64*)memStart()) + 3);
   }
-  ui64  map_capacity() const
+  ui64   map_capacity() const
   {
     if(!m_mem) return 0;
 
@@ -774,19 +787,19 @@ public:
     auto  szKV = sizeof(KV);
     return (sz - membr - cap*szT) / szKV;
   }
-  auto     elemStart() -> KV* 
+  auto      elemStart() -> KV* 
   {
     if(!m_mem) return nullptr;
 
     return (KV*)(data() + capacity());
   }
-  auto     elemStart() const -> KV const* 
+  auto      elemStart() const -> KV const* 
   {
     if(!m_mem) return nullptr;
 
     return (KV*)(data() + capacity());
   }
-  void*      reserve(ui64 count, ui64 mapcount)
+  void*       reserve(ui64 count, ui64 mapcount)
   {
     count    = mx(count, capacity());
     mapcount = mx(mapcount, map_capacity());
@@ -829,24 +842,26 @@ public:
 
       if(prevElems)
       { 
-        ui64  i  = 0;
-        ui64 en  = prev(i,mapcap);
-        ui64 cnt = 0; 
-        do{
-          ui64 nxti = nxt(i,mapcap); 
-          if(el[i].hsh.type != EMPTY){
-            KV kv  = el[i];
-            el[i]  = KV();
-            //ui64 p = place(kv,el,mapcap);
-            ui64 st = kv.hsh.hash%mapcap;
-            ui64  p = i; 
-            place_rh(kv,el,st,0,mapcap,&p);
-            if(p!=i) en = i;
-          }
-          i = nxti;
-          ++cnt;
-        }while(i!=en);
+        ui64 cnt = reorder();
         printf("\n loop count: %d mapcap: %d  ratio: %.4f \n", cnt, mapcap, cnt/(float)mapcap );
+
+        //ui64  i  = 0;
+        //ui64 en  = prev(i,mapcap);
+        //ui64 cnt = 0; 
+        //do{
+        //  ui64 nxti = nxt(i,mapcap); 
+        //  if(el[i].hsh.type != EMPTY){
+        //    KV kv  = el[i];
+        //    el[i]  = KV();
+        //    //ui64 p = place(kv,el,mapcap);
+        //    ui64 st = kv.hsh.hash%mapcap;
+        //    ui64  p = i; 
+        //    place_rh(kv,el,st,0,mapcap,&p);
+        //    if(p!=i) en = i;
+        //  }
+        //  i = nxti;
+        //  ++cnt;
+        //}while(i!=en);
 
         //for(ui64 mvcnt=1; mvcnt>0;)
         //{
@@ -902,7 +917,7 @@ public:
     
     return re;
   }
-  void*       expand()
+  void*        expand()
   {
     ui64    sz = size();
     ui64 nxtSz = sz + sz/2;
@@ -918,7 +933,38 @@ public:
 
     return reserve(nxtSz, nxtCap);
   }
-  i64           find(const char* key, ui32* hash=nullptr)
+  bool  shrink_to_fit()
+  {
+    ui64    sz = size();
+    ui64 vecsz = memberBytes() + sz*sizeof(T);
+    ui64 mapsz = elems()*sizeof(KV);
+    ui64 nxtsz = vecsz + mapsz;
+    
+    KV const* el = elemStart();
+    i8* nxtp = (i8*)malloc(nxtsz);
+    if(nxtp){
+      i8* p = (i8*)memStart();
+      memcpy(nxtp, p, vecsz);
+      KV* nxtel = (KV*)(nxtp+vecsz);
+      ui64  cur = 0;
+      TO(map_capacity(),i){
+        if(el[i].hsh.type!=EMPTY) 
+          nxtel[cur++] = el[i];
+        } 
+
+      free(p);
+      m_mem = nxtp+memberBytes();
+      set_sizeBytes(nxtsz);
+      set_size(sz);
+      set_capacity(sz);
+
+      //reorder();
+
+      return true;
+    }else 
+      return false;
+  }
+  i64            find(const char* key, ui32* hash=nullptr) const
   {
     ui32   hsh  =  HashStr(key);
     //ui32   hsh  =  (ui32)(*key); // & HASH_MASK );
@@ -929,15 +975,12 @@ public:
     ui64     i  =  hsh;
     ui64  wrap  =  hsh % cap - 1;
     ui64    en  =  wrap<(cap-1)? wrap : cap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
-    //ui64  dist  =  0;
-    for(;;++i/*,++dist*/)
+    for(;;++i)
     {
       i %= cap;                                                        // get idx within map_capacity
       HshType eh = el[i].hsh;                                          // eh is element hash
       if(el[i].hsh.type==EMPTY){ 
         return i;
-      //}else if(ideal(i)<dist){
-      //  return i;
       }else if(hsh == eh.hash){                                        // if the hashes aren't the same, the keys can't be the same
         auto cmp = strncmp(el[i].key, key, sizeof(KV::Key)-1);         // check if the keys are the same 
         if(cmp==0) return i;
@@ -948,19 +991,19 @@ public:
     
     return -1;
   }
-  ui64         ideal(ui64 i)
+  ui64          ideal(ui64 i)
   {
     auto el = elemStart();
     if(el[i].hsh.type==EMPTY) return i;
      
     return el[i].hsh.hash % map_capacity();
   }
-  ui64      distance(ui64 i)
+  ui64       distance(ui64 i)
   {
     //ui64 idl = ideal(i);
     return wrapDist( ideal(i), i, map_capacity() );
   }
-  i64       holeOfst(ui64 i)
+  i64        holeOfst(ui64 i)
   { // finds the closes hole from an element, but not the furthest hole
     KV*   el = elemStart();
     ui64 mod = map_capacity();
@@ -978,7 +1021,7 @@ public:
     }
     return h;
   }
-  bool           del(const char* key)
+  bool            del(const char* key)
   { 
     ui64 i = find(key);
     KV* el = elemStart();
@@ -989,15 +1032,28 @@ public:
     ui64     en = prev(i, mapcap);
 
     ui64 cnt=0;
-    while( (i=compact(i,en,mapcap))!=en ){ ++cnt; } 
-
+    //while( (i=compact(i,en,mapcap))!=en ){ ++cnt; } 
+    cnt = reorder();
     set_elems( elems()-1 );
 
     printf("\ncount: %d\n", cnt);
 
     return true;
   }
+  ui64            del(Type t)
+  {
+    ui64 mapcap = map_capacity();
+    KV*      el = elemStart();
+    ui64    cnt = 0;
+    TO(mapcap,i) 
+      if(el[i].hsh.type==t){ 
+        el[i] = KV();
+        ++cnt;
+      }
+    reorder();
 
+    return cnt;
+  }
 
 private:
   static const ui32 HASH_MASK = 0x07FFFFFF;
@@ -1132,6 +1188,29 @@ public:
 
 
 
+//ui64  dist  =  0;
+// ,++dist
+//
+//}else if(ideal(i)<dist){
+//  return i;
+
+//bool             del(ui64 i)
+//{ 
+//  //ui64 i = find(key);
+//  KV* el = elemStart();
+//  if(el[i].hsh.type==EMPTY) return false;
+//
+//  el[i] = KV();
+//  ui64 mapcap = map_capacity();
+//  ui64     en = prev(i, mapcap);
+//  //compact(i, en, mapcap);
+//
+//  return true;
+//}
+
+//void* el = elemStart();
+//memcpy(nxtp+vecsz, el, mapsz);
+
 //i64            place(KV kv, KV* elems, ui64 mod)
 //{
 //  ui64  i = kv.hsh.hash % mod;
@@ -1221,7 +1300,6 @@ public:
 //kv = val;
 //strcpy_s(kv.key, sizeof(KV::Key), key);
 //kv.hsh.hash = hsh;
-
 //ui32   hsh  =  (ui32)(*key); // & HASH_MASK );
 //ui64   cap  =  map_capacity();  
 //ui64  wrap  =  hsh % cap - 1;

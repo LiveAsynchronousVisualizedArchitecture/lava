@@ -293,35 +293,56 @@ int main()
   //float*  pos = t("pos").data();
   //float* norm = t("normals").data();
 
-  SECTION(test del function)
+  //SECTION(test del function)
+  //{
+  //  tbl t;
+  //  t("0") = 850;
+  //  t("1") = 1;
+  //  t("2") = 2;
+  //  t("3") = 3;
+  //  //t("zero")  = 850;
+  //  //t("one")   = 850;
+  //  //t("two")   = 850;
+  //  //t("three") = 850;
+  //  t("zero");
+  //  t("one") ;
+  //  t("two") ;
+  //  t("three") ;
+  //
+  //  //t("super_extra_mega_long_key_to_test_the_fifty_charac") = 999;
+  //
+  //  //prnt_elems(t);
+  //
+  //  t("4") = 4;
+  //  prnt_elems(t);
+  //
+  //  //t.del("zero");
+  //  t.del(tbl::NONE);
+  //  //t.shrink_to_fit();
+  //  prnt_elems(t);
+  //
+  //  //t.del("4");
+  //  //prnt_elems(t);
+  //
+  //  t("5") = 5;
+  //  prnt_elems(t);
+  //
+  //  //t.del("1");
+  //  //prnt_elems(t);
+  //}
+
+  SECTION(test shrink_to_fit)
   {
     tbl t;
-    t("0") = 850;
+    t("0") = 0;
     t("1") = 1;
     t("2") = 2;
     t("3") = 3;
-    t("zero")  = 850;
-    t("one")   = 850;
-    t("two")   = 850;
-    t("three") = 850;
-    t("super_extra_mega_long_key_to_test_the_fifty_charac") = 999;
-
-    //prnt_elems(t);
-
     t("4") = 4;
     prnt_elems(t);
 
-    t.del("zero");
+    t.shrink_to_fit();
     prnt_elems(t);
-
-    //t.del("4");
-    //prnt_elems(t);
-
-    t("5") = 5;
-    prnt_elems(t);
-
-    //t.del("1");
-    //prnt_elems(t);
 
   }
 
