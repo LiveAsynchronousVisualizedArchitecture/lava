@@ -149,19 +149,18 @@ inline auto    winbnd_to_sidebarRect(float w, float h) -> struct nk_rect
   
   return nk_rect(sbx, 0, sbw, h);    //struct nk_rect rect =
 }
-inline mat4           camera_to_mat4(Camera const& cam)
+inline mat4           camera_to_mat4(Camera const& cam, float w, float h)
 {
+  //using namespace glm;
+  
   const static auto XAXIS = vec4(1.f, 0.f, 0.f, 1.f);
   const static auto YAXIS = vec4(0.f, 1.f, 0.f, 1.f);
   //const static auto YAXIS = vec3(0.f, 1.f, 0.f);
 
-  mat4 view  =  lookAt(cam.pos, vd.camera.lookAt, vd.camera.up);
+  mat4 view  =  lookAt(cam.pos, cam.lookAt, cam.up);
         
   //mat4 projection;
-  mat4 projection = perspective(vd.camera.fov,
-                          (GLfloat)vd.ui.w / (GLfloat)vd.ui.h,
-                          vd.camera.nearClip, 
-                          vd.camera.farClip);
+  mat4 projection = glm::perspective(cam.fov, (w/h), cam.nearClip, cam.farClip);
   return projection * view;
   //camMtx = vd.camera.tfm * projection;
 }

@@ -105,6 +105,7 @@ struct Camera
   vec3 rot;
   vec3 lookAt;
   vec3 up;
+  mat4 pantfm;
   mat4 tfm;     //glm::mat4 transformMtx;
   mat4 proj;
   bool rightButtonDown, leftButtonDown;

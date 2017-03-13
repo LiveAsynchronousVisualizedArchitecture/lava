@@ -48,10 +48,11 @@
 // -todo: make 'h' revert camera settings 
 // -todo: reverse scroll distance control
 
+// todo: put back pan 
 // todo: make pan sensitivity not vary with scale of scene
-// todo: put back pan sensitivity
 // todo: make 'f' create a bounding box of all the active shapes and focus the camera on them
 // todo: put sensitivity into a separate settings struct
+// todo: try nanogui as a replacement for nuklear? 
 // todo: make text field for typing in database name
 // todo: fix far clipping plane - not sure what the problem is yet
 // todo: work out file locking so there is no race condition on two programs creating mmaped files
@@ -161,7 +162,7 @@ Camera        initCamera()
   cam.mouseDelta      = vec2(0.0f, 0.0f);
   cam.btn2Delta       = vec2(0.0f, 0.0f);
   cam.sensitivity     = 0.01f;
-  cam.pansense        = 0.05f;
+  cam.pansense        = 0.01f;
   cam.pos             = vec3(0,0,-10.0f);
   cam.rot             = vec3(0,0,0);
   cam.lookAt          = vec3(0.0f, 0.0f, 0.0f);
@@ -237,17 +238,19 @@ void   cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
   const static float _2PI = 2.f* PIf; //  pi<float>();
 
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
+  Camera& cam = vd->camera;
   vec2 newMousePosition = vec2((float)xposition, (float)yposition);
 
-  if(vd->camera.leftButtonDown){
-    vd->camera.mouseDelta = (newMousePosition - vd->camera.oldMousePos);
-  }else{ vd->camera.mouseDelta = vec2(0,0); }
+  if(cam.leftButtonDown){
+    cam.mouseDelta = (newMousePosition - cam.oldMousePos);
+  }else{ cam.mouseDelta = vec2(0,0); }
     
-  if(vd->camera.rightButtonDown){
-    vd->camera.btn2Delta  = (newMousePosition - vd->camera.oldMousePos);
-  }else{ vd->camera.btn2Delta  = vec2(0,0); }
+  if(cam.rightButtonDown){
+    cam.btn2Delta  = (newMousePosition - cam.oldMousePos);
+    cam.pantfm = cam.pantfm;
+  }else{ cam.btn2Delta  = vec2(0,0); }
 
-  vd->camera.oldMousePos = newMousePosition;
+  cam.oldMousePos = newMousePosition;
 }
 GLFWwindow*     initGLFW(VizData* vd)
 {
@@ -609,8 +612,17 @@ ENTRY_DECLARATION
 
       SECTION(update camera)
       {
-        float ry  =   vd.camera.mouseDelta.x * vd.camera.sensitivity;
-        float rx  =  (vd.camera.mouseDelta.y * vd.camera.sensitivity);
+        float   ry  =   vd.camera.mouseDelta.x * vd.camera.sensitivity;
+        float   rx  =  (vd.camera.mouseDelta.y * vd.camera.sensitivity);
+
+        vec3  camx  =  vd.camera.pantfm * vec4(1.f,0,0,1.f);      // use a separate transform for panning that is frozen on mouse down so that the panning space won't constantly be changing due to rotation from the lookat function
+        vec3  camy  =  vd.camera.pantfm * vec4(0,1.f,0,1.f);      // why does the transform change though if both the lookat and offset are being translated? are they not translated at the same time?
+
+        vec3  ofst(0,0,0); 
+        ofst       +=  camx * -vd.camera.btn2Delta.x * vd.camera.pansense;
+        ofst       +=  camy * -vd.camera.btn2Delta.y * vd.camera.pansense;
+        vd.camera.lookAt += ofst;
+        vd.camera.pos    += ofst;
 
         mat4    xzmat = rotate(mat4(), ry, YAXIS);
         mat4     ymat = rotate(mat4(), rx, XAXIS);
@@ -620,14 +632,15 @@ ENTRY_DECLARATION
         vec4 ypos(0, p.y, dst, 1.f);
         vd.camera.pos.y = (ymat * ypos).y;
 
-        vec3 lookOfst = normalize(vd.camera.pos-vd.camera.lookAt)*vd.camera.dist;
+        vec3 lookOfst = normalize(vd.camera.pos-vd.camera.lookAt)*dst;
         vd.camera.pos = vd.camera.lookAt + lookOfst;
+
       }
-      mat4 camMtx = camera_to_mat4(vd.camera);
+      vd.camera.tfm = camera_to_mat4(vd.camera, (f32)vd.ui.w, (f32)vd.ui.h);
 
       for(auto& kv : vd.shapes){
         if(kv.second.active)
-          RenderShape(kv.second, camMtx);
+          RenderShape(kv.second, vd.camera.tfm);
       }
       PRINT_GL_ERRORS
     }
@@ -661,6 +674,12 @@ ENTRY_DECLARATION
 
 
 
+
+
+//vd.camera.pos += camx * vd.camera.btn2Delta.x;
+//vd.camera.pos += camy * vd.camera.btn2Delta.y;
+//
+//mat4 camMtx = camera_to_mat4(vd.camera);
 
 //vd.camera.fov             = 75.0f;
 //vd.camera.mouseDelta      = vec2(0.0f, 0.0f);
