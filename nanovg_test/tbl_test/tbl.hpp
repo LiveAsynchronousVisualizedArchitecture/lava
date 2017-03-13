@@ -119,18 +119,19 @@
 // -todo: make function to delete KV with NONE type? set NONE to empty? - make delete type function?
 // -todo: make shrink_to_fit()
 // -todo: change find() ideal() distance() and holeOfst to const
+// -todo: update reserve() and constructor to set map capacity
+// -todo: make operator-- be shrink_to_fit() and ++ be expand() ?
 
-// todo: update reserve() and constructor to set map capacity
 // todo: work on flattening table - put in table data segment
-//       - change map_capacity to be a variable in memory
-//       - tbl segment would be calculated from other variables - internal tbl would be an offset from m_mem
+//       | -change map_capacity to be a variable in memory
+//       | tbl segment would be calculated from other variables - internal tbl would be an offset from m_mem
 // todo: figure out what happens when doing anything that effects the size of a child tbl - child tbl cannot have it's size changed? need two different internal tbl types, one for references(non owned) and one for children(owned) ?
 //       - changing size or deleting an internal tbl means re-making the memory with another allocation and memcpy
-// todo: make resize()
 // todo: make sure destructor is being run on objects being held once turned into a template
 // todo: make constructor that takes only an address to the start of a tbl memory span - just has to offset it by memberBytes()
 // todo: make flatten method that has creates a new tbl with no extra capacity and takes all tbl references and makes them into offset/children tbls that are stored in the sub-tbl segment - instead of child type, make a read only type? read only could have template specializations or static asserts that prevent changing the tbl or the KV objects from it
 // todo: make non owned type always read only? - still need owned and non-owned types within tbl
+// todo: make resize()
 
 // todo: try template constructor that returns a tbl<type> with a default value set? - can't have a constructor that reserves elems with this? would need a reserve_elems() function? reserve_elems() not needed since adding a key will allocate map_capacity memory  - will have to try after turning into a template
 // todo: make copy use resize? - should it just be a memcpy?
@@ -145,7 +146,6 @@
 // todo: use binary bit operators to make tbl act like a set?
 // todo: make operator~ return just the vector
 // todo: make different unary operator return just the map?
-// todo: make operator-- be shrink_to_fit() and ++ be expand() ?
 // todo: make macro to allocate memory on the stack and use it for a table
 // todo: make emplace and emplace_back()
 // todo: specialize cp() and mv() as well?
@@ -664,6 +664,8 @@ public:
   }
   tbl     operator>>(tbl const& l){ return tbl::concat_l(*this, l); }
   tbl     operator<<(tbl const& l){ return tbl::concat_r(*this, l); }
+  tbl&    operator--(){ shrink_to_fit(); return *this; }    
+  tbl&    operator++(){ expand();        return *this; }
   void    operator+=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
   void    operator-=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }
   void    operator*=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a *= b; } ); }

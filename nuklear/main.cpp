@@ -42,8 +42,18 @@
 // -todo: figure out why location returns -1 - now returns 0
 // -todo: try debugging gradient plane object in update_test - quads no drawn by glDrawElements
 // -todo: rename VizDataStructures to just VizData
+// -todo: reverse vertical rotation
+// -todo: make vertical rotation relative to the camera - only need the Y value, so always rotate (0,Y,dist) around X axis and take the Y value from that, the real rotation will come from the lookat function
+// -todo: cap change in distance - scroll callback revamped to take into account distance and yoffset
+// -todo: make 'h' revert camera settings 
+// -todo: reverse scroll distance control
 
-// todo: fix far clipping plane
+// todo: make pan sensitivity not vary with scale of scene
+// todo: put back pan sensitivity
+// todo: make 'f' create a bounding box of all the active shapes and focus the camera on them
+// todo: put sensitivity into a separate settings struct
+// todo: make text field for typing in database name
+// todo: fix far clipping plane - not sure what the problem is yet
 // todo: work out file locking so there is no race condition on two programs creating mmaped files
 // todo: figure out reference counting so that files are cleaned up on exit
 // todo: add panning to right mouse button - probably by multing x and y vectors by the cameras transformation matrix, then adding those vectors to the cameras position
@@ -108,58 +118,106 @@
 
 namespace {
 
-vec3               pos(mat4 const& m)
-{ return vec3(m[0].w, m[1].w, m[2].w); }
-void           set_pos(mat4* m, vec3 const p)
+vec3                 pos(mat4 const& m)
+{ return m[3];                      }
+void             set_pos(mat4* m, vec3 const p)
 {
   (*m)[0].w = p.x;
   (*m)[1].w = p.y;
   (*m)[2].w = p.z;
 }
-float wrapAngleRadians(float angle)     
+float   wrapAngleRadians(float angle)     
 {
   using namespace glm;
   const static float _2PI = 2.f*pi<float>();
 
   return fmodf(angle, _2PI);
 }
-void     errorCallback(int e, const char *d) {
+void       errorCallback(int e, const char *d) {
   printf("Error %d: %s\n", e, d);
   fflush(stdout);
 }
-void       keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+void            initGlew()
 {
-    if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
-        glfwSetWindowShouldClose(window, GL_TRUE);
+  //glewExperimental = 1;
+  if(glewInit() != GLEW_OK) {
+    fprintf(stderr, "Failed to setup GLEW\n");
+    exit(1);
+  }
 }
-void    scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
+auto         initNuklear(GLFWwindow* win) -> struct nk_context*
+{
+  struct nk_context*      ctx = nk_glfw3_init(win, NK_GLFW3_INSTALL_CALLBACKS);
+  struct nk_font_atlas* atlas;
+  nk_glfw3_font_stash_begin(&atlas);
+  nk_glfw3_font_stash_end();
+
+  return ctx;
+}
+Camera        initCamera()
+{
+  Camera cam;
+  cam.fov             = 75.0f;
+  cam.mouseDelta      = vec2(0.0f, 0.0f);
+  cam.btn2Delta       = vec2(0.0f, 0.0f);
+  cam.sensitivity     = 0.01f;
+  cam.pansense        = 0.05f;
+  cam.pos             = vec3(0,0,-10.0f);
+  cam.rot             = vec3(0,0,0);
+  cam.lookAt          = vec3(0.0f, 0.0f, 0.0f);
+  cam.dist            = 10.0f;
+  cam.up              = vec3(0.0f, 1.0f, 0.0f);
+  cam.oldMousePos     = vec2(0.0f, 0.0f);
+  cam.rightButtonDown = false;
+  cam.leftButtonDown  = false;
+  cam.nearClip        = 0.01f;
+  cam.farClip         = 1000.0f;
+
+  return cam;
+}
+void         keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+  if(key==GLFW_KEY_ESCAPE && action==GLFW_PRESS)
+      glfwSetWindowShouldClose(window, GL_TRUE);
+
+  VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
+  switch(key)
+  {
+  case GLFW_KEY_K: {
+    //auto bnd = shapes_to_bnds(vd);
+  } break; 
+  case GLFW_KEY_H: {
+    vd->camera = initCamera();
+    //auto bnd = shapes_to_bnds(vd);
+  } break; 
+  default:
+    break;
+  }
+
+}
+void      scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
   using namespace std;
   
-  const float dollySens = 0.9f;
+  const float dollySens = 0.1f;
 
-  float sense = (float)(yoffset * dollySens);
-  VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
-  if(yoffset>0)
-    vd->camera.P( vd->camera.P()*sense );
-  else
-    vd->camera.P( vd->camera.P() * (1.f/abs(sense)) );
+  VizData*   vd = (VizData*)glfwGetWindowUserPointer(window);
+  auto&     cam = vd->camera;
+  float    ofst = (float) -(cam.dist*yoffset*dollySens);
+  float  prvDst = cam.dist;                                        // prvDst is previous distance
+  float  nxtDst = cam.dist;
+  nxtDst        = cam.dist + ofst;
 
-  //auto P = -vd->camera.P();
-  //P /= 
+  cam.dist = nxtDst;
 
-  //vd->camera.fov += (GLfloat)(yoffset / 10); 
-  //vd->camera.fov  = max(45.f, min(90.f, vd->camera.fov));
+  //if(cam.dis > 0)
+  //else
+  //  nxtDst = cam.dist * 1.f/abs(sense);
 
-  //if(vd->camera.fieldOfView < 45.0f) {
-  //  vd->camera.fieldOfView = 45.0f;
-  //}
-  //
-  //if(vd->camera.fieldOfView > 90.0f) {
-  //  vd->camera.fieldOfView = 90.0f;
-  //}
+  //if     (nxtDst < prvDst*0.9f) cam.dist = prvDst*0.9f;
+  //else if(nxtDst > prvDst/0.9f) cam.dist = prvDst/0.9f;
 }
-void  mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
+void    mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 {
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
 
@@ -173,7 +231,7 @@ void  mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
     else if(action==GLFW_RELEASE) vd->camera.rightButtonDown = false;
   }
 }
-void cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
+void   cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
 {
   //using namespace glm;
   const static float _2PI = 2.f* PIf; //  pi<float>();
@@ -186,69 +244,12 @@ void cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
   }else{ vd->camera.mouseDelta = vec2(0,0); }
     
   if(vd->camera.rightButtonDown){
-    vd->camera.btn2Delta = (newMousePosition - vd->camera.oldMousePos);
+    vd->camera.btn2Delta  = (newMousePosition - vd->camera.oldMousePos);
   }else{ vd->camera.btn2Delta  = vec2(0,0); }
 
   vd->camera.oldMousePos = newMousePosition;
 }
-int           sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* shps) // VizData* vd)
-{
-  using namespace std;
-
-  nk_flags window_flags = 0;                 /* window flags */
-  struct nk_panel layout;                    /* popups */
-
-  ctx->style.window.header.align = NK_HEADER_RIGHT;   // header_align;   /* window flags */
-
-  if(ctx->active){
-    memcpy( &ctx->active->bounds, &rect, sizeof(struct nk_rect) );
-  }
-
-  if(nk_begin(ctx, &layout, "Overview", rect, window_flags))
-  //if(nk_group_begin(ctx, &layout, "Overview", window_flags))
-  {
-    nk_layout_row_static(ctx, 18, (int)(rect.w-25.f), 1);
-    //nk_layout_row_static(ctx, 18, 120, 1);
-    for(auto& kv : *shps){
-      if(kv.first.s.length()>0)
-        nk_selectable_label(ctx, kv.first.s.c_str(), NK_TEXT_RIGHT, &kv.second.active);
-    }
-    //nk_group_end(ctx);
-  }
-  nk_end(ctx);
-
-  return !nk_window_is_closed(ctx, "Overview");
-}
-void      RenderShape(Shape const& shp, mat4 const& m) // GLuint shaderId)
-{
-  glUseProgram(shp.shader);  //shader.use();
-
-  GLint transformLoc = glGetUniformLocation(vd.shaderId, "transform");
-  glUniformMatrix4fv(transformLoc, 1, GL_FALSE, value_ptr(m));
-
-  int size;
-  glActiveTexture(GL_TEXTURE0);	// Activate the texture unit first before binding texture
-  glBindTexture(GL_TEXTURE_2D, shp.tx);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); // GL_LINEAR);
-  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); // GL_LINEAR);
-  PRINT_GL_ERRORS
-
-  auto loc = glGetUniformLocation(shp.shader, "tex0");
-  glUniform1i(loc, 0);
-
-  glBindVertexArray(shp.vertary);
-  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shp.idxbuf);                       PRINT_GL_ERRORS
-  glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);  PRINT_GL_ERRORS   // todo: keep size with shape instead of querying it
-  glDrawElements(shp.mode, shp.indsz, GL_UNSIGNED_INT, 0);                 PRINT_GL_ERRORS   // todo: can't use quads with glDrawElements?
-  
-  //glDrawElements(GL_QUADS, 4, GL_UNSIGNED_INT, 0);
-  
-  glBindVertexArray(0);
-  glBindTexture(GL_TEXTURE_2D, 0);
-}
-GLFWwindow*  initGLFW(VizData* vd)
+GLFWwindow*     initGLFW(VizData* vd)
 {
   glfwSetErrorCallback(errorCallback);
   if( !glfwInit() ){
@@ -281,24 +282,64 @@ GLFWwindow*  initGLFW(VizData* vd)
 
   return win;
 }
-void         initGlew()
+int              sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* shps) // VizData* vd)
 {
-  //glewExperimental = 1;
-  if(glewInit() != GLEW_OK) {
-    fprintf(stderr, "Failed to setup GLEW\n");
-    exit(1);
-  }
-}
-auto      initNuklear(GLFWwindow* win) -> struct nk_context*
-{
-  struct nk_context*      ctx = nk_glfw3_init(win, NK_GLFW3_INSTALL_CALLBACKS);
-  struct nk_font_atlas* atlas;
-  nk_glfw3_font_stash_begin(&atlas);
-  nk_glfw3_font_stash_end();
+  using namespace std;
 
-  return ctx;
+  nk_flags window_flags = 0;                 /* window flags */
+  struct nk_panel layout;                    /* popups */
+
+  ctx->style.window.header.align = NK_HEADER_RIGHT;   // header_align;   /* window flags */
+
+  if(ctx->active){
+    memcpy( &ctx->active->bounds, &rect, sizeof(struct nk_rect) );
+  }
+
+  if(nk_begin(ctx, &layout, "Overview", rect, window_flags))
+  //if(nk_group_begin(ctx, &layout, "Overview", window_flags))
+  {
+    nk_layout_row_static(ctx, 18, (int)(rect.w-25.f), 1);
+    //nk_layout_row_static(ctx, 18, 120, 1);
+    for(auto& kv : *shps){
+      if(kv.first.s.length()>0)
+        nk_selectable_label(ctx, kv.first.s.c_str(), NK_TEXT_RIGHT, &kv.second.active);
+    }
+    //nk_group_end(ctx);
+  }
+  nk_end(ctx);
+
+  return !nk_window_is_closed(ctx, "Overview");
 }
-void   shapesFromKeys(simdb const& db, vec<VerStr> const& dbKeys, VizData* vd)  // vec<str> const& dbKeys
+void         RenderShape(Shape const& shp, mat4 const& m) // GLuint shaderId)
+{
+  glUseProgram(shp.shader);  //shader.use();
+
+  GLint transformLoc = glGetUniformLocation(vd.shaderId, "transform");
+  glUniformMatrix4fv(transformLoc, 1, GL_FALSE, value_ptr(m));
+
+  int size;
+  glActiveTexture(GL_TEXTURE0);	// Activate the texture unit first before binding texture
+  glBindTexture(GL_TEXTURE_2D, shp.tx);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST); // GL_LINEAR);
+  glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST); // GL_LINEAR);
+  PRINT_GL_ERRORS
+
+  auto loc = glGetUniformLocation(shp.shader, "tex0");
+  glUniform1i(loc, 0);
+
+  glBindVertexArray(shp.vertary);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shp.idxbuf);                       PRINT_GL_ERRORS
+  glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);  PRINT_GL_ERRORS   // todo: keep size with shape instead of querying it
+  glDrawElements(shp.mode, shp.indsz, GL_UNSIGNED_INT, 0);                 PRINT_GL_ERRORS   // todo: can't use quads with glDrawElements?
+  
+  //glDrawElements(GL_QUADS, 4, GL_UNSIGNED_INT, 0);
+  
+  glBindVertexArray(0);
+  glBindTexture(GL_TEXTURE_2D, 0);
+}
+void      shapesFromKeys(simdb const& db, vec<VerStr> const& dbKeys, VizData* vd)  // vec<str> const& dbKeys
 {
   using namespace std;
 
@@ -310,7 +351,7 @@ void   shapesFromKeys(simdb const& db, vec<VerStr> const& dbKeys, VizData* vd)  
 
     ui32    vlen = 0;
     ui32 version = 0;
-    auto len = db.len(k.s.data(), (ui32)k.s.length(), &vlen, &version);          // todo: make ui64 as the input length
+    auto     len = db.len(k.s.data(), (ui32)k.s.length(), &vlen, &version);          // todo: make ui64 as the input length
 
     vec<i8> ivbuf(vlen);
     db.get(k.s.data(), (ui32)k.s.length(), ivbuf.data(), (ui32)ivbuf.size());
@@ -321,7 +362,7 @@ void   shapesFromKeys(simdb const& db, vec<VerStr> const& dbKeys, VizData* vd)  
     vd->shapes[k] = move(s);                           PRINT_GL_ERRORS
   };
 }
-int  eraseMissingKeys(vec<VerStr> dbKeys, KeyShapes* shps)           // vec<str> dbKeys,
+int     eraseMissingKeys(vec<VerStr> dbKeys, KeyShapes* shps)           // vec<str> dbKeys,
 {
 
   int cnt = 0;
@@ -341,13 +382,13 @@ int  eraseMissingKeys(vec<VerStr> dbKeys, KeyShapes* shps)           // vec<str>
 
   return cnt;
 }
-bool        updateKey(simdb const& db, VerStr const& key, VizData* vd)
+bool           updateKey(simdb const& db, VerStr const& key, VizData* vd)
 {
   using namespace std;
 
-  ui32 version=0;
-  ui32    vlen=0;
-  auto len = db.len(key.s.data(), (ui32)key.s.length(), &vlen, &version);
+  ui32 version = 0;
+  ui32    vlen = 0;
+  auto     len = db.len(key.s.data(), (ui32)key.s.length(), &vlen, &version);
 
   if(len>0 && version!=key.v){
     vec<i8> ivbuf(vlen);
@@ -363,7 +404,7 @@ bool        updateKey(simdb const& db, VerStr const& key, VizData* vd)
 
   return false;
 }
-double           nowd()
+double              nowd()
 {
   using namespace std;
   using namespace std::chrono;
@@ -403,36 +444,24 @@ ENTRY_DECLARATION
   {
     new (&db) simdb("test", 1024, 1<<14);        // inititialize the DB with placement new into the data segment
 
-    vd.ui.w         =  1024; 
-    vd.ui.h         =   768;
-    vd.ui.bgclr     =  nk_rgb(16,16,16);         // darker than this may risk not seeing the difference between black and the background
-    vd.now          =  nowd();
-    vd.prev         =  vd.now;
-    vd.verRefresh   =  0.007;                    // roughly 144hz
-    vd.verRefreshClock = 0.0;
-    vd.keyRefresh             =  2.0;
-    vd.keyRefreshClock        = vd.keyRefresh;
-    vd.camera.fov             = 75.0f;
-    vd.camera.mouseDelta      = vec2(0.0f, 0.0f);
-    vd.camera.btn2Delta       = vec2(0.0f, 0.0f);
-    vd.camera.sensitivity     = 0.001f;
-    vd.camera.pansense        = 0.05f;
-    //vd.camera.viewDirection   = vec3(0.0f, 0.0f, 0.0f);
-    vd.camera.lookAt          = vec3(0.0f, 0.0f, 0.0f);
-    vd.camera.up              = vec3(0.0f, 1.0f, 0.0f);
-    vd.camera.oldMousePos     = vec2(0.0f, 0.0f);
-    vd.camera.rightButtonDown = false;
-    vd.camera.leftButtonDown  = false;
-    vd.camera.nearClip        = 0.1f;
-    vd.camera.farClip         = 1000.0f;
+    vd.ui.w             =  1024; 
+    vd.ui.h             =   768;
+    vd.ui.bgclr         =  nk_rgb(16,16,16);         // darker than this may risk not seeing the difference between black and the background
+    vd.now              =  nowd();
+    vd.prev             =  vd.now;
+    vd.verRefresh       =  0.007;                    // roughly 144hz
+    vd.verRefreshClock  =  0.0;
+    vd.keyRefresh       =  2.0;
+    vd.keyRefreshClock  =  vd.keyRefresh;
+    vd.camera           =  initCamera();
     
     mat4 view, projection;
-    view       = lookAt(vec3(0.f, 0.f, 1.f), vd.camera.lookAt, vd.camera.up);
-    projection = perspective(vd.camera.fov, (GLfloat)1024 / (GLfloat)768, vd.camera.nearClip, vd.camera.farClip);
+    view          = lookAt(vec3(0.f, 0.f, 1.f), vd.camera.lookAt, vd.camera.up);
+    projection    = perspective(vd.camera.fov, (GLfloat)1024 / (GLfloat)768, vd.camera.nearClip, vd.camera.farClip);
     vd.camera.tfm = view;
     set_pos( &vd.camera.tfm, vec3(0.f,0.f,3.f) );
   }
-  genTestGeo(&db);
+  //genTestGeo(&db);
   SECTION(initialize glfw window, glew, and nuklear)
   {
     vd.win = initGLFW( &vd );                        assert(vd.win!=nullptr);
@@ -522,13 +551,13 @@ ENTRY_DECLARATION
     {
       nk_glfw3_new_frame();
       vd.ui.rect = winbnd_to_sidebarRect((float)vd.ui.w, (float)vd.ui.h);
-
+    
       //struct nk_panel layout;
       //if(nk_begin(vd.ctx, &layout, "fps", vd.ui.rect, NK_WINDOW_BACKGROUND))
       //{
-
+    
       sidebar(vd.ctx, vd.ui.rect, &vd.shapes);                     // alters the shapes by setting their active flags
-
+    
       //nk_flags window_flags = NK_WINDOW_DYNAMIC;                 /* window flags */
         //struct nk_rect fpsRect;
         //struct nk_panel fpsLayout;
@@ -544,17 +573,27 @@ ENTRY_DECLARATION
         //}
       //}  
       //nk_end(vd.ctx);
-    
+      
       PRINT_GL_ERRORS
     }
     SECTION(openGL frame setup)
     {
       glViewport(0, 0, vd.ui.w, vd.ui.h);
+      glDisable(GL_CLIP_PLANE0);
+      glDisable(GL_CLIP_PLANE1);
+      glDisable(GL_CLIP_PLANE2);
+      glDisable(GL_CLIP_PLANE3);
+      glDisable(GL_FOG);
+
       glDisable(GL_CULL_FACE);
+      glDisable(GL_SCISSOR_TEST);
+      glDisable(GL_STENCIL_TEST);
+      glDisable(GL_DEPTH);
+      glDisable(GL_DEPTH_TEST);                                   // glDepthFunc(GL_LESS);
       glEnable(GL_BLEND);
       //glEnable(GL_TEXTURE_2D);
       //glEnable(GL_DEPTH);
-      glEnable(GL_DEPTH_TEST);                                   // glDepthFunc(GL_LESS);
+      //glEnable(GL_DEPTH_TEST);                                   // glDepthFunc(GL_LESS);
       //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -565,60 +604,27 @@ ENTRY_DECLARATION
     }
     SECTION(render the shapes in VizData::shapes)
     {
-      mat4 camMtx;
-      SECTION(create camera matrix)
+      const static auto XAXIS = vec3(1.f, 0.f, 0.f);
+      const static auto YAXIS = vec3(0.f, 1.f, 0.f);
+
+      SECTION(update camera)
       {
-        const static auto XAXIS = vec4(1.f, 0.f, 0.f, 1.f);
-        const static auto YAXIS = vec4(0.f, 1.f, 0.f, 1.f);
+        float ry  =   vd.camera.mouseDelta.x * vd.camera.sensitivity;
+        float rx  =  (vd.camera.mouseDelta.y * vd.camera.sensitivity);
 
-        mat4 view;
-        auto tfm   =  vd.camera.tfm;
-        auto P     =  pos(tfm);
-        auto plen  =  length(P);
-        //auto lkmtx =  lookAt(P, vd.camera.lookAt, normalize(vec3(vec4(vd.camera.up,1.f)*tfm)) );
-        auto lkmtx =  lookAt(P, vd.camera.lookAt, vd.camera.up);
-        view       =  lkmtx;
-        set_pos(&view, P);
-        
-        vec3 yview = vec3(YAXIS * lkmtx);
-        vec3 xview = vec3(XAXIS * lkmtx);
+        mat4    xzmat = rotate(mat4(), ry, YAXIS);
+        mat4     ymat = rotate(mat4(), rx, XAXIS);
+        vec4        p = vec4(vd.camera.pos, 1.f);
+        vd.camera.pos = xzmat * p;
+        f32       dst = vd.camera.dist;
+        vec4 ypos(0, p.y, dst, 1.f);
+        vd.camera.pos.y = (ymat * ypos).y;
 
-        auto sens  =  plen*2.f*PIf * vd.camera.sensitivity;
-        auto xrot  =  -vd.camera.mouseDelta.x * sens;
-        auto yrot  =  -vd.camera.mouseDelta.y * sens;
-        view       =  rotate(view, yrot, xview);
-        view       =  rotate(view, xrot, yview);                // todo: these need to be moved to the cursor callback, although input updates are only called once per frame so it likely doesn't matter
-        auto viewP =  pos(view);
-        //tfm        =  lookAt(viewP, vd.camera.lookAt, normalize(vec3(vec4(vd.camera.up,1.f)*lkmtx)) );
-        tfm        =  lookAt(viewP, vd.camera.lookAt, vd.camera.up);
-        set_pos(&tfm, viewP);
-        vd.camera.tfm = tfm;
-
-        mat4 panmtx = vd.camera.tfm;
-        set_pos(&panmtx, vec3(0));
-        vec3 xpan   = vec3(XAXIS * panmtx);
-        vec3 ypan   = vec3(YAXIS * panmtx) * -1.f;
-        vec3 xofst  = normalize(xpan) * vd.camera.btn2Delta.x * vd.camera.pansense;
-        vec3 yofst  = normalize(ypan) * vd.camera.btn2Delta.y * vd.camera.pansense;
-        vd.camera.lookAt += xofst;
-        vd.camera.lookAt += yofst;
-        vec3 panpos = pos(vd.camera.tfm);
-        panpos += xofst;
-        panpos += yofst;
-        set_pos(&vd.camera.tfm, panpos);
-        
-        mat4 projection;
-        projection = perspective(vd.camera.fov,
-                                 (GLfloat)vd.ui.w / (GLfloat)vd.ui.h, 
-                                 vd.camera.nearClip, 
-                                 vd.camera.farClip);
-        camMtx = projection * vd.camera.tfm;
-        //camMtx = vd.camera.tfm * projection;
-
-        PRINT_GL_ERRORS
+        vec3 lookOfst = normalize(vd.camera.pos-vd.camera.lookAt)*vd.camera.dist;
+        vd.camera.pos = vd.camera.lookAt + lookOfst;
       }
+      mat4 camMtx = camera_to_mat4(vd.camera);
 
-      // updateCamera(vd);
       for(auto& kv : vd.shapes){
         if(kv.second.active)
           RenderShape(kv.second, camMtx);
@@ -626,13 +632,15 @@ ENTRY_DECLARATION
       PRINT_GL_ERRORS
     }
 
-    nk_glfw3_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_BUFFER, MAX_ELEMENT_BUFFER);        
-       /* 
-        * IMPORTANT: `nk_glfw_render` modifies some global OpenGL state
-        * with blending, scissor, face culling, depth test and viewport and
-        * defaults everything back into a default state.
-        * Make sure to either a.) save and restore or b.) reset your own state after
-        * rendering the UI. */
+    nk_glfw3_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_BUFFER, MAX_ELEMENT_BUFFER);
+
+    /* 
+    * IMPORTANT: `nk_glfw_render` modifies some global OpenGL state
+    * with blending, scissor, face culling, depth test and viewport and
+    * defaults everything back into a default state.
+    * Make sure to either a.) save and restore or b.) reset your own state after
+    * rendering the UI. 
+    */
     glfwSwapBuffers(vd.win);
     PRINT_GL_ERRORS
 
@@ -653,6 +661,95 @@ ENTRY_DECLARATION
 
 
 
+
+//vd.camera.fov             = 75.0f;
+//vd.camera.mouseDelta      = vec2(0.0f, 0.0f);
+//vd.camera.btn2Delta       = vec2(0.0f, 0.0f);
+//vd.camera.sensitivity     = 0.01f;
+//vd.camera.pansense        = 0.05f;
+////vd.camera.viewDirection   = vec3(0.0f, 0.0f, 0.0f);
+//vd.camera.pos             = vec3(0,0,-10.0f);
+//vd.camera.rot             = vec3(0,0,0);
+//vd.camera.lookAt          = vec3(0.0f, 0.0f, 0.0f);
+//vd.camera.dist            = 10.0f;
+//vd.camera.up              = vec3(0.0f, 1.0f, 0.0f);
+//vd.camera.oldMousePos     = vec2(0.0f, 0.0f);
+//vd.camera.rightButtonDown = false;
+//vd.camera.leftButtonDown  = false;
+//vd.camera.nearClip        = 0.01f;
+//vd.camera.farClip         = 1000.0f;
+
+//mat4 p;
+//mat4 p = translate(mat4(), vd.camera.pos);
+//f32   dist = (float)(vd.camera.pos-vd.camera.lookAt).length();
+//f32   dstRoot = sqrtf(vd.camera.dist);
+
+//vd->camera.P( vd->camera.P()*sense );
+//vd->camera.P( vd->camera.P() * (1.f/abs(sense)) );
+
+//auto P = -vd->camera.P();
+//P /= 
+
+//vd->camera.fov += (GLfloat)(yoffset / 10); 
+//vd->camera.fov  = max(45.f, min(90.f, vd->camera.fov));
+
+//if(vd->camera.fieldOfView < 45.0f) {
+//  vd->camera.fieldOfView = 45.0f;
+//}
+//
+//if(vd->camera.fieldOfView > 90.0f) {
+//  vd->camera.fieldOfView = 90.0f;
+//}
+
+//vec3               pos(mat4 const& m)
+//{ return vec3(m[0].w, m[1].w, m[2].w); }
+
+//const static auto XAXIS = vec4(1.f, 0.f, 0.f, 1.f);
+//const static auto YAXIS = vec4(0.f, 1.f, 0.f, 1.f);
+//
+//mat4 view;
+//auto tfm   =  vd.camera.tfm;
+//auto P     =  pos(tfm);
+//auto plen  =  length(P);
+////auto lkmtx =  lookAt(P, vd.camera.lookAt, normalize(vec3(vec4(vd.camera.up,1.f)*tfm)) );
+//auto lkmtx =  lookAt(P, vd.camera.lookAt, vd.camera.up);
+//view       =  lkmtx;
+//set_pos(&view, P);
+//
+//vec3 yview = vec3(YAXIS * lkmtx);
+//vec3 xview = vec3(XAXIS * lkmtx);
+//
+//auto sens  =  plen*2.f*PIf * vd.camera.sensitivity;
+//auto xrot  =  -vd.camera.mouseDelta.x * sens;
+//auto yrot  =  -vd.camera.mouseDelta.y * sens;
+//view       =  rotate(view, yrot, xview);
+//view       =  rotate(view, xrot, yview);                // todo: these need to be moved to the cursor callback, although input updates are only called once per frame so it likely doesn't matter
+//auto viewP =  pos(view);
+////tfm        =  lookAt(viewP, vd.camera.lookAt, normalize(vec3(vec4(vd.camera.up,1.f)*lkmtx)) );
+//tfm        =  lookAt(viewP, vd.camera.lookAt, vd.camera.up);
+//set_pos(&tfm, viewP);
+//vd.camera.tfm = tfm;
+//
+//mat4 panmtx = vd.camera.tfm;
+//set_pos(&panmtx, vec3(0));
+//vec3 xpan   = vec3(XAXIS * panmtx);
+//vec3 ypan   = vec3(YAXIS * panmtx) * -1.f;
+//vec3 xofst  = normalize(xpan) * vd.camera.btn2Delta.x * vd.camera.pansense;
+//vec3 yofst  = normalize(ypan) * vd.camera.btn2Delta.y * vd.camera.pansense;
+//vd.camera.lookAt += xofst;
+//vd.camera.lookAt += yofst;
+//vec3 panpos = pos(vd.camera.tfm);
+//panpos += xofst;
+//panpos += yofst;
+//set_pos(&vd.camera.tfm, panpos);
+//
+//mat4 projection;
+//projection = perspective(vd.camera.fov,
+//                         (GLfloat)vd.ui.w / (GLfloat)vd.ui.h,
+//                         vd.camera.nearClip, 
+//                         vd.camera.farClip);
+//camMtx = projection * vd.camera.tfm;
+////camMtx = vd.camera.tfm * projection;
 
 //if(button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS){
 //  vd->camera.leftButtonDown = true;

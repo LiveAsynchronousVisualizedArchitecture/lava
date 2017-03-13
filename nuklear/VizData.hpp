@@ -95,12 +95,14 @@ public:
 
 struct Camera
 {
-  float fov, pansense, sensitivity, nearClip, farClip;                     // field of view is fov
+  float fov, pansense, sensitivity, nearClip, farClip, dist;                     // field of view is fov
   vec2 mouseDelta;
   vec2 btn2Delta;
   vec2 oldMousePos;
   //vec3 position;
   //vec3 viewDirection;
+  vec3 pos;
+  vec3 rot;
   vec3 lookAt;
   vec3 up;
   mat4 tfm;     //glm::mat4 transformMtx;
@@ -137,8 +139,6 @@ struct VizData
   // todo: VizData deconstructor - will need this to clean up shader programs 
 };
 
-//static const char*  vShaderPath  =  "../vertexShader.vert";
-//static const char*  fShaderPath  =  "../fragmentShader.frag";
 static const char*  vertShader   = 
 "#version 330 core\n"
 "\n"
@@ -185,6 +185,9 @@ static VizData  vd;
 #endif
 
 
+
+//static const char*  vShaderPath  =  "../vertexShader.vert";
+//static const char*  fShaderPath  =  "../fragmentShader.frag";
 
 /*
 static const char*  vertShader   = 

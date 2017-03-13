@@ -11,6 +11,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GenPath", "GenPath\GenPath.
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tbl_test", "tbl_test\tbl_test.vcxproj", "{90E50FF0-13E0-4EBF-9735-E667081192E4}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lava_priq", "lava_priq\lava_priq.vcxproj", "{14CC7C03-2F5B-42F4-965E-4613E0C7D9EA}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Mixed Platforms = Debug|Mixed Platforms
@@ -69,6 +71,17 @@ Global
 		{90E50FF0-13E0-4EBF-9735-E667081192E4}.Release|Win32.Build.0 = Release|Win32
 		{90E50FF0-13E0-4EBF-9735-E667081192E4}.Release|x64.ActiveCfg = Release|x64
 		{90E50FF0-13E0-4EBF-9735-E667081192E4}.Release|x64.Build.0 = Release|x64
+		{14CC7C03-2F5B-42F4-965E-4613E0C7D9EA}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
+		{14CC7C03-2F5B-42F4-965E-4613E0C7D9EA}.Debug|Mixed Platforms.Build.0 = Debug|Win32
+		{14CC7C03-2F5B-42F4-965E-4613E0C7D9EA}.Debug|Win32.ActiveCfg = Debug|Win32
+		{14CC7C03-2F5B-42F4-965E-4613E0C7D9EA}.Debug|Win32.Build.0 = Debug|Win32
+		{14CC7C03-2F5B-42F4-965E-4613E0C7D9EA}.Debug|x64.ActiveCfg = Debug|x64
+		{14CC7C03-2F5B-42F4-965E-4613E0C7D9EA}.Debug|x64.Build.0 = Debug|x64
+		{14CC7C03-2F5B-42F4-965E-4613E0C7D9EA}.Release|Mixed Platforms.ActiveCfg = Release|Win32
+		{14CC7C03-2F5B-42F4-965E-4613E0C7D9EA}.Release|Mixed Platforms.Build.0 = Release|Win32
+		{14CC7C03-2F5B-42F4-965E-4613E0C7D9EA}.Release|Win32.ActiveCfg = Release|Win32
+		{14CC7C03-2F5B-42F4-965E-4613E0C7D9EA}.Release|Win32.Build.0 = Release|Win32
+		{14CC7C03-2F5B-42F4-965E-4613E0C7D9EA}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

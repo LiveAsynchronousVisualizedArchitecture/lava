@@ -149,11 +149,69 @@ inline auto    winbnd_to_sidebarRect(float w, float h) -> struct nk_rect
   
   return nk_rect(sbx, 0, sbw, h);    //struct nk_rect rect =
 }
+inline mat4           camera_to_mat4(Camera const& cam)
+{
+  const static auto XAXIS = vec4(1.f, 0.f, 0.f, 1.f);
+  const static auto YAXIS = vec4(0.f, 1.f, 0.f, 1.f);
+  //const static auto YAXIS = vec3(0.f, 1.f, 0.f);
 
+  mat4 view  =  lookAt(cam.pos, vd.camera.lookAt, vd.camera.up);
+        
+  //mat4 projection;
+  mat4 projection = perspective(vd.camera.fov,
+                          (GLfloat)vd.ui.w / (GLfloat)vd.ui.h,
+                          vd.camera.nearClip, 
+                          vd.camera.farClip);
+  return projection * view;
+  //camMtx = vd.camera.tfm * projection;
+}
+inline void           shapes_to_bnds(KeyShapes const& shapes)
+{
+  for(auto const& shp : shapes){
+    Shape const& s = shp.second;
+    if(s.active){
+      
+    }
+  }
+}
 #endif
 
 
 
+
+//auto tfm    =  vd.camera.tfm;
+//auto P      =  pos(tfm);
+//auto plen   =  length(P);
+//auto lkmtx =  lookAt(P, vd.camera.lookAt, normalize(vec3(vec4(vd.camera.up,1.f)*tfm)) );
+//view       =  lkmtx;
+//set_pos(&view, P);
+//    
+//vec3 yview = vec3(YAXIS * lkmtx);
+//vec3 xview = vec3(XAXIS * lkmtx);
+//
+//auto sens  =  plen*2.f*PIf * vd.camera.sensitivity;
+//auto xrot  =  -vd.camera.mouseDelta.x * sens;
+//auto yrot  =  -vd.camera.mouseDelta.y * sens;
+//view       =  rotate(view, yrot, xview);
+//view       =  rotate(view, xrot, yview);                // todo: these need to be moved to the cursor callback, although input updates are only called once per frame so it likely doesn't matter
+//auto viewP =  pos(view);
+////tfm        =  lookAt(viewP, vd.camera.lookAt, normalize(vec3(vec4(vd.camera.up,1.f)*lkmtx)) );
+//tfm        =  lookAt(viewP, vd.camera.lookAt, vd.camera.up);
+//set_pos(&tfm, viewP);
+//vd.camera.tfm = tfm;
+//
+//mat4 panmtx = vd.camera.tfm;
+//set_pos(&panmtx, vec3(0));
+//vec3 xpan   = vec3(XAXIS * panmtx);
+//vec3 ypan   = vec3(YAXIS * panmtx) * -1.f;
+//vec3 xofst  = normalize(xpan) * vd.camera.btn2Delta.x * vd.camera.pansense;
+//vec3 yofst  = normalize(ypan) * vd.camera.btn2Delta.y * vd.camera.pansense;
+//vd.camera.lookAt += xofst;
+//vd.camera.lookAt += yofst;
+//vec3 panpos = pos(vd.camera.tfm);
+//panpos += xofst;
+//panpos += yofst;
+//set_pos(&vd.camera.tfm, panpos);
 
 //glVertexAttribPointer( (GLuint)AtrId::POSITION, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);                  // position 
 //glVertexAttribPointer( (GLuint)AtrId::NORMAL,   4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 6));   // normals 
