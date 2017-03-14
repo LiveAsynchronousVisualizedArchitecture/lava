@@ -164,10 +164,15 @@ inline mat4           camera_to_mat4(Camera const& cam, float w, float h)
   return projection * view;
   //camMtx = vd.camera.tfm * projection;
 }
-inline vec4         shapes_to_bndsph(VizData const& vd, KeyShapes const& shapes)
+inline vec4         shapes_to_bndsph(VizData const& vd)
 {
+  f32  r = 0;
+  vec3 p(0,0,0);
+
   for(auto& kv : vd.shapes)
   {
+    if(!kv.second.active) continue;
+
     auto&    key = kv.first.s;
     ui32    vlen = 0;
     ui32 version = 0;
@@ -176,17 +181,20 @@ inline vec4         shapes_to_bndsph(VizData const& vd, KeyShapes const& shapes)
     vec<i8> ivbuf(vlen);
     db.get(key.data(), (ui32)key.length(), ivbuf.data(), (ui32)ivbuf.size());
 
-    IndexedVerts* iv = (IndexedVerts*)ivbuf.data();
+    IndexedVerts* iv = (IndexedVerts*)IndexedVertsLoad(ivbuf.data());
     vec3*          v = (vec3*)iv->verts;
-    f32            r = 0;
-    vec3           p(0,0,0);
     TO(iv->vertsLen,i){
-      v[i];
+      f32 dist = distance(v[i], p); 
+      p = (v[i] + p) / 2.f;
+      r = (r + dist) / 2.f;
     }
-
-    //Shape s = ivbuf_to_shape(ivbuf.data(), len);
+    IndexedVertsDestroy(iv);
   }
+  return vec4(p, r);
 
+
+  //Shape s = ivbuf_to_shape(ivbuf.data(), len);
+  //
   //for(auto const& shp : shapes){
   //  Shape const& s = shp.second;
   //  if(s.active){

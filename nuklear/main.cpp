@@ -53,8 +53,10 @@
 // -todo: work out file locking so there is no race condition on two programs creating mmaped files - possibly fixed in simdb
 // -todo: make pan sensitivity vary with scale of cam.dist
 // -todo: fix camera pan when rotated - needed to lock the pan transform correctly?
+// -todo: fix panning after rotation again - decomposed into quaternion which is then conjugated? and turned into a matrix
+// -todo: make 'f' create a bounding box of all the active shapes and focus the camera on them
 
-// todo: make 'f' create a bounding box of all the active shapes and focus the camera on them
+// todo: make camera fitting use the field of view and change the dist to fit all geometry
 // todo: try nanogui as a replacement for nuklear? 
 // todo: make text field for typing in database name
 // todo: add fps counter in the corner
@@ -90,10 +92,12 @@
 #include "no_rt_util.h"
 
 #define GLM_FORCE_RADIANS
+#define GLM_ENABLE_EXPERIMENTAL
 #include "glm/glm.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include "glm/gtc/type_ptr.hpp"
 #include "glm/gtc/constants.hpp"
+#include "glm/gtx/matrix_decompose.hpp"
 
 #include "glfw3.h"
 
@@ -182,10 +186,13 @@ Camera        initCamera()
 }
 void         keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
+  //using namespace glm;
+
   if(key==GLFW_KEY_ESCAPE && action==GLFW_PRESS)
       glfwSetWindowShouldClose(window, GL_TRUE);
 
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
+  auto&   cam = vd->camera;
   switch(key)
   {
   case GLFW_KEY_K: {
@@ -195,6 +202,17 @@ void         keyCallback(GLFWwindow* window, int key, int scancode, int action, 
     vd->camera = initCamera();
     //auto bnd = shapes_to_bnds(vd);
   } break; 
+  case GLFW_KEY_J:
+  case GLFW_KEY_F: {
+    if(action==GLFW_RELEASE){
+      vec4   sph   =  shapes_to_bndsph(*vd);
+      vec3  cntr   =  vec3(sph.x,sph.y,sph.z);
+      vec3  ofst   =  cam.pos - cam.lookAt;
+      cam.lookAt   =  cntr;
+      cam.pos      =  cam.lookAt + ofst;
+    }
+    //cam.dist     =  sph.r;
+  } break;
   default:
     break;
   }
@@ -236,11 +254,7 @@ void    mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
     else if(action==GLFW_RELEASE){
       vd->camera.rightButtonDown = false;
     }
-  }else{
-    vd->camera.pantfm = vd->camera.tfm;
-    set_pos(&vd->camera.pantfm, vec3(0,0,0) );
   }
-
 }
 void   cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
 {
@@ -257,7 +271,21 @@ void   cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
     
   if(cam.rightButtonDown){
     cam.btn2Delta  = (newMousePosition - cam.oldMousePos);
-  }else{ cam.btn2Delta  = vec2(0,0); }
+  }else{ 
+    cam.btn2Delta  = vec2(0,0);
+
+    cam.tfm     =  lookAt(cam.pos, cam.lookAt, cam.up);
+    vec3 scale, pos, skew; vec4 persp;
+    quat rot;
+    decompose(cam.tfm, scale, rot, pos, skew, persp);
+    cam.pantfm  =  (mat4)conjugate(rot);
+
+    //set_pos(&cam.pantfm, vec3(0,0,0) );
+    //
+    //cam.tfm     =  lookAt(cam.pos, cam.lookAt, cam.up);
+    //cam.pantfm  =  cam.tfm;
+    //set_pos(&cam.pantfm, vec3(0,0,0) );
+  }
 
   cam.oldMousePos = newMousePosition;
 }
@@ -619,21 +647,23 @@ ENTRY_DECLARATION
       const static auto XAXIS = vec3(1.f, 0.f, 0.f);
       const static auto YAXIS = vec3(0.f, 1.f, 0.f);
 
-      mat4 viewProj;
+      mat4  viewProj;
+      vec3      camx;    //  =  normalize( vec3(cam.pantfm*vec4(1.f,0,0,1.f)) );              // use a separate transform for panning that is frozen on mouse down so that the panning space won't constantly be changing due to rotation from the lookat function
+      vec3      camy;    //  =  normalize( vec3(cam.pantfm*vec4(0,1.f,0,1.f)) );              // why does the transform change though if both the lookat and offset are being translated? are they not translated at the same time?
       SECTION(update camera)
       {
-        auto&  cam  =  vd.camera;
-        f32    dst  =  cam.dist;
+        auto&  cam    =  vd.camera;
+        f32    dst    =  cam.dist;
 
-        float   ry  =   cam.mouseDelta.x * cam.sensitivity;
-        float   rx  =  (cam.mouseDelta.y * cam.sensitivity);
+        float   ry    =   cam.mouseDelta.x * cam.sensitivity;
+        float   rx    =  (cam.mouseDelta.y * cam.sensitivity);
 
         mat4    xzmat = rotate(mat4(), ry, YAXIS);
         mat4     ymat = rotate(mat4(), rx, XAXIS);
         vec4        p = vec4(cam.pos, 1.f);
-        cam.pos = xzmat * p;
+        cam.pos    =  xzmat * p;
         vec4 ypos(0, p.y, dst, 1.f);
-        cam.pos.y = (ymat * ypos).y;
+        cam.pos.y  = (ymat * ypos).y;
 
         vec3 lookOfst = normalize(cam.pos-cam.lookAt)*dst;
         cam.pos = cam.lookAt + lookOfst;
@@ -641,31 +671,31 @@ ENTRY_DECLARATION
         //cam.pantfm = cam.tfm;
         //set_pos(&cam.pantfm, vec3(0,0,0) );
 
-        vec3  camx  =  normalize( vec3(cam.pantfm*vec4(1.f,0,0,1.f)) );              // use a separate transform for panning that is frozen on mouse down so that the panning space won't constantly be changing due to rotation from the lookat function
-        vec3  camy  =  normalize( vec3(cam.pantfm*vec4(0,1.f,0,1.f)) );              // why does the transform change though if both the lookat and offset are being translated? are they not translated at the same time?
+        camx   =  normalize( vec3(cam.pantfm*vec4(1.f,0,0,1.f)) );              // use a separate transform for panning that is frozen on mouse down so that the panning space won't constantly be changing due to rotation from the lookat function
+        camy   =  normalize( vec3(cam.pantfm*vec4(0,1.f,0,1.f)) );              // why does the transform change though if both the lookat and offset are being translated? are they not translated at the same time?
 
         vec3  ofst(0,0,0); 
 
-        ofst        +=  camx * -cam.btn2Delta.x * cam.pansense * dst;
+        ofst        +=  camx *  cam.btn2Delta.x * cam.pansense * dst;
         ofst        +=  camy * -cam.btn2Delta.y * cam.pansense * dst;
         cam.lookAt  +=  ofst;
         cam.pos     +=  ofst;
         
         viewProj     =  camera_to_mat4(cam, (f32)vd.ui.w, (f32)vd.ui.h);
-        cam.tfm      =  lookAt(cam.pos, cam.lookAt, cam.up);
+        //cam.tfm      =  lookAt(cam.pos, cam.lookAt, cam.up);
 
-        //glBegin(GL_LINE);
-        //  glVertex3f(0,0,0);
-        //  glVertex3f(camx.x, camx.y, camx.z);
-        //glEnd();
       }
-
       SECTION(draw shapes)
       {
         for(auto& kv : vd.shapes){
           if(kv.second.active)
             RenderShape(kv.second, viewProj);
         }
+
+        //glBegin(GL_LINE);
+        //  glVertex3f(0,0,0);
+        //  glVertex3f(camx.x, camx.y, camx.z);
+        //glEnd();
       }
 
       PRINT_GL_ERRORS
