@@ -14,12 +14,14 @@ tbl:
  | tbl references as a value for the map
  | owned tbl values for the map through offset into the child tbl segment of the tbl memory  
  | flattening of tbl references into owned tbls 
+ | optimization of auxillary map functions to return to a robin hood state without extra algorithm complexity
 
 visualizer:
  | take out nuklear and put in nanogui
  | frames per second
  | rgb under cursor 
  | text field or file dialog for database selection
+ | fit field of view to bounding sphere of active geometry using distance of the camera to the lookAt point 
 
 node graph:
  | file saving as tbl
@@ -28,6 +30,7 @@ node graph:
 
 
 | Readme.md writeup
+| update to C++14 compatible compilers
 | lava_flow, data packet execution
 | tbl visualization
 | concurrent priority queue
