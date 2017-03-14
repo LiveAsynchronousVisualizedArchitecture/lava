@@ -58,7 +58,7 @@
 
 // todo: make camera fitting use the field of view and change the dist to fit all geometry
 // todo: try nanogui as a replacement for nuklear? 
-// todo: make text field for typing in database name
+// todo: make text field or file dialog for typing in database name
 // todo: add fps counter in the corner
 // todo: add color under cursor like previous visualizer - use the gl get frame like the previous visualizer - check if the cursor is over the gl window first as an optimization? - sort of in but not working
 

@@ -1,0 +1,37 @@
+
+-------------------------
+| High Level Todo List: |
+-------------------------
+
+simdb:
+ | Concurrent Robin hood hashing
+ | Resizing of block lists instead of full destruction and creation when changing the value of a key
+ | Reference counting of the memory mapped file so that it can be deleted on the last program close in osx and linux
+ | some sort of resizing
+
+tbl:
+ | templating instead of using int as a standing
+ | tbl references as a value for the map
+ | owned tbl values for the map through offset into the child tbl segment of the tbl memory  
+ | flattening of tbl references into owned tbls 
+
+visualizer:
+ | take out nuklear and put in nanogui
+ | frames per second
+ | rgb under cursor 
+ | text field or file dialog for database selection
+
+node graph:
+ | file saving as tbl
+ | solidify node shared library format
+ | output of lava_flow data
+
+
+| Readme.md writeup
+| lava_flow, data packet execution
+| tbl visualization
+| concurrent priority queue
+
+
+
+
