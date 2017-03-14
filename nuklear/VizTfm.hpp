@@ -164,14 +164,35 @@ inline mat4           camera_to_mat4(Camera const& cam, float w, float h)
   return projection * view;
   //camMtx = vd.camera.tfm * projection;
 }
-inline void           shapes_to_bnds(KeyShapes const& shapes)
+inline vec4         shapes_to_bndsph(VizData const& vd, KeyShapes const& shapes)
 {
-  for(auto const& shp : shapes){
-    Shape const& s = shp.second;
-    if(s.active){
-      
+  for(auto& kv : vd.shapes)
+  {
+    auto&    key = kv.first.s;
+    ui32    vlen = 0;
+    ui32 version = 0;
+    auto     len = db.len(key.data(), (ui32)key.length(), &vlen, &version);          // todo: make ui64 as the input length
+
+    vec<i8> ivbuf(vlen);
+    db.get(key.data(), (ui32)key.length(), ivbuf.data(), (ui32)ivbuf.size());
+
+    IndexedVerts* iv = (IndexedVerts*)ivbuf.data();
+    vec3*          v = (vec3*)iv->verts;
+    f32            r = 0;
+    vec3           p(0,0,0);
+    TO(iv->vertsLen,i){
+      v[i];
     }
+
+    //Shape s = ivbuf_to_shape(ivbuf.data(), len);
   }
+
+  //for(auto const& shp : shapes){
+  //  Shape const& s = shp.second;
+  //  if(s.active){
+  //    
+  //  }
+  //}
 }
 #endif
 

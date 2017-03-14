@@ -47,21 +47,22 @@
 // -todo: cap change in distance - scroll callback revamped to take into account distance and yoffset
 // -todo: make 'h' revert camera settings 
 // -todo: reverse scroll distance control
+// -todo: put back pan 
+// -todo: add panning to right mouse button - probably by multing x and y vectors by the cameras transformation matrix, then adding those vectors to the cameras position
+// -todo: fix far clipping plane - not sure what the problem is yet - seems fixed with the re-done camera - might have been a projection issue
+// -todo: work out file locking so there is no race condition on two programs creating mmaped files - possibly fixed in simdb
+// -todo: make pan sensitivity vary with scale of cam.dist
+// -todo: fix camera pan when rotated - needed to lock the pan transform correctly?
 
-// todo: put back pan 
-// todo: make pan sensitivity not vary with scale of scene
 // todo: make 'f' create a bounding box of all the active shapes and focus the camera on them
-// todo: put sensitivity into a separate settings struct
 // todo: try nanogui as a replacement for nuklear? 
 // todo: make text field for typing in database name
-// todo: fix far clipping plane - not sure what the problem is yet
-// todo: work out file locking so there is no race condition on two programs creating mmaped files
-// todo: figure out reference counting so that files are cleaned up on exit
-// todo: add panning to right mouse button - probably by multing x and y vectors by the cameras transformation matrix, then adding those vectors to the cameras position
 // todo: add fps counter in the corner
 // todo: add color under cursor like previous visualizer - use the gl get frame like the previous visualizer - check if the cursor is over the gl window first as an optimization? - sort of in but not working
-// todo: move and rename project to LavaViz or any non test name
 
+// todo: figure out reference counting so that files are cleaned up on exit
+// todo: move and rename project to LavaViz or any non test name
+// todo: put sensitivity into a separate settings struct
 // idea: make IndexedVerts restore without copying bytes? - this would mean that there would need to be a pointer to the head and each member would be pointers filled in on deserialization? 
 // idea: call getKeys asynchronously - use futures? 
 // idea: put version next to key value 
@@ -123,9 +124,12 @@ vec3                 pos(mat4 const& m)
 { return m[3];                      }
 void             set_pos(mat4* m, vec3 const p)
 {
-  (*m)[0].w = p.x;
-  (*m)[1].w = p.y;
-  (*m)[2].w = p.z;
+  //(*m)[0].w = p.x;
+  //(*m)[1].w = p.y;
+  //(*m)[2].w = p.z;
+  (*m)[3].x = p.x;
+  (*m)[3].y = p.y;
+  (*m)[3].z = p.z;
 }
 float   wrapAngleRadians(float angle)     
 {
@@ -162,7 +166,7 @@ Camera        initCamera()
   cam.mouseDelta      = vec2(0.0f, 0.0f);
   cam.btn2Delta       = vec2(0.0f, 0.0f);
   cam.sensitivity     = 0.01f;
-  cam.pansense        = 0.01f;
+  cam.pansense        = 0.002f;
   cam.pos             = vec3(0,0,-10.0f);
   cam.rot             = vec3(0,0,0);
   cam.lookAt          = vec3(0.0f, 0.0f, 0.0f);
@@ -229,8 +233,14 @@ void    mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 
   if(button==GLFW_MOUSE_BUTTON_RIGHT){
     if(action==GLFW_PRESS) vd->camera.rightButtonDown = true;
-    else if(action==GLFW_RELEASE) vd->camera.rightButtonDown = false;
+    else if(action==GLFW_RELEASE){
+      vd->camera.rightButtonDown = false;
+    }
+  }else{
+    vd->camera.pantfm = vd->camera.tfm;
+    set_pos(&vd->camera.pantfm, vec3(0,0,0) );
   }
+
 }
 void   cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
 {
@@ -247,7 +257,6 @@ void   cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
     
   if(cam.rightButtonDown){
     cam.btn2Delta  = (newMousePosition - cam.oldMousePos);
-    cam.pantfm = cam.pantfm;
   }else{ cam.btn2Delta  = vec2(0,0); }
 
   cam.oldMousePos = newMousePosition;
@@ -610,38 +619,55 @@ ENTRY_DECLARATION
       const static auto XAXIS = vec3(1.f, 0.f, 0.f);
       const static auto YAXIS = vec3(0.f, 1.f, 0.f);
 
+      mat4 viewProj;
       SECTION(update camera)
       {
-        float   ry  =   vd.camera.mouseDelta.x * vd.camera.sensitivity;
-        float   rx  =  (vd.camera.mouseDelta.y * vd.camera.sensitivity);
+        auto&  cam  =  vd.camera;
+        f32    dst  =  cam.dist;
 
-        vec3  camx  =  vd.camera.pantfm * vec4(1.f,0,0,1.f);      // use a separate transform for panning that is frozen on mouse down so that the panning space won't constantly be changing due to rotation from the lookat function
-        vec3  camy  =  vd.camera.pantfm * vec4(0,1.f,0,1.f);      // why does the transform change though if both the lookat and offset are being translated? are they not translated at the same time?
-
-        vec3  ofst(0,0,0); 
-        ofst       +=  camx * -vd.camera.btn2Delta.x * vd.camera.pansense;
-        ofst       +=  camy * -vd.camera.btn2Delta.y * vd.camera.pansense;
-        vd.camera.lookAt += ofst;
-        vd.camera.pos    += ofst;
+        float   ry  =   cam.mouseDelta.x * cam.sensitivity;
+        float   rx  =  (cam.mouseDelta.y * cam.sensitivity);
 
         mat4    xzmat = rotate(mat4(), ry, YAXIS);
         mat4     ymat = rotate(mat4(), rx, XAXIS);
-        vec4        p = vec4(vd.camera.pos, 1.f);
-        vd.camera.pos = xzmat * p;
-        f32       dst = vd.camera.dist;
+        vec4        p = vec4(cam.pos, 1.f);
+        cam.pos = xzmat * p;
         vec4 ypos(0, p.y, dst, 1.f);
-        vd.camera.pos.y = (ymat * ypos).y;
+        cam.pos.y = (ymat * ypos).y;
 
-        vec3 lookOfst = normalize(vd.camera.pos-vd.camera.lookAt)*dst;
-        vd.camera.pos = vd.camera.lookAt + lookOfst;
+        vec3 lookOfst = normalize(cam.pos-cam.lookAt)*dst;
+        cam.pos = cam.lookAt + lookOfst;
+        
+        //cam.pantfm = cam.tfm;
+        //set_pos(&cam.pantfm, vec3(0,0,0) );
 
+        vec3  camx  =  normalize( vec3(cam.pantfm*vec4(1.f,0,0,1.f)) );              // use a separate transform for panning that is frozen on mouse down so that the panning space won't constantly be changing due to rotation from the lookat function
+        vec3  camy  =  normalize( vec3(cam.pantfm*vec4(0,1.f,0,1.f)) );              // why does the transform change though if both the lookat and offset are being translated? are they not translated at the same time?
+
+        vec3  ofst(0,0,0); 
+
+        ofst        +=  camx * -cam.btn2Delta.x * cam.pansense * dst;
+        ofst        +=  camy * -cam.btn2Delta.y * cam.pansense * dst;
+        cam.lookAt  +=  ofst;
+        cam.pos     +=  ofst;
+        
+        viewProj     =  camera_to_mat4(cam, (f32)vd.ui.w, (f32)vd.ui.h);
+        cam.tfm      =  lookAt(cam.pos, cam.lookAt, cam.up);
+
+        //glBegin(GL_LINE);
+        //  glVertex3f(0,0,0);
+        //  glVertex3f(camx.x, camx.y, camx.z);
+        //glEnd();
       }
-      vd.camera.tfm = camera_to_mat4(vd.camera, (f32)vd.ui.w, (f32)vd.ui.h);
 
-      for(auto& kv : vd.shapes){
-        if(kv.second.active)
-          RenderShape(kv.second, vd.camera.tfm);
+      SECTION(draw shapes)
+      {
+        for(auto& kv : vd.shapes){
+          if(kv.second.active)
+            RenderShape(kv.second, viewProj);
+        }
       }
+
       PRINT_GL_ERRORS
     }
 
