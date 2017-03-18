@@ -10,6 +10,7 @@
 // -todo: change getKeyStrs() to get the number looped through by nxtKey() so it isn't O(n^2)
 // -todo: put in osx stuff here - likely mmmap with shared memory
 
+// todo: convert to 64 bit integers
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths 
 // todo: make windows version have permissions for just read and write
 // todo: make a macro to have separate windows and unix paths?
@@ -1627,6 +1628,10 @@ public:
     });
 
     return ok;
+  }
+  void       flush() const
+  {
+    FlushViewOfFile(m_mem.hndlPtr, m_mem.size);
   }
   VerIdx       nxt() const                                   // this version index represents a hash index, not an block storage index
   {

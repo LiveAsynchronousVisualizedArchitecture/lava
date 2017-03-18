@@ -47,7 +47,7 @@ public:
     }
   }
 
-  int take()
+  int  take()
   {
     using namespace std;
 

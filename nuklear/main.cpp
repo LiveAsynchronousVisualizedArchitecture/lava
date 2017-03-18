@@ -55,8 +55,15 @@
 // -todo: fix camera pan when rotated - needed to lock the pan transform correctly?
 // -todo: fix panning after rotation again - decomposed into quaternion which is then conjugated? and turned into a matrix
 // -todo: make 'f' create a bounding box of all the active shapes and focus the camera on them
+//- todo: invert Y - FOV is specified in radians, so a 75 or 80 field of view was inverting the camera
+// -todo: fix rotation to not flip on the other side - just needed to reverse rotation around the Y axis completely
+// -todo: fix lack of color - color was fine, input was at fault
+// -todo: fix memory leak - has to do with crash? - has to do with memory mapped pages coming into the process' memory space? - if that is the case, how does memory rise above the size of the memory mapped file? - at least partially due to the destructor not being run in the move constructor
 
-// todo: make camera fitting use the field of view and change the dist to fit all geometry
+// todo: fix crash in nuklear assertion that only happens in release mode
+// todo: write visualizer overview for Readme.md
+// todo: make save button or menu to save serialized files 
+// todo: make camera fitting use the field of view and change the dist to fit all geometry - use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
 // todo: try nanogui as a replacement for nuklear? 
 // todo: make text field or file dialog for typing in database name
 // todo: add fps counter in the corner
@@ -166,10 +173,10 @@ auto         initNuklear(GLFWwindow* win) -> struct nk_context*
 Camera        initCamera()
 {
   Camera cam;
-  cam.fov             = 75.0f;
+  cam.fov             = PIf * 0.5f;
   cam.mouseDelta      = vec2(0.0f, 0.0f);
   cam.btn2Delta       = vec2(0.0f, 0.0f);
-  cam.sensitivity     = 0.01f;
+  cam.sensitivity     = 0.005f;
   cam.pansense        = 0.002f;
   cam.pos             = vec3(0,0,-10.0f);
   cam.rot             = vec3(0,0,0);
@@ -383,7 +390,6 @@ void      shapesFromKeys(simdb const& db, vec<VerStr> const& dbKeys, VizData* vd
 {
   using namespace std;
 
-  vd->shaderId = shadersrc_to_shaderid(vertShader, fragShader);   PRINT_GL_ERRORS
   for(auto& k : dbKeys)
   {
     auto cur = vd->shapes.find(k);
@@ -401,10 +407,11 @@ void      shapesFromKeys(simdb const& db, vec<VerStr> const& dbKeys, VizData* vd
     s.active = vd->shapes[k].active;
     vd->shapes[k] = move(s);                           PRINT_GL_ERRORS
   };
+
+  db.flush();
 }
 int     eraseMissingKeys(vec<VerStr> dbKeys, KeyShapes* shps)           // vec<str> dbKeys,
 {
-
   int cnt = 0;
   sort( ALL(dbKeys) );
   //assert( shps->size() == 0 || dbKeys.size() != 0 );
@@ -482,7 +489,7 @@ ENTRY_DECLARATION
 
   SECTION(initialize static simdb and static VizData)
   {
-    new (&db) simdb("test", 1024, 1<<14);        // inititialize the DB with placement new into the data segment
+    new (&db) simdb("test", 4096, 1<<14);             // inititialize the DB with placement new into the data segment
 
     vd.ui.w             =  1024; 
     vd.ui.h             =   768;
@@ -499,13 +506,15 @@ ENTRY_DECLARATION
     view          = lookAt(vec3(0.f, 0.f, 1.f), vd.camera.lookAt, vd.camera.up);
     projection    = perspective(vd.camera.fov, (GLfloat)1024 / (GLfloat)768, vd.camera.nearClip, vd.camera.farClip);
     vd.camera.tfm = view;
-    set_pos( &vd.camera.tfm, vec3(0.f,0.f,3.f) );
+    //set_pos( &vd.camera.tfm, vec3(0.f,0.f,3.f) );
   }
   //genTestGeo(&db);
   SECTION(initialize glfw window, glew, and nuklear)
   {
     vd.win = initGLFW( &vd );                        assert(vd.win!=nullptr);
     initGlew();
+    vd.shaderId = shadersrc_to_shaderid(vertShader, fragShader);   PRINT_GL_ERRORS
+
     glfwSetWindowUserPointer(vd.win, &vd);
     vd.ctx = initNuklear(vd.win);                    assert(vd.ctx!=nullptr);
 
@@ -655,8 +664,8 @@ ENTRY_DECLARATION
         auto&  cam    =  vd.camera;
         f32    dst    =  cam.dist;
 
-        float   ry    =   cam.mouseDelta.x * cam.sensitivity;
-        float   rx    =  (cam.mouseDelta.y * cam.sensitivity);
+        float   ry    =  -(cam.mouseDelta.x * cam.sensitivity);
+        float   rx    =  -(cam.mouseDelta.y * cam.sensitivity);
 
         mat4    xzmat = rotate(mat4(), ry, YAXIS);
         mat4     ymat = rotate(mat4(), rx, XAXIS);
@@ -672,12 +681,12 @@ ENTRY_DECLARATION
         //set_pos(&cam.pantfm, vec3(0,0,0) );
 
         camx   =  normalize( vec3(cam.pantfm*vec4(1.f,0,0,1.f)) );              // use a separate transform for panning that is frozen on mouse down so that the panning space won't constantly be changing due to rotation from the lookat function
-        camy   =  normalize( vec3(cam.pantfm*vec4(0,1.f,0,1.f)) );              // why does the transform change though if both the lookat and offset are being translated? are they not translated at the same time?
+        camy   =  normalize( vec3(cam.pantfm*vec4(0,1.f,0,1.f)) );              // why does the transform change though, if both the lookat and offset are being translated? are they not translated at the same time?
 
         vec3  ofst(0,0,0); 
 
-        ofst        +=  camx *  cam.btn2Delta.x * cam.pansense * dst;
-        ofst        +=  camy * -cam.btn2Delta.y * cam.pansense * dst;
+        ofst        +=  camx *  -cam.btn2Delta.x * cam.pansense * dst;
+        ofst        +=  camy *   cam.btn2Delta.y * cam.pansense * dst;
         cam.lookAt  +=  ofst;
         cam.pos     +=  ofst;
         

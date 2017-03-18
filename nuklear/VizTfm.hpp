@@ -157,7 +157,9 @@ inline mat4           camera_to_mat4(Camera const& cam, float w, float h)
   const static auto YAXIS = vec4(0.f, 1.f, 0.f, 1.f);
   //const static auto YAXIS = vec3(0.f, 1.f, 0.f);
 
-  mat4 view  =  lookAt(cam.pos, cam.lookAt, cam.up);
+  mat4 look  =  lookAt(cam.pos, cam.lookAt, cam.up);
+  //mat4 view  =  glm::inverse(look);
+  mat4 view  =  look;
         
   //mat4 projection;
   mat4 projection = glm::perspective(cam.fov, (w/h), cam.nearClip, cam.farClip);

@@ -7,13 +7,16 @@ int  main()
 {
   using namespace std;
 
-  lava_priq pq(7);
+  lava_priq pq(12);
   pq.put(55);
   pq.put(44);
   pq.put(22);
+  pq.put(88);
+  pq.put(99);
   pq.put(33);
   pq.put(11);
   pq.put(66);
+  pq.put(77);
 
   ui64 exp = 0;
   TO(pq.q.size(),i){

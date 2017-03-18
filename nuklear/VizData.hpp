@@ -48,8 +48,19 @@ using glm::length;
 
 struct Shape {                     // todo: make rvalue constructor - make all constructors?
 private:
-  void mv(Shape&& rval)
+  void del()
   {
+    if(owner){
+      glDeleteVertexArrays(1, &vertary);
+      glDeleteBuffers(1,       &idxbuf);
+      glDeleteTextures(1,          &tx);
+    }
+    owner = false;
+  }
+  void  mv(Shape&& rval)
+  {
+    del();
+
     memcpy(this, &rval, sizeof(Shape));
     memset(&rval,    0, sizeof(Shape));
     rval.owner = false;
@@ -63,13 +74,14 @@ public:
   GLuint   shader;                       // the shader ID is not owned by the shape 
 
   Shape() :
+      owner(false),
     version(0),
-    active(0),
+     active(0),
     vertbuf(0),
     vertary(0),
-    idxbuf(0),
-    tx(0),
-    shader(0)
+     idxbuf(0),
+         tx(0),
+     shader(0)
   {}
   Shape(Shape&& rval)
   {
@@ -82,15 +94,9 @@ public:
   }
   void operator=(Shape const&) = delete;
 
-  ~Shape()  // todo: put in checking to make sure that indices to delete are ok
+  ~Shape()  // todo: put in checking to make sure that indices to delete are ok     // todo: need to build in ownership to not run the destructor twice?
   { 
-    // todo: need to build in ownership to not run the destructor twice?
-    if(owner){
-      glDeleteVertexArrays(1, &vertary);
-      glDeleteBuffers(1,       &idxbuf);
-      glDeleteTextures(1,          &tx);
-    }
-    owner = false;
+    del();
   }
 };
 
