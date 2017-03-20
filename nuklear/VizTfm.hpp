@@ -175,7 +175,7 @@ inline vec4         shapes_to_bndsph(VizData const& vd)
   {
     if(!kv.second.active) continue;
 
-    auto&    key = kv.first.s;
+    auto&    key = kv.first;
     ui32    vlen = 0;
     ui32 version = 0;
     auto     len = db.len(key.data(), (ui32)key.length(), &vlen, &version);          // todo: make ui64 as the input length

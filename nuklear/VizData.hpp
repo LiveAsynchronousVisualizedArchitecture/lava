@@ -46,12 +46,16 @@ using glm::perspective;
 using glm::rotate;
 using glm::length;
 
+using vec_vs  =  std::vector<VerStr>;
+using   vecb  =  std::vector<bool>;
+
 struct Shape {                     // todo: make rvalue constructor - make all constructors?
 private:
   void del()
   {
     if(owner){
       glDeleteVertexArrays(1, &vertary);
+      glDeleteBuffers(1,      &vertbuf);
       glDeleteBuffers(1,       &idxbuf);
       glDeleteTextures(1,          &tx);
     }
@@ -63,7 +67,7 @@ private:
 
     memcpy(this, &rval, sizeof(Shape));
     memset(&rval,    0, sizeof(Shape));
-    rval.owner = false;
+    //rval.owner = false;
   }
 
 public:
@@ -127,7 +131,8 @@ struct Camera
   }
 };
 
-using  KeyShapes = map<VerStr, Shape>;
+//using  KeyShapes = map<VerStr, Shape>;
+using  KeyShapes = map<str, Shape>;
 struct VizData
 {
   GLFWwindow*            win;                      /* Platform */    //int width = 0, height = 0;
@@ -140,6 +145,7 @@ struct VizData
     int w, h;
     struct nk_rect      rect;                // rect is the rectangle of the sidebar gui
     struct nk_color    bgclr;
+    float ptSz;
   } ui;
   double  keyRefresh, keyRefreshClock, verRefresh, verRefreshClock, prev, now;
   float  mouseRGB[3];

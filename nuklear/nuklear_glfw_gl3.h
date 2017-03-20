@@ -227,7 +227,8 @@ nk_glfw3_render(enum nk_anti_aliasing AA, int max_vertex_buffer, int max_element
     {
         /* convert from command queue into draw list and draw to screen */
         const struct nk_draw_command *cmd;
-        void *vertices, *elements;
+        void *vertices = NULL; // sbassett
+        void *elements = NULL; // sbassett
         const nk_draw_index *offset = NULL;
 
         /* allocate vertex and element buffer */
@@ -241,7 +242,7 @@ nk_glfw3_render(enum nk_anti_aliasing AA, int max_vertex_buffer, int max_element
         /* load draw vertices & elements directly into vertex + element buffer */
         vertices = glMapBuffer(GL_ARRAY_BUFFER, GL_WRITE_ONLY);
         elements = glMapBuffer(GL_ELEMENT_ARRAY_BUFFER, GL_WRITE_ONLY);
-        {
+        if(vertices && elements){ // sbassett
             /* fill convert configuration */
             struct nk_convert_config config;
             static const struct nk_draw_vertex_layout_element vertex_layout[] = {

@@ -30,22 +30,26 @@ IndexedVerts* ChanImgToIndexedVerts(ChanImg ci, std::initializer_list<i64> chns=
   auto inds    =  6;
   //auto iv      =  (IndexedVerts*)IndexedVertsCreate(0,6,IV_QUADS,sz,sz,w,h,chans);
   auto iv      =  (IndexedVerts*)IndexedVertsCreate(0,6,IV_TRIANGLES,sz,inds,w,h,chans);  // 6 indices to make two triangles
-  
-  TO(sz,i)
-  {
-    Vertex& v = iv->verts[i];
-    TO(4,c) v.color[c]    = 1.f;
-    TO(3,p) v.position[p] = 0.f;
-  }
-  iv->verts[1].texCoord[0] = iv->verts[1].position[0] = 1.f;
-  iv->verts[2].texCoord[0] = iv->verts[2].position[0] = 1.f;
-  iv->verts[0].texCoord[1] = iv->verts[2].position[1] = 1.f;
-  iv->verts[1].texCoord[1] = iv->verts[3].position[1] = 1.f;
+  if(!iv) return nullptr;
 
-  TO(3,i){ iv->indices[i] = i; }
-  iv->indices[3] = 0;
-  iv->indices[4] = 2;
-  iv->indices[5] = 3;
+  if(iv->verts){
+    TO(sz,i){
+      Vertex& v = iv->verts[i];
+      TO(4,c) v.color[c]    = 1.f;
+      TO(3,p) v.position[p] = 0.f;
+    }
+    iv->verts[1].texCoord[0] = iv->verts[1].position[0] = 1.f;
+    iv->verts[2].texCoord[0] = iv->verts[2].position[0] = 1.f;
+    iv->verts[0].texCoord[1] = iv->verts[2].position[1] = 1.f;
+    iv->verts[1].texCoord[1] = iv->verts[3].position[1] = 1.f;
+  }
+
+  if(iv->indices){
+    TO(3,i){ iv->indices[i] = i; }
+    iv->indices[3] = 0;
+    iv->indices[4] = 2;
+    iv->indices[5] = 3;
+  }
 
   if( chns.size() > 0 )
   {

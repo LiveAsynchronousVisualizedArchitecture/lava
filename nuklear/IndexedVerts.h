@@ -111,25 +111,29 @@ extern "C"
         va_end(ap);
 
         IndexedVerts* iv = (IndexedVerts*)malloc(sizeof(IndexedVerts));
-        iv->mode = mode;
-        iv->vertsLen = vertsLen;
-        iv->indicesLen = indicesLen;
-        iv->imgWidth = imgWidth;
-        iv->imgHeight = imgHeight;
-        iv->imgChans = imgChans;
-        int64_t pxLen = imgWidth*imgHeight*imgChans;
-        iv->verts = (Vertex*)malloc(vertsLen   * sizeof(Vertex));
-        iv->indices = (uint32_t*)malloc(indicesLen * sizeof(uint32_t));
-        iv->pixels = (float*)malloc(pxLen      * sizeof(float));
-        memset(iv->verts, 0, vertsLen   * sizeof(Vertex));
-        memset(iv->indices, 0, indicesLen * sizeof(uint32_t));
-        memset(iv->pixels, 0, pxLen      * sizeof(float));
+        if(iv){
+          iv->mode       = mode;
+          iv->vertsLen   = vertsLen;
+          iv->indicesLen = indicesLen;
+          iv->imgWidth   = imgWidth;
+          iv->imgHeight  = imgHeight;
+          iv->imgChans   = imgChans;
+          int64_t pxLen  = imgWidth*imgHeight*imgChans;
+          iv->verts = (Vertex*)malloc(vertsLen * sizeof(Vertex));
+          if(iv->verts){ memset(iv->verts, 0, vertsLen   * sizeof(Vertex)); }
+          iv->indices = (uint32_t*)malloc(indicesLen * sizeof(uint32_t));
+          if(iv->indices){ memset(iv->indices, 0, indicesLen * sizeof(uint32_t)); }
+          iv->pixels = (float*)malloc(pxLen * sizeof(float));
+          if(iv->pixels){ memset(iv->pixels, 0, pxLen * sizeof(float)); }
+        }
 
         return iv;
     }
     void* IndexedVertsLoad(void*const  bytes)
     {
         IndexedVerts* iv = (IndexedVerts*)malloc(sizeof(IndexedVerts));
+        if(!iv) return nullptr;
+
         auto p = (uint8_t*)bytes;
 
         iv->mode = *((uint32_t*)p);
@@ -152,11 +156,11 @@ extern "C"
         size_t pxSz = iv->imgWidth * iv->imgHeight * iv->imgChans * sizeof(float);
         iv->pixels = (float*)malloc(pxSz);
 
-        memcpy(iv->verts, p, vertSz);
+        if(iv->verts) memcpy(iv->verts, p, vertSz);
         p += vertSz;
-        memcpy(iv->indices, p, idxSz);
+        if(iv->indices) memcpy(iv->indices, p, idxSz);
         p += idxSz;
-        memcpy(iv->pixels, p, pxSz);
+        if(iv->pixels) memcpy(iv->pixels, p, pxSz);
 
         return iv;
     }

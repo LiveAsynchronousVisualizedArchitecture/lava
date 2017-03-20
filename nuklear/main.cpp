@@ -59,15 +59,24 @@
 // -todo: fix rotation to not flip on the other side - just needed to reverse rotation around the Y axis completely
 // -todo: fix lack of color - color was fine, input was at fault
 // -todo: fix memory leak - has to do with crash? - has to do with memory mapped pages coming into the process' memory space? - if that is the case, how does memory rise above the size of the memory mapped file? - at least partially due to the destructor not being run in the move constructor
+// -todo: fix versions not being updated, leading to constant updates 
+// -todo: fix dissapearing keys on updates - is the problem that active is not being kept? - if keys are updating quickly, does erasing unused keys remove keys even if they were just updated? - the update version number was from the database, while the version checked in erase...  was the key from getDbStrs()
+// -todo: fix further memory leak? version not being put into ivbuf_to_shape ? - version is now updated from the database and dbKeys have their versions being updated  as well
+// -todo: fix keys disappearing - erase was doing a binary search that also compared versions, which were always different
+// -todo: find memory leak when rapidly updating a key - Shape::vertbuf not being deleted in destructor
+// -todo: fix crash in nuklear assertion that only happens in release mode - only happens when panning while rays are updating?
+// -todo: add control to set line and particle thickness
+// -todo: make separate settings struct under viz data - can just use the ui struct for this?
 
-// todo: fix crash in nuklear assertion that only happens in release mode
-// todo: write visualizer overview for Readme.md
+// todo: fix nuklear ui disappearing when panning on rays changing - first it was a crash due to a gl function returning a null buffer and it not being checked for by nuklear - doesn't come back when resetting the camera
+// todo: write visualizer overview for Readme.md  
 // todo: make save button or menu to save serialized files 
 // todo: make camera fitting use the field of view and change the dist to fit all geometry - use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
-// todo: try nanogui as a replacement for nuklear? 
+// todo: replace nuklear with nanogui
 // todo: make text field or file dialog for typing in database name
 // todo: add fps counter in the corner
 // todo: add color under cursor like previous visualizer - use the gl get frame like the previous visualizer - check if the cursor is over the gl window first as an optimization? - sort of in but not working
+// todo: put vd.now as a variable loop?
 
 // todo: figure out reference counting so that files are cleaned up on exit
 // todo: move and rename project to LavaViz or any non test name
@@ -131,9 +140,9 @@
 
 namespace {
 
-vec3                 pos(mat4 const& m)
+vec3                   pos(mat4 const& m)
 { return m[3];                      }
-void             set_pos(mat4* m, vec3 const p)
+void               set_pos(mat4* m, vec3 const p)
 {
   //(*m)[0].w = p.x;
   //(*m)[1].w = p.y;
@@ -142,18 +151,18 @@ void             set_pos(mat4* m, vec3 const p)
   (*m)[3].y = p.y;
   (*m)[3].z = p.z;
 }
-float   wrapAngleRadians(float angle)     
+float     wrapAngleRadians(float angle)     
 {
   using namespace glm;
   const static float _2PI = 2.f*pi<float>();
 
   return fmodf(angle, _2PI);
 }
-void       errorCallback(int e, const char *d) {
+void         errorCallback(int e, const char *d) {
   printf("Error %d: %s\n", e, d);
   fflush(stdout);
 }
-void            initGlew()
+void              initGlew()
 {
   //glewExperimental = 1;
   if(glewInit() != GLEW_OK) {
@@ -161,7 +170,7 @@ void            initGlew()
     exit(1);
   }
 }
-auto         initNuklear(GLFWwindow* win) -> struct nk_context*
+auto           initNuklear(GLFWwindow* win) -> struct nk_context*
 {
   struct nk_context*      ctx = nk_glfw3_init(win, NK_GLFW3_INSTALL_CALLBACKS);
   struct nk_font_atlas* atlas;
@@ -170,7 +179,7 @@ auto         initNuklear(GLFWwindow* win) -> struct nk_context*
 
   return ctx;
 }
-Camera        initCamera()
+Camera          initCamera()
 {
   Camera cam;
   cam.fov             = PIf * 0.5f;
@@ -191,7 +200,7 @@ Camera        initCamera()
 
   return cam;
 }
-void         keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+void           keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
   //using namespace glm;
 
@@ -220,12 +229,18 @@ void         keyCallback(GLFWwindow* window, int key, int scancode, int action, 
     }
     //cam.dist     =  sph.r;
   } break;
+  case GLFW_KEY_PAGE_UP: {
+    vd->ui.ptSz *= 2;
+  } break;
+  case GLFW_KEY_PAGE_DOWN: {
+    vd->ui.ptSz /= 2;
+  } break;
   default:
     break;
   }
 
 }
-void      scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
+void        scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 {
   using namespace std;
   
@@ -247,7 +262,7 @@ void      scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
   //if     (nxtDst < prvDst*0.9f) cam.dist = prvDst*0.9f;
   //else if(nxtDst > prvDst/0.9f) cam.dist = prvDst/0.9f;
 }
-void    mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
+void      mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 {
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
 
@@ -263,7 +278,7 @@ void    mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
     }
   }
 }
-void   cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
+void     cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
 {
   //using namespace glm;
   const static float _2PI = 2.f* PIf; //  pi<float>();
@@ -296,7 +311,7 @@ void   cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
 
   cam.oldMousePos = newMousePosition;
 }
-GLFWwindow*     initGLFW(VizData* vd)
+GLFWwindow*       initGLFW(VizData* vd)
 {
   glfwSetErrorCallback(errorCallback);
   if( !glfwInit() ){
@@ -329,7 +344,7 @@ GLFWwindow*     initGLFW(VizData* vd)
 
   return win;
 }
-int              sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* shps) // VizData* vd)
+int                sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* shps) // VizData* vd)
 {
   using namespace std;
 
@@ -348,8 +363,8 @@ int              sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes*
     nk_layout_row_static(ctx, 18, (int)(rect.w-25.f), 1);
     //nk_layout_row_static(ctx, 18, 120, 1);
     for(auto& kv : *shps){
-      if(kv.first.s.length()>0)
-        nk_selectable_label(ctx, kv.first.s.c_str(), NK_TEXT_RIGHT, &kv.second.active);
+      if(kv.first.length()>0)
+        nk_selectable_label(ctx, kv.first.c_str(), NK_TEXT_RIGHT, &kv.second.active);
     }
     //nk_group_end(ctx);
   }
@@ -357,7 +372,7 @@ int              sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes*
 
   return !nk_window_is_closed(ctx, "Overview");
 }
-void         RenderShape(Shape const& shp, mat4 const& m) // GLuint shaderId)
+void           RenderShape(Shape const& shp, mat4 const& m) // GLuint shaderId)
 {
   glUseProgram(shp.shader);  //shader.use();
 
@@ -386,31 +401,37 @@ void         RenderShape(Shape const& shp, mat4 const& m) // GLuint shaderId)
   glBindVertexArray(0);
   glBindTexture(GL_TEXTURE_2D, 0);
 }
-void      shapesFromKeys(simdb const& db, vec<VerStr> const& dbKeys, VizData* vd)  // vec<str> const& dbKeys
+vec_vs      shapesFromKeys(simdb const& db, vec_vs dbKeys, VizData* vd)  // vec<str> const& dbKeys
 {
   using namespace std;
 
-  for(auto& k : dbKeys)
+  for(auto& vs : dbKeys)
+  TO(dbKeys.size(),i)
   {
-    auto cur = vd->shapes.find(k);
-    if(cur!=vd->shapes.end() && cur->first.v==k.v) continue;
+    auto& vs = dbKeys[i];
+    auto cur = vd->shapes.find(vs.s);
+    if(cur!=vd->shapes.end() ){
+      continue;
+    }
 
     ui32    vlen = 0;
     ui32 version = 0;
-    auto     len = db.len(k.s.data(), (ui32)k.s.length(), &vlen, &version);          // todo: make ui64 as the input length
+    auto     len = db.len(vs.s.data(), (ui32)vs.s.length(), &vlen, &version);          // todo: make ui64 as the input length
+    vs.v = version;
 
     vec<i8> ivbuf(vlen);
-    db.get(k.s.data(), (ui32)k.s.length(), ivbuf.data(), (ui32)ivbuf.size());
+    db.get(vs.s.data(), (ui32)vs.s.length(), ivbuf.data(), (ui32)ivbuf.size());
 
-    Shape  s = ivbuf_to_shape(ivbuf.data(), len);      PRINT_GL_ERRORS
-    s.shader = vd->shaderId;
-    s.active = vd->shapes[k].active;
-    vd->shapes[k] = move(s);                           PRINT_GL_ERRORS
+    Shape  s      = ivbuf_to_shape(ivbuf.data(), len);      PRINT_GL_ERRORS
+    s.shader      = vd->shaderId;
+    s.active      = vd->shapes[vs.s].active;
+    s.version     = version; //vs.v; // version;
+    vd->shapes[vs.s] = move(s);
   };
 
-  db.flush();
+  return dbKeys;
 }
-int     eraseMissingKeys(vec<VerStr> dbKeys, KeyShapes* shps)           // vec<str> dbKeys,
+vec_vs    eraseMissingKeys(vec_vs dbKeys, KeyShapes* shps)           // vec<str> dbKeys,
 {
   int cnt = 0;
   sort( ALL(dbKeys) );
@@ -421,29 +442,35 @@ int     eraseMissingKeys(vec<VerStr> dbKeys, KeyShapes* shps)           // vec<s
   for(auto it = shps->begin(); it != shps->end(); )
   {
     auto const& kv = *it;
-    if( !binary_search(ALL(dbKeys),kv.first) ){
+    VerStr vs;
+    vs.v = kv.second.version;
+    vs.s = kv.first;
+    bool isKeyInDb = binary_search(ALL(dbKeys),vs, [](VerStr const& a, VerStr const& b){ return a.s < b.s; } );
+    if( !isKeyInDb ){
       it = shps->erase(it);
       ++cnt;
     }else ++it;
   }
 
-  return cnt;
+  return dbKeys;
+  //return cnt;
 }
-bool           updateKey(simdb const& db, VerStr const& key, VizData* vd)
+bool             updateKey(simdb const& db, str const& key, ui32 version, VizData* vd)
 {
   using namespace std;
 
-  ui32 version = 0;
-  ui32    vlen = 0;
-  auto     len = db.len(key.s.data(), (ui32)key.s.length(), &vlen, &version);
+  ui32 dbVersion = 0;
+  ui32      vlen = 0;
+  auto       len = db.len(key.data(), (ui32)key.length(), &vlen, &dbVersion);
 
-  if(len>0 && version!=key.v){
+  if(len>0 && dbVersion!=version){ //key.v){
     vec<i8> ivbuf(vlen);
-    db.get(key.s.data(), (ui32)key.s.length(), ivbuf.data(), (ui32)ivbuf.size());
+    db.get(key.data(), (ui32)key.length(), ivbuf.data(), (ui32)ivbuf.size());
 
-    Shape  s = ivbuf_to_shape(ivbuf.data(), len);
-    s.shader = vd->shaderId;
-    s.active = true;                     // because updates only happen when the shape is active, always setting an updated shape to active should work
+    Shape  s  = ivbuf_to_shape(ivbuf.data(), len);
+    s.shader  = vd->shaderId;
+    s.active  = true;                     // because updates only happen when the shape is active, always setting an updated shape to active should work
+    s.version = dbVersion;
     vd->shapes[key] = move(s);
     
     return true;
@@ -451,7 +478,7 @@ bool           updateKey(simdb const& db, VerStr const& key, VizData* vd)
 
   return false;
 }
-double              nowd()
+double                nowd()
 {
   using namespace std;
   using namespace std::chrono;
@@ -494,19 +521,15 @@ ENTRY_DECLARATION
     vd.ui.w             =  1024; 
     vd.ui.h             =   768;
     vd.ui.bgclr         =  nk_rgb(16,16,16);         // darker than this may risk not seeing the difference between black and the background
+    vd.ui.ptSz          =  0.25f;
+
     vd.now              =  nowd();
     vd.prev             =  vd.now;
     vd.verRefresh       =  0.007;                    // roughly 144hz
     vd.verRefreshClock  =  0.0;
     vd.keyRefresh       =  2.0;
     vd.keyRefreshClock  =  vd.keyRefresh;
-    vd.camera           =  initCamera();
-    
-    mat4 view, projection;
-    view          = lookAt(vec3(0.f, 0.f, 1.f), vd.camera.lookAt, vd.camera.up);
-    projection    = perspective(vd.camera.fov, (GLfloat)1024 / (GLfloat)768, vd.camera.nearClip, vd.camera.farClip);
-    vd.camera.tfm = view;
-    //set_pos( &vd.camera.tfm, vec3(0.f,0.f,3.f) );
+    vd.camera           =  initCamera();    
   }
   //genTestGeo(&db);
   SECTION(initialize glfw window, glew, and nuklear)
@@ -567,7 +590,7 @@ ENTRY_DECLARATION
     {
       if( vd.keyRefreshClock > vd.keyRefresh ){
         auto dbKeys = db.getKeyStrs();                           // Get all keys in DB - this will need to be ran in the main loop, but not every frame
-        shapesFromKeys(db, dbKeys, &vd);
+        dbKeys      = shapesFromKeys(db, move(dbKeys), &vd);
         eraseMissingKeys(move(dbKeys), &vd.shapes);
 
         vd.keyRefreshClock -= vd.keyRefresh;
@@ -578,7 +601,7 @@ ENTRY_DECLARATION
       }else if( vd.verRefreshClock > vd.verRefresh ){
         for(auto& kv : vd.shapes){
           if(kv.second.active){
-            updateKey(db, kv.first, &vd);
+            updateKey(db, kv.first, kv.second.version, &vd);
           }
         }
         vd.verRefreshClock -= vd.verRefresh;
@@ -628,22 +651,26 @@ ENTRY_DECLARATION
     SECTION(openGL frame setup)
     {
       glViewport(0, 0, vd.ui.w, vd.ui.h);
+      
       glDisable(GL_CLIP_PLANE0);
       glDisable(GL_CLIP_PLANE1);
       glDisable(GL_CLIP_PLANE2);
       glDisable(GL_CLIP_PLANE3);
       glDisable(GL_FOG);
-
       glDisable(GL_CULL_FACE);
       glDisable(GL_SCISSOR_TEST);
       glDisable(GL_STENCIL_TEST);
       glDisable(GL_DEPTH);
-      glDisable(GL_DEPTH_TEST);                                   // glDepthFunc(GL_LESS);
-      glEnable(GL_BLEND);
+      glDisable(GL_DEPTH_TEST);                                    // glDepthFunc(GL_LESS);
+      
       //glEnable(GL_TEXTURE_2D);
       //glEnable(GL_DEPTH);
       //glEnable(GL_DEPTH_TEST);                                   // glDepthFunc(GL_LESS);
       //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+      glEnable(GL_BLEND);
+      glLineWidth(vd.ui.ptSz);
+      glPointSize(vd.ui.ptSz);
 
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
       float bg[4];
@@ -677,9 +704,6 @@ ENTRY_DECLARATION
         vec3 lookOfst = normalize(cam.pos-cam.lookAt)*dst;
         cam.pos = cam.lookAt + lookOfst;
         
-        //cam.pantfm = cam.tfm;
-        //set_pos(&cam.pantfm, vec3(0,0,0) );
-
         camx   =  normalize( vec3(cam.pantfm*vec4(1.f,0,0,1.f)) );              // use a separate transform for panning that is frozen on mouse down so that the panning space won't constantly be changing due to rotation from the lookat function
         camy   =  normalize( vec3(cam.pantfm*vec4(0,1.f,0,1.f)) );              // why does the transform change though, if both the lookat and offset are being translated? are they not translated at the same time?
 
@@ -691,20 +715,14 @@ ENTRY_DECLARATION
         cam.pos     +=  ofst;
         
         viewProj     =  camera_to_mat4(cam, (f32)vd.ui.w, (f32)vd.ui.h);
-        //cam.tfm      =  lookAt(cam.pos, cam.lookAt, cam.up);
-
       }
       SECTION(draw shapes)
       {
+
         for(auto& kv : vd.shapes){
           if(kv.second.active)
             RenderShape(kv.second, viewProj);
         }
-
-        //glBegin(GL_LINE);
-        //  glVertex3f(0,0,0);
-        //  glVertex3f(camx.x, camx.y, camx.z);
-        //glEnd();
       }
 
       PRINT_GL_ERRORS
@@ -740,6 +758,43 @@ ENTRY_DECLARATION
 
 
 
+//mat4 view, projection;
+//view          = lookAt(vec3(0.f, 0.f, 1.f), vd.camera.lookAt, vd.camera.up);
+//projection    = perspective(vd.camera.fov, (GLfloat)1024 / (GLfloat)768, vd.camera.nearClip, vd.camera.farClip);
+//vd.camera.tfm = view;
+//set_pos( &vd.camera.tfm, vec3(0.f,0.f,3.f) );
+
+//glBegin(GL_LINE);
+//  glVertex3f(0,0,0);
+//  glVertex3f(camx.x, camx.y, camx.z);
+//glEnd();
+
+//cam.pantfm = cam.tfm;
+//set_pos(&cam.pantfm, vec3(0,0,0) );
+//
+//cam.tfm      =  lookAt(cam.pos, cam.lookAt, cam.up);
+
+// vecb del(dbKeys.size(), false);
+// /*&& cur->second.version==vs.v*/
+//
+//del[i] = true;
+//dbKeys[i] = {0,""};
+//
+//vd->shapes.erase(vs.s);
+//
+//VerStr nxtKey = vs;
+//nxtKey.v      = version;
+//
+//vd->shapes.insert( make_pair(k, s.version) );
+//
+//TO(del.size(),i){
+//  if(del[i]) dbKeys[i] = {0,""};
+//}
+//
+//db.flush();
+
+//
+//bool           updateKey(simdb const& db, VerStr const& key, VizData* vd)
 
 //vd.camera.pos += camx * vd.camera.btn2Delta.x;
 //vd.camera.pos += camy * vd.camera.btn2Delta.y;

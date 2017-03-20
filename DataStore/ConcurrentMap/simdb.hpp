@@ -1698,9 +1698,9 @@ public:
   // separated C++ functions - these won't need to exist if compiled for a C interface
   struct VerStr { 
     ui32 v; str s; 
-    bool  operator<(VerStr const& vs) const { return s<vs.s;  }  
+    bool  operator<(VerStr const& vs) const { if(s==vs.s) return v<vs.v; else return s<vs.s; }  
     bool  operator<(str const&    rs) const { return s<rs;    }
-    bool operator==(VerStr const& vs) const { return s==vs.s; } 
+    bool operator==(VerStr const& vs) const { return s==vs.s && v==vs.v; } 
   };   
 
   i64          put(str    const& key, str const& value)
