@@ -77,6 +77,8 @@
 // todo: add fps counter in the corner
 // todo: add color under cursor like previous visualizer - use the gl get frame like the previous visualizer - check if the cursor is over the gl window first as an optimization? - sort of in but not working
 // todo: put vd.now as a variable loop?
+// todo: put database name/list in visualizer title
+// todo: add list of databases to select and/or databases currently open
 
 // todo: figure out reference counting so that files are cleaned up on exit
 // todo: move and rename project to LavaViz or any non test name
@@ -212,11 +214,9 @@ void           keyCallback(GLFWwindow* window, int key, int scancode, int action
   switch(key)
   {
   case GLFW_KEY_K: {
-    //auto bnd = shapes_to_bnds(vd);
   } break; 
   case GLFW_KEY_H: {
     vd->camera = initCamera();
-    //auto bnd = shapes_to_bnds(vd);
   } break; 
   case GLFW_KEY_J:
   case GLFW_KEY_F: {
@@ -326,7 +326,7 @@ GLFWwindow*       initGLFW(VizData* vd)
   glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
   glfwWindowHint(GLFW_SAMPLES, 32);
 
-  GLFWwindow* win = glfwCreateWindow(vd->ui.w, vd->ui.h, "Demo", NULL, NULL);    assert(win!=nullptr);
+  GLFWwindow* win = glfwCreateWindow(vd->ui.w, vd->ui.h, "Visualizer - simdb:test", NULL, NULL);    assert(win!=nullptr);
   glfwMakeContextCurrent(win);
   glfwGetWindowSize(win, &vd->ui.w, &vd->ui.h);
 
@@ -525,7 +525,7 @@ ENTRY_DECLARATION
 
     vd.now              =  nowd();
     vd.prev             =  vd.now;
-    vd.verRefresh       =  0.007;                    // roughly 144hz
+    vd.verRefresh       =  1.0/144.0;  //0.0035;  //0.007;                    // roughly 144hz
     vd.verRefreshClock  =  0.0;
     vd.keyRefresh       =  2.0;
     vd.keyRefreshClock  =  vd.keyRefresh;
@@ -718,7 +718,6 @@ ENTRY_DECLARATION
       }
       SECTION(draw shapes)
       {
-
         for(auto& kv : vd.shapes){
           if(kv.second.active)
             RenderShape(kv.second, viewProj);
