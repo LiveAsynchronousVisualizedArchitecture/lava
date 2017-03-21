@@ -10,6 +10,7 @@
 // -todo: change getKeyStrs() to get the number looped through by nxtKey() so it isn't O(n^2)
 // -todo: put in osx stuff here - likely mmmap with shared memory
 
+// todo: make a resize/realloc function to change the size of a block list instead of destroying and creating all indices when updating a key
 // todo: make a standard "simdb" shared memory file that contains the paths of all other shared memory files?
 // todo: convert to 64 bit integers
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths 
