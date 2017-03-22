@@ -516,7 +516,7 @@ ENTRY_DECLARATION
 
   SECTION(initialize static simdb and static VizData)
   {
-    new (&db) simdb("test", 4096, 1<<14);             // inititialize the DB with placement new into the data segment
+    new (&db) simdb("AAAAA_super_long_name_goes_here_for_visibility", 4096, 1<<14);             // inititialize the DB with placement new into the data segment
 
     vd.ui.w             =  1024; 
     vd.ui.h             =   768;
@@ -531,7 +531,7 @@ ENTRY_DECLARATION
     vd.keyRefreshClock  =  vd.keyRefresh;
     vd.camera           =  initCamera();    
   }
-  //genTestGeo(&db);
+  genTestGeo(&db);
   SECTION(initialize glfw window, glew, and nuklear)
   {
     vd.win = initGLFW( &vd );                        assert(vd.win!=nullptr);
@@ -652,21 +652,21 @@ ENTRY_DECLARATION
     {
       glViewport(0, 0, vd.ui.w, vd.ui.h);
       
-      glDisable(GL_CLIP_PLANE0);
-      glDisable(GL_CLIP_PLANE1);
-      glDisable(GL_CLIP_PLANE2);
-      glDisable(GL_CLIP_PLANE3);
-      glDisable(GL_FOG);
-      glDisable(GL_CULL_FACE);
-      glDisable(GL_SCISSOR_TEST);
-      glDisable(GL_STENCIL_TEST);
-      glDisable(GL_DEPTH);
-      glDisable(GL_DEPTH_TEST);                                    // glDepthFunc(GL_LESS);
+      //glDisable(GL_CLIP_PLANE0);
+      //glDisable(GL_CLIP_PLANE1);
+      //glDisable(GL_CLIP_PLANE2);
+      //glDisable(GL_CLIP_PLANE3);
+      //glDisable(GL_FOG);
+      //glDisable(GL_CULL_FACE);
+      //glDisable(GL_SCISSOR_TEST);
+      //glDisable(GL_STENCIL_TEST);
+      //glDisable(GL_DEPTH);
+      //glDisable(GL_DEPTH_TEST);                                    // glDepthFunc(GL_LESS);
       
-      //glEnable(GL_TEXTURE_2D);
-      //glEnable(GL_DEPTH);
-      //glEnable(GL_DEPTH_TEST);                                   // glDepthFunc(GL_LESS);
-      //glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+      glEnable(GL_TEXTURE_2D);
+      glEnable(GL_DEPTH);
+      glEnable(GL_DEPTH_TEST);                                   // glDepthFunc(GL_LESS);
+      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
       glEnable(GL_BLEND);
       glLineWidth(vd.ui.ptSz);

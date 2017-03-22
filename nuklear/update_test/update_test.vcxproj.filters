@@ -20,6 +20,9 @@
     <ClInclude Include="update_test_generators.hpp">
       <Filter>hpp</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\DataStore\ConcurrentMap\simdb.hpp">
+      <Filter>hpp</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="update_test.cpp">

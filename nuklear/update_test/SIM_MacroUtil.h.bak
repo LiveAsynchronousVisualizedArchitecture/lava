@@ -69,9 +69,9 @@
 #endif
 
 // Iters
-#ifndef ALL
-  #define ALL(collection) std::begin(collection), std::end(collection)
-#endif
+//#ifndef ALL
+//  #define ALL(collection) std::begin(collection), std::end(collection)
+//#endif
 
 #define ITERATE(_collection_, _iter_var_)  for(auto _iter_var_ = begin(_collection_); _iter_var_ != end(_collection_); ++_iter_var_)
 

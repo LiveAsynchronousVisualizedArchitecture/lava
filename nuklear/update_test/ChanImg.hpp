@@ -10,7 +10,7 @@
 
 #include <functional>
 #include <vector>
-#include "SIM_MacroUtil.h"
+//#include "SIM_MacroUtil.h"
 //#include "Img.hpp"
 
       template<class T = float, class _Alloc = std::allocator<T> >

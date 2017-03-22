@@ -10,7 +10,7 @@
 // -todo: change getKeyStrs() to get the number looped through by nxtKey() so it isn't O(n^2)
 // -todo: put in osx stuff here - likely mmmap with shared memory
 
-// todo: make a resize/realloc function to change the size of a block list instead of destroying and creating all indices when updating a key
+// todo: try using NtOpenFile
 // todo: make a standard "simdb" shared memory file that contains the paths of all other shared memory files?
 // todo: convert to 64 bit integers
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths 
@@ -33,6 +33,10 @@
 //       empty : 1, deleted : 1, index : 35, hash : 35, version : 56 - total 128 bits, 34 billion entry limit 
 // todo: make resize function so block lists can be resized rather than freed, only to be reallocated
 // todo: test alignment
+// todo: switch negative numbers to a bitfield struct instead of implicitly using the sign bit for different purposes
+
+// todo: make a resize/realloc function to change the size of a block list instead of destroying and creating all indices when updating a key? - would need a different putWeak, since the writing of the index needs  to be atomic and re-writing the currently used blocks would not work with concurrency
+// todo: integrate realloc into put() function - will need to query to see if the key exists, delete it, then insert the reallocated version? - if done like this, does it disrupt for a moment a key existing, and if so, is this an insurmountable problem?
 
 // q: can cleanup be done by a ring buffer of block lists? would the ring buffer only need to be as long as the number of threads if each thread helps clear out the ring buffer after every free()? Probably not, because delayed deallocation would be useful only when there is a reader/ref count, which would mean many more reads than writes could stall the ability to free? But each thread can really only hold one reference at a time so maybe it would work? 
 // q: if using a ring buffer, indices might be freed in between non-freed indices, in which case the pointer to beginning and end would not be able to shift, and therefore would need space for more indices than just the number of threads
@@ -136,30 +140,17 @@
 #ifndef __SIMDB_HEADER_GUARD__
 #define __SIMDB_HEADER_GUARD__
 
-#include <cstdint>
-#include <cstring>
-#include <atomic>
-#include <mutex>
-#include <memory>
-#include <vector>
-#include <string>
-#include <unordered_set>
-#include <set>
-#include <algorithm>
-#include <cassert>
-
 // platform specifics - mostly for shared memory mapping and auxillary functions like open, close and the windows equivilents
-#ifdef _MSC_VER
-  #if !defined(_CRT_SECURE_NO_WARNINGS)
-    #define _CRT_SECURE_NO_WARNINGS
-  #endif
-
-  #if !defined(_SCL_SECURE_NO_WARNINGS)
-    #define _SCL_SECURE_NO_WARNINGS
-  #endif
-#endif
-
 #if defined(_WIN32)      // windows
+  #ifdef _MSC_VER
+    #if !defined(_CRT_SECURE_NO_WARNINGS)
+      #define _CRT_SECURE_NO_WARNINGS
+    #endif
+
+    #if !defined(_SCL_SECURE_NO_WARNINGS)
+      #define _SCL_SECURE_NO_WARNINGS
+    #endif
+  #endif
 
  //#if defined(_CRT_SECURE_NO_WARNINGS)
  //  #undef _CRT_SECURE_NO_WARNINGS
@@ -172,9 +163,19 @@
  //  #define _CRT_SECURE_NO_WARNINGS        // msvc mandatory error nonsense when using some standard C functions like fopen 
  //#endif
 
+ #include <tchar.h>
  #define NOMINMAX
  #define WIN32_LEAN_AND_MEAN
  #include <windows.h>
+ //#include <winternl.h>
+ namespace WINNT { 
+   #include <Ntdef.h> 
+   //#include <Ntifs.h>
+ }
+ #include <ntstatus.h>
+ //#include <Wdm.h>
+ //#include <Ntstrsafe.h>
+ #include <strsafe.h>
 #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
   // for mmap and munmap
   // PROT_READ and PROT_WRITE  to allow reading and writing but not executing of the mapped memory pages
@@ -189,9 +190,172 @@
   #include <unistd.h>
 #endif
 
+#include <cstdint>
+#include <cstring>
+#include <atomic>
+#include <mutex>
+#include <memory>
+#include <vector>
+#include <string>
+#include <unordered_set>
+#include <set>
+#include <algorithm>
+#include <cassert>
+
 #ifdef _WIN32
   // use _malloca ? - would need to use _freea and also know that _malloca always allocates on the heap in debug mode for some crazy reason
   #define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);
+  
+  // the following is api poison and is a cancerous abomination, but it seems to be the only way to list the global anonymous memory maps in windows
+  #define DIRECTORY_QUERY 0x0001  
+  typedef struct _IO_STATUS_BLOCK {
+		union {
+			WINNT::NTSTATUS Status;
+			PVOID    Pointer;
+		};
+		ULONG_PTR Information;
+	} IO_STATUS_BLOCK, *PIO_STATUS_BLOCK;
+
+  using NTOPENDIRECTORYOBJECT = WINNT::NTSTATUS (WINAPI*)(
+	  _Out_  PHANDLE DirectoryHandle,
+	  _In_   ACCESS_MASK DesiredAccess,
+	  _In_   WINNT::POBJECT_ATTRIBUTES ObjectAttributes
+	);
+  using NTOPENFILE = WINNT::NTSTATUS (WINAPI*)(
+    _Out_ PHANDLE               FileHandle,
+    _In_  ACCESS_MASK        DesiredAccess,
+    _In_  WINNT::POBJECT_ATTRIBUTES ObjectAttributes,
+    _Out_ PIO_STATUS_BLOCK   IoStatusBlock,
+    _In_  ULONG                ShareAccess,
+    _In_  ULONG                OpenOptions
+  );
+  using NTQUERYDIRECTORYOBJECT = WINNT::NTSTATUS(WINAPI*)(
+	  _In_       HANDLE DirectoryHandle,
+	  _Out_opt_  PVOID Buffer,
+	  _In_       ULONG Length,
+	  _In_       BOOLEAN ReturnSingleEntry,
+	  _In_       BOOLEAN RestartScan,
+	  _Inout_    PULONG Context,
+	  _Out_opt_  PULONG ReturnLength
+	);
+  using RTLINITUNICODESTRING = VOID(*)(
+    _Out_    WINNT::PUNICODE_STRING DestinationString,
+    _In_opt_ PCWSTR          SourceString
+  );
+
+  struct OBJECT_DIRECTORY_INFORMATION
+  {
+    WINNT::UNICODE_STRING    name;
+    WINNT::UNICODE_STRING    type;
+  };
+
+  std::string GetLastErrorStdStr()
+  {
+    DWORD error = GetLastError();
+    if (error)
+    {
+      LPVOID lpMsgBuf;
+      DWORD bufLen = FormatMessage(
+          FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+          FORMAT_MESSAGE_FROM_SYSTEM |
+          FORMAT_MESSAGE_IGNORE_INSERTS,
+          NULL,
+          error,
+          MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+          (LPTSTR) &lpMsgBuf,
+          0, NULL );
+      if (bufLen)
+      {
+        LPCSTR lpMsgStr = (LPCSTR)lpMsgBuf;
+        std::string result(lpMsgStr, lpMsgStr+bufLen);
+      
+        LocalFree(lpMsgBuf);
+
+        return result;
+      }
+    }
+    return std::string();
+  }
+  PVOID GetLibraryProcAddress(PSTR LibraryName, PSTR ProcName)
+  {
+    return GetProcAddress(GetModuleHandleA(LibraryName), ProcName);
+  }
+
+  auto listDBs() -> std::vector<std::wstring>
+  {
+    using namespace WINNT;
+
+    static HMODULE _hModule = nullptr; 
+    static NTOPENDIRECTORYOBJECT  NtOpenDirectoryObject  = nullptr;
+    static NTOPENFILE             NtOpenFile             = nullptr;
+    static NTQUERYDIRECTORYOBJECT NtQueryDirectoryObject = nullptr;
+    static RTLINITUNICODESTRING   RtlInitUnicodeString   = nullptr;
+    
+    std::vector<std::wstring> ret;
+
+    if(!NtOpenDirectoryObject){  
+      NtOpenDirectoryObject  = (NTOPENDIRECTORYOBJECT)GetLibraryProcAddress( _T("ntdll.dll"), "NtOpenDirectoryObject");
+    }
+    if(!NtQueryDirectoryObject){ 
+      NtQueryDirectoryObject = (NTQUERYDIRECTORYOBJECT)GetLibraryProcAddress(_T("ntdll.dll"), "NtQueryDirectoryObject");
+    }
+    if(!NtOpenFile){ 
+      NtOpenFile = (NTOPENFILE)GetLibraryProcAddress(_T("ntdll.dll"), "NtOpenFile");
+    }
+
+    WINNT::HANDLE   hDir = NULL;
+    IO_STATUS_BLOCK  isb = { 0 };
+    WINNT::WCHAR* mempth = L"\\BaseNamedObjects";
+    
+    wprintf(L"\n%s \n", mempth);
+
+    WINNT::WCHAR buf[4096];
+    UNICODE_STRING   pth = { 0 };
+    pth.Buffer        = mempth; //buf;  // /*(WINNT::PWCH)*/ mempth; 
+    pth.Length        = lstrlenW(mempth) * sizeof(WINNT::WCHAR); //sizeof(buf); 
+    pth.MaximumLength = pth.Length;
+
+    OBJECT_ATTRIBUTES oa = { 0 };
+    oa.Length = sizeof( OBJECT_ATTRIBUTES );
+    oa.RootDirectory      = NULL;
+    oa.Attributes         = OBJ_CASE_INSENSITIVE;                               
+    oa.ObjectName         = &pth;
+    oa.SecurityDescriptor = NULL;                        
+    oa.SecurityQualityOfService = NULL;               
+
+    NTSTATUS status;
+    status = NtOpenDirectoryObject(
+      &hDir, 
+      /*STANDARD_RIGHTS_READ |*/ DIRECTORY_QUERY, 
+      &oa);
+
+    int s = (int)status;
+    printf("\nstatus: %0xh error: %s\n", s, GetLastErrorStdStr().c_str() );
+    if(status==STATUS_SUCCESS){
+      printf("status success");
+    }
+
+    WINNT::BOOLEAN rescan = TRUE;
+    WINNT::ULONG      ctx = 0;
+    WINNT::ULONG   retLen = 0;
+    do
+    {
+      status = NtQueryDirectoryObject(hDir, buf, sizeof(buf), TRUE, rescan, &ctx, &retLen);
+      rescan = FALSE;
+      auto info = (OBJECT_DIRECTORY_INFORMATION*)buf;
+
+      if( lstrcmpW(info->type.Buffer, L"Section")!=0 ){ continue; }
+      WINNT::WCHAR wPrefix[] = L"simdb_";
+      size_t pfxSz = sizeof(wPrefix);
+      if( strncmp( (char*)info->name.Buffer, (char*)wPrefix, pfxSz)!=0 ){  continue; }
+
+      std::wstring name =  std::wstring( (WINNT::WCHAR*)info->name.Buffer );
+      ret.push_back(name);
+    }while(status!=STATUS_NO_MORE_ENTRIES);
+    
+    return ret;
+  }
+
 #else
   // gcc/clang/linux ?
   #include <alloca.h>
@@ -211,9 +375,9 @@ using aui64   =   std::atomic<ui64>;
 using  ai32   =   std::atomic<i64>;
 using   ai8   =   std::atomic<i8>;
 using  cstr   =   const char*;
-using   str   =   std::string;
+using   str   =   std::string; // will need C++ ifdefs eventually or just need to be taken out
 
-template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;
+template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  // will need C++ ifdefs eventually
 
 namespace {
   enum Match { MATCH_FALSE=0, MATCH_TRUE=1, MATCH_REMOVED=-1  };
@@ -727,46 +891,106 @@ public:
     assert(blockSize > sizeof(IDX));
   }
 
-  auto        alloc(i32    size, ui32 klen, i32* out_blocks=nullptr) -> VerIdx   // todo: doesn't this need to give back the blocks if allocation fails?
+  auto      alloc(i32    size, ui32 klen, i32* out_blocks=nullptr) -> VerIdx     // todo: doesn't this need to give back the blocks if allocation fails?
   {
     i32 byteRem  =  0;
     i32  blocks  =  blocksNeeded(size, &byteRem);
-    //if(out_blocks) *out_blocks = blocks;
 
     ui32   st = s_cl.nxt();                                     // stBlk  is starting block
-    if(st==LIST_END){
-      if(out_blocks) *out_blocks = 0; 
-      return List_End(); // LIST_END; 
+    SECTION(get the starting block index and handle errors)
+    {
+      if(st==LIST_END){
+        if(out_blocks) *out_blocks = 0; 
+        return List_End(); // LIST_END; 
+      }
     }
 
     ui32 ver  =  (ui32)s_version->fetch_add(1);
     i32  cur  =  st;
-    i32  cnt  =   0;
     i32  nxt  =   0;
-    for(i32 i=0; i<blocks-1; ++i)
+    i32  cnt  =   0;
+    SECTION(loop for the number of blocks needed and get new block and link it to the list)
     {
-      nxt    = s_cl.nxt();
-      if(nxt==LIST_END){ free(st, ver); VerIdx empty={LIST_END,0}; return empty; }
+      for(i32 i=0; i<blocks-1; ++i)
+      {
+        nxt    = s_cl.nxt();
+        if(nxt==LIST_END){ free(st, ver); VerIdx empty={LIST_END,0}; return empty; }
 
-      if(i==0)  s_bls[cur] =  make_BlkLst(true,  0, nxt, ver, size, klen);
-      else      s_bls[cur] =  make_BlkLst(false, 0, nxt, ver, 0, 0);
-      cur        =  nxt;
-      ++cnt;
-      m_blocksUsed.fetch_add(1);
+        if(i==0)  s_bls[cur] =  make_BlkLst(true,  0, nxt, ver, size, klen);
+        else      s_bls[cur] =  make_BlkLst(false, 0, nxt, ver, 0, 0);
+        cur        =  nxt;
+        ++cnt;
+        m_blocksUsed.fetch_add(1);
+      }
     }
 
-    BlkLst bl  = make_BlkLst(cur==st, 0, byteRem? -byteRem : -blockFreeSize(), ver, size, klen);
-    s_bls[cur] = bl;
+    SECTION(add the last index into the list, set out_blocks and return the start index with its version)
+    {
+      ui32 blockRemainder = byteRem? -byteRem : -blockFreeSize();
+      BlkLst  bl = make_BlkLst(cur==st, 0, blockRemainder, ver, size, klen);
+      s_bls[cur] = bl;
+      s_bls[st].kr.isKey = true;
 
-    if(out_blocks){ *out_blocks = nxt==LIST_END? -cnt : cnt; }     
-
-    s_bls[st].kr.isKey = true;
-
-    VerIdx vi = { st, ver };
-    return vi;
-
-    //return s_bls[st].vi;
+      if(out_blocks){ *out_blocks = nxt==LIST_END? -cnt : cnt; }     
+      VerIdx vi = { st, ver };
+      return vi;
+    }
   }
+  //auto      realloc(VerIdx st, i32 size, ui32 klen, i32* out_blocks=nullptr) -> VerIdx     // todo: doesn't this need to give back the blocks if allocation fails?
+  //{
+  //  i32  byteRem  =  0;
+  //  i32 blksNeed  =  blocksNeeded(size, &byteRem);
+  //
+  //  //ui32   st = s_cl.nxt();                                     // stBlk  is starting block
+  //  //SECTION(get the starting block index and handle errors)
+  //  //{
+  //  //  if(st==LIST_END){
+  //  //    if(out_blocks) *out_blocks = 0; 
+  //  //    return List_End();
+  //  //  }
+  //  //}
+  //
+  //  ui32    kvlen = len(st.idx, st.version);
+  //  i32  blksHave = blocksNeeded(size);
+  //  if(blksNeed > blksHave){
+  //    SECTION(add more blocks the current list)
+  //    {
+  //    }
+  //    SECTION(write )
+  //  }else{
+  //  }
+  //
+  //  //ui32 ver  =  (ui32)s_version->fetch_add(1);
+  //  //i32  cur  =  st;
+  //  //i32  nxt  =   0;
+  //  //i32  cnt  =   0;
+  //  //SECTION(loop for the number of blocks needed and get new block and link it to the list)
+  //  //{
+  //  //  for(i32 i=0; i<blocks-1; ++i)
+  //  //  {
+  //  //    nxt    = s_cl.nxt();
+  //  //    if(nxt==LIST_END){ free(st, ver); VerIdx empty={LIST_END,0}; return empty; }
+  //  //
+  //  //    if(i==0)  s_bls[cur] =  make_BlkLst(true,  0, nxt, ver, size, klen);
+  //  //    else      s_bls[cur] =  make_BlkLst(false, 0, nxt, ver, 0, 0);
+  //  //    cur        =  nxt;
+  //  //    ++cnt;
+  //  //    m_blocksUsed.fetch_add(1);
+  //  //  }
+  //  //}
+  //
+  //  SECTION(add the last index into the list, set out_blocks and return the start index with its version)
+  //  {
+  //    ui32 blockRemainder = byteRem? -byteRem : -blockFreeSize();
+  //    BlkLst  bl = make_BlkLst(cur==st, 0, blockRemainder, ver, size, klen);
+  //    s_bls[cur] = bl;
+  //    s_bls[st].kr.isKey = true;
+  //
+  //    if(out_blocks){ *out_blocks = nxt==LIST_END? -cnt : cnt; }
+  //    VerIdx vi = { st, ver };
+  //    return vi;
+  //  }
+  //}
   bool         free(ui32 blkIdx, ui32 version)        // frees a list/chain of blocks
   {
     return decReaders(blkIdx, version);
@@ -954,11 +1178,11 @@ public:
     //}else if(-nxt != curlen){ return MATCH_FALSE; }
     // return MATCH_TRUE; // never reached
   }
-  ui32          len(i32  blkIdx, ui32 version, ui32* out_vlen) const
+  ui32          len(i32  blkIdx, ui32 version, ui32* out_vlen=nullptr) const
   {
     BlkLst bl = s_bls[blkIdx];
     if(version==bl.kr.version && bl.len>0){
-      *out_vlen = bl.len - bl.klen;
+      if(out_vlen) *out_vlen = bl.len - bl.klen;
       return bl.len;
     }else 
       return 0;
@@ -978,8 +1202,6 @@ public:
 };
 class   ConcurrentHash
 {
-private:
-
 public:
   using VerIdx = ConcurrentStore::VerIdx;
 
@@ -1320,7 +1542,7 @@ public:
     sm.size  = alignment==0? size  :  alignment-(size%alignment);
 
     #ifdef _WIN32      // windows
-      char path[512] = "Global\\simdb_15_";
+      char path[512] = "Global\\simdb_";
     //#elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
     #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
       char path[512] = "/tmp/simdb_15_";
@@ -1449,7 +1671,6 @@ public:
   using VerIdx = ConcurrentHash::VerIdx;
 
 private:
-  SharedMem           m_mem;
 
   aui64*            s_flags;
   aui64*        s_blockSize;
@@ -1458,8 +1679,9 @@ private:
   ConcurrentHash       s_ch;     // store the indices of keys and values - contains a ConcurrentList
 
   // these variables are local to the stack where simdb lives, unlike the others, they are not simply a pointer into the shared memory
-  mutable ui32   m_nxtChIdx;      
-  mutable ui32   m_curChIdx;     
+  SharedMem           m_mem;
+  mutable ui32   m_nxtChIdx;
+  mutable ui32   m_curChIdx;
   ui64             m_blkCnt;
   ui64              m_blkSz;
 
@@ -1537,7 +1759,7 @@ public:
 
     i32 blkcnt = 0;
     
-    auto vi = s_cs.alloc(klen+vlen, klen, &blkcnt);    // todo: use the VersionIdx struct // kidx is key index
+    auto vi = s_cs.alloc(klen+vlen, klen, &blkcnt);                             // todo: use the VersionIdx struct // kidx is key index
     if(vi.idx==LIST_END) return EMPTY_KEY;
 
     s_cs.put(vi.idx, key, klen, val, vlen);
@@ -1801,24 +2023,11 @@ public:
     return put(key.data(), (ui32)key.length(), val.data(), (ui32)(val.size()*sizeof(T)) );
   }
 
-
-  /*
-  template<class T>
-  i64          get(vec<T> const& key, void*  out_buf) const     // todo: needs to be redone
-  {
-    Reader r = read((void*)key.data(), (ui32)(key.size() * sizeof(T)));
-    if(isEmpty(r.kv)) return -1;
-    //if(r.kv.key == EMPTY_KEY || r.kv.readers <= 0){ return -1; }
-
-    ui64 len = getFromBlkIdx(r.kv.val, out_buf);
-    if(r.doRm()){ m_cs.free(r.kv.val); m_cs.free(r.kv.idx); }
-
-    return len;
-  }
-  */
   // end separated C++ functions
 
 };
+
+
 
 #endif
 
@@ -1826,6 +2035,138 @@ public:
 
 
 
+
+//typedef struct _RTLP_CURDIR_REF
+//{
+//	LONG RefCount;
+//	HANDLE Handle;
+//} RTLP_CURDIR_REF, *PRTLP_CURDIR_REF;
+// typedef struct RTL_RELATIVE_NAME_U {
+//	WINNT::UNICODE_STRING RelativeName;
+//	HANDLE ContainingDirectory;
+//	PRTLP_CURDIR_REF CurDirRef;
+//} RTL_RELATIVE_NAME_U, *PRTL_RELATIVE_NAME_U;
+//typedef BOOLEAN (NTAPI *RtlDosPathNameToNtPathName_U_t)(
+//                          WINNT::PCWSTR DosName,
+//                          WINNT::PUNICODE_STRING NtName,
+//                          PCWSTR *PartName,
+//                          PRTL_RELATIVE_NAME_U RelativeName);
+
+/*
+template<class T>
+i64          get(vec<T> const& key, void*  out_buf) const     // todo: needs to be redone
+{
+  Reader r = read((void*)key.data(), (ui32)(key.size() * sizeof(T)));
+  if(isEmpty(r.kv)) return -1;
+  //if(r.kv.key == EMPTY_KEY || r.kv.readers <= 0){ return -1; }
+
+  ui64 len = getFromBlkIdx(r.kv.val, out_buf);
+  if(r.doRm()){ m_cs.free(r.kv.val); m_cs.free(r.kv.idx); }
+
+  return len;
+}
+*/
+
+// typedef NTSTATUS(WINAPI *NTOPENDIRECTORYOBJECT)(
+//_Out_  PHANDLE DirectoryHandle,
+//_In_   ACCESS_MASK DesiredAccess,
+//_In_   POBJECT_ATTRIBUTES ObjectAttributes
+//);
+// 
+//typedef NTSTATUS(WINAPI *NTQUERYDIRECTORYOBJECT)(
+// _In_       HANDLE DirectoryHandle,
+// _Out_opt_  PVOID Buffer,
+// _In_       ULONG Length,
+// _In_       BOOLEAN ReturnSingleEntry,
+// _In_       BOOLEAN RestartScan,
+// _Inout_    PULONG Context,
+// _Out_opt_  PULONG ReturnLength
+// );
+
+//s = (int)status;
+//printf("\nstatus: %0xh error: %s retlen: %llu \n", s, GetLastErrorStdStr().c_str(), retLen );
+//wprintf(L"Buffer name: %s  type: %s\n\n", info->name.Buffer, info->type.Buffer );
+//if(status==STATUS_SUCCESS){
+//  printf("status success");
+//}
+
+//if(!_hModule){ LoadLibrary( _T("ntdll.dll") ); }
+//if(!_hModule){ return ret; }
+//if(!NtOpenDirectoryObject){  NtOpenDirectoryObject  = (NTOPENDIRECTORYOBJECT)GetProcAddress( _hModule, "NtOpenDirectoryObject");  }
+//if(!NtQueryDirectoryObject){ NtQueryDirectoryObject = (NTQUERYDIRECTORYOBJECT)GetProcAddress(_hModule, "NtQueryDirectoryObject"); }
+//
+//printf("error: %s", GetLastErrorStdStr().c_str() );
+//
+//if(!RtlInitUnicodeString){
+//  RtlInitUnicodeString = (RTLINITUNICODESTRING)GetLibraryProcAddress( _T("NtosKrnl.exe"), "RtlInitUnicodeString");
+//}
+//
+// static RtlDosPathNameToNtPathName_U_t RtlDosPathNameToNtPathName_U;
+//if(!RtlDosPathNameToNtPathName_U)
+// if(!(RtlDosPathNameToNtPathName_U=(RtlDosPathNameToNtPathName_U_t) GetProcAddress(GetModuleHandleA("NTDLL.DLL"), "RtlDosPathNameToNtPathName_U")))
+//  abort();
+
+//RtlInitUnicodeString(&usDirectoryName, DIRECTORY_NAME);
+//(WINNT::PUNICODE_STRING)
+//oattr    
+//WINNT::WCHAR* mempth = L"c:";
+//
+//printf("error: %s", GetLastErrorStdStr().c_str() ); 
+//wprintf(L"\n%s \n", pth.Buffer);
+//
+//RtlDosPathNameToNtPathName_U(mempth, &pth, NULL, NULL);
+//RtlInitUnicodeString(&UName, pszDir);
+//
+//oa.ObjectName         = NULL;                                
+//
+// status = NtOpenFile(
+//   &hDir, 
+//   FILE_LIST_DIRECTORY|SYNCHRONIZE, 
+//   &oa, &isb, 
+//   FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
+	//0x01 /*FILE_DIRECTORY_FILE*/ | 0x20/*FILE_SYNCHRONOUS_IO_NONALERT*/ | 0x4000/*FILE_OPEN_FOR_BACKUP_INTENT*/);
+//InitializeObjectAttributes(&objectAttributes, L("\BaseNamedObjects"), OBJ_CASE_INSENSITIVE, NULL, NULL);
+//
+// /*0x20001*/ /*SECTION_MAP_READ*/
+
+//auto        alloc(i32    size, ui32 klen, i32* out_blocks=nullptr) -> VerIdx   // todo: doesn't this need to give back the blocks if allocation fails?
+//{
+//  i32 byteRem  =  0;
+//  i32  blocks  =  blocksNeeded(size, &byteRem);
+//  //if(out_blocks) *out_blocks = blocks;
+//
+//  ui32   st = s_cl.nxt();                                     // stBlk  is starting block
+//  if(st==LIST_END){
+//    if(out_blocks) *out_blocks = 0; 
+//    return List_End(); // LIST_END; 
+//  }
+//
+//  ui32 ver  =  (ui32)s_version->fetch_add(1);
+//  i32  cur  =  st;
+//  i32  cnt  =   0;
+//  i32  nxt  =   0;
+//  for(i32 i=0; i<blocks-1; ++i)
+//  {
+//    nxt    = s_cl.nxt();
+//    if(nxt==LIST_END){ free(st, ver); VerIdx empty={LIST_END,0}; return empty; }
+//
+//    if(i==0)  s_bls[cur] =  make_BlkLst(true,  0, nxt, ver, size, klen);
+//    else      s_bls[cur] =  make_BlkLst(false, 0, nxt, ver, 0, 0);
+//    cur        =  nxt;
+//    ++cnt;
+//    m_blocksUsed.fetch_add(1);
+//  }
+//
+//  BlkLst bl  = make_BlkLst(cur==st, 0, byteRem? -byteRem : -blockFreeSize(), ver, size, klen);
+//  s_bls[cur] = bl;
+//
+//  if(out_blocks){ *out_blocks = nxt==LIST_END? -cnt : cnt; }     
+//
+//  s_bls[st].kr.isKey = true;
+//
+//  VerIdx vi = { st, ver };
+//  return vi;
+//}
 
 //str       nxtKey(ui32* out_version=nullptr)         const
 //{
