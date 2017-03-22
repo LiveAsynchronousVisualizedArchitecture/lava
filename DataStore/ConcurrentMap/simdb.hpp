@@ -307,12 +307,10 @@
     IO_STATUS_BLOCK  isb = { 0 };
     WINNT::WCHAR* mempth = L"\\BaseNamedObjects";
     
-    wprintf(L"\n%s \n", mempth);
-
     WINNT::WCHAR buf[4096];
     UNICODE_STRING   pth = { 0 };
-    pth.Buffer        = mempth; //buf;  // /*(WINNT::PWCH)*/ mempth; 
-    pth.Length        = lstrlenW(mempth) * sizeof(WINNT::WCHAR); //sizeof(buf); 
+    pth.Buffer        = mempth;
+    pth.Length        = lstrlenW(mempth) * sizeof(WINNT::WCHAR);
     pth.MaximumLength = pth.Length;
 
     OBJECT_ATTRIBUTES oa = { 0 };
@@ -328,12 +326,6 @@
       &hDir, 
       /*STANDARD_RIGHTS_READ |*/ DIRECTORY_QUERY, 
       &oa);
-
-    int s = (int)status;
-    printf("\nstatus: %0xh error: %s\n", s, GetLastErrorStdStr().c_str() );
-    if(status==STATUS_SUCCESS){
-      printf("status success");
-    }
 
     WINNT::BOOLEAN rescan = TRUE;
     WINNT::ULONG      ctx = 0;
@@ -2035,6 +2027,16 @@ public:
 
 
 
+
+//int s = (int)status;
+//printf("\nstatus: %0xh error: %s\n", s, GetLastErrorStdStr().c_str() );
+//if(status==STATUS_SUCCESS){
+//  printf("status success");
+//}
+
+//wprintf(L"\n%s \n", mempth);
+//buf;  // /*(WINNT::PWCH)*/ mempth;
+//sizeof(buf); 
 
 //typedef struct _RTLP_CURDIR_REF
 //{

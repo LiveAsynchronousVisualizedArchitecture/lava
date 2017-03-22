@@ -92,6 +92,8 @@ using ms = duration<double, std::milli>;
 
 int    main(void)
 {
+  using namespace std;
+  
   new (&db) simdb("test", 1024, 1<<14);        // 4096x1024 is 4MB inititialize the DB with placement new into the data segment
   
   //ui64 rightLen, cubeLen;
@@ -119,7 +121,9 @@ int    main(void)
   //idx = db.put("update test Image Gradient", gradIvBuf);
   //assert(idx!=simdb::FAILED_PUT);
 
-  listDBs();
+  auto dbs = listDBs();
+  TO(dbs.size(),i) wprintf(L"%s\n", dbs[i].c_str() );
+  //TO(dbs.size(),i) wcout << dbs[i] << endl;
 
   //while(true)
   //{
