@@ -9,21 +9,29 @@
 // -todo: take out any inf loops in runMatch
 // -todo: change getKeyStrs() to get the number looped through by nxtKey() so it isn't O(n^2)
 // -todo: put in osx stuff here - likely mmmap with shared memory
+// -todo: try using NtOpenFile
+// -todo: make a standard "simdb" shared memory file that contains the paths of all other shared memory files? - not needed for now
+// -todo: make realloc that changes the size of a block list - would have to find a way to not break concurrency to be able to resize block lists, with reference counting and some sort of flag, it would still be the same as blinking the key out of existence while a thread updates the block list size
+// -todo: make windows version have permissions for just read and write
+// -todo: check if memset to 0 is still anywhere in the release build - line 1827 still has a memset to 0 on free
 
-// todo: try using NtOpenFile
-// todo: make a standard "simdb" shared memory file that contains the paths of all other shared memory files?
-// todo: convert to 64 bit integers
-// todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths 
-// todo: make windows version have permissions for just read and write
+// todo: get compiler warning out of windows build - just need to take out unneccesary headers and copy in any struct and function definitions?
+// todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
+// todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
 // todo: make a macro to have separate windows and unix paths?
-// todo: make realloc that changes the size of a block list
-// todo: check if memset to 0 is still anywhere in the release build - line 1827 still has a memset to 0 on free
+// todo: make arguments to listDBs for the prefix? 'type' is windows specific and should be ok to be hardcoded
+// todo: convert to 64 bit integers
+// todo: test windows permissions
+// todo: put prefetching into reading of blocks
+// todo: prefetch memory for next block when looping through blocks - does this require a system call for shared memory and does it lock? it should just be the prefetch instruction or an unoptimized away load? use intrinsic?
 // todo: make put give back FAILED_PUT on error
 // todo: make ConcurrentStore get() stop before exceeding maxlen?
 // todo: make put return VerIdx ?
 // todo: make a DELETED value for hash entries so that when something is removed, it doesn't block a linear search
+// todo: figure out deletion - look back at tbl with EMPTY and NONE types 
+//       | even without robin hood hashing are 128 bit atomics needed to swap/bubble sort keys into the new free slot?
+//       | when deleting, instead of swapping the deleted key, duplicate the next key to the previous key and so on until reaching either an empty slot, a key that is further from its optimal distance, or two of the same key in a row (indicating another thread is moving keys around)
 // todo: make readers for blocks only exist on the head of the list?
-// todo: prefetch memory for next block when looping through blocks - does this require a system call for shared memory and does it lock? it should just be the prefetch instruction or an unoptimized away load? use intrinsic?
 // todo: look at making a memory access to the next block that can't be optimized away
 // todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
 // todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
@@ -163,19 +171,6 @@
  //  #define _CRT_SECURE_NO_WARNINGS        // msvc mandatory error nonsense when using some standard C functions like fopen 
  //#endif
 
- #include <tchar.h>
- #define NOMINMAX
- #define WIN32_LEAN_AND_MEAN
- #include <windows.h>
- //#include <winternl.h>
- namespace WINNT { 
-   #include <Ntdef.h> 
-   //#include <Ntifs.h>
- }
- #include <ntstatus.h>
- //#include <Wdm.h>
- //#include <Ntstrsafe.h>
- #include <strsafe.h>
 #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
   // for mmap and munmap
   // PROT_READ and PROT_WRITE  to allow reading and writing but not executing of the mapped memory pages
@@ -206,8 +201,26 @@
   // use _malloca ? - would need to use _freea and also know that _malloca always allocates on the heap in debug mode for some crazy reason
   #define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);
   
-  // the following is api poison and is a cancerous abomination, but it seems to be the only way to list the global anonymous memory maps in windows
-  #define DIRECTORY_QUERY 0x0001  
+  #include <tchar.h>
+  #define NOMINMAX
+  #define WIN32_LEAN_AND_MEAN
+  #include <windows.h>
+  //#include <winternl.h>
+  namespace WINNT { 
+    #include <Ntdef.h> 
+    //#include <Ntifs.h>
+    typedef long LONG;
+    typedef LONG NTSTATUS;
+  }
+  #include <ntstatus.h>
+  //#include <Wdm.h>
+  //#include <Ntstrsafe.h>
+  #include <strsafe.h>
+
+  // the following is api poison and is a cancerous abomination, but it seems to be the only way to list the global anonymous memory maps in windows  
+  #define DIRECTORY_QUERY  0x0001  
+  #define STATUS_SUCCESS   ((NTSTATUS)0x00000000L)    // ntsubauth
+
   typedef struct _IO_STATUS_BLOCK {
 		union {
 			WINNT::NTSTATUS Status;
@@ -215,7 +228,7 @@
 		};
 		ULONG_PTR Information;
 	} IO_STATUS_BLOCK, *PIO_STATUS_BLOCK;
-
+  
   using NTOPENDIRECTORYOBJECT = WINNT::NTSTATUS (WINAPI*)(
 	  _Out_  PHANDLE DirectoryHandle,
 	  _In_   ACCESS_MASK DesiredAccess,
@@ -249,7 +262,7 @@
     WINNT::UNICODE_STRING    type;
   };
 
-  std::string GetLastErrorStdStr()
+  auto      GetLastErrorStdStr() -> std::string
   {
     DWORD error = GetLastError();
     if (error)
@@ -276,7 +289,7 @@
     }
     return std::string();
   }
-  PVOID GetLibraryProcAddress(PSTR LibraryName, PSTR ProcName)
+  PVOID  GetLibraryProcAddress(PSTR LibraryName, PSTR ProcName)
   {
     return GetProcAddress(GetModuleHandleA(LibraryName), ProcName);
   }
@@ -326,6 +339,8 @@
       &hDir, 
       /*STANDARD_RIGHTS_READ |*/ DIRECTORY_QUERY, 
       &oa);
+
+    if(status==STATUS_SUCCESS){ return ret; }
 
     WINNT::BOOLEAN rescan = TRUE;
     WINNT::ULONG      ctx = 0;
@@ -790,7 +805,7 @@ private:
     i32   nxt  =   s_bls[cur].idx;         //*stPtr(cur);              // nxt is the next block index
     for(; nxt>0; nxt=s_bls[cur].idx)
     { 
-      memset(blkPtr(cur), 0, m_blockSize);    // zero out memory on free, 
+      //memset(blkPtr(cur), 0, m_blockSize);    // zero out memory on free, 
       //m_bls[cur].readers = 0;               // reset the reader count
       
       s_bls[cur].kr.isKey   = false;          // make sure key is false;
@@ -800,7 +815,7 @@ private:
       m_blocksUsed.fetch_add(-1);
       cur  =  nxt;
     }
-    memset(blkPtr(cur), 0, m_blockSize);       // 0 out memory on free, 
+    //memset(blkPtr(cur), 0, m_blockSize);       // 0 out memory on free, 
     //m_bls[cur].readers = 0;                  // reset the reader count
     s_bls[cur].kr.readers = 0;                 // reset the reader count
     s_cl.free(cur);
