@@ -44,6 +44,8 @@
 // todo: test alignment
 // todo: switch negative numbers to a bitfield struct instead of implicitly using the sign bit for different purposes
 // todo: make sure that the important atomic variables like block list next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries?
+// todo: check if read can be made non-atomic if they already aren't?
+
 
 // todo: make a 'waiting' flag or type for keys so that they can be rewritten and resized in place? - would mean that they could not be read from at any time like they can be now
 // todo: make alloc look for multiple blocks then check the next block variable for its version and if the version has not changed, allocate all blocks at once?
@@ -222,10 +224,10 @@
     //    ULONG64 SecurityQualityOfService;
     //} OBJECT_ATTRIBUTES64;
     //typedef OBJECT_ATTRIBUTES64 *POBJECT_ATTRIBUTES64;
-    typedef void    *HANDLE;
-    typedef HANDLE *PHANDLE;
-    typedef wchar_t   WCHAR;    // wc,   16-bit UNICODE character
-    typedef UCHAR   BOOLEAN;           // winnt
+    typedef void        *HANDLE;
+    typedef HANDLE     *PHANDLE;
+    typedef wchar_t       WCHAR;        // wc,   16-bit UNICODE character
+    typedef UCHAR       BOOLEAN;        // winnt
     typedef unsigned long ULONG;
 
     typedef struct _UNICODE_STRING {
@@ -253,7 +255,7 @@
     typedef LONG NTSTATUS;
   }
   //#include <ntstatus.h>
-
+  //
   //#include <Wdm.h>
   //#include <Ntstrsafe.h>
   #include <strsafe.h>

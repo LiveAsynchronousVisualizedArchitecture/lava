@@ -516,7 +516,7 @@ ENTRY_DECLARATION
 
   SECTION(initialize static simdb and static VizData)
   {
-    new (&db) simdb("AAAAA_super_long_name_goes_here_for_visibility", 4096, 1<<14);             // inititialize the DB with placement new into the data segment
+    new (&db) simdb("test", 4096, 1<<14);             // inititialize the DB with placement new into the data segment
 
     vd.ui.w             =  1024; 
     vd.ui.h             =   768;

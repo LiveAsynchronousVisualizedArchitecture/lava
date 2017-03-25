@@ -5,12 +5,11 @@
 
 simdb:
  | Concurrent Robin hood hashing
- | Resizing of block lists instead of full destruction and creation when changing the value of a key
  | Reference counting of the memory mapped file so that it can be deleted on the last program close in osx and linux
  | some sort of resizing
 
 tbl:
- | templating instead of using int as a standing
+ | templating instead of using int as a stand in
  | tbl references as a value for the map
  | owned tbl values for the map through offset into the child tbl segment of the tbl memory  
  | flattening of tbl references into owned tbls 
