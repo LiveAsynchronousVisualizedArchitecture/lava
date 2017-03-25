@@ -132,6 +132,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="..\..\DataStore\ConcurrentMap\simdb.hpp" />
+    <ClInclude Include="C:\Program Files (x86)\Windows Kits\8.1\Include\shared\ntdef.h" />
+    <ClInclude Include="C:\Program Files (x86)\Windows Kits\8.1\Include\shared\ntstatus.h" />
     <ClInclude Include="update_test_data.hpp" />
     <ClInclude Include="update_test_generators.hpp" />
   </ItemGroup>

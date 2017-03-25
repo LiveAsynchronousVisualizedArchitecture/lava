@@ -14,8 +14,9 @@
 // -todo: make realloc that changes the size of a block list - would have to find a way to not break concurrency to be able to resize block lists, with reference counting and some sort of flag, it would still be the same as blinking the key out of existence while a thread updates the block list size
 // -todo: make windows version have permissions for just read and write
 // -todo: check if memset to 0 is still anywhere in the release build - line 1827 still has a memset to 0 on free
+// -todo: get compiler warning out of windows build - just need to take out unneccesary headers and copy in any struct and function definitions?
 
-// todo: get compiler warning out of windows build - just need to take out unneccesary headers and copy in any struct and function definitions?
+// todo: take out WINNT namespace for windows NT definitions
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
 // todo: make a macro to have separate windows and unix paths?
@@ -42,7 +43,10 @@
 // todo: make resize function so block lists can be resized rather than freed, only to be reallocated
 // todo: test alignment
 // todo: switch negative numbers to a bitfield struct instead of implicitly using the sign bit for different purposes
+// todo: make sure that the important atomic variables like block list next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries?
 
+// todo: make a 'waiting' flag or type for keys so that they can be rewritten and resized in place? - would mean that they could not be read from at any time like they can be now
+// todo: make alloc look for multiple blocks then check the next block variable for its version and if the version has not changed, allocate all blocks at once?
 // todo: make a resize/realloc function to change the size of a block list instead of destroying and creating all indices when updating a key? - would need a different putWeak, since the writing of the index needs  to be atomic and re-writing the currently used blocks would not work with concurrency
 // todo: integrate realloc into put() function - will need to query to see if the key exists, delete it, then insert the reallocated version? - if done like this, does it disrupt for a moment a key existing, and if so, is this an insurmountable problem?
 
@@ -207,19 +211,59 @@
   #include <windows.h>
   //#include <winternl.h>
   namespace WINNT { 
-    #include <Ntdef.h> 
+    //#include <Ntdef.h> 
     //#include <Ntifs.h>
+    //typedef struct _OBJECT_ATTRIBUTES64 {
+    //    ULONG Length;
+    //    ULONG64 RootDirectory;
+    //    ULONG64 ObjectName;
+    //    ULONG Attributes;
+    //    ULONG64 SecurityDescriptor;
+    //    ULONG64 SecurityQualityOfService;
+    //} OBJECT_ATTRIBUTES64;
+    //typedef OBJECT_ATTRIBUTES64 *POBJECT_ATTRIBUTES64;
+    typedef void    *HANDLE;
+    typedef HANDLE *PHANDLE;
+    typedef wchar_t   WCHAR;    // wc,   16-bit UNICODE character
+    typedef UCHAR   BOOLEAN;           // winnt
+    typedef unsigned long ULONG;
+
+    typedef struct _UNICODE_STRING {
+      USHORT Length;
+      USHORT MaximumLength;
+      #ifdef MIDL_PASS
+          [size_is(MaximumLength / 2), length_is((Length) / 2) ] USHORT * Buffer;
+      #else // MIDL_PASS
+          _Field_size_bytes_part_(MaximumLength, Length) PWCH   Buffer;
+      #endif // MIDL_PASS
+      } UNICODE_STRING;
+    typedef UNICODE_STRING *PUNICODE_STRING;
+
+    typedef struct _OBJECT_ATTRIBUTES {
+        ULONG Length;
+        HANDLE RootDirectory;
+        PUNICODE_STRING ObjectName;
+        ULONG Attributes;
+        PVOID SecurityDescriptor;        // Points to type SECURITY_DESCRIPTOR
+        PVOID SecurityQualityOfService;  // Points to type SECURITY_QUALITY_OF_SERVICE
+    } OBJECT_ATTRIBUTES;
+    typedef OBJECT_ATTRIBUTES *POBJECT_ATTRIBUTES;
+
     typedef long LONG;
     typedef LONG NTSTATUS;
   }
-  #include <ntstatus.h>
+  //#include <ntstatus.h>
+
   //#include <Wdm.h>
   //#include <Ntstrsafe.h>
   #include <strsafe.h>
 
   // the following is api poison and is a cancerous abomination, but it seems to be the only way to list the global anonymous memory maps in windows  
-  #define DIRECTORY_QUERY  0x0001  
-  #define STATUS_SUCCESS   ((NTSTATUS)0x00000000L)    // ntsubauth
+  #define DIRECTORY_QUERY              0x0001  
+  #define STATUS_SUCCESS               ((NTSTATUS)0x00000000L)    // ntsubauth
+  #define OBJ_CASE_INSENSITIVE         0x00000040L
+  #define STATUS_NO_MORE_FILES         ((NTSTATUS)0x80000006L)
+  #define STATUS_NO_MORE_ENTRIES       ((NTSTATUS)0x8000001AL)
 
   typedef struct _IO_STATUS_BLOCK {
 		union {
@@ -323,7 +367,7 @@
     WINNT::WCHAR buf[4096];
     UNICODE_STRING   pth = { 0 };
     pth.Buffer        = mempth;
-    pth.Length        = lstrlenW(mempth) * sizeof(WINNT::WCHAR);
+    pth.Length        = (USHORT)lstrlenW(mempth) * sizeof(WINNT::WCHAR);
     pth.MaximumLength = pth.Length;
 
     OBJECT_ATTRIBUTES oa = { 0 };
@@ -2038,6 +2082,12 @@ public:
 
 #endif
 
+
+
+//namespace WINNT { 
+//  #include <Ntdef.h> 
+////#include <Ntifs.h>
+//}
 
 
 

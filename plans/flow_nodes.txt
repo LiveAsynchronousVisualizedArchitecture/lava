@@ -11,3 +11,11 @@ Is scatter needed?
  - Ordering can be done at any point by sorting on the version number
  - any list should be able to be 'scattered' and processed by different threads because the data is separate
 
+
+Make message passing nodes circles and data flow containers squares
+ | both could contain stats
+ | the message passing nodes could have segments on the border that show their connections/messages to data flow containers and other message nodes
+ | | use an arc along the border and change it to hav a teardrop shaped protrusion that transitions into the line/noodle showing the connection?
+
+
+
