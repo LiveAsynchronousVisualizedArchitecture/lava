@@ -122,6 +122,9 @@
 // -todo: update reserve() and constructor to set map capacity
 // -todo: make operator-- be shrink_to_fit() and ++ be expand() ?
 
+// todo: make operator()() take integers so that the map can also be used as an iterable list through sub-tables
+// todo: make operator+=(const char*) create a key in the map
+// todo: make operator-=(const char*) delete a key in the map
 // todo: work on flattening table - put in table data segment
 //       | -change map_capacity to be a variable in memory
 //       | tbl segment would be calculated from other variables - internal tbl would be an offset from m_mem
