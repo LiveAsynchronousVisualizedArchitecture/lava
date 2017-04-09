@@ -524,10 +524,10 @@ int main()
   //db.get(wut,   &v);  Println("value: ", v);
   //db.get(kablam,&v);  Println("value: ", v);
 
-  Println("\nKEYS");
-  auto keys = db.getKeyStrs();
-  for(auto k : keys) Println(k,":  ", db.get(k) );
-  Println("\n");
+  //Println("\nKEYS");
+  //auto keys = db.getKeyStrs();
+  //for(auto k : keys) Println(k,":  ", db.get(k) );
+  //Println("\n");
 
   //TO(6,i)
   //{  

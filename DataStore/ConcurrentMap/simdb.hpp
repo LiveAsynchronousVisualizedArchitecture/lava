@@ -46,7 +46,6 @@
 // todo: make sure that the important atomic variables like block list next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries?
 // todo: check if read can be made non-atomic if they already aren't?
 
-
 // todo: make a 'waiting' flag or type for keys so that they can be rewritten and resized in place? - would mean that they could not be read from at any time like they can be now
 // todo: make alloc look for multiple blocks then check the next block variable for its version and if the version has not changed, allocate all blocks at once?
 // todo: make a resize/realloc function to change the size of a block list instead of destroying and creating all indices when updating a key? - would need a different putWeak, since the writing of the index needs  to be atomic and re-writing the currently used blocks would not work with concurrency
@@ -153,6 +152,10 @@
 
 #ifndef __SIMDB_HEADER_GUARD__
 #define __SIMDB_HEADER_GUARD__
+
+#if !defined(SECTION)
+  #define       SECTION(_msvc_only_collapses_macros_with_arguments, ...)
+#endif
 
 // platform specifics - mostly for shared memory mapping and auxillary functions like open, close and the windows equivilents
 #if defined(_WIN32)      // windows
