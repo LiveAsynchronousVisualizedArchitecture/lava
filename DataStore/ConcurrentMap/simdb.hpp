@@ -1598,7 +1598,8 @@ public:
     sm.size  = alignment==0? size  :  alignment-(size%alignment);
 
     #ifdef _WIN32      // windows
-      char path[512] = "Global\\simdb_";
+      //char path[512] = "Global\\simdb_";
+      char path[512] = "simdb_";
     //#elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
     #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
       char path[512] = "/tmp/simdb_15_";
