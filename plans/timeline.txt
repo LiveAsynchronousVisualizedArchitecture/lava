@@ -1,0 +1,44 @@
+The pieces: 
+
+simdb.hpp  -  Working  -  Future refinements include lock free robin hood hashing.
+
+tbl.hpp        -   Partial     - A vector+hash map data structure that is always a single span of contiguous memory and thus has no separate serialization.
+
+visualizer   -   Working  - Separate process that draws textured 3d models or shows the contents of a tbl.  Uses simdb to get data from other processes and is fast enough to update at greater than 144 frames per second. 
+
+
+
+
+
+
+The pieces are simdb, tbl, visualizer, node graph creator, execution loop
+ 
+simdb.hpp  -  Working  -  Future refinements include lock free robin hood hashing.
+
+tbl.hpp        -   Partial     - A vector+hash table data structure that is always a single span of contiguous memory and thus has no separate serialization. Useful as a general purpose high level data structure so that custom structures that and their serialization are not needed as often.   Next step is to nest tbl structures so that trees and compound data structures can be created easily as well.
+
+visualizer   -   Working  - Separate process that draws textured 3d models or shows the contents of a tbl.  Uses simdb to get data from other processes and is fast enough to update at greater than 144 frames per second. 
+
+
+
+
+
+
+
+The pieces are simdb, tbl, visualizer, node graph creator, execution loop
+ 
+simdb.hpp  -  Working  -  Future refinements include lock free robin hood hashing.
+
+tbl.hpp        -   Partial     - A vector+hash table data structure that is always a single span of contiguous memory and thus has no separate serialization. Useful as a general purpose high level data structure so that custom structures that and their serialization are not needed as often.   Next step is to nest tbl structures so that trees and compound data structures can be created easily as well.
+
+visualizer   -   Working  - Separate process that draws textured 3d geometry from other processes. Uses simdb to get data which enables it to update at greater than 144 frames per second.  Future refinements include showing the vector, key-value, and nested tbl contents of a tbl structure.
+
+
+
+
+
+
+
+
+
+
