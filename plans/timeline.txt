@@ -25,11 +25,21 @@ Execution loop:  The actual execution of the program being created. Takes data p
 
 
 
-The individual components are simdb, tbl, visualizer, node graph interface, execution loop.  Most of the work would go into the node graph and execution loop.
+The individual components are simdb, tbl, the visualizer, the node graph interface and the execution loop.  Most of the time would go into the node graph and execution loop. Some additional time could be used to polish tbl.hpp and simdb.hpp so that they could be released individually and used to promote the architecture as a whole.  All estimates are just as rough as any software estimate. 
  
-node graph interface - Initial Prototype - Still in it's infancy, though shows that openGL + nanovg can be used to provide a fluid and great looking interface.
+Node graph interface - 3-4 Weeks: Still in it's infancy, though shows that openGL + nanovg can be used to provide a fluid and great looking interface. The goal would be:
+ | A workable interface for building data flow graphs 
+ | Dynamic reloading of nodes on change
+ | Ability to visualize any types in the shared memory that can be converted to images or geometry
+ | Ability to freeze execution on a node so that dynamic reloading runs the node and visualizes the result
+ | The ability to load and save workspace files
 
-Execution loop:  The actual execution of the program being created. Takes data packets from a lock free queue, passes them to the node they go to, gets the outputs and puts them into the queue.     Not Yet Started  -  Previous Prototypes.
+Execution loop - 10 days:  
+ | Define plug-in API for shared libaries
+ | Take data packets from a lock free queue, pass to their destination node
+ | Get the outputs and put them into the queue
+ | Run message passing nodes with their messages when available
+
 
 simdb.hpp  - 5 days: Lock free robin hood hashing.
 tbl.hpp    - 5 days: Nesting tables as offsets into contiguous memory. 
