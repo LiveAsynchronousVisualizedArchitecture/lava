@@ -1,0 +1,1 @@
+With this I could spend 6 weeks working full time to get to a state where the node graph could be used productively, opening up the possibility of others being able to start  doing research interactively.   Multiple components could also stand alone as general purpose projects on github.  Hopefully extra promotion and attention could be brought to it as well.

@@ -1,20 +1,27 @@
 
 
-I am a film visual effects veteran.  I started when I was 12, growing up near NewTek, makers of Lightwave 3D and the Video Toaster.  Eventually I was hired as a technical director for Rhythm and Hues at 21, worked on Aslan for The Lion the Witch and the Wardrobe at 23, took responsibility for Garfield at 24 (which was used downstream by over 100 people) and helped lead a team on A Night at the Museum later that year.  Eventually I spent four years as Lead Technical Director of Industrial Light and Magic Singapore. 
+Most of my career has been spent in film visual effects with my last job being Lead Technical Director of Industrial Light and Magic Singapore. I started programming and computer graphics when I was 12, was hired at Rhythm and Hues at 21, worked on Aslan for The Lion the Witch and the Wardrobe at 23, took responsibility for Garfield at 24 (which was used downstream by over 100 people) and helped lead a team on A Night at the Museum later that year. After, I worked at Digital Domain and Rising Sun in Sydney before moving to Singapore to work at ILM. 
 
 http://www.imdb.com/name/nm2280069/?ref_=nv_sr_1
 https://youtu.be/lQCaH3OS82E?t=35
 https://youtu.be/lQCaH3OS82E?t=131
 
-For the past four years I have been working with C++11,  eventually starting my own S-Corp LLC to sell a Unity asset to do live light mapping, single handedly garnering near universal praise in comparison to the previous built in solution which was bought from ARM.
+For the past four years I have been working with C++11,  eventually starting my own S-Corp LLC to sell a Unity asset which does live feedback light mapping, garnering near universal praise in comparison to the previous built in solution, which was bought from ARM.
 
 https://www.assetstore.unity3d.com/en/#!/content/72162
 
-Two major indications that this is something I can do are:
-1. I've already created most or all the components in some form and have used them successfully to get work done in isolation. 
-2. The project is in progress and has already yielded what I feel are incredibly useful components despite being done in my spare time.
+Two major indications that I can do this:
+1. I've already created most or all the components in some form and used them in other projects.
+2. The project is in progress and has already yielded what I feel are very useful components despite being done in my spare time.
 
 
-I am currently self employed and flexible since I work from home and have already launched multiple versions of my asset. My time currently goes into building and marketing my Unity App.
+I am currently self employed. I'm flexible since I work from home and have already launched multiple versions of my asset. My time currently goes into building and marketing my Unity App.
+
+
+
+
+
+, growing up near NewTek, makers of Lightwave 3D and the Video Toaster.  
+
 
 
