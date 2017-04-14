@@ -2,33 +2,7 @@
 
 The pieces are simdb, tbl, visualizer, node graph interface, execution loop
  
-simdb.hpp      -  Lock free shared memory key value store. Currently working.
-
-Future Work   -  Lock free robin hood hashing.
-
-tbl.hpp           -   A vector+hash table data structure that is always a single span of contiguous memory and thus has no separate serialization. Useful as a general purpose high level data structure so that custom structures that and their serialization are not needed as often.   Next step is to nest tbl structures so that trees and compound data structures can be created easily as well.  Working but missing nested tables.
-
-Future Work  - Nesting tables as pointers or offsets into contiguous memory. 
-
-Visualizer:  -Separate process that draws textured 3d geometry from other processes. Uses simdb to get data which enables it to update at greater than 144 frames per second.  Currently working and in fact has been already been used to debug my commercial product.
-
-Future Work:  Showing the vector, key-value, and nested tbl contents of a tbl structure.  Estimate: 8 days 
-
-node graph interface - Initial Prototype - Still in it's infancy though shows that openGL + nanovg can be used to provide a fluid and great looking interface.
-
-execution loop  -  Not Yet Started  -  Previous Prototypes.
-
-
-
-
-
-
-
-
-
-The pieces are simdb, tbl, visualizer, node graph interface, execution loop
- 
-simdb.hpp      -  Lock free shared memory key value store. Currently working.
+simdb.hpp     -  Lock free shared memory key value store. Currently working.
 
 Future Work   -  Lock free robin hood hashing.
 
@@ -43,5 +17,25 @@ Future Work:  Showing the vector, key-value, and nested tbl contents of a tbl st
 node graph interface - Initial Prototype - Still in it's infancy though shows that openGL + nanovg can be used to provide a fluid and great looking interface.
 
 Execution loop:  The actual execution of the program being created. Takes data packets from a lock free queue, passes them to the node they go to, gets the outputs and puts them into the queue.     Not Yet Started  -  Previous Prototypes.
+
+
+
+
+
+
+
+
+The individual components are simdb, tbl, visualizer, node graph interface, execution loop.  Most of the work would go into the node graph and execution loop.
+ 
+node graph interface - Initial Prototype - Still in it's infancy, though shows that openGL + nanovg can be used to provide a fluid and great looking interface.
+
+Execution loop:  The actual execution of the program being created. Takes data packets from a lock free queue, passes them to the node they go to, gets the outputs and puts them into the queue.     Not Yet Started  -  Previous Prototypes.
+
+simdb.hpp  - 5 days: Lock free robin hood hashing.
+tbl.hpp    - 5 days: Nesting tables as offsets into contiguous memory. 
+Visualizer - 8 days: Showing the vector, key-value and nested tbl contents of a tbl structure.  
+
+
+
 
 
