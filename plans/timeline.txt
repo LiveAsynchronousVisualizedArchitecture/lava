@@ -1,23 +1,22 @@
-The pieces: 
-
-simdb.hpp  -  Working  -  Future refinements include lock free robin hood hashing.
-
-tbl.hpp        -   Partial     - A vector+hash map data structure that is always a single span of contiguous memory and thus has no separate serialization.
-
-visualizer   -   Working  - Separate process that draws textured 3d models or shows the contents of a tbl.  Uses simdb to get data from other processes and is fast enough to update at greater than 144 frames per second. 
 
 
-
-
-
-
-The pieces are simdb, tbl, visualizer, node graph creator, execution loop
+The pieces are simdb, tbl, visualizer, node graph interface, execution loop
  
-simdb.hpp  -  Working  -  Future refinements include lock free robin hood hashing.
+simdb.hpp      -  Lock free shared memory key value store. Currently working.
 
-tbl.hpp        -   Partial     - A vector+hash table data structure that is always a single span of contiguous memory and thus has no separate serialization. Useful as a general purpose high level data structure so that custom structures that and their serialization are not needed as often.   Next step is to nest tbl structures so that trees and compound data structures can be created easily as well.
+Future Work   -  Lock free robin hood hashing.
 
-visualizer   -   Working  - Separate process that draws textured 3d models or shows the contents of a tbl.  Uses simdb to get data from other processes and is fast enough to update at greater than 144 frames per second. 
+tbl.hpp           -   A vector+hash table data structure that is always a single span of contiguous memory and thus has no separate serialization. Useful as a general purpose high level data structure so that custom structures that and their serialization are not needed as often.   Next step is to nest tbl structures so that trees and compound data structures can be created easily as well.  Working but missing nested tables.
+
+Future Work  - Nesting tables as pointers or offsets into contiguous memory. 
+
+Visualizer:  -Separate process that draws textured 3d geometry from other processes. Uses simdb to get data which enables it to update at greater than 144 frames per second.  Currently working and in fact has been already been used to debug my commercial product.
+
+Future Work:  Showing the vector, key-value, and nested tbl contents of a tbl structure.  Estimate: 8 days 
+
+node graph interface - Initial Prototype - Still in it's infancy though shows that openGL + nanovg can be used to provide a fluid and great looking interface.
+
+execution loop  -  Not Yet Started  -  Previous Prototypes.
 
 
 
@@ -25,20 +24,24 @@ visualizer   -   Working  - Separate process that draws textured 3d models or sh
 
 
 
-The pieces are simdb, tbl, visualizer, node graph creator, execution loop
+
+
+The pieces are simdb, tbl, visualizer, node graph interface, execution loop
  
-simdb.hpp  -  Working  -  Future refinements include lock free robin hood hashing.
+simdb.hpp      -  Lock free shared memory key value store. Currently working.
 
-tbl.hpp        -   Partial     - A vector+hash table data structure that is always a single span of contiguous memory and thus has no separate serialization. Useful as a general purpose high level data structure so that custom structures that and their serialization are not needed as often.   Next step is to nest tbl structures so that trees and compound data structures can be created easily as well.
+Future Work   -  Lock free robin hood hashing.
 
-visualizer   -   Working  - Separate process that draws textured 3d geometry from other processes. Uses simdb to get data which enables it to update at greater than 144 frames per second.  Future refinements include showing the vector, key-value, and nested tbl contents of a tbl structure.
+tbl.hpp           -   A vector+hash table data structure that is always a single span of contiguous memory and thus has no separate serialization. Useful as a general purpose high level data structure so that custom structures that and their serialization are not needed as often.   Next step is to nest tbl structures so that trees and compound data structures can be created easily as well.  Working but missing nested tables.
 
+Future Work  - Nesting tables as pointers or offsets into contiguous memory. 
 
+Visualizer:  -Separate process that draws textured 3d geometry from other processes. Uses simdb to get data which enables it to update at greater than 144 frames per second.  Currently working and in fact has been already been used to debug my commercial product.
 
+Future Work:  Showing the vector, key-value, and nested tbl contents of a tbl structure.  Estimate: 8 days 
 
+node graph interface - Initial Prototype - Still in it's infancy though shows that openGL + nanovg can be used to provide a fluid and great looking interface.
 
-
-
-
+Execution loop:  The actual execution of the program being created. Takes data packets from a lock free queue, passes them to the node they go to, gets the outputs and puts them into the queue.     Not Yet Started  -  Previous Prototypes.
 
 
