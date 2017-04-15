@@ -25,7 +25,6 @@ Execution loop:  The actual execution of the program being created. Takes data p
 
 Total days: 37 -> roughly 6 weeks at 6 days per week.
 
-
 The individual components are simdb, tbl, the visualizer, the node graph interface and the execution loop.  Most of the time would go into the node graph and execution loop since the other parts have signifanct progress already. Some additional time could be used to polish tbl.hpp and simdb.hpp so that they could be released individually and used to promote the architecture as a whole. 
  
 Node graph interface - 15 days: Still in its infancy, though shows that OpenGL+NanoVG can be used to provide a fluid and great looking interface. The goal would be:
@@ -33,14 +32,13 @@ Node graph interface - 15 days: Still in its infancy, though shows that OpenGL+N
  | Dynamic reloading of nodes when underlying shared library changes 
  | Ability to visualize any types in the shared memory that can be converted to images or geometry
  | Ability to isolate a node so that dynamic reloading + specific data the node and visualizes the result
- | The ability to load and save workspace files
+ | The ability to load and save workspace files with native file dialogs
 
 Execution loop - 8 days:  
  | Define plug-in API for shared libaries
  | Take data packets from a lock free queue, pass to their destination node
  | Get the outputs and put them into the queue
  | Run message passing nodes with their messages when available
-
 
 simdb.hpp  - 4 days: Lock free robin hood hashing.
 tbl.hpp    - 4 days: Nesting tables as offsets into contiguous memory. 
