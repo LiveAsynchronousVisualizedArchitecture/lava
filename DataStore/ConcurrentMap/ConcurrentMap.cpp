@@ -11,10 +11,12 @@
 #include <iostream>
 #include <sstream>
 #include <thread>
-
 #include "simdb.hpp"
 
-#include <windows.h>
+#ifdef _WIN32
+  #include <intrin.h>
+  #include <windows.h>
+#endif
 
 //#include <SIM/SIM_GeneralTemplateUtil.hpp>
 
@@ -210,10 +212,45 @@ inline void prefetch0(char const* const p)
   //_m_prefetch((void*)p);
 }
 
+
+//struct _u128 { u64 hi, lo; };
+//using u128 = __declspec(align(128)) volatile _u128;
+
 int main()
 {
   using namespace std;
-  
+
+  SECTION(128 bit atomic compare and exchange)
+  {
+    u128 dest = { 101, 102 };
+    u128 comp = { 101, 102 };
+    u128 desired = { 85, 86 };
+
+    _InterlockedCompareExchange128(
+      (i64*)(&dest), 
+      desired.hi,
+      desired.lo,
+      (i64*)(&comp) );
+
+    Println("dest: ", dest.hi, " ", dest.lo);
+    Println("comp: ", comp.hi, " ", comp.lo);
+    Println("\n\n");
+
+    //u128 dest = { 101, 102 };
+    //u128 comp = { 101, 102 };
+    //u128 desired = { 85, 86 };
+
+    _InterlockedCompareExchange128(
+      (i64*)(&dest), 
+      desired.hi,
+      desired.lo,
+      (i64*)(&comp) );
+
+    Println("dest: ", dest.hi, " ", dest.lo);
+    Println("comp: ", comp.hi, " ", comp.lo);
+    Println("\n\n");
+  }
+
   //ui32 sz = 18921703;
   //ui32 sz = 400;
   //ConcurrentMap cm(sz);

@@ -4,7 +4,7 @@
 #include <vector>
 
 #include "catch.hpp"
-#include "ConcurrentMap.hpp"
+#include "../ConcurrentMap/simdb.hpp"
 
 
 TEST_CASE("SimDB.get(const char *key)", "[simdb]") {
