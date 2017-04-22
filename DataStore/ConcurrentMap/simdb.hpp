@@ -37,40 +37,48 @@
 // -todo: make the BlkLst hash be checked before comparing keys
 // -todo: make ConcurrentStore get() stop before exceeding maxlen? - already done
 // -todo: clean up type aliases with ui32 to u32
+// -todo: make arguments to listDBs for the prefix? 'type' is windows specific and should be ok to be hardcoded - not neccesary because windows will be hardcoded and unix and linux don't have types
+// -todo: make a macro to have separate windows and unix paths
 
-// todo: make put() insert at the first available slot then swap with one index lower if it has a IPD that is at least 2 less
-//       | after swapping, set the block list's version to the new version of the index? - what if the found version is not what the old version was? leave it? 
-// todo: align ConcurrentHash's lava vec on 128 bit boundary - need to make an extra 128bit value and 
-// todo: change ConcurrentHash to CncrHsh 
+// todo: take out IDX alias
+// todo: take out stack based m_blocksUsed
+// todo: make del() delete a VerIdx, duplicate the VerIdx ahead into the deleted slot, check that the indices are the same, and if they are, mark the one further ahead as deleted
+// todo: short circuit as not found on finding an empty slot - will need a deleted value
+// todo: make a DELETED value for hash entries so that when something is removed, it doesn't block a linear search
+// todo: change ConcurrentHash  to CncrHsh 
 // todo: change ConcurrentStore to CncrStr
-// todo: change ConcurrentList to CncrLst
+// todo: change ConcurrentList  to CncrLst
 // todo: clean up inconsitent signs and usage of negative numbers
+// todo: switch negative numbers to a bitfield struct instead of implicitly using the sign bit for different purposes
 // todo: give a ConcurrentStore pointer to ConcurrentHash and stop using lambdas and templates?
 // todo: check the hash in each BlkLst index as an early out for failed reads?
 // todo: take out simdb_ prefix?
-// todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
-// todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
-// todo: make a macro to have separate windows and unix paths?
-// todo: make arguments to listDBs for the prefix? 'type' is windows specific and should be ok to be hardcoded
-// todo: compile with maximum warnings
+// todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
+// todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
 // todo: put prefetching into reading of blocks
+// todo: look at making a memory access to the next block that can't be optimized away
 // todo: prefetch memory for next block when looping through blocks - does this require a system call for shared memory and does it lock? it should just be the prefetch instruction or an unoptimized away load? use intrinsic?
 // todo: make put give back FAILED_PUT on error
 // todo: make put return VerIdx ?
-// todo: make a DELETED value for hash entries so that when something is removed, it doesn't block a linear search
-// todo: figure out deletion - look back at tbl with EMPTY and NONE types 
-//       | even without robin hood hashing are 128 bit atomics needed to swap/bubble sort keys into the new free slot?
-//       | when deleting, instead of swapping the deleted key, duplicate the next key to the previous key and so on until reaching either an empty slot, a key that is further from its optimal distance, or two of the same key in a row (indicating another thread is moving keys around)
-// todo: look at making a memory access to the next block that can't be optimized away
-// todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
-// todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
+// todo: check if reads can be made non-atomic if they already aren't?
+// todo: make sure that the important atomic variables like block list next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries?
+// todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
+// todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
+// todo: compile with maximum warnings
+
+
+// robin hood hashing
+// todo: do rm()/del() first and make deletion take care of holes in spans?
+// todo: make put() insert at the first available slot then swap with one index lower if it has a IPD that is at least 2 less
+//       | after swapping, set the block list's version to the new version of the index? - what if the found version is not what the old version was? leave it? 
+// todo: align ConcurrentHash's lava vec on 128 bit boundary - need to make an extra 128bit value and 
 // todo: -organize ConcurrentHash entry to have the index on the left side, version on the right side. 
 //       Put hash in the middle and use the first two bits of the index as empty and deleted flags
 //       empty : 1, deleted : 1, index : 35, hash : 35, version : 56 - total 128 bits, 34 billion entry limit 
 // todo: test alignment
-// todo: switch negative numbers to a bitfield struct instead of implicitly using the sign bit for different purposes
-// todo: make sure that the important atomic variables like block list next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries?
-// todo: check if read can be made non-atomic if they already aren't?
+// todo: figure out deletion - look back at tbl with EMPTY and NONE types 
+//       | even without robin hood hashing are 128 bit atomics needed to swap/bubble sort keys into the new free slot?
+//       | when deleting, instead of swapping the deleted key, duplicate the next key to the previous key and so on until reaching either an empty slot, a key that is further from its optimal distance, or two of the same key in a row (indicating another thread is moving keys around)
 
 // todo: make a 'waiting' flag or type for keys so that they can be rewritten and resized in place? - would mean that they could not be read from at any time like they can be now
 // todo: make alloc look for multiple blocks then check the next block variable for its version and if the version has not changed, allocate all blocks at once?
@@ -468,6 +476,7 @@
 
 using    i8   =   int8_t;
 using   ui8   =   uint8_t;
+using    u8   =   uint8_t;
 using   i64   =   int64_t;
 using  ui64   =   uint64_t;
 using   u64   =   uint64_t;
@@ -742,7 +751,7 @@ public:
   union VerIdx
   {
     struct {
-      i32      idx;
+      i32     idx;
       u32 version;
     };
     ui64 asInt;
@@ -790,24 +799,6 @@ public:
 
   const static u32 LIST_END = ConcurrentList::LIST_END;
 
-  //static BlkLst   make_BlkLst(bool isKey, i32 readers, u32 idx, u32 ver, u32 len, u32 klen)
-  //{
-  //  BlkLst bl;
-  //  bl.kr.isKey    = isKey;
-  //  bl.kr.readers  = readers;
-  //  bl.idx         = idx;
-  //  bl.kr.version  = ver;
-  //
-  //  if(isKey){
-  //    bl.len  = len;
-  //    bl.klen = klen;
-  //  }else{
-  //    bl.len  = 0;
-  //    bl.klen = 0;
-  //  }
-  //
-  //  return bl;
-  //}
   static VerIdx      List_End()
   { 
     VerIdx vi; 
@@ -860,10 +851,10 @@ private:
   void*               s_blksAddr;       // points to the block space in the shared memory
   aui64*               s_version;       // pointer to the shared version number
 
-  u32               m_blockSize;
-  u32              m_blockCount;
+  u32                m_blockSize;
+  u32               m_blockCount;
   ui64                 m_szBytes;
-  mutable ai32      m_blocksUsed;      // todo: this is a mistake and does no good unless it is in the shared memory
+  mutable ai32      m_blocksUsed;       // todo: this is a mistake and does no good unless it is in the shared memory
 
   VerIdx       nxtBlock(i32  blkIdx)  const
   {
@@ -926,7 +917,7 @@ private:
     s_bls[cur].kr.readers = 0;                 // reset the reader count
     s_cl.free(cur);
   }
-  u32       writeBlock(i32  blkIdx, void const* const bytes, u32 len=0, u32 ofst=0)      // don't need to increment readers since write should be done before the block is exposed to any other threads
+  u32        writeBlock(i32  blkIdx, void const* const bytes, u32 len=0, u32 ofst=0)      // don't need to increment readers since write should be done before the block is exposed to any other threads
   {
     i32   blkFree  =  blockFreeSize();
     ui8*        p  =  blockFreePtr(blkIdx);
@@ -937,7 +928,7 @@ private:
 
     return cpyLen;
   }
-  u32        readBlock(i32  blkIdx, u32 version, void *const bytes, u32 ofst=0, u32 len=0) const
+  u32         readBlock(i32  blkIdx, u32 version, void *const bytes, u32 ofst=0, u32 len=0) const
   {
     BlkLst bl = incReaders(blkIdx, version);      if(bl.kr.version==0) return 0;
       i32   blkFree  =  blockFreeSize();
@@ -1043,7 +1034,7 @@ public:
       return vi;
     }
   }
-  bool         free(u32 blkIdx, u32 version)        // frees a list/chain of blocks
+  bool         free(u32  blkIdx, u32 version)        // frees a list/chain of blocks
   {
     return decReaders(blkIdx, version);
   }
@@ -1081,7 +1072,7 @@ public:
       b   +=  writeBlock(cur, b, remvlen);
     }
   }
-  u32          get(i32  blkIdx, u32 version, void *const bytes, u32 maxlen) const
+  u32           get(i32  blkIdx, u32 version, void *const bytes, u32 maxlen) const
   {
     using namespace std;
 
@@ -1096,8 +1087,8 @@ public:
     auto  kblks = kdiv.quot;
     auto   krem = kdiv.rem;
     auto vrdLen = 0;
-    u32    len = 0;
-    u32  rdLen = 0;
+    u32     len = 0;
+    u32   rdLen = 0;
     i8*       b = (i8*)bytes;
     i8*      en = b + maxlen;
     i32     cur = blkIdx;
@@ -1113,6 +1104,7 @@ public:
     len   +=  rdLen;
     nxt    =  nxtBlock(cur);         if(nxt.version!=version){ goto read_failure; }
 
+    // todo: is this not technically correct? this checks that the next version is the same and then reads it, but shouldn't it read the block and then check if the version is still the same?
     while(len<maxlen && !(nxt.idx<0) && nxt.idx!=LIST_END && nxt.version==version)
     {
       vrdLen =  min<u32>(blockFreeSize(), maxlen-len);
@@ -1128,7 +1120,7 @@ public:
 
     return len;                                           // only one return after the top to make sure readers can be decremented - maybe it should be wrapped in a struct with a destructor
   }
-  u32       getKey(u32  blkIdx, u32 version, void *const bytes, u32 maxlen) const
+  u32        getKey(u32  blkIdx, u32 version, void *const bytes, u32 maxlen) const
   {
     if(blkIdx == LIST_END){ return 0; }
 
@@ -1225,7 +1217,7 @@ public:
       nxt      =  nxtBlock(curidx);                               if(nxt.version!=version) return MATCH_FALSE;
     }
   }
-  u32          len(i32  blkIdx, u32 version, u32* out_vlen=nullptr) const
+  u32           len(i32  blkIdx, u32 version, u32* out_vlen=nullptr) const
   {
     BlkLst bl = s_bls[blkIdx];
     if(version==bl.kr.version && bl.len>0){
@@ -1246,23 +1238,37 @@ public:
   {
     return 0; // m_cl.sizeBytes();
   }
+  auto       blkLst(u32 i) const -> BlkLst
+  {
+    return s_bls[i];
+  }
+
+  friend ConcurrentHash;
 };
 class   ConcurrentHash
 {
 public:
-  using VerIdx = ConcurrentStore::VerIdx;
+  using VerIdx  = ConcurrentStore::VerIdx;
+  using CncrStr = ConcurrentStore;
 
-  static const  i8   RM_OWNER         =    -1;            // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
-  static const ui8   LAST_READER      =     0;            // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
-  static const ui8   INIT_READERS     =     0;            // eventually make this 1 again? - to catch when readers has dropped to 0
-  static const ui8   FREE_READY       =     0;
-  static const ui8   MAX_READERS      =  0xFF;
-  static const ui64  EMPTY_KEY        =  2097151;         // first 21 bits set 
-  static const u32  EMPTY_HASH_IDX   =  0xFFFFFFFF;           // 32 bits set - hash indices are different from block indices 
+  struct VerIpd { u32 version, ipd; };                   // ipd is Ideal Position Distance
+
+  static const i8   RM_OWNER         =    -1;            // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
+  static const u8   LAST_READER      =     0;            // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
+  static const u8   INIT_READERS     =     0;            // eventually make this 1 again? - to catch when readers has dropped to 0
+  static const u8   FREE_READY       =     0;
+  static const u8   MAX_READERS      =  0xFF;
+  static const u32  KEY_MAX          =  0xFFFFFFFF; 
+  static const u32  EMPTY_KEY        =  0x0000001FFFFF;   // first 21 bits set 
+  static const u32  DELETED_KEY      =  0x0000001FFFFE;   // 1 less than the EMPTY_KEY
+  static const u32  EMPTY_HASH_IDX   =  0xFFFFFFFF;       // 32 bits set - hash indices are different from block indices 
+
+  //static const u64  EMPTY_KEY        =  0x000000000000001FFFFF;         // first 21 bits set 
   //static const ui64  EMPTY_KEY        =  0x000000000FFFFFFF;   // first 28 bits set 
   //static const ui64  EMPTY_KEY        =    0x0000000000200000;   // first 21 bits set 
+  //static const ui64  EMPTY_KEY        =  2097151;         // first 21 bits set 
 
-  static u32       nextPowerOf2(u32  v)
+  static u32        nextPowerOf2(u32  v)
   {
     v--;
     v |= v >> 1;
@@ -1283,7 +1289,7 @@ public:
   {
     return a == b;
   }
-  static u32          HashBytes(const void *const buf, u32 len)
+  static u32           HashBytes(const void *const buf, u32 len)
   {
     ui64 hsh = fnv_64a_buf(buf, len);
 
@@ -1293,9 +1299,17 @@ public:
   {
     VerIdx empty;
     empty.idx      =  EMPTY_KEY;
-    //empty.val      =  EMPTY_KEY;
     empty.version  =  0;
+    return empty;
+
+    //empty.val      =  EMPTY_KEY;
     //empty.readers  =  0;
+  }
+  static VerIdx       deleted_kv()
+  {
+    VerIdx empty;
+    empty.idx      =  DELETED_KEY;
+    empty.version  =  0;
     return empty;
   }
   static bool            IsEmpty(VerIdx kv)
@@ -1306,30 +1320,33 @@ public:
   static u32                hi32(u64 n){ return (n>>32)<<32; }
   static u32                lo32(u64 n){ return (n<<32)>>32; }
   static u64               swp32(u64 n){ return (((u64)hi32(n))<<32) & lo32(n); }
-  static u64                incHi32(u64 n, u32 i)
+  static u64             incHi32(u64 n, u32 i)
   {
     return ((u64)hi32(n)+i)<<32 & lo32(n);
   }
-  static u64                incLo32(u64 n, u32 i)
+  static u64             incLo32(u64 n, u32 i)
   {
     return ((u64)hi32(n))<<32 & (lo32(n)+i);
   }
 
 private:
-  using i8        =  int8_t;
-  using u32      =  uint32_t;
-  using ui64      =  uint64_t;
-  using  u32      =  uint32_t;
-  using  u64      =  uint64_t;
+  using   i8     =  int8_t;
+  using  u32     =  uint32_t;
+  using ui64     =  uint64_t;
+  using  u32     =  uint32_t;
+  using  u64     =  uint64_t;
   using Au32     =  std::atomic<u32>;
-  using Aui64     =  std::atomic<ui64>;
-  using VerIdxs   =  lava_vec<VerIdx>;
-  using Mut       =  std::mutex;
-  using UnqLock   =  std::unique_lock<Mut>;
+  using Aui64    =  std::atomic<ui64>;
+  using VerIdxs  =  lava_vec<VerIdx>;
+  using Mut      =  std::mutex;
+  using UnqLock  =  std::unique_lock<Mut>;
 
-          u32      m_sz;
-  mutable VerIdxs   m_kvs;
+          u32       m_sz;
+  mutable VerIdxs   m_kvs;           // m_kvs is key value(s) - needs to be changed to versioned indices, m_vis
+          CncrStr*  m_chp;           // chp is concurrent hash pointer
 
+
+  u32            nxtIdx(u32 i)                const { return (i+1)%m_sz; }
   VerIdx        load_kv(u32 i)                const
   {
     using namespace std;
@@ -1378,6 +1395,22 @@ private:
   void           doFree(u32 i)                const
   {
     store_kv(i, empty_kv());
+  }
+  VerIpd            ipd(VerIdx vi)            const  // ipd is Ideal Position Distance - it is the distance a ConcurrentHash index value is from the position that it gets hashed to 
+  {
+    u32  ip = m_chp->blkLst(vi.idx).hash % m_sz;     // ip is Ideal Position
+    u32 ipd = vi.idx>ip?  vi.idx-ip  :  KEY_MAX-ip + vi.idx;
+    return {vi.version, ipd};
+  }
+  void    cleanDeletion(u32 i)                const
+  {
+    VerIdx vi; VerIpd vp;
+    u32 nxti = nxtIdx(i);
+    vi = load_kv(nxti);
+    vp = ipd(vi);
+
+    if(vp.ipd){}
+
   }
 
   template<class MATCH_FUNC> 
@@ -1438,8 +1471,8 @@ public:
     VerIdx desired   =  empty;
     desired.idx      =  vi.idx;
     desired.version  =  vi.version;
-    u32          i  =  hash;
-    u32         en  =  min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap?   // % m_sz;   //>0? hash-1  :  m_sz
+    u32           i  =  hash;
+    u32          en  =  min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap?   // % m_sz;   //>0? hash-1  :  m_sz
     for(;; ++i)
     {
       i %= m_sz;
@@ -1466,7 +1499,8 @@ public:
   VerIdx    rmHashed(u32 hash, MATCH_FUNC match)            const
   {  
     using namespace std;
-    static const VerIdx empty = empty_kv();
+    static const VerIdx   empty =   empty_kv();
+    static const VerIdx deleted = deleted_kv();
 
     u32  i = hash;
     u32 en = min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap? 
@@ -1479,15 +1513,16 @@ public:
 
       Match m = checkMatch(probedKv.version, probedKv.idx, match);
       if(m==MATCH_TRUE){
-        bool success = compexchange_kv(i, &probedKv.asInt, empty.asInt);
-        if(success) return probedKv;
-        else{ i==0? (m_sz-1)  : (i-1); continue; }  // retry the same loop again
+        bool success = compexchange_kv(i, &probedKv.asInt, deleted.asInt);
+        if(success){
+          cleanDeletion(i);
+          return probedKv;
+        }else{ i==0? (m_sz-1)  : (i-1); continue; }  // retry the same loop again
 
         return probedKv;   
       }
-      if(m==MATCH_REMOVED || i==en){ return empty; }
 
-      //if(i==en) break;
+      if(m==MATCH_REMOVED || i==en){ return empty; }
     }
 
     return empty; 
@@ -1509,7 +1544,7 @@ public:
     }
   }
   template<class FUNC> 
-  auto       runRead(u32 idx, u32 version, FUNC f)         const -> decltype( f(VerIdx()) )    // decltype( (f(empty_kv())) )
+  auto       runRead(u32 idx, u32 version, FUNC f)          const -> decltype( f(VerIdx()) )    // decltype( (f(empty_kv())) )
   {
     //VerIdx kv = incReaders(idx);
     //auto ret = f(vi);
@@ -1537,12 +1572,12 @@ public:
     
     return true;
   }
-  VerIdx          at(u32  idx)                   const
+  VerIdx          at(u32  idx)                  const
   {
     //return m_kvs[idx];
     return load_kv(idx);
   }
-  u32           nxt(u32  stIdx)                 const
+  u32            nxt(u32  stIdx)                 const
   {
     auto idx = stIdx;
     VerIdx empty = empty_kv();
@@ -1558,15 +1593,15 @@ public:
 
     /* && kv.readers>=0 */
   }
-  u32          size()                            const
+  u32           size()                           const
   {
     return m_sz;
   }
-  ui64     sizeBytes()                            const
+  ui64     sizeBytes()                          const
   {
     return m_kvs.sizeBytes();
   }
-  i64        swapNxt(u32 idx)                     const
+  i64        swapNxt(u32 idx)                   const
   {
     i64 retries = -1;
     if(idx%2==0)
@@ -1792,8 +1827,8 @@ private:
 
   // these variables are local to the stack where simdb lives, unlike the others, they are not simply a pointer into the shared memory
   SharedMem           m_mem;
-  mutable u32   m_nxtChIdx;
-  mutable u32   m_curChIdx;
+  mutable u32    m_nxtChIdx;
+  mutable u32    m_curChIdx;
   ui64             m_blkCnt;
   ui64              m_blkSz;
 
@@ -1898,7 +1933,7 @@ public:
     };
     
     u32  out_klen = 0;
-    auto   runFunc = [ths, &out_klen, out_val, vlen](VerIdx kv){
+    auto  runFunc = [ths, &out_klen, out_val, vlen](VerIdx kv){
       return ths->s_cs.get(kv.idx, kv.version, out_val, vlen);
     };
 
@@ -2146,6 +2181,25 @@ public:
 
 
 
+
+//static BlkLst   make_BlkLst(bool isKey, i32 readers, u32 idx, u32 ver, u32 len, u32 klen)
+//{
+//  BlkLst bl;
+//  bl.kr.isKey    = isKey;
+//  bl.kr.readers  = readers;
+//  bl.idx         = idx;
+//  bl.kr.version  = ver;
+//
+//  if(isKey){
+//    bl.len  = len;
+//    bl.klen = klen;
+//  }else{
+//    bl.len  = 0;
+//    bl.klen = 0;
+//  }
+//
+//  return bl;
+//}
 
 //i32      nxt  =  nxtBlock(curidx);
 //
