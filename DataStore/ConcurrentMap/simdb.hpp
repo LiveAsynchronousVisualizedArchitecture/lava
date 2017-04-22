@@ -27,15 +27,27 @@
 // -todo: test windows permissions - ok now that \\Global isn't used and the shared memory 'Segment' goes into the current session?
 // -todo: take out WINNT namespace for windows NT definitions
 // -todo: make readers for blocks only exist on the head of the list? - not needed
+// -todo: move make_BlkLst to constructor
+// -todo: change BlkLst union to hold hash values
+// -todo: writeup why robin hood hashing will work for put, get, and delete (and their interactions)
+// -todo: store hash of key in ConcurrentStore
+// -todo: make alloc give back the blocks if allocation fails - already done
+// -todo: make sure when comparing VerIdxs that they compare both the version and the index - already done, compared as a single 64 bit int ?
+// -todo: make sure ConcurrentStore.put() tests each block for LIST_END - not needed because alloc checks for LIST_END
+// -todo: make the BlkLst hash be checked before comparing keys
+// -todo: make ConcurrentStore get() stop before exceeding maxlen? - already done
+// -todo: clean up type aliases with ui32 to u32
 
-// todo: writeup why robin hood hashing will work for put, get, and delete (and their interactions)
-// todo: store hash of key in ConcurrentStore
-// todo: align ConcurrentHash's lava vec on 128 bit boundary
-// todo: make sure when comparing VerIdxs that they compare both the version and the index
-// todo: take out simdb_ prefix?
-// todo: make ConcurrentStore get() stop before exceeding maxlen?
-// todo: clean up type aliases with ui32 to u32
+// todo: make put() insert at the first available slot then swap with one index lower if it has a IPD that is at least 2 less
+//       | after swapping, set the block list's version to the new version of the index? - what if the found version is not what the old version was? leave it? 
+// todo: align ConcurrentHash's lava vec on 128 bit boundary - need to make an extra 128bit value and 
+// todo: change ConcurrentHash to CncrHsh 
+// todo: change ConcurrentStore to CncrStr
+// todo: change ConcurrentList to CncrLst
 // todo: clean up inconsitent signs and usage of negative numbers
+// todo: give a ConcurrentStore pointer to ConcurrentHash and stop using lambdas and templates?
+// todo: check the hash in each BlkLst index as an early out for failed reads?
+// todo: take out simdb_ prefix?
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
 // todo: make a macro to have separate windows and unix paths?
@@ -64,6 +76,16 @@
 // todo: make alloc look for multiple blocks then check the next block variable for its version and if the version has not changed, allocate all blocks at once?
 // todo: make a resize/realloc function to change the size of a block list instead of destroying and creating all indices when updating a key? - would need a different putWeak, since the writing of the index needs  to be atomic and re-writing the currently used blocks would not work with concurrency
 // todo: integrate realloc into put() function - will need to query to see if the key exists, delete it, then insert the reallocated version? - if done like this, does it disrupt for a moment a key existing, and if so, is this an insurmountable problem?
+
+// q: do the Index numbers in VerIdx need a flag saying that they haven't been changed? - what if before a thread switches two indices, other threads delete both VerIdxs and create new VerIdxs with different ideal position distances, but the exact same Indexes? can storing the Index as an xor of the Version and the Index solve this or will there still be non unique combinations? Ths would also mean that the Index would not line up immediatly after the swap. Do the upper bits of a 64 bit version counter need to be used? If even/odd versions are used, does that alleviate the problem? Is there a way to do XOR swapping and be able to see the XOR in progress?
+// q: what operations need ConcurrentHash Index values to have versions with them? 
+//       | get() does not, since it can check the key value to verify the block list is what it wants and it can check the version number on the block list to make sure the blocks did not change while reading
+//       | put() does, since it needs to know that the Index value it is going to change still points to the same data
+//       | del() does, since it needs to know that the Index value it is going to change still points to the same data
+// q: what if two version numbers are put into each block list starting entry? verA, verB, hash, and index - 128 bits
+// q: if Index values are swapped atomically but their version numbers can not be known to be the same, does this require more flexibility on the part of the linear search? only stop when hitting IPD (ideal position distances) less than the IPD of the searched item more than once? 
+// q: the 64 bit Index swap needs to check that both IPD are still the same after the swap?
+// q: is it possible to know to go backwards when finding an element if the same index is seen with a different version on an adjacent VerIdx ?
 
 // q: can cleanup be done by a ring buffer of block lists? would the ring buffer only need to be as long as the number of threads if each thread helps clear out the ring buffer after every free()? Probably not, because delayed deallocation would be useful only when there is a reader/ref count, which would mean many more reads than writes could stall the ability to free? But each thread can really only hold one reference at a time so maybe it would work? 
 // q: if using a ring buffer, indices might be freed in between non-freed indices, in which case the pointer to beginning and end would not be able to shift, and therefore would need space for more indices than just the number of threads
@@ -158,6 +180,18 @@
  |  |  4. Use version from that struct to verify that each block is part of the list given by the ConcurrenHash entry.
  |  |  5. If there is a match, keep reading the list of blocks to fill the output buffer with the value section of the block list.
 
+ Robin Hood Hashing:
+ |  The ConcurrentHash indices are organized so that when searching for a key by linear search, no encountered key has an ideal position distance lower than the key being searched for
+ |  To do this concurrently, instead of looking for an empty or deleted slot in the ConcurrentHash array and simply inserting there (as with linear search), the VerIdx is put into a free slot and continuously swapped with its VerIdx to the left if the distance to its ideal position is larger.
+ |  The concurrent swapping of two 64 bit structures is complicated by the fact that while 128 bit atomic compare and exchange instructions are present on most modern CPUs, they are only able to operate on 128 bit aligned memory. 
+ |  While half the 128 bit pairs of two 64 bit structures could be swapped with this instruction, the other half can not.
+ |  On x64 64 bit atomic compare and exchanges CAN be unaligned, meaning that if Index values are next to each other in memory, they can be compare-exchanged atomically or read atomically
+ |  There are multiple insights and techniques working together that allow the concurrent swapping to happen:
+ |  |  The Index of the VerIdx struct stored in the ConcurrentHash array is always unique, since it is the index into the block list.
+ |  |  The Version of the VerIdx struct stored in the ConcurrentHash array is always unique if the BlockList's atomic version counter has not wrapped around after overflow
+ |  |  Because both the Version AND the Index are unique, the same Version + Index combination cannot occur twice over the lifetime of the database unless the version has overflowed and wrapped around (and the same index into the BlockList ends up with the same Version)
+ |  |  The 64 bit Version+Index structure (Version is 32 bits and Index is 32 bits) is flipped on even indices in the ConcurrentHash array. The memory is ordered as  |Idx Ver Ver Idx|Idx Ver Ver Idx| with '|' here representing 128 bit alignment boundaries
+ |  |  The Index values, next to each other in an unaligned 64 bit configuration can be swapped atomically, though their indices can not be 
 */
 
 #ifdef _MSC_VER
@@ -603,28 +637,28 @@ class   ConcurrentList
 public:
   union Head
   {
-    struct { ui32 ver; ui32 idx; };                      // ver is version, idx is index // todo: change cnt to version
+    struct { u32 ver; u32 idx; };                      // ver is version, idx is index // todo: change cnt to version
     ui64 asInt;
   };
   
-  using    ui32  =  uint32_t;                            // need to be i32 instead for the ConcurrentStore indices?
+  using    u32  =  uint32_t;                            // need to be i32 instead for the ConcurrentStore indices?
   using    ui64  =  uint64_t;
-  using ListVec  =  lava_vec<ui32>;
+  using ListVec  =  lava_vec<u32>;
 
-  const static ui32 LIST_END = 0xFFFFFFFF;
+  const static u32 LIST_END = 0xFFFFFFFF;
 
 private:
   ListVec     m_lv;
   aui64*       m_h;
 
 public:
-  static ui64 sizeBytes(ui32 size)
+  static ui64 sizeBytes(u32 size)
   {
     return ListVec::sizeBytes(size);
   }
 
   ConcurrentList(){}
-  ConcurrentList(void* addr, ui32 size, bool owner=true) :           // this constructor is for when the memory is owned an needs to be initialized
+  ConcurrentList(void* addr, u32 size, bool owner=true) :           // this constructor is for when the memory is owned an needs to be initialized
     m_lv(addr, size, owner)
   {                                                                  // separate out initialization and let it be done explicitly in the simdb constructor?
     m_h = (aui64*)addr;
@@ -658,7 +692,7 @@ public:
     //return nxtHead.idx;
     return curHead.idx;
   }
-  auto       free(ui32 idx) -> uint32_t   // not thread safe yet when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway?
+  auto       free(u32 idx) -> uint32_t   // not thread safe yet when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway?
   {
     Head curHead;
     Head nxtHead;
@@ -674,13 +708,13 @@ public:
 
     return retIdx;
   }
-  auto      count() const -> ui32
+  auto      count() const -> u32
   {
     //return ((HeadUnion*)(&m_h))->cnt;
     //return ((Head*)(&m_h))->ver;
     return ((Head*)m_h)->ver;
   }
-  auto        idx() -> ui32
+  auto        idx() -> u32
   {
     //return ((Head*)(&m_h))->idx;
     return ((Head*)m_h)->idx;
@@ -689,11 +723,11 @@ public:
   {
     return &m_lv;
   }            // not thread safe
-  ui32     lnkCnt()                     // not thread safe
+  u32     lnkCnt()                     // not thread safe
   {
-    ui32    cnt = 0;
+    u32    cnt = 0;
     //auto      l = list();
-    ui32 curIdx = idx();
+    u32 curIdx = idx();
     while( curIdx != LIST_END ){
       //curIdx = l->at(curIdx).load();
       curIdx = m_lv[curIdx];   //  l->at(curIdx).load();
@@ -709,47 +743,71 @@ public:
   {
     struct {
       i32      idx;
-      ui32 version;
+      u32 version;
     };
     ui64 asInt;
   };
   union KeyAndReaders
   {
-    struct{ ui32    isKey :  1; i32   readers : 31; ui32 version; };
+    struct{ u32 isKey :  1; i32   readers : 31; u32 version; };
     ui64 asInt;
 
-    //ui32 asInt;
+    //u32 asInt;
   };
   union BlkLst                            // need to do anything special to guarantee that readers is aligned so it is atomic?
   {
-    //struct { KeyAndReaders kr; ui32 version; i32 idx; ui32 len, klen; };
-    struct { KeyAndReaders kr; i32 idx; ui32 len, klen; };
+    //struct { KeyAndReaders kr; u32 version; i32 idx; u32 len, klen; };
+
+    struct { KeyAndReaders kr; i32 idx; u32 len, klen, hash; };
+
+    BlkLst() : idx(0), len(0), klen(0), hash(0)
+    { 
+      kr.isKey    = 0;
+      kr.readers  = 0;
+      kr.version  = 0;
+    }
+    BlkLst(bool isKey, i32 readers, u32 _idx, u32 ver, u32 _len, u32 _klen, u32 _hash=0) : 
+      idx(_idx),
+      hash(_hash)
+    {
+      kr.isKey    = isKey;
+      kr.readers  = readers;
+      kr.version  = ver;
+
+      if(isKey){
+        len  = _len;
+        klen = _klen;
+      }else{
+        len  = 0;
+        klen = 0;
+      }
+    } 
   };
 
   using IDX         =  i32;
   using ai32        =  std::atomic<i32>;
   using BlockLists  =  lava_vec<BlkLst>;   // only the indices returned from the concurrent list are altered, and only one thread will deal with any single index at a time 
 
-  const static ui32 LIST_END = ConcurrentList::LIST_END;
+  const static u32 LIST_END = ConcurrentList::LIST_END;
 
-  static BlkLst   make_BlkLst(bool isKey, i32 readers, ui32 idx, ui32 ver, ui32 len, ui32 klen)
-  {
-    BlkLst bl;
-    bl.kr.isKey    = isKey;
-    bl.kr.readers  = readers;
-    bl.idx      = idx;
-    bl.kr.version  = ver;
-
-    if(isKey){
-      bl.len  = len;
-      bl.klen = klen;
-    }else{
-      bl.len  = 0;
-      bl.klen = 0;
-    }
-
-    return bl;
-  }
+  //static BlkLst   make_BlkLst(bool isKey, i32 readers, u32 idx, u32 ver, u32 len, u32 klen)
+  //{
+  //  BlkLst bl;
+  //  bl.kr.isKey    = isKey;
+  //  bl.kr.readers  = readers;
+  //  bl.idx         = idx;
+  //  bl.kr.version  = ver;
+  //
+  //  if(isKey){
+  //    bl.len  = len;
+  //    bl.klen = klen;
+  //  }else{
+  //    bl.len  = 0;
+  //    bl.klen = 0;
+  //  }
+  //
+  //  return bl;
+  //}
   static VerIdx      List_End()
   { 
     VerIdx vi; 
@@ -763,7 +821,7 @@ public:
     return empty.asInt == vi.asInt;
   }
 
-  BlkLst    incReaders(ui32 blkIdx, ui32 version) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
+  BlkLst    incReaders(u32 blkIdx, u32 version) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
 
     KeyAndReaders cur, nxt;
@@ -771,14 +829,14 @@ public:
     aui64* areaders = (aui64*)&(bl->kr.asInt);    
     cur.asInt       = areaders->load();
     do{
-      if(cur.version!=version || cur.readers<0) return make_BlkLst(0,0,0,0,0,0);
+      if(cur.version!=version || cur.readers<0) return BlkLst(); // make_BlkLst(0,0,0,0,0,0);
       nxt = cur;
       nxt.readers += 1;
     }while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
     
     return *bl;  // after readers has been incremented this block list entry is not going away. The only thing that would change would be the readers and that doesn't matter to the calling function.
   }
-  bool      decReaders(ui32 blkIdx, ui32 version) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
+  bool      decReaders(u32 blkIdx, u32 version) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
     KeyAndReaders cur, nxt;
     aui64* areaders = (aui64*)&(s_bls[blkIdx].kr.asInt);    
@@ -802,8 +860,8 @@ private:
   void*               s_blksAddr;       // points to the block space in the shared memory
   aui64*               s_version;       // pointer to the shared version number
 
-  ui32               m_blockSize;
-  ui32              m_blockCount;
+  u32               m_blockSize;
+  u32              m_blockCount;
   ui64                 m_szBytes;
   mutable ai32      m_blocksUsed;      // todo: this is a mistake and does no good unless it is in the shared memory
 
@@ -868,30 +926,30 @@ private:
     s_bls[cur].kr.readers = 0;                 // reset the reader count
     s_cl.free(cur);
   }
-  ui32       writeBlock(i32  blkIdx, void const* const bytes, ui32 len=0, ui32 ofst=0)      // don't need to increment readers since write should be done before the block is exposed to any other threads
+  u32       writeBlock(i32  blkIdx, void const* const bytes, u32 len=0, u32 ofst=0)      // don't need to increment readers since write should be done before the block is exposed to any other threads
   {
     i32   blkFree  =  blockFreeSize();
     ui8*        p  =  blockFreePtr(blkIdx);
     auto      nxt  =  nxtBlock(blkIdx);
-    ui32   cpyLen  =  len==0? blkFree : len;             // if next is negative, then it will be the length of the bytes in that block
+    u32   cpyLen  =  len==0? blkFree : len;             // if next is negative, then it will be the length of the bytes in that block
     p      += ofst;
     memcpy(p, bytes, cpyLen);
 
     return cpyLen;
   }
-  ui32        readBlock(i32  blkIdx, ui32 version, void *const bytes, ui32 ofst=0, ui32 len=0) const
+  u32        readBlock(i32  blkIdx, u32 version, void *const bytes, u32 ofst=0, u32 len=0) const
   {
     BlkLst bl = incReaders(blkIdx, version);      if(bl.kr.version==0) return 0;
       i32   blkFree  =  blockFreeSize();
       ui8*        p  =  blockFreePtr(blkIdx);
       i32       nxt  =  bl.idx;
-      ui32   cpyLen  =  len==0?  blkFree-ofst  :  len;
+      u32   cpyLen  =  len==0?  blkFree-ofst  :  len;
       //cpyLen        -=  ofst;
       memcpy(bytes, p+ofst, cpyLen);
     decReaders(blkIdx, version);
 
     return cpyLen;
-    //ui32   cpyLen  =  nxt<0? -nxt : blkFree;             // if next is negative, then it will be the length of the bytes in that block
+    //u32   cpyLen  =  nxt<0? -nxt : blkFree;             // if next is negative, then it will be the length of the bytes in that block
   }
 
 public:
@@ -907,23 +965,23 @@ public:
     //return sizeof(*s_version);
     return sizeof(ui64);
   }
-  static ui64         CListOfst(ui32 blockCount)
+  static ui64         CListOfst(u32 blockCount)
   {
-    return BlockListsOfst() + BlockLists::sizeBytes(blockCount);
+    return BlockListsOfst() + BlockLists::sizeBytes(blockCount);   // BlockLists::sizeBytes ends up being sizeof(BlkLst)*blockCount + 2 u64 variables
   }
-  static ui64          BlksOfst(ui32 blockCount)
+  static ui64          BlksOfst(u32 blockCount)
   {
     //return sizeof(*s_version) + ConcurrentList::sizeBytes(blockCount) + BlockLists::sizeBytes(blockCount);
     return CListOfst(blockCount) + ConcurrentList::sizeBytes(blockCount);
   }
-  static ui64         sizeBytes(ui32 blockSize, ui32 blockCount)
+  static ui64         sizeBytes(u32 blockSize, u32 blockCount)
   {
     //return ConcurrentList::sizeBytes(blockCount) + BlockLists::sizeBytes(blockCount) + blockSize*blockCount;
     return BlksOfst(blockCount) + blockSize*blockCount;
   }
 
   ConcurrentStore(){}
-  ConcurrentStore(void* addr, ui32 blockSize, ui32 blockCount, bool owner=true) :
+  ConcurrentStore(void* addr, u32 blockSize, u32 blockCount, bool owner=true) :
     m_blockSize(blockSize),
     m_blockCount(blockCount),
     m_blocksUsed(0),
@@ -939,12 +997,12 @@ public:
     assert(blockSize > sizeof(IDX));
   }
 
-  auto        alloc(i32    size, ui32 klen, i32* out_blocks=nullptr) -> VerIdx     // todo: doesn't this need to give back the blocks if allocation fails?
+  auto        alloc(i32    size, u32 klen, u32 hash, i32* out_blocks=nullptr) -> VerIdx     // todo: doesn't this need to give back the blocks if allocation fails?
   {
     i32 byteRem  =  0;
     i32  blocks  =  blocksNeeded(size, &byteRem);
 
-    ui32   st = s_cl.nxt();                                     // stBlk  is starting block
+    u32   st = s_cl.nxt();                                     // stBlk  is starting block
     SECTION(get the starting block index and handle errors)
     {
       if(st==LIST_END){
@@ -953,7 +1011,7 @@ public:
       }
     }
 
-    ui32 ver  =  (ui32)s_version->fetch_add(1);
+    u32 ver  =  (u32)s_version->fetch_add(1);
     i32  cur  =  st;
     i32  nxt  =   0;
     i32  cnt  =   0;
@@ -964,9 +1022,9 @@ public:
         nxt    = s_cl.nxt();
         if(nxt==LIST_END){ free(st, ver); VerIdx empty={LIST_END,0}; return empty; }
 
-        if(i==0)  s_bls[cur] =  make_BlkLst(true,  0, nxt, ver, size, klen);
-        else      s_bls[cur] =  make_BlkLst(false, 0, nxt, ver, 0, 0);
-        cur        =  nxt;
+        if(i==0) s_bls[cur] =  BlkLst(true,  0, nxt, ver, size, klen);  // make_BlkLst(true,  0, nxt, ver, size, klen);
+        else     s_bls[cur] =  BlkLst(false, 0, nxt, ver, 0, 0);        // make_BlkLst(false, 0, nxt, ver, 0, 0);
+        cur    =  nxt;
         ++cnt;
         m_blocksUsed.fetch_add(1);
       }
@@ -974,8 +1032,9 @@ public:
 
     SECTION(add the last index into the list, set out_blocks and return the start index with its version)
     {
-      ui32 blockRemainder = byteRem? -byteRem : -blockFreeSize();
-      BlkLst  bl = make_BlkLst(cur==st, 0, blockRemainder, ver, size, klen);
+      u32 blockRemainder = byteRem? -byteRem : -blockFreeSize();
+      //BlkLst  bl =  make_BlkLst(cur==st, 0, blockRemainder, ver, size, klen);
+      BlkLst bl(cur==st, 0, blockRemainder, ver, size, klen, hash);
       s_bls[cur] = bl;
       s_bls[st].kr.isKey = true;
 
@@ -984,7 +1043,7 @@ public:
       return vi;
     }
   }
-  bool         free(ui32 blkIdx, ui32 version)        // frees a list/chain of blocks
+  bool         free(u32 blkIdx, u32 version)        // frees a list/chain of blocks
   {
     return decReaders(blkIdx, version);
   }
@@ -1022,7 +1081,7 @@ public:
       b   +=  writeBlock(cur, b, remvlen);
     }
   }
-  ui32          get(i32  blkIdx, ui32 version, void *const bytes, ui32 maxlen) const
+  u32          get(i32  blkIdx, u32 version, void *const bytes, u32 maxlen) const
   {
     using namespace std;
 
@@ -1037,8 +1096,8 @@ public:
     auto  kblks = kdiv.quot;
     auto   krem = kdiv.rem;
     auto vrdLen = 0;
-    ui32    len = 0;
-    ui32  rdLen = 0;
+    u32    len = 0;
+    u32  rdLen = 0;
     i8*       b = (i8*)bytes;
     i8*      en = b + maxlen;
     i32     cur = blkIdx;
@@ -1048,7 +1107,7 @@ public:
       cur = nxt.idx;
     }
 
-    vrdLen =  min<ui32>(blockFreeSize()-krem, vlen);
+    vrdLen =  min<u32>(blockFreeSize()-krem, vlen);
     rdLen  =  readBlock(cur, version, b, krem, vrdLen);
     b     +=  rdLen;
     len   +=  rdLen;
@@ -1056,7 +1115,7 @@ public:
 
     while(len<maxlen && !(nxt.idx<0) && nxt.idx!=LIST_END && nxt.version==version)
     {
-      vrdLen =  min<ui32>(blockFreeSize(), maxlen-len);
+      vrdLen =  min<u32>(blockFreeSize(), maxlen-len);
       cur    =  nxt.idx;
       rdLen  =  readBlock(cur, version, b, 0, vrdLen);  if(rdLen==0) break;        // rdLen is read length
       b     +=  rdLen;
@@ -1069,7 +1128,7 @@ public:
 
     return len;                                           // only one return after the top to make sure readers can be decremented - maybe it should be wrapped in a struct with a destructor
   }
-  ui32       getKey(ui32  blkIdx, ui32 version, void *const bytes, ui32 maxlen) const
+  u32       getKey(u32  blkIdx, u32 version, void *const bytes, u32 maxlen) const
   {
     if(blkIdx == LIST_END){ return 0; }
 
@@ -1080,10 +1139,10 @@ public:
     auto   kdiv = div(bl.klen, blockFreeSize());
     auto  kblks = kdiv.quot;
     auto   krem = kdiv.rem;
-    ui32    len = 0;
-    ui32  rdLen = 0;
+    u32    len = 0;
+    u32  rdLen = 0;
     i8*       b = (i8*)bytes;
-    ui32    cur = blkIdx;
+    u32    cur = blkIdx;
     VerIdx  nxt = { blkIdx, version };
 
     if(krem>0) --kblks;
@@ -1129,7 +1188,7 @@ public:
     //  //if(nxt<0 || nxt==LIST_END) break;
     //}
   }
-  Match   memcmpBlk(i32  blkIdx, ui32 version, void const *const buf1, void const *const buf2, ui32 len) const  // todo: eventually take out the inc and dec readers and only do them when dealing with the whole chain of blocks
+  Match   memcmpBlk(i32  blkIdx, u32 version, void const *const buf1, void const *const buf2, u32 len) const  // todo: eventually take out the inc and dec readers and only do them when dealing with the whole chain of blocks
   {
     if(incReaders(blkIdx, version).len==0) return MATCH_REMOVED;
       auto ret = memcmp(buf1, buf2, len);
@@ -1139,14 +1198,15 @@ public:
 
     return MATCH_FALSE;
   }
-  Match     compare(IDX  blkIdx, ui32 version, void const *const buf, ui32 len) const
+  Match     compare(IDX  blkIdx, u32 version, void const *const buf, u32 len, u32 hash) const
   {
     using namespace std;
     
+    if(s_bls[blkIdx].hash!=hash) return MATCH_FALSE;  // vast majority of calls should end here
+
     IDX   curidx  =  blkIdx;
-    //i32      nxt  =  nxtBlock(curidx);
     auto     nxt  =  nxtBlock(curidx);                            if(nxt.version!=version) return MATCH_FALSE;
-    ui32   blksz  =  (ui32)blockFreeSize();  // todo: change this to ui32
+    u32   blksz  =  (u32)blockFreeSize();  // todo: change this to u32
     ui8*  curbuf  =  (ui8*)buf;
     auto    klen  =  s_bls[blkIdx].klen;                          if(klen!=len) return MATCH_FALSE;
     auto  curlen  =  len;
@@ -1164,14 +1224,8 @@ public:
       curidx   =  nxt.idx;
       nxt      =  nxtBlock(curidx);                               if(nxt.version!=version) return MATCH_FALSE;
     }
-
-    //if(curlen < blksz){ return MATCH_FALSE; }
-    //auto cmplen = min(curlen, (ui32)blksz);
-    //Match   cmp = memcmpBlk(curidx, curbuf, p, cmplen);
-    //}else if(-nxt != curlen){ return MATCH_FALSE; }
-    // return MATCH_TRUE; // never reached
   }
-  ui32          len(i32  blkIdx, ui32 version, ui32* out_vlen=nullptr) const
+  u32          len(i32  blkIdx, u32 version, u32* out_vlen=nullptr) const
   {
     BlkLst bl = s_bls[blkIdx];
     if(version==bl.kr.version && bl.len>0){
@@ -1204,11 +1258,11 @@ public:
   static const ui8   FREE_READY       =     0;
   static const ui8   MAX_READERS      =  0xFF;
   static const ui64  EMPTY_KEY        =  2097151;         // first 21 bits set 
-  static const ui32  EMPTY_HASH_IDX   =  0xFFFFFFFF;           // 32 bits set - hash indices are different from block indices 
+  static const u32  EMPTY_HASH_IDX   =  0xFFFFFFFF;           // 32 bits set - hash indices are different from block indices 
   //static const ui64  EMPTY_KEY        =  0x000000000FFFFFFF;   // first 28 bits set 
   //static const ui64  EMPTY_KEY        =    0x0000000000200000;   // first 21 bits set 
 
-  static ui32       nextPowerOf2(ui32  v)
+  static u32       nextPowerOf2(u32  v)
   {
     v--;
     v |= v >> 1;
@@ -1220,20 +1274,20 @@ public:
 
     return v;
   }
-  static ui64          sizeBytes(ui32 size)
+  static ui64          sizeBytes(u32 size)
   {
     //return lava_vec<VerIdx>::sizeBytes( nextPowerOf2(size) );
     return lava_vec<VerIdx>::sizeBytes(size);
   }
-  static bool  DefaultKeyCompare(ui32 a, ui32 b)
+  static bool  DefaultKeyCompare(u32 a, u32 b)
   {
     return a == b;
   }
-  static ui32          HashBytes(const void *const buf, ui32 len)
+  static u32          HashBytes(const void *const buf, u32 len)
   {
     ui64 hsh = fnv_64a_buf(buf, len);
 
-    return (ui32)( (hsh>>32) ^ ((ui32)hsh));
+    return (u32)( (hsh>>32) ^ ((u32)hsh));
   }
   static VerIdx         empty_kv()
   {
@@ -1263,20 +1317,20 @@ public:
 
 private:
   using i8        =  int8_t;
-  using ui32      =  uint32_t;
+  using u32      =  uint32_t;
   using ui64      =  uint64_t;
   using  u32      =  uint32_t;
   using  u64      =  uint64_t;
-  using Aui32     =  std::atomic<ui32>;
+  using Au32     =  std::atomic<u32>;
   using Aui64     =  std::atomic<ui64>;
   using VerIdxs   =  lava_vec<VerIdx>;
   using Mut       =  std::mutex;
   using UnqLock   =  std::unique_lock<Mut>;
 
-          ui32      m_sz;
+          u32      m_sz;
   mutable VerIdxs   m_kvs;
 
-  VerIdx        load_kv(ui32 i)                const
+  VerIdx        load_kv(u32 i)                const
   {
     using namespace std;
     
@@ -1309,7 +1363,7 @@ private:
 
     return ret;
   }
-  bool  compexchange_kv(ui32 i, ui64* expected, ui64 desired) const
+  bool  compexchange_kv(u32 i, ui64* expected, ui64 desired) const
   {
     using namespace std;
     
@@ -1321,13 +1375,13 @@ private:
 
     return atomic_compare_exchange_strong( (Aui64*)&(m_kvs.data()[i].asInt), expected, desired);                      // The entry was free. Now let's try to take it using a CAS. 
   }
-  void           doFree(ui32 i)                const
+  void           doFree(u32 i)                const
   {
     store_kv(i, empty_kv());
   }
 
   template<class MATCH_FUNC> 
-  auto       checkMatch(ui32 version, ui32 key, MATCH_FUNC match) const -> Match //  decltype(match(empty_kv()))
+  auto       checkMatch(u32 version, u32 key, MATCH_FUNC match) const -> Match //  decltype(match(empty_kv()))
   {
     //incReaders(i);  // todo: have incReaders return a VerIdx?
       Match ret = match(key, version);
@@ -1337,7 +1391,7 @@ private:
   }
 
   template<class MATCH_FUNC, class FUNC> 
-  bool       runIfMatch(ui32 i, ui32 version, ui32 key, MATCH_FUNC match, FUNC f) const // const -> bool
+  bool       runIfMatch(u32 i, u32 version, u32 key, MATCH_FUNC match, FUNC f) const // const -> bool
   {
     //VerIdx kv = incReaders(i);    
       Match      m = match(key, version);
@@ -1350,11 +1404,11 @@ private:
 
 public:
   ConcurrentHash(){}
-  ConcurrentHash(ui32 size)
+  ConcurrentHash(u32 size)
   {
     init(size);
   }
-  ConcurrentHash(void* addr, ui32 size, bool owner=true) :
+  ConcurrentHash(void* addr, u32 size, bool owner=true) :
     m_sz(nextPowerOf2(size)),
     m_kvs(addr, m_sz)
   {
@@ -1370,13 +1424,13 @@ public:
   ConcurrentHash& operator=(ConcurrentHash const& lval) = delete;
   ConcurrentHash& operator=(ConcurrentHash&&      rval) = delete;
 
-  VerIdx operator[](ui32 idx) const
+  VerIdx operator[](u32 idx) const
   {
     return m_kvs[idx];
   }
 
   template<class MATCH_FUNC> 
-  VerIdx   putHashed(ui32 hash, VerIdx vi, MATCH_FUNC match) const
+  VerIdx   putHashed(u32 hash, VerIdx vi, MATCH_FUNC match) const
   {
     using namespace std;
     static const VerIdx empty = empty_kv();
@@ -1384,8 +1438,8 @@ public:
     VerIdx desired   =  empty;
     desired.idx      =  vi.idx;
     desired.version  =  vi.version;
-    ui32          i  =  hash;
-    ui32         en  =  min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap?   // % m_sz;   //>0? hash-1  :  m_sz
+    u32          i  =  hash;
+    u32         en  =  min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap?   // % m_sz;   //>0? hash-1  :  m_sz
     for(;; ++i)
     {
       i %= m_sz;
@@ -1409,13 +1463,13 @@ public:
     return empty;  // should never be reached
   }
   template<class MATCH_FUNC> 
-  VerIdx    rmHashed(ui32 hash, MATCH_FUNC match)            const
+  VerIdx    rmHashed(u32 hash, MATCH_FUNC match)            const
   {  
     using namespace std;
     static const VerIdx empty = empty_kv();
 
-    ui32  i = hash;
-    ui32 en = min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap? 
+    u32  i = hash;
+    u32 en = min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap? 
     for(;; ++i)
     {
       i %= m_sz;
@@ -1439,12 +1493,12 @@ public:
     return empty; 
   }
   template<class MATCH_FUNC, class FUNC> 
-  bool      runMatch(ui32 hash, MATCH_FUNC match, FUNC f)    const // -> decltype( f(VerIdx()) )
+  bool      runMatch(u32 hash, MATCH_FUNC match, FUNC f)    const // -> decltype( f(VerIdx()) )
   {
     using namespace std;
     
-    ui32  i = hash;
-    ui32 en = min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap?   // % m_sz;   //>0? hash-1  :  m_sz
+    u32  i = hash;
+    u32 en = min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap?   // % m_sz;   //>0? hash-1  :  m_sz
     for(;; ++i)
     {
       i %= m_sz;
@@ -1455,7 +1509,7 @@ public:
     }
   }
   template<class FUNC> 
-  auto       runRead(ui32 idx, ui32 version, FUNC f)         const -> decltype( f(VerIdx()) )    // decltype( (f(empty_kv())) )
+  auto       runRead(u32 idx, u32 version, FUNC f)         const -> decltype( f(VerIdx()) )    // decltype( (f(empty_kv())) )
   {
     //VerIdx kv = incReaders(idx);
     //auto ret = f(vi);
@@ -1483,12 +1537,12 @@ public:
     
     return true;
   }
-  VerIdx          at(ui32  idx)                   const
+  VerIdx          at(u32  idx)                   const
   {
     //return m_kvs[idx];
     return load_kv(idx);
   }
-  ui32           nxt(ui32  stIdx)                 const
+  u32           nxt(u32  stIdx)                 const
   {
     auto idx = stIdx;
     VerIdx empty = empty_kv();
@@ -1504,7 +1558,7 @@ public:
 
     /* && kv.readers>=0 */
   }
-  ui32          size()                            const
+  u32          size()                            const
   {
     return m_sz;
   }
@@ -1738,35 +1792,35 @@ private:
 
   // these variables are local to the stack where simdb lives, unlike the others, they are not simply a pointer into the shared memory
   SharedMem           m_mem;
-  mutable ui32   m_nxtChIdx;
-  mutable ui32   m_curChIdx;
+  mutable u32   m_nxtChIdx;
+  mutable u32   m_curChIdx;
   ui64             m_blkCnt;
   ui64              m_blkSz;
 
 public:
-  static const ui32  EMPTY_KEY = ConcurrentHash::EMPTY_KEY;          // 28 bits set 
-  static const ui32 FAILED_PUT = ConcurrentHash::EMPTY_KEY;          // 28 bits set 
-  static const ui32   LIST_END = ConcurrentStore::LIST_END;
+  static const u32  EMPTY_KEY = ConcurrentHash::EMPTY_KEY;          // 28 bits set 
+  static const u32 FAILED_PUT = ConcurrentHash::EMPTY_KEY;          // 28 bits set 
+  static const u32   LIST_END = ConcurrentStore::LIST_END;
   static ui64       OffsetBytes()
   {
     return sizeof(aui64)*3;
   }
   static ui64           MemSize(ui64 blockSize, ui64 blockCount)
   {
-    auto  hashbytes = ConcurrentHash::sizeBytes((ui32)blockCount);
-    auto storebytes = ConcurrentStore::sizeBytes((ui32)blockSize, (ui32)blockCount);
+    auto  hashbytes = ConcurrentHash::sizeBytes((u32)blockCount);
+    auto storebytes = ConcurrentStore::sizeBytes((u32)blockSize, (u32)blockCount);
     return  hashbytes + storebytes + OffsetBytes();
   }
-  static Match     CompareBlock(simdb const *const ths, i32 blkIdx, ui32 version, void const *const buf, ui32 len)
+  static Match     CompareBlock(simdb const *const ths, i32 blkIdx, u32 version, void const *const buf, u32 len, u32 hash)
   { 
-    return ths->s_cs.compare(blkIdx, version, buf, len);
+    return ths->s_cs.compare(blkIdx, version, buf, len, hash);
   }
   static bool           IsEmpty(VerIdx kv){return ConcurrentHash::IsEmpty(kv);}         // special value for ConcurrentHash
   static bool         IsListEnd(VerIdx vi){return ConcurrentStore::IsListEnd(vi); }     // special value for ConcurrentStore
 
 public:
   simdb(){}
-  simdb(const char* name, ui32 blockSize, ui32 blockCount) : 
+  simdb(const char* name, u32 blockSize, u32 blockCount) : 
     m_curChIdx(0)
     //m_mem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount)) ),
     //m_ch( ((i8*)m_mem.data())+OffsetBytes(), blockCount, m_mem.owner),
@@ -1796,12 +1850,12 @@ public:
     //new (&m_ch) ConcurrentHash( ( ((i8*)m_mem.data())+OffsetBytes(), blockCount, m_mem.owner) );
     //new (&m_cs) ConcurrentStore(  ((i8*)m_mem.data())+m_ch.sizeBytes(blockCount)+OffsetBytes(), blockSize, blockCount, m_mem.owner);                 // todo: change this to a void*
     new (&s_ch) ConcurrentHash( ((i8*)m_mem.data())+OffsetBytes(), 
-                                       (ui32)s_blockCount->load(), 
+                                       (u32)s_blockCount->load(), 
                                                       m_mem.owner);
     auto chSz = s_ch.sizeBytes();
     new (&s_cs) ConcurrentStore( ((i8*)m_mem.data())+chSz+OffsetBytes(), 
-                                              (ui32)s_blockSize->load(), 
-                                             (ui32)s_blockCount->load(), 
+                                              (u32)s_blockSize->load(), 
+                                             (u32)s_blockCount->load(), 
                                                            m_mem.owner);                 // todo: change this to a void*
 
     m_blkCnt = s_blockCount->load();
@@ -1811,96 +1865,95 @@ public:
     if(isOwner()) s_flags->store(1);                                        // set to 1 to signal construction is done
   }
 
-  i32          put(const void *const key, ui32 klen, const void *const val, ui32 vlen)
+  i32          put(const void *const key, u32 klen, const void *const val, u32 vlen)
   {
     assert(klen>0);
 
-    i32 blkcnt = 0;
+    u32   hash = ConcurrentHash::HashBytes(key, klen);
     
-    auto vi = s_cs.alloc(klen+vlen, klen, &blkcnt);                             // todo: use the VersionIdx struct // kidx is key index
+    i32  blkcnt = 0;    
+    auto vi = s_cs.alloc(klen+vlen, klen, hash, &blkcnt);                             // todo: use the VersionIdx struct // kidx is key index
     if(vi.idx==LIST_END) return EMPTY_KEY;
 
     s_cs.put(vi.idx, key, klen, val, vlen);
 
-    ui32 keyhash = ConcurrentHash::HashBytes(key, klen);
     auto     ths = this;                                                        // this silly song and dance is because the this pointer can't be passed to a lambda
-    VerIdx    kv = s_ch.putHashed(keyhash, vi,                                  // this returns the previous VerIdx at the position
-      [ths, key, klen](ui32 blkidx, ui32 ver){
-        return CompareBlock(ths,blkidx,ver,key,klen);
+    VerIdx    kv = s_ch.putHashed(hash, vi,                                  // this returns the previous VerIdx at the position
+      [ths, key, klen, hash](u32 blkidx, u32 ver){
+        return CompareBlock(ths,blkidx,ver,key,klen,hash);
       });
 
     if(kv.idx!=EMPTY_KEY) s_cs.free(kv.idx, kv.version);                       // putHashed returns the entry that was there before, which is the entry that was replaced. If it wasn't empty, we free it here. 
 
     return vi.idx;
   }
-  i32          put(char const* const key, const void *const val, ui32 vlen)
-  {
-    assert(strlen(key)>0);
-    return put(key, (ui32)strlen(key), val, vlen);
-  }
-  bool         get(const void *const key, ui32 klen, void *const   out_val, ui32 vlen) const
+  bool         get(const void *const key, u32 klen, void *const   out_val, u32 vlen) const
   {
     if(klen<1) return 0;
 
-    auto       ths = this;
-    auto       hsh = ConcurrentHash::HashBytes(key, klen);
-
-    auto matchFunc = [ths, key, klen](ui32 blkidx, ui32 ver){
-      return CompareBlock(ths,blkidx,ver,key,klen);
+    auto hash = ConcurrentHash::HashBytes(key, klen);
+    auto  ths = this;
+    auto matchFunc = [ths, key, klen, hash](u32 blkidx, u32 ver){
+      return CompareBlock(ths,blkidx,ver,key,klen,hash);
     };
     
-    ui32  out_klen = 0;
+    u32  out_klen = 0;
     auto   runFunc = [ths, &out_klen, out_val, vlen](VerIdx kv){
       return ths->s_cs.get(kv.idx, kv.version, out_val, vlen);
     };
 
-    return s_ch.runMatch(hsh, matchFunc, runFunc);
+    return s_ch.runMatch(hash, matchFunc, runFunc);
   }
-  bool         get(char const* const key, void *const val, ui32 vlen) const
-  {
-    return get(key, (ui32)strlen(key), val, vlen);
-  }
-  bool          rm(const void *const key, ui32 klen)
+  bool          rm(const void *const key, u32 klen)
   {
     auto hash = ConcurrentHash::HashBytes(key, klen);
     auto  ths = this;
     VerIdx kv = s_ch.rmHashed(hash,
-      [ths, key, klen](ui32 blkidx, ui32 ver){ return CompareBlock(ths,blkidx,ver,key,klen); });
+      [ths, key, klen, hash](u32 blkidx, u32 ver){ return CompareBlock(ths,blkidx,ver,key,klen,hash); });
 
     if(kv.idx!=EMPTY_KEY) s_cs.free(kv.idx, kv.version);
 
     return kv.idx!=EMPTY_KEY;
   }
-  i64          len(const void *const key, ui32 klen, ui32* out_vlen=nullptr, ui32* out_version=nullptr) const
+  i64          len(const void *const key, u32 klen, u32* out_vlen=nullptr, u32* out_version=nullptr) const
   {
     if(klen<1) return 0;
 
-    auto       ths = this;
-    auto       hsh = ConcurrentHash::HashBytes(key, klen);
-
-    auto matchFunc = [ths, key, klen](ui32 blkidx, ui32 ver){
-      return CompareBlock(ths,blkidx,ver,key,klen);
+    auto hash = ConcurrentHash::HashBytes(key, klen);
+    auto  ths = this;
+    auto matchFunc = [ths, key, klen, hash](u32 blkidx, u32 ver){
+      return CompareBlock(ths,blkidx,ver,key,klen,hash);
     };
     
-    ui32 len=0;
-    ui32 ver=0;
+    u32 len=0;
+    u32 ver=0;
     auto runFunc = [ths, &len, &ver, out_vlen](VerIdx kv){
       len = IsEmpty(kv)?  0ull  :  ths->s_cs.len(kv.idx, kv.version, out_vlen);
       ver = kv.version;
     };
 
-    if( !s_ch.runMatch(hsh,  matchFunc, runFunc) ) return 0;
+    if( !s_ch.runMatch(hash, matchFunc, runFunc) ) return 0;
 
     if(out_version) *out_version = ver;
     return len;
   }
-  bool         len(ui32 idx, ui32 version, ui32* out_klen=nullptr, ui32* out_vlen=nullptr) const
+
+  i32          put(char const* const key, const void *const val, u32 vlen)
+  {
+    assert(strlen(key)>0);
+    return put(key, (u32)strlen(key), val, vlen);
+  }
+  bool         get(char const* const key, void *const val, u32 vlen) const
+  {
+    return get(key, (u32)strlen(key), val, vlen);
+  }
+  bool         len(u32 idx, u32 version, u32* out_klen=nullptr, u32* out_vlen=nullptr) const
   {
     auto  ths = this;
     bool   ok = s_ch.runRead(idx, version, 
     [ths, out_klen, out_vlen](VerIdx kv)
     {
-      ui32 vlen = 0;
+      u32 vlen = 0;
       auto tlen = ths->s_cs.len(kv.idx, kv.version, out_vlen);
       if(tlen>0){
         *out_klen = tlen - *out_vlen;
@@ -1919,7 +1972,7 @@ public:
   {
     auto        st = m_nxtChIdx;
     VerIdx   empty = s_ch.empty_kv();
-    ui32    chNxt; // = empty.key;
+    u32    chNxt; // = empty.key;
     VerIdx     vi;
     do{
            chNxt = s_ch.nxt(m_nxtChIdx);      if(chNxt==empty.idx) return empty;             // can return the same index - it does not do the iteration after finding a non empty key
@@ -1932,7 +1985,7 @@ public:
     
     return ret;
   }
-  bool      getKey(ui32 idx, ui32 version, void *const out_buf, ui32 klen)   const
+  bool      getKey(u32 idx, u32 version, void *const out_buf, u32 klen)   const
   {
     if(klen<1) return false;
     
@@ -1946,7 +1999,7 @@ public:
     };
     return s_ch.runRead(idx, version, runFunc);
   }
-  ui32         cur() const
+  u32         cur() const
   {
     return m_curChIdx;
   }
@@ -1957,8 +2010,8 @@ public:
   ui64        size() const
   {
     //return m_mem.size;
-    //return s_cs.sizeBytes( (ui32)s_blockSize->load(), (ui32)s_blockCount->load());
-    return ConcurrentStore::sizeBytes( (ui32)s_blockSize->load(), (ui32)s_blockCount->load());
+    //return s_cs.sizeBytes( (u32)s_blockSize->load(), (u32)s_blockCount->load());
+    return ConcurrentStore::sizeBytes( (u32)s_blockSize->load(), (u32)s_blockCount->load());
   }
   bool     isOwner() const
   {
@@ -1979,7 +2032,7 @@ public:
 
   // separated C++ functions - these won't need to exist if compiled for a C interface
   struct VerStr { 
-    ui32 v; str s; 
+    u32 v; str s; 
     bool  operator<(VerStr const& vs) const { if(s==vs.s) return v<vs.v; else return s<vs.s; }  
     bool  operator<(str const&    rs) const { return s<rs;    }
     bool operator==(VerStr const& vs) const { return s==vs.s && v==vs.v; } 
@@ -1987,14 +2040,14 @@ public:
 
   i64          put(str    const& key, str const& value)
   {
-    return put(key.data(), (ui32)key.length(), value.data(), (ui32)value.length());
+    return put(key.data(), (u32)key.length(), value.data(), (u32)value.length());
   }
   bool         get(str    const& key, str* out_value) const
   {
-    ui32   vlen = 0;
-    auto  kvLen = len(key.data(), (ui32)key.length(), &vlen);
+    u32   vlen = 0;
+    auto  kvLen = len(key.data(), (u32)key.length(), &vlen);
     new (out_value) std::string(vlen,'\0');
-    bool     ok = get(key.data(), (ui32)key.length(), (void*)out_value->data(), vlen);
+    bool     ok = get(key.data(), (u32)key.length(), (void*)out_value->data(), vlen);
 
     return ok;
   }
@@ -2006,7 +2059,7 @@ public:
   }
   VerStr    nxtKey(ui64* searched=nullptr)            const
   {
-    ui32 klen, vlen;
+    u32 klen, vlen;
     bool    ok = false;
     i64   prev = (i64)m_nxtChIdx;
     VerIdx nxt = this->nxt();
@@ -2038,7 +2091,7 @@ public:
     return { nxt.version, key };                    // copy elision 
     //else   return { 0, "" };
   }
-  auto  getKeyStrs() const -> vec<VerStr>            // vec<ui32>* out_versions=nullptr
+  auto  getKeyStrs() const -> vec<VerStr>            // vec<u32>* out_versions=nullptr
   {
     using namespace std;
     
@@ -2053,7 +2106,7 @@ public:
 
     set<VerStr> keys;
 
-    //ui32       i = 0;
+    //u32       i = 0;
     //str nxt = nxtKey();
     ui64 srchCnt = 0;
     auto     nxt = nxtKey();                             
@@ -2067,18 +2120,18 @@ public:
       //++i;
     }
 
-    //if(out_versions) new (out_versions) vec<ui32>()
+    //if(out_versions) new (out_versions) vec<u32>()
     return vec<VerStr>(keys.begin(), keys.end());
   }
   bool          rm(str const& key)
   {
-    return this->rm( (void const* const)key.data(), (ui32)key.length() );
+    return this->rm( (void const* const)key.data(), (u32)key.length() );
   }
 
   template<class T>
   i64          put(str    const& key, vec<T> const& val)
   {    
-    return put(key.data(), (ui32)key.length(), val.data(), (ui32)(val.size()*sizeof(T)) );
+    return put(key.data(), (u32)key.length(), val.data(), (u32)(val.size()*sizeof(T)) );
   }
 
   // end separated C++ functions
@@ -2093,6 +2146,14 @@ public:
 
 
 
+
+//i32      nxt  =  nxtBlock(curidx);
+//
+//if(curlen < blksz){ return MATCH_FALSE; }
+//auto cmplen = min(curlen, (ui32)blksz);
+//Match   cmp = memcmpBlk(curidx, curbuf, p, cmplen);
+//}else if(-nxt != curlen){ return MATCH_FALSE; }
+// return MATCH_TRUE; // never reached
 
 //m_cl(m_blockCount)
 //
