@@ -40,6 +40,7 @@
 // -todo: make arguments to listDBs for the prefix? 'type' is windows specific and should be ok to be hardcoded - not neccesary because windows will be hardcoded and unix and linux don't have types
 // -todo: make a macro to have separate windows and unix paths
 
+// todo: make compexchange_kv take VerIdx instead u64
 // todo: take out IDX alias
 // todo: take out stack based m_blocksUsed
 // todo: make del() delete a VerIdx, duplicate the VerIdx ahead into the deleted slot, check that the indices are the same, and if they are, mark the one further ahead as deleted
@@ -1243,13 +1244,14 @@ public:
     return s_bls[i];
   }
 
-  friend ConcurrentHash;
+  friend class ConcurrentHash;
 };
 class   ConcurrentHash
 {
 public:
-  using VerIdx  = ConcurrentStore::VerIdx;
+  using  VerIdx = ConcurrentStore::VerIdx;
   using CncrStr = ConcurrentStore;
+  using  BlkLst = ConcurrentStore::BlkLst;
 
   struct VerIpd { u32 version, ipd; };                   // ipd is Ideal Position Distance
 
@@ -1263,7 +1265,7 @@ public:
   static const u32  DELETED_KEY      =  0x0000001FFFFE;   // 1 less than the EMPTY_KEY
   static const u32  EMPTY_HASH_IDX   =  0xFFFFFFFF;       // 32 bits set - hash indices are different from block indices 
 
-  //static const u64  EMPTY_KEY        =  0x000000000000001FFFFF;         // first 21 bits set 
+  //static const  u64  EMPTY_KEY        =  0x000000000000001FFFFF;         // first 21 bits set 
   //static const ui64  EMPTY_KEY        =  0x000000000FFFFFFF;   // first 28 bits set 
   //static const ui64  EMPTY_KEY        =    0x0000000000200000;   // first 21 bits set 
   //static const ui64  EMPTY_KEY        =  2097151;         // first 21 bits set 
@@ -1398,19 +1400,30 @@ private:
   }
   VerIpd            ipd(VerIdx vi)            const  // ipd is Ideal Position Distance - it is the distance a ConcurrentHash index value is from the position that it gets hashed to 
   {
-    u32  ip = m_chp->blkLst(vi.idx).hash % m_sz;     // ip is Ideal Position
-    u32 ipd = vi.idx>ip?  vi.idx-ip  :  KEY_MAX-ip + vi.idx;
-    return {vi.version, ipd};
+    BlkLst bl = m_chp->blkLst(vi.idx);
+    u32    ip = bl.hash % m_sz;     // ip is Ideal Position
+    u32   ipd = vi.idx>ip?  vi.idx-ip  :  KEY_MAX-ip + vi.idx;  // todo: change vi.idx to u32 so that there aren't sign mismatch warnings
+    return {bl.kr.version, ipd};
   }
-  void    cleanDeletion(u32 i)                const
+  bool    cleanDeletion(u32 i)                const
   {
-    VerIdx vi; VerIpd vp;
-    u32 nxti = nxtIdx(i);
-    vi = load_kv(nxti);
-    vp = ipd(vi);
+    VerIdx curVi, vi; VerIpd vp;
+    do{
+      curVi = load_kv(i);
+      if(curVi.idx != DELETED_KEY){ return false; }
 
-    if(vp.ipd){}
+      u32 nxti = nxtIdx(i);
+      vi = load_kv(nxti);
+      if(vi.idx==DELETED_KEY || vi.idx==EMPTY_KEY) return true;
+      vp = ipd(vi);
 
+      vp.ipd>0
+    }while( vp.version!=vi.version || !compexchange_kv(i, &curVi.asInt, vi.asInt) );
+
+    return true;
+    //if(vp.version!=vi.version && vp.ipd>0){
+    //  //compexchange_kv(i, &curVi.asInt, vi.asInt);       // write next index's VerIdx to the current index if it is still deleted
+    //}
   }
 
   template<class MATCH_FUNC> 
