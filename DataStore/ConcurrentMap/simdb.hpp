@@ -40,6 +40,9 @@
 // -todo: make arguments to listDBs for the prefix? 'type' is windows specific and should be ok to be hardcoded - not neccesary because windows will be hardcoded and unix and linux don't have types
 // -todo: make a macro to have separate windows and unix paths
 
+// todo: initialize ConcurrentHash with a pointer to ConcurrentStore
+// todo: change i8* to u8*
+// todo: get rid of unused uiX type aliases
 // todo: put supporting windows functions into anonymous namespace
 // todo: make compexchange_kv take VerIdx instead u64
 // todo: take out IDX alias
@@ -1341,14 +1344,8 @@ public:
   static u32                hi32(u64 n){ return (n>>32)<<32; }
   static u32                lo32(u64 n){ return (n<<32)>>32; }
   static u64               swp32(u64 n){ return (((u64)hi32(n))<<32) & lo32(n); }
-  static u64             incHi32(u64 n, u32 i)
-  {
-    return ((u64)hi32(n)+i)<<32 & lo32(n);
-  }
-  static u64             incLo32(u64 n, u32 i)
-  {
-    return ((u64)hi32(n))<<32 & (lo32(n)+i);
-  }
+  static u64             incHi32(u64 n, u32 i){ return ((u64)hi32(n)+i)<<32 & lo32(n); }
+  static u64             incLo32(u64 n, u32 i){ return ((u64)hi32(n))<<32 & (lo32(n)+i); }
 
 private:
   using   i8     =  int8_t;
@@ -1364,8 +1361,7 @@ private:
 
           u32       m_sz;
   mutable VerIdxs   m_kvs;           // m_kvs is key value(s) - needs to be changed to versioned indices, m_vis
-          CncrStr*  m_chp;           // chp is concurrent hash pointer
-
+          CncrStr*  m_csp;           // csp is concurrent store pointer
 
   u32            nxtIdx(u32 i)                const { return (i+1)%m_sz; }
   u32           prevIdx(u32 i)                const { return std::min(i-1, m_sz-1); } // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap
@@ -1373,10 +1369,6 @@ private:
   {
     using namespace std;
     
-    //VerIdx keyval;
-    //keyval.asInt
-    //return keyval;   
-
     u64 cur = atomic_load<ui64>( (Aui64*)(&(m_kvs.data()[i].asInt)) );              // Load the key that was there.
 
     VerIdx ret;
@@ -1384,6 +1376,10 @@ private:
     else       ret.asInt = cur;
 
     return ret;
+    
+    //VerIdx keyval;
+    //keyval.asInt
+    //return keyval;   
   }
   VerIdx       store_kv(u32 i, VerIdx keyval) const
   {
@@ -1619,23 +1615,26 @@ public:
     return f(vi);
   }
 
-  bool          init(u32   sz)
+  bool          init(u32   sz, ConcurrentStore* cs=nullptr)
   {
     using namespace std;
     
-    //m_sz      =  nextPowerOf2(sz);
+    m_csp     =  cs;
     m_sz      =  sz;
-    //m_kvs     =  lava_vec<VerIdx>(m_sz);
     new (&m_kvs) lava_vec<VerIdx>(m_sz); // placement new because the copy constructor and assignment operator are deleted.  msvc doesn't care, but clang does
     VerIdx ver0  =  empty_kv();
     VerIdx ver1  =  empty_kv();
     ver1.version =  1;
 
-    //for(ui64 i=0; i<m_kvs.size(); ++i) m_kvs[i] = defKv;
     for(u32 i=0; i<sz; i+=2) store_kv(i, ver0);        // evens 
     for(u32 i=1; i<sz; i+=2) store_kv(i, ver1);
     
     return true;
+    
+    //m_sz      =  nextPowerOf2(sz);
+    //m_kvs     =  lava_vec<VerIdx>(m_sz);
+    // 
+    //for(ui64 i=0; i<m_kvs.size(); ++i) m_kvs[i] = defKv;
   }
   VerIdx          at(u32  idx)                  const
   {
@@ -1896,9 +1895,9 @@ private:
   ui64              m_blkSz;
 
 public:
-  static const u32  EMPTY_KEY = ConcurrentHash::EMPTY_KEY;          // 28 bits set 
-  static const u32 FAILED_PUT = ConcurrentHash::EMPTY_KEY;          // 28 bits set 
-  static const u32   LIST_END = ConcurrentStore::LIST_END;
+  static const u32   EMPTY_KEY = ConcurrentHash::EMPTY_KEY;          // 28 bits set 
+  static const u32  FAILED_PUT = ConcurrentHash::EMPTY_KEY;          // 28 bits set 
+  static const u32    LIST_END = ConcurrentStore::LIST_END;
   static ui64       OffsetBytes()
   {
     return sizeof(aui64)*3;
@@ -1920,18 +1919,12 @@ public:
   simdb(){}
   simdb(const char* name, u32 blockSize, u32 blockCount) : 
     m_curChIdx(0)
-    //m_mem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount)) ),
-    //m_ch( ((i8*)m_mem.data())+OffsetBytes(), blockCount, m_mem.owner),
-    //m_cs( ((i8*)m_mem.data())+m_ch.sizeBytes(blockCount)+OffsetBytes(), blockSize, blockCount, m_mem.owner),                 // todo: change this to a void*
-    //m_blockCount( ((aui64*)m_mem.data())+2 ),
-    //m_blockSize(  ((aui64*)m_mem.data())+1 ),
-    //m_flags(       (aui64*)m_mem.data() )
   {
     new (&m_mem) SharedMem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount)) );
 
-    s_blockCount =  ((aui64*)m_mem.data())+2;
-    s_blockSize  =  ((aui64*)m_mem.data())+1;
-    s_flags      =   (aui64*)m_mem.data();
+    s_blockCount =  ((au64*)m_mem.data())+2;
+    s_blockSize  =  ((au64*)m_mem.data())+1;
+    s_flags      =   (au64*)m_mem.data();
 
     if(isOwner()){
       s_blockCount->store(blockCount);
@@ -1940,21 +1933,17 @@ public:
     else{                                                       // need to spin until ready
       while(s_flags->load()==false){}
       m_mem.size = MemSize(s_blockSize->load(), s_blockCount->load());
-      //new (&m_ch) ConcurrentHash( ((i8*)m_mem.data())+OffsetBytes(), m_blockCount->load(), m_mem.owner);
-      //new (&m_cs) ConcurrentStore( ((i8*)m_mem.data())+m_ch.sizeBytes(m_blockCount->load())+OffsetBytes(), m_blockSize->load(), m_blockCount->load(), m_mem.owner);                 // todo: change this to a void*
     }
 
-    //new (&m_mem) SharedMem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount)) );
-    //new (&m_ch) ConcurrentHash( ( ((i8*)m_mem.data())+OffsetBytes(), blockCount, m_mem.owner) );
-    //new (&m_cs) ConcurrentStore(  ((i8*)m_mem.data())+m_ch.sizeBytes(blockCount)+OffsetBytes(), blockSize, blockCount, m_mem.owner);                 // todo: change this to a void*
     new (&s_ch) ConcurrentHash( ((i8*)m_mem.data())+OffsetBytes(), 
-                                       (u32)s_blockCount->load(), 
-                                                      m_mem.owner);
+                                (u32)s_blockCount->load(), 
+                                m_mem.owner);
+
     auto chSz = s_ch.sizeBytes();
     new (&s_cs) ConcurrentStore( ((i8*)m_mem.data())+chSz+OffsetBytes(), 
-                                              (u32)s_blockSize->load(), 
-                                             (u32)s_blockCount->load(), 
-                                                           m_mem.owner);                 // todo: change this to a void*
+                                 (u32)s_blockSize->load(), 
+                                 (u32)s_blockCount->load(), 
+                                 m_mem.owner);                 // todo: change this to a void*
 
     m_blkCnt = s_blockCount->load();
     m_blkSz  = s_blockSize->load();
@@ -2097,7 +2086,7 @@ public:
     };
     return s_ch.runRead(idx, version, runFunc);
   }
-  u32         cur() const
+  u32          cur() const
   {
     return m_curChIdx;
   }
@@ -2244,6 +2233,20 @@ public:
 
 
 
+
+//new (&m_ch) ConcurrentHash( ((i8*)m_mem.data())+OffsetBytes(), m_blockCount->load(), m_mem.owner);
+//new (&m_cs) ConcurrentStore( ((i8*)m_mem.data())+m_ch.sizeBytes(m_blockCount->load())+OffsetBytes(), m_blockSize->load(), m_blockCount->load(), m_mem.owner);                 // todo: change this to a void*
+
+//new (&m_mem) SharedMem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount)) );
+//new (&m_ch) ConcurrentHash( ( ((i8*)m_mem.data())+OffsetBytes(), blockCount, m_mem.owner) );
+//new (&m_cs) ConcurrentStore(  ((i8*)m_mem.data())+m_ch.sizeBytes(blockCount)+OffsetBytes(), blockSize, blockCount, m_mem.owner);                 // todo: change this to a void*
+
+//m_mem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount)) ),
+//m_ch( ((i8*)m_mem.data())+OffsetBytes(), blockCount, m_mem.owner),
+//m_cs( ((i8*)m_mem.data())+m_ch.sizeBytes(blockCount)+OffsetBytes(), blockSize, blockCount, m_mem.owner),                 // todo: change this to a void*
+//m_blockCount( ((aui64*)m_mem.data())+2 ),
+//m_blockSize(  ((aui64*)m_mem.data())+1 ),
+//m_flags(       (aui64*)m_mem.data() )
 
 //static BlkLst   make_BlkLst(bool isKey, i32 readers, u32 idx, u32 ver, u32 len, u32 klen)
 //{
