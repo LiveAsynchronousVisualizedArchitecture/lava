@@ -40,6 +40,7 @@
 // -todo: make arguments to listDBs for the prefix? 'type' is windows specific and should be ok to be hardcoded - not neccesary because windows will be hardcoded and unix and linux don't have types
 // -todo: make a macro to have separate windows and unix paths
 
+// todo: put supporting windows functions into anonymous namespace
 // todo: make compexchange_kv take VerIdx instead u64
 // todo: take out IDX alias
 // todo: take out stack based m_blocksUsed
@@ -505,24 +506,6 @@ namespace {
     void operator()(){}
   };
 
-  ui64 fnv_64a_buf(void const *const buf, ui64 len)
-  {
-    // const ui64 FNV_64_PRIME = 0x100000001b3;
-    ui64 hval = 0xcbf29ce484222325;    // FNV1_64_INIT;  // ((Fnv64_t)0xcbf29ce484222325ULL)
-    ui8*   bp = (ui8*)buf;	           /* start of buffer */
-    ui8*   be = bp + len;		           /* beyond end of buffer */
-
-    while(bp < be)                     // FNV-1a hash each octet of the buffer
-    {
-      hval ^= (ui64)*bp++;             /* xor the bottom with the current octet */
-
-      //hval *= FNV_64_PRIME; // does this do the same thing?  /* multiply by the 64 bit FNV magic prime mod 2^64 */
-      hval += (hval << 1) + (hval << 4) + (hval << 5) +
-              (hval << 7) + (hval << 8) + (hval << 40);
-    }
-    return hval;
-  }
-
   template<class T, class Deleter=std::default_delete<T>, class Allocator=std::allocator<T> >
   class lava_vec
   {
@@ -629,6 +612,42 @@ namespace {
       return p;
     }
   };
+
+  ui64 fnv_64a_buf(void const *const buf, ui64 len)
+  {
+    // const ui64 FNV_64_PRIME = 0x100000001b3;
+    ui64 hval = 0xcbf29ce484222325;    // FNV1_64_INIT;  // ((Fnv64_t)0xcbf29ce484222325ULL)
+    ui8*   bp = (ui8*)buf;	           /* start of buffer */
+    ui8*   be = bp + len;		           /* beyond end of buffer */
+
+    while(bp < be)                     // FNV-1a hash each octet of the buffer
+    {
+      hval ^= (ui64)*bp++;             /* xor the bottom with the current octet */
+
+      //hval *= FNV_64_PRIME; // does this do the same thing?  /* multiply by the 64 bit FNV magic prime mod 2^64 */
+      hval += (hval << 1) + (hval << 4) + (hval << 5) +
+              (hval << 7) + (hval << 8) + (hval << 40);
+    }
+    return hval;
+  }
+  
+  bool compex128(
+    volatile long long*  _Destination, 
+    long long           _ExchangeHigh, 
+    long long            _ExchangeLow, 
+    long long*      _CompareAndResult)
+  {
+    return _InterlockedCompareExchange128(
+     _Destination,
+     _ExchangeHigh,
+     _ExchangeLow,
+     _CompareAndResult) == 1;
+
+    //return _InterlockedCompareExchange128( (i64*)(idxAddr), 
+    //    swpvi.hi, swpvi.lo,
+    //    (i64*)(&dblvi) )==1;
+  }
+
 }
 
 struct  _u128
@@ -1349,6 +1368,7 @@ private:
 
 
   u32            nxtIdx(u32 i)                const { return (i+1)%m_sz; }
+  u32           prevIdx(u32 i)                const { return std::min(i-1, m_sz-1); } // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap
   VerIdx        load_kv(u32 i)                const
   {
     using namespace std;
@@ -1405,22 +1425,54 @@ private:
     u32   ipd = vi.idx>ip?  vi.idx-ip  :  KEY_MAX-ip + vi.idx;  // todo: change vi.idx to u32 so that there aren't sign mismatch warnings
     return {bl.kr.version, ipd};
   }
+  bool          delDupe(u32 i)                const                   // delete duplicate indices - l is left index, r is right index - will do something different depending on if the two slots are within 128 bit alignment or not
+  {
+    if(i%2==0){             // both indices are within a 128 bit boundary, so the 128 bit atomic can (and must) be used
+      // find 128 bit offset address
+      // check if both the indices are the same
+      // if both the indices are the same, make a new right side VerIdx with the idx set to DELETED_KEY
+      // compex128()  // then compare and swap for a version with the new right side VerIdx
+    }else{
+    }
+  }
   bool    cleanDeletion(u32 i)                const
   {
-    VerIdx curVi, vi; VerIpd vp;
-    do{
+    VerIdx curVi, nxtVi; VerIpd nxtVp;
+
+    dupe_nxt: while( (nxtVi=load_kv(nxtIdx(i))).idx < DELETED_KEY )   // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
+    {
       curVi = load_kv(i);
-      if(curVi.idx != DELETED_KEY){ return false; }
+      if(curVi.idx >= DELETED_KEY){ return false; }
 
-      u32 nxti = nxtIdx(i);
-      vi = load_kv(nxti);
-      if(vi.idx==DELETED_KEY || vi.idx==EMPTY_KEY) return true;
-      vp = ipd(vi);
+      nxtVp = ipd(nxtVi);
+      if(nxtVp.version!=nxtVi.version){ goto dupe_nxt; }              // the versions don't match, so start over on the same index and skip the compare exchange 
+      else if(nxtVp.ipd==0){ return true; }                           // next slot's versions match and its VerIdx is in its ideal position, so we are done 
+      else if( compexchange_kv(i, &curVi.asInt, nxtVi.asInt) ){ i = nxtIdx(i); }
+    }
 
-      vp.ipd>0
-    }while( vp.version!=vi.version || !compexchange_kv(i, &curVi.asInt, vi.asInt) );
+    // now that the next VerIdx is duplicated into the current slot, compare the indices of both and if they are the same, set the right index (the original VerIdx) to DELETED_IDX
+    delDupe(prevIdx(i));
 
     return true;
+
+    //loop_start: while( (nxtVi=load_kv(nxtIdx(i))).idx < DELETED_KEY )
+    //{
+    //  do{ 
+    //    curVi = load_kv(i);
+    //    if(curVi.idx != DELETED_KEY){ return false; }
+    //
+    //    nxtVp = ipd(nxtVi);
+    //    if(nxtVp.version!=nxtVi.version){ goto loop_start; }  // the versions don't match, so start over on the same index and skip the compare exchange 
+    //    else if(nxtVp.ipd==0){ return true; }                 // next slot's versions match and its VerIdx is in its ideal position, so we are done 
+    //  }while( !compexchange_kv(i, &curVi.asInt, nxtVi.asInt) );
+    //  
+    //  ++i;
+    //}
+
+    //u32 nxti = nxtIdx(i);
+    //nxtVi = load_kv(nxti);
+    //if(nxtVi.idx==DELETED_KEY || nxtVi.idx==EMPTY_KEY){ return true; }
+
     //if(vp.version!=vi.version && vp.ipd>0){
     //  //compexchange_kv(i, &curVi.asInt, vi.asInt);       // write next index's VerIdx to the current index if it is still deleted
     //}
@@ -1590,7 +1642,7 @@ public:
     //return m_kvs[idx];
     return load_kv(idx);
   }
-  u32            nxt(u32  stIdx)                 const
+  u32            nxt(u32  stIdx)                const
   {
     auto idx = stIdx;
     VerIdx empty = empty_kv();
@@ -1606,7 +1658,7 @@ public:
 
     /* && kv.readers>=0 */
   }
-  u32           size()                           const
+  u32           size()                          const
   {
     return m_sz;
   }
@@ -1628,9 +1680,7 @@ public:
         swpvi = { swp32(idxAddr->lo), swp32(idxAddr->hi) };           // not needed? can use the values directly?
         //swpvi.hi = incLo32(swpvi.hi, 2);                              // swpvi.hi is the left VerIdx, actually ordered as IdxVer, so the lo 32 bits of that are the version number
         //swpvi.lo = incHi32(swpvi.lo, 2);                              // swpvi.lo is the right VerIdx, ordered as VerIdx since the versions are in the middle of the 128 bit alignments and the indices are on the outside
-      }while( _InterlockedCompareExchange128( (i64*)(idxAddr), 
-        swpvi.hi, swpvi.lo,
-        (i64*)(&dblvi) )==1 );
+      }while( compex128( (i64*)(idxAddr), swpvi.hi, swpvi.lo, (i64*)(&dblvi) )==1 );
     }
     else                                                              // must be on an odd number, and so will need to use a 64 bit atomic to swap the indices in the middle
     {
