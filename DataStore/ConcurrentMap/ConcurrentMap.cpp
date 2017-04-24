@@ -220,36 +220,36 @@ int main()
 {
   using namespace std;
 
-  SECTION(128 bit atomic compare and exchange)
-  {
-    u128 dest = { 101, 102 };
-    u128 comp = { 101, 102 };
-    u128 desired = { 85, 86 };
-
-    _InterlockedCompareExchange128(
-      (i64*)(&dest), 
-      desired.hi,
-      desired.lo,
-      (i64*)(&comp) );
-
-    Println("dest: ", dest.hi, " ", dest.lo);
-    Println("comp: ", comp.hi, " ", comp.lo);
-    Println("\n\n");
-
-    //u128 dest = { 101, 102 };
-    //u128 comp = { 101, 102 };
-    //u128 desired = { 85, 86 };
-
-    _InterlockedCompareExchange128(
-      (i64*)(&dest), 
-      desired.hi,
-      desired.lo,
-      (i64*)(&comp) );
-
-    Println("dest: ", dest.hi, " ", dest.lo);
-    Println("comp: ", comp.hi, " ", comp.lo);
-    Println("\n\n");
-  }
+  //SECTION(128 bit atomic compare and exchange)
+  //{
+  //  u128 dest = { 101, 102 };
+  //  u128 comp = { 101, 102 };
+  //  u128 desired = { 85, 86 };
+  //
+  //  _InterlockedCompareExchange128(
+  //    (i64*)(&dest), 
+  //    desired.hi,
+  //    desired.lo,
+  //    (i64*)(&comp) );
+  //
+  //  Println("dest: ", dest.hi, " ", dest.lo);
+  //  Println("comp: ", comp.hi, " ", comp.lo);
+  //  Println("\n\n");
+  //
+  //  //u128 dest = { 101, 102 };
+  //  //u128 comp = { 101, 102 };
+  //  //u128 desired = { 85, 86 };
+  //
+  //  _InterlockedCompareExchange128(
+  //    (i64*)(&dest), 
+  //    desired.hi,
+  //    desired.lo,
+  //    (i64*)(&comp) );
+  //
+  //  Println("dest: ", dest.hi, " ", dest.lo);
+  //  Println("comp: ", comp.hi, " ", comp.lo);
+  //  Println("\n\n");
+  //}
 
   //ui32 sz = 18921703;
   //ui32 sz = 400;
@@ -535,9 +535,9 @@ int main()
   str  skidoosh  =  "skidoosh";
   //str    kablam  =    "kablam";
 
-  //if( db.isOwner() ){
-    //Println("put: ", db.put( wat.data(),   (ui32)wat.length(),    skidoosh.data(), (ui32)skidoosh.length()) );
-    //db.rm("wat");
+  if( db.isOwner() ){
+    Println("put: ", db.put( wat.data(),   (ui32)wat.length(),    skidoosh.data(), (ui32)skidoosh.length()) );
+    db.del("wat");
     //Println("put: ", db.put( wut.data(),   (ui32)wut.length(),    kablam.data(),   (ui32)kablam.length())   ); 
     //db.rm("wut");
     //Println("put: ", db.put( kablam.data(),(ui32)kablam.length(), skidoosh.data(), (ui32)skidoosh.length()) ); 
@@ -545,7 +545,7 @@ int main()
     //Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
     //db.rm("wat");
     //Println();
-  //}
+  }
   //else{
   //  Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
   //}

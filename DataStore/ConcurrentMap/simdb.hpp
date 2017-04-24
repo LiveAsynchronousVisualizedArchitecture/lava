@@ -39,9 +39,10 @@
 // -todo: clean up type aliases with ui32 to u32
 // -todo: make arguments to listDBs for the prefix? 'type' is windows specific and should be ok to be hardcoded - not neccesary because windows will be hardcoded and unix and linux don't have types
 // -todo: make a macro to have separate windows and unix paths
+// -todo: initialize ConcurrentHash with a pointer to ConcurrentStore
+// -todo: change rm() to del()
 
-// todo: initialize ConcurrentHash with a pointer to ConcurrentStore
-// todo: change i8* to u8*
+// todo: change i8* to u8* and ui8* to u8*
 // todo: get rid of unused uiX type aliases
 // todo: put supporting windows functions into anonymous namespace
 // todo: make compexchange_kv take VerIdx instead u64
@@ -503,6 +504,12 @@ template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  //
 namespace {
   enum Match { MATCH_FALSE=0, MATCH_TRUE=1, MATCH_REMOVED=-1  };
 
+  struct _u128
+  {
+    volatile u64 hi; volatile u64 lo; 
+    //_u128& operator=(_u128 l){ hi = l.hi; lo = l.lo; return *this; };
+  };
+
   template<class T>
   class lava_noop
   {
@@ -653,11 +660,6 @@ namespace {
 
 }
 
-struct  _u128
-{
-  volatile u64 hi; volatile u64 lo; 
-  //_u128& operator=(_u128 l){ hi = l.hi; lo = l.lo; return *this; };
-};
 #ifdef _WIN32
   using  u128 = __declspec(align(128)) /*volatile*/ _u128;
 #else
@@ -1416,38 +1418,60 @@ private:
   }
   VerIpd            ipd(VerIdx vi)            const  // ipd is Ideal Position Distance - it is the distance a ConcurrentHash index value is from the position that it gets hashed to 
   {
-    BlkLst bl = m_chp->blkLst(vi.idx);
+    BlkLst bl = m_csp->blkLst(vi.idx);
     u32    ip = bl.hash % m_sz;     // ip is Ideal Position
     u32   ipd = vi.idx>ip?  vi.idx-ip  :  KEY_MAX-ip + vi.idx;  // todo: change vi.idx to u32 so that there aren't sign mismatch warnings
     return {bl.kr.version, ipd};
   }
-  bool          delDupe(u32 i)                const                   // delete duplicate indices - l is left index, r is right index - will do something different depending on if the two slots are within 128 bit alignment or not
+  bool          delDupe(u32 i)                const                                 // delete duplicate indices - l is left index, r is right index - will do something different depending on if the two slots are within 128 bit alignment or not
   {
-    if(i%2==0){             // both indices are within a 128 bit boundary, so the 128 bit atomic can (and must) be used
-      // find 128 bit offset address
-      // check if both the indices are the same
-      // if both the indices are the same, make a new right side VerIdx with the idx set to DELETED_KEY
-      // compex128()  // then compare and swap for a version with the new right side VerIdx
-    }else{
+    if(i%2==0)
+    {                                                                               // both indices are within a 128 bit boundary, so the 128 bit atomic can (and must) be used
+      i64 rgtDel;  _u128 viDbl;
+      //_u128* viDblAddr;
+      _u128* viDblAddr = (_u128*)&m_kvs[i];                                         // find 128 bit offset address
+      viDbl            = *viDblAddr;                                                // todo: should this use a 128 bit atomic load? if it isn't the same, the atomic compare exchange will load it atomically
+      do{
+        if( hi32(viDbl.hi) != lo32(viDbl.lo) ){ false; }                            // check if both the indices are the same
+        
+        ui64 delkv = deleted_kv().asInt;                                          // if both the indices are the same, make a new right side VerIdx with the idx set to DELETED_KEY
+        rgtDel   = *((i64*)(&delkv));                                           // interpret the ui64 bits directly as a signed 64 bit integer instead
+      }while( !compex128( (i64*)viDblAddr, viDbl.hi, rgtDel, (i64*)&viDbl) );     // then compare and swap for a version with the new right side VerIdx // todo: does this need to be in a loop that only breaks when the two indices are not the same?
+    }else
+    {
+      au64* idxDblAddr; u64 idxDbl, rgtDel;
+      u32* leftAddr = ((u32*)(&m_kvs[i]))+1;                                        // if the two VerIdxs are not in a 128 bit boundary, then use a 64 bit compare and swap to set the right side index to DELETED_KEY
+      idxDblAddr    = (au64*)leftAddr;                                              // increment the address by 4 bytes so that it lines up with the start of the two indices, then cast it to an atomic 64 bit unsigned integer for the compare and switch
+      idxDbl        = idxDblAddr->load();
+      do{
+        u32  l = hi32(idxDbl);
+        u32  r = lo32(idxDbl);
+        if(l!=r){ return false; }                                                   // if the indices are the same then do the compare and swap
+        rgtDel = (32<<((u64)l)) & DELETED_KEY;                                      // make the new 64 bit integer with the right index set to DELETED_KEY
+      }while( !idxDblAddr->compare_exchange_strong(idxDbl, rgtDel) );               // looping here would essentially mean that the indices change but are still identical to each other
     }
+
+    return true;
   }
   bool    cleanDeletion(u32 i)                const
   {
     VerIdx curVi, nxtVi; VerIpd nxtVp;
 
-    dupe_nxt: while( (nxtVi=load_kv(nxtIdx(i))).idx < DELETED_KEY )   // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
+    dupe_nxt: while( (nxtVi=load_kv(nxtIdx(i))).idx < DELETED_KEY )                 // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
     {
       curVi = load_kv(i);
       if(curVi.idx >= DELETED_KEY){ return false; }
 
       nxtVp = ipd(nxtVi);
-      if(nxtVp.version!=nxtVi.version){ goto dupe_nxt; }              // the versions don't match, so start over on the same index and skip the compare exchange 
-      else if(nxtVp.ipd==0){ return true; }                           // next slot's versions match and its VerIdx is in its ideal position, so we are done 
-      else if( compexchange_kv(i, &curVi.asInt, nxtVi.asInt) ){ i = nxtIdx(i); }
+      if(nxtVp.version!=nxtVi.version){ goto dupe_nxt; }                            // the versions don't match, so start over on the same index and skip the compare exchange 
+      else if(nxtVp.ipd==0){ return true; }                                         // should this be converted to an empty slot since it is the end of a span? // next slot's versions match and its VerIdx is in its ideal position, so we are done 
+      else if( compexchange_kv(i, &curVi.asInt, nxtVi.asInt) ){ 
+        delDupe(i);
+        i = nxtIdx(i);
+      }
     }
 
-    // now that the next VerIdx is duplicated into the current slot, compare the indices of both and if they are the same, set the right index (the original VerIdx) to DELETED_IDX
-    delDupe(prevIdx(i));
+    // delDupe(prevIdx(i));                                    // now that the next VerIdx is duplicated into the current slot, compare the indices of both and if they are the same, set the right index (the original VerIdx) to DELETED_IDX
 
     return true;
 
@@ -1498,13 +1522,14 @@ private:
 
 public:
   ConcurrentHash(){}
-  ConcurrentHash(u32 size)
+  ConcurrentHash(u32 size, ConcurrentStore* cs)
   {
-    init(size);
+    init(size, cs);
   }
-  ConcurrentHash(void* addr, u32 size, bool owner=true) :
+  ConcurrentHash(void* addr, u32 size, ConcurrentStore* cs, bool owner=true) :
     m_sz(nextPowerOf2(size)),
-    m_kvs(addr, m_sz)
+    m_kvs(addr, m_sz),
+    m_csp(cs)
   {
     if(owner){
       VerIdx defKv = empty_kv();
@@ -1557,7 +1582,7 @@ public:
     return empty;  // should never be reached
   }
   template<class MATCH_FUNC> 
-  VerIdx    rmHashed(u32 hash, MATCH_FUNC match)            const
+  VerIdx   delHashed(u32 hash, MATCH_FUNC match)            const
   {  
     using namespace std;
     static const VerIdx   empty =   empty_kv();
@@ -1599,7 +1624,7 @@ public:
     {
       i %= m_sz;
       VerIdx probedKv = load_kv(i);
-      if( probedKv.idx==EMPTY_KEY ) return false;     // todo: this conflates and assumes that EMPTY_KEY is both the ConcurrentStore block index EMPTY_KEY and the ConcurrentHash EMPTY_KEY?
+      if( probedKv.idx >= DELETED_KEY) return false;     // todo: this conflates and assumes that EMPTY_KEY is both the ConcurrentStore block index EMPTY_KEY and the ConcurrentHash EMPTY_KEY?
       if( runIfMatch(i, probedKv.version, probedKv.idx, match, f) ) return  true;
       if(i==en) return false;
     }
@@ -1615,7 +1640,7 @@ public:
     return f(vi);
   }
 
-  bool          init(u32   sz, ConcurrentStore* cs=nullptr)
+  bool          init(u32   sz, ConcurrentStore* cs)
   {
     using namespace std;
     
@@ -1929,21 +1954,22 @@ public:
     if(isOwner()){
       s_blockCount->store(blockCount);
       s_blockSize->store(blockSize);
-    }
-    else{                                                       // need to spin until ready
+    }else{                                                       // need to spin until ready
       while(s_flags->load()==false){}
       m_mem.size = MemSize(s_blockSize->load(), s_blockCount->load());
     }
 
-    new (&s_ch) ConcurrentHash( ((i8*)m_mem.data())+OffsetBytes(), 
-                                (u32)s_blockCount->load(), 
-                                m_mem.owner);
-
-    auto chSz = s_ch.sizeBytes();
+    //auto chSz = s_ch.sizeBytes();
+    auto chSz = ConcurrentHash::sizeBytes(blockCount);
     new (&s_cs) ConcurrentStore( ((i8*)m_mem.data())+chSz+OffsetBytes(), 
                                  (u32)s_blockSize->load(), 
                                  (u32)s_blockCount->load(), 
                                  m_mem.owner);                 // todo: change this to a void*
+
+    new (&s_ch) ConcurrentHash( ((i8*)m_mem.data())+OffsetBytes(), 
+                                (u32)s_blockCount->load(),
+                                &s_cs,                        // the address of the ConcurrentStore
+                                m_mem.owner);
 
     m_blkCnt = s_blockCount->load();
     m_blkSz  = s_blockSize->load();
@@ -1991,11 +2017,11 @@ public:
 
     return s_ch.runMatch(hash, matchFunc, runFunc);
   }
-  bool          rm(const void *const key, u32 klen)
+  bool         del(const void *const key, u32 klen)
   {
     auto hash = ConcurrentHash::HashBytes(key, klen);
     auto  ths = this;
-    VerIdx kv = s_ch.rmHashed(hash,
+    VerIdx kv = s_ch.delHashed(hash,
       [ths, key, klen, hash](u32 blkidx, u32 ver){ return CompareBlock(ths,blkidx,ver,key,klen,hash); });
 
     if(kv.idx!=EMPTY_KEY) s_cs.free(kv.idx, kv.version);
@@ -2210,9 +2236,9 @@ public:
     //if(out_versions) new (out_versions) vec<u32>()
     return vec<VerStr>(keys.begin(), keys.end());
   }
-  bool          rm(str const& key)
+  bool         del(str const& key)
   {
-    return this->rm( (void const* const)key.data(), (u32)key.length() );
+    return this->del( (void const* const)key.data(), (u32)key.length() );
   }
 
   template<class T>
