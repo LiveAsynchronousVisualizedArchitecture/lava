@@ -48,15 +48,15 @@
 // -todo: make a DELETED value for hash entries so that when something is removed, it doesn't block a linear search
 // -todo: take out stack based m_blocksUsed
 // -todo: give a ConcurrentStore pointer to ConcurrentHash 
+// -todo: change ConcurrentHash  to CncrHsh or LfHsh
+// -todo: change ConcurrentStore to CncrStr
+// -todo: change ConcurrentList  to CncrLst
 
-// todo: change ConcurrentHash  to CncrHsh 
-// todo: change ConcurrentStore to CncrStr
-// todo: change ConcurrentList  to CncrLst
+// todo: make compexchange_kv take VerIdx instead u64
 // todo: clean up inconsitent signs and usage of negative numbers
 // todo: switch negative numbers to a bitfield struct instead of implicitly using the sign bit for different purposes
 // todo: stop using lambdas and templates
 // todo: make deleted indices that have an empty index on their right side become empty indices
-// todo: make compexchange_kv take VerIdx instead u64
 // todo: short circuit as not found on finding an empty slot - will need a deleted value
 // todo: check the hash in each BlkLst index as an early out for failed reads?
 // todo: take out simdb_ prefix? - if this happens, how will 
@@ -73,7 +73,6 @@
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
 // todo: compile with maximum warnings
-
 
 // robin hood hashing
 // todo: do rm()/del() first and make deletion take care of holes in spans?
@@ -208,6 +207,16 @@
  |  |  Because both the Version AND the Index are unique, the same Version + Index combination cannot occur twice over the lifetime of the database unless the version has overflowed and wrapped around (and the same index into the BlockList ends up with the same Version)
  |  |  The 64 bit Version+Index structure (Version is 32 bits and Index is 32 bits) is flipped on even indices in the ConcurrentHash array. The memory is ordered as  |Idx Ver Ver Idx|Idx Ver Ver Idx| with '|' here representing 128 bit alignment boundaries
  |  |  The Index values, next to each other in an unaligned 64 bit configuration can be swapped atomically, though their indices can not be 
+ |  del():
+ |  |  Finds the matching key
+ |  |  Makes sure the VerIdx matches in ConcurrentHash and atomically comapare exchanges it for a VerIdx with a DELETED_KEY index value
+ |  |  Calls cleanupDeleted(i) with the current ConcurrentHash slot
+ |  |  |  Checks the next slot to see if there is a VerIdx in it, and if so, check to see what its ideal position distance is
+ |  |  |  If the ideal position distance is more than 0, it can be moved backwards, so duplicate it into the current slot with an atomic compare-exchange to make sure it is deleted
+ |  |  |  Check the indices of the current and next slots to see if the indices are still identical and atomically compare-exchange the right index value to DELETED_KEY if they are
+ |  |  |  The possibility exists that after duplication but before deletion of the duplicate, put() could swap the duplicate to the right (higher slot). Because of this, put will need to delete any indices that it finds that link to non-key block lists
+ |  |  |  put() will also need to check for duplicate indices, since if they are bubble sorting a robin hood span, they could separate duplicate indices from being next to each other, but also sort them back together
+ |  |  |  should get() also check for duplicates? - probably, since it would have tighter cleanup of the ConcurrentHash only at the expense of one or two extra atomic loads per read
 */
 
 #ifdef _MSC_VER
@@ -670,7 +679,7 @@ namespace {
 
 }
 
-class   ConcurrentList
+class   CncrLst
 {
 public:
   union Head
@@ -695,8 +704,8 @@ public:
     return ListVec::sizeBytes(size);
   }
 
-  ConcurrentList(){}
-  ConcurrentList(void* addr, u32 size, bool owner=true) :           // this constructor is for when the memory is owned an needs to be initialized
+  CncrLst(){}
+  CncrLst(void* addr, u32 size, bool owner=true) :           // this constructor is for when the memory is owned an needs to be initialized
     m_lv(addr, size, owner)
   {                                                                  // separate out initialization and let it be done explicitly in the simdb constructor?
     m_h = (au64*)addr;
@@ -771,7 +780,7 @@ public:
     return cnt;
   }
 };
-class  ConcurrentStore
+class  CncrStr
 {
 public:
   union VerIdx
@@ -823,12 +832,12 @@ public:
   using ai32        =  std::atomic<i32>;
   using BlockLists  =  lava_vec<BlkLst>;   // only the indices returned from the concurrent list are altered, and only one thread will deal with any single index at a time 
 
-  const static u32 LIST_END = ConcurrentList::LIST_END;
+  const static u32 LIST_END = CncrLst::LIST_END;
 
   static VerIdx      List_End()
   { 
     VerIdx vi; 
-    vi.idx     = ConcurrentList::LIST_END; 
+    vi.idx     = CncrLst::LIST_END; 
     vi.version = 0; 
     return vi; 
   }
@@ -872,7 +881,7 @@ public:
 private:   
 
   // On the thread's stack
-  mutable ConcurrentList    s_cl;       // flat data structure - pointer to memory 
+  mutable CncrLst    s_cl;       // flat data structure - pointer to memory 
   mutable BlockLists       s_bls;       // flat data structure - pointer to memory - bl is Block Lists
   void*               s_blksAddr;       // points to the block space in the shared memory
   au64*               s_version;       // pointer to the shared version number
@@ -973,7 +982,7 @@ public:
   /* 
     The order of the shared memory is:
     Version
-    ConcurrentList
+    CncrLst
     BlockLists
     Blocks
   */
@@ -988,17 +997,17 @@ public:
   }
   static u64          BlksOfst(u32 blockCount)
   {
-    //return sizeof(*s_version) + ConcurrentList::sizeBytes(blockCount) + BlockLists::sizeBytes(blockCount);
-    return CListOfst(blockCount) + ConcurrentList::sizeBytes(blockCount);
+    //return sizeof(*s_version) + CncrLst::sizeBytes(blockCount) + BlockLists::sizeBytes(blockCount);
+    return CListOfst(blockCount) + CncrLst::sizeBytes(blockCount);
   }
   static u64         sizeBytes(u32 blockSize, u32 blockCount)
   {
-    //return ConcurrentList::sizeBytes(blockCount) + BlockLists::sizeBytes(blockCount) + blockSize*blockCount;
+    //return CncrLst::sizeBytes(blockCount) + BlockLists::sizeBytes(blockCount) + blockSize*blockCount;
     return BlksOfst(blockCount) + blockSize*blockCount;
   }
 
-  ConcurrentStore(){}
-  ConcurrentStore(void* addr, u32 blockSize, u32 blockCount, bool owner=true) :
+  CncrStr(){}
+  CncrStr(void* addr, u32 blockSize, u32 blockCount, bool owner=true) :
     m_blockSize(blockSize),
     m_blockCount(blockCount),
     //m_blocksUsed(0),
@@ -1252,7 +1261,7 @@ public:
     }else 
       return 0;
   }
-  auto         list() const -> ConcurrentList const&
+  auto         list() const -> CncrLst const&
   {
     return s_cl;
   }
@@ -1269,14 +1278,14 @@ public:
     return s_bls[i];
   }
 
-  friend class ConcurrentHash;
+  friend class CncrHsh;
 };
-class   ConcurrentHash
+class   CncrHsh
 {
 public:
-  using  VerIdx = ConcurrentStore::VerIdx;
-  using CncrStr = ConcurrentStore;
-  using  BlkLst = ConcurrentStore::BlkLst;
+  using  VerIdx = CncrStr::VerIdx;
+  using CncrStr = CncrStr;
+  using  BlkLst = CncrStr::BlkLst;
 
   struct VerIpd { u32 version, ipd; };                   // ipd is Ideal Position Distance
 
@@ -1417,7 +1426,7 @@ private:
   {
     store_kv(i, empty_kv());
   }
-  VerIpd            ipd(VerIdx vi)            const  // ipd is Ideal Position Distance - it is the distance a ConcurrentHash index value is from the position that it gets hashed to 
+  VerIpd            ipd(VerIdx vi)            const  // ipd is Ideal Position Distance - it is the distance a CncrHsh index value is from the position that it gets hashed to 
   {
     BlkLst bl = m_csp->blkLst(vi.idx);
     u32    ip = bl.hash % m_sz;     // ip is Ideal Position
@@ -1522,12 +1531,12 @@ private:
   }
 
 public:
-  ConcurrentHash(){}
-  ConcurrentHash(u32 size, ConcurrentStore* cs)
+  CncrHsh(){}
+  CncrHsh(u32 size, CncrStr* cs)
   {
     init(size, cs);
   }
-  ConcurrentHash(void* addr, u32 size, ConcurrentStore* cs, bool owner=true) :
+  CncrHsh(void* addr, u32 size, CncrStr* cs, bool owner=true) :
     m_sz(nextPowerOf2(size)),
     m_kvs(addr, m_sz),
     m_csp(cs)
@@ -1538,11 +1547,11 @@ public:
         m_kvs[i] = defKv;
     }
   }
-  ConcurrentHash(ConcurrentHash const& lval) = delete;
-  ConcurrentHash(ConcurrentHash&&      rval) = delete;
+  CncrHsh(CncrHsh const& lval) = delete;
+  CncrHsh(CncrHsh&&      rval) = delete;
   
-  ConcurrentHash& operator=(ConcurrentHash const& lval) = delete;
-  ConcurrentHash& operator=(ConcurrentHash&&      rval) = delete;
+  CncrHsh& operator=(CncrHsh const& lval) = delete;
+  CncrHsh& operator=(CncrHsh&&      rval) = delete;
 
   VerIdx operator[](u32 idx) const
   {
@@ -1625,7 +1634,7 @@ public:
     {
       i %= m_sz;
       VerIdx probedKv = load_kv(i);
-      if( probedKv.idx >= DELETED_KEY) return false;     // todo: this conflates and assumes that EMPTY_KEY is both the ConcurrentStore block index EMPTY_KEY and the ConcurrentHash EMPTY_KEY?
+      if( probedKv.idx >= DELETED_KEY) return false;     // todo: this conflates and assumes that EMPTY_KEY is both the CncrStr block index EMPTY_KEY and the CncrHsh EMPTY_KEY?
       if( runIfMatch(i, probedKv.version, probedKv.idx, match, f) ) return  true;
       if(i==en) return false;
     }
@@ -1641,7 +1650,7 @@ public:
     return f(vi);
   }
 
-  bool          init(u32   sz, ConcurrentStore* cs)
+  bool          init(u32   sz, CncrStr* cs)
   {
     using namespace std;
     
@@ -1903,15 +1912,15 @@ public:
 class            simdb
 {
 public:
-  using VerIdx = ConcurrentHash::VerIdx;
+  using VerIdx = CncrHsh::VerIdx;
 
 private:
 
   au64*            s_flags;
   au64*        s_blockSize;
   au64*       s_blockCount;
-  ConcurrentStore      s_cs;     // store data in blocks and get back indices
-  ConcurrentHash       s_ch;     // store the indices of keys and values - contains a ConcurrentList
+  CncrStr      s_cs;     // store data in blocks and get back indices
+  CncrHsh       s_ch;     // store the indices of keys and values - contains a ConcurrentList
 
   // these variables are local to the stack where simdb lives, unlike the others, they are not simply a pointer into the shared memory
   SharedMem           m_mem;
@@ -1921,25 +1930,25 @@ private:
   u64              m_blkSz;
 
 public:
-  static const u32   EMPTY_KEY = ConcurrentHash::EMPTY_KEY;          // 28 bits set 
-  static const u32  FAILED_PUT = ConcurrentHash::EMPTY_KEY;          // 28 bits set 
-  static const u32    LIST_END = ConcurrentStore::LIST_END;
+  static const u32   EMPTY_KEY = CncrHsh::EMPTY_KEY;          // 28 bits set 
+  static const u32  FAILED_PUT = CncrHsh::EMPTY_KEY;          // 28 bits set 
+  static const u32    LIST_END = CncrStr::LIST_END;
   static u64       OffsetBytes()
   {
     return sizeof(au64)*3;
   }
   static u64           MemSize(u64 blockSize, u64 blockCount)
   {
-    auto  hashbytes = ConcurrentHash::sizeBytes((u32)blockCount);
-    auto storebytes = ConcurrentStore::sizeBytes((u32)blockSize, (u32)blockCount);
+    auto  hashbytes = CncrHsh::sizeBytes((u32)blockCount);
+    auto storebytes = CncrStr::sizeBytes((u32)blockSize, (u32)blockCount);
     return  hashbytes + storebytes + OffsetBytes();
   }
   static Match     CompareBlock(simdb const *const ths, i32 blkIdx, u32 version, void const *const buf, u32 len, u32 hash)
   { 
     return ths->s_cs.compare(blkIdx, version, buf, len, hash);
   }
-  static bool           IsEmpty(VerIdx kv){return ConcurrentHash::IsEmpty(kv);}         // special value for ConcurrentHash
-  static bool         IsListEnd(VerIdx vi){return ConcurrentStore::IsListEnd(vi); }     // special value for ConcurrentStore
+  static bool           IsEmpty(VerIdx kv){return CncrHsh::IsEmpty(kv);}         // special value for CncrHsh
+  static bool         IsListEnd(VerIdx vi){return CncrStr::IsListEnd(vi); }     // special value for CncrStr
 
 public:
   simdb(){}
@@ -1961,15 +1970,15 @@ public:
     }
 
     //auto chSz = s_ch.sizeBytes();
-    auto chSz = ConcurrentHash::sizeBytes(blockCount);
-    new (&s_cs) ConcurrentStore( ((u8*)m_mem.data())+chSz+OffsetBytes(), 
+    auto chSz = CncrHsh::sizeBytes(blockCount);
+    new (&s_cs) CncrStr( ((u8*)m_mem.data())+chSz+OffsetBytes(), 
                                  (u32)s_blockSize->load(), 
                                  (u32)s_blockCount->load(), 
                                  m_mem.owner);                 // todo: change this to a void*
 
-    new (&s_ch) ConcurrentHash( ((u8*)m_mem.data())+OffsetBytes(), 
+    new (&s_ch) CncrHsh( ((u8*)m_mem.data())+OffsetBytes(), 
                                 (u32)s_blockCount->load(),
-                                &s_cs,                        // the address of the ConcurrentStore
+                                &s_cs,                        // the address of the CncrStr
                                 m_mem.owner);
 
     m_blkCnt = s_blockCount->load();
@@ -1983,7 +1992,7 @@ public:
   {
     assert(klen>0);
 
-    u32   hash = ConcurrentHash::HashBytes(key, klen);
+    u32   hash = CncrHsh::HashBytes(key, klen);
     
     i32  blkcnt = 0;    
     auto vi = s_cs.alloc(klen+vlen, klen, hash, &blkcnt);                             // todo: use the VersionIdx struct // kidx is key index
@@ -2005,7 +2014,7 @@ public:
   {
     if(klen<1) return 0;
 
-    auto hash = ConcurrentHash::HashBytes(key, klen);
+    auto hash = CncrHsh::HashBytes(key, klen);
     auto  ths = this;
     auto matchFunc = [ths, key, klen, hash](u32 blkidx, u32 ver){
       return CompareBlock(ths,blkidx,ver,key,klen,hash);
@@ -2020,7 +2029,7 @@ public:
   }
   bool         del(const void *const key, u32 klen)
   {
-    auto hash = ConcurrentHash::HashBytes(key, klen);
+    auto hash = CncrHsh::HashBytes(key, klen);
     auto  ths = this;
     VerIdx kv = s_ch.delHashed(hash,
       [ths, key, klen, hash](u32 blkidx, u32 ver){ return CompareBlock(ths,blkidx,ver,key,klen,hash); });
@@ -2033,7 +2042,7 @@ public:
   {
     if(klen<1) return 0;
 
-    auto hash = ConcurrentHash::HashBytes(key, klen);
+    auto hash = CncrHsh::HashBytes(key, klen);
     auto  ths = this;
     auto matchFunc = [ths, key, klen, hash](u32 blkidx, u32 ver){
       return CompareBlock(ths,blkidx,ver,key,klen,hash);
@@ -2125,7 +2134,7 @@ public:
   {
     //return m_mem.size;
     //return s_cs.sizeBytes( (u32)s_blockSize->load(), (u32)s_blockCount->load());
-    return ConcurrentStore::sizeBytes( (u32)s_blockSize->load(), (u32)s_blockCount->load());
+    return CncrStr::sizeBytes( (u32)s_blockSize->load(), (u32)s_blockCount->load());
   }
   bool     isOwner() const
   {
@@ -2267,11 +2276,11 @@ public:
 //
 //return nxtHead.idx;
 
-//new (&m_ch) ConcurrentHash( ((i8*)m_mem.data())+OffsetBytes(), m_blockCount->load(), m_mem.owner);
+//new (&m_ch) CncrHsh( ((i8*)m_mem.data())+OffsetBytes(), m_blockCount->load(), m_mem.owner);
 //new (&m_cs) ConcurrentStore( ((i8*)m_mem.data())+m_ch.sizeBytes(m_blockCount->load())+OffsetBytes(), m_blockSize->load(), m_blockCount->load(), m_mem.owner);                 // todo: change this to a void*
 
 //new (&m_mem) SharedMem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount)) );
-//new (&m_ch) ConcurrentHash( ( ((i8*)m_mem.data())+OffsetBytes(), blockCount, m_mem.owner) );
+//new (&m_ch) CncrHsh( ( ((i8*)m_mem.data())+OffsetBytes(), blockCount, m_mem.owner) );
 //new (&m_cs) ConcurrentStore(  ((i8*)m_mem.data())+m_ch.sizeBytes(blockCount)+OffsetBytes(), blockSize, blockCount, m_mem.owner);                 // todo: change this to a void*
 
 //m_mem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount)) ),
