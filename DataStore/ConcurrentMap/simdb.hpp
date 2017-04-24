@@ -57,7 +57,7 @@
 // -todo: take out simdb_ prefix? - if this happens, how will listDBs be able to find, think about this later, an answer will likely become clear
 // -todo: change compexchange_kv to cmpex_vi
 
-// todo: clean up inconsitent signs and usage of negative numbers
+// todo: clean up inconsitent signs and usage of negative numbers - VerIdx and BlkLst both have i32 for their idx field
 // todo: switch negative numbers to a bitfield struct instead of implicitly using the sign bit for different purposes
 // todo: stop using lambdas and templates
 // todo: check the hash in each BlkLst index as an early out for failed reads?
@@ -681,6 +681,9 @@ namespace {
 
 class    CncrLst
 {
+// Internally this is an array of indices that makes a linked list
+// Externally indices can be gotten atomically and given back atomically
+// | This is used to get free indices one at a time, and give back in-use indices one at a time
 public:
   union Head
   {
@@ -793,15 +796,11 @@ public:
   };
   union KeyAndReaders
   {
-    struct{ u32 isKey :  1; i32   readers : 31; u32 version; };
+    struct{ u32 isKey : 1; i32 readers : 31; u32 version; };
     u64 asInt;
-
-    //u32 asInt;
   };
   union BlkLst                            // need to do anything special to guarantee that readers is aligned so it is atomic?
   {
-    //struct { KeyAndReaders kr; u32 version; i32 idx; u32 len, klen; };
-
     struct { KeyAndReaders kr; i32 idx; u32 len, klen, hash; };
 
     BlkLst() : idx(0), len(0), klen(0), hash(0)
@@ -897,21 +896,18 @@ private:
     VerIdx vi;
     vi.idx     = bl.idx;
     vi.version = bl.kr.version;
-    return vi;      // bl.idx, bl.kr.version };  // s_bls[blkIdx].kr.;
+    return vi;
   }
   i32     blockFreeSize()             const
   {
-    //return m_blockSize - sizeof(IDX);
     return m_blockSize;
   }
   u8*      blockFreePtr(i32  blkIdx)  const
   {
-    //return ((u8*)stPtr(blkIdx)) + sizeof(IDX);
     return ((u8*)s_blksAddr) + blkIdx*m_blockSize;
   }
   u8*            blkPtr(i32  blkIdx)  const
   {
-    //return ((u8*)stPtr(blkIdx)) + sizeof(IDX);
     return ((u8*)s_blksAddr) + blkIdx*m_blockSize;
   }
   i32      blocksNeeded(i32     len, i32* out_rem=nullptr)
@@ -924,7 +920,7 @@ private:
 
     return blocks;
   }
-  i32          blockLen(i32  blkIdx)     // todo: change this to be either i64 or a 'BlkLen' struct that has the flag if nxt isn't valid?
+  i32          blockLen(i32  blkIdx)                    // todo: change this to be either i64 or a 'BlkLen' struct that has the flag if nxt isn't valid?
   {
     VerIdx nxt = nxtBlock(blkIdx);
     if(nxt.idx < 0) return -(nxt.idx);
@@ -938,7 +934,7 @@ private:
     for(; nxt>0; nxt=s_bls[cur].idx)
     { 
       //memset(blkPtr(cur), 0, m_blockSize);    // zero out memory on free, 
-      //m_bls[cur].readers = 0;               // reset the reader count
+      //m_bls[cur].readers = 0;                 // reset the reader count
       
       s_bls[cur].kr.isKey   = false;          // make sure key is false;
       s_bls[cur].kr.readers = 0;              // reset the reader count
@@ -967,15 +963,14 @@ private:
   {
     BlkLst bl = incReaders(blkIdx, version);      if(bl.kr.version==0) return 0;
       i32   blkFree  =  blockFreeSize();
-      u8*        p  =  blockFreePtr(blkIdx);
+      u8*         p  =  blockFreePtr(blkIdx);
       i32       nxt  =  bl.idx;
-      u32   cpyLen  =  len==0?  blkFree-ofst  :  len;
+      u32    cpyLen  =  len==0?  blkFree-ofst  :  len;
       //cpyLen        -=  ofst;
       memcpy(bytes, p+ofst, cpyLen);
     decReaders(blkIdx, version);
 
     return cpyLen;
-    //u32   cpyLen  =  nxt<0? -nxt : blkFree;             // if next is negative, then it will be the length of the bytes in that block
   }
 
 public:
@@ -986,25 +981,10 @@ public:
     BlockLists
     Blocks
   */
-  static u64    BlockListsOfst()
-  {
-    //return sizeof(*s_version);
-    return sizeof(u64);
-  }
-  static u64         CListOfst(u32 blockCount)
-  {
-    return BlockListsOfst() + BlockLists::sizeBytes(blockCount);   // BlockLists::sizeBytes ends up being sizeof(BlkLst)*blockCount + 2 u64 variables
-  }
-  static u64          BlksOfst(u32 blockCount)
-  {
-    //return sizeof(*s_version) + CncrLst::sizeBytes(blockCount) + BlockLists::sizeBytes(blockCount);
-    return CListOfst(blockCount) + CncrLst::sizeBytes(blockCount);
-  }
-  static u64         sizeBytes(u32 blockSize, u32 blockCount)
-  {
-    //return CncrLst::sizeBytes(blockCount) + BlockLists::sizeBytes(blockCount) + blockSize*blockCount;
-    return BlksOfst(blockCount) + blockSize*blockCount;
-  }
+  static u64    BlockListsOfst(){ return sizeof(u64); }
+  static u64         CListOfst(u32 blockCount){ return BlockListsOfst() + BlockLists::sizeBytes(blockCount); }      // BlockLists::sizeBytes ends up being sizeof(BlkLst)*blockCount + 2 u64 variables
+  static u64          BlksOfst(u32 blockCount){ return CListOfst(blockCount) + CncrLst::sizeBytes(blockCount); }
+  static u64         sizeBytes(u32 blockSize, u32 blockCount){ return BlksOfst(blockCount) + blockSize*blockCount; }
 
   CncrStr(){}
   CncrStr(void* addr, u32 blockSize, u32 blockCount, bool owner=true) :
@@ -1468,13 +1448,6 @@ private:
     }
 
     return true;
-
-    //u64 delkv = deleted_kv().asInt;                                         
-    //rgtDel    = *((i64*)(&delkv));                                          
-
-    //desired = (32<<((u64)l)) & DELETED_KEY;                                       
-    //
-    //desired = (32<<(u64)EMPTY_KEY) && EMPTY_KEY
   }
   bool    cleanDeletion(u32 i, u8 depth=0)    const
   {
@@ -2265,7 +2238,32 @@ public:
 
 
 
+//return sizeof(*s_version) + CncrLst::sizeBytes(blockCount) + BlockLists::sizeBytes(blockCount);
+//
+//return CncrLst::sizeBytes(blockCount) + BlockLists::sizeBytes(blockCount) + blockSize*blockCount;
+//
+//return sizeof(*s_version);
 
+//u64 delkv = deleted_kv().asInt;                                         
+//rgtDel    = *((i64*)(&delkv));                                          
+//
+//desired = (32<<((u64)l)) & DELETED_KEY;                                       
+//
+//desired = (32<<(u64)EMPTY_KEY) && EMPTY_KEY
+
+//return ((u8*)stPtr(blkIdx)) + sizeof(IDX);
+//
+//return ((u8*)stPtr(blkIdx)) + sizeof(IDX);
+//
+//u32   cpyLen  =  nxt<0? -nxt : blkFree;             // if next is negative, then it will be the length of the bytes in that block
+
+//u32 asInt; - from KeyAndReaders
+//
+//struct { KeyAndReaders kr; u32 version; i32 idx; u32 len, klen; };
+
+// bl.idx, bl.kr.version };  // s_bls[blkIdx].kr.;
+//
+//return m_blockSize - sizeof(IDX);
 
 //bool       delToEmpty(u32 i)                const
 //{
