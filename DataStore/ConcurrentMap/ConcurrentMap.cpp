@@ -28,7 +28,7 @@
   #define TO(to, var)      for(std::remove_const<decltype(to)>::type var = 0; var < to; ++var)
 #endif
 
-ui32       intHash(ui32    h)
+u32       intHash(u32    h)
 {
   //h += 1;
   h ^= h >> 16;
@@ -38,7 +38,7 @@ ui32       intHash(ui32    h)
   h ^= h >> 16;
   return h;
 }
-ui32  nextPowerOf2(ui32    v)
+u32  nextPowerOf2(u32    v)
 {
   v--;
   v |= v >> 1;
@@ -251,8 +251,8 @@ int main()
   //  Println("\n\n");
   //}
 
-  //ui32 sz = 18921703;
-  //ui32 sz = 400;
+  //u32 sz = 18921703;
+  //u32 sz = 400;
   //ConcurrentMap cm(sz);
 
   //ScopeTime t;
@@ -274,7 +274,7 @@ int main()
   //}
 
   //
-  //ui32 loopSz  =  (ui32)( double(cm.size()) / 1.5);
+  //u32 loopSz  =  (u32)( double(cm.size()) / 1.5);
 
   //
   //RngInt<int> rng(1, 2);
@@ -289,7 +289,7 @@ int main()
   //    t.start();
   //    TO(loopSz, i) {
   //      auto val = i*10 + tid;
-  //      ui32 pidx = cm.put(i, val);
+  //      u32 pidx = cm.put(i, val);
   //      SleepMs( rng() );
   //
   //      //SleepMs( (int)pow(4-tid,2) );
@@ -301,7 +301,7 @@ int main()
   //
   //    //t.start();
   //    //TO(loopSz, i) {
-  //    //  ui32 gidx = cm.get(i);
+  //    //  u32 gidx = cm.get(i);
   //    //  cout << gidx << "  ";
   //    //  //Println("Get Idx: ", (i64)gidx);
   //    //}
@@ -316,7 +316,7 @@ int main()
   // test getting back from the map
   //t.start();
   //TO(loopSz, i) {
-  //  ui32 gidx = cm.get(i);
+  //  u32 gidx = cm.get(i);
   //  cout << gidx << "  ";
   //  //Println("Get Idx: ", (i64)gidx);
   //}
@@ -374,7 +374,7 @@ int main()
   //i32 blkSz  = 5;
   //i32 blocks = 2;
   //vec<ui8> mem(blocks*blkSz, 0);
-  //ConcurrentStore cs(mem.data(), blkSz, (ui32)(blocks) );
+  //ConcurrentStore cs(mem.data(), blkSz, (u32)(blocks) );
   //
   //Println("\n");
   //
@@ -448,17 +448,17 @@ int main()
 
   //Println("kv sz: ", sizeof(simdb::KV) );
 
-  //ui32    isKey :  1;
+  //u32    isKey :  1;
   //i32   readers : 31;
 
   //union KeyAndReaders
   //{
-  //  struct{ ui32    isKey :  1; i32   readers : 31; };
-  //  ui32 asInt;
+  //  struct{ u32    isKey :  1; i32   readers : 31; };
+  //  u32 asInt;
   //};
   //union BlkLst
   //{
-  //  struct { KeyAndReaders kr; ui32 idx; };
+  //  struct { KeyAndReaders kr; u32 idx; };
   //  ui64 asInt;
   //};
   //Println("KeyAndReaders sz: ", sizeof(KeyAndReaders) );
@@ -508,7 +508,7 @@ int main()
   str  label[] = {"zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven"};
   
   vec<thread>            thrds;
-  vec<RngInt<ui32>> rngSwitches;
+  vec<RngInt<u32>> rngSwitches;
   TO(12,i) rngSwitches.emplace_back(0,1,i);
 
   //int sz = (int)thrds.size(); 
@@ -531,35 +531,35 @@ int main()
   //TO(thrds.size(),i) thrds[i].join();
 
   str       wat  =       "wat";
-  //str       wut  =       "wut";
+  str       wut  =       "wut";
   str  skidoosh  =  "skidoosh";
-  //str    kablam  =    "kablam";
+  str    kablam  =    "kablam";
 
   if( db.isOwner() ){
-    Println("put: ", db.put( wat.data(),   (ui32)wat.length(),    skidoosh.data(), (ui32)skidoosh.length()) );
+    Println("put: ", db.put( wat.data(),   (u32)wat.length(),    skidoosh.data(), (u32)skidoosh.length()) );
     db.del("wat");
-    //Println("put: ", db.put( wut.data(),   (ui32)wut.length(),    kablam.data(),   (ui32)kablam.length())   ); 
-    //db.rm("wut");
-    //Println("put: ", db.put( kablam.data(),(ui32)kablam.length(), skidoosh.data(), (ui32)skidoosh.length()) ); 
+    Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
+    //db.del("wut");
+    //Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
     //db.rm("kablam");
-    //Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
+    //Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
     //db.rm("wat");
     //Println();
   }
   //else{
-  //  Println("put: ", db.put( (void*)wat.data(),   (ui32)wat.length(),    (void*)skidoosh.data(), (ui32)skidoosh.length()) );
+  //  Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
   //}
 
-  ui32 vlen = 0;
-  auto  len = db.len( wat.data(), (ui32)wat.length(), &vlen);
+  u32 vlen = 0;
+  auto  len = db.len( wat.data(), (u32)wat.length(), &vlen);
   str   val(vlen, '\0');
-  bool   ok = db.get( wat.data(), (ui32)wat.length(), (void*)val.data(), (ui32)val.length() );
+  bool   ok = db.get( wat.data(), (u32)wat.length(), (void*)val.data(), (u32)val.length() );
   Println("ok: ", ok, " value: ", val, "  wat total len: ", len, " wat val len: ", vlen, "\n");
 
-  //str v; 
-  //db.get(wat,   &v);  Println("value: ", v);
-  //db.get(wut,   &v);  Println("value: ", v);
-  //db.get(kablam,&v);  Println("value: ", v);
+  str v; 
+  db.get(wat,   &v);  Println("value: ", v);
+  db.get(wut,   &v);  Println("value: ", v);
+  db.get(kablam,&v);  Println("value: ", v);
 
   //Println("\nKEYS");
   //auto keys = db.getKeyStrs();
@@ -568,7 +568,7 @@ int main()
 
   //TO(6,i)
   //{  
-  //  ui32 klen, vlen;
+  //  u32 klen, vlen;
   //  auto   nxt = db.nxt();
   //  bool oklen = db.len(nxt.idx, nxt.version, &klen, &vlen);
   //  str key(klen,'\0');
@@ -629,7 +629,7 @@ int main()
   ////lava_vec<i32> lv(mem, cnt);
   //
   //auto lv = STACK_VEC(i64, cnt);
-  ////memset(lv.data(), 0, 16*sizeof(ui32) );
+  ////memset(lv.data(), 0, 16*sizeof(u32) );
   //Println("capacity: ",  lv.capacity() );
   //Println("size: ",      lv.size() );
   //Println("sizeBytes: ", lv.sizeBytes() );
@@ -652,8 +652,8 @@ int main()
 
 
 //thrds[i] = move(thread( [i,&label,&db]
-//RngInt<ui32> rnd(i*10, ((i+1)*10)-1);
-//RngInt<ui32> rnd(0, 10, i);
+//RngInt<u32> rnd(i*10, ((i+1)*10)-1);
+//RngInt<u32> rnd(0, 10, i);
 //db.put( toString(rnd()), label[i] );
 //thrds[i].detach();
 

@@ -41,24 +41,26 @@
 // -todo: make a macro to have separate windows and unix paths
 // -todo: initialize ConcurrentHash with a pointer to ConcurrentStore
 // -todo: change rm() to del()
+// -todo: change i8* to u8* and ui8* to u8*
+// -todo: get rid of unused uiX type aliases
+// -todo: take out IDX alias
+// -todo: make del() delete a VerIdx, duplicate the VerIdx ahead into the deleted slot, check that the indices are the same, and if they are, mark the one further ahead as deleted
+// -todo: make a DELETED value for hash entries so that when something is removed, it doesn't block a linear search
+// -todo: take out stack based m_blocksUsed
+// -todo: give a ConcurrentStore pointer to ConcurrentHash 
 
-// todo: change i8* to u8* and ui8* to u8*
-// todo: get rid of unused uiX type aliases
-// todo: put supporting windows functions into anonymous namespace
-// todo: make compexchange_kv take VerIdx instead u64
-// todo: take out IDX alias
-// todo: take out stack based m_blocksUsed
-// todo: make del() delete a VerIdx, duplicate the VerIdx ahead into the deleted slot, check that the indices are the same, and if they are, mark the one further ahead as deleted
-// todo: short circuit as not found on finding an empty slot - will need a deleted value
-// todo: make a DELETED value for hash entries so that when something is removed, it doesn't block a linear search
 // todo: change ConcurrentHash  to CncrHsh 
 // todo: change ConcurrentStore to CncrStr
 // todo: change ConcurrentList  to CncrLst
 // todo: clean up inconsitent signs and usage of negative numbers
 // todo: switch negative numbers to a bitfield struct instead of implicitly using the sign bit for different purposes
-// todo: give a ConcurrentStore pointer to ConcurrentHash and stop using lambdas and templates?
+// todo: stop using lambdas and templates
+// todo: make deleted indices that have an empty index on their right side become empty indices
+// todo: make compexchange_kv take VerIdx instead u64
+// todo: short circuit as not found on finding an empty slot - will need a deleted value
 // todo: check the hash in each BlkLst index as an early out for failed reads?
-// todo: take out simdb_ prefix?
+// todo: take out simdb_ prefix? - if this happens, how will 
+// todo: put supporting windows functions into anonymous namespace
 // todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
 // todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
 // todo: put prefetching into reading of blocks
@@ -268,7 +270,29 @@
 #include <algorithm>
 #include <cassert>
 
-#ifdef _WIN32
+
+using    i8   =   int8_t;
+using    u8   =   uint8_t;
+using   i64   =   int64_t;
+using   u64   =   uint64_t;
+using   i32   =   int32_t;
+using   u32   =   uint32_t;
+using   f32   =   float;
+using   f64   =   double;
+using  au64   =   std::atomic<u64>;
+using  ai32   =   std::atomic<i64>;
+using   ai8   =   std::atomic<i8>;
+using  cstr   =   const char*;
+using   str   =   std::string;             // will need C++ ifdefs eventually or just need to be taken out
+//using   ui8   =   uint8_t;
+//using  ui64   =   uint64_t;
+//using  ui32   =   uint32_t;
+//using aui32   =   std::atomic<ui32>;
+//using aui64   =   std::atomic<u64>;
+
+template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  // will need C++ ifdefs eventually
+
+  #ifdef _WIN32
   // use _malloca ? - would need to use _freea and also know that _malloca always allocates on the heap in debug mode for some crazy reason
   #define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);
   
@@ -480,26 +504,6 @@
   #define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);  
 #endif
 
-using    i8   =   int8_t;
-using   ui8   =   uint8_t;
-using    u8   =   uint8_t;
-using   i64   =   int64_t;
-using  ui64   =   uint64_t;
-using   u64   =   uint64_t;
-using   i32   =   int32_t;
-using  ui32   =   uint32_t;
-using   u32   =   uint32_t;
-using   f32   =   float;
-using   f64   =   double;
-using aui32   =   std::atomic<ui32>;
-using aui64   =   std::atomic<u64>;
-using  au64   =   std::atomic<u64>;
-using  ai32   =   std::atomic<i64>;
-using   ai8   =   std::atomic<i8>;
-using  cstr   =   const char*;
-using   str   =   std::string;             // will need C++ ifdefs eventually or just need to be taken out
-
-template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  // will need C++ ifdefs eventually
 
 namespace {
   enum Match { MATCH_FALSE=0, MATCH_TRUE=1, MATCH_REMOVED=-1  };
@@ -522,47 +526,47 @@ namespace {
   private:
     void* p;
 
-    void       set_size(ui64  s)
+    void       set_size(u64  s)
     { 
-      *((ui64*)clearBits(p) + 1) = s;
+      *((u64*)clearBits(p) + 1) = s;
     }
-    void  set_sizeBytes(ui64 sb)
+    void  set_sizeBytes(u64 sb)
     {
-      *((ui64*)clearBits(p)) = sb;      // first 8 bytes should be the total size of the buffer in bytes
+      *((u64*)clearBits(p)) = sb;      // first 8 bytes should be the total size of the buffer in bytes
     } 
 
   public:
     static void*  setDestructorBit(void* p)
     {
-      //return (void*)((ui64)p ^ (((ui64)1l)<<63));
-      return (void*)((ui64)p | (1llu<<63));
+      //return (void*)((u64)p ^ (((u64)1l)<<63));
+      return (void*)((u64)p | (1llu<<63));
     }
     static bool   getDestructorBit(void* p)
     {
-      return (((ui64)p)>>63)!=0;
+      return (((u64)p)>>63)!=0;
     }
     static void*         clearBits(void* p)
     {
-      return (void*)( ((ui64)p) & 0x0000FFFFFFFFFFFF);
+      return (void*)( ((u64)p) & 0x0000FFFFFFFFFFFF);
     }
-    static ui64          sizeBytes(ui64 count)  // sizeBytes is meant to take the same arguments as a constructor and return the total number of bytes to hold the entire stucture given those arguments 
+    static u64          sizeBytes(u64 count)  // sizeBytes is meant to take the same arguments as a constructor and return the total number of bytes to hold the entire stucture given those arguments 
     {
-      return sizeof(ui64)*2 + count*sizeof(T);
+      return sizeof(u64)*2 + count*sizeof(T);
     }
 
     lava_vec(){}
-    lava_vec(ui64  count)
+    lava_vec(u64  count)
     {
-      ui64 sb = lava_vec::sizeBytes(count);
+      u64 sb = lava_vec::sizeBytes(count);
       p       = Allocator().allocate(sb);
       p       = setDestructorBit(p);
       set_size(count);
       set_sizeBytes(sb);
     }
-    lava_vec(void*  addr, ui64 count, bool owner=true) :
+    lava_vec(void*  addr, u64 count, bool owner=true) :
       p(addr)
     {
-      //ui64 sb = lava_vec::sizeBytes(count);
+      //u64 sb = lava_vec::sizeBytes(count);
       //p       = addr;
       if(owner){
         set_sizeBytes( lava_vec::sizeBytes(count) );
@@ -572,7 +576,7 @@ namespace {
     lava_vec(void*  addr) :
       p(addr)
     {
-      //ui64 sb = lava_vec::sizeBytes(count);
+      //u64 sb = lava_vec::sizeBytes(count);
       //set_size(count);
       //set_sizeBytes(sb);
       //
@@ -593,29 +597,29 @@ namespace {
       }
     }
 
-    T& operator[](ui64 i)
+    T& operator[](u64 i)
     {
       return data()[i];
     }
 
     T*         data()
     {
-      //ui64 pnum = 
-      ui64* maskptr = (ui64*)clearBits(p); // (ui64*)( ((ui64)p) & 0x0000FFFFFFFFFFFF);
+      //u64 pnum = 
+      u64* maskptr = (u64*)clearBits(p); // (u64*)( ((u64)p) & 0x0000FFFFFFFFFFFF);
       return (T*)(maskptr+2);
-      //return (void*)((ui64*)p+2);
+      //return (void*)((u64*)p+2);
     }
-    ui64   capacity() const
+    u64   capacity() const
     {
-      return (sizeBytes() - sizeof(ui64)*2) / sizeof(T);
+      return (sizeBytes() - sizeof(u64)*2) / sizeof(T);
     }
-    ui64       size() const
+    u64       size() const
     {
-      return *((ui64*)clearBits(p) + 1);   // second 8 bytes should be the number of elements
+      return *((u64*)clearBits(p) + 1);   // second 8 bytes should be the number of elements
     } 
-    ui64  sizeBytes() const
+    u64  sizeBytes() const
     {
-      return *((ui64*)clearBits(p));   // first 8 bytes should be the total size of the buffer in bytes
+      return *((u64*)clearBits(p));   // first 8 bytes should be the total size of the buffer in bytes
     } 
     auto       addr() const -> void*
     {
@@ -623,16 +627,16 @@ namespace {
     }
   };
 
-  ui64 fnv_64a_buf(void const *const buf, ui64 len)
+  u64 fnv_64a_buf(void const *const buf, u64 len)
   {
-    // const ui64 FNV_64_PRIME = 0x100000001b3;
-    ui64 hval = 0xcbf29ce484222325;    // FNV1_64_INIT;  // ((Fnv64_t)0xcbf29ce484222325ULL)
-    ui8*   bp = (ui8*)buf;	           /* start of buffer */
-    ui8*   be = bp + len;		           /* beyond end of buffer */
+    // const u64 FNV_64_PRIME = 0x100000001b3;
+    u64 hval = 0xcbf29ce484222325;    // FNV1_64_INIT;  // ((Fnv64_t)0xcbf29ce484222325ULL)
+    u8*   bp = (u8*)buf;	           /* start of buffer */
+    u8*   be = bp + len;		           /* beyond end of buffer */
 
     while(bp < be)                     // FNV-1a hash each octet of the buffer
     {
-      hval ^= (ui64)*bp++;             /* xor the bottom with the current octet */
+      hval ^= (u64)*bp++;             /* xor the bottom with the current octet */
 
       //hval *= FNV_64_PRIME; // does this do the same thing?  /* multiply by the 64 bit FNV magic prime mod 2^64 */
       hval += (hval << 1) + (hval << 4) + (hval << 5) +
@@ -658,13 +662,13 @@ namespace {
     //    (i64*)(&dblvi) )==1;
   }
 
-}
+  #ifdef _WIN32
+    using  u128 = __declspec(align(128)) /*volatile*/ _u128;
+  #else
+    using  u128 = volatile _u128;
+  #endif
 
-#ifdef _WIN32
-  using  u128 = __declspec(align(128)) /*volatile*/ _u128;
-#else
-  using  u128 = volatile _u128;
-#endif
+}
 
 class   ConcurrentList
 {
@@ -672,21 +676,21 @@ public:
   union Head
   {
     struct { u32 ver; u32 idx; };                      // ver is version, idx is index // todo: change cnt to version
-    ui64 asInt;
+    u64 asInt;
   };
   
   using    u32  =  uint32_t;                            // need to be i32 instead for the ConcurrentStore indices?
-  using    ui64  =  uint64_t;
+  using    u64  =  uint64_t;
   using ListVec  =  lava_vec<u32>;
 
   const static u32 LIST_END = 0xFFFFFFFF;
 
 private:
   ListVec     m_lv;
-  aui64*       m_h;
+  au64*       m_h;
 
 public:
-  static ui64 sizeBytes(u32 size)
+  static u64 sizeBytes(u32 size)
   {
     return ListVec::sizeBytes(size);
   }
@@ -695,7 +699,7 @@ public:
   ConcurrentList(void* addr, u32 size, bool owner=true) :           // this constructor is for when the memory is owned an needs to be initialized
     m_lv(addr, size, owner)
   {                                                                  // separate out initialization and let it be done explicitly in the simdb constructor?
-    m_h = (aui64*)addr;
+    m_h = (au64*)addr;
 
     if(owner){
       for(uint32_t i=0; i<(size-1); ++i) m_lv[i]=i+1;
@@ -709,8 +713,6 @@ public:
 
   auto        nxt() -> uint32_t    // moves forward in the list and return the previous index
   {
-    //HeadUnion  curHead;
-    //HeadUnion  nxtHead;
     Head curHead;
     Head nxtHead;
 
@@ -723,7 +725,6 @@ public:
       nxtHead.ver  =  curHead.ver + 1;
     } while( !m_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
 
-    //return nxtHead.idx;
     return curHead.idx;
   }
   auto       free(u32 idx) -> uint32_t   // not thread safe yet when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway?
@@ -757,7 +758,7 @@ public:
   {
     return &m_lv;
   }            // not thread safe
-  u32     lnkCnt()                     // not thread safe
+  u32      lnkCnt()                     // not thread safe
   {
     u32    cnt = 0;
     //auto      l = list();
@@ -779,12 +780,12 @@ public:
       i32     idx;
       u32 version;
     };
-    ui64 asInt;
+    u64 asInt;
   };
   union KeyAndReaders
   {
     struct{ u32 isKey :  1; i32   readers : 31; u32 version; };
-    ui64 asInt;
+    u64 asInt;
 
     //u32 asInt;
   };
@@ -818,7 +819,7 @@ public:
     } 
   };
 
-  using IDX         =  i32;
+  //using IDX         =  i32;
   using ai32        =  std::atomic<i32>;
   using BlockLists  =  lava_vec<BlkLst>;   // only the indices returned from the concurrent list are altered, and only one thread will deal with any single index at a time 
 
@@ -842,7 +843,7 @@ public:
 
     KeyAndReaders cur, nxt;
     BlkLst* bl      = &s_bls[blkIdx];
-    aui64* areaders = (aui64*)&(bl->kr.asInt);    
+    au64* areaders = (au64*)&(bl->kr.asInt);    
     cur.asInt       = areaders->load();
     do{
       if(cur.version!=version || cur.readers<0) return BlkLst(); // make_BlkLst(0,0,0,0,0,0);
@@ -855,7 +856,7 @@ public:
   bool      decReaders(u32 blkIdx, u32 version) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
     KeyAndReaders cur, nxt;
-    aui64* areaders = (aui64*)&(s_bls[blkIdx].kr.asInt);    
+    au64* areaders = (au64*)&(s_bls[blkIdx].kr.asInt);    
     cur.asInt = areaders->load();
     do{
       if(cur.version!=version) return false;
@@ -874,12 +875,12 @@ private:
   mutable ConcurrentList    s_cl;       // flat data structure - pointer to memory 
   mutable BlockLists       s_bls;       // flat data structure - pointer to memory - bl is Block Lists
   void*               s_blksAddr;       // points to the block space in the shared memory
-  aui64*               s_version;       // pointer to the shared version number
+  au64*               s_version;       // pointer to the shared version number
 
   u32                m_blockSize;
   u32               m_blockCount;
-  ui64                 m_szBytes;
-  mutable ai32      m_blocksUsed;       // todo: this is a mistake and does no good unless it is in the shared memory
+  u64                 m_szBytes;
+  //mutable ai32      m_blocksUsed;       // todo: this is a mistake and does no good unless it is in the shared memory
 
   VerIdx       nxtBlock(i32  blkIdx)  const
   {
@@ -894,15 +895,15 @@ private:
     //return m_blockSize - sizeof(IDX);
     return m_blockSize;
   }
-  ui8*     blockFreePtr(i32  blkIdx)  const
+  u8*     blockFreePtr(i32  blkIdx)  const
   {
-    //return ((ui8*)stPtr(blkIdx)) + sizeof(IDX);
-    return ((ui8*)s_blksAddr) + blkIdx*m_blockSize;
+    //return ((u8*)stPtr(blkIdx)) + sizeof(IDX);
+    return ((u8*)s_blksAddr) + blkIdx*m_blockSize;
   }
-  ui8*           blkPtr(i32  blkIdx)  const
+  u8*           blkPtr(i32  blkIdx)  const
   {
-    //return ((ui8*)stPtr(blkIdx)) + sizeof(IDX);
-    return ((ui8*)s_blksAddr) + blkIdx*m_blockSize;
+    //return ((u8*)stPtr(blkIdx)) + sizeof(IDX);
+    return ((u8*)s_blksAddr) + blkIdx*m_blockSize;
   }
   i32      blocksNeeded(i32     len, i32* out_rem=nullptr)
   {
@@ -934,7 +935,7 @@ private:
       s_bls[cur].kr.readers = 0;              // reset the reader count
       
       s_cl.free(cur);
-      m_blocksUsed.fetch_add(-1);
+      //m_blocksUsed.fetch_add(-1);
       cur  =  nxt;
     }
     //memset(blkPtr(cur), 0, m_blockSize);       // 0 out memory on free, 
@@ -945,7 +946,7 @@ private:
   u32        writeBlock(i32  blkIdx, void const* const bytes, u32 len=0, u32 ofst=0)      // don't need to increment readers since write should be done before the block is exposed to any other threads
   {
     i32   blkFree  =  blockFreeSize();
-    ui8*        p  =  blockFreePtr(blkIdx);
+    u8*        p  =  blockFreePtr(blkIdx);
     auto      nxt  =  nxtBlock(blkIdx);
     u32   cpyLen  =  len==0? blkFree : len;             // if next is negative, then it will be the length of the bytes in that block
     p      += ofst;
@@ -957,7 +958,7 @@ private:
   {
     BlkLst bl = incReaders(blkIdx, version);      if(bl.kr.version==0) return 0;
       i32   blkFree  =  blockFreeSize();
-      ui8*        p  =  blockFreePtr(blkIdx);
+      u8*        p  =  blockFreePtr(blkIdx);
       i32       nxt  =  bl.idx;
       u32   cpyLen  =  len==0?  blkFree-ofst  :  len;
       //cpyLen        -=  ofst;
@@ -976,21 +977,21 @@ public:
     BlockLists
     Blocks
   */
-  static ui64    BlockListsOfst()
+  static u64    BlockListsOfst()
   {
     //return sizeof(*s_version);
-    return sizeof(ui64);
+    return sizeof(u64);
   }
-  static ui64         CListOfst(u32 blockCount)
+  static u64         CListOfst(u32 blockCount)
   {
     return BlockListsOfst() + BlockLists::sizeBytes(blockCount);   // BlockLists::sizeBytes ends up being sizeof(BlkLst)*blockCount + 2 u64 variables
   }
-  static ui64          BlksOfst(u32 blockCount)
+  static u64          BlksOfst(u32 blockCount)
   {
     //return sizeof(*s_version) + ConcurrentList::sizeBytes(blockCount) + BlockLists::sizeBytes(blockCount);
     return CListOfst(blockCount) + ConcurrentList::sizeBytes(blockCount);
   }
-  static ui64         sizeBytes(u32 blockSize, u32 blockCount)
+  static u64         sizeBytes(u32 blockSize, u32 blockCount)
   {
     //return ConcurrentList::sizeBytes(blockCount) + BlockLists::sizeBytes(blockCount) + blockSize*blockCount;
     return BlksOfst(blockCount) + blockSize*blockCount;
@@ -1000,17 +1001,17 @@ public:
   ConcurrentStore(void* addr, u32 blockSize, u32 blockCount, bool owner=true) :
     m_blockSize(blockSize),
     m_blockCount(blockCount),
-    m_blocksUsed(0),
-    s_blksAddr( (i8*)addr + BlksOfst(blockCount) ),
-    s_cl(  (i8*)addr + CListOfst(blockCount), blockCount, owner),
-    s_bls( (i8*)addr + BlockListsOfst(),      blockCount, owner),
-    s_version(  (aui64*)addr ),
-    m_szBytes( *((ui64*)addr) )
+    //m_blocksUsed(0),
+    s_blksAddr( (u8*)addr + BlksOfst(blockCount) ),
+    s_cl(  (u8*)addr + CListOfst(blockCount), blockCount, owner),
+    s_bls( (u8*)addr + BlockListsOfst(),      blockCount, owner),
+    s_version(  (au64*)addr ),
+    m_szBytes( *((u64*)addr) )
   {
     if(owner){
       s_version->store(1);                            // start at 1, use 0 as a special value
     }
-    assert(blockSize > sizeof(IDX));
+    assert(blockSize > sizeof(i32));
   }
 
   auto        alloc(i32    size, u32 klen, u32 hash, i32* out_blocks=nullptr) -> VerIdx     // todo: doesn't this need to give back the blocks if allocation fails?
@@ -1042,7 +1043,7 @@ public:
         else     s_bls[cur] =  BlkLst(false, 0, nxt, ver, 0, 0);        // make_BlkLst(false, 0, nxt, ver, 0, 0);
         cur    =  nxt;
         ++cnt;
-        m_blocksUsed.fetch_add(1);
+        //m_blocksUsed.fetch_add(1);
       }
     }
 
@@ -1067,7 +1068,7 @@ public:
   {
     using namespace std;
     
-    ui8*         b  =  (ui8*)kbytes;
+    u8*         b  =  (u8*)kbytes;
     bool   kjagged  =  (klen % blockFreeSize()) != 0;
     i32    kblocks  =  kjagged? blocksNeeded(klen)-1 : blocksNeeded(klen);
     i32   remklen   =  klen - (kblocks*blockFreeSize());
@@ -1085,7 +1086,7 @@ public:
     }
     if(kjagged){
       writeBlock(cur, b, remklen);
-      b    =  (ui8*)vbytes;
+      b    =  (u8*)vbytes;
       b   +=  writeBlock(cur, b, fillvlen, remklen);
       cur  =  nxtBlock(cur).idx;
     }
@@ -1114,8 +1115,8 @@ public:
     auto vrdLen = 0;
     u32     len = 0;
     u32   rdLen = 0;
-    i8*       b = (i8*)bytes;
-    i8*      en = b + maxlen;
+    u8*       b = (u8*)bytes;
+    u8*      en = b + maxlen;
     i32     cur = blkIdx;
     VerIdx  nxt;
     for(int i=0; i<kblks; ++i){ 
@@ -1158,7 +1159,7 @@ public:
     auto   krem = kdiv.rem;
     u32    len = 0;
     u32  rdLen = 0;
-    i8*       b = (i8*)bytes;
+    u8*       b = (u8*)bytes;
     u32    cur = blkIdx;
     VerIdx  nxt = { blkIdx, version };
 
@@ -1215,16 +1216,16 @@ public:
 
     return MATCH_FALSE;
   }
-  Match     compare(IDX  blkIdx, u32 version, void const *const buf, u32 len, u32 hash) const
+  Match     compare(i32  blkIdx, u32 version, void const *const buf, u32 len, u32 hash) const
   {
     using namespace std;
     
     if(s_bls[blkIdx].hash!=hash) return MATCH_FALSE;  // vast majority of calls should end here
 
-    IDX   curidx  =  blkIdx;
+    i32   curidx  =  blkIdx;
     auto     nxt  =  nxtBlock(curidx);                            if(nxt.version!=version) return MATCH_FALSE;
-    u32   blksz  =  (u32)blockFreeSize();  // todo: change this to u32
-    ui8*  curbuf  =  (ui8*)buf;
+    u32    blksz  =  (u32)blockFreeSize();  // todo: change this to u32
+    u8*   curbuf  =  (u8*)buf;
     auto    klen  =  s_bls[blkIdx].klen;                          if(klen!=len) return MATCH_FALSE;
     auto  curlen  =  len;
     while(true)
@@ -1259,7 +1260,7 @@ public:
   {
     return (void*)s_blksAddr;
   }
-  ui64   blockCount() const
+  u64   blockCount() const
   {
     return 0; // m_cl.sizeBytes();
   }
@@ -1290,9 +1291,9 @@ public:
   static const u32  EMPTY_HASH_IDX   =  0xFFFFFFFF;       // 32 bits set - hash indices are different from block indices 
 
   //static const  u64  EMPTY_KEY        =  0x000000000000001FFFFF;         // first 21 bits set 
-  //static const ui64  EMPTY_KEY        =  0x000000000FFFFFFF;   // first 28 bits set 
-  //static const ui64  EMPTY_KEY        =    0x0000000000200000;   // first 21 bits set 
-  //static const ui64  EMPTY_KEY        =  2097151;         // first 21 bits set 
+  //static const u64  EMPTY_KEY        =  0x000000000FFFFFFF;   // first 28 bits set 
+  //static const u64  EMPTY_KEY        =    0x0000000000200000;   // first 21 bits set 
+  //static const u64  EMPTY_KEY        =  2097151;         // first 21 bits set 
 
   static u32        nextPowerOf2(u32  v)
   {
@@ -1306,7 +1307,7 @@ public:
 
     return v;
   }
-  static ui64          sizeBytes(u32 size)
+  static u64          sizeBytes(u32 size)
   {
     //return lava_vec<VerIdx>::sizeBytes( nextPowerOf2(size) );
     return lava_vec<VerIdx>::sizeBytes(size);
@@ -1317,7 +1318,7 @@ public:
   }
   static u32           HashBytes(const void *const buf, u32 len)
   {
-    ui64 hsh = fnv_64a_buf(buf, len);
+    u64 hsh = fnv_64a_buf(buf, len);
 
     return (u32)( (hsh>>32) ^ ((u32)hsh));
   }
@@ -1352,11 +1353,11 @@ public:
 private:
   using   i8     =  int8_t;
   using  u32     =  uint32_t;
-  using ui64     =  uint64_t;
+  using u64     =  uint64_t;
   using  u32     =  uint32_t;
   using  u64     =  uint64_t;
   using Au32     =  std::atomic<u32>;
-  using Aui64    =  std::atomic<ui64>;
+  using Au64    =  std::atomic<u64>;
   using VerIdxs  =  lava_vec<VerIdx>;
   using Mut      =  std::mutex;
   using UnqLock  =  std::unique_lock<Mut>;
@@ -1371,7 +1372,7 @@ private:
   {
     using namespace std;
     
-    u64 cur = atomic_load<ui64>( (Aui64*)(&(m_kvs.data()[i].asInt)) );              // Load the key that was there.
+    u64 cur = atomic_load<u64>( (Au64*)(&(m_kvs.data()[i].asInt)) );              // Load the key that was there.
 
     VerIdx ret;
     if(i%2==0) ret.asInt = swp32(cur);
@@ -1387,12 +1388,12 @@ private:
   {
     using namespace std;
     
-    //atomic_store<ui64>( (Aui64*)&m_kvs[i].asInt, _kv.asInt );
+    //atomic_store<u64>( (Au64*)&m_kvs[i].asInt, _kv.asInt );
     
     u64 asInt = keyval.asInt;
     if(i%2==0) asInt = swp32(asInt);            // the even numbers need to be swapped so that their indices are in the lower address / higher bytes - the indices need to be on the border of the 128 bit boundary so they can be swapped with an unaligned 64 bit atomic operation
 
-    u64 prev = atomic_exchange<ui64>( (Aui64*)(&(m_kvs[i].asInt)), asInt);
+    u64 prev = atomic_exchange<u64>( (Au64*)(&(m_kvs[i].asInt)), asInt);
 
     VerIdx ret;
     if(i%2==0) ret.asInt = swp32(prev);
@@ -1400,17 +1401,17 @@ private:
 
     return ret;
   }
-  bool  compexchange_kv(u32 i, ui64* expected, ui64 desired) const
+  bool  compexchange_kv(u32 i, u64* expected, u64 desired) const
   {
     using namespace std;
     
     //kv    keyval;
-    //keyval.asInt    =  atomic_load<ui64>( (Aui64*)&m_kvs.data()[i].asInt );
+    //keyval.asInt    =  atomic_load<u64>( (Au64*)&m_kvs.data()[i].asInt );
     //keyval.key      =  key;
     //keyval.val      =  val;
     //return success;
 
-    return atomic_compare_exchange_strong( (Aui64*)&(m_kvs.data()[i].asInt), expected, desired);                      // The entry was free. Now let's try to take it using a CAS. 
+    return atomic_compare_exchange_strong( (Au64*)&(m_kvs.data()[i].asInt), expected, desired);                      // The entry was free. Now let's try to take it using a CAS. 
   }
   void           doFree(u32 i)                const
   {
@@ -1434,8 +1435,8 @@ private:
       do{
         if( hi32(viDbl.hi) != lo32(viDbl.lo) ){ false; }                            // check if both the indices are the same
         
-        ui64 delkv = deleted_kv().asInt;                                          // if both the indices are the same, make a new right side VerIdx with the idx set to DELETED_KEY
-        rgtDel   = *((i64*)(&delkv));                                           // interpret the ui64 bits directly as a signed 64 bit integer instead
+        u64 delkv = deleted_kv().asInt;                                          // if both the indices are the same, make a new right side VerIdx with the idx set to DELETED_KEY
+        rgtDel   = *((i64*)(&delkv));                                           // interpret the u64 bits directly as a signed 64 bit integer instead
       }while( !compex128( (i64*)viDblAddr, viDbl.hi, rgtDel, (i64*)&viDbl) );     // then compare and swap for a version with the new right side VerIdx // todo: does this need to be in a loop that only breaks when the two indices are not the same?
     }else
     {
@@ -1533,7 +1534,7 @@ public:
   {
     if(owner){
       VerIdx defKv = empty_kv();
-      for(ui64 i=0; i<m_kvs.size(); ++i)
+      for(u64 i=0; i<m_kvs.size(); ++i)
         m_kvs[i] = defKv;
     }
   }
@@ -1659,7 +1660,7 @@ public:
     //m_sz      =  nextPowerOf2(sz);
     //m_kvs     =  lava_vec<VerIdx>(m_sz);
     // 
-    //for(ui64 i=0; i<m_kvs.size(); ++i) m_kvs[i] = defKv;
+    //for(u64 i=0; i<m_kvs.size(); ++i) m_kvs[i] = defKv;
   }
   VerIdx          at(u32  idx)                  const
   {
@@ -1686,7 +1687,7 @@ public:
   {
     return m_sz;
   }
-  ui64     sizeBytes()                          const
+  u64     sizeBytes()                          const
   {
     return m_kvs.sizeBytes();
   }
@@ -1732,7 +1733,7 @@ struct       SharedMem       // in a halfway state right now - will need to use 
 
   void*       hndlPtr;
   void*           ptr;
-  ui64           size;
+  u64           size;
   bool          owner;
 
   static  bool file_exists(char const* filename)
@@ -1766,7 +1767,7 @@ public:
 
     sm.clear();
   }
-  static SharedMem  AllocAnon(const char* name, ui64 size)
+  static SharedMem  AllocAnon(const char* name, u64 size)
   {
     using namespace std;
     
@@ -1784,7 +1785,7 @@ public:
     #endif
 
     // todo: need to check that name and path are less than sizeof(path) here
-    size_t len = strlen(path) + strlen(name);
+    u64 len = strlen(path) + strlen(name);
     if(len > sizeof(path)-1){ /* todo: handle errors here */ }
     else{ strcat(path, name); }
 
@@ -1862,8 +1863,8 @@ public:
       }
     #endif       
   
-    ui64      addr = (ui64)(sm.hndlPtr);
-    ui64 alignAddr = addr;
+    u64      addr = (u64)(sm.hndlPtr);
+    u64 alignAddr = addr;
     if(alignment!=0) alignAddr = addr + ((alignment-addr%alignment)%alignment);       // why was the second modulo needed?
     sm.ptr         = (void*)(alignAddr);
 
@@ -1906,9 +1907,9 @@ public:
 
 private:
 
-  aui64*            s_flags;
-  aui64*        s_blockSize;
-  aui64*       s_blockCount;
+  au64*            s_flags;
+  au64*        s_blockSize;
+  au64*       s_blockCount;
   ConcurrentStore      s_cs;     // store data in blocks and get back indices
   ConcurrentHash       s_ch;     // store the indices of keys and values - contains a ConcurrentList
 
@@ -1916,18 +1917,18 @@ private:
   SharedMem           m_mem;
   mutable u32    m_nxtChIdx;
   mutable u32    m_curChIdx;
-  ui64             m_blkCnt;
-  ui64              m_blkSz;
+  u64             m_blkCnt;
+  u64              m_blkSz;
 
 public:
   static const u32   EMPTY_KEY = ConcurrentHash::EMPTY_KEY;          // 28 bits set 
   static const u32  FAILED_PUT = ConcurrentHash::EMPTY_KEY;          // 28 bits set 
   static const u32    LIST_END = ConcurrentStore::LIST_END;
-  static ui64       OffsetBytes()
+  static u64       OffsetBytes()
   {
-    return sizeof(aui64)*3;
+    return sizeof(au64)*3;
   }
-  static ui64           MemSize(ui64 blockSize, ui64 blockCount)
+  static u64           MemSize(u64 blockSize, u64 blockCount)
   {
     auto  hashbytes = ConcurrentHash::sizeBytes((u32)blockCount);
     auto storebytes = ConcurrentStore::sizeBytes((u32)blockSize, (u32)blockCount);
@@ -1961,12 +1962,12 @@ public:
 
     //auto chSz = s_ch.sizeBytes();
     auto chSz = ConcurrentHash::sizeBytes(blockCount);
-    new (&s_cs) ConcurrentStore( ((i8*)m_mem.data())+chSz+OffsetBytes(), 
+    new (&s_cs) ConcurrentStore( ((u8*)m_mem.data())+chSz+OffsetBytes(), 
                                  (u32)s_blockSize->load(), 
                                  (u32)s_blockCount->load(), 
                                  m_mem.owner);                 // todo: change this to a void*
 
-    new (&s_ch) ConcurrentHash( ((i8*)m_mem.data())+OffsetBytes(), 
+    new (&s_ch) ConcurrentHash( ((u8*)m_mem.data())+OffsetBytes(), 
                                 (u32)s_blockCount->load(),
                                 &s_cs,                        // the address of the ConcurrentStore
                                 m_mem.owner);
@@ -2120,7 +2121,7 @@ public:
   {
     return s_cs.data();
   }
-  ui64        size() const
+  u64        size() const
   {
     //return m_mem.size;
     //return s_cs.sizeBytes( (u32)s_blockSize->load(), (u32)s_blockCount->load());
@@ -2130,7 +2131,7 @@ public:
   {
     return m_mem.owner;
   }
-  ui64      blocks() const
+  u64      blocks() const
   {
     return s_blockCount->load();
   }
@@ -2138,7 +2139,7 @@ public:
   {
     return m_mem.hndlPtr;
   }
-  ui64     memsize() const
+  u64     memsize() const
   {
     return m_mem.size;
   }
@@ -2170,7 +2171,7 @@ public:
     if(this->get(key, &ret)) return ret;
     else return str("");
   }
-  VerStr    nxtKey(ui64* searched=nullptr)            const
+  VerStr    nxtKey(u64* searched=nullptr)            const
   {
     u32 klen, vlen;
     bool    ok = false;
@@ -2221,13 +2222,13 @@ public:
 
     //u32       i = 0;
     //str nxt = nxtKey();
-    ui64 srchCnt = 0;
+    u64 srchCnt = 0;
     auto     nxt = nxtKey();                             
     while( srchCnt<m_blkCnt && keys.find(nxt)==keys.end() )
     {
       if(nxt.s.length()>0) keys.insert(nxt);
     
-      ui64 searched = 0;
+      u64 searched = 0;
       nxt = nxtKey(&searched);
       srchCnt += searched;
       //++i;
@@ -2260,6 +2261,12 @@ public:
 
 
 
+
+//HeadUnion  curHead;
+//HeadUnion  nxtHead;
+//
+//return nxtHead.idx;
+
 //new (&m_ch) ConcurrentHash( ((i8*)m_mem.data())+OffsetBytes(), m_blockCount->load(), m_mem.owner);
 //new (&m_cs) ConcurrentStore( ((i8*)m_mem.data())+m_ch.sizeBytes(m_blockCount->load())+OffsetBytes(), m_blockSize->load(), m_blockCount->load(), m_mem.owner);                 // todo: change this to a void*
 
@@ -2270,9 +2277,9 @@ public:
 //m_mem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount)) ),
 //m_ch( ((i8*)m_mem.data())+OffsetBytes(), blockCount, m_mem.owner),
 //m_cs( ((i8*)m_mem.data())+m_ch.sizeBytes(blockCount)+OffsetBytes(), blockSize, blockCount, m_mem.owner),                 // todo: change this to a void*
-//m_blockCount( ((aui64*)m_mem.data())+2 ),
-//m_blockSize(  ((aui64*)m_mem.data())+1 ),
-//m_flags(       (aui64*)m_mem.data() )
+//m_blockCount( ((au64*)m_mem.data())+2 ),
+//m_blockSize(  ((au64*)m_mem.data())+1 ),
+//m_flags(       (au64*)m_mem.data() )
 
 //static BlkLst   make_BlkLst(bool isKey, i32 readers, u32 idx, u32 ver, u32 len, u32 klen)
 //{
@@ -2303,12 +2310,12 @@ public:
 
 //m_cl(m_blockCount)
 //
-//if(owner) *((ui64*)addr) = blockCount;
+//if(owner) *((u64*)addr) = blockCount;
 //
 //BlkLst def; 
 //def.idx     = 0; 
 //def.readers = 0; 
-//for(ui64 i=0; i<m_bls.size(); ++i) m_bls[i]=def;
+//for(u64 i=0; i<m_bls.size(); ++i) m_bls[i]=def;
 
 //
 //using BlockLists  =  lava_vec<IDX>;
