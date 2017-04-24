@@ -51,8 +51,8 @@
 // -todo: change ConcurrentHash  to CncrHsh or LfHsh
 // -todo: change ConcurrentStore to CncrStr
 // -todo: change ConcurrentList  to CncrLst
+// -todo: make compexchange_kv take VerIdx instead u64
 
-// todo: make compexchange_kv take VerIdx instead u64
 // todo: clean up inconsitent signs and usage of negative numbers
 // todo: switch negative numbers to a bitfield struct instead of implicitly using the sign bit for different purposes
 // todo: stop using lambdas and templates
@@ -679,7 +679,7 @@ namespace {
 
 }
 
-class   CncrLst
+class    CncrLst
 {
 public:
   union Head
@@ -780,7 +780,7 @@ public:
     return cnt;
   }
 };
-class  CncrStr
+class    CncrStr
 {
 public:
   union VerIdx
@@ -1280,7 +1280,7 @@ public:
 
   friend class CncrHsh;
 };
-class   CncrHsh
+class    CncrHsh
 {
 public:
   using  VerIdx = CncrStr::VerIdx;
@@ -1410,17 +1410,10 @@ private:
 
     return ret;
   }
-  bool  compexchange_kv(u32 i, u64* expected, u64 desired) const
+  bool  compexchange_kv(u32 i, VerIdx* expected, VerIdx desired) const
   {
     using namespace std;
-    
-    //kv    keyval;
-    //keyval.asInt    =  atomic_load<u64>( (Au64*)&m_kvs.data()[i].asInt );
-    //keyval.key      =  key;
-    //keyval.val      =  val;
-    //return success;
-
-    return atomic_compare_exchange_strong( (Au64*)&(m_kvs.data()[i].asInt), expected, desired);                      // The entry was free. Now let's try to take it using a CAS. 
+    return atomic_compare_exchange_strong( (au64*)&(m_kvs.data()[i].asInt), (u64*)expected, desired.asInt);                      // The entry was free. Now let's try to take it using a CAS. 
   }
   void           doFree(u32 i)                const
   {
@@ -1475,7 +1468,8 @@ private:
       nxtVp = ipd(nxtVi);
       if(nxtVp.version!=nxtVi.version){ goto dupe_nxt; }                            // the versions don't match, so start over on the same index and skip the compare exchange 
       else if(nxtVp.ipd==0){ return true; }                                         // should this be converted to an empty slot since it is the end of a span? // next slot's versions match and its VerIdx is in its ideal position, so we are done 
-      else if( compexchange_kv(i, &curVi.asInt, nxtVi.asInt) ){ 
+      //else if( compexchange_kv(i, &curVi.asInt, nxtVi.asInt) ){ 
+      else if( compexchange_kv(i, &curVi, nxtVi) ){ 
         delDupe(i);
         i = nxtIdx(i);
       }
@@ -1576,13 +1570,13 @@ public:
       if(probedKv.idx==EMPTY_KEY)
       {          
         VerIdx expected  =  empty;
-        bool    success  =  compexchange_kv(i, &expected.asInt, desired.asInt);
+        bool    success  =  compexchange_kv(i, &expected, desired);
         if(success) return expected;  // continue;                                       // WRONG!? // Another thread just stole it from underneath us.
         else{ i==0? (m_sz-1)  : (i-1); continue; }  // retry the same loop again
       }                                                                                    // Either we just added the key, or another thread did.
       
       if( checkMatch(probedKv.version, probedKv.idx, match)!=MATCH_TRUE ) continue;
-      bool success = compexchange_kv(i, &probedKv.asInt, desired.asInt);
+      bool success = compexchange_kv(i, &probedKv, desired);
       if(success) return probedKv;
       else{ i==0? (m_sz-1)  : (i-1); continue; }
 
@@ -1609,7 +1603,7 @@ public:
 
       Match m = checkMatch(probedKv.version, probedKv.idx, match);
       if(m==MATCH_TRUE){
-        bool success = compexchange_kv(i, &probedKv.asInt, deleted.asInt);
+        bool success = compexchange_kv(i, &probedKv, deleted);
         if(success){
           cleanDeletion(i);
           return probedKv;
@@ -1696,7 +1690,7 @@ public:
   {
     return m_sz;
   }
-  u64     sizeBytes()                          const
+  u64      sizeBytes()                          const
   {
     return m_kvs.sizeBytes();
   }
@@ -1730,7 +1724,7 @@ public:
     return retries;
   }
 };
-struct       SharedMem       // in a halfway state right now - will need to use arbitrary memory and have other OS implementations for shared memory eventually
+struct SharedMem       // in a halfway state right now - will need to use arbitrary memory and have other OS implementations for shared memory eventually
 {
   static const int alignment = 0;
   
@@ -1909,35 +1903,34 @@ public:
     return ptr;
   }
 };
-class            simdb
+class      simdb
 {
 public:
   using VerIdx = CncrHsh::VerIdx;
 
 private:
-
-  au64*            s_flags;
-  au64*        s_blockSize;
-  au64*       s_blockCount;
-  CncrStr      s_cs;     // store data in blocks and get back indices
-  CncrHsh       s_ch;     // store the indices of keys and values - contains a ConcurrentList
+  au64*      s_flags;
+  au64*      s_blockSize;
+  au64*      s_blockCount;
+  CncrStr    s_cs;               // store data in blocks and get back indices
+  CncrHsh    s_ch;               // store the indices of keys and values - contains a ConcurrentList
 
   // these variables are local to the stack where simdb lives, unlike the others, they are not simply a pointer into the shared memory
   SharedMem           m_mem;
   mutable u32    m_nxtChIdx;
   mutable u32    m_curChIdx;
-  u64             m_blkCnt;
-  u64              m_blkSz;
+  u64              m_blkCnt;
+  u64               m_blkSz;
 
 public:
-  static const u32   EMPTY_KEY = CncrHsh::EMPTY_KEY;          // 28 bits set 
-  static const u32  FAILED_PUT = CncrHsh::EMPTY_KEY;          // 28 bits set 
-  static const u32    LIST_END = CncrStr::LIST_END;
-  static u64       OffsetBytes()
+  static const u32    EMPTY_KEY = CncrHsh::EMPTY_KEY;          // 28 bits set 
+  static const u32   FAILED_PUT = CncrHsh::EMPTY_KEY;          // 28 bits set 
+  static const u32     LIST_END = CncrStr::LIST_END;
+  static u64        OffsetBytes()
   {
     return sizeof(au64)*3;
   }
-  static u64           MemSize(u64 blockSize, u64 blockCount)
+  static u64            MemSize(u64 blockSize, u64 blockCount)
   {
     auto  hashbytes = CncrHsh::sizeBytes((u32)blockCount);
     auto storebytes = CncrStr::sizeBytes((u32)blockSize, (u32)blockCount);
@@ -2270,6 +2263,19 @@ public:
 
 
 
+
+//bool  compexchange_kv(u32 i, u64* expected, u64 desired) const
+//{
+//  using namespace std;
+//  
+//  //kv    keyval;
+//  //keyval.asInt    =  atomic_load<u64>( (Au64*)&m_kvs.data()[i].asInt );
+//  //keyval.key      =  key;
+//  //keyval.val      =  val;
+//  //return success;
+//
+//  return atomic_compare_exchange_strong( (Au64*)&(m_kvs.data()[i].asInt), expected, desired);                      // The entry was free. Now let's try to take it using a CAS. 
+//}
 
 //HeadUnion  curHead;
 //HeadUnion  nxtHead;
