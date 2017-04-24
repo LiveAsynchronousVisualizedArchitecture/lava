@@ -52,16 +52,16 @@
 // -todo: change ConcurrentStore to CncrStr
 // -todo: change ConcurrentList  to CncrLst
 // -todo: make compexchange_kv take VerIdx instead u64
+// -todo: make deleted_i64 function - made a vi_i64 function instead
+// -todo: make deleted indices that have an empty index on their right side become empty indices
+// -todo: take out simdb_ prefix? - if this happens, how will listDBs be able to find, think about this later, an answer will likely become clear
+// -todo: change compexchange_kv to cmpex_vi
 
-// todo: make deleted_i64 function
-// todo: change compexchange_kv to cmpex_vi
-// todo: make deleted indices that have an empty index on their right side become empty indices
-// todo: short circuit as not found on finding an empty slot - will need a deleted value
 // todo: clean up inconsitent signs and usage of negative numbers
 // todo: switch negative numbers to a bitfield struct instead of implicitly using the sign bit for different purposes
 // todo: stop using lambdas and templates
 // todo: check the hash in each BlkLst index as an early out for failed reads?
-// todo: take out simdb_ prefix? - if this happens, how will listDBs be able to find 
+// todo: short circuit as not found on finding an empty slot - will need a deleted value
 // todo: put supporting windows functions into anonymous namespace
 // todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
 // todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
@@ -280,7 +280,6 @@
 #include <set>
 #include <algorithm>
 #include <cassert>
-
 
 using    i8   =   int8_t;
 using    u8   =   uint8_t;
@@ -514,7 +513,6 @@ template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  //
   #include <alloca.h>
   #define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);  
 #endif
-
 
 namespace {
   enum Match { MATCH_FALSE=0, MATCH_TRUE=1, MATCH_REMOVED=-1  };
@@ -1414,7 +1412,7 @@ private:
 
     return ret;
   }
-  bool  compexchange_kv(u32 i, VerIdx* expected, VerIdx desired) const
+  bool  cmpex_vi(u32 i, VerIdx* expected, VerIdx desired) const
   {
     using namespace std;
     return atomic_compare_exchange_strong( (au64*)&(m_kvs.data()[i].asInt), (u64*)expected, desired.asInt);                      // The entry was free. Now let's try to take it using a CAS. 
@@ -1478,14 +1476,6 @@ private:
     //
     //desired = (32<<(u64)EMPTY_KEY) && EMPTY_KEY
   }
-  //bool       delToEmpty(u32 i)                const
-  //{
-  //  if(i%2==0)                                                                      // both indices are within a 128 bit boundary, so the 128 bit atomic can (and must) be used
-  //  {                                                                               
-  //  }else
-  //  {
-  //  }
-  //}
   bool    cleanDeletion(u32 i, u8 depth=0)    const
   {
     VerIdx curVi, nxtVi; VerIpd nxtVp;
@@ -1498,7 +1488,7 @@ private:
       nxtVp = ipd(nxtVi);
       if(nxtVp.version!=nxtVi.version){ continue; /*goto clean_loop;*/ }             // the versions don't match, so start over on the same index and skip the compare exchange 
       else if(nxtVp.ipd==0){ return true; }                                          // should this be converted to an empty slot since it is the end of a span? // next slot's versions match and its VerIdx is in its ideal position, so we are done 
-      else if( compexchange_kv(i, &curVi, nxtVi) ){ 
+      else if( cmpex_vi(i, &curVi, nxtVi) ){ 
         delDupe(i);
         i = nxtIdx(i);
       }
@@ -1583,13 +1573,13 @@ public:
       if(probedKv.idx==EMPTY_KEY)
       {          
         VerIdx expected  =  empty;
-        bool    success  =  compexchange_kv(i, &expected, desired);
+        bool    success  =  cmpex_vi(i, &expected, desired);
         if(success) return expected;  // continue;                                       // WRONG!? // Another thread just stole it from underneath us.
         else{ i==0? (m_sz-1)  : (i-1); continue; }  // retry the same loop again
       }                                                                                    // Either we just added the key, or another thread did.
       
       if( checkMatch(probedKv.version, probedKv.idx, match)!=MATCH_TRUE ) continue;
-      bool success = compexchange_kv(i, &probedKv, desired);
+      bool success = cmpex_vi(i, &probedKv, desired);
       if(success) return probedKv;
       else{ i==0? (m_sz-1)  : (i-1); continue; }
 
@@ -1616,7 +1606,7 @@ public:
 
       Match m = checkMatch(probedKv.version, probedKv.idx, match);
       if(m==MATCH_TRUE){
-        bool success = compexchange_kv(i, &probedKv, deleted);
+        bool success = cmpex_vi(i, &probedKv, deleted);
         if(success){
           cleanDeletion(i);
           return probedKv;
@@ -2276,6 +2266,15 @@ public:
 
 
 
+
+//bool       delToEmpty(u32 i)                const
+//{
+//  if(i%2==0)                                                                      // both indices are within a 128 bit boundary, so the 128 bit atomic can (and must) be used
+//  {                                                                               
+//  }else
+//  {
+//  }
+//}
 
 //
 // delDupe(prevIdx(i));                                    // now that the next VerIdx is duplicated into the current slot, compare the indices of both and if they are the same, set the right index (the original VerIdx) to DELETED_IDX
