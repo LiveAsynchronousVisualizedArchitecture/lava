@@ -53,13 +53,15 @@
 // -todo: change ConcurrentList  to CncrLst
 // -todo: make compexchange_kv take VerIdx instead u64
 
+// todo: make deleted_i64 function
+// todo: change compexchange_kv to cmpex_vi
+// todo: make deleted indices that have an empty index on their right side become empty indices
+// todo: short circuit as not found on finding an empty slot - will need a deleted value
 // todo: clean up inconsitent signs and usage of negative numbers
 // todo: switch negative numbers to a bitfield struct instead of implicitly using the sign bit for different purposes
 // todo: stop using lambdas and templates
-// todo: make deleted indices that have an empty index on their right side become empty indices
-// todo: short circuit as not found on finding an empty slot - will need a deleted value
 // todo: check the hash in each BlkLst index as an early out for failed reads?
-// todo: take out simdb_ prefix? - if this happens, how will 
+// todo: take out simdb_ prefix? - if this happens, how will listDBs be able to find 
 // todo: put supporting windows functions into anonymous namespace
 // todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
 // todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
@@ -881,14 +883,14 @@ public:
 private:   
 
   // On the thread's stack
-  mutable CncrLst    s_cl;       // flat data structure - pointer to memory 
+  mutable CncrLst           s_cl;       // flat data structure - pointer to memory 
   mutable BlockLists       s_bls;       // flat data structure - pointer to memory - bl is Block Lists
   void*               s_blksAddr;       // points to the block space in the shared memory
-  au64*               s_version;       // pointer to the shared version number
+  au64*                s_version;       // pointer to the shared version number
 
   u32                m_blockSize;
   u32               m_blockCount;
-  u64                 m_szBytes;
+  u64                  m_szBytes;
   //mutable ai32      m_blocksUsed;       // todo: this is a mistake and does no good unless it is in the shared memory
 
   VerIdx       nxtBlock(i32  blkIdx)  const
@@ -904,12 +906,12 @@ private:
     //return m_blockSize - sizeof(IDX);
     return m_blockSize;
   }
-  u8*     blockFreePtr(i32  blkIdx)  const
+  u8*      blockFreePtr(i32  blkIdx)  const
   {
     //return ((u8*)stPtr(blkIdx)) + sizeof(IDX);
     return ((u8*)s_blksAddr) + blkIdx*m_blockSize;
   }
-  u8*           blkPtr(i32  blkIdx)  const
+  u8*            blkPtr(i32  blkIdx)  const
   {
     //return ((u8*)stPtr(blkIdx)) + sizeof(IDX);
     return ((u8*)s_blksAddr) + blkIdx*m_blockSize;
@@ -1269,7 +1271,7 @@ public:
   {
     return (void*)s_blksAddr;
   }
-  u64   blockCount() const
+  u64    blockCount() const
   {
     return 0; // m_cl.sizeBytes();
   }
@@ -1316,7 +1318,7 @@ public:
 
     return v;
   }
-  static u64          sizeBytes(u32 size)
+  static u64           sizeBytes(u32 size)
   {
     //return lava_vec<VerIdx>::sizeBytes( nextPowerOf2(size) );
     return lava_vec<VerIdx>::sizeBytes(size);
@@ -1348,6 +1350,11 @@ public:
     empty.version  =  0;
     return empty;
   }
+  static i64              vi_i64(VerIdx vi)
+  {
+    u64 iVi = vi.asInt;
+    return *((i64*)(&iVi));                                              // interpret the u64 bits directly as a signed 64 bit integer instead    
+  }
   static bool            IsEmpty(VerIdx kv)
   {
     static VerIdx emptykv = empty_kv();
@@ -1358,15 +1365,12 @@ public:
   static u64               swp32(u64 n){ return (((u64)hi32(n))<<32) & lo32(n); }
   static u64             incHi32(u64 n, u32 i){ return ((u64)hi32(n)+i)<<32 & lo32(n); }
   static u64             incLo32(u64 n, u32 i){ return ((u64)hi32(n))<<32 & (lo32(n)+i); }
+  static u64          shftToHi64(u32 n){ return 32<<(u64)n; }
+  static u64              make64(u32 hi, u32 lo){ return (32<<((u64)hi)) && lo; }
 
 private:
-  using   i8     =  int8_t;
-  using  u32     =  uint32_t;
-  using u64     =  uint64_t;
-  using  u32     =  uint32_t;
-  using  u64     =  uint64_t;
   using Au32     =  std::atomic<u32>;
-  using Au64    =  std::atomic<u64>;
+  using Au64     =  std::atomic<u64>;
   using VerIdxs  =  lava_vec<VerIdx>;
   using Mut      =  std::mutex;
   using UnqLock  =  std::unique_lock<Mut>;
@@ -1430,76 +1434,85 @@ private:
   {
     if(i%2==0)
     {                                                                               // both indices are within a 128 bit boundary, so the 128 bit atomic can (and must) be used
-      i64 rgtDel;  _u128 viDbl;
-      //_u128* viDblAddr;
+      i64 rgtDel, lftDel;  _u128 viDbl;
       _u128* viDblAddr = (_u128*)&m_kvs[i];                                         // find 128 bit offset address
       viDbl            = *viDblAddr;                                                // todo: should this use a 128 bit atomic load? if it isn't the same, the atomic compare exchange will load it atomically
       do{
-        if( hi32(viDbl.hi) != lo32(viDbl.lo) ){ false; }                            // check if both the indices are the same
-        
-        u64 delkv = deleted_kv().asInt;                                          // if both the indices are the same, make a new right side VerIdx with the idx set to DELETED_KEY
-        rgtDel   = *((i64*)(&delkv));                                           // interpret the u64 bits directly as a signed 64 bit integer instead
-      }while( !compex128( (i64*)viDblAddr, viDbl.hi, rgtDel, (i64*)&viDbl) );     // then compare and swap for a version with the new right side VerIdx // todo: does this need to be in a loop that only breaks when the two indices are not the same?
+        u32 l = hi32(viDbl.hi);
+        u32 r = lo32(viDbl.lo);
+        if(l==DELETED_KEY && r==EMPTY_KEY){
+          lftDel = vi_i64( empty_kv() );
+          rgtDel = *((i64*)(&viDbl.lo));
+        }else if(l!=r || l>=DELETED_KEY){                                           // check if both the indices are the same and if they are, that they aren't both deleted or both empty 
+          return false;                     
+        }else{
+          lftDel = *((i64*)(&viDbl.hi));                                            // if both the indices are the same, make a new right side VerIdx with the idx set to DELETED_KEY
+          rgtDel = vi_i64( deleted_kv() );                                          // interpret the u64 bits directly as a signed 64 bit integer instead
+        }
+      }while( !compex128( (i64*)viDblAddr, lftDel, rgtDel, (i64*)&viDbl) );         // then compare and swap for a version with the new right side VerIdx // todo: does this need to be in a loop that only breaks when the two indices are not the same?
     }else
     {
-      au64* idxDblAddr; u64 idxDbl, rgtDel;
+      au64* idxDblAddr; u64 idxDbl, desired;
       u32* leftAddr = ((u32*)(&m_kvs[i]))+1;                                        // if the two VerIdxs are not in a 128 bit boundary, then use a 64 bit compare and swap to set the right side index to DELETED_KEY
       idxDblAddr    = (au64*)leftAddr;                                              // increment the address by 4 bytes so that it lines up with the start of the two indices, then cast it to an atomic 64 bit unsigned integer for the compare and switch
       idxDbl        = idxDblAddr->load();
       do{
         u32  l = hi32(idxDbl);
         u32  r = lo32(idxDbl);
-        if(l!=r){ return false; }                                                   // if the indices are the same then do the compare and swap
-        rgtDel = (32<<((u64)l)) & DELETED_KEY;                                      // make the new 64 bit integer with the right index set to DELETED_KEY
-      }while( !idxDblAddr->compare_exchange_strong(idxDbl, rgtDel) );               // looping here would essentially mean that the indices change but are still identical to each other
+        if(l==DELETED_KEY && r==EMPTY_KEY){                                         // change the deleted key to empty if it is to the left of an empty slot and therefore at the end of a span
+          desired = make64(EMPTY_KEY, EMPTY_KEY);
+        }else if(l!=r || l>=DELETED_KEY){
+          return false; 
+        }else{                                                                      // if the indices are the same then do the compare and swap
+          desired = make64(l, DELETED_KEY);                                         // make the new 64 bit integer with the right index set to DELETED_KEY
+        }
+      }while( !idxDblAddr->compare_exchange_strong(idxDbl, desired) );              // looping here would essentially mean that the indices change but are still identical to each other
     }
 
     return true;
+
+    //u64 delkv = deleted_kv().asInt;                                         
+    //rgtDel    = *((i64*)(&delkv));                                          
+
+    //desired = (32<<((u64)l)) & DELETED_KEY;                                       
+    //
+    //desired = (32<<(u64)EMPTY_KEY) && EMPTY_KEY
   }
-  bool    cleanDeletion(u32 i)                const
+  //bool       delToEmpty(u32 i)                const
+  //{
+  //  if(i%2==0)                                                                      // both indices are within a 128 bit boundary, so the 128 bit atomic can (and must) be used
+  //  {                                                                               
+  //  }else
+  //  {
+  //  }
+  //}
+  bool    cleanDeletion(u32 i, u8 depth=0)    const
   {
     VerIdx curVi, nxtVi; VerIpd nxtVp;
 
-    dupe_nxt: while( (nxtVi=load_kv(nxtIdx(i))).idx < DELETED_KEY )                 // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
+    clean_loop: while( (nxtVi=load_kv(nxtIdx(i))).idx < DELETED_KEY )                 // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
     {
       curVi = load_kv(i);
       if(curVi.idx >= DELETED_KEY){ return false; }
 
       nxtVp = ipd(nxtVi);
-      if(nxtVp.version!=nxtVi.version){ goto dupe_nxt; }                            // the versions don't match, so start over on the same index and skip the compare exchange 
-      else if(nxtVp.ipd==0){ return true; }                                         // should this be converted to an empty slot since it is the end of a span? // next slot's versions match and its VerIdx is in its ideal position, so we are done 
-      //else if( compexchange_kv(i, &curVi.asInt, nxtVi.asInt) ){ 
+      if(nxtVp.version!=nxtVi.version){ continue; /*goto clean_loop;*/ }             // the versions don't match, so start over on the same index and skip the compare exchange 
+      else if(nxtVp.ipd==0){ return true; }                                          // should this be converted to an empty slot since it is the end of a span? // next slot's versions match and its VerIdx is in its ideal position, so we are done 
       else if( compexchange_kv(i, &curVi, nxtVi) ){ 
         delDupe(i);
         i = nxtIdx(i);
       }
     }
 
-    // delDupe(prevIdx(i));                                    // now that the next VerIdx is duplicated into the current slot, compare the indices of both and if they are the same, set the right index (the original VerIdx) to DELETED_IDX
+    if(nxtVi.idx==DELETED_KEY){                                                      // if the next index is deleted, try to clean the next index, then come back and try to delete this one again
+      if(depth<1){ cleanDeletion(nxtIdx(i), depth+1); }                             // could this recurse to the depth of the number of blocks?
+      //i = nxtIdx(i);                                                               // this could mean the current slot has a deleted key and isn't cleanup by this function
+      goto clean_loop;
+    }else if(nxtVi.idx==EMPTY_KEY){
+      
+    }
 
     return true;
-
-    //loop_start: while( (nxtVi=load_kv(nxtIdx(i))).idx < DELETED_KEY )
-    //{
-    //  do{ 
-    //    curVi = load_kv(i);
-    //    if(curVi.idx != DELETED_KEY){ return false; }
-    //
-    //    nxtVp = ipd(nxtVi);
-    //    if(nxtVp.version!=nxtVi.version){ goto loop_start; }  // the versions don't match, so start over on the same index and skip the compare exchange 
-    //    else if(nxtVp.ipd==0){ return true; }                 // next slot's versions match and its VerIdx is in its ideal position, so we are done 
-    //  }while( !compexchange_kv(i, &curVi.asInt, nxtVi.asInt) );
-    //  
-    //  ++i;
-    //}
-
-    //u32 nxti = nxtIdx(i);
-    //nxtVi = load_kv(nxti);
-    //if(nxtVi.idx==DELETED_KEY || nxtVi.idx==EMPTY_KEY){ return true; }
-
-    //if(vp.version!=vi.version && vp.ipd>0){
-    //  //compexchange_kv(i, &curVi.asInt, vi.asInt);       // write next index's VerIdx to the current index if it is still deleted
-    //}
   }
 
   template<class MATCH_FUNC> 
@@ -2123,7 +2136,7 @@ public:
   {
     return s_cs.data();
   }
-  u64        size() const
+  u64         size() const
   {
     //return m_mem.size;
     //return s_cs.sizeBytes( (u32)s_blockSize->load(), (u32)s_blockCount->load());
@@ -2133,7 +2146,7 @@ public:
   {
     return m_mem.owner;
   }
-  u64      blocks() const
+  u64       blocks() const
   {
     return s_blockCount->load();
   }
@@ -2141,7 +2154,7 @@ public:
   {
     return m_mem.hndlPtr;
   }
-  u64     memsize() const
+  u64      memsize() const
   {
     return m_mem.size;
   }
@@ -2263,6 +2276,37 @@ public:
 
 
 
+
+//
+// delDupe(prevIdx(i));                                    // now that the next VerIdx is duplicated into the current slot, compare the indices of both and if they are the same, set the right index (the original VerIdx) to DELETED_IDX
+
+//loop_start: while( (nxtVi=load_kv(nxtIdx(i))).idx < DELETED_KEY )
+//{
+//  do{ 
+//    curVi = load_kv(i);
+//    if(curVi.idx != DELETED_KEY){ return false; }
+//
+//    nxtVp = ipd(nxtVi);
+//    if(nxtVp.version!=nxtVi.version){ goto loop_start; }  // the versions don't match, so start over on the same index and skip the compare exchange 
+//    else if(nxtVp.ipd==0){ return true; }                 // next slot's versions match and its VerIdx is in its ideal position, so we are done 
+//  }while( !compexchange_kv(i, &curVi.asInt, nxtVi.asInt) );
+//  
+//  ++i;
+//}
+
+//u32 nxti = nxtIdx(i);
+//nxtVi = load_kv(nxti);
+//if(nxtVi.idx==DELETED_KEY || nxtVi.idx==EMPTY_KEY){ return true; }
+
+//if(vp.version!=vi.version && vp.ipd>0){
+//  //compexchange_kv(i, &curVi.asInt, vi.asInt);       // write next index's VerIdx to the current index if it is still deleted
+//}
+
+//using   i8     =  int8_t;
+//using  u32     =  uint32_t;
+//using  u64     =  uint64_t;
+//using  u32     =  uint32_t;
+//using  u64     =  uint64_t;
 
 //bool  compexchange_kv(u32 i, u64* expected, u64 desired) const
 //{
