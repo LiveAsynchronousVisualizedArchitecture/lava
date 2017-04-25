@@ -71,14 +71,14 @@
 // -todo: check the hash in each BlkLst index as an early out for failed reads - already done through CncrStr::compare()
 // -todo: get() - short circuit as not found on finding an empty slot - will need a deleted value - already was returning false on EMPTY, but needed to keep going on DELETED_KEY
 // -todo: check if reads can be made non-atomic if they already aren't - not worth looking in to now
+// -todo: redo EMPTY_KEY and DELETED_KEY to use last two values of u32
+// -todo: put supporting windows functions into anonymous namespace - only typedefs needed to be outside the anonymous namespace
 
-// todo: redo EMPTY_KEY and DELETED_KEY to use last two values of u32
 // todo: flatten runIfMatch function to only take a function template argument but not a match function template argument
 // todo: stop using match function as a template in and just run a function in CncrHsh
 //       | len()
 //       | get()
 //       | put()
-// todo: put supporting windows functions into anonymous namespace
 // todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
 // todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
 // todo: put prefetching into reading of blocks
@@ -249,6 +249,15 @@
 
 // platform specifics - mostly for shared memory mapping and auxillary functions like open, close and the windows equivilents
 #if defined(_WIN32)      // windows
+  // use _malloca ? - would need to use _freea and also know that _malloca always allocates on the heap in debug mode for some crazy reason
+  #define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);
+  
+  #include <tchar.h>
+  #define NOMINMAX
+  #define WIN32_LEAN_AND_MEAN
+  #include <windows.h>
+  #include <strsafe.h>
+
   #ifdef _MSC_VER
     #if !defined(_CRT_SECURE_NO_WARNINGS)
       #define _CRT_SECURE_NO_WARNINGS
@@ -259,16 +268,6 @@
     #endif
   #endif
 
- //#if defined(_CRT_SECURE_NO_WARNINGS)
- //  #undef _CRT_SECURE_NO_WARNINGS
- //  #define _CRT_SECURE_NO_WARNINGS
- //#endif
- //#undef _CRT_SECURE_NO_WARNINGS
- //#define _CRT_SECURE_NO_WARNINGS 1       // msvc mandatory error nonsense when using some standard C functions like fopen 
-
- //#if !defined(_CRT_SECURE_NO_WARNINGS)
- //  #define _CRT_SECURE_NO_WARNINGS        // msvc mandatory error nonsense when using some standard C functions like fopen 
- //#endif
 
 #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
   // for mmap and munmap
@@ -317,216 +316,12 @@ using   str   =   std::string;             // will need C++ ifdefs eventually or
 
 template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  // will need C++ ifdefs eventually
 
-  #ifdef _WIN32
-  // use _malloca ? - would need to use _freea and also know that _malloca always allocates on the heap in debug mode for some crazy reason
-  #define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);
-  
-  #include <tchar.h>
-  #define NOMINMAX
-  #define WIN32_LEAN_AND_MEAN
-  #include <windows.h>
-  //#include <winternl.h>
-  //namespace WINNT { 
-    //#include <Ntdef.h> 
-    //#include <Ntifs.h>
-    //typedef struct _OBJECT_ATTRIBUTES64 {
-    //    ULONG Length;
-    //    ULONG64 RootDirectory;
-    //    ULONG64 ObjectName;
-    //    ULONG Attributes;
-    //    ULONG64 SecurityDescriptor;
-    //    ULONG64 SecurityQualityOfService;
-    //} OBJECT_ATTRIBUTES64;
-    //typedef OBJECT_ATTRIBUTES64 *POBJECT_ATTRIBUTES64;
-    typedef void        *HANDLE;
-    typedef HANDLE     *PHANDLE;
-    typedef wchar_t       WCHAR;        // wc,   16-bit UNICODE character
-    typedef UCHAR       BOOLEAN;        // winnt
-    typedef unsigned long ULONG;
-
-    typedef struct _UNICODE_STRING {
-      USHORT Length;
-      USHORT MaximumLength;
-      #ifdef MIDL_PASS
-          [size_is(MaximumLength / 2), length_is((Length) / 2) ] USHORT * Buffer;
-      #else // MIDL_PASS
-          _Field_size_bytes_part_(MaximumLength, Length) PWCH   Buffer;
-      #endif // MIDL_PASS
-      } UNICODE_STRING;
-    typedef UNICODE_STRING *PUNICODE_STRING;
-
-    typedef struct _OBJECT_ATTRIBUTES {
-        ULONG Length;
-        HANDLE RootDirectory;
-        PUNICODE_STRING ObjectName;
-        ULONG Attributes;
-        PVOID SecurityDescriptor;        // Points to type SECURITY_DESCRIPTOR
-        PVOID SecurityQualityOfService;  // Points to type SECURITY_QUALITY_OF_SERVICE
-    } OBJECT_ATTRIBUTES;
-    typedef OBJECT_ATTRIBUTES *POBJECT_ATTRIBUTES;
-
-    typedef long LONG;
-    typedef LONG NTSTATUS;
-  //}
-  //#include <ntstatus.h>
-  //
-  //#include <Wdm.h>
-  //#include <Ntstrsafe.h>
-  #include <strsafe.h>
-
-  // the following is api poison and is a cancerous abomination, but it seems to be the only way to list the global anonymous memory maps in windows  
-  #define DIRECTORY_QUERY              0x0001  
-  #define STATUS_SUCCESS               ((NTSTATUS)0x00000000L)    // ntsubauth
-  #define OBJ_CASE_INSENSITIVE         0x00000040L
-  #define STATUS_NO_MORE_FILES         ((NTSTATUS)0x80000006L)
-  #define STATUS_NO_MORE_ENTRIES       ((NTSTATUS)0x8000001AL)
-
-  typedef struct _IO_STATUS_BLOCK {
-		union {
-			NTSTATUS Status;
-			PVOID    Pointer;
-		};
-		ULONG_PTR Information;
-	} IO_STATUS_BLOCK, *PIO_STATUS_BLOCK;
-  
-  using NTOPENDIRECTORYOBJECT = NTSTATUS (WINAPI*)(
-	  _Out_  PHANDLE DirectoryHandle,
-	  _In_   ACCESS_MASK DesiredAccess,
-	  _In_   POBJECT_ATTRIBUTES ObjectAttributes
-	);
-  using NTOPENFILE = NTSTATUS (WINAPI*)(
-    _Out_ PHANDLE               FileHandle,
-    _In_  ACCESS_MASK        DesiredAccess,
-    _In_  POBJECT_ATTRIBUTES ObjectAttributes,
-    _Out_ PIO_STATUS_BLOCK   IoStatusBlock,
-    _In_  ULONG                ShareAccess,
-    _In_  ULONG                OpenOptions
-  );
-  using NTQUERYDIRECTORYOBJECT = NTSTATUS(WINAPI*)(
-	  _In_       HANDLE DirectoryHandle,
-	  _Out_opt_  PVOID Buffer,
-	  _In_       ULONG Length,
-	  _In_       BOOLEAN ReturnSingleEntry,
-	  _In_       BOOLEAN RestartScan,
-	  _Inout_    PULONG Context,
-	  _Out_opt_  PULONG ReturnLength
-	);
-  using RTLINITUNICODESTRING = VOID(*)(
-    _Out_    PUNICODE_STRING DestinationString,
-    _In_opt_ PCWSTR          SourceString
-  );
-
-  struct OBJECT_DIRECTORY_INFORMATION
-  {
-    UNICODE_STRING    name;
-    UNICODE_STRING    type;
-  };
-
-  auto      GetLastErrorStdStr() -> std::string
-  {
-    DWORD error = GetLastError();
-    if (error)
-    {
-      LPVOID lpMsgBuf;
-      DWORD bufLen = FormatMessage(
-          FORMAT_MESSAGE_ALLOCATE_BUFFER | 
-          FORMAT_MESSAGE_FROM_SYSTEM |
-          FORMAT_MESSAGE_IGNORE_INSERTS,
-          NULL,
-          error,
-          MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
-          (LPTSTR) &lpMsgBuf,
-          0, NULL );
-      if (bufLen)
-      {
-        LPCSTR lpMsgStr = (LPCSTR)lpMsgBuf;
-        std::string result(lpMsgStr, lpMsgStr+bufLen);
-      
-        LocalFree(lpMsgBuf);
-
-        return result;
-      }
-    }
-    return std::string();
-  }
-  PVOID  GetLibraryProcAddress(PSTR LibraryName, PSTR ProcName)
-  {
-    return GetProcAddress(GetModuleHandleA(LibraryName), ProcName);
-  }
-
-  auto listDBs() -> std::vector<std::wstring>
-  {
-    //using namespace WINNT;
-
-    static HMODULE _hModule = nullptr; 
-    static NTOPENDIRECTORYOBJECT  NtOpenDirectoryObject  = nullptr;
-    static NTOPENFILE             NtOpenFile             = nullptr;
-    static NTQUERYDIRECTORYOBJECT NtQueryDirectoryObject = nullptr;
-    static RTLINITUNICODESTRING   RtlInitUnicodeString   = nullptr;
-    
-    std::vector<std::wstring> ret;
-
-    if(!NtOpenDirectoryObject){  
-      NtOpenDirectoryObject  = (NTOPENDIRECTORYOBJECT)GetLibraryProcAddress( _T("ntdll.dll"), "NtOpenDirectoryObject");
-    }
-    if(!NtQueryDirectoryObject){ 
-      NtQueryDirectoryObject = (NTQUERYDIRECTORYOBJECT)GetLibraryProcAddress(_T("ntdll.dll"), "NtQueryDirectoryObject");
-    }
-    if(!NtOpenFile){ 
-      NtOpenFile = (NTOPENFILE)GetLibraryProcAddress(_T("ntdll.dll"), "NtOpenFile");
-    }
-
-    HANDLE   hDir = NULL;
-    IO_STATUS_BLOCK  isb = { 0 };
-    WCHAR* mempth = L"\\BaseNamedObjects";
-    
-    WCHAR buf[4096];
-    UNICODE_STRING   pth = { 0 };
-    pth.Buffer        = mempth;
-    pth.Length        = (USHORT)lstrlenW(mempth) * sizeof(WCHAR);
-    pth.MaximumLength = pth.Length;
-
-    OBJECT_ATTRIBUTES oa = { 0 };
-    oa.Length = sizeof( OBJECT_ATTRIBUTES );
-    oa.RootDirectory      = NULL;
-    oa.Attributes         = OBJ_CASE_INSENSITIVE;                               
-    oa.ObjectName         = &pth;
-    oa.SecurityDescriptor = NULL;                        
-    oa.SecurityQualityOfService = NULL;               
-
-    NTSTATUS status;
-    status = NtOpenDirectoryObject(
-      &hDir, 
-      /*STANDARD_RIGHTS_READ |*/ DIRECTORY_QUERY, 
-      &oa);
-
-    if(status==STATUS_SUCCESS){ return ret; }
-
-    BOOLEAN rescan = TRUE;
-    ULONG      ctx = 0;
-    ULONG   retLen = 0;
-    do
-    {
-      status = NtQueryDirectoryObject(hDir, buf, sizeof(buf), TRUE, rescan, &ctx, &retLen);
-      rescan = FALSE;
-      auto info = (OBJECT_DIRECTORY_INFORMATION*)buf;
-
-      if( lstrcmpW(info->type.Buffer, L"Section")!=0 ){ continue; }
-      WCHAR wPrefix[] = L"simdb_";
-      size_t pfxSz = sizeof(wPrefix);
-      if( strncmp( (char*)info->name.Buffer, (char*)wPrefix, pfxSz)!=0 ){  continue; }
-
-      std::wstring name =  std::wstring( (WCHAR*)info->name.Buffer );
-      ret.push_back(name);
-    }while(status!=STATUS_NO_MORE_ENTRIES);
-    
-    return ret;
-  }
-
-#else
-  // gcc/clang/linux ?
-  #include <alloca.h>
-  #define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);  
+#ifdef _WIN32                         // these have to be outside the anonymous namespace
+  typedef void        *HANDLE;
+  typedef HANDLE     *PHANDLE;
+  typedef wchar_t       WCHAR;        // wc,   16-bit UNICODE character
+  typedef UCHAR       BOOLEAN;        // winnt
+  typedef unsigned long ULONG;
 #endif
 
 namespace {
@@ -692,7 +487,188 @@ namespace {
     using  u128 = volatile _u128;
   #endif
 
+  #ifdef _WIN32
+    typedef struct _UNICODE_STRING {
+      USHORT Length;
+      USHORT MaximumLength;
+      #ifdef MIDL_PASS
+          [size_is(MaximumLength / 2), length_is((Length) / 2) ] USHORT * Buffer;
+      #else // MIDL_PASS
+          _Field_size_bytes_part_(MaximumLength, Length) PWCH   Buffer;
+      #endif // MIDL_PASS
+      } UNICODE_STRING;
+    typedef UNICODE_STRING *PUNICODE_STRING;
+
+    typedef struct _OBJECT_ATTRIBUTES {
+        ULONG Length;
+        HANDLE RootDirectory;
+        PUNICODE_STRING ObjectName;
+        ULONG Attributes;
+        PVOID SecurityDescriptor;        // Points to type SECURITY_DESCRIPTOR
+        PVOID SecurityQualityOfService;  // Points to type SECURITY_QUALITY_OF_SERVICE
+    } OBJECT_ATTRIBUTES;
+    typedef OBJECT_ATTRIBUTES *POBJECT_ATTRIBUTES;
+
+    typedef long LONG;
+    typedef LONG NTSTATUS;
+
+    // the following is api poison and is a cancerous abomination, but it seems to be the only way to list the global anonymous memory maps in windows  
+    #define DIRECTORY_QUERY              0x0001  
+    #define STATUS_SUCCESS               ((NTSTATUS)0x00000000L)    // ntsubauth
+    #define OBJ_CASE_INSENSITIVE         0x00000040L
+    #define STATUS_NO_MORE_FILES         ((NTSTATUS)0x80000006L)
+    #define STATUS_NO_MORE_ENTRIES       ((NTSTATUS)0x8000001AL)
+
+    typedef struct _IO_STATUS_BLOCK {
+		  union {
+			  NTSTATUS Status;
+			  PVOID    Pointer;
+		  };
+		  ULONG_PTR Information;
+	  } IO_STATUS_BLOCK, *PIO_STATUS_BLOCK;
+  
+    using NTOPENDIRECTORYOBJECT = NTSTATUS (WINAPI*)(
+	    _Out_  PHANDLE DirectoryHandle,
+	    _In_   ACCESS_MASK DesiredAccess,
+	    _In_   POBJECT_ATTRIBUTES ObjectAttributes
+	  );
+    using NTOPENFILE = NTSTATUS (WINAPI*)(
+      _Out_ PHANDLE               FileHandle,
+      _In_  ACCESS_MASK        DesiredAccess,
+      _In_  POBJECT_ATTRIBUTES ObjectAttributes,
+      _Out_ PIO_STATUS_BLOCK   IoStatusBlock,
+      _In_  ULONG                ShareAccess,
+      _In_  ULONG                OpenOptions
+    );
+    using NTQUERYDIRECTORYOBJECT = NTSTATUS(WINAPI*)(
+	    _In_       HANDLE DirectoryHandle,
+	    _Out_opt_  PVOID Buffer,
+	    _In_       ULONG Length,
+	    _In_       BOOLEAN ReturnSingleEntry,
+	    _In_       BOOLEAN RestartScan,
+	    _Inout_    PULONG Context,
+	    _Out_opt_  PULONG ReturnLength
+	  );
+    using RTLINITUNICODESTRING = VOID(*)(
+      _Out_    PUNICODE_STRING DestinationString,
+      _In_opt_ PCWSTR          SourceString
+    );
+
+    struct OBJECT_DIRECTORY_INFORMATION
+    {
+      UNICODE_STRING    name;
+      UNICODE_STRING    type;
+    };
+
+    auto      GetLastErrorStdStr() -> std::string
+    {
+      DWORD error = GetLastError();
+      if (error)
+      {
+        LPVOID lpMsgBuf;
+        DWORD bufLen = FormatMessage(
+            FORMAT_MESSAGE_ALLOCATE_BUFFER | 
+            FORMAT_MESSAGE_FROM_SYSTEM |
+            FORMAT_MESSAGE_IGNORE_INSERTS,
+            NULL,
+            error,
+            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+            (LPTSTR) &lpMsgBuf,
+            0, NULL );
+        if (bufLen)
+        {
+          LPCSTR lpMsgStr = (LPCSTR)lpMsgBuf;
+          std::string result(lpMsgStr, lpMsgStr+bufLen);
+      
+          LocalFree(lpMsgBuf);
+
+          return result;
+        }
+      }
+      return std::string();
+    }
+    PVOID  GetLibraryProcAddress(PSTR LibraryName, PSTR ProcName)
+    {
+      return GetProcAddress(GetModuleHandleA(LibraryName), ProcName);
+    }
+  #endif
 }
+
+#ifdef _WIN32
+  auto listDBs() -> std::vector<std::wstring>
+  {
+    //using namespace WINNT;
+
+    static HMODULE _hModule = nullptr; 
+    static NTOPENDIRECTORYOBJECT  NtOpenDirectoryObject  = nullptr;
+    static NTOPENFILE             NtOpenFile             = nullptr;
+    static NTQUERYDIRECTORYOBJECT NtQueryDirectoryObject = nullptr;
+    static RTLINITUNICODESTRING   RtlInitUnicodeString   = nullptr;
+    
+    std::vector<std::wstring> ret;
+
+    if(!NtOpenDirectoryObject){  
+      NtOpenDirectoryObject  = (NTOPENDIRECTORYOBJECT)GetLibraryProcAddress( _T("ntdll.dll"), "NtOpenDirectoryObject");
+    }
+    if(!NtQueryDirectoryObject){ 
+      NtQueryDirectoryObject = (NTQUERYDIRECTORYOBJECT)GetLibraryProcAddress(_T("ntdll.dll"), "NtQueryDirectoryObject");
+    }
+    if(!NtOpenFile){ 
+      NtOpenFile = (NTOPENFILE)GetLibraryProcAddress(_T("ntdll.dll"), "NtOpenFile");
+    }
+
+    HANDLE   hDir = NULL;
+    IO_STATUS_BLOCK  isb = { 0 };
+    WCHAR* mempth = L"\\BaseNamedObjects";
+    
+    WCHAR buf[4096];
+    UNICODE_STRING   pth = { 0 };
+    pth.Buffer        = mempth;
+    pth.Length        = (USHORT)lstrlenW(mempth) * sizeof(WCHAR);
+    pth.MaximumLength = pth.Length;
+
+    OBJECT_ATTRIBUTES oa = { 0 };
+    oa.Length = sizeof( OBJECT_ATTRIBUTES );
+    oa.RootDirectory      = NULL;
+    oa.Attributes         = OBJ_CASE_INSENSITIVE;                               
+    oa.ObjectName         = &pth;
+    oa.SecurityDescriptor = NULL;                        
+    oa.SecurityQualityOfService = NULL;               
+
+    NTSTATUS status;
+    status = NtOpenDirectoryObject(
+      &hDir, 
+      /*STANDARD_RIGHTS_READ |*/ DIRECTORY_QUERY, 
+      &oa);
+
+    if(status==STATUS_SUCCESS){ return ret; }
+
+    BOOLEAN rescan = TRUE;
+    ULONG      ctx = 0;
+    ULONG   retLen = 0;
+    do
+    {
+      status = NtQueryDirectoryObject(hDir, buf, sizeof(buf), TRUE, rescan, &ctx, &retLen);
+      rescan = FALSE;
+      auto info = (OBJECT_DIRECTORY_INFORMATION*)buf;
+
+      if( lstrcmpW(info->type.Buffer, L"Section")!=0 ){ continue; }
+      WCHAR wPrefix[] = L"simdb_";
+      size_t pfxSz = sizeof(wPrefix);
+      if( strncmp( (char*)info->name.Buffer, (char*)wPrefix, pfxSz)!=0 ){  continue; }
+
+      std::wstring name =  std::wstring( (WCHAR*)info->name.Buffer );
+      ret.push_back(name);
+    }while(status!=STATUS_NO_MORE_ENTRIES);
+    
+    return ret;
+  }
+#else
+  // gcc/clang/linux ?
+  #include <alloca.h>
+  #define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);  
+#endif
+
 
 class     CncrLst
 {
@@ -706,15 +682,15 @@ public:
     u64 asInt;
   };
   
-  using    u32  =  uint32_t;                            // need to be i32 instead for the ConcurrentStore indices?
-  using    u64  =  uint64_t;
+  using     u32  =  uint32_t;                            // need to be i32 instead for the ConcurrentStore indices?
+  using     u64  =  uint64_t;
   using ListVec  =  lava_vec<u32>;
 
   const static u32 LIST_END = 0xFFFFFFFF;
 
 private:
   ListVec     m_lv;
-  au64*       m_h;
+  au64*        m_h;
 
 public:
   static u64 sizeBytes(u32 size)
@@ -1278,11 +1254,13 @@ public:
   static const u8   FREE_READY       =     0;
   static const u8   MAX_READERS      =  0xFF;
   static const u32  KEY_MAX          =  0xFFFFFFFF; 
-  static const u32  EMPTY_KEY        =  0x0000001FFFFF;   // first 21 bits set 
-  static const u32  DELETED_KEY      =  0x0000001FFFFE;   // 1 less than the EMPTY_KEY
+  static const u32  EMPTY_KEY        =  KEY_MAX;          // first 21 bits set 
+  static const u32  DELETED_KEY      =  KEY_MAX - 1;      // 0xFFFFFFFE;       // 1 less than the EMPTY_KEY
   static const u32  EMPTY_HASH_IDX   =  0xFFFFFFFF;       // 32 bits set - hash indices are different from block indices 
   static const u32  LIST_END         =  CncrStr::LIST_END;
 
+  //static const u32  EMPTY_KEY        =  0x0000001FFFFF;   // first 21 bits set 
+  //static const u32  DELETED_KEY      =  0x0000001FFFFE;   // 1 less than the EMPTY_KEY
   //static const  u64  EMPTY_KEY        =  0x000000000000001FFFFF;         // first 21 bits set 
   //static const u64  EMPTY_KEY        =  0x000000000FFFFFFF;   // first 28 bits set 
   //static const u64  EMPTY_KEY        =    0x0000000000200000;   // first 21 bits set 
@@ -2272,6 +2250,41 @@ public:
 
 #endif
 
+
+
+
+
+
+//#include <winternl.h>
+//namespace WINNT { 
+//#include <Ntdef.h> 
+//#include <Ntifs.h>
+//typedef struct _OBJECT_ATTRIBUTES64 {
+//    ULONG Length;
+//    ULONG64 RootDirectory;
+//    ULONG64 ObjectName;
+//    ULONG Attributes;
+//    ULONG64 SecurityDescriptor;
+//    ULONG64 SecurityQualityOfService;
+//} OBJECT_ATTRIBUTES64;
+//typedef OBJECT_ATTRIBUTES64 *POBJECT_ATTRIBUTES64;
+//
+//}
+//#include <ntstatus.h>
+//
+//#include <Wdm.h>
+//#include <Ntstrsafe.h>
+
+//#if defined(_CRT_SECURE_NO_WARNINGS)
+//  #undef _CRT_SECURE_NO_WARNINGS
+//  #define _CRT_SECURE_NO_WARNINGS
+//#endif
+//#undef _CRT_SECURE_NO_WARNINGS
+//#define _CRT_SECURE_NO_WARNINGS 1       // msvc mandatory error nonsense when using some standard C functions like fopen 
+//
+//#if !defined(_CRT_SECURE_NO_WARNINGS)
+//  #define _CRT_SECURE_NO_WARNINGS        // msvc mandatory error nonsense when using some standard C functions like fopen 
+//#endif
 
 //template<class MATCH_FUNC> 
 //VerIdx   delHashed(const void *const key, u32 klen, u32 hash) const // MATCH_FUNC match)            const
