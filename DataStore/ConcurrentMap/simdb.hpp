@@ -78,16 +78,17 @@
 // -todo: prefetch memory for next block when looping through blocks - does this require a system call for shared memory and does it lock? it should just be the prefetch instruction or an unoptimized away load? use intrinsic?
 // -todo: change CncrStr::get() to check the version after reading and not before - is this not technically correct!!1! this checks that the next version is the same and then reads it, but shouldn't it read the block and then check if the version is still the same? - version is checked in readblock already
 
+// todo: make sure that 128 bit atomics are actually being called
+// todo: make put give back FAILED_PUT on error - isn't EMPTY_KEY enough?
+// todo: make put return VerIdx ? - is having an out_version pointer enough?
+// todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
+// todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
 // todo: flatten runIfMatch function to only take a function template argument but not a match function template argument
 // todo: stop using match function as a template in and just run a function in CncrHsh
 //       | len()
 //       | get()
 //       | put()
-// todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
-// todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
-// todo: make put give back FAILED_PUT on error - isn't EMPTY_KEY enough?
-// todo: make put return VerIdx ? - is having an out_version pointer enough?
-// todo: make sure that the important atomic variables like block list next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries?
+// todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries?
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
 // todo: compile with maximum warnings
@@ -1335,11 +1336,17 @@ public:
   }
   static u32                hi32(u64 n){ return (n>>32)<<32; }
   static u32                lo32(u64 n){ return (n<<32)>>32; }
-  static u64               swp32(u64 n){ return (((u64)hi32(n))<<32) & lo32(n); }
-  static u64             incHi32(u64 n, u32 i){ return ((u64)hi32(n)+i)<<32 & lo32(n); }
-  static u64             incLo32(u64 n, u32 i){ return ((u64)hi32(n))<<32 & (lo32(n)+i); }
+  static u64               swp32(u64 n){ return (((u64)lo32(n))<<32)  |  ((u64)hi32(n)); }
+  static u64             incHi32(u64 n, u32 i){ return ((u64)hi32(n)+i)<<32 | lo32(n); }
+  static u64             incLo32(u64 n, u32 i){ return ((u64)hi32(n))<<32 | (lo32(n)+i); }
   static u64          shftToHi64(u32 n){ return 32<<(u64)n; }
-  static u64              make64(u32 hi, u32 lo){ return (32<<((u64)hi)) && lo; }
+  static u64              make64(u32 hi, u32 lo){ return (32<<((u64)hi)) | lo; }
+  //static u64               swp32(u64 n){ 
+  //  return (((u64)hi32(n))<<32) & (u64)lo32(n);
+  //  }
+    //u64 nxtHi = (((u64)lo32(n))<<32);
+    //u64 nxtLo = ((u64)hi32(n));
+    //return nxtHi  |  nxtLo;
 
 
 private:
@@ -1359,7 +1366,7 @@ private:
   {
     using namespace std;
     
-    u64 cur = atomic_load<u64>( (Au64*)(&(m_kvs.data()[i].asInt)) );              // Load the key that was there.
+    u64 cur = atomic_load<u64>( (au64*)(&(m_kvs.data()[i].asInt)) );              // Load the key that was there.
 
     VerIdx ret;
     if(i%2==0) ret.asInt = swp32(cur);
@@ -1452,7 +1459,8 @@ private:
     clean_loop: while( (nxtVi=load_vi(nxtIdx(i))).idx < DELETED_KEY )                 // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
     {
       curVi = load_vi(i);
-      if(curVi.idx >= DELETED_KEY){ return false; }
+      //if(curVi.idx >= DELETED_KEY){ return false; }
+      if(curVi.idx == EMPTY_KEY){ return false; }
 
       nxtVp = ipd(nxtVi);
       if(nxtVp.version!=nxtVi.version){ continue; /*goto clean_loop;*/ }             // the versions don't match, so start over on the same index and skip the compare exchange 
