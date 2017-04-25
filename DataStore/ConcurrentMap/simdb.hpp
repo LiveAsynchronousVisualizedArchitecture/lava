@@ -1573,7 +1573,7 @@ public:
     static const VerIdx deleted = deleted_kv();
 
     u32  i = hash;
-    u32 en = min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap? 
+    u32 en = prevIdx(i); // min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap? 
     for(;; ++i)
     {
       i %= m_sz;
@@ -1781,6 +1781,9 @@ public:
     CncrStr* csp = m_csp;
     VerIdx kv = delHashed(hash,
       [csp, key, klen, hash](u32 blkidx, u32 ver){ return csp->compare(blkidx,ver,key,klen,hash); });
+
+
+
 
     bool doFree = kv.idx<DELETED_KEY;
     if(doFree) m_csp->free(kv.idx, kv.version);
