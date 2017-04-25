@@ -66,25 +66,26 @@
 //       | get()
 //       | del()
 //       | put()
+// -todo: stop using match function as a template in del() 
+// -todo: change load_kv and store_kv to load_vi and store_vi
+// -todo: check the hash in each BlkLst index as an early out for failed reads - already done through CncrStr::compare()
+// -todo: get() - short circuit as not found on finding an empty slot - will need a deleted value - already was returning false on EMPTY, but needed to keep going on DELETED_KEY
+// -todo: check if reads can be made non-atomic if they already aren't - not worth looking in to now
 
-// todo: stop using match function as a template and just run a function in CncrHsh
+// todo: redo EMPTY_KEY and DELETED_KEY to use last two values of u32
+// todo: flatten runIfMatch function to only take a function template argument but not a match function template argument
+// todo: stop using match function as a template in and just run a function in CncrHsh
 //       | len()
 //       | get()
-//       | del()
 //       | put()
-// todo: change load_kv and store_kv to load_vi and store_vi
-// todo: check the hash in each BlkLst index as an early out for failed reads
-// todo: short circuit as not found on finding an empty slot - will need a deleted value
-// todo: redo EMPTY_KEY and DELETED_KEY to use last two values of u32
 // todo: put supporting windows functions into anonymous namespace
 // todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
 // todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
 // todo: put prefetching into reading of blocks
 // todo: look at making a memory access to the next block that can't be optimized away
 // todo: prefetch memory for next block when looping through blocks - does this require a system call for shared memory and does it lock? it should just be the prefetch instruction or an unoptimized away load? use intrinsic?
-// todo: make put give back FAILED_PUT on error
-// todo: make put return VerIdx ?
-// todo: check if reads can be made non-atomic if they already aren't?
+// todo: make put give back FAILED_PUT on error - isn't EMPTY_KEY enough?
+// todo: make put return VerIdx ? - is having an out_version pointer enough?
 // todo: make sure that the important atomic variables like block list next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries?
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
@@ -1244,15 +1245,15 @@ public:
     }else 
       return 0;
   }
-  auto         list() const -> CncrLst const&
+  auto         list()      const -> CncrLst const&
   {
     return s_cl;
   }
-  auto         data() const -> const void*
+  auto         data()      const -> const void*
   {
     return (void*)s_blksAddr;
   }
-  u64    blockCount() const
+  u64    blockCount()      const
   {
     return 0; // m_cl.sizeBytes();
   }
@@ -1361,9 +1362,9 @@ private:
   mutable VerIdxs   m_kvs;           // m_kvs is key value(s) - needs to be changed to versioned indices, m_vis
           CncrStr*  m_csp;           // csp is concurrent store pointer
 
-  u32            nxtIdx(u32 i)                const { return (i+1)%m_sz; }
-  u32           prevIdx(u32 i)                const { return std::min(i-1, m_sz-1); } // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap
-  VerIdx        load_kv(u32 i)                const
+  u32            nxtIdx(u32 i)                 const { return (i+1)%m_sz; }
+  u32           prevIdx(u32 i)                 const { return std::min(i-1, m_sz-1); } // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap
+  VerIdx        load_vi(u32 i)                 const
   {
     using namespace std;
     
@@ -1379,7 +1380,7 @@ private:
     //keyval.asInt
     //return keyval;   
   }
-  VerIdx       store_kv(u32 i, VerIdx keyval) const
+  VerIdx       store_vi(u32 i, VerIdx  keyval) const
   {
     using namespace std;
     
@@ -1401,18 +1402,18 @@ private:
     using namespace std;
     return atomic_compare_exchange_strong( (au64*)&(m_kvs.data()[i].asInt), (u64*)expected, desired.asInt);                      // The entry was free. Now let's try to take it using a CAS. 
   }
-  void           doFree(u32 i)                const
+  void           doFree(u32 i)                 const
   {
-    store_kv(i, empty_kv());
+    store_vi(i, empty_kv());
   }
-  VerIpd            ipd(VerIdx vi)            const  // ipd is Ideal Position Distance - it is the distance a CncrHsh index value is from the position that it gets hashed to 
+  VerIpd            ipd(VerIdx vi)             const  // ipd is Ideal Position Distance - it is the distance a CncrHsh index value is from the position that it gets hashed to 
   {
     BlkLst bl = m_csp->blkLst(vi.idx);
     u32    ip = bl.hash % m_sz;     // ip is Ideal Position
     u32   ipd = vi.idx>ip?  vi.idx-ip  :  KEY_MAX-ip + vi.idx;  // todo: change vi.idx to u32 so that there aren't sign mismatch warnings
     return {bl.kr.version, ipd};
   }
-  bool          delDupe(u32 i)                const                                 // delete duplicate indices - l is left index, r is right index - will do something different depending on if the two slots are within 128 bit alignment or not
+  bool          delDupe(u32 i)                 const                                 // delete duplicate indices - l is left index, r is right index - will do something different depending on if the two slots are within 128 bit alignment or not
   {
     if(i%2==0)
     {                                                                               // both indices are within a 128 bit boundary, so the 128 bit atomic can (and must) be used
@@ -1453,13 +1454,13 @@ private:
 
     return true;
   }
-  bool    cleanDeletion(u32 i, u8 depth=0)    const
+  bool    cleanDeletion(u32 i, u8 depth=0)     const
   {
     VerIdx curVi, nxtVi; VerIpd nxtVp;
 
-    clean_loop: while( (nxtVi=load_kv(nxtIdx(i))).idx < DELETED_KEY )                 // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
+    clean_loop: while( (nxtVi=load_vi(nxtIdx(i))).idx < DELETED_KEY )                 // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
     {
-      curVi = load_kv(i);
+      curVi = load_vi(i);
       if(curVi.idx >= DELETED_KEY){ return false; }
 
       nxtVp = ipd(nxtVi);
@@ -1498,7 +1499,7 @@ private:
     //VerIdx kv = incReaders(i);    
       Match      m = match(key, version);
       bool matched = false;                                       // not inside a scope
-      if(m==MATCH_TRUE){ matched=true; f(load_kv(i)); }          
+      if(m==MATCH_TRUE){ matched=true; f(load_vi(i)); }          
     //decReaders(i);
     
     return matched;
@@ -1527,13 +1528,13 @@ public:
   CncrHsh& operator=(CncrHsh const& lval) = delete;
   CncrHsh& operator=(CncrHsh&&      rval) = delete;
 
-  VerIdx operator[](u32 idx) const
+  VerIdx  operator[](u32 idx) const
   {
     return m_kvs[idx];
   }
 
   template<class MATCH_FUNC> 
-  VerIdx   putHashed(u32 hash, VerIdx vi, MATCH_FUNC match) const
+  VerIdx   putHashed(u32 hash, VerIdx vi, MATCH_FUNC match)     const
   {
     using namespace std;
     static const VerIdx empty   = empty_kv();
@@ -1547,7 +1548,7 @@ public:
     for(;; ++i)
     {
       i %= m_sz;
-      VerIdx probedKv = load_kv(i);
+      VerIdx probedKv = load_vi(i);
       if(probedKv.idx>=DELETED_KEY)                                                         // it is either deleted or empty
       {          
         VerIdx expected  =  probedKv.idx==EMPTY_KEY?  empty  :  deleted;
@@ -1567,22 +1568,49 @@ public:
     return empty;  // should never be reached
   }
 
-  //template<class MATCH_FUNC> 
-  VerIdx   delHashed(const void *const key, u32 klen, u32 hash) const // MATCH_FUNC match)            const
+  template<class MATCH_FUNC, class FUNC> 
+  bool      runMatch(u32 hash, MATCH_FUNC match, FUNC f)        const // -> decltype( f(VerIdx()) )
+  {
+    using namespace std;
+    
+    u32  i = hash % m_sz;
+    u32 en = prevIdx(i);     // min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap?   // % m_sz;   //>0? hash-1  :  m_sz
+    //for(;; ++i)
+    for(;; i=nxtIdx(i) )
+    {
+      //i %= m_sz;
+      VerIdx vi = load_vi(i);
+      if(vi.idx == EMPTY_KEY){ return false;  }                                             // only EMPTY_KEY is the short circuit, since DELETED_KEY means you are still within a span and need to keep searching
+      else if(vi.idx == DELETED_KEY){ continue; }
+      else if( runIfMatch(i, vi.version, vi.idx, match, f) ){ return true; }
+      else if(i==en){ return false; }
+    }
+  }
+  template<class FUNC> 
+  auto       runRead(u32  idx, u32 version, FUNC f)             const -> decltype( f(VerIdx()) )    // decltype( (f(empty_kv())) )
+  {
+    //VerIdx kv = incReaders(idx);
+    //auto ret = f(vi);
+    //decReaders(idx);
+
+    auto  vi = load_vi(idx);        if(vi.version!=version) return false;
+    return f(vi);
+  }
+
+  VerIdx   delHashed(const void *const key, u32 klen, u32 hash) const
   {  
     using namespace std;
     static const VerIdx   empty = empty_kv();
     static const VerIdx deleted = deleted_kv();
 
-    u32  i = hash;
+    u32  i = hash % m_sz;
     u32 en = prevIdx(i); 
-    for(;; ++i)
+    for(;; i=nxtIdx(i) )
     {
-      i %= m_sz;
-      VerIdx vi = load_kv(i);
+      VerIdx vi = load_vi(i);
 
-      if(vi.idx==EMPTY_KEY)   return empty;
-      if(vi.idx==DELETED_KEY) return deleted;
+      if(vi.idx==EMPTY_KEY){   return empty;   }
+      if(vi.idx==DELETED_KEY){ return deleted; }
 
       Match m = m_csp->compare(vi.idx, vi.version, key, klen, hash);   //checkMatch(probedKv.version, probedKv.idx, match);
       if(m==MATCH_TRUE){
@@ -1590,7 +1618,8 @@ public:
         if(success){
           cleanDeletion(i);
           return vi;
-        }else{ i==0? (m_sz-1)  : (i-1); continue; }  // todo: look back at this, it shouldn't work!1!! - retry the same loop again
+        }else{ i=prevIdx(i); continue; }
+        //}else{ i==0? (m_sz-1)  : (i-1); continue; }  // todo: look back at this, it shouldn't work!1!! - retry the same loop again
 
         return vi;
       }
@@ -1599,32 +1628,6 @@ public:
     }
 
     return empty; 
-  }
-  template<class MATCH_FUNC, class FUNC> 
-  bool      runMatch(u32 hash, MATCH_FUNC match, FUNC f)    const // -> decltype( f(VerIdx()) )
-  {
-    using namespace std;
-    
-    u32  i = hash;
-    u32 en = prevIdx(i);     // min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap?   // % m_sz;   //>0? hash-1  :  m_sz
-    for(;; ++i)
-    {
-      i %= m_sz;
-      VerIdx probedKv = load_kv(i);
-      if( probedKv.idx >= DELETED_KEY) return false;
-      if( runIfMatch(i, probedKv.version, probedKv.idx, match, f) ) return  true;
-      if(i==en) return false;
-    }
-  }
-  template<class FUNC> 
-  auto       runRead(u32  idx, u32 version, FUNC f)         const -> decltype( f(VerIdx()) )    // decltype( (f(empty_kv())) )
-  {
-    //VerIdx kv = incReaders(idx);
-    //auto ret = f(vi);
-    //decReaders(idx);
-
-    auto  vi = load_kv(idx);        if(vi.version!=version) return false;
-    return f(vi);
   }
 
   bool          init(u32   sz, CncrStr* cs)
@@ -1638,8 +1641,8 @@ public:
     VerIdx ver1  =  empty_kv();
     ver1.version =  1;
 
-    for(u32 i=0; i<sz; i+=2) store_kv(i, ver0);        // evens 
-    for(u32 i=1; i<sz; i+=2) store_kv(i, ver1);
+    for(u32 i=0; i<sz; i+=2) store_vi(i, ver0);        // evens 
+    for(u32 i=1; i<sz; i+=2) store_vi(i, ver1);
     
     return true;
     
@@ -1651,14 +1654,14 @@ public:
   VerIdx          at(u32  idx)                  const
   {
     //return m_kvs[idx];
-    return load_kv(idx);
+    return load_vi(idx);
   }
   u32            nxt(u32  stIdx)                const
   {
     auto idx = stIdx;
     VerIdx empty = empty_kv();
     do{
-      VerIdx kv = load_kv(idx);
+      VerIdx kv = load_vi(idx);
       if(kv.idx != empty.idx) break;
       idx = (idx+1) % m_sz;                                             // don't increment idx above since break comes before it here
 
@@ -1779,22 +1782,14 @@ public:
   }
   bool           del(const void *const key, u32 klen)
   {
-    auto    hash = CncrHsh::HashBytes(key, klen);
     CncrStr* csp = m_csp;
-    //VerIdx kv = delHashed(hash,
-    //  [csp, key, klen, hash](u32 blkidx, u32 ver){ return csp->compare(blkidx,ver,key,klen,hash); });
-
-    VerIdx kv = delHashed(key, klen, hash);
-
-
-
-    bool doFree = kv.idx<DELETED_KEY;
-    if(doFree) m_csp->free(kv.idx, kv.version);
+    auto    hash = CncrHsh::HashBytes(key, klen);
+    VerIdx    kv = delHashed(key, klen, hash);
+    bool  doFree = kv.idx<DELETED_KEY;
+    if(doFree){ m_csp->free(kv.idx, kv.version); }
 
     return doFree;
   }
-
-
 };
 struct  SharedMem       // in a halfway state right now - will need to use arbitrary memory and have other OS implementations for shared memory eventually
 {
@@ -2807,7 +2802,7 @@ i64          get(vec<T> const& key, void*  out_buf) const     // todo: needs to 
 
 // todo: WRONG? check needs to be run on each spin if the entry is different
 //if( checkMatch(i, probedKv.version, probedKv.idx, match)==MATCH_TRUE ){
-  //return store_kv(i, desired);
+  //return store_vi(i, desired);
 //}
 
 //
