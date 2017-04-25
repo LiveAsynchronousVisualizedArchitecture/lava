@@ -56,9 +56,10 @@
 // -todo: make deleted indices that have an empty index on their right side become empty indices
 // -todo: take out simdb_ prefix? - if this happens, how will listDBs be able to find, think about this later, an answer will likely become clear
 // -todo: change compexchange_kv to cmpex_vi
+// -todo: need to do anything special to guarantee that readers is aligned so it is atomic? - no it is 64 bit so alignement doesn't matter for atomicity and barely matters for performance
+// -todo: clean up inconsitent signs and usage of negative numbers - VerIdx and BlkLst both have i32 for their idx field
+// -todo: switch negative numbers to a bitfield struct instead of implicitly using the sign bit for different purposes - use a bitfield struct with a flag for hitting LIST_END for out_blocks in alloc()
 
-// todo: clean up inconsitent signs and usage of negative numbers - VerIdx and BlkLst both have i32 for their idx field
-// todo: switch negative numbers to a bitfield struct instead of implicitly using the sign bit for different purposes
 // todo: stop using lambdas and templates
 // todo: check the hash in each BlkLst index as an early out for failed reads?
 // todo: short circuit as not found on finding an empty slot - will need a deleted value
@@ -786,22 +787,19 @@ public:
 class    CncrStr
 {
 public:
-  union VerIdx
+  union   VerIdx
   {
-    struct {
-      i32     idx;
-      u32 version;
-    };
+    struct { u32 idx; u32 version; };
     u64 asInt;
   };
-  union KeyAndReaders
+  union   KeyAndReaders
   {
     struct{ u32 isKey : 1; i32 readers : 31; u32 version; };
     u64 asInt;
   };
-  union BlkLst                            // need to do anything special to guarantee that readers is aligned so it is atomic?
+  union   BlkLst
   {
-    struct { KeyAndReaders kr; i32 idx; u32 len, klen, hash; };
+    struct { KeyAndReaders kr; u32 idx; u32 len, klen, hash; };
 
     BlkLst() : idx(0), len(0), klen(0), hash(0)
     { 
@@ -826,6 +824,7 @@ public:
       }
     } 
   };
+  struct  BlkCnt { u32 end : 1; u32 cnt : 31; };
 
   //using IDX         =  i32;
   using ai32        =  std::atomic<i32>;
@@ -880,57 +879,48 @@ public:
 private:   
 
   // On the thread's stack
-  mutable CncrLst           s_cl;       // flat data structure - pointer to memory 
-  mutable BlockLists       s_bls;       // flat data structure - pointer to memory - bl is Block Lists
-  void*               s_blksAddr;       // points to the block space in the shared memory
-  au64*                s_version;       // pointer to the shared version number
+  mutable CncrLst           s_cl;        // flat data structure - pointer to memory 
+  mutable BlockLists       s_bls;        // flat data structure - pointer to memory - bl is Block Lists
+  void*               s_blksAddr;        // points to the block space in the shared memory
+  au64*                s_version;        // pointer to the shared version number
 
   u32                m_blockSize;
   u32               m_blockCount;
   u64                  m_szBytes;
   //mutable ai32      m_blocksUsed;       // todo: this is a mistake and does no good unless it is in the shared memory
 
-  VerIdx       nxtBlock(i32  blkIdx)  const
+  VerIdx       nxtBlock(u32  blkIdx)  const
   {
-    BlkLst bl = s_bls[blkIdx];
+    BlkLst bl  = s_bls[blkIdx];
     VerIdx vi;
     vi.idx     = bl.idx;
     vi.version = bl.kr.version;
     return vi;
   }
-  i32     blockFreeSize()             const
+  u32     blockFreeSize()             const { return m_blockSize; }
+  u8*      blockFreePtr(u32  blkIdx)  const { return ((u8*)s_blksAddr) + blkIdx*m_blockSize; }
+  u8*            blkPtr(u32  blkIdx)  const { return ((u8*)s_blksAddr) + blkIdx*m_blockSize; }
+  u32      blocksNeeded(u32     len, u32* out_rem=nullptr)
   {
-    return m_blockSize;
-  }
-  u8*      blockFreePtr(i32  blkIdx)  const
-  {
-    return ((u8*)s_blksAddr) + blkIdx*m_blockSize;
-  }
-  u8*            blkPtr(i32  blkIdx)  const
-  {
-    return ((u8*)s_blksAddr) + blkIdx*m_blockSize;
-  }
-  i32      blocksNeeded(i32     len, i32* out_rem=nullptr)
-  {
-    i32  freeSz   = blockFreeSize();
-    i32  byteRem  = len % freeSz;
-    i32  blocks   = len / freeSz + (byteRem? 1 : 0);    // should never be 0 if blocksize is greater than the size of the index type
+    u32  freeSz   = blockFreeSize();
+    u32  byteRem  = len % freeSz;
+    u32  blocks   = len / freeSz + (byteRem? 1 : 0);    // should never be 0 if blocksize is greater than the size of the index type
 
     if(out_rem) *out_rem = byteRem;
 
     return blocks;
   }
-  i32          blockLen(i32  blkIdx)                    // todo: change this to be either i64 or a 'BlkLen' struct that has the flag if nxt isn't valid?
+  //i32          blockLen(i32  blkIdx)      // todo: change this to be either i64 or a 'BlkLen' struct that has the flag if nxt isn't valid?
+  //{
+  //  VerIdx nxt = nxtBlock(blkIdx);
+  //  if(nxt.idx < 0) return -(nxt.idx);
+  //
+  //  return blockFreeSize();
+  //}
+  void           doFree(u32  blkIdx)  const        // frees a list/chain of blocks
   {
-    VerIdx nxt = nxtBlock(blkIdx);
-    if(nxt.idx < 0) return -(nxt.idx);
-
-    return blockFreeSize();
-  }
-  void           doFree(i32  blkIdx)  const        // frees a list/chain of blocks
-  {
-    i32   cur  =             blkIdx;          // cur is the current block index
-    i32   nxt  =   s_bls[cur].idx;         //*stPtr(cur);              // nxt is the next block index
+    u32   cur  =             blkIdx;          // cur is the current block index
+    u32   nxt  =   s_bls[cur].idx;         //*stPtr(cur);              // nxt is the next block index
     for(; nxt>0; nxt=s_bls[cur].idx)
     { 
       //memset(blkPtr(cur), 0, m_blockSize);    // zero out memory on free, 
@@ -948,23 +938,23 @@ private:
     s_bls[cur].kr.readers = 0;                 // reset the reader count
     s_cl.free(cur);
   }
-  u32        writeBlock(i32  blkIdx, void const* const bytes, u32 len=0, u32 ofst=0)      // don't need to increment readers since write should be done before the block is exposed to any other threads
+  u32        writeBlock(u32  blkIdx, void const* const bytes, u32 len=0, u32 ofst=0)      // don't need to increment readers since write should be done before the block is exposed to any other threads
   {
-    i32   blkFree  =  blockFreeSize();
+    u32  blkFree  =  blockFreeSize();
     u8*        p  =  blockFreePtr(blkIdx);
-    auto      nxt  =  nxtBlock(blkIdx);
+    auto     nxt  =  nxtBlock(blkIdx);
     u32   cpyLen  =  len==0? blkFree : len;             // if next is negative, then it will be the length of the bytes in that block
     p      += ofst;
     memcpy(p, bytes, cpyLen);
 
     return cpyLen;
   }
-  u32         readBlock(i32  blkIdx, u32 version, void *const bytes, u32 ofst=0, u32 len=0) const
+  u32         readBlock(u32  blkIdx, u32 version, void *const bytes, u32 ofst=0, u32 len=0) const
   {
     BlkLst bl = incReaders(blkIdx, version);      if(bl.kr.version==0) return 0;
-      i32   blkFree  =  blockFreeSize();
+      u32   blkFree  =  blockFreeSize();
       u8*         p  =  blockFreePtr(blkIdx);
-      i32       nxt  =  bl.idx;
+      u32       nxt  =  bl.idx;
       u32    cpyLen  =  len==0?  blkFree-ofst  :  len;
       //cpyLen        -=  ofst;
       memcpy(bytes, p+ofst, cpyLen);
@@ -992,8 +982,8 @@ public:
     m_blockCount(blockCount),
     //m_blocksUsed(0),
     s_blksAddr( (u8*)addr + BlksOfst(blockCount) ),
-    s_cl(  (u8*)addr + CListOfst(blockCount), blockCount, owner),
-    s_bls( (u8*)addr + BlockListsOfst(),      blockCount, owner),
+    s_cl(       (u8*)addr + CListOfst(blockCount), blockCount, owner),
+    s_bls(      (u8*)addr + BlockListsOfst(),      blockCount, owner),
     s_version(  (au64*)addr ),
     m_szBytes( *((u64*)addr) )
   {
@@ -1003,27 +993,28 @@ public:
     assert(blockSize > sizeof(i32));
   }
 
-  auto        alloc(i32    size, u32 klen, u32 hash, i32* out_blocks=nullptr) -> VerIdx     // todo: doesn't this need to give back the blocks if allocation fails?
+  //auto        alloc(u32    size, u32 klen, u32 hash, i32* out_blocks=nullptr) -> VerIdx     // have this output a struct with a 1 bit flag of whether it reached the LIST_END or not    // -todo: doesn't this need to give back the blocks if allocation fails? - it does
+  auto        alloc(u32    size, u32 klen, u32 hash, BlkCnt* out_blocks=nullptr) -> VerIdx     // have this output a struct with a 1 bit flag of whether it reached the LIST_END or not    // -todo: doesn't this need to give back the blocks if allocation fails? - it does
   {
-    i32 byteRem  =  0;
-    i32  blocks  =  blocksNeeded(size, &byteRem);
+    u32 byteRem  =  0;
+    u32  blocks  =  blocksNeeded(size, &byteRem);
 
     u32   st = s_cl.nxt();                                     // stBlk  is starting block
     SECTION(get the starting block index and handle errors)
     {
       if(st==LIST_END){
-        if(out_blocks) *out_blocks = 0; 
+        if(out_blocks){ *out_blocks = {1, 0} ; } 
         return List_End(); // LIST_END; 
       }
     }
 
-    u32 ver  =  (u32)s_version->fetch_add(1);
-    i32  cur  =  st;
-    i32  nxt  =   0;
-    i32  cnt  =   0;
+    u32  ver  =  (u32)s_version->fetch_add(1);
+    u32  cur  =  st;
+    u32  nxt  =   0;
+    u32  cnt  =   0;
     SECTION(loop for the number of blocks needed and get new block and link it to the list)
     {
-      for(i32 i=0; i<blocks-1; ++i)
+      for(u32 i=0; i<blocks-1; ++i)
       {
         nxt    = s_cl.nxt();
         if(nxt==LIST_END){ free(st, ver); VerIdx empty={LIST_END,0}; return empty; }
@@ -1038,13 +1029,19 @@ public:
 
     SECTION(add the last index into the list, set out_blocks and return the start index with its version)
     {
-      u32 blockRemainder = byteRem? -byteRem : -blockFreeSize();
+      //u32 blockRemainder = byteRem? -byteRem : -blockFreeSize();
       //BlkLst  bl =  make_BlkLst(cur==st, 0, blockRemainder, ver, size, klen);
+
+      u32 blockRemainder = byteRem? byteRem : blockFreeSize();
       BlkLst bl(cur==st, 0, blockRemainder, ver, size, klen, hash);
       s_bls[cur] = bl;
       s_bls[st].kr.isKey = true;
 
-      if(out_blocks){ *out_blocks = nxt==LIST_END? -cnt : cnt; }     
+      //if(out_blocks){ *out_blocks = nxt==LIST_END? -((i32)cnt) : (i32)cnt; }     
+      if(out_blocks){
+        out_blocks->end = nxt==LIST_END;
+        out_blocks->cnt = cnt;
+      }     
       VerIdx vi = { st, ver };
       return vi;
     }
@@ -1053,23 +1050,23 @@ public:
   {
     return decReaders(blkIdx, version);
   }
-  void          put(i32  blkIdx, void const *const kbytes, i32 klen, void const *const vbytes, i32 vlen)  // don't need version because this will only be used after allocating and therefore will only be seen by one thread until it is inserted into the ConcurrentHash
+  void          put(u32  blkIdx, void const *const kbytes, u32 klen, void const *const vbytes, u32 vlen)  // don't need version because this will only be used after allocating and therefore will only be seen by one thread until it is inserted into the ConcurrentHash
   {
     using namespace std;
     
     u8*         b  =  (u8*)kbytes;
     bool   kjagged  =  (klen % blockFreeSize()) != 0;
-    i32    kblocks  =  kjagged? blocksNeeded(klen)-1 : blocksNeeded(klen);
-    i32   remklen   =  klen - (kblocks*blockFreeSize());
+    u32    kblocks  =  kjagged? blocksNeeded(klen)-1 : blocksNeeded(klen);
+    u32   remklen   =  klen - (kblocks*blockFreeSize());
     
-    i32   fillvlen  =  min(vlen, blockFreeSize()-remklen);
-    i32   tailvlen  =  vlen-fillvlen;
+    u32   fillvlen  =  min(vlen, blockFreeSize()-remklen);
+    u32   tailvlen  =  vlen-fillvlen;
     bool   vjagged  =  (tailvlen % blockFreeSize()) != 0;
-    i32    vblocks  =  vjagged? blocksNeeded(tailvlen)-1 : blocksNeeded(tailvlen);
-    i32    remvlen  =  max<i32>(0, tailvlen - (vblocks*blockFreeSize()) ); 
+    u32    vblocks  =  vjagged? blocksNeeded(tailvlen)-1 : blocksNeeded(tailvlen);
+    u32    remvlen  =  max<u32>(0, tailvlen - (vblocks*blockFreeSize()) ); 
 
-    i32       cur  =  blkIdx;
-    for(i32 i=0; i<kblocks; ++i){
+    u32       cur  =  blkIdx;
+    for(u32 i=0; i<kblocks; ++i){
       b   +=  writeBlock(cur, b);
       cur  =  nxtBlock(cur).idx;
     }
@@ -1079,7 +1076,7 @@ public:
       b   +=  writeBlock(cur, b, fillvlen, remklen);
       cur  =  nxtBlock(cur).idx;
     }
-    for(i32 i=0; i<vblocks; ++i){
+    for(u32 i=0; i<vblocks; ++i){
       b   +=  writeBlock(cur, b);
       cur  =  nxtBlock(cur).idx;
     }
@@ -1087,7 +1084,7 @@ public:
       b   +=  writeBlock(cur, b, remvlen);
     }
   }
-  u32           get(i32  blkIdx, u32 version, void *const bytes, u32 maxlen) const
+  u32           get(u32  blkIdx, u32 version, void *const bytes, u32 maxlen) const
   {
     using namespace std;
 
@@ -1095,12 +1092,12 @@ public:
 
     BlkLst bl = incReaders(blkIdx, version);   
     
-    auto vlen = bl.len-bl.klen;
+    u32 vlen = bl.len-bl.klen;
     if(bl.len==0 || vlen>maxlen ) return 0;
 
-    auto   kdiv = div(bl.klen, blockFreeSize());
+    auto   kdiv = div((i64)bl.klen, (i64)blockFreeSize());
     auto  kblks = kdiv.quot;
-    auto   krem = kdiv.rem;
+    u32    krem = (u32)kdiv.rem;
     auto vrdLen = 0;
     u32     len = 0;
     u32   rdLen = 0;
@@ -1114,7 +1111,7 @@ public:
     }
 
     vrdLen =  min<u32>(blockFreeSize()-krem, vlen);
-    rdLen  =  readBlock(cur, version, b, krem, vrdLen);
+    rdLen  =  (u32)readBlock(cur, version, b, krem, vrdLen);
     b     +=  rdLen;
     len   +=  rdLen;
     nxt    =  nxtBlock(cur);         if(nxt.version!=version){ goto read_failure; }
@@ -1143,13 +1140,13 @@ public:
     
     if(bl.len==0 || (bl.klen)>maxlen ) return 0;
 
-    auto   kdiv = div(bl.klen, blockFreeSize());
+    auto   kdiv = div((i64)bl.klen, (i64)blockFreeSize());
     auto  kblks = kdiv.quot;
-    auto   krem = kdiv.rem;
-    u32    len = 0;
-    u32  rdLen = 0;
+    u32    krem = (u32)kdiv.rem;
+    u32     len = 0;
+    u32   rdLen = 0;
     u8*       b = (u8*)bytes;
-    u32    cur = blkIdx;
+    u32     cur = blkIdx;
     VerIdx  nxt = { blkIdx, version };
 
     if(krem>0) --kblks;
@@ -1195,7 +1192,7 @@ public:
     //  //if(nxt<0 || nxt==LIST_END) break;
     //}
   }
-  Match   memcmpBlk(i32  blkIdx, u32 version, void const *const buf1, void const *const buf2, u32 len) const  // todo: eventually take out the inc and dec readers and only do them when dealing with the whole chain of blocks
+  Match   memcmpBlk(u32  blkIdx, u32 version, void const *const buf1, void const *const buf2, u32 len) const  // todo: eventually take out the inc and dec readers and only do them when dealing with the whole chain of blocks
   {
     if(incReaders(blkIdx, version).len==0) return MATCH_REMOVED;
       auto ret = memcmp(buf1, buf2, len);
@@ -1205,13 +1202,13 @@ public:
 
     return MATCH_FALSE;
   }
-  Match     compare(i32  blkIdx, u32 version, void const *const buf, u32 len, u32 hash) const
+  Match     compare(u32  blkIdx, u32 version, void const *const buf, u32 len, u32 hash) const
   {
     using namespace std;
     
     if(s_bls[blkIdx].hash!=hash) return MATCH_FALSE;  // vast majority of calls should end here
 
-    i32   curidx  =  blkIdx;
+    u32   curidx  =  blkIdx;
     auto     nxt  =  nxtBlock(curidx);                            if(nxt.version!=version) return MATCH_FALSE;
     u32    blksz  =  (u32)blockFreeSize();  // todo: change this to u32
     u8*   curbuf  =  (u8*)buf;
@@ -1232,7 +1229,7 @@ public:
       nxt      =  nxtBlock(curidx);                               if(nxt.version!=version) return MATCH_FALSE;
     }
   }
-  u32           len(i32  blkIdx, u32 version, u32* out_vlen=nullptr) const
+  u32           len(u32  blkIdx, u32 version, u32* out_vlen=nullptr) const
   {
     BlkLst bl = s_bls[blkIdx];
     if(version==bl.kr.version && bl.len>0){
@@ -1882,6 +1879,7 @@ public:
 class      simdb
 {
 public:
+  using BlkCnt = CncrStr::BlkCnt;
   using VerIdx = CncrHsh::VerIdx;
 
 private:
@@ -1917,7 +1915,7 @@ public:
     return ths->s_cs.compare(blkIdx, version, buf, len, hash);
   }
   static bool           IsEmpty(VerIdx kv){return CncrHsh::IsEmpty(kv);}         // special value for CncrHsh
-  static bool         IsListEnd(VerIdx vi){return CncrStr::IsListEnd(vi); }     // special value for CncrStr
+  static bool         IsListEnd(VerIdx vi){return CncrStr::IsListEnd(vi); }      // special value for CncrStr
 
 public:
   simdb(){}
@@ -1963,19 +1961,20 @@ public:
 
     u32   hash = CncrHsh::HashBytes(key, klen);
     
-    i32  blkcnt = 0;    
-    auto vi = s_cs.alloc(klen+vlen, klen, hash, &blkcnt);                             // todo: use the VersionIdx struct // kidx is key index
+    //i32  blkcnt = 0;    
+    //BlkCnt blkcnt;
+    auto vi = s_cs.alloc(klen+vlen, klen, hash); // &blkcnt);                       // todo: use the VersionIdx struct // kidx is key index
     if(vi.idx==LIST_END) return EMPTY_KEY;
 
     s_cs.put(vi.idx, key, klen, val, vlen);
 
     auto     ths = this;                                                        // this silly song and dance is because the this pointer can't be passed to a lambda
-    VerIdx    kv = s_ch.putHashed(hash, vi,                                  // this returns the previous VerIdx at the position
+    VerIdx    kv = s_ch.putHashed(hash, vi,                                     // this returns the previous VerIdx at the position
       [ths, key, klen, hash](u32 blkidx, u32 ver){
         return CompareBlock(ths,blkidx,ver,key,klen,hash);
       });
 
-    if(kv.idx!=EMPTY_KEY) s_cs.free(kv.idx, kv.version);                       // putHashed returns the entry that was there before, which is the entry that was replaced. If it wasn't empty, we free it here. 
+    if(kv.idx!=EMPTY_KEY) s_cs.free(kv.idx, kv.version);                        // putHashed returns the entry that was there before, which is the entry that was replaced. If it wasn't empty, we free it here. 
 
     return vi.idx;
   }

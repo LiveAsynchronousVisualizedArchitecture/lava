@@ -56,6 +56,8 @@ Pack:
 
 
 
+Make loading priority for nodes, or load them when it is first known that they will be needed based on data flow and messaging?
+
 
 -------------------------------------------------------------------------------------------
 Simplicity does not precede complexity, but follows it.
