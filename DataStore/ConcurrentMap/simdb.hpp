@@ -73,6 +73,10 @@
 // -todo: check if reads can be made non-atomic if they already aren't - not worth looking in to now
 // -todo: redo EMPTY_KEY and DELETED_KEY to use last two values of u32
 // -todo: put supporting windows functions into anonymous namespace - only typedefs needed to be outside the anonymous namespace
+// -todo: put prefetching into reading of blocks - put in to nxtBlock()
+// -todo: look at making a memory access to the next block that can't be optimized away
+// -todo: prefetch memory for next block when looping through blocks - does this require a system call for shared memory and does it lock? it should just be the prefetch instruction or an unoptimized away load? use intrinsic?
+// -todo: change CncrStr::get() to check the version after reading and not before - is this not technically correct!!1! this checks that the next version is the same and then reads it, but shouldn't it read the block and then check if the version is still the same? - version is checked in readblock already
 
 // todo: flatten runIfMatch function to only take a function template argument but not a match function template argument
 // todo: stop using match function as a template in and just run a function in CncrHsh
@@ -81,9 +85,6 @@
 //       | put()
 // todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
 // todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
-// todo: put prefetching into reading of blocks
-// todo: look at making a memory access to the next block that can't be optimized away
-// todo: prefetch memory for next block when looping through blocks - does this require a system call for shared memory and does it lock? it should just be the prefetch instruction or an unoptimized away load? use intrinsic?
 // todo: make put give back FAILED_PUT on error - isn't EMPTY_KEY enough?
 // todo: make put return VerIdx ? - is having an out_version pointer enough?
 // todo: make sure that the important atomic variables like block list next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries?
@@ -446,7 +447,7 @@ namespace {
     }
   };
 
-  u64 fnv_64a_buf(void const *const buf, u64 len)
+  inline u64 fnv_64a_buf(void const *const buf, u64 len)
   {
     // const u64 FNV_64_PRIME = 0x100000001b3;
     u64 hval = 0xcbf29ce484222325;    // FNV1_64_INIT;  // ((Fnv64_t)0xcbf29ce484222325ULL)
@@ -464,7 +465,7 @@ namespace {
     return hval;
   }
   
-  bool compex128(
+  inline bool compex128(
     volatile long long*  _Destination, 
     long long           _ExchangeHigh, 
     long long            _ExchangeLow, 
@@ -479,6 +480,16 @@ namespace {
     //return _InterlockedCompareExchange128( (i64*)(idxAddr), 
     //    swpvi.hi, swpvi.lo,
     //    (i64*)(&dblvi) )==1;
+  }
+
+  inline void prefetch1(char const* const p)
+  {
+    // if msvc or intel compilers
+    _mm_prefetch(p, _MM_HINT_T1);
+    // else 
+
+    //endif
+    //_m_prefetch((void*)p);
   }
 
   #ifdef _WIN32
@@ -885,6 +896,9 @@ private:
     VerIdx vi;
     vi.idx     = bl.idx;
     vi.version = bl.kr.version;
+
+    prefetch1( (char const* const)blockFreePtr(bl.idx) );
+
     return vi;
   }
   u32     blockFreeSize()             const { return m_blockSize; }
@@ -1099,7 +1113,6 @@ public:
     len   +=  rdLen;
     nxt    =  nxtBlock(cur);         if(nxt.version!=version){ goto read_failure; }
 
-    // todo: is this not technically correct? this checks that the next version is the same and then reads it, but shouldn't it read the block and then check if the version is still the same?
     while(len<maxlen && !(nxt.idx<0) && nxt.idx!=LIST_END && nxt.version==version)
     {
       vrdLen =  min<u32>(blockFreeSize(), maxlen-len);
@@ -2165,7 +2178,7 @@ public:
     if(this->get(key, &ret)) return ret;
     else return str("");
   }
-  VerStr    nxtKey(u64* searched=nullptr)            const
+  VerStr    nxtKey(u64* searched=nullptr)             const
   {
     u32 klen, vlen;
     bool    ok = false;
@@ -2192,12 +2205,7 @@ public:
     if(!ok || strlen(key.c_str())!=key.length() )
       return {nxt.version, ""};
 
-    //if(out_version) *out_version = nxt.version;
-    //if(ok) 
-
-
     return { nxt.version, key };                    // copy elision 
-    //else   return { 0, "" };
   }
   auto  getKeyStrs() const -> vec<VerStr>            // vec<u32>* out_versions=nullptr
   {
@@ -2254,6 +2262,11 @@ public:
 
 
 
+
+//if(out_version) *out_version = nxt.version;
+//if(ok) 
+//
+//else   return { 0, "" };
 
 //#include <winternl.h>
 //namespace WINNT { 
