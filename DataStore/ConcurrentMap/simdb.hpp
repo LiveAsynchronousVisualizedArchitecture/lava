@@ -72,6 +72,7 @@
 //       | get()
 //       | del()
 //       | put()
+// todo: change load_kv and store_kv to load_vi and store_vi
 // todo: check the hash in each BlkLst index as an early out for failed reads
 // todo: short circuit as not found on finding an empty slot - will need a deleted value
 // todo: redo EMPTY_KEY and DELETED_KEY to use last two values of u32
@@ -1565,32 +1566,33 @@ public:
 
     return empty;  // should never be reached
   }
-  template<class MATCH_FUNC> 
-  VerIdx   delHashed(u32 hash, MATCH_FUNC match)            const
+
+  //template<class MATCH_FUNC> 
+  VerIdx   delHashed(const void *const key, u32 klen, u32 hash) const // MATCH_FUNC match)            const
   {  
     using namespace std;
-    static const VerIdx   empty =   empty_kv();
+    static const VerIdx   empty = empty_kv();
     static const VerIdx deleted = deleted_kv();
 
     u32  i = hash;
-    u32 en = prevIdx(i); // min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap? 
+    u32 en = prevIdx(i); 
     for(;; ++i)
     {
       i %= m_sz;
-      VerIdx probedKv = load_kv(i);
+      VerIdx vi = load_kv(i);
 
-      if(probedKv.idx==EMPTY_KEY)   return empty;
-      if(probedKv.idx==DELETED_KEY) return deleted;
+      if(vi.idx==EMPTY_KEY)   return empty;
+      if(vi.idx==DELETED_KEY) return deleted;
 
-      Match m = checkMatch(probedKv.version, probedKv.idx, match);
+      Match m = m_csp->compare(vi.idx, vi.version, key, klen, hash);   //checkMatch(probedKv.version, probedKv.idx, match);
       if(m==MATCH_TRUE){
-        bool success = cmpex_vi(i, &probedKv, deleted);
+        bool success = cmpex_vi(i, &vi, deleted);
         if(success){
           cleanDeletion(i);
-          return probedKv;
-        }else{ i==0? (m_sz-1)  : (i-1); continue; }  // retry the same loop again
+          return vi;
+        }else{ i==0? (m_sz-1)  : (i-1); continue; }  // todo: look back at this, it shouldn't work!1!! - retry the same loop again
 
-        return probedKv;   
+        return vi;
       }
 
       if(m==MATCH_REMOVED || i==en){ return empty; }
@@ -1779,9 +1781,10 @@ public:
   {
     auto    hash = CncrHsh::HashBytes(key, klen);
     CncrStr* csp = m_csp;
-    VerIdx kv = delHashed(hash,
-      [csp, key, klen, hash](u32 blkidx, u32 ver){ return csp->compare(blkidx,ver,key,klen,hash); });
+    //VerIdx kv = delHashed(hash,
+    //  [csp, key, klen, hash](u32 blkidx, u32 ver){ return csp->compare(blkidx,ver,key,klen,hash); });
 
+    VerIdx kv = delHashed(key, klen, hash);
 
 
 
@@ -2275,6 +2278,39 @@ public:
 #endif
 
 
+//template<class MATCH_FUNC> 
+//VerIdx   delHashed(const void *const key, u32 klen, u32 hash) const // MATCH_FUNC match)            const
+//{  
+//  using namespace std;
+//  static const VerIdx   empty =   empty_kv();
+//  static const VerIdx deleted = deleted_kv();
+//
+//  u32  i = hash;
+//  u32 en = prevIdx(i); // min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap? 
+//  for(;; ++i)
+//  {
+//    i %= m_sz;
+//    VerIdx probedKv = load_kv(i);
+//
+//    if(probedKv.idx==EMPTY_KEY)   return empty;
+//    if(probedKv.idx==DELETED_KEY) return deleted;
+//
+//    Match m = checkMatch(probedKv.version, probedKv.idx, match);
+//    if(m==MATCH_TRUE){
+//      bool success = cmpex_vi(i, &probedKv, deleted);
+//      if(success){
+//        cleanDeletion(i);
+//        return probedKv;
+//      }else{ i==0? (m_sz-1)  : (i-1); continue; }  // retry the same loop again
+//
+//      return probedKv;   
+//    }
+//
+//    if(m==MATCH_REMOVED || i==en){ return empty; }
+//  }
+//
+//  return empty; 
+//}
 
 // len()
 //if(klen<1) return 0;
