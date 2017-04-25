@@ -216,6 +216,19 @@ inline void prefetch0(char const* const p)
 //struct _u128 { u64 hi, lo; };
 //using u128 = __declspec(align(128)) volatile _u128;
 
+void printdb(simdb const& db)
+{
+  Println("size: ", db.size());
+
+  //str memstr;
+  //memstr.resize(db.size()+1);
+  vec<i8> memv(db.memsize(), 0);
+  memcpy( (void*)memv.data(), db.mem(), db.memsize() );
+
+  str memstr( (const char*)db.data(), (const char*)db.data() + db.size());
+  Println("\nmem: ", memstr, "\n" );
+}
+
 int main()
 {
   using namespace std;
@@ -538,13 +551,14 @@ int main()
   if( db.isOwner() ){
     Println("put: ", db.put( wat.data(),   (u32)wat.length(),    skidoosh.data(), (u32)skidoosh.length()) );
     db.del("wat");
-    Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
+    //Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
     //db.del("wut");
     //Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
-    //db.rm("kablam");
-    //Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
-    //db.rm("wat");
-    //Println();
+    //db.del("kablam");
+    //printdb(db);
+    Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
+    //db.del("wat");
+    Println();
   }
   //else{
   //  Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
@@ -606,13 +620,13 @@ int main()
   //Println();
   //
 
-  Println("size: ", db.size());
-
-  //str memstr;
-  //memstr.resize(db.size()+1);
-  vec<i8> memv(db.memsize(), 0);
-  memcpy( (void*)memv.data(), db.mem(), db.memsize() );
-
+  //Println("size: ", db.size());
+  //
+  ////str memstr;
+  ////memstr.resize(db.size()+1);
+  //vec<i8> memv(db.memsize(), 0);
+  //memcpy( (void*)memv.data(), db.mem(), db.memsize() );
+  //
   //str memstr( (const char*)db.data(), (const char*)db.data() + db.size());
   //Println("\nmem: ", memstr, "\n" );
 
