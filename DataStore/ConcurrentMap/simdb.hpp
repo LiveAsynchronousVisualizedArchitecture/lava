@@ -78,6 +78,7 @@
 // -todo: prefetch memory for next block when looping through blocks - does this require a system call for shared memory and does it lock? it should just be the prefetch instruction or an unoptimized away load? use intrinsic?
 // -todo: change CncrStr::get() to check the version after reading and not before - is this not technically correct!!1! this checks that the next version is the same and then reads it, but shouldn't it read the block and then check if the version is still the same? - version is checked in readblock already
 
+// todo: print or visualize CncrHsh 
 // todo: flatten putHashed into having the block comparison embedded 
 // todo: make a swapped VerIdx type?
 // todo: fix infinite loop on put
@@ -685,7 +686,6 @@ namespace {
   #define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);  
 #endif
 
-
 class     CncrLst
 {
 // Internally this is an array of indices that makes a linked list
@@ -1269,18 +1269,18 @@ public:
   using  VerIdx   = CncrStr::VerIdx;
   using  BlkLst   = CncrStr::BlkLst;
 
-  struct VerIpd { u32 version, ipd; };                   // ipd is Ideal Position Distance
+  struct VerIpd { u32 version, ipd; };                       // ipd is Ideal Position Distance
 
-  static const i8   RM_OWNER         =    -1;            // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
-  static const u8   LAST_READER      =     0;            // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
-  static const u8   INIT_READERS     =     0;            // eventually make this 1 again? - to catch when readers has dropped to 0
-  static const u8   FREE_READY       =     0;
-  static const u8   MAX_READERS      =  0xFF;
-  static const u32  KEY_MAX          =  0xFFFFFFFF; 
-  static const u32  EMPTY_KEY        =  KEY_MAX;          // first 21 bits set 
-  static const u32  DELETED_KEY      =  KEY_MAX - 1;      // 0xFFFFFFFE;       // 1 less than the EMPTY_KEY
-  static const u32  EMPTY_HASH_IDX   =  0xFFFFFFFF;       // 32 bits set - hash indices are different from block indices 
-  static const u32  LIST_END         =  CncrStr::LIST_END;
+  static const i8   RM_OWNER         =     -1;               // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
+  static const u8   LAST_READER      =      0;               // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
+  static const u8   INIT_READERS     =      0;               // eventually make this 1 again? - to catch when readers has dropped to 0
+  static const u8   FREE_READY       =      0;
+  static const u8   MAX_READERS      =   0xFF;
+  static const u32  KEY_MAX          =   0xFFFFFFFF; 
+  static const u32  EMPTY_KEY        =   KEY_MAX;            // first 21 bits set 
+  static const u32  DELETED_KEY      =   KEY_MAX - 1;        // 0xFFFFFFFE;       // 1 less than the EMPTY_KEY
+  static const u32  EMPTY_HASH_IDX   =   0xFFFFFFFF;         // 32 bits set - hash indices are different from block indices 
+  static const u32  LIST_END         =   CncrStr::LIST_END;
 
   //static const u32  EMPTY_KEY        =  0x0000001FFFFF;   // first 21 bits set 
   //static const u32  DELETED_KEY      =  0x0000001FFFFE;   // 1 less than the EMPTY_KEY
@@ -1369,10 +1369,11 @@ private:
   {
     using namespace std;
     
-    u64 cur = atomic_load<u64>( (au64*)(&(m_kvs.data()[i].asInt)) );              // Load the key that was there.
+    au64* avi = (au64*)(m_kvs.data()+i);                            // avi is atomic versioned index
+    u64   cur = avi->load();                                        // atomic_load<u64>( (au64*)(m_kvs.data()+i) );              // Load the key that was there.
 
     VerIdx ret;
-    if(i%2==0) ret.asInt = swp32(cur);
+    if(i%2==1) ret.asInt = swp32(cur);
     else       ret.asInt = cur;
 
     return ret;
@@ -1381,23 +1382,25 @@ private:
     //keyval.asInt
     //return keyval;   
   }
-  VerIdx       store_vi(u32 i, VerIdx  keyval) const
-  {
-    using namespace std;
-    
-    //atomic_store<u64>( (Au64*)&m_kvs[i].asInt, _kv.asInt );
-    
-    u64 asInt = keyval.asInt;
-    if(i%2==0) asInt = swp32(asInt);            // the even numbers need to be swapped so that their indices are in the lower address / higher bytes - the indices need to be on the border of the 128 bit boundary so they can be swapped with an unaligned 64 bit atomic operation
+  //VerIdx       store_vi(u32 i, VerIdx  vi) const
+  //{
+  //  using namespace std;
+  //  
+  //  //atomic_store<u64>( (Au64*)&m_kvs[i].asInt, _kv.asInt );
+  //  
+  //  u64 asInt = vi.asInt;
+  //  bool  odd = i%2 == 1;
+  //  if(odd) asInt = swp32(asInt);            // the even numbers need to be swapped so that their indices are in the lower address / higher bytes - the indices need to be on the border of the 128 bit boundary so they can be swapped with an unaligned 64 bit atomic operation
 
-    u64 prev = atomic_exchange<u64>( (Au64*)(&(m_kvs[i].asInt)), asInt);
+  //  au64* avi = (au64*)(m_kvs.data()+i);                            // avi is atomic versioned index
+  //  u64  prev = avi->exchange(asInt);          //atomic_exchange<u64>( (au64*)(&(m_kvs[i].asInt)), asInt);
 
-    VerIdx ret;
-    if(i%2==0) ret.asInt = swp32(prev);
-    else       ret.asInt = prev;
+  //  VerIdx ret;
+  //  if(odd) ret.asInt = swp32(prev);
+  //  else    ret.asInt = prev;
 
-    return ret;
-  }
+  //  return ret;
+  //}
   VerIdx       store_vi(u32 i, u64 vi) const
   {
     using namespace std;
@@ -1421,7 +1424,7 @@ private:
   }
   void           doFree(u32 i)                 const
   {
-    store_vi(i, empty_kv());
+    store_vi(i, empty_kv().asInt);
   }
   VerIpd            ipd(u32 i, VerIdx vi)      const  // ipd is Ideal Position Distance - it is the distance a CncrHsh index value is from the position that it gets hashed to 
   {
@@ -1476,13 +1479,27 @@ private:
   {
     VerIdx curVi, nxtVi; VerIpd nxtVp; u32 nxtI;
 
-    clean_loop: while( (nxtVi=load_vi(nxtI=nxtIdx(i))).idx != DELETED_KEY )           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
+    clean_loop: while( (nxtVi=load_vi(nxtI=nxtIdx(i))).idx <= DELETED_KEY )           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
     {
       curVi = load_vi(i);
       //if(curVi.idx >= DELETED_KEY){ return false; }
       if(curVi.idx == EMPTY_KEY){ return false; }
 
-      //nxtVp = ipd(nxtIdx(i), nxtVi);
+      ////nxtVp = ipd(nxtIdx(i), nxtVi);
+      //nxtVp = ipd(nxtI, nxtVi);
+      //if(nxtVp.version!=nxtVi.version){ continue; /*goto clean_loop;*/ }             // the versions don't match, so start over on the same index and skip the compare exchange 
+      //else if(nxtVp.ipd==0){ return true; }                                          // should this be converted to an empty slot since it is the end of a span? // next slot's versions match and its VerIdx is in its ideal position, so we are done 
+      //else if( cmpex_vi(i, &curVi, nxtVi) ){ 
+      //  delDupe(i);
+      //  i = nxtIdx(i);
+      //}
+
+      //if(nxtVi.idx==EMPTY_KEY){ 
+      //  if(delDupe(i)){ return true; }
+      //  
+      //  i = nxtIdx(i); continue;
+      //}
+
       nxtVp = ipd(nxtI, nxtVi);
       if(nxtVp.version!=nxtVi.version){ continue; /*goto clean_loop;*/ }             // the versions don't match, so start over on the same index and skip the compare exchange 
       else if(nxtVp.ipd==0){ return true; }                                          // should this be converted to an empty slot since it is the end of a span? // next slot's versions match and its VerIdx is in its ideal position, so we are done 
@@ -1490,13 +1507,16 @@ private:
         delDupe(i);
         i = nxtIdx(i);
       }
+
     }
 
     if(nxtVi.idx == DELETED_KEY){                                                    // if the next index is deleted, try to clean the next index, then come back and try to delete this one again
       if(depth<1){ cleanDeletion(nxtIdx(i), depth+1); }                              // could this recurse to the depth of the number of blocks?
       //i = nxtIdx(i);                                                               // this could mean the current slot has a deleted key and isn't cleanup by this function
       goto clean_loop;
-    }// else if(nxtVi.idx==EMPTY_KEY){    }
+    }else if(nxtVi.idx==EMPTY_KEY){
+      delDupe(i);    
+    }
 
     return true;
   }
@@ -1652,17 +1672,19 @@ public:
   bool          init(u32   sz, CncrStr* cs)
   {
     using namespace std;
+    static const u64 iempty  =  empty_kv().asInt;
     
     m_csp   =  cs;
     m_sz    =  sz;
     new (&m_kvs) lava_vec<VerIdx>(m_sz);                   // placement new because the copy constructor and assignment operator are deleted.  msvc doesn't care, but clang does
-    u64 ver0, ver1;
-    ver0         =  empty_kv().asInt;
-    ver1         =  swp32(empty_kv().asInt);
+    //u64 ver0, ver1;
+    //ver0         =  empty_kv().asInt;
+    //ver1         =  swp32(empty_kv().asInt);
     //ver1.version  =  1;
 
-    for(u32 i=0; i<sz; i+=2) store_vi(i, ver0);            // evens 
-    for(u32 i=1; i<sz; i+=2) store_vi(i, ver1);
+
+    for(u32 i=0; i<sz; i+=2) store_vi(i, iempty);            // evens 
+    for(u32 i=1; i<sz; i+=2) store_vi(i, iempty);            // odds
     
     return true;
   }

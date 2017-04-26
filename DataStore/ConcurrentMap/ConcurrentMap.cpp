@@ -551,8 +551,7 @@ int main()
   //Println("put: ", db.put( wat.data(),   (u32)wat.length(),    skidoosh.data(), (u32)skidoosh.length()) );
   if( db.isOwner() ){
     Println("put: ", db.put(wat, skidoosh.data()) );
-
-    //db.del("wat");
+    db.del("wat");
     //Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
     //db.del("wut");
     //Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
