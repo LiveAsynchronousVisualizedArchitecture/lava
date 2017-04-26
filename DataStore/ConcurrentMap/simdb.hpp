@@ -83,8 +83,8 @@
 // -todo: make sure that 128 bit atomics are actually being called - breakpoint is hit when setting inside the function
 // -todo: refine putHashed to have proper names
 // -todo: change CncrStr::free() to take a VerIdx instead of separate variables? - might as well not 
+// -todo: fix infinite loop when deleting "wat" for the second time - alloc was not setting the first BlkLst index correctly
 
-// todo: fix infinite loop when deleting "wat" for the second time
 // todo: re-evaluate CncrHsh main loops' back tracking on compare exchange failure 
 // todo: print or visualize CncrHsh 
 // todo: flatten putHashed into having the block comparison embedded 
@@ -997,7 +997,8 @@ public:
     m_szBytes( *((u64*)addr) )
   {
     if(owner){
-      s_version->store(1);                            // start at 1, use 0 as a special value
+      for(u32 i=0; i<m_blockCount; ++i){ s_bls[i] = BlkLst(); }
+      s_version->store(1);                            // todo: redo this, with 32 bit integers, 0 shouldn't be a special value because it could loop around start at 1, use 0 as a special value - 
     }
     assert(blockSize > sizeof(i32));
   }
@@ -1019,8 +1020,9 @@ public:
 
     u32  ver  =  (u32)s_version->fetch_add(1);
     u32  cur  =  st;
-    u32  nxt  =   0;
-    u32  cnt  =   0;
+    u32  nxt  =  s_cl.nxt();
+    //s_bls[st] =  BlkLst(true, 0, nxt, ver, size, klen, hash);
+    u32  cnt  =  0;
     SECTION(loop for the number of blocks needed and get new block and link it to the list)
     {
       for(u32 i=0; i<blocks-1; ++i)
@@ -1041,10 +1043,10 @@ public:
       //u32 blockRemainder = byteRem? -byteRem : -blockFreeSize();
       //BlkLst  bl =  make_BlkLst(cur==st, 0, blockRemainder, ver, size, klen);
 
-      u32 blockRemainder = byteRem? byteRem : blockFreeSize();
-      BlkLst bl(cur==st, 0, blockRemainder, ver, size, klen, hash);
-      s_bls[cur] = bl;
-      s_bls[st].kr.isKey = true;
+      //u32 blockRemainder = byteRem? byteRem : blockFreeSize();
+      //BlkLst bl(cur==st, 0, blockRemainder, ver, size, klen, hash);
+      //s_bls[cur] = bl;
+      //s_bls[st].kr.isKey = true;
 
       //if(out_blocks){ *out_blocks = nxt==LIST_END? -((i32)cnt) : (i32)cnt; }     
       if(out_blocks){
@@ -1798,10 +1800,10 @@ public:
   }
   bool           del(const void *const key, u32 klen)
   {
-    CncrStr* csp = m_csp;
-    auto    hash = CncrHsh::HashBytes(key, klen);
-    VerIdx    vi = delHashed(key, klen, hash);
-    bool  doFree = vi.idx<DELETED_KEY;
+    CncrStr*  csp = m_csp;
+    auto     hash = CncrHsh::HashBytes(key, klen);
+    VerIdx     vi = delHashed(key, klen, hash);
+    bool   doFree = vi.idx<DELETED_KEY;
     if(doFree){ m_csp->free(vi.idx, vi.version); }
 
     return doFree;
