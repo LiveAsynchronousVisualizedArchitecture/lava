@@ -80,14 +80,15 @@
 // -todo: fix infinite loop on put
 // -todo: fix infinite loop on delete
 // -todo: make a swapped VerIdx type? - no because it won't do any good due to the VerIdx struct being used moslty to store the info on the stack and store it in memory 
+// -todo: make sure that 128 bit atomics are actually being called - breakpoint is hit when setting inside the function
+// -todo: refine putHashed to have proper names
+// -todo: change CncrStr::free() to take a VerIdx instead of separate variables? - might as well not 
 
 // todo: fix infinite loop when deleting "wat" for the second time
-// todo: refine putHashed to have proper names
 // todo: re-evaluate CncrHsh main loops' back tracking on compare exchange failure 
 // todo: print or visualize CncrHsh 
 // todo: flatten putHashed into having the block comparison embedded 
 // todo: change CncrHsh init to set ints directly instead of using store_vi
-// todo: make sure that 128 bit atomics are actually being called
 // todo: redo the BlkLst struct with calibrated bitfield size and without sub structures
 // todo: find and remnants of KeyVal or kv and change them to VerIdx or vi
 // todo: make put give back FAILED_PUT on error - isn't EMPTY_KEY enough?
@@ -403,8 +404,6 @@ namespace {
     lava_vec(void*  addr, u64 count, bool owner=true) :
       p(addr)
     {
-      //u64 sb = lava_vec::sizeBytes(count);
-      //p       = addr;
       if(owner){
         set_sizeBytes( lava_vec::sizeBytes(count) );
         set_size(count);
@@ -491,10 +490,6 @@ namespace {
      _ExchangeHigh,
      _ExchangeLow,
      _CompareAndResult) == 1;
-
-    //return _InterlockedCompareExchange128( (i64*)(idxAddr), 
-    //    swpvi.hi, swpvi.lo,
-    //    (i64*)(&dblvi) )==1;
   }
 
   inline void prefetch1(char const* const p)
@@ -741,10 +736,8 @@ public:
 
   auto        nxt() -> uint32_t           // moves forward in the list and return the previous index
   {
-    Head /*prevHead,*/ curHead, nxtHead;
-
-    //Head curHead;
-    //Head nxtHead;
+    /*prevHead,*/
+    Head  curHead, nxtHead;
 
     curHead.asInt  =  m_h->load();        // std::atomic_load(m_h);  // m_h.load();
     do 
@@ -844,11 +837,11 @@ public:
       }
     } 
   };
-  struct  BlkCnt { u32 end : 1; u32 cnt : 31; };
+  struct  BlkCnt { u32 end : 1; u32 cnt : 31; };                                       // this is returned from alloc() and may not be neccesary - it is the number of blocks allocated and if the end was reached
 
   //using IDX         =  i32;
   using ai32        =  std::atomic<i32>;
-  using BlockLists  =  lava_vec<BlkLst>;   // only the indices returned from the concurrent list are altered, and only one thread will deal with any single index at a time 
+  using BlockLists  =  lava_vec<BlkLst>;                                               // only the indices returned from the concurrent list are altered, and only one thread will deal with any single index at a time 
 
   const static u32 LIST_END = CncrLst::LIST_END;
 
@@ -1224,7 +1217,7 @@ public:
     if(s_bls[blkIdx].hash!=hash) return MATCH_FALSE;  // vast majority of calls should end here
 
     u32   curidx  =  blkIdx;
-    auto     nxt  =  nxtBlock(curidx);                            if(nxt.version!=version) return MATCH_FALSE;
+    VerIdx   nxt  =  nxtBlock(curidx);                            if(nxt.version!=version) return MATCH_FALSE;
     u32    blksz  =  (u32)blockFreeSize();  // todo: change this to u32
     u8*   curbuf  =  (u8*)buf;
     auto    klen  =  s_bls[blkIdx].klen;                          if(klen!=len) return MATCH_FALSE;
@@ -1807,9 +1800,9 @@ public:
   {
     CncrStr* csp = m_csp;
     auto    hash = CncrHsh::HashBytes(key, klen);
-    VerIdx    kv = delHashed(key, klen, hash);
-    bool  doFree = kv.idx<DELETED_KEY;
-    if(doFree){ m_csp->free(kv.idx, kv.version); }
+    VerIdx    vi = delHashed(key, klen, hash);
+    bool  doFree = vi.idx<DELETED_KEY;
+    if(doFree){ m_csp->free(vi.idx, vi.version); }
 
     return doFree;
   }
@@ -2293,7 +2286,12 @@ public:
 
 
 
+//u64 sb = lava_vec::sizeBytes(count);
+//p       = addr;
 
+//return _InterlockedCompareExchange128( (i64*)(idxAddr), 
+//    swpvi.hi, swpvi.lo,
+//    (i64*)(&dblvi) )==1;
 
 //u64 pnum = 
 // (u64*)( ((u64)p) & 0x0000FFFFFFFFFFFF);

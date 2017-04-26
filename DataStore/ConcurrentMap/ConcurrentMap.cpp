@@ -549,8 +549,9 @@ int main()
   str    kablam  =    "kablam";
 
   //Println("put: ", db.put( wat.data(),   (u32)wat.length(),    skidoosh.data(), (u32)skidoosh.length()) );
+  //Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
   if( db.isOwner() ){
-    Println("put: ", db.put(wat, skidoosh.data()) );
+    Println("put: ", db.put(wat, skidoosh) );
     db.del("wat");
     //Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
     //db.del("wut");
@@ -558,7 +559,7 @@ int main()
     //db.del("kablam");
     //printdb(db);
 
-    Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
+    Println("put: ", db.put(wat, skidoosh) );
     Println("del wat: ", db.del("wat") );
     //Println();
   }
@@ -655,7 +656,7 @@ int main()
   ////TO(lv.size(), i) cout << lv[i] << " ";
   ////lv.~lava_vec();  // running the destructor explicitly tests double destrucion since it will be destructed at the end of the function also
 
-  //Println("\n");
+  Println("\n\n DONE \n\n");
   PAUSE
 
   return 0;
