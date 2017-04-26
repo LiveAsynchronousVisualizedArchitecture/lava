@@ -84,8 +84,10 @@
 // -todo: refine putHashed to have proper names
 // -todo: change CncrStr::free() to take a VerIdx instead of separate variables? - might as well not 
 // -todo: fix infinite loop when deleting "wat" for the second time - alloc was not setting the first BlkLst index correctly
+// -todo: re-evaluate CncrHsh main loops' back tracking on compare exchange failure - just use prevIdx(i) - could use a goto to the top of the loop to avoid running prevIdx and then nxtIdx
 
-// todo: re-evaluate CncrHsh main loops' back tracking on compare exchange failure 
+// todo: rename m_kvs to m_vis
+// todo: make cmpex_vi swap hi and lo on odd indices
 // todo: print or visualize CncrHsh 
 // todo: flatten putHashed into having the block comparison embedded 
 // todo: change CncrHsh init to set ints directly instead of using store_vi
@@ -1401,7 +1403,10 @@ private:
   bool         cmpex_vi(u32 i, VerIdx* expected, VerIdx desired) const
   {
     using namespace std;
-    return atomic_compare_exchange_strong( (au64*)&(m_kvs.data()[i].asInt), (u64*)expected, desired.asInt);                      // The entry was free. Now let's try to take it using a CAS. 
+
+    u64    desi = i%2? swp32(desired.asInt) : desired.asInt;                                // desi is desired int
+    au64*  addr = (au64*)(m_kvs.data()+i);
+    return atomic_compare_exchange_strong(addr, (u64*)expected, desi);                      // The entry was free. Now let's try to take it using a CAS. 
   }
   void           doFree(u32 i)                 const
   {
@@ -1569,18 +1574,18 @@ public:
     {
       //i %= m_sz;
       VerIdx vi = load_vi(i);
-      if(vi.idx>=DELETED_KEY)                                                         // it is either deleted or empty
+      if(vi.idx>=DELETED_KEY)                                                               // it is either deleted or empty
       {          
-        VerIdx expected  =  vi.idx==EMPTY_KEY?  empty  :  deleted;
-        bool    success  =  cmpex_vi(i, &expected, desired);
-        if(success) return expected;  // continue;                                          // WRONG!? // Another thread just stole it from underneath us.
-        else{ i==0? (m_sz-1)  : (i-1); continue; }  // retry the same loop again
+        //VerIdx expected  =  vi; // vi.idx==EMPTY_KEY?  empty  :  deleted;
+        bool    success  =  cmpex_vi(i, m_kvs.data()+i, desired);
+        if(success) return vi; //expected;  // continue;                                          // WRONG!? // Another thread just stole it from underneath us.
+        else{ i=prevIdx(i); /*i==0? (m_sz-1)  : (i-1);*/ continue; }  // retry the same loop again
       }                                                                                     // Either we just added the key, or another thread did.
       
       if( checkMatch(vi.version, vi.idx, match)!=MATCH_TRUE ) continue;
-      bool success = cmpex_vi(i, &vi, desired);
+      bool success = cmpex_vi(i, m_kvs.data()+i, desired);
       if(success) return vi;
-      else{ i==0? (m_sz-1)  : (i-1); continue; }                                            // todo: this doesn't do anything because it doesn't assign to i !! - come back and look this over
+      else{ i=prevIdx(i);  /*i==0? (m_sz-1)  : (i-1);*/ continue; }                                            // todo: this doesn't do anything because it doesn't assign to i !! - come back and look this over
 
       if(i==en) break;
     }
