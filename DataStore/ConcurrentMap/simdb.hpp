@@ -1243,9 +1243,9 @@ public:
   {
     return (void*)s_blksAddr;
   }
-  u64    blockCount()      const
+  u32    blockCount()      const
   {
-    return 0; // m_cl.sizeBytes();
+    return m_blockCount; // m_cl.sizeBytes();
   }
   auto       blkLst(u32 i) const -> BlkLst
   {
@@ -1339,8 +1339,8 @@ public:
   static u64               swp32(u64 n){ return (((u64)lo32(n))<<32)  |  ((u64)hi32(n)); }
   static u64             incHi32(u64 n, u32 i){ return ((u64)hi32(n)+i)<<32 | lo32(n); }
   static u64             incLo32(u64 n, u32 i){ return ((u64)hi32(n))<<32 | (lo32(n)+i); }
-  static u64          shftToHi64(u32 n){ return 32<<(u64)n; }
-  static u64              make64(u32 hi, u32 lo){ return (32<<((u64)hi)) | lo; }
+  static u64          shftToHi64(u32 n){ return ((u64)n)<<32; }
+  static u64              make64(u32 hi, u32 lo){ return (((u64)hi)<<32) | ((u64)lo); }
   //static u64               swp32(u64 n){ 
   //  return (((u64)hi32(n))<<32) & (u64)lo32(n);
   //  }
@@ -1404,11 +1404,12 @@ private:
   {
     store_vi(i, empty_kv());
   }
-  VerIpd            ipd(VerIdx vi)             const  // ipd is Ideal Position Distance - it is the distance a CncrHsh index value is from the position that it gets hashed to 
+  VerIpd            ipd(u32 i, VerIdx vi)      const  // ipd is Ideal Position Distance - it is the distance a CncrHsh index value is from the position that it gets hashed to 
   {
     BlkLst bl = m_csp->blkLst(vi.idx);
     u32    ip = bl.hash % m_sz;     // ip is Ideal Position
-    u32   ipd = vi.idx>ip?  vi.idx-ip  :  KEY_MAX-ip + vi.idx;  // todo: change vi.idx to u32 so that there aren't sign mismatch warnings
+    //u32   ipd = vi.idx>ip?  vi.idx-ip  :  m_csp->blockCount() - ip + vi.idx;  // todo: change vi.idx to u32 so that there aren't sign mismatch warnings
+    u32   ipd = i>ip?  i-ip  :  m_csp->blockCount() - ip + i;  // todo: change vi.idx to u32 so that there aren't sign mismatch warnings
     return {bl.kr.version, ipd};
   }
   bool          delDupe(u32 i)                 const                                 // delete duplicate indices - l is left index, r is right index - will do something different depending on if the two slots are within 128 bit alignment or not
@@ -1454,15 +1455,16 @@ private:
   }
   bool    cleanDeletion(u32 i, u8 depth=0)     const
   {
-    VerIdx curVi, nxtVi; VerIpd nxtVp;
+    VerIdx curVi, nxtVi; VerIpd nxtVp; u32 nxtI;
 
-    clean_loop: while( (nxtVi=load_vi(nxtIdx(i))).idx < DELETED_KEY )                 // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
+    clean_loop: while( (nxtVi=load_vi(nxtI=nxtIdx(i))).idx < DELETED_KEY )                 // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
     {
       curVi = load_vi(i);
       //if(curVi.idx >= DELETED_KEY){ return false; }
       if(curVi.idx == EMPTY_KEY){ return false; }
 
-      nxtVp = ipd(nxtVi);
+      //nxtVp = ipd(nxtIdx(i), nxtVi);
+      nxtVp = ipd(nxtI, nxtVi);
       if(nxtVp.version!=nxtVi.version){ continue; /*goto clean_loop;*/ }             // the versions don't match, so start over on the same index and skip the compare exchange 
       else if(nxtVp.ipd==0){ return true; }                                          // should this be converted to an empty slot since it is the end of a span? // next slot's versions match and its VerIdx is in its ideal position, so we are done 
       else if( cmpex_vi(i, &curVi, nxtVi) ){ 
@@ -1472,7 +1474,7 @@ private:
     }
 
     if(nxtVi.idx==DELETED_KEY){                                                      // if the next index is deleted, try to clean the next index, then come back and try to delete this one again
-      if(depth<1){ cleanDeletion(nxtIdx(i), depth+1); }                             // could this recurse to the depth of the number of blocks?
+      if(depth<1){ cleanDeletion(nxtIdx(i), depth+1); }                              // could this recurse to the depth of the number of blocks?
       //i = nxtIdx(i);                                                               // this could mean the current slot has a deleted key and isn't cleanup by this function
       goto clean_loop;
     }else if(nxtVi.idx==EMPTY_KEY){
@@ -1516,9 +1518,10 @@ public:
     m_csp(cs)
   {
     if(owner){
-      VerIdx defKv = empty_kv();
-      for(u64 i=0; i<m_kvs.size(); ++i)
-        m_kvs[i] = defKv;
+      init(size, cs);
+      //VerIdx defKv = empty_kv();
+      //for(u64 i=0; i<m_kvs.size(); ++i)
+      //  m_kvs[i] = defKv;
     }
   }
   CncrHsh(CncrHsh const& lval) = delete;
