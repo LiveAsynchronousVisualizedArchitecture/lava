@@ -557,9 +557,10 @@ int main()
     //Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
     //db.del("kablam");
     //printdb(db);
-    //Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
-    //db.del("wat");
-    Println();
+
+    Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
+    Println("del wat: ", db.del("wat") );
+    //Println();
   }
   //else{
   //  Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );

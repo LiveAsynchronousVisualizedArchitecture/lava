@@ -77,13 +77,19 @@
 // -todo: look at making a memory access to the next block that can't be optimized away
 // -todo: prefetch memory for next block when looping through blocks - does this require a system call for shared memory and does it lock? it should just be the prefetch instruction or an unoptimized away load? use intrinsic?
 // -todo: change CncrStr::get() to check the version after reading and not before - is this not technically correct!!1! this checks that the next version is the same and then reads it, but shouldn't it read the block and then check if the version is still the same? - version is checked in readblock already
+// -todo: fix infinite loop on put
+// -todo: fix infinite loop on delete
+// -todo: make a swapped VerIdx type? - no because it won't do any good due to the VerIdx struct being used moslty to store the info on the stack and store it in memory 
 
+// todo: fix infinite loop when deleting "wat" for the second time
+// todo: refine putHashed to have proper names
+// todo: re-evaluate CncrHsh main loops' back tracking on compare exchange failure 
 // todo: print or visualize CncrHsh 
 // todo: flatten putHashed into having the block comparison embedded 
-// todo: make a swapped VerIdx type?
-// todo: fix infinite loop on put
-// todo: fix infinite loop on delete
+// todo: change CncrHsh init to set ints directly instead of using store_vi
 // todo: make sure that 128 bit atomics are actually being called
+// todo: redo the BlkLst struct with calibrated bitfield size and without sub structures
+// todo: find and remnants of KeyVal or kv and change them to VerIdx or vi
 // todo: make put give back FAILED_PUT on error - isn't EMPTY_KEY enough?
 // todo: make put return VerIdx ? - is having an out_version pointer enough?
 // todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
@@ -96,7 +102,12 @@
 // todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries?
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
+// todo: make sure readers is only used on the key block list
+// todo: make sure readers deletes the block list if it is the last reader after deletion
+// todo: search for any embedded todo comments
+// todo: clean out old commented lines
 // todo: compile with maximum warnings
+// todo: run existing tests
 
 // robin hood hashing
 // todo: do rm()/del() first and make deletion take care of holes in spans?
@@ -430,10 +441,8 @@ namespace {
 
     T*         data()
     {
-      //u64 pnum = 
-      u64* maskptr = (u64*)clearBits(p); // (u64*)( ((u64)p) & 0x0000FFFFFFFFFFFF);
+      u64* maskptr = (u64*)clearBits(p); 
       return (T*)(maskptr+2);
-      //return (void*)((u64*)p+2);
     }
     u64   capacity() const
     {
@@ -1376,31 +1385,8 @@ private:
     if(i%2==1) ret.asInt = swp32(cur);
     else       ret.asInt = cur;
 
-    return ret;
-    
-    //VerIdx keyval;
-    //keyval.asInt
-    //return keyval;   
+    return ret;    
   }
-  //VerIdx       store_vi(u32 i, VerIdx  vi) const
-  //{
-  //  using namespace std;
-  //  
-  //  //atomic_store<u64>( (Au64*)&m_kvs[i].asInt, _kv.asInt );
-  //  
-  //  u64 asInt = vi.asInt;
-  //  bool  odd = i%2 == 1;
-  //  if(odd) asInt = swp32(asInt);            // the even numbers need to be swapped so that their indices are in the lower address / higher bytes - the indices need to be on the border of the 128 bit boundary so they can be swapped with an unaligned 64 bit atomic operation
-
-  //  au64* avi = (au64*)(m_kvs.data()+i);                            // avi is atomic versioned index
-  //  u64  prev = avi->exchange(asInt);          //atomic_exchange<u64>( (au64*)(&(m_kvs[i].asInt)), asInt);
-
-  //  VerIdx ret;
-  //  if(odd) ret.asInt = swp32(prev);
-  //  else    ret.asInt = prev;
-
-  //  return ret;
-  //}
   VerIdx       store_vi(u32 i, u64 vi) const
   {
     using namespace std;
@@ -1582,23 +1568,23 @@ public:
     VerIdx desired   =  empty;
     desired.idx      =  vi.idx;
     desired.version  =  vi.version;
-    u32           i  =  hash;
+    u32           i  =  hash % m_sz;
     u32          en  =  prevIdx(i);   //min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap?   // % m_sz;   //>0? hash-1  :  m_sz
-    for(;; ++i)
+    for(;; i=nxtIdx(i) ) //++i)
     {
-      i %= m_sz;
-      VerIdx probedKv = load_vi(i);
-      if(probedKv.idx>=DELETED_KEY)                                                         // it is either deleted or empty
+      //i %= m_sz;
+      VerIdx vi = load_vi(i);
+      if(vi.idx>=DELETED_KEY)                                                         // it is either deleted or empty
       {          
-        VerIdx expected  =  probedKv.idx==EMPTY_KEY?  empty  :  deleted;
+        VerIdx expected  =  vi.idx==EMPTY_KEY?  empty  :  deleted;
         bool    success  =  cmpex_vi(i, &expected, desired);
         if(success) return expected;  // continue;                                          // WRONG!? // Another thread just stole it from underneath us.
         else{ i==0? (m_sz-1)  : (i-1); continue; }  // retry the same loop again
       }                                                                                     // Either we just added the key, or another thread did.
       
-      if( checkMatch(probedKv.version, probedKv.idx, match)!=MATCH_TRUE ) continue;
-      bool success = cmpex_vi(i, &probedKv, desired);
-      if(success) return probedKv;
+      if( checkMatch(vi.version, vi.idx, match)!=MATCH_TRUE ) continue;
+      bool success = cmpex_vi(i, &vi, desired);
+      if(success) return vi;
       else{ i==0? (m_sz-1)  : (i-1); continue; }                                            // todo: this doesn't do anything because it doesn't assign to i !! - come back and look this over
 
       if(i==en) break;
@@ -2308,6 +2294,34 @@ public:
 
 
 
+
+//u64 pnum = 
+// (u64*)( ((u64)p) & 0x0000FFFFFFFFFFFF);
+//return (void*)((u64*)p+2);
+
+//VerIdx keyval;
+//keyval.asInt
+//return keyval;   
+//
+//VerIdx       store_vi(u32 i, VerIdx  vi) const
+//{
+//  using namespace std;
+//  
+//  //atomic_store<u64>( (Au64*)&m_kvs[i].asInt, _kv.asInt );
+//  
+//  u64 asInt = vi.asInt;
+//  bool  odd = i%2 == 1;
+//  if(odd) asInt = swp32(asInt);            // the even numbers need to be swapped so that their indices are in the lower address / higher bytes - the indices need to be on the border of the 128 bit boundary so they can be swapped with an unaligned 64 bit atomic operation
+//
+//  au64* avi = (au64*)(m_kvs.data()+i);                            // avi is atomic versioned index
+//  u64  prev = avi->exchange(asInt);          //atomic_exchange<u64>( (au64*)(&(m_kvs[i].asInt)), asInt);
+//
+//  VerIdx ret;
+//  if(odd) ret.asInt = swp32(prev);
+//  else    ret.asInt = prev;
+//
+//  return ret;
+//}
     
 //m_sz      =  nextPowerOf2(sz);
 //m_kvs     =  lava_vec<VerIdx>(m_sz);
