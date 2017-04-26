@@ -78,6 +78,10 @@
 // -todo: prefetch memory for next block when looping through blocks - does this require a system call for shared memory and does it lock? it should just be the prefetch instruction or an unoptimized away load? use intrinsic?
 // -todo: change CncrStr::get() to check the version after reading and not before - is this not technically correct!!1! this checks that the next version is the same and then reads it, but shouldn't it read the block and then check if the version is still the same? - version is checked in readblock already
 
+// todo: flatten putHashed into having the block comparison embedded 
+// todo: make a swapped VerIdx type?
+// todo: fix infinite loop on put
+// todo: fix infinite loop on delete
 // todo: make sure that 128 bit atomics are actually being called
 // todo: make put give back FAILED_PUT on error - isn't EMPTY_KEY enough?
 // todo: make put return VerIdx ? - is having an out_version pointer enough?
@@ -694,7 +698,7 @@ public:
     u64 asInt;
   };
   
-  using     u32  =  uint32_t;                            // need to be i32 instead for the ConcurrentStore indices?
+  using     u32  =  uint32_t;                               // need to be i32 instead for the ConcurrentStore indices?
   using     u64  =  uint64_t;
   using ListVec  =  lava_vec<u32>;
 
@@ -713,11 +717,11 @@ public:
   CncrLst(){}
   CncrLst(void* addr, u32 size, bool owner=true) :           // this constructor is for when the memory is owned an needs to be initialized
     m_lv(addr, size, owner)
-  {                                                                  // separate out initialization and let it be done explicitly in the simdb constructor?
+  {                                                          // separate out initialization and let it be done explicitly in the simdb constructor?
     m_h = (au64*)addr;
 
     if(owner){
-      for(uint32_t i=0; i<(size-1); ++i) m_lv[i]=i+1;
+      for(u32 i=0; i<(size-1); ++i) m_lv[i] = i+1;
       m_lv[size-1] = LIST_END;
 
       ((Head*)m_h)->idx = 0;
@@ -726,12 +730,14 @@ public:
                                           // uses the first 8 bytes that would normally store sizeBytes as the 64 bits of memory for the Head structure
   }
 
-  auto        nxt() -> uint32_t    // moves forward in the list and return the previous index
+  auto        nxt() -> uint32_t           // moves forward in the list and return the previous index
   {
-    Head curHead;
-    Head nxtHead;
+    Head /*prevHead,*/ curHead, nxtHead;
 
-    curHead.asInt  =  m_h->load(); // std::atomic_load(m_h);  // m_h.load();
+    //Head curHead;
+    //Head nxtHead;
+
+    curHead.asInt  =  m_h->load();        // std::atomic_load(m_h);  // m_h.load();
     do 
     {
       if(curHead.idx==LIST_END) return LIST_END;
@@ -791,8 +797,11 @@ class     CncrStr
 public:
   union   VerIdx
   {
-    struct { u32 idx; u32 version; };
+    struct { u32 version; u32 idx; }; // declaring the version first and idx second puts the 
     u64 asInt;
+
+    VerIdx(){}
+    VerIdx(u32 _idx, u32 _version) : idx(_idx), version(_version) {}
   };
   union   KeyAndReaders
   {
@@ -1040,7 +1049,7 @@ public:
         out_blocks->end = nxt==LIST_END;
         out_blocks->cnt = cnt;
       }     
-      VerIdx vi = { st, ver };
+      VerIdx vi(st, ver);
       return vi;
     }
   }
@@ -1334,20 +1343,14 @@ public:
     static VerIdx emptykv = empty_kv();
     return emptykv.asInt == kv.asInt;
   }
-  static u32                hi32(u64 n){ return (n>>32)<<32; }
+  static u32                hi32(u64 n){ return (n>>32); }
   static u32                lo32(u64 n){ return (n<<32)>>32; }
-  static u64               swp32(u64 n){ return (((u64)lo32(n))<<32)  |  ((u64)hi32(n)); }
+  static u64               swp32(u64 n){ 
+   return (((u64)lo32(n))<<32)  |  ((u64)hi32(n)); }
   static u64             incHi32(u64 n, u32 i){ return ((u64)hi32(n)+i)<<32 | lo32(n); }
   static u64             incLo32(u64 n, u32 i){ return ((u64)hi32(n))<<32 | (lo32(n)+i); }
   static u64          shftToHi64(u32 n){ return ((u64)n)<<32; }
   static u64              make64(u32 hi, u32 lo){ return (((u64)hi)<<32) | ((u64)lo); }
-  //static u64               swp32(u64 n){ 
-  //  return (((u64)hi32(n))<<32) & (u64)lo32(n);
-  //  }
-    //u64 nxtHi = (((u64)lo32(n))<<32);
-    //u64 nxtLo = ((u64)hi32(n));
-    //return nxtHi  |  nxtLo;
-
 
 private:
   using Au32     =  std::atomic<u32>;
@@ -1392,6 +1395,22 @@ private:
     VerIdx ret;
     if(i%2==0) ret.asInt = swp32(prev);
     else       ret.asInt = prev;
+
+    return ret;
+  }
+  VerIdx       store_vi(u32 i, u64 vi) const
+  {
+    using namespace std;
+        
+    //u64 asInt = keyval.asInt;
+    bool odd = i%2 == 1;
+    if(odd) vi = swp32(vi);            // the odd numbers need to be swapped so that their indices are on the outer border of 128 bit alignment - the indices need to be on the border of the 128 bit boundary so they can be swapped with an unaligned 64 bit atomic operation
+
+    u64 prev = atomic_exchange<u64>( (au64*)(&(m_kvs[i].asInt)), vi);
+
+    VerIdx ret;
+    if(odd) ret.asInt = swp32(prev);
+    else    ret.asInt = prev;
 
     return ret;
   }
@@ -1457,7 +1476,7 @@ private:
   {
     VerIdx curVi, nxtVi; VerIpd nxtVp; u32 nxtI;
 
-    clean_loop: while( (nxtVi=load_vi(nxtI=nxtIdx(i))).idx < DELETED_KEY )                 // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
+    clean_loop: while( (nxtVi=load_vi(nxtI=nxtIdx(i))).idx != DELETED_KEY )           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
     {
       curVi = load_vi(i);
       //if(curVi.idx >= DELETED_KEY){ return false; }
@@ -1473,13 +1492,11 @@ private:
       }
     }
 
-    if(nxtVi.idx==DELETED_KEY){                                                      // if the next index is deleted, try to clean the next index, then come back and try to delete this one again
+    if(nxtVi.idx == DELETED_KEY){                                                    // if the next index is deleted, try to clean the next index, then come back and try to delete this one again
       if(depth<1){ cleanDeletion(nxtIdx(i), depth+1); }                              // could this recurse to the depth of the number of blocks?
       //i = nxtIdx(i);                                                               // this could mean the current slot has a deleted key and isn't cleanup by this function
       goto clean_loop;
-    }else if(nxtVi.idx==EMPTY_KEY){
-      
-    }
+    }// else if(nxtVi.idx==EMPTY_KEY){    }
 
     return true;
   }
@@ -1636,22 +1653,18 @@ public:
   {
     using namespace std;
     
-    m_csp     =  cs;
-    m_sz      =  sz;
-    new (&m_kvs) lava_vec<VerIdx>(m_sz); // placement new because the copy constructor and assignment operator are deleted.  msvc doesn't care, but clang does
-    VerIdx ver0  =  empty_kv();
-    VerIdx ver1  =  empty_kv();
-    ver1.version =  1;
+    m_csp   =  cs;
+    m_sz    =  sz;
+    new (&m_kvs) lava_vec<VerIdx>(m_sz);                   // placement new because the copy constructor and assignment operator are deleted.  msvc doesn't care, but clang does
+    u64 ver0, ver1;
+    ver0         =  empty_kv().asInt;
+    ver1         =  swp32(empty_kv().asInt);
+    //ver1.version  =  1;
 
-    for(u32 i=0; i<sz; i+=2) store_vi(i, ver0);        // evens 
+    for(u32 i=0; i<sz; i+=2) store_vi(i, ver0);            // evens 
     for(u32 i=1; i<sz; i+=2) store_vi(i, ver1);
     
     return true;
-    
-    //m_sz      =  nextPowerOf2(sz);
-    //m_kvs     =  lava_vec<VerIdx>(m_sz);
-    // 
-    //for(u64 i=0; i<m_kvs.size(); ++i) m_kvs[i] = defKv;
   }
   VerIdx          at(u32  idx)                  const
   {
@@ -1766,7 +1779,7 @@ public:
     
     //i32  blkcnt = 0;    
     //BlkCnt blkcnt;
-    auto vi = m_csp->alloc(klen+vlen, klen, hash); // &blkcnt);                       
+    VerIdx vi = m_csp->alloc(klen+vlen, klen, hash); // &blkcnt);                       
     if(vi.idx==LIST_END) return EMPTY_KEY;
 
     m_csp->put(vi.idx, key, klen, val, vlen);
@@ -2273,6 +2286,18 @@ public:
 
 
 
+    
+//m_sz      =  nextPowerOf2(sz);
+//m_kvs     =  lava_vec<VerIdx>(m_sz);
+// 
+//for(u64 i=0; i<m_kvs.size(); ++i) m_kvs[i] = defKv;
+
+//static u64               swp32(u64 n){ 
+//  return (((u64)hi32(n))<<32) & (u64)lo32(n);
+//  }
+//u64 nxtHi = (((u64)lo32(n))<<32);
+//u64 nxtLo = ((u64)hi32(n));
+//return nxtHi  |  nxtLo;
 
 //if(out_version) *out_version = nxt.version;
 //if(ok) 

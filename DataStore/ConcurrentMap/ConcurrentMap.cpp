@@ -515,7 +515,7 @@ int main()
 
   //Println("simdb stack sz: ", sizeof(simdb) );
 
-  simdb db("test", 16, 16);
+  simdb db("test", 32, 8);
 
   str numkey[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"};
   str  label[] = {"zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven"};
@@ -548,9 +548,11 @@ int main()
   str  skidoosh  =  "skidoosh";
   str    kablam  =    "kablam";
 
+  //Println("put: ", db.put( wat.data(),   (u32)wat.length(),    skidoosh.data(), (u32)skidoosh.length()) );
   if( db.isOwner() ){
-    Println("put: ", db.put( wat.data(),   (u32)wat.length(),    skidoosh.data(), (u32)skidoosh.length()) );
-    db.del("wat");
+    Println("put: ", db.put(wat, skidoosh.data()) );
+
+    //db.del("wat");
     //Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
     //db.del("wut");
     //Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
