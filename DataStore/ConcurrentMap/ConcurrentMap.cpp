@@ -598,10 +598,12 @@ int main()
 
   printhsh(db); // Println();
 
+  Println("BlkLst size: ", sizeof(CncrHsh::BlkLst) );
+
   u32 vlen=0,ver=0;
   i64  len = db.len( wat.data(), (u32)wat.length(), &vlen, &ver);
-  str   val(vlen, '\0');
-  bool   ok = db.get( wat.data(), (u32)wat.length(), (void*)val.data(), (u32)val.length() );
+  str val(vlen, '\0');
+  bool  ok = db.get( wat.data(), (u32)wat.length(), (void*)val.data(), (u32)val.length() );
   Println("ok: ", ok, " value: ", val, "  wat total len: ", len, " wat val len: ", vlen, "\n");
 
   str v; 

@@ -97,8 +97,9 @@
 // -todo: make BlkLst hash 64 bits instead of 32? - leave this until there is a reason to change it 
 // -todo: make put return a bool and output the index in a separate out variable? -  make put give back FAILED_PUT on error - isn't EMPTY_KEY enough? - no, because the put might fail due to no blocks left
 // -todo: make put return VerIdx ? - is having an out_version pointer enough? - revisit this if it becomes an issue
+// -todo: redo the BlkLst struct with calibrated bitfield size and without sub structures
 
-// todo: redo the BlkLst struct with calibrated bitfield size and without sub structures
+// todo: debug new BlkLst struct with get() / len() no longer working - put() seems to work, len() seems to not work
 // todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
 // todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
 // todo: flatten runIfMatch function to only take a function template argument but not a match function template argument
@@ -822,23 +823,29 @@ public:
     struct{ u32 isKey : 1; i32 readers : 31; u32 version; };
     u64 asInt;
   };
-  union   BlkLst
+  struct  BlkLst
   {
-    struct { KeyAndReaders kr; u32 idx; u32 len, klen, hash; };
+    //struct { KeyAndReaders kr; u32 idx; u32 len, klen, hash; };
+    u32 isKey : 1; i32 readers : 31;            //  4 bytes 
+    u32 idx, version, len, klen, hash;          // 20 bytes
+    // 24 bytes total
 
-    BlkLst() : idx(0), len(0), klen(0), hash(0)
+    BlkLst() : isKey(0), readers(0), idx(0), version(0), len(0), klen(0), hash(0)
     { 
-      kr.isKey    = 0;
-      kr.readers  = 0;
-      kr.version  = 0;
+      //kr.isKey    = 0;
+      //kr.readers  = 0;
+      //kr.version  = 0;
     }
-    BlkLst(bool isKey, i32 readers, u32 _idx, u32 ver, u32 _len, u32 _klen, u32 _hash=0) : 
+    BlkLst(bool _isKey, i32 _readers, u32 _idx, u32 _version, u32 _len=0, u32 _klen=0, u32 _hash=0) : 
+      isKey(_isKey),
+      readers(_readers),
       idx(_idx),
+      version(_version),
       hash(_hash)
     {
-      kr.isKey    = isKey;
-      kr.readers  = readers;
-      kr.version  = ver;
+      //kr.isKey    = isKey;
+      //kr.readers  = readers;
+      //kr.version  = ver;
 
       if(isKey){
         len  = _len;
@@ -874,9 +881,10 @@ public:
   {
 
     KeyAndReaders cur, nxt;
-    BlkLst* bl      = &s_bls[blkIdx];
-    au64* areaders = (au64*)&(bl->kr.asInt);    
-    cur.asInt       = areaders->load();
+    BlkLst*     bl  =  &s_bls[blkIdx];
+    //au64* areaders  =  (au64*)&(bl->kr.asInt);    
+    au64* areaders  =  (au64*)&(bl);  // todo: desperatly need to check and redo this - if readers is signed, 31 bits, and part of a bit set with a flag, the flag needs to be kept while the 31 bit signed int is incremented
+    cur.asInt       =  areaders->load();
     do{
       if(cur.version!=version || cur.readers<0) return BlkLst(); // make_BlkLst(0,0,0,0,0,0);
       nxt = cur;
@@ -888,8 +896,9 @@ public:
   bool      decReaders(u32 blkIdx, u32 version) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
     KeyAndReaders cur, nxt;
-    au64* areaders = (au64*)&(s_bls[blkIdx].kr.asInt);    
-    cur.asInt = areaders->load();
+    //au64* areaders = (au64*)&(s_bls[blkIdx].kr.asInt);
+    au64* areaders = (au64*)&(s_bls[blkIdx]);
+    cur.asInt      = areaders->load();
     do{
       if(cur.version!=version) return false;
       nxt = cur;
@@ -919,7 +928,8 @@ private:
     BlkLst bl  = s_bls[blkIdx];
     VerIdx vi;
     vi.idx     = bl.idx;
-    vi.version = bl.kr.version;
+    //vi.version = bl.kr.version;
+    vi.version = bl.version;
 
     prefetch1( (char const* const)blockFreePtr(bl.idx) );
 
@@ -947,8 +957,10 @@ private:
       //memset(blkPtr(cur), 0, m_blockSize);    // zero out memory on free, 
       //m_bls[cur].readers = 0;                 // reset the reader count
       
-      s_bls[cur].kr.isKey   = false;          // make sure key is false;
-      s_bls[cur].kr.readers = 0;              // reset the reader count
+      //s_bls[cur].kr.isKey   = false;          // make sure key is false;
+      //s_bls[cur].kr.readers = 0;              // reset the reader count
+      s_bls[cur].isKey   = false;          // make sure key is false;
+      s_bls[cur].readers = 0;              // reset the reader count
       
       s_cl.free(cur);
       //m_blocksUsed.fetch_add(-1);
@@ -956,7 +968,9 @@ private:
     }
     //memset(blkPtr(cur), 0, m_blockSize);       // 0 out memory on free, 
     //m_bls[cur].readers = 0;                  // reset the reader count
-    s_bls[cur].kr.readers = 0;                 // reset the reader count
+    //s_bls[cur].kr.readers = 0;                 // reset the reader count
+
+    s_bls[cur].readers = 0;                 // reset the reader count
     s_cl.free(cur);
   }
   u32        writeBlock(u32  blkIdx, void const* const bytes, u32 len=0, u32 ofst=0)      // don't need to increment readers since write should be done before the block is exposed to any other threads
@@ -972,7 +986,7 @@ private:
   }
   u32         readBlock(u32  blkIdx, u32 version, void *const bytes, u32 ofst=0, u32 len=0) const
   {
-    BlkLst bl = incReaders(blkIdx, version);      if(bl.kr.version==0) return 0;
+    BlkLst bl = incReaders(blkIdx, version);               if(bl.version==0) return 0;  // if(bl.kr.version==0) return 0;
       u32   blkFree  =  blockFreeSize();
       u8*         p  =  blockFreePtr(blkIdx);
       u32       nxt  =  bl.idx;
@@ -1032,8 +1046,7 @@ public:
 
     u32  ver  =  (u32)s_version->fetch_add(1);
     u32  cur  =  st;
-    u32  nxt  =  0; //s_cl.nxt();
-    //s_bls[st] =  BlkLst(true, 0, nxt, ver, size, klen, hash);
+    u32  nxt  =  0;    // s_cl.nxt(); //s_bls[st] =  BlkLst(true, 0, nxt, ver, size, klen, hash);
     u32  cnt  =  0;
     SECTION(loop for the number of blocks needed and get new block and link it to the list)
     {
@@ -1044,7 +1057,8 @@ public:
 
         //if(i==0) s_bls[cur] =  BlkLst(true,  0, nxt, ver, size, klen);        // make_BlkLst(true,  0, nxt, ver, size, klen);
         //else     s_bls[cur] =  BlkLst(false, 0, nxt, ver, 0, 0);              // make_BlkLst(false, 0, nxt, ver, 0, 0);
-        s_bls[cur] = BlkLst(false, 0, nxt, ver, 0, 0);
+
+        s_bls[cur] = BlkLst(false, 0, nxt, ver);
         cur        = nxt;
         ++cnt;
         //m_blocksUsed.fetch_add(1);
@@ -1062,10 +1076,12 @@ public:
       //
       //if(out_blocks){ *out_blocks = nxt==LIST_END? -((i32)cnt) : (i32)cnt; }     
 
-      s_bls[st].kr.isKey = true;
-      s_bls[st].hash     = hash;
-      s_bls[st].len      = size;
-      s_bls[st].klen     = klen;
+      //s_bls[st].kr.isKey = true;
+      
+      s_bls[st].isKey = true;
+      s_bls[st].hash  = hash;
+      s_bls[st].len   = size;
+      s_bls[st].klen  = klen;
 
       if(out_blocks){
         out_blocks->end = nxt==LIST_END;
@@ -1261,7 +1277,8 @@ public:
   u32           len(u32  blkIdx, u32 version, u32* out_vlen=nullptr) const
   {
     BlkLst bl = s_bls[blkIdx];
-    if(version==bl.kr.version && bl.len>0){
+    //if(version==bl.kr.version && bl.len>0){
+    if(version==bl.version && bl.len>0){
       if(out_vlen) *out_vlen = bl.len - bl.klen;
       return bl.len;
     }else 
@@ -1427,7 +1444,9 @@ private:
     u32    ip = bl.hash % m_sz;     // ip is Ideal Position
     //u32   ipd = vi.idx>ip?  vi.idx-ip  :  m_csp->blockCount() - ip + vi.idx;  // todo: change vi.idx to u32 so that there aren't sign mismatch warnings
     u32   ipd = i>ip?  i-ip  :  m_csp->blockCount() - ip + i;  // todo: change vi.idx to u32 so that there aren't sign mismatch warnings
-    return {bl.kr.version, ipd};
+
+    //return {bl.kr.version, ipd};
+    return {bl.version, ipd};
   }
   bool          delDupe(u32 i)                 const                                 // delete duplicate indices - l is left index, r is right index - will do something different depending on if the two slots are within 128 bit alignment or not
   {
@@ -1655,7 +1674,7 @@ public:
     return empty; 
   }
 
-  bool          init(u32   sz, CncrStr* cs)
+  bool          init(u32    sz, CncrStr* cs)
   {
     using namespace std;
     static const u64 iempty    =  empty_kv().asInt;
@@ -1684,11 +1703,11 @@ public:
     
     return true;
   }
-  VerIdx          at(u32  idx)                  const
+  VerIdx          at(u32   idx)                const
   {
     return load_vi(idx);
   }
-  u32            nxt(u32  stIdx)                const
+  u32            nxt(u32 stIdx)                const
   {
     auto idx = stIdx;
     VerIdx empty = empty_kv();
@@ -1704,16 +1723,16 @@ public:
 
     /* && kv.readers>=0 */
   }
-  u32           size()                          const
+  u32           size()                         const
   {
     return m_sz;
   }
-  auto          data()                          const -> void* { return s_vis.data(); }
-  u64      sizeBytes()                          const
+  auto          data()                         const -> void* { return s_vis.data(); }
+  u64      sizeBytes()                         const
   {
     return s_vis.sizeBytes();
   }
-  i64        swapNxt(u32 idx)                   const
+  i64        swapNxt(u32  idx)                 const
   {
     i64 retries = -1;
     if(idx%2==0)
@@ -2036,7 +2055,7 @@ public:
     return ths->s_cs.compare(blkIdx, version, buf, len, hash);
   }
   static bool           IsEmpty(VerIdx kv){return CncrHsh::IsEmpty(kv);}         // special value for CncrHsh
-  static bool         IsListEnd(VerIdx vi){return CncrStr::IsListEnd(vi); }      // special value for CncrStr
+  static bool         IsListEnd(VerIdx vi){return CncrStr::IsListEnd(vi);}       // special value for CncrStr
 
 public:
   simdb(){}
