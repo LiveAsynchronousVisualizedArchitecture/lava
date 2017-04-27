@@ -95,8 +95,8 @@
 // -todo: debug len returning 0 when key seems to exist in memory - not making it in to CncrHsh? - not using the shared memory for CncrHsh finally causing a problem? - put() not setting the hash? - alloc() was not setting the hash correctly
 // -todo: redo CncrHsh to use the shared memory instead of the lava_vec allocated on heap mistake - will this require aligning to 128 bit memory?
 // -todo: make BlkLst hash 64 bits instead of 32? - leave this until there is a reason to change it 
+// -todo: make put return a bool and output the index in a separate out variable? -  make put give back FAILED_PUT on error - isn't EMPTY_KEY enough? - no, because the put might fail due to no blocks left
 
-// todo: make put give back FAILED_PUT on error - isn't EMPTY_KEY enough?
 // todo: make put return VerIdx ? - is having an out_version pointer enough?
 // todo: redo the BlkLst struct with calibrated bitfield size and without sub structures
 // todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
@@ -1333,15 +1333,6 @@ public:
     return (u32)( (hsh>>32) ^ ((u32)hsh));
   }
   static VerIdx         empty_kv(){ return VerIdx(EMPTY_KEY,0); }
-  //{
-  //  VerIdx empty;
-  //  empty.idx      =  EMPTY_KEY;
-  //  empty.version  =  0;
-  //  return empty;
-  //
-  //  //empty.val      =  EMPTY_KEY;
-  //  //empty.readers  =  0;
-  //}
   static VerIdx       deleted_kv()
   {
     VerIdx empty;
@@ -1399,7 +1390,6 @@ private:
   {
     using namespace std;
         
-    //u64 asInt = keyval.asInt;
     bool odd = i%2 == 1;
     VerIdx strVi;
     if(odd) strVi = VerIdx(lo32(vi), hi32(vi));            // the odd numbers need to be swapped so that their indices are on the outer border of 128 bit alignment - the indices need to be on the border of the 128 bit boundary so they can be swapped with an unaligned 64 bit atomic operation
@@ -1410,22 +1400,6 @@ private:
     if(odd) return VerIdx(lo32(prev), hi32(prev));
     else    return VerIdx(hi32(prev), lo32(prev));
   }
-  //VerIdx       store_vi(u32 i, u64 vi)         const
-  //{
-  //  using namespace std;
-  //      
-  //  //u64 asInt = keyval.asInt;
-  //  bool odd = i%2 == 1;
-  //  if(odd) vi = swp32(vi);            // the odd numbers need to be swapped so that their indices are on the outer border of 128 bit alignment - the indices need to be on the border of the 128 bit boundary so they can be swapped with an unaligned 64 bit atomic operation
-  //
-  //  u64 prev = atomic_exchange<u64>( (au64*)(&m_vis[i]), vi);
-  //
-  //  VerIdx ret;
-  //  if(odd) ret.asInt = swp32(prev);
-  //  else    ret.asInt = prev;
-  //
-  //  return ret;
-  //}
   bool         cmpex_vi(u32 i, VerIdx* volatile expected, VerIdx desired) const
   {
     using namespace std;
@@ -1566,10 +1540,6 @@ private:
 
 public:
   CncrHsh(){}
-  //CncrHsh(u32 size, CncrStr* cs)
-  //{
-  //  //init(size, cs);
-  //}
   CncrHsh(void* addr, u32 size, CncrStr* cs, bool owner=true) :
     m_sz(nextPowerOf2(size)),
     s_vis(addr, m_sz),
@@ -1591,39 +1561,6 @@ public:
   {
     return s_vis[idx];
   }
-
-  //template<class MATCH_FUNC> 
-  //VerIdx   putHashed(u32 hash, VerIdx vi, MATCH_FUNC match)     const
-  //{
-  //  using namespace std;
-  //  static const VerIdx empty   = empty_kv();
-  //  static const VerIdx deleted = deleted_kv();
-  //
-  //  VerIdx desired   =  empty;
-  //  desired.idx      =  vi.idx;
-  //  desired.version  =  vi.version;
-  //  u32           i  =  hash % m_sz;
-  //  u32          en  =  prevIdx(i);   //min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap?   // % m_sz;   //>0? hash-1  :  m_sz
-  //  for(;; i=nxtIdx(i) ) //++i)
-  //  {
-  //    VerIdx vi = load_vi(i);
-  //    if(vi.idx>=DELETED_KEY)                                                               // it is either deleted or empty
-  //    {          
-  //      bool    success  =  cmpex_vi(i, m_vis.data()+i, desired);
-  //      if(success) return vi;                                                //expected;  // continue; // WRONG!? // Another thread just stole it from underneath us.
-  //      else{ i=prevIdx(i); continue; }  // retry the same loop again
-  //    }                                                                                     // Either we just added the key, or another thread did.
-  //    
-  //    if( checkMatch(vi.version, vi.idx, match)!=MATCH_TRUE ) continue;
-  //    bool success = cmpex_vi(i, m_vis.data()+i, desired);
-  //    if(success) return vi;
-  //    else{ i=prevIdx(i); continue; }                                            // todo: this doesn't do anything because it doesn't assign to i !! - come back and look this over
-  //
-  //    if(i==en) break;
-  //  }
-  //
-  //  return empty;  // should never be reached
-  //}
 
   VerIdx   putHashed(u32 hash, VerIdx lstVi, const void *const key, u32 klen)     const
   {
@@ -1660,16 +1597,14 @@ public:
   }
 
   template<class MATCH_FUNC, class FUNC> 
-  bool      runMatch(u32 hash, MATCH_FUNC match, FUNC f)        const // -> decltype( f(VerIdx()) )
+  bool      runMatch(u32 hash, MATCH_FUNC match, FUNC f)        const 
   {
     using namespace std;
     
     u32  i = hash % m_sz;
-    u32 en = prevIdx(i);     // min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap?   // % m_sz;   //>0? hash-1  :  m_sz
-    //for(;; ++i)
+    u32 en = prevIdx(i);
     for(;; i=nxtIdx(i) )
     {
-      //i %= m_sz;
       VerIdx vi = load_vi(i);
       if(vi.idx == EMPTY_KEY){ return false;  }                                             // only EMPTY_KEY is the short circuit, since DELETED_KEY means you are still within a span and need to keep searching
       else if(vi.idx == DELETED_KEY){ continue; }
@@ -1854,27 +1789,21 @@ public:
 
     return runMatch(hash, matchFunc, runFunc);
   }
-  i32            put(const void *const key, u32 klen, const void *const val, u32 vlen)
+  bool           put(const void *const key, u32 klen, const void *const val, u32 vlen, u32* out_startBlock=nullptr) 
   {
     assert(klen>0);
 
-    u32      hash = CncrHsh::HashBytes(key, klen);
-        
-    VerIdx lstVi = m_csp->alloc(klen+vlen, klen, hash);                       // lstVi is block list versioned index
-    if(lstVi.idx==LIST_END){ return EMPTY_KEY; }
+    u32     hash = CncrHsh::HashBytes(key, klen);
+    VerIdx lstVi = m_csp->alloc(klen+vlen, klen, hash);                                 // lstVi is block list versioned index
+    if(out_startBlock){ *out_startBlock = lstVi.idx; }
+    if(lstVi.idx==LIST_END){ return false; }
 
     m_csp->put(lstVi.idx, key, klen, val, vlen);
 
     VerIdx vi = putHashed(hash, lstVi, key, klen);
     if(vi.idx<DELETED_KEY){ m_csp->free(vi.idx, vi.version); }                          // putHashed returns the entry that was there before, which is the entry that was replaced. If it wasn't empty, we free it here. 
 
-    return lstVi.idx;
-
-    //CncrStr*  csp = m_csp;                                                            // this silly song and dance is because the this pointer can't be passed to a lambda
-    //VerIdx     kv = putHashed(hash, vi,                                               // this returns the previous VerIdx at the position
-    //  [csp, key, klen, hash](u32 blkidx, u32 ver){
-    //    return csp->compare(blkidx,ver,key,klen,hash);
-    //  });
+    return true;
   }
   bool           del(const void *const key, u32 klen)
   {
@@ -2155,19 +2084,19 @@ public:
   {
     return s_ch.get(key, klen, out_val, vlen);
   }
-  i32          put(const void *const key, u32 klen, const void *const val, u32 vlen)
+  bool         put(const void *const key, u32 klen, const void *const val, u32 vlen, u32* out_startBlock=nullptr)
   {
-    return s_ch.put(key, klen, val, vlen);
+    return s_ch.put(key, klen, val, vlen, out_startBlock);
   }
   bool         del(const void *const key, u32 klen)
   {
     return s_ch.del(key, klen);
   }
 
-  i32          put(char const* const key, const void *const val, u32 vlen)
+  bool         put(char const* const key, const void *const val, u32 vlen, u32* out_startBlock=nullptr)
   {
     assert(strlen(key)>0);
-    return put(key, (u32)strlen(key), val, vlen);
+    return put(key, (u32)strlen(key), val, vlen, out_startBlock);
   }
   bool         get(char const* const key, void *const val, u32 vlen) const // todo: should val not be a const pointer?
   {
@@ -2342,6 +2271,78 @@ public:
 
 
 
+
+
+//{
+//  VerIdx empty;
+//  empty.idx      =  EMPTY_KEY;
+//  empty.version  =  0;
+//  return empty;
+//
+//  //empty.val      =  EMPTY_KEY;
+//  //empty.readers  =  0;
+//}
+
+//VerIdx       store_vi(u32 i, u64 vi)         const
+//{
+//  using namespace std;
+//      
+//  //u64 asInt = keyval.asInt;
+//  bool odd = i%2 == 1;
+//  if(odd) vi = swp32(vi);            // the odd numbers need to be swapped so that their indices are on the outer border of 128 bit alignment - the indices need to be on the border of the 128 bit boundary so they can be swapped with an unaligned 64 bit atomic operation
+//
+//  u64 prev = atomic_exchange<u64>( (au64*)(&m_vis[i]), vi);
+//
+//  VerIdx ret;
+//  if(odd) ret.asInt = swp32(prev);
+//  else    ret.asInt = prev;
+//
+//  return ret;
+//}
+
+//CncrHsh(u32 size, CncrStr* cs)
+//{
+//  //init(size, cs);
+//}
+
+//template<class MATCH_FUNC> 
+//VerIdx   putHashed(u32 hash, VerIdx vi, MATCH_FUNC match)     const
+//{
+//  using namespace std;
+//  static const VerIdx empty   = empty_kv();
+//  static const VerIdx deleted = deleted_kv();
+//
+//  VerIdx desired   =  empty;
+//  desired.idx      =  vi.idx;
+//  desired.version  =  vi.version;
+//  u32           i  =  hash % m_sz;
+//  u32          en  =  prevIdx(i);   //min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap?   // % m_sz;   //>0? hash-1  :  m_sz
+//  for(;; i=nxtIdx(i) ) //++i)
+//  {
+//    VerIdx vi = load_vi(i);
+//    if(vi.idx>=DELETED_KEY)                                                               // it is either deleted or empty
+//    {          
+//      bool    success  =  cmpex_vi(i, m_vis.data()+i, desired);
+//      if(success) return vi;                                                //expected;  // continue; // WRONG!? // Another thread just stole it from underneath us.
+//      else{ i=prevIdx(i); continue; }  // retry the same loop again
+//    }                                                                                     // Either we just added the key, or another thread did.
+//    
+//    if( checkMatch(vi.version, vi.idx, match)!=MATCH_TRUE ) continue;
+//    bool success = cmpex_vi(i, m_vis.data()+i, desired);
+//    if(success) return vi;
+//    else{ i=prevIdx(i); continue; }                                            // todo: this doesn't do anything because it doesn't assign to i !! - come back and look this over
+//
+//    if(i==en) break;
+//  }
+//
+//  return empty;  // should never be reached
+//}
+
+//CncrStr*  csp = m_csp;                                                            // this silly song and dance is because the this pointer can't be passed to a lambda
+//VerIdx     kv = putHashed(hash, vi,                                               // this returns the previous VerIdx at the position
+//  [csp, key, klen, hash](u32 blkidx, u32 ver){
+//    return csp->compare(blkidx,ver,key,klen,hash);
+//  });
 
 //return m_mem.size;
 //return s_cs.sizeBytes( (u32)s_blockSize->load(), (u32)s_blockCount->load());
