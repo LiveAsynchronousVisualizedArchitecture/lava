@@ -96,8 +96,8 @@
 // -todo: redo CncrHsh to use the shared memory instead of the lava_vec allocated on heap mistake - will this require aligning to 128 bit memory?
 // -todo: make BlkLst hash 64 bits instead of 32? - leave this until there is a reason to change it 
 // -todo: make put return a bool and output the index in a separate out variable? -  make put give back FAILED_PUT on error - isn't EMPTY_KEY enough? - no, because the put might fail due to no blocks left
+// -todo: make put return VerIdx ? - is having an out_version pointer enough? - revisit this if it becomes an issue
 
-// todo: make put return VerIdx ? - is having an out_version pointer enough?
 // todo: redo the BlkLst struct with calibrated bitfield size and without sub structures
 // todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
 // todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
