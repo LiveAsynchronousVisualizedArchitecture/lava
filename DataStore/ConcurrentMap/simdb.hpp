@@ -1378,11 +1378,8 @@ private:
     //if(i%2==1) ret.asInt = swp32(cur);
     //else       ret.asInt = cur;
 
-    VerIdx ret;
     if(i%2==1) return VerIdx(lo32(cur), hi32(cur));
     else       return VerIdx(hi32(cur), lo32(cur));
-
-    return ret;    
   }
   VerIdx       store_vi(u32 i, u64 vi)         const
   {
@@ -1390,16 +1387,31 @@ private:
         
     //u64 asInt = keyval.asInt;
     bool odd = i%2 == 1;
-    if(odd) vi = swp32(vi);            // the odd numbers need to be swapped so that their indices are on the outer border of 128 bit alignment - the indices need to be on the border of the 128 bit boundary so they can be swapped with an unaligned 64 bit atomic operation
+    VerIdx strVi;
+    if(odd) strVi = VerIdx(lo32(vi), hi32(vi));            // the odd numbers need to be swapped so that their indices are on the outer border of 128 bit alignment - the indices need to be on the border of the 128 bit boundary so they can be swapped with an unaligned 64 bit atomic operation
+    else    strVi = VerIdx(hi32(vi), lo32(vi));
 
-    u64 prev = atomic_exchange<u64>( (au64*)(&(m_vis[i].asInt)), vi);
+    u64 prev = atomic_exchange<u64>( (au64*)(&m_vis[i]), *((u64*)(&strVi)) );
 
-    VerIdx ret;
-    if(odd) ret.asInt = swp32(prev);
-    else    ret.asInt = prev;
-
-    return ret;
+    if(i%2==1) return VerIdx(lo32(prev), hi32(prev));
+    else       return VerIdx(hi32(prev), lo32(prev));
   }
+  //VerIdx       store_vi(u32 i, u64 vi)         const
+  //{
+  //  using namespace std;
+  //      
+  //  //u64 asInt = keyval.asInt;
+  //  bool odd = i%2 == 1;
+  //  if(odd) vi = swp32(vi);            // the odd numbers need to be swapped so that their indices are on the outer border of 128 bit alignment - the indices need to be on the border of the 128 bit boundary so they can be swapped with an unaligned 64 bit atomic operation
+  //
+  //  u64 prev = atomic_exchange<u64>( (au64*)(&m_vis[i]), vi);
+  //
+  //  VerIdx ret;
+  //  if(odd) ret.asInt = swp32(prev);
+  //  else    ret.asInt = prev;
+  //
+  //  return ret;
+  //}
   bool         cmpex_vi(u32 i, VerIdx* expected, VerIdx desired) const
   {
     using namespace std;
