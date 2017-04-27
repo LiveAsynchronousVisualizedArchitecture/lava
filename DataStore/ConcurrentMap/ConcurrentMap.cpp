@@ -243,16 +243,16 @@ void printhsh(simdb const& db)
   }
   printf("\n\n");
 
-  auto vi = (simdb::VerIdx*)db.hashData();
-  for(u32 i=0; i<(db.blocks()); ++i){
-    if(i%2==0) printf("|");
-
-    printf(" %u %u ", vi[i].idx, vi[i].version);
-
-    //if(i%8) printf("|");
-    //else if(i%4) printf(" ");
-  }
-  printf("\n\n");
+  //auto vi = (simdb::VerIdx*)db.hashData();
+  //for(u32 i=0; i<(db.blocks()); ++i){
+  //  if(i%2==0) printf("|");
+  //
+  //  printf(" %u %u ", vi[i].idx, vi[i].version);
+  //
+  //  //if(i%8) printf("|");
+  //  //else if(i%4) printf(" ");
+  //}
+  //printf("\n\n");
 }
 
 int main()

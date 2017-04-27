@@ -88,11 +88,15 @@
 // -todo: make cmpex_vi swap hi and lo on odd indices - also had to feed it the actual address of the shared memory vi instead of the address of the copied (and possibly swapped)
 // -todo: rename m_kvs to m_vis
 // -todo: flatten putHashed into having the block comparison embedded 
+// -todo: print or visualize CncrHsh 
+// -todo: rename m_vis to s_vis since it is a lava_vec of Version Indexes in shared memory
+// -todo: debug compare exchange not working - dereferencing a pointer passed to the function failed silently while returning true - the value needed to be assigned to another local variable and that variable used as a reference
+// -todo: redo alloc so that there isn't a branch in the BlkLst construction
+// -todo: debug len returning 0 when key seems to exist in memory - not making it in to CncrHsh? - not using the shared memory for CncrHsh finally causing a problem? - put() not setting the hash? - alloc() was not setting the hash correctly
 
-// todo: debug len returning 0 when key seems to exist in memory
 // todo: redo CncrHsh to use the shared memory instead of the lava_vec allocated on heap mistake - this will require aligning to 128 bit memory
-// todo: print or visualize CncrHsh 
 // todo: redo the BlkLst struct with calibrated bitfield size and without sub structures
+// todo: make BlkLst hash 64 bits instead of 32?
 // todo: make put give back FAILED_PUT on error - isn't EMPTY_KEY enough?
 // todo: make put return VerIdx ? - is having an out_version pointer enough?
 // todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
@@ -107,8 +111,11 @@
 // todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries?
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
+// todo: make sure that the start and end are taken care of with regards to cleaning up deletions - need to not go off the end of the array and need to figure out how to deal with spans between them
 // todo: make sure readers is only used on the key block list
 // todo: make sure readers deletes the block list if it is the last reader after deletion
+// todo: reference count initializations so that the last process out can destroy the db
+// todo: re-evaluate if the high bits of the lava vec pointer need to contain extra information
 // todo: search for any embedded todo comments
 // todo: clean out old commented lines
 // todo: compile with maximum warnings
@@ -459,7 +466,7 @@ namespace {
     {
       return *((u64*)clearBits(p));   // first 8 bytes should be the total size of the buffer in bytes
     } 
-    auto       addr() const -> void*
+    auto      addr() const -> void*
     {
       return p;
     }
@@ -1025,19 +1032,20 @@ public:
 
     u32  ver  =  (u32)s_version->fetch_add(1);
     u32  cur  =  st;
-    u32  nxt  =  s_cl.nxt();
+    u32  nxt  =  0; //s_cl.nxt();
     //s_bls[st] =  BlkLst(true, 0, nxt, ver, size, klen, hash);
     u32  cnt  =  0;
     SECTION(loop for the number of blocks needed and get new block and link it to the list)
     {
-      for(u32 i=0; i<blocks-1; ++i)
+      for(u32 i=0; i<blocks; ++i)
       {
-        nxt    = s_cl.nxt();
+        nxt = s_cl.nxt();
         if(nxt==LIST_END){ free(st, ver); VerIdx empty={LIST_END,0}; return empty; }
 
-        if(i==0) s_bls[cur] =  BlkLst(true,  0, nxt, ver, size, klen);  // make_BlkLst(true,  0, nxt, ver, size, klen);
-        else     s_bls[cur] =  BlkLst(false, 0, nxt, ver, 0, 0);        // make_BlkLst(false, 0, nxt, ver, 0, 0);
-        cur    =  nxt;
+        //if(i==0) s_bls[cur] =  BlkLst(true,  0, nxt, ver, size, klen);        // make_BlkLst(true,  0, nxt, ver, size, klen);
+        //else     s_bls[cur] =  BlkLst(false, 0, nxt, ver, 0, 0);              // make_BlkLst(false, 0, nxt, ver, 0, 0);
+        s_bls[cur] = BlkLst(false, 0, nxt, ver, 0, 0);
+        cur        = nxt;
         ++cnt;
         //m_blocksUsed.fetch_add(1);
       }
@@ -1047,13 +1055,18 @@ public:
     {
       //u32 blockRemainder = byteRem? -byteRem : -blockFreeSize();
       //BlkLst  bl =  make_BlkLst(cur==st, 0, blockRemainder, ver, size, klen);
-
+      //
       //u32 blockRemainder = byteRem? byteRem : blockFreeSize();
       //BlkLst bl(cur==st, 0, blockRemainder, ver, size, klen, hash);
       //s_bls[cur] = bl;
-      //s_bls[st].kr.isKey = true;
-
+      //
       //if(out_blocks){ *out_blocks = nxt==LIST_END? -((i32)cnt) : (i32)cnt; }     
+
+      s_bls[st].kr.isKey = true;
+      s_bls[st].hash     = hash;
+      s_bls[st].len      = size;
+      s_bls[st].klen     = klen;
+
       if(out_blocks){
         out_blocks->end = nxt==LIST_END;
         out_blocks->cnt = cnt;
@@ -1221,6 +1234,7 @@ public:
   {
     using namespace std;
     
+    u32 blklstHsh = s_bls[blkIdx].hash;
     if(s_bls[blkIdx].hash!=hash) return MATCH_FALSE;  // vast majority of calls should end here
 
     u32   curidx  =  blkIdx;
@@ -1362,7 +1376,7 @@ private:
   using UnqLock  =  std::unique_lock<Mut>;
 
           u32       m_sz;
-  mutable VerIdxs   m_vis;           // m_vis is key value(s) - needs to be changed to versioned indices, m_vis
+  mutable VerIdxs   s_vis;           // s_vis is key value(s) - needs to be changed to versioned indices, m_vis
           CncrStr*  m_csp;           // csp is concurrent store pointer
 
   u32            nxtIdx(u32 i)                 const { return (i+1)%m_sz; }
@@ -1371,7 +1385,7 @@ private:
   {
     using namespace std;
     
-    au64* avi = (au64*)(m_vis.data()+i);                            // avi is atomic versioned index
+    au64* avi = (au64*)(s_vis.data()+i);                            // avi is atomic versioned index
     u64   cur = swp32(avi->load());                                 // need because of endianess? // atomic_load<u64>( (au64*)(m_vis.data()+i) );              // Load the key that was there.
 
     //VerIdx ret;
@@ -1391,7 +1405,7 @@ private:
     if(odd) strVi = VerIdx(lo32(vi), hi32(vi));            // the odd numbers need to be swapped so that their indices are on the outer border of 128 bit alignment - the indices need to be on the border of the 128 bit boundary so they can be swapped with an unaligned 64 bit atomic operation
     else    strVi = VerIdx(hi32(vi), lo32(vi));
 
-    u64 prev = atomic_exchange<u64>( (au64*)(&m_vis[i]), *((u64*)(&strVi)) );
+    u64 prev = atomic_exchange<u64>( (au64*)(s_vis.data()+i), *((u64*)(&strVi)) );
 
     if(odd) return VerIdx(lo32(prev), hi32(prev));
     else    return VerIdx(hi32(prev), lo32(prev));
@@ -1412,13 +1426,22 @@ private:
   //
   //  return ret;
   //}
-  bool         cmpex_vi(u32 i, VerIdx* expected, VerIdx desired) const
+  bool         cmpex_vi(u32 i, VerIdx* volatile expected, VerIdx desired) const
   {
     using namespace std;
 
-    u64    desi = i%2? swp32(desired.asInt) : desired.asInt;                                // desi is desired int
-    au64*  addr = (au64*)(m_vis.data()+i);
-    return atomic_compare_exchange_strong(addr, (u64*)expected, desi);                      // The entry was free. Now let's try to take it using a CAS. 
+    u64     exp = *((u64*)expected);
+    u64    desi = i%2? swp32(desired.asInt) : desired.asInt;                                 // desi is desired int
+    au64*  addr = (au64*)(s_vis.data()+i);
+    auto before = addr->load();
+    bool     ok = addr->compare_exchange_strong( exp, desi );
+    auto  after = addr->load();
+    
+    //return atomic_compare_exchange_strong(addr, (u64*)expected, desi);                      // The entry was free. Now let's try to take it using a CAS. 
+    //addr->store(desi);
+    //return true;
+
+    return ok;
   }
   void           doFree(u32 i)                 const
   {
@@ -1437,7 +1460,7 @@ private:
     if(i%2==0)
     {                                                                               // both indices are within a 128 bit boundary, so the 128 bit atomic can (and must) be used
       i64 rgtDel, lftDel;  _u128 viDbl;
-      _u128* viDblAddr = (_u128*)&m_vis[i];                                         // find 128 bit offset address
+      _u128* viDblAddr = (_u128*)&s_vis[i];                                         // find 128 bit offset address
       viDbl            = *viDblAddr;                                                // todo: should this use a 128 bit atomic load? if it isn't the same, the atomic compare exchange will load it atomically
       do{
         u32 l = hi32(viDbl.hi);
@@ -1455,7 +1478,7 @@ private:
     }else
     {
       au64* idxDblAddr; u64 idxDbl, desired;
-      u32* leftAddr = ((u32*)(&m_vis[i]))+1;                                        // if the two VerIdxs are not in a 128 bit boundary, then use a 64 bit compare and swap to set the right side index to DELETED_KEY
+      u32* leftAddr = ((u32*)(&s_vis[i]))+1;                                        // if the two VerIdxs are not in a 128 bit boundary, then use a 64 bit compare and swap to set the right side index to DELETED_KEY
       idxDblAddr    = (au64*)leftAddr;                                              // increment the address by 4 bytes so that it lines up with the start of the two indices, then cast it to an atomic 64 bit unsigned integer for the compare and switch
       idxDbl        = idxDblAddr->load();
       do{
@@ -1543,13 +1566,13 @@ private:
 
 public:
   CncrHsh(){}
-  CncrHsh(u32 size, CncrStr* cs)
-  {
-    init(size, cs);
-  }
+  //CncrHsh(u32 size, CncrStr* cs)
+  //{
+  //  //init(size, cs);
+  //}
   CncrHsh(void* addr, u32 size, CncrStr* cs, bool owner=true) :
     m_sz(nextPowerOf2(size)),
-    m_vis(addr, m_sz),
+    s_vis(addr, m_sz),
     m_csp(cs)
   {
     if(owner){
@@ -1561,13 +1584,12 @@ public:
   }
   CncrHsh(CncrHsh const& lval) = delete;
   CncrHsh(CncrHsh&&      rval) = delete;
-  
   CncrHsh& operator=(CncrHsh const& lval) = delete;
   CncrHsh& operator=(CncrHsh&&      rval) = delete;
 
   VerIdx  operator[](u32 idx) const
   {
-    return m_vis[idx];
+    return s_vis[idx];
   }
 
   //template<class MATCH_FUNC> 
@@ -1619,7 +1641,7 @@ public:
       VerIdx vi = load_vi(i);
       if(vi.idx>=DELETED_KEY)                                                               // it is either deleted or empty
       {          
-        bool    success  =  cmpex_vi(i, m_vis.data()+i, desired);
+        bool    success  =  cmpex_vi(i, s_vis.data()+i, desired);
         if(success) return vi;
         else{ i=prevIdx(i); continue; }                                                     // retry the same loop again if a good slot was found but it was changed by another thread between the load and the compare-exchange
       }                                                                                     // Either we just added the key, or another thread did.
@@ -1627,7 +1649,7 @@ public:
       //if( checkMatch(vi.version, vi.idx, match)!=MATCH_TRUE ){ continue; }
       if(m_csp->compare(vi.idx,vi.version,key,klen,hash)!=MATCH_TRUE ){ continue; }
 
-      bool success = cmpex_vi(i, m_vis.data()+i, desired);
+      bool success = cmpex_vi(i, s_vis.data()+i, desired);
       if(success) return vi;
       else{ i=prevIdx(i); continue; }
 
@@ -1709,7 +1731,7 @@ public:
     
     m_csp   =  cs;
     m_sz    =  sz;
-    new (&m_vis) lava_vec<VerIdx>(m_sz);                   // placement new because the copy constructor and assignment operator are deleted.  msvc doesn't care, but clang does
+    //new (&m_vis) lava_vec<VerIdx>(m_sz);                   // placement new because the copy constructor and assignment operator are deleted.  msvc doesn't care, but clang does
     
     //u64 ver0, ver1;
     //ver0         =  empty_kv().asInt;
@@ -1722,8 +1744,8 @@ public:
     //for(u32 i=0; i<sz; i+=2) *((u64*)(&m_vis[i])) = iempty;          // evens 
     //for(u32 i=1; i<sz; i+=2) *((u64*)(&m_vis[i])) = swpempty;        // odds
 
-    for(u32 i=0; i<sz; i+=2) m_vis[i] = VerIdx(EMPTY_KEY,0);         // evens 
-    for(u32 i=1; i<sz; i+=2) m_vis[i] = VerIdx(0,EMPTY_KEY);         // odds
+    for(u32 i=0; i<sz; i+=2) s_vis[i] = VerIdx(EMPTY_KEY,0);         // evens 
+    for(u32 i=1; i<sz; i+=2) s_vis[i] = VerIdx(0,EMPTY_KEY);         // odds
     
     return true;
   }
@@ -1751,17 +1773,17 @@ public:
   {
     return m_sz;
   }
-  auto          data()                          const -> void* { return m_vis.data(); }
+  auto          data()                          const -> void* { return s_vis.data(); }
   u64      sizeBytes()                          const
   {
-    return m_vis.sizeBytes();
+    return s_vis.sizeBytes();
   }
   i64        swapNxt(u32 idx)                   const
   {
     i64 retries = -1;
     if(idx%2==0)
     {                                                                 // if idx is even just use 128 bit atomic straight    
-      u128*  idxAddr  =  (u128*)( ((u64*)m_vis.addr())+idx );
+      u128*  idxAddr  =  (u128*)( ((u64*)s_vis.addr())+idx );
       u128   dblvi;                                                   // dblvi is double Version Index - it is used to point to two VerIdx structs at the same time 
       u128   swpvi;                                                   // swpvi is swapped version index - the two indices swapped - this is the desired value 
       do{           
@@ -1774,7 +1796,7 @@ public:
     }
     else                                                              // must be on an odd number, and so will need to use a 64 bit atomic to swap the indices in the middle
     {
-      au64* idxAddr = (au64*)( ((u32*)m_vis.addr())+(idx*2+1) );      // offsets using u32, so idx needs to be double, then one more to point to the two indices that are on either side of the 128 bit atomic boundary    
+      au64* idxAddr = (au64*)( ((u32*)s_vis.addr())+(idx*2+1) );      // offsets using u32, so idx needs to be double, then one more to point to the two indices that are on either side of the 128 bit atomic boundary    
       u64       cur = idxAddr->load();
       u64      swpd;
       do{
@@ -2101,28 +2123,28 @@ public:
     if(isOwner()){
       s_blockCount->store(blockCount);
       s_blockSize->store(blockSize);
-    }else{                                                       // need to spin until ready
+    }else{                                                      // need to spin until ready
       while(s_flags->load()==false){}
       m_mem.size = MemSize(s_blockSize->load(), s_blockCount->load());
     }
 
     //auto chSz = s_ch.sizeBytes();
-    auto chSz = CncrHsh::sizeBytes(blockCount);
-    new (&s_cs) CncrStr( ((u8*)m_mem.data())+chSz+OffsetBytes(), 
+    auto cncrHashSize = CncrHsh::sizeBytes(blockCount);
+    new (&s_cs) CncrStr( ((u8*)m_mem.data())+cncrHashSize+OffsetBytes(), 
                                  (u32)s_blockSize->load(), 
                                  (u32)s_blockCount->load(), 
-                                 m_mem.owner);                 // todo: change this to a void*
+                                 m_mem.owner);                  // todo: change this to a void* - ? why change the owner flag to a void pointer?
 
     new (&s_ch) CncrHsh( ((u8*)m_mem.data())+OffsetBytes(), 
                                 (u32)s_blockCount->load(),
-                                &s_cs,                        // the address of the CncrStr
+                                &s_cs,                          // the address of the CncrStr
                                 m_mem.owner);
 
     m_blkCnt = s_blockCount->load();
     m_blkSz  = s_blockSize->load();
 
     // todo: initialized flag and reference count
-    if(isOwner()) s_flags->store(1);                                        // set to 1 to signal construction is done
+    if(isOwner()) s_flags->store(1);                             // set to 1 to signal construction is done
   }
 
   i64          len(const void *const key, u32 klen, u32* out_vlen=nullptr, u32* out_version=nullptr) const
