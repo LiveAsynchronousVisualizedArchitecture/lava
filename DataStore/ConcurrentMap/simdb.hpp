@@ -93,12 +93,12 @@
 // -todo: debug compare exchange not working - dereferencing a pointer passed to the function failed silently while returning true - the value needed to be assigned to another local variable and that variable used as a reference
 // -todo: redo alloc so that there isn't a branch in the BlkLst construction
 // -todo: debug len returning 0 when key seems to exist in memory - not making it in to CncrHsh? - not using the shared memory for CncrHsh finally causing a problem? - put() not setting the hash? - alloc() was not setting the hash correctly
+// -todo: redo CncrHsh to use the shared memory instead of the lava_vec allocated on heap mistake - will this require aligning to 128 bit memory?
+// -todo: make BlkLst hash 64 bits instead of 32? - leave this until there is a reason to change it 
 
-// todo: redo CncrHsh to use the shared memory instead of the lava_vec allocated on heap mistake - this will require aligning to 128 bit memory
-// todo: redo the BlkLst struct with calibrated bitfield size and without sub structures
-// todo: make BlkLst hash 64 bits instead of 32?
 // todo: make put give back FAILED_PUT on error - isn't EMPTY_KEY enough?
 // todo: make put return VerIdx ? - is having an out_version pointer enough?
+// todo: redo the BlkLst struct with calibrated bitfield size and without sub structures
 // todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
 // todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
 // todo: flatten runIfMatch function to only take a function template argument but not a match function template argument
@@ -115,7 +115,7 @@
 // todo: make sure readers is only used on the key block list
 // todo: make sure readers deletes the block list if it is the last reader after deletion
 // todo: reference count initializations so that the last process out can destroy the db
-// todo: re-evaluate if the high bits of the lava vec pointer need to contain extra information
+// todo: re-evaluate if the high bits of the lava vec pointer still need to contain extra information
 // todo: search for any embedded todo comments
 // todo: clean out old commented lines
 // todo: compile with maximum warnings
