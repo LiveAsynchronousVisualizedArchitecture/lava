@@ -98,8 +98,8 @@
 // -todo: make put return a bool and output the index in a separate out variable? -  make put give back FAILED_PUT on error - isn't EMPTY_KEY enough? - no, because the put might fail due to no blocks left
 // -todo: make put return VerIdx ? - is having an out_version pointer enough? - revisit this if it becomes an issue
 // -todo: redo the BlkLst struct with calibrated bitfield size and without sub structures
+// -todo: debug new BlkLst struct with get() / len() no longer working - put() seems to work, len() seems to not work -  incReaders() and decReaders() needed a union of isKey and readers to be an integer
 
-// todo: debug new BlkLst struct with get() / len() no longer working - put() seems to work, len() seems to not work
 // todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
 // todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
 // todo: flatten runIfMatch function to only take a function template argument but not a match function template argument
@@ -825,9 +825,8 @@ public:
   };
   struct  BlkLst
   {
-    //struct { KeyAndReaders kr; u32 idx; u32 len, klen, hash; };
-    u32 isKey : 1; i32 readers : 31;            //  4 bytes 
-    u32 idx, version, len, klen, hash;          // 20 bytes
+    union{ struct{ u32 isKey : 1; i32 readers : 31; }; u32 kr; };  //  4 bytes   -   kr is key readers  // todo: make sure that kr can be incremented safely
+    u32 idx, version, len, klen, hash;                             // 20 bytes
     // 24 bytes total
 
     BlkLst() : isKey(0), readers(0), idx(0), version(0), len(0), klen(0), hash(0)
@@ -858,7 +857,6 @@ public:
   };
   struct  BlkCnt { u32 end : 1; u32 cnt : 31; };                                       // this is returned from alloc() and may not be neccesary - it is the number of blocks allocated and if the end was reached
 
-  //using IDX         =  i32;
   using ai32        =  std::atomic<i32>;
   using BlockLists  =  lava_vec<BlkLst>;                                               // only the indices returned from the concurrent list are altered, and only one thread will deal with any single index at a time 
 
@@ -883,7 +881,7 @@ public:
     KeyAndReaders cur, nxt;
     BlkLst*     bl  =  &s_bls[blkIdx];
     //au64* areaders  =  (au64*)&(bl->kr.asInt);    
-    au64* areaders  =  (au64*)&(bl);  // todo: desperatly need to check and redo this - if readers is signed, 31 bits, and part of a bit set with a flag, the flag needs to be kept while the 31 bit signed int is incremented
+    au64* areaders  =  (au64*)&(bl->kr);        // todo: desperatly need to check and redo this - if readers is signed, 31 bits, and part of a bit set with a flag, the flag needs to be kept while the 31 bit signed int is incremented
     cur.asInt       =  areaders->load();
     do{
       if(cur.version!=version || cur.readers<0) return BlkLst(); // make_BlkLst(0,0,0,0,0,0);
@@ -896,9 +894,10 @@ public:
   bool      decReaders(u32 blkIdx, u32 version) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
     KeyAndReaders cur, nxt;
+    BlkLst*     bl  =  &s_bls[blkIdx];
     //au64* areaders = (au64*)&(s_bls[blkIdx].kr.asInt);
-    au64* areaders = (au64*)&(s_bls[blkIdx]);
-    cur.asInt      = areaders->load();
+    au64* areaders  =  (au64*)&(bl->kr);
+    cur.asInt       =  areaders->load();
     do{
       if(cur.version!=version) return false;
       nxt = cur;
@@ -1732,7 +1731,7 @@ public:
   {
     return s_vis.sizeBytes();
   }
-  i64        swapNxt(u32  idx)                 const
+  i64        swapNxt(u32   idx)                const
   {
     i64 retries = -1;
     if(idx%2==0)
@@ -2291,6 +2290,8 @@ public:
 
 
 
+//struct { KeyAndReaders kr; u32 idx; u32 len, klen, hash; };
+//using IDX         =  i32;
 
 //{
 //  VerIdx empty;
