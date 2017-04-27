@@ -803,7 +803,8 @@ class     CncrStr
 public:
   union   VerIdx
   {
-    struct { u32 version; u32 idx; }; // declaring the version first and idx second puts the 
+    //struct { u32 version; u32 idx; }; // declaring the version first and idx second puts the 
+    struct { u32 idx; u32 version; }; // declaring the version first and idx second puts the 
     u64 asInt;
 
     VerIdx(){}
@@ -1317,16 +1318,16 @@ public:
 
     return (u32)( (hsh>>32) ^ ((u32)hsh));
   }
-  static VerIdx         empty_kv()
-  {
-    VerIdx empty;
-    empty.idx      =  EMPTY_KEY;
-    empty.version  =  0;
-    return empty;
-
-    //empty.val      =  EMPTY_KEY;
-    //empty.readers  =  0;
-  }
+  static VerIdx         empty_kv(){ return VerIdx(EMPTY_KEY,0); }
+  //{
+  //  VerIdx empty;
+  //  empty.idx      =  EMPTY_KEY;
+  //  empty.version  =  0;
+  //  return empty;
+  //
+  //  //empty.val      =  EMPTY_KEY;
+  //  //empty.readers  =  0;
+  //}
   static VerIdx       deleted_kv()
   {
     VerIdx empty;
@@ -1373,9 +1374,13 @@ private:
     au64* avi = (au64*)(m_vis.data()+i);                            // avi is atomic versioned index
     u64   cur = avi->load();                                        // atomic_load<u64>( (au64*)(m_vis.data()+i) );              // Load the key that was there.
 
+    //VerIdx ret;
+    //if(i%2==1) ret.asInt = swp32(cur);
+    //else       ret.asInt = cur;
+
     VerIdx ret;
-    if(i%2==1) ret.asInt = swp32(cur);
-    else       ret.asInt = cur;
+    if(i%2==1) return VerIdx(lo32(cur), hi32(cur));
+    else       return VerIdx(hi32(cur), lo32(cur));
 
     return ret;    
   }
@@ -1684,19 +1689,29 @@ public:
   bool          init(u32   sz, CncrStr* cs)
   {
     using namespace std;
-    static const u64 iempty  =  empty_kv().asInt;
+    static const u64 iempty    =  empty_kv().asInt;
+    static const u64 swpempty  =  swp32(iempty);
+
+    u32 hi = hi32(iempty);
+    u32 lo = lo32(iempty);
     
     m_csp   =  cs;
     m_sz    =  sz;
     new (&m_vis) lava_vec<VerIdx>(m_sz);                   // placement new because the copy constructor and assignment operator are deleted.  msvc doesn't care, but clang does
+    
     //u64 ver0, ver1;
     //ver0         =  empty_kv().asInt;
     //ver1         =  swp32(empty_kv().asInt);
     //ver1.version  =  1;
+    
+    //for(u32 i=0; i<sz; i+=2) store_vi(i, iempty);            // evens 
+    //for(u32 i=1; i<sz; i+=2) store_vi(i, iempty);            // odds
 
+    //for(u32 i=0; i<sz; i+=2) *((u64*)(&m_vis[i])) = iempty;          // evens 
+    //for(u32 i=1; i<sz; i+=2) *((u64*)(&m_vis[i])) = swpempty;        // odds
 
-    for(u32 i=0; i<sz; i+=2) store_vi(i, iempty);            // evens 
-    for(u32 i=1; i<sz; i+=2) store_vi(i, iempty);            // odds
+    for(u32 i=0; i<sz; i+=2) m_vis[i] = VerIdx(EMPTY_KEY,0);         // evens 
+    for(u32 i=1; i<sz; i+=2) m_vis[i] = VerIdx(0,EMPTY_KEY);         // odds
     
     return true;
   }
@@ -2162,7 +2177,7 @@ public:
     
     return ret;
   }
-  bool      getKey(u32 idx, u32 version, void *const out_buf, u32 klen)   const
+  bool      getKey(u32 idx, u32 version, void *const out_buf, u32 klen) const
   {
     if(klen<1) return false;
     
@@ -2176,32 +2191,12 @@ public:
     };
     return s_ch.runRead(idx, version, runFunc);
   }
-  u32          cur() const
-  {
-    return m_curChIdx;
-  }
-  auto        data() const -> const void* const
-  {
-    return s_cs.data();
-  }
-  u64         size() const
-  {
-    //return m_mem.size;
-    //return s_cs.sizeBytes( (u32)s_blockSize->load(), (u32)s_blockCount->load());
-    return CncrStr::sizeBytes( (u32)s_blockSize->load(), (u32)s_blockCount->load());
-  }
-  bool     isOwner() const
-  {
-    return m_mem.owner;
-  }
-  u64       blocks() const
-  {
-    return s_blockCount->load();
-  }
-  auto         mem() const -> void*
-  {
-    return m_mem.hndlPtr;
-  }
+  u32          cur() const { return m_curChIdx; }
+  auto        data() const -> const void* const { return s_cs.data(); }
+  u64         size() const { return CncrStr::sizeBytes( (u32)s_blockSize->load(), (u32)s_blockCount->load()); }
+  bool     isOwner() const { return m_mem.owner; }
+  u64       blocks() const { return s_blockCount->load(); }
+  auto         mem() const -> void* { return m_mem.hndlPtr; }
   u64      memsize() const { return m_mem.size; }
   auto    hashData() const -> void const* const { return s_ch.data(); }
 
@@ -2313,6 +2308,9 @@ public:
 
 
 
+
+//return m_mem.size;
+//return s_cs.sizeBytes( (u32)s_blockSize->load(), (u32)s_blockCount->load());
 
 //checkMatch(probedKv.version, probedKv.idx, match);
 //

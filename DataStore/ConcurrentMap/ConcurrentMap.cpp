@@ -233,7 +233,24 @@ void printhsh(simdb const& db)
 {
   u32* d = (u32*)db.hashData();
   for(u32 i=0; i<(db.blocks()*2); ++i){
-    printf(" %xd ", d[i]); 
+    if(i%4==0) printf("|");
+    else if(i%2==0) printf(" ");
+
+    printf(" 0x%08x ", d[i]);
+
+    //if(i%8) printf("|");
+    //else if(i%4) printf(" ");
+  }
+  printf("\n\n");
+
+  auto vi = (simdb::VerIdx*)db.hashData();
+  for(u32 i=0; i<(db.blocks()); ++i){
+    if(i%2==0) printf("|");
+
+    printf(" %u %u ", vi[i].idx, vi[i].version);
+
+    //if(i%8) printf("|");
+    //else if(i%4) printf(" ");
   }
   printf("\n\n");
 }
@@ -501,7 +518,6 @@ int main()
   //Println("KV sz: ", sizeof(ConcurrentHash::KV) );
   //Println("empty kv: ", ConcurrentHash::empty_kv().key == ConcurrentHash::EMPTY_KEY );
   //Println("empty kv: ", ConcurrentHash::EMPTY_KEY );
-
 
   //Println("\n");
   //struct ui128_t { uint64_t lo, hi; };
