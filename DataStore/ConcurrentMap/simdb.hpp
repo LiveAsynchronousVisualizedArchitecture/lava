@@ -87,9 +87,11 @@
 // -todo: re-evaluate CncrHsh main loops' back tracking on compare exchange failure - just use prevIdx(i) - could use a goto to the top of the loop to avoid running prevIdx and then nxtIdx
 // -todo: make cmpex_vi swap hi and lo on odd indices - also had to feed it the actual address of the shared memory vi instead of the address of the copied (and possibly swapped)
 // -todo: rename m_kvs to m_vis
+// -todo: flatten putHashed into having the block comparison embedded 
 
+// todo: debug len returning 0 when key seems to exist in memory
+// todo: redo CncrHsh to use the shared memory instead of the lava_vec allocated on heap mistake - this will require aligning to 128 bit memory
 // todo: print or visualize CncrHsh 
-// todo: flatten putHashed into having the block comparison embedded 
 // todo: redo the BlkLst struct with calibrated bitfield size and without sub structures
 // todo: make put give back FAILED_PUT on error - isn't EMPTY_KEY enough?
 // todo: make put return VerIdx ? - is having an out_version pointer enough?
@@ -1288,13 +1290,6 @@ public:
   static const u32  EMPTY_HASH_IDX   =   0xFFFFFFFF;         // 32 bits set - hash indices are different from block indices 
   static const u32  LIST_END         =   CncrStr::LIST_END;
 
-  //static const u32  EMPTY_KEY        =  0x0000001FFFFF;   // first 21 bits set 
-  //static const u32  DELETED_KEY      =  0x0000001FFFFE;   // 1 less than the EMPTY_KEY
-  //static const  u64  EMPTY_KEY        =  0x000000000000001FFFFF;         // first 21 bits set 
-  //static const u64  EMPTY_KEY        =  0x000000000FFFFFFF;   // first 28 bits set 
-  //static const u64  EMPTY_KEY        =    0x0000000000200000;   // first 21 bits set 
-  //static const u64  EMPTY_KEY        =  2097151;         // first 21 bits set 
-
   static u32        nextPowerOf2(u32  v)
   {
     v--;
@@ -1384,7 +1379,7 @@ private:
 
     return ret;    
   }
-  VerIdx       store_vi(u32 i, u64 vi) const
+  VerIdx       store_vi(u32 i, u64 vi)         const
   {
     using namespace std;
         
@@ -1558,34 +1553,66 @@ public:
     return m_vis[idx];
   }
 
-  template<class MATCH_FUNC> 
-  VerIdx   putHashed(u32 hash, VerIdx vi, MATCH_FUNC match)     const
+  //template<class MATCH_FUNC> 
+  //VerIdx   putHashed(u32 hash, VerIdx vi, MATCH_FUNC match)     const
+  //{
+  //  using namespace std;
+  //  static const VerIdx empty   = empty_kv();
+  //  static const VerIdx deleted = deleted_kv();
+  //
+  //  VerIdx desired   =  empty;
+  //  desired.idx      =  vi.idx;
+  //  desired.version  =  vi.version;
+  //  u32           i  =  hash % m_sz;
+  //  u32          en  =  prevIdx(i);   //min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap?   // % m_sz;   //>0? hash-1  :  m_sz
+  //  for(;; i=nxtIdx(i) ) //++i)
+  //  {
+  //    VerIdx vi = load_vi(i);
+  //    if(vi.idx>=DELETED_KEY)                                                               // it is either deleted or empty
+  //    {          
+  //      bool    success  =  cmpex_vi(i, m_vis.data()+i, desired);
+  //      if(success) return vi;                                                //expected;  // continue; // WRONG!? // Another thread just stole it from underneath us.
+  //      else{ i=prevIdx(i); continue; }  // retry the same loop again
+  //    }                                                                                     // Either we just added the key, or another thread did.
+  //    
+  //    if( checkMatch(vi.version, vi.idx, match)!=MATCH_TRUE ) continue;
+  //    bool success = cmpex_vi(i, m_vis.data()+i, desired);
+  //    if(success) return vi;
+  //    else{ i=prevIdx(i); continue; }                                            // todo: this doesn't do anything because it doesn't assign to i !! - come back and look this over
+  //
+  //    if(i==en) break;
+  //  }
+  //
+  //  return empty;  // should never be reached
+  //}
+
+  VerIdx   putHashed(u32 hash, VerIdx lstVi, const void *const key, u32 klen)     const
   {
     using namespace std;
     static const VerIdx empty   = empty_kv();
     static const VerIdx deleted = deleted_kv();
 
     VerIdx desired   =  empty;
-    desired.idx      =  vi.idx;
-    desired.version  =  vi.version;
+    desired.idx      =  lstVi.idx;
+    desired.version  =  lstVi.version;
     u32           i  =  hash % m_sz;
-    u32          en  =  prevIdx(i);   //min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap?   // % m_sz;   //>0? hash-1  :  m_sz
-    for(;; i=nxtIdx(i) ) //++i)
+    u32          en  =  prevIdx(i);
+    for(;; i=nxtIdx(i) )
     {
-      //i %= m_sz;
       VerIdx vi = load_vi(i);
       if(vi.idx>=DELETED_KEY)                                                               // it is either deleted or empty
       {          
-        //VerIdx expected  =  vi; // vi.idx==EMPTY_KEY?  empty  :  deleted;
         bool    success  =  cmpex_vi(i, m_vis.data()+i, desired);
-        if(success) return vi; //expected;  // continue;                                          // WRONG!? // Another thread just stole it from underneath us.
-        else{ i=prevIdx(i); /*i==0? (m_sz-1)  : (i-1);*/ continue; }  // retry the same loop again
+        if(success) return vi;
+        else{ i=prevIdx(i); continue; }                                                     // retry the same loop again if a good slot was found but it was changed by another thread between the load and the compare-exchange
       }                                                                                     // Either we just added the key, or another thread did.
       
-      if( checkMatch(vi.version, vi.idx, match)!=MATCH_TRUE ) continue;
+      //if( checkMatch(vi.version, vi.idx, match)!=MATCH_TRUE ){ continue; }
+      if(m_csp->compare(vi.idx,vi.version,key,klen,hash)!=MATCH_TRUE ){ continue; }
+
       bool success = cmpex_vi(i, m_vis.data()+i, desired);
       if(success) return vi;
-      else{ i=prevIdx(i);  /*i==0? (m_sz-1)  : (i-1);*/ continue; }                                            // todo: this doesn't do anything because it doesn't assign to i !! - come back and look this over
+      else{ i=prevIdx(i); continue; }
 
       if(i==en) break;
     }
@@ -1637,14 +1664,13 @@ public:
       if(vi.idx==EMPTY_KEY){   return empty;   }
       if(vi.idx==DELETED_KEY){ return deleted; }
 
-      Match m = m_csp->compare(vi.idx, vi.version, key, klen, hash);   //checkMatch(probedKv.version, probedKv.idx, match);
+      Match m = m_csp->compare(vi.idx, vi.version, key, klen, hash);
       if(m==MATCH_TRUE){
         bool success = cmpex_vi(i, &vi, deleted);
         if(success){
           cleanDeletion(i);
           return vi;
         }else{ i=prevIdx(i); continue; }
-        //}else{ i==0? (m_sz-1)  : (i-1); continue; }  // todo: look back at this, it shouldn't work!1!! - retry the same loop again
 
         return vi;
       }
@@ -1676,7 +1702,6 @@ public:
   }
   VerIdx          at(u32  idx)                  const
   {
-    //return m_vis[idx];
     return load_vi(idx);
   }
   u32            nxt(u32  stIdx)                const
@@ -1744,16 +1769,15 @@ public:
 
     //m_csp->compare(blkIdx, version, buf, len, hash);
     
-    u32 len=0;
-    u32 ver=0;
+    u32 len=0; u32 ver=0;
     auto runFunc = [csp, &len, &ver, out_vlen](VerIdx kv){
       len = IsEmpty(kv)?  0ull  :  csp->len(kv.idx, kv.version, out_vlen);
       ver = kv.version;
     };
 
+    if(out_version){ *out_version = ver; }
     if( !runMatch(hash, matchFunc, runFunc) ) return 0;
 
-    if(out_version) *out_version = ver;
     return len;
   }
   bool           get(const void *const key, u32 klen, void *const   out_val, u32 vlen) const
@@ -1784,24 +1808,22 @@ public:
     assert(klen>0);
 
     u32      hash = CncrHsh::HashBytes(key, klen);
-    
-    //i32  blkcnt = 0;    
-    //BlkCnt blkcnt;
-    VerIdx vi = m_csp->alloc(klen+vlen, klen, hash); // &blkcnt);                       
-    if(vi.idx==LIST_END) return EMPTY_KEY;
+        
+    VerIdx lstVi = m_csp->alloc(klen+vlen, klen, hash);                       // lstVi is block list versioned index
+    if(lstVi.idx==LIST_END){ return EMPTY_KEY; }
 
-    m_csp->put(vi.idx, key, klen, val, vlen);
+    m_csp->put(lstVi.idx, key, klen, val, vlen);
 
-    //auto     ths = this;
-    CncrStr*  csp = m_csp;                                                            // this silly song and dance is because the this pointer can't be passed to a lambda
-    VerIdx     kv = putHashed(hash, vi,                                               // this returns the previous VerIdx at the position
-      [csp, key, klen, hash](u32 blkidx, u32 ver){
-        return csp->compare(blkidx,ver,key,klen,hash);
-      });
+    VerIdx vi = putHashed(hash, lstVi, key, klen);
+    if(vi.idx<DELETED_KEY){ m_csp->free(vi.idx, vi.version); }                          // putHashed returns the entry that was there before, which is the entry that was replaced. If it wasn't empty, we free it here. 
 
-    if(kv.idx<DELETED_KEY) m_csp->free(kv.idx, kv.version);                           // putHashed returns the entry that was there before, which is the entry that was replaced. If it wasn't empty, we free it here. 
+    return lstVi.idx;
 
-    return vi.idx;
+    //CncrStr*  csp = m_csp;                                                            // this silly song and dance is because the this pointer can't be passed to a lambda
+    //VerIdx     kv = putHashed(hash, vi,                                               // this returns the previous VerIdx at the position
+    //  [csp, key, klen, hash](u32 blkidx, u32 ver){
+    //    return csp->compare(blkidx,ver,key,klen,hash);
+    //  });
   }
   bool           del(const void *const key, u32 klen)
   {
@@ -2076,7 +2098,6 @@ public:
   i64          len(const void *const key, u32 klen, u32* out_vlen=nullptr, u32* out_version=nullptr) const
   {
     return s_ch.len(key, klen, out_vlen, out_version);
-
   }
   bool         get(const void *const key, u32 klen, void *const   out_val, u32 vlen) const
   {
@@ -2096,25 +2117,25 @@ public:
     assert(strlen(key)>0);
     return put(key, (u32)strlen(key), val, vlen);
   }
-  bool         get(char const* const key, void *const val, u32 vlen) const
+  bool         get(char const* const key, void *const val, u32 vlen) const // todo: should val not be a const pointer?
   {
     return get(key, (u32)strlen(key), val, vlen);
   }
-  bool         len(u32 idx, u32 version, u32* out_klen=nullptr, u32* out_vlen=nullptr) const
+  bool         len(u32 idx, u32 version, u32* out_vlen=nullptr, u32* out_version=nullptr) const  // todo: this needs to be redone to fit the functions as they stand now
   {
     auto  ths = this;
     bool   ok = s_ch.runRead(idx, version, 
-    [ths, out_klen, out_vlen](VerIdx kv)
+    [ths, out_vlen, out_version](VerIdx kv)
     {
       u32 vlen = 0;
       auto tlen = ths->s_cs.len(kv.idx, kv.version, out_vlen);
       if(tlen>0){
-        *out_klen = tlen - *out_vlen;
+        *out_vlen = tlen - *out_vlen;
         return true;
       }
       return false;
     });
-
+  
     return ok;
   }
   void       flush() const
@@ -2195,7 +2216,7 @@ public:
   {
     return put(key.data(), (u32)key.length(), value.data(), (u32)value.length());
   }
-  bool         get(str    const& key, str* out_value) const
+  bool         get(str    const& key, str*   out_value) const
   {
     u32   vlen = 0;
     auto  kvLen = len(key.data(), (u32)key.length(), &vlen);
@@ -2204,13 +2225,13 @@ public:
 
     return ok;
   }
-  auto         get(str    const& key)                 const -> std::string
+  auto         get(str    const& key)                   const -> std::string
   {
     str ret;
     if(this->get(key, &ret)) return ret;
     else return str("");
   }
-  VerStr    nxtKey(u64* searched=nullptr)             const
+  VerStr    nxtKey(u64* searched=nullptr)               const
   {
     u32 klen, vlen;
     bool    ok = false;
@@ -2281,7 +2302,6 @@ public:
   {    
     return put(key.data(), (u32)key.length(), val.data(), (u32)(val.size()*sizeof(T)) );
   }
-
   // end separated C++ functions
 
 };
@@ -2292,6 +2312,30 @@ public:
 
 
 
+
+//checkMatch(probedKv.version, probedKv.idx, match);
+//
+//}else{ i==0? (m_sz-1)  : (i-1); continue; }  // todo: look back at this, it shouldn't work!1!! - retry the same loop again
+
+//i32  blkcnt = 0;    
+//BlkCnt blkcnt;
+// &blkcnt);
+//
+//auto     ths = this;
+
+//i %= m_sz;
+//
+//VerIdx expected  =  vi; // vi.idx==EMPTY_KEY?  empty  :  deleted;
+// 
+// i==0? (m_sz-1)  : (i-1); 
+// i==0? (m_sz-1)  : (i-1);
+
+//static const u32  EMPTY_KEY        =  0x0000001FFFFF;   // first 21 bits set 
+//static const u32  DELETED_KEY      =  0x0000001FFFFE;   // 1 less than the EMPTY_KEY
+//static const  u64  EMPTY_KEY        =  0x000000000000001FFFFF;         // first 21 bits set 
+//static const u64  EMPTY_KEY        =  0x000000000FFFFFFF;   // first 28 bits set 
+//static const u64  EMPTY_KEY        =    0x0000000000200000;   // first 21 bits set 
+//static const u64  EMPTY_KEY        =  2097151;         // first 21 bits set 
 
 //u64 sb = lava_vec::sizeBytes(count);
 //p       = addr;
