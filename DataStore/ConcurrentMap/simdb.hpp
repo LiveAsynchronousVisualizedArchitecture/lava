@@ -1372,7 +1372,7 @@ private:
     using namespace std;
     
     au64* avi = (au64*)(m_vis.data()+i);                            // avi is atomic versioned index
-    u64   cur = avi->load();                                        // atomic_load<u64>( (au64*)(m_vis.data()+i) );              // Load the key that was there.
+    u64   cur = swp32(avi->load());                                 // need because of endianess? // atomic_load<u64>( (au64*)(m_vis.data()+i) );              // Load the key that was there.
 
     //VerIdx ret;
     //if(i%2==1) ret.asInt = swp32(cur);
@@ -1393,8 +1393,8 @@ private:
 
     u64 prev = atomic_exchange<u64>( (au64*)(&m_vis[i]), *((u64*)(&strVi)) );
 
-    if(i%2==1) return VerIdx(lo32(prev), hi32(prev));
-    else       return VerIdx(hi32(prev), lo32(prev));
+    if(odd) return VerIdx(lo32(prev), hi32(prev));
+    else    return VerIdx(hi32(prev), lo32(prev));
   }
   //VerIdx       store_vi(u32 i, u64 vi)         const
   //{
