@@ -229,6 +229,15 @@ void printdb(simdb const& db)
   Println("\nmem: ", memstr, "\n" );
 }
 
+void printhsh(simdb const& db)
+{
+  u32* d = (u32*)db.hashData();
+  for(u32 i=0; i<(db.blocks()*2); ++i){
+    printf(" %xd ", d[i]); 
+  }
+  printf("\n\n");
+}
+
 int main()
 {
   using namespace std;
@@ -454,11 +463,12 @@ int main()
   //  memSz);
 
   // OpenFileMapping if the file exists
-  
+  //
   //Println(fileHndl);
   //Println("\n\n");
   //Println(mapmem);
 
+  //
   //Println("kv sz: ", sizeof(simdb::KV) );
 
   //u32    isKey :  1;
@@ -517,6 +527,8 @@ int main()
 
   simdb db("test", 32, 8);
 
+  printhsh(db);
+
   str numkey[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"};
   str  label[] = {"zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven"};
   
@@ -567,6 +579,8 @@ int main()
   //else{
   //  Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
   //}
+
+  printhsh(db); // Println();
 
   u32 vlen=0,ver=0;
   i64  len = db.len( wat.data(), (u32)wat.length(), &vlen, &ver);

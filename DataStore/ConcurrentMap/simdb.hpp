@@ -1724,6 +1724,7 @@ public:
   {
     return m_sz;
   }
+  auto          data()                          const -> void* { return m_vis.data(); }
   u64      sizeBytes()                          const
   {
     return m_vis.sizeBytes();
@@ -1777,6 +1778,7 @@ public:
 
     if(out_version){ *out_version = ver; }
     if( !runMatch(hash, matchFunc, runFunc) ) return 0;
+    if(out_version){ *out_version = ver; }
 
     return len;
   }
@@ -1835,6 +1837,7 @@ public:
 
     return doFree;
   }
+
 };
 struct  SharedMem       // in a halfway state right now - will need to use arbitrary memory and have other OS implementations for shared memory eventually
 {
@@ -2199,10 +2202,8 @@ public:
   {
     return m_mem.hndlPtr;
   }
-  u64      memsize() const
-  {
-    return m_mem.size;
-  }
+  u64      memsize() const { return m_mem.size; }
+  auto    hashData() const -> void const* const { return s_ch.data(); }
 
   // separated C++ functions - these won't need to exist if compiled for a C interface
   struct VerStr { 
