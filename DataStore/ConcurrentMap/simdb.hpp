@@ -102,9 +102,16 @@
 // -todo: change CncrHsh init to set ints directly instead of using store_vi
 // -todo: make alloc() set up a list with LIST_END as the last index
 // -todo: redo KeyReaders, incReaders() and decReaders()
+// -todo: make CncrLst::idx() an atomic load
+// -todo: figure out why neither version of CncrStr::free() is being hit - wasn't calling del()....
 
+// todo: figure out 128 bit alignement of CncrHsh's VerIdx memory
+// todo: figure out how to set the indices into a list in CncrLst so that free() can use the start and end indices to free multiple blocks
+// todo: make a CncrStr function to free a series of blocks with a begin and end, returning failure or success
 // todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
 // todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
+// todo: test with larger keys and values that span multiple blocks
+// todo: does a BlkLst need to be loaded atomically by a read operation? is it possible that a read could be out of date and use an incorrect cached version?
 // todo: flatten runIfMatch function to only take a function template argument but not a match function template argument
 // todo: find any remnants of KeyVal or kv and change them to VerIdx or vi
 // todo: stop using match function as a template in and just run a function in CncrHsh
@@ -119,6 +126,7 @@
 // todo: make sure readers deletes the block list if it is the last reader after deletion
 // todo: reference count initializations so that the last process out can destroy the db
 // todo: re-evaluate if the high bits of the lava vec pointer still need to contain extra information
+// todo: redo basic type definitions and put them only into class definitions
 // todo: search for any embedded todo comments
 // todo: clean out old commented lines
 // todo: compile with maximum warnings
@@ -342,11 +350,6 @@ using  ai32   =   std::atomic<i64>;
 using   ai8   =   std::atomic<i8>;
 using  cstr   =   const char*;
 using   str   =   std::string;             // will need C++ ifdefs eventually or just need to be taken out
-//using   ui8   =   uint8_t;
-//using  ui64   =   uint64_t;
-//using  ui32   =   uint32_t;
-//using aui32   =   std::atomic<ui32>;
-//using aui64   =   std::atomic<u64>;
 
 template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  // will need C++ ifdefs eventually
 
@@ -749,30 +752,38 @@ public:
                                           // uses the first 8 bytes that would normally store sizeBytes as the 64 bits of memory for the Head structure
   }
 
-  auto        nxt() -> uint32_t           // moves forward in the list and return the previous index
+  u32        nxt()                                               // moves forward in the list and return the previous index
   {
-    /*prevHead,*/
     Head  curHead, nxtHead;
-
-    curHead.asInt  =  m_h->load();        // std::atomic_load(m_h);  // m_h.load();
-    do 
-    {
-      if(curHead.idx==LIST_END) return LIST_END;
+    curHead.asInt  =  m_h->load();
+    do{
+      if(curHead.idx==LIST_END){return LIST_END;}
 
       nxtHead.idx  =  m_lv[curHead.idx];
       nxtHead.ver  =  curHead.ver + 1;
-    } while( !m_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
+    }while( !m_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
 
     return curHead.idx;
   }
-  u32        free(u32 idx)                         // not thread safe yet when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway?
+  u32        free(u32 idx)                         // not thread safe when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway, since the CncrHsh will already have the index taken out and the free will only be triggered after the last reader has read from it 
   {
     Head curHead, nxtHead; u32 retIdx;
-
     curHead.asInt = m_h->load();
     do{
       retIdx = m_lv[idx] = curHead.idx;
       nxtHead.idx  =  idx;
+      nxtHead.ver  =  curHead.ver + 1;
+    }while( !m_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
+
+    return retIdx;
+  }
+  u32        free(u32 st, u32 en)                                // not thread safe when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway, since the CncrHsh will already have the index taken out and the free will only be triggered after the last reader has read from it 
+  {
+    Head curHead, nxtHead; u32 retIdx;
+    curHead.asInt = m_h->load();
+    do{
+      retIdx = m_lv[en] = curHead.idx;
+      nxtHead.idx  =  st;
       nxtHead.ver  =  curHead.ver + 1;
     }while( !m_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
 
@@ -784,11 +795,12 @@ public:
     //return ((Head*)(&m_h))->ver;
     return ((Head*)m_h)->ver;
   }
-  auto        idx() -> u32
+  auto        idx() const -> u32
   {
-    //return ((Head*)(&m_h))->idx;
-    return ((Head*)m_h)->idx;
-  }            // not thread safe
+    Head h; 
+    h.asInt = m_h->load();
+    return h.idx;
+  }
   auto       list() -> ListVec const* 
   {
     return &m_lv;
@@ -805,6 +817,7 @@ public:
     }
     return cnt;
   }
+  auto       head() -> Head* { return (Head*)m_h; }
 };
 class     CncrStr
 {
@@ -946,33 +959,20 @@ private:
 
     return blocks;
   }
-  void           doFree(u32  blkIdx)  const        // frees a list/chain of blocks
+  u32       findListEnd(u32  blkIdx)  const                  // find the last BlkLst slot in the linked list of blocks to free 
   {
-  // todo: set the last index to the current value in head
-  // todo: set the head's value to the first free index (blkIdx) with a compare-exchange 
-  // todo: loop on failure 
-    u32   cur  =             blkIdx;          // cur is the current block index
-    u32   nxt  =   s_bls[cur].idx;         //*stPtr(cur);              // nxt is the next block index
-    for(; nxt>0; nxt=s_bls[cur].idx)
-    { 
-      //memset(blkPtr(cur), 0, m_blockSize);    // zero out memory on free, 
-      //m_bls[cur].readers = 0;                 // reset the reader count
-      
-      //s_bls[cur].kr.isKey   = false;          // make sure key is false;
-      //s_bls[cur].kr.readers = 0;              // reset the reader count
-      s_bls[cur].isKey   = false;          // make sure key is false;
-      s_bls[cur].readers = 0;              // reset the reader count
-      
-      s_cl.free(cur);
-      //m_blocksUsed.fetch_add(-1);
-      cur  =  nxt;
+    u32 cur=blkIdx, prev=blkIdx;
+    while(cur != LIST_END){
+      prev = cur;
+      cur  = s_bls[cur].idx;
     }
-    //memset(blkPtr(cur), 0, m_blockSize);       // 0 out memory on free, 
-    //m_bls[cur].readers = 0;                  // reset the reader count
-    //s_bls[cur].kr.readers = 0;                 // reset the reader count
 
-    s_bls[cur].readers = 0;                 // reset the reader count
-    s_cl.free(cur);
+    return prev;
+  }
+  void           doFree(u32  blkIdx)  const        // frees a list/chain of blocks - don't need to zero out the memory of the blocks or reset any of the BlkLsts' variables since they will be re-initialized anyway
+  {
+    u32 listEnd  =  findListEnd(blkIdx); 
+    s_cl.free(blkIdx, listEnd);
   }
   u32        writeBlock(u32  blkIdx, void const* const bytes, u32 len=0, u32 ofst=0)      // don't need to increment readers since write should be done before the block is exposed to any other threads
   {
@@ -2278,6 +2278,51 @@ public:
 
 
 
+
+//auto        idx() -> u32
+//{
+//  //return ((Head*)(&m_h))->idx;
+//  return ((Head*)m_h)->idx;
+//}            // not thread safe
+
+//void           doFree(u32  blkIdx)  const        // frees a list/chain of blocks
+//{
+//// todo: set the last index to the current value in head
+//// todo: set the head's value to the first free index (blkIdx) with a compare-exchange 
+//// todo: loop on failure 
+//  u32   cur  =             blkIdx;          // cur is the current block index
+//  u32   nxt  =   s_bls[cur].idx;         //*stPtr(cur);              // nxt is the next block index
+//  for(; nxt>0; nxt=s_bls[cur].idx)
+//  { 
+//    //memset(blkPtr(cur), 0, m_blockSize);    // zero out memory on free, 
+//    //m_bls[cur].readers = 0;                 // reset the reader count
+//    
+//    //s_bls[cur].kr.isKey   = false;          // make sure key is false;
+//    //s_bls[cur].kr.readers = 0;              // reset the reader count
+//    s_bls[cur].isKey   = false;          // make sure key is false;
+//    s_bls[cur].readers = 0;              // reset the reader count
+//    
+//    s_cl.free(cur);
+//    //m_blocksUsed.fetch_add(-1);
+//    cur  =  nxt;
+//  }
+//  //memset(blkPtr(cur), 0, m_blockSize);       // 0 out memory on free, 
+//  //m_bls[cur].readers = 0;                  // reset the reader count
+//  //s_bls[cur].kr.readers = 0;                 // reset the reader count
+//
+//  s_bls[cur].readers = 0;                 // reset the reader count
+//  s_cl.free(cur);
+//}
+// todo: find the last BlkLst 
+// todo: set the last index to the current value in head
+// todo: set the head's value to the first free index (blkIdx) with a compare-exchange 
+// todo: loop on failure 
+
+//using   ui8   =   uint8_t;
+//using  ui64   =   uint64_t;
+//using  ui32   =   uint32_t;
+//using aui32   =   std::atomic<ui32>;
+//using aui64   =   std::atomic<u64>;
 
 //struct { u32 version; u32 idx; }; // declaring the version first and idx second puts the 
 //
