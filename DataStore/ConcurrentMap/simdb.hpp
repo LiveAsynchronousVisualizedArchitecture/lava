@@ -99,11 +99,13 @@
 // -todo: make put return VerIdx ? - is having an out_version pointer enough? - revisit this if it becomes an issue
 // -todo: redo the BlkLst struct with calibrated bitfield size and without sub structures
 // -todo: debug new BlkLst struct with get() / len() no longer working - put() seems to work, len() seems to not work -  incReaders() and decReaders() needed a union of isKey and readers to be an integer
+// -todo: change CncrHsh init to set ints directly instead of using store_vi
+// -todo: make alloc() set up a list with LIST_END as the last index
+// -todo: redo KeyReaders, incReaders() and decReaders()
 
 // todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
 // todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
 // todo: flatten runIfMatch function to only take a function template argument but not a match function template argument
-// todo: change CncrHsh init to set ints directly instead of using store_vi
 // todo: find and remnants of KeyVal or kv and change them to VerIdx or vi
 // todo: stop using match function as a template in and just run a function in CncrHsh
 //       | len()
@@ -335,6 +337,7 @@ using   u32   =   uint32_t;
 using   f32   =   float;
 using   f64   =   double;
 using  au64   =   std::atomic<u64>;
+using  au32   =   std::atomic<u32>;
 using  ai32   =   std::atomic<i64>;
 using   ai8   =   std::atomic<i8>;
 using  cstr   =   const char*;
@@ -818,14 +821,23 @@ public:
     VerIdx(){}
     VerIdx(u32 _idx, u32 _version) : idx(_idx), version(_version) {}
   };
-  union   KeyAndReaders
+  //union   KeyAndReaders
+  //{
+  //  struct{ u32 isKey : 1; i32 readers : 31; u32 version; };
+  //  u64 asInt;
+  //};
+  union   KeyReaders
   {
-    struct{ u32 isKey : 1; i32 readers : 31; u32 version; };
-    u64 asInt;
+    struct{ u32 isKey : 1; i32 readers : 31; };
+    u32 asInt;
   };
   struct  BlkLst
   {
-    union{ struct{ u32 isKey : 1; i32 readers : 31; }; u32 kr; };  //  4 bytes   -   kr is key readers  // todo: make sure that kr can be incremented safely
+    //union{ struct{ u32 isKey : 1; i32 readers : 31; }; u32 kr; };  //  4 bytes   -   kr is key readers  // todo: make sure that kr can be incremented safely
+    union{
+      KeyReaders kr;
+      struct{ u32 isKey : 1; i32 readers : 31; };
+    };
     u32 idx, version, len, klen, hash;                             // 20 bytes
     // 24 bytes total
 
@@ -878,13 +890,13 @@ public:
   BlkLst    incReaders(u32 blkIdx, u32 version) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
 
-    KeyAndReaders cur, nxt;
+    KeyReaders cur, nxt;
     BlkLst*     bl  =  &s_bls[blkIdx];
     //au64* areaders  =  (au64*)&(bl->kr.asInt);    
-    au64* areaders  =  (au64*)&(bl->kr);        // todo: desperatly need to check and redo this - if readers is signed, 31 bits, and part of a bit set with a flag, the flag needs to be kept while the 31 bit signed int is incremented
+    au32* areaders  =  (au32*)&(bl->kr);                               // todo: desperatly need to check and redo this - if readers is signed, 31 bits, and part of a bit set with a flag, the flag needs to be kept while the 31 bit signed int is incremented
     cur.asInt       =  areaders->load();
     do{
-      if(cur.version!=version || cur.readers<0) return BlkLst(); // make_BlkLst(0,0,0,0,0,0);
+      if(bl->version!=version || cur.readers<0) return BlkLst(); // make_BlkLst(0,0,0,0,0,0);
       nxt = cur;
       nxt.readers += 1;
     }while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
@@ -893,13 +905,13 @@ public:
   }
   bool      decReaders(u32 blkIdx, u32 version) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
-    KeyAndReaders cur, nxt;
+    KeyReaders cur, nxt;
     BlkLst*     bl  =  &s_bls[blkIdx];
     //au64* areaders = (au64*)&(s_bls[blkIdx].kr.asInt);
-    au64* areaders  =  (au64*)&(bl->kr);
+    au32* areaders  =  (au32*)&(bl->kr);
     cur.asInt       =  areaders->load();
     do{
-      if(cur.version!=version) return false;
+      if(bl->version!=version) return false;
       nxt = cur;
       nxt.readers -= 1;
     }while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
@@ -1028,34 +1040,29 @@ public:
     assert(blockSize > sizeof(i32));
   }
 
-  //auto        alloc(u32    size, u32 klen, u32 hash, i32* out_blocks=nullptr) -> VerIdx     // have this output a struct with a 1 bit flag of whether it reached the LIST_END or not    // -todo: doesn't this need to give back the blocks if allocation fails? - it does
-  auto        alloc(u32    size, u32 klen, u32 hash, BlkCnt* out_blocks=nullptr) -> VerIdx     // have this output a struct with a 1 bit flag of whether it reached the LIST_END or not    // -todo: doesn't this need to give back the blocks if allocation fails? - it does
+  auto        alloc(u32    size, u32 klen, u32 hash, BlkCnt* out_blocks=nullptr) -> VerIdx    
   {
-    u32 byteRem  =  0;
-    u32  blocks  =  blocksNeeded(size, &byteRem);
-
-    u32   st = s_cl.nxt();                                     // stBlk  is starting block
+    u32  byteRem = 0;
+    u32   blocks = blocksNeeded(size, &byteRem);
+    u32       st = s_cl.nxt();
     SECTION(get the starting block index and handle errors)
     {
       if(st==LIST_END){
         if(out_blocks){ *out_blocks = {1, 0} ; } 
-        return List_End(); // LIST_END; 
+        return List_End(); 
       }
     }
 
-    u32  ver  =  (u32)s_version->fetch_add(1);
-    u32  cur  =  st;
-    u32  nxt  =  0;    // s_cl.nxt(); //s_bls[st] =  BlkLst(true, 0, nxt, ver, size, klen, hash);
-    u32  cnt  =  0;
+    u32  ver = (u32)s_version->fetch_add(1);
+    u32  cur = st;
+    u32  nxt = 0;
+    u32  cnt = 0;
     SECTION(loop for the number of blocks needed and get new block and link it to the list)
     {
-      for(u32 i=0; i<blocks; ++i)
+      for(u32 i=0; i<blocks-1; ++i)
       {
         nxt = s_cl.nxt();
         if(nxt==LIST_END){ free(st, ver); VerIdx empty={LIST_END,0}; return empty; }
-
-        //if(i==0) s_bls[cur] =  BlkLst(true,  0, nxt, ver, size, klen);        // make_BlkLst(true,  0, nxt, ver, size, klen);
-        //else     s_bls[cur] =  BlkLst(false, 0, nxt, ver, 0, 0);              // make_BlkLst(false, 0, nxt, ver, 0, 0);
 
         s_bls[cur] = BlkLst(false, 0, nxt, ver);
         cur        = nxt;
@@ -1065,18 +1072,9 @@ public:
     }
 
     SECTION(add the last index into the list, set out_blocks and return the start index with its version)
-    {
-      //u32 blockRemainder = byteRem? -byteRem : -blockFreeSize();
-      //BlkLst  bl =  make_BlkLst(cur==st, 0, blockRemainder, ver, size, klen);
-      //
-      //u32 blockRemainder = byteRem? byteRem : blockFreeSize();
-      //BlkLst bl(cur==st, 0, blockRemainder, ver, size, klen, hash);
-      //s_bls[cur] = bl;
-      //
-      //if(out_blocks){ *out_blocks = nxt==LIST_END? -((i32)cnt) : (i32)cnt; }     
+    {      
+      s_bls[cur] = BlkLst(false,0,LIST_END,ver,0,0,0);       // if there is only one block needed, cur and st could be the same
 
-      //s_bls[st].kr.isKey = true;
-      
       s_bls[st].isKey = true;
       s_bls[st].hash  = hash;
       s_bls[st].len   = size;
@@ -2289,6 +2287,29 @@ public:
 
 
 
+
+
+//if(i==0) s_bls[cur] =  BlkLst(true,  0, nxt, ver, size, klen);        // make_BlkLst(true,  0, nxt, ver, size, klen);
+//else     s_bls[cur] =  BlkLst(false, 0, nxt, ver, 0, 0);              // make_BlkLst(false, 0, nxt, ver, 0, 0);
+
+//u32 blockRemainder = byteRem? -byteRem : -blockFreeSize();
+//BlkLst  bl =  make_BlkLst(cur==st, 0, blockRemainder, ver, size, klen);
+//
+//u32 blockRemainder = byteRem? byteRem : blockFreeSize();
+//BlkLst bl(cur==st, 0, blockRemainder, ver, size, klen, hash);
+//s_bls[cur] = bl;
+//
+//if(out_blocks){ *out_blocks = nxt==LIST_END? -((i32)cnt) : (i32)cnt; }     
+//
+//s_bls[st].kr.isKey = true;
+
+// stBlk  is starting block
+// LIST_END;
+// have this output a struct with a 1 bit flag of whether it reached the LIST_END or not    // -todo: doesn't this need to give back the blocks if allocation fails? - it does
+// s_cl.nxt(); //s_bls[st] =  BlkLst(true, 0, nxt, ver, size, klen, hash);
+
+//
+//auto        alloc(u32    size, u32 klen, u32 hash, i32* out_blocks=nullptr) -> VerIdx     // have this output a struct with a 1 bit flag of whether it reached the LIST_END or not    // -todo: doesn't this need to give back the blocks if allocation fails? - it does
 
 //struct { KeyAndReaders kr; u32 idx; u32 len, klen, hash; };
 //using IDX         =  i32;
