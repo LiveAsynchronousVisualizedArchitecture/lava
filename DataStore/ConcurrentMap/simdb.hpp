@@ -765,19 +765,16 @@ public:
 
     return curHead.idx;
   }
-  auto       free(u32 idx) -> uint32_t   // not thread safe yet when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway?
+  u32        free(u32 idx)                         // not thread safe yet when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway?
   {
-    Head curHead;
-    Head nxtHead;
-    uint32_t    retIdx;
+    Head curHead, nxtHead; u32 retIdx;
 
     curHead.asInt = m_h->load();
-    do 
-    {
+    do{
       retIdx = m_lv[idx] = curHead.idx;
       nxtHead.idx  =  idx;
       nxtHead.ver  =  curHead.ver + 1;
-    } while( !m_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
+    }while( !m_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
 
     return retIdx;
   }
@@ -814,30 +811,23 @@ class     CncrStr
 public:
   union   VerIdx
   {
-    //struct { u32 version; u32 idx; }; // declaring the version first and idx second puts the 
     struct { u32 idx; u32 version; }; // declaring the version first and idx second puts the 
     u64 asInt;
 
     VerIdx(){}
     VerIdx(u32 _idx, u32 _version) : idx(_idx), version(_version) {}
   };
-  //union   KeyAndReaders
-  //{
-  //  struct{ u32 isKey : 1; i32 readers : 31; u32 version; };
-  //  u64 asInt;
-  //};
   union   KeyReaders
   {
     struct{ u32 isKey : 1; i32 readers : 31; };
     u32 asInt;
   };
   struct  BlkLst
-  {
-    //union{ struct{ u32 isKey : 1; i32 readers : 31; }; u32 kr; };  //  4 bytes   -   kr is key readers  // todo: make sure that kr can be incremented safely
+  {    
     union{
       KeyReaders kr;
       struct{ u32 isKey : 1; i32 readers : 31; };
-    };
+    };                                                              //  4 bytes   -   kr is key readers  // todo: make sure that kr can be incremented safely
     u32 idx, version, len, klen, hash;                             // 20 bytes
     // 24 bytes total
 
@@ -892,7 +882,6 @@ public:
 
     KeyReaders cur, nxt;
     BlkLst*     bl  =  &s_bls[blkIdx];
-    //au64* areaders  =  (au64*)&(bl->kr.asInt);    
     au32* areaders  =  (au32*)&(bl->kr);                               // todo: desperatly need to check and redo this - if readers is signed, 31 bits, and part of a bit set with a flag, the flag needs to be kept while the 31 bit signed int is incremented
     cur.asInt       =  areaders->load();
     do{
@@ -907,7 +896,6 @@ public:
   {
     KeyReaders cur, nxt;
     BlkLst*     bl  =  &s_bls[blkIdx];
-    //au64* areaders = (au64*)&(s_bls[blkIdx].kr.asInt);
     au32* areaders  =  (au32*)&(bl->kr);
     cur.asInt       =  areaders->load();
     do{
@@ -939,7 +927,6 @@ private:
     BlkLst bl  = s_bls[blkIdx];
     VerIdx vi;
     vi.idx     = bl.idx;
-    //vi.version = bl.kr.version;
     vi.version = bl.version;
 
     prefetch1( (char const* const)blockFreePtr(bl.idx) );
@@ -961,6 +948,9 @@ private:
   }
   void           doFree(u32  blkIdx)  const        // frees a list/chain of blocks
   {
+  // todo: set the last index to the current value in head
+  // todo: set the head's value to the first free index (blkIdx) with a compare-exchange 
+  // todo: loop on failure 
     u32   cur  =             blkIdx;          // cur is the current block index
     u32   nxt  =   s_bls[cur].idx;         //*stPtr(cur);              // nxt is the next block index
     for(; nxt>0; nxt=s_bls[cur].idx)
@@ -2288,6 +2278,16 @@ public:
 
 
 
+
+//struct { u32 version; u32 idx; }; // declaring the version first and idx second puts the 
+//
+//union   KeyAndReaders
+//{
+//  struct{ u32 isKey : 1; i32 readers : 31; u32 version; };
+//  u64 asInt;
+//};
+//
+//union{ struct{ u32 isKey : 1; i32 readers : 31; }; u32 kr; };  
 
 //if(i==0) s_bls[cur] =  BlkLst(true,  0, nxt, ver, size, klen);        // make_BlkLst(true,  0, nxt, ver, size, klen);
 //else     s_bls[cur] =  BlkLst(false, 0, nxt, ver, 0, 0);              // make_BlkLst(false, 0, nxt, ver, 0, 0);
