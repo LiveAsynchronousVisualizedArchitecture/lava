@@ -105,6 +105,7 @@
 // -todo: make CncrLst::idx() an atomic load
 // -todo: figure out why neither version of CncrStr::free() is being hit - wasn't calling del()....
 
+// todo: 
 // todo: figure out 128 bit alignement of CncrHsh's VerIdx memory
 // todo: figure out how to set the indices into a list in CncrLst so that free() can use the start and end indices to free multiple blocks
 // todo: make a CncrStr function to free a series of blocks with a begin and end, returning failure or success
@@ -127,6 +128,7 @@
 // todo: reference count initializations so that the last process out can destroy the db
 // todo: re-evaluate if the high bits of the lava vec pointer still need to contain extra information
 // todo: redo basic type definitions and put them only into class definitions
+// todo: re-evaluate strong vs weak ordering
 // todo: search for any embedded todo comments
 // todo: clean out old commented lines
 // todo: compile with maximum warnings
@@ -275,6 +277,10 @@
  |  |  |  The possibility exists that after duplication but before deletion of the duplicate, put() could swap the duplicate to the right (higher slot). Because of this, put will need to delete any indices that it finds that link to non-key block lists
  |  |  |  put() will also need to check for duplicate indices, since if they are bubble sorting a robin hood span, they could separate duplicate indices from being next to each other, but also sort them back together
  |  |  |  should get() also check for duplicates? - probably, since it would have tighter cleanup of the ConcurrentHash only at the expense of one or two extra atomic loads per read
+
+ Other notables:
+ | All of the main classes have a static sizeBytes() function that takes in the same arguments as a constructor and return the number of bytes that it will need in the shared memory
+
 */
 
 #ifdef _MSC_VER
@@ -288,7 +294,7 @@
   #define       SECTION(_msvc_only_collapses_macros_with_arguments, ...)
 #endif
 
-// platform specifics - mostly for shared memory mapping and auxillary functions like open, close and the windows equivilents
+// platform specific includes - mostly for shared memory mapping and auxillary functions like open, close and the windows equivilents
 #if defined(_WIN32)      // windows
   // use _malloca ? - would need to use _freea and also know that _malloca always allocates on the heap in debug mode for some crazy reason
   #define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);
@@ -353,6 +359,7 @@ using   str   =   std::string;             // will need C++ ifdefs eventually or
 
 template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  // will need C++ ifdefs eventually
 
+// platform specific type definitions
 #ifdef _WIN32                         // these have to be outside the anonymous namespace
   typedef void        *HANDLE;
   typedef HANDLE     *PHANDLE;
@@ -503,6 +510,7 @@ namespace {
     long long            _ExchangeLow, 
     long long*      _CompareAndResult)
   {
+    //assert( ((u64)_Destination) % 16 == 0 );
     return _InterlockedCompareExchange128(
      _Destination,
      _ExchangeHigh,
@@ -1309,6 +1317,10 @@ public:
   static const u32  EMPTY_HASH_IDX   =   0xFFFFFFFF;         // 32 bits set - hash indices are different from block indices 
   static const u32  LIST_END         =   CncrStr::LIST_END;
 
+  static u64           sizeBytes(u32 size)                   // the size in bytes that this structure will take up in the shared memory
+  {
+    return lava_vec<VerIdx>::sizeBytes(size) + 16;           // extra 16 bytes for 128 bit alignment padding 
+  }
   static u32        nextPowerOf2(u32  v)
   {
     v--;
@@ -1320,11 +1332,6 @@ public:
     v++;
 
     return v;
-  }
-  static u64           sizeBytes(u32 size)
-  {
-    //return lava_vec<VerIdx>::sizeBytes( nextPowerOf2(size) );
-    return lava_vec<VerIdx>::sizeBytes(size);
   }
   static bool  DefaultKeyCompare(u32 a, u32 b)
   {
@@ -1548,14 +1555,18 @@ public:
   CncrHsh(){}
   CncrHsh(void* addr, u32 size, CncrStr* cs, bool owner=true) :
     m_sz(nextPowerOf2(size)),
-    s_vis(addr, m_sz),
+    //s_vis(addr, m_sz),
     m_csp(cs)
   {
+    u64     paddr  =  (u64)addr;                // paddr is padded address
+    u8        rem  =  16 - paddr%16;
+    u8       ofst  =  16 - rem;
+    void* algnMem  =  (void*)(paddr+ofst);      assert( ((u64)algnMem) % 16 == 0 ); 
+
+    new (&s_vis) VerIdxs(algnMem, m_sz);        // initialize the lava_vec of VerIdx structs with the 128 bit aligned address
+    
     if(owner){
       init(size, cs);
-      //VerIdx defKv = empty_kv();
-      //for(u64 i=0; i<m_vis.size(); ++i)
-      //  m_vis[i] = defKv;
     }
   }
   CncrHsh(CncrHsh const& lval) = delete;
@@ -2278,6 +2289,12 @@ public:
 
 
 
+//
+//return lava_vec<VerIdx>::sizeBytes( nextPowerOf2(size) );
+
+//VerIdx defKv = empty_kv();
+//for(u64 i=0; i<m_vis.size(); ++i)
+//  m_vis[i] = defKv;
 
 //auto        idx() -> u32
 //{
