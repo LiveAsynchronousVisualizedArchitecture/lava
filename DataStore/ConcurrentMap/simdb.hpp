@@ -106,7 +106,7 @@
 // todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
 // todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
 // todo: flatten runIfMatch function to only take a function template argument but not a match function template argument
-// todo: find and remnants of KeyVal or kv and change them to VerIdx or vi
+// todo: find any remnants of KeyVal or kv and change them to VerIdx or vi
 // todo: stop using match function as a template in and just run a function in CncrHsh
 //       | len()
 //       | get()
