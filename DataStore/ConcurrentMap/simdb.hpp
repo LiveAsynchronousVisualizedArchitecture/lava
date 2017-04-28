@@ -104,9 +104,9 @@
 // -todo: redo KeyReaders, incReaders() and decReaders()
 // -todo: make CncrLst::idx() an atomic load
 // -todo: figure out why neither version of CncrStr::free() is being hit - wasn't calling del()....
+// -todo: figure out 128 bit alignement of CncrHsh's VerIdx memory - padded sizeBytes() by 16 and offset the address in which the lava_vec is created with to land on the 128 bit boundary
 
-// todo: 
-// todo: figure out 128 bit alignement of CncrHsh's VerIdx memory
+// todo: debug clean deletions leaving slots in a DELETED_KEY state - one side of the 128 bit alignment not being swapped - now duplicate DELETED_KEY entries are being created without being cleaned up - also deleting an adjacent EMPTY_KEY?
 // todo: figure out how to set the indices into a list in CncrLst so that free() can use the start and end indices to free multiple blocks
 // todo: make a CncrStr function to free a series of blocks with a begin and end, returning failure or success
 // todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
@@ -373,7 +373,7 @@ namespace {
 
   struct _u128
   {
-    volatile u64 hi; volatile u64 lo; 
+   volatile u64 lo; volatile u64 hi; 
     //_u128& operator=(_u128 l){ hi = l.hi; lo = l.lo; return *this; };
   };
 
@@ -1356,19 +1356,20 @@ public:
     u64 iVi = vi.asInt;
     return *((i64*)(&iVi));                                              // interpret the u64 bits directly as a signed 64 bit integer instead    
   }
+  static i64              vi_i64(u64  i){ return *((i64*)&i); }          // interpret the u64 bits directly as a signed 64 bit integer instead    
   static bool            IsEmpty(VerIdx kv)
   {
     static VerIdx emptykv = empty_kv();
     return emptykv.asInt == kv.asInt;
   }
-  static u32                hi32(u64 n){ return (n>>32); }
-  static u32                lo32(u64 n){ return (n<<32)>>32; }
+  static u32                lo32(u64 n){ return (n>>32); }
+  static u32                hi32(u64 n){ return (n<<32)>>32; }
   static u64               swp32(u64 n){ 
-   return (((u64)lo32(n))<<32)  |  ((u64)hi32(n)); }
-  static u64             incHi32(u64 n, u32 i){ return ((u64)hi32(n)+i)<<32 | lo32(n); }
-  static u64             incLo32(u64 n, u32 i){ return ((u64)hi32(n))<<32 | (lo32(n)+i); }
+   return (((u64)hi32(n))<<32)  |  ((u64)lo32(n)); }
+  static u64             inclo32(u64 n, u32 i){ return ((u64)hi32(n)+i)<<32 | lo32(n); }
+  static u64             incHi32(u64 n, u32 i){ return ((u64)hi32(n))<<32 | (lo32(n)+i); }
   static u64          shftToHi64(u32 n){ return ((u64)n)<<32; }
-  static u64              make64(u32 hi, u32 lo){ return (((u64)hi)<<32) | ((u64)lo); }
+  static u64              make64(u32 lo, u32 hi){ return (((u64)lo)<<32) | ((u64)hi); }
 
 private:
   using Au32     =  std::atomic<u32>;
@@ -1394,8 +1395,8 @@ private:
     //if(i%2==1) ret.asInt = swp32(cur);
     //else       ret.asInt = cur;
 
-    if(i%2==1) return VerIdx(lo32(cur), hi32(cur));
-    else       return VerIdx(hi32(cur), lo32(cur));
+    if(i%2==1) return VerIdx(hi32(cur), lo32(cur));
+    else       return VerIdx(lo32(cur), hi32(cur));
   }
   VerIdx       store_vi(u32 i, u64 vi)         const
   {
@@ -1450,18 +1451,21 @@ private:
       _u128* viDblAddr = (_u128*)&s_vis[i];                                         // find 128 bit offset address
       viDbl            = *viDblAddr;                                                // todo: should this use a 128 bit atomic load? if it isn't the same, the atomic compare exchange will load it atomically
       do{
-        u32 l = hi32(viDbl.hi);
-        u32 r = lo32(viDbl.lo);
+        u32 l = hi32(viDbl.lo);
+        u32 r = lo32(viDbl.hi);                                                     //  this unintuitivness might be because of endianness, need to look into it
         if(l==DELETED_KEY && r==EMPTY_KEY){
+          //u64 rgtSwp = viDbl.lo;
+          //rgtDel     = *((i64*)&rgtSwp);
+          rgtDel = vi_i64( swp32(empty_kv().asInt) );
           lftDel = vi_i64( empty_kv() );
-          rgtDel = *((i64*)(&viDbl.lo));
         }else if(l!=r || l>=DELETED_KEY){                                           // check if both the indices are the same and if they are, that they aren't both deleted or both empty 
           return false;                     
         }else{
-          lftDel = *((i64*)(&viDbl.hi));                                            // if both the indices are the same, make a new right side VerIdx with the idx set to DELETED_KEY
-          rgtDel = vi_i64( deleted_kv() );                                          // interpret the u64 bits directly as a signed 64 bit integer instead
+          u64 lftSwp = swp32(viDbl.hi);
+          lftDel     = *((i64*)&lftSwp);                                            // if both the indices are the same, make a new right side VerIdx with the idx set to DELETED_KEY
+          rgtDel     = vi_i64( deleted_kv() );                                      // interpret the u64 bits directly as a signed 64 bit integer instead
         }
-      }while( !compex128( (i64*)viDblAddr, lftDel, rgtDel, (i64*)&viDbl) );         // then compare and swap for a version with the new right side VerIdx // todo: does this need to be in a loop that only breaks when the two indices are not the same?
+      }while( !compex128( (i64*)viDblAddr, rgtDel, lftDel, (i64*)&viDbl) );         // then compare and swap for a version with the new right side VerIdx // todo: does this need to be in a loop that only breaks when the two indices are not the same?
     }else
     {
       au64* idxDblAddr; u64 idxDbl, desired;
@@ -1469,8 +1473,8 @@ private:
       idxDblAddr    = (au64*)leftAddr;                                              // increment the address by 4 bytes so that it lines up with the start of the two indices, then cast it to an atomic 64 bit unsigned integer for the compare and switch
       idxDbl        = idxDblAddr->load();
       do{
-        u32  l = hi32(idxDbl);
-        u32  r = lo32(idxDbl);
+        u32  l = lo32(idxDbl);
+        u32  r = hi32(idxDbl);
         if(l==DELETED_KEY && r==EMPTY_KEY){                                         // change the deleted key to empty if it is to the left of an empty slot and therefore at the end of a span
           desired = make64(EMPTY_KEY, EMPTY_KEY);
         }else if(l!=r || l>=DELETED_KEY){
@@ -1490,23 +1494,7 @@ private:
     clean_loop: while( (nxtVi=load_vi(nxtI=nxtIdx(i))).idx <= DELETED_KEY )           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
     {
       curVi = load_vi(i);
-      //if(curVi.idx >= DELETED_KEY){ return false; }
       if(curVi.idx == EMPTY_KEY){ return false; }
-
-      ////nxtVp = ipd(nxtIdx(i), nxtVi);
-      //nxtVp = ipd(nxtI, nxtVi);
-      //if(nxtVp.version!=nxtVi.version){ continue; /*goto clean_loop;*/ }             // the versions don't match, so start over on the same index and skip the compare exchange 
-      //else if(nxtVp.ipd==0){ return true; }                                          // should this be converted to an empty slot since it is the end of a span? // next slot's versions match and its VerIdx is in its ideal position, so we are done 
-      //else if( cmpex_vi(i, &curVi, nxtVi) ){ 
-      //  delDupe(i);
-      //  i = nxtIdx(i);
-      //}
-
-      //if(nxtVi.idx==EMPTY_KEY){ 
-      //  if(delDupe(i)){ return true; }
-      //  
-      //  i = nxtIdx(i); continue;
-      //}
 
       nxtVp = ipd(nxtI, nxtVi);
       if(nxtVp.version!=nxtVi.version){ continue; /*goto clean_loop;*/ }             // the versions don't match, so start over on the same index and skip the compare exchange 
@@ -2289,809 +2277,24 @@ public:
 
 
 
+
+
+//if(curVi.idx >= DELETED_KEY){ return false; }
 //
-//return lava_vec<VerIdx>::sizeBytes( nextPowerOf2(size) );
-
-//VerIdx defKv = empty_kv();
-//for(u64 i=0; i<m_vis.size(); ++i)
-//  m_vis[i] = defKv;
-
-//auto        idx() -> u32
-//{
-//  //return ((Head*)(&m_h))->idx;
-//  return ((Head*)m_h)->idx;
-//}            // not thread safe
-
-//void           doFree(u32  blkIdx)  const        // frees a list/chain of blocks
-//{
-//// todo: set the last index to the current value in head
-//// todo: set the head's value to the first free index (blkIdx) with a compare-exchange 
-//// todo: loop on failure 
-//  u32   cur  =             blkIdx;          // cur is the current block index
-//  u32   nxt  =   s_bls[cur].idx;         //*stPtr(cur);              // nxt is the next block index
-//  for(; nxt>0; nxt=s_bls[cur].idx)
-//  { 
-//    //memset(blkPtr(cur), 0, m_blockSize);    // zero out memory on free, 
-//    //m_bls[cur].readers = 0;                 // reset the reader count
-//    
-//    //s_bls[cur].kr.isKey   = false;          // make sure key is false;
-//    //s_bls[cur].kr.readers = 0;              // reset the reader count
-//    s_bls[cur].isKey   = false;          // make sure key is false;
-//    s_bls[cur].readers = 0;              // reset the reader count
-//    
-//    s_cl.free(cur);
-//    //m_blocksUsed.fetch_add(-1);
-//    cur  =  nxt;
-//  }
-//  //memset(blkPtr(cur), 0, m_blockSize);       // 0 out memory on free, 
-//  //m_bls[cur].readers = 0;                  // reset the reader count
-//  //s_bls[cur].kr.readers = 0;                 // reset the reader count
-//
-//  s_bls[cur].readers = 0;                 // reset the reader count
-//  s_cl.free(cur);
+////nxtVp = ipd(nxtIdx(i), nxtVi);
+//nxtVp = ipd(nxtI, nxtVi);
+//if(nxtVp.version!=nxtVi.version){ continue; /*goto clean_loop;*/ }             // the versions don't match, so start over on the same index and skip the compare exchange 
+//else if(nxtVp.ipd==0){ return true; }                                          // should this be converted to an empty slot since it is the end of a span? // next slot's versions match and its VerIdx is in its ideal position, so we are done 
+//else if( cmpex_vi(i, &curVi, nxtVi) ){ 
+//  delDupe(i);
+//  i = nxtIdx(i);
 //}
-// todo: find the last BlkLst 
-// todo: set the last index to the current value in head
-// todo: set the head's value to the first free index (blkIdx) with a compare-exchange 
-// todo: loop on failure 
-
-//using   ui8   =   uint8_t;
-//using  ui64   =   uint64_t;
-//using  ui32   =   uint32_t;
-//using aui32   =   std::atomic<ui32>;
-//using aui64   =   std::atomic<u64>;
-
-//struct { u32 version; u32 idx; }; // declaring the version first and idx second puts the 
 //
-//union   KeyAndReaders
-//{
-//  struct{ u32 isKey : 1; i32 readers : 31; u32 version; };
-//  u64 asInt;
-//};
-//
-//union{ struct{ u32 isKey : 1; i32 readers : 31; }; u32 kr; };  
-
-//if(i==0) s_bls[cur] =  BlkLst(true,  0, nxt, ver, size, klen);        // make_BlkLst(true,  0, nxt, ver, size, klen);
-//else     s_bls[cur] =  BlkLst(false, 0, nxt, ver, 0, 0);              // make_BlkLst(false, 0, nxt, ver, 0, 0);
-
-//u32 blockRemainder = byteRem? -byteRem : -blockFreeSize();
-//BlkLst  bl =  make_BlkLst(cur==st, 0, blockRemainder, ver, size, klen);
-//
-//u32 blockRemainder = byteRem? byteRem : blockFreeSize();
-//BlkLst bl(cur==st, 0, blockRemainder, ver, size, klen, hash);
-//s_bls[cur] = bl;
-//
-//if(out_blocks){ *out_blocks = nxt==LIST_END? -((i32)cnt) : (i32)cnt; }     
-//
-//s_bls[st].kr.isKey = true;
-
-// stBlk  is starting block
-// LIST_END;
-// have this output a struct with a 1 bit flag of whether it reached the LIST_END or not    // -todo: doesn't this need to give back the blocks if allocation fails? - it does
-// s_cl.nxt(); //s_bls[st] =  BlkLst(true, 0, nxt, ver, size, klen, hash);
-
-//
-//auto        alloc(u32    size, u32 klen, u32 hash, i32* out_blocks=nullptr) -> VerIdx     // have this output a struct with a 1 bit flag of whether it reached the LIST_END or not    // -todo: doesn't this need to give back the blocks if allocation fails? - it does
-
-//struct { KeyAndReaders kr; u32 idx; u32 len, klen, hash; };
-//using IDX         =  i32;
-
-//{
-//  VerIdx empty;
-//  empty.idx      =  EMPTY_KEY;
-//  empty.version  =  0;
-//  return empty;
-//
-//  //empty.val      =  EMPTY_KEY;
-//  //empty.readers  =  0;
-//}
-
-//VerIdx       store_vi(u32 i, u64 vi)         const
-//{
-//  using namespace std;
-//      
-//  //u64 asInt = keyval.asInt;
-//  bool odd = i%2 == 1;
-//  if(odd) vi = swp32(vi);            // the odd numbers need to be swapped so that their indices are on the outer border of 128 bit alignment - the indices need to be on the border of the 128 bit boundary so they can be swapped with an unaligned 64 bit atomic operation
-//
-//  u64 prev = atomic_exchange<u64>( (au64*)(&m_vis[i]), vi);
-//
-//  VerIdx ret;
-//  if(odd) ret.asInt = swp32(prev);
-//  else    ret.asInt = prev;
-//
-//  return ret;
-//}
-
-//CncrHsh(u32 size, CncrStr* cs)
-//{
-//  //init(size, cs);
-//}
-
-//template<class MATCH_FUNC> 
-//VerIdx   putHashed(u32 hash, VerIdx vi, MATCH_FUNC match)     const
-//{
-//  using namespace std;
-//  static const VerIdx empty   = empty_kv();
-//  static const VerIdx deleted = deleted_kv();
-//
-//  VerIdx desired   =  empty;
-//  desired.idx      =  vi.idx;
-//  desired.version  =  vi.version;
-//  u32           i  =  hash % m_sz;
-//  u32          en  =  prevIdx(i);   //min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap?   // % m_sz;   //>0? hash-1  :  m_sz
-//  for(;; i=nxtIdx(i) ) //++i)
-//  {
-//    VerIdx vi = load_vi(i);
-//    if(vi.idx>=DELETED_KEY)                                                               // it is either deleted or empty
-//    {          
-//      bool    success  =  cmpex_vi(i, m_vis.data()+i, desired);
-//      if(success) return vi;                                                //expected;  // continue; // WRONG!? // Another thread just stole it from underneath us.
-//      else{ i=prevIdx(i); continue; }  // retry the same loop again
-//    }                                                                                     // Either we just added the key, or another thread did.
-//    
-//    if( checkMatch(vi.version, vi.idx, match)!=MATCH_TRUE ) continue;
-//    bool success = cmpex_vi(i, m_vis.data()+i, desired);
-//    if(success) return vi;
-//    else{ i=prevIdx(i); continue; }                                            // todo: this doesn't do anything because it doesn't assign to i !! - come back and look this over
-//
-//    if(i==en) break;
-//  }
-//
-//  return empty;  // should never be reached
-//}
-
-//CncrStr*  csp = m_csp;                                                            // this silly song and dance is because the this pointer can't be passed to a lambda
-//VerIdx     kv = putHashed(hash, vi,                                               // this returns the previous VerIdx at the position
-//  [csp, key, klen, hash](u32 blkidx, u32 ver){
-//    return csp->compare(blkidx,ver,key,klen,hash);
-//  });
-
-//return m_mem.size;
-//return s_cs.sizeBytes( (u32)s_blockSize->load(), (u32)s_blockCount->load());
-
-//checkMatch(probedKv.version, probedKv.idx, match);
-//
-//}else{ i==0? (m_sz-1)  : (i-1); continue; }  // todo: look back at this, it shouldn't work!1!! - retry the same loop again
-
-//i32  blkcnt = 0;    
-//BlkCnt blkcnt;
-// &blkcnt);
-//
-//auto     ths = this;
-
-//i %= m_sz;
-//
-//VerIdx expected  =  vi; // vi.idx==EMPTY_KEY?  empty  :  deleted;
-// 
-// i==0? (m_sz-1)  : (i-1); 
-// i==0? (m_sz-1)  : (i-1);
-
-//static const u32  EMPTY_KEY        =  0x0000001FFFFF;   // first 21 bits set 
-//static const u32  DELETED_KEY      =  0x0000001FFFFE;   // 1 less than the EMPTY_KEY
-//static const  u64  EMPTY_KEY        =  0x000000000000001FFFFF;         // first 21 bits set 
-//static const u64  EMPTY_KEY        =  0x000000000FFFFFFF;   // first 28 bits set 
-//static const u64  EMPTY_KEY        =    0x0000000000200000;   // first 21 bits set 
-//static const u64  EMPTY_KEY        =  2097151;         // first 21 bits set 
-
-//u64 sb = lava_vec::sizeBytes(count);
-//p       = addr;
-
-//return _InterlockedCompareExchange128( (i64*)(idxAddr), 
-//    swpvi.hi, swpvi.lo,
-//    (i64*)(&dblvi) )==1;
-
-//u64 pnum = 
-// (u64*)( ((u64)p) & 0x0000FFFFFFFFFFFF);
-//return (void*)((u64*)p+2);
-
-//VerIdx keyval;
-//keyval.asInt
-//return keyval;   
-//
-//VerIdx       store_vi(u32 i, VerIdx  vi) const
-//{
-//  using namespace std;
+//if(nxtVi.idx==EMPTY_KEY){ 
+//  if(delDupe(i)){ return true; }
 //  
-//  //atomic_store<u64>( (Au64*)&m_vis[i].asInt, _kv.asInt );
-//  
-//  u64 asInt = vi.asInt;
-//  bool  odd = i%2 == 1;
-//  if(odd) asInt = swp32(asInt);            // the even numbers need to be swapped so that their indices are in the lower address / higher bytes - the indices need to be on the border of the 128 bit boundary so they can be swapped with an unaligned 64 bit atomic operation
-//
-//  au64* avi = (au64*)(m_vis.data()+i);                            // avi is atomic versioned index
-//  u64  prev = avi->exchange(asInt);          //atomic_exchange<u64>( (au64*)(&(m_vis[i].asInt)), asInt);
-//
-//  VerIdx ret;
-//  if(odd) ret.asInt = swp32(prev);
-//  else    ret.asInt = prev;
-//
-//  return ret;
+//  i = nxtIdx(i); continue;
 //}
-    
-//m_sz      =  nextPowerOf2(sz);
-//m_vis     =  lava_vec<VerIdx>(m_sz);
-// 
-//for(u64 i=0; i<m_vis.size(); ++i) m_vis[i] = defKv;
-
-//static u64               swp32(u64 n){ 
-//  return (((u64)hi32(n))<<32) & (u64)lo32(n);
-//  }
-//u64 nxtHi = (((u64)lo32(n))<<32);
-//u64 nxtLo = ((u64)hi32(n));
-//return nxtHi  |  nxtLo;
-
-//if(out_version) *out_version = nxt.version;
-//if(ok) 
-//
-//else   return { 0, "" };
-
-//#include <winternl.h>
-//namespace WINNT { 
-//#include <Ntdef.h> 
-//#include <Ntifs.h>
-//typedef struct _OBJECT_ATTRIBUTES64 {
-//    ULONG Length;
-//    ULONG64 RootDirectory;
-//    ULONG64 ObjectName;
-//    ULONG Attributes;
-//    ULONG64 SecurityDescriptor;
-//    ULONG64 SecurityQualityOfService;
-//} OBJECT_ATTRIBUTES64;
-//typedef OBJECT_ATTRIBUTES64 *POBJECT_ATTRIBUTES64;
-//
-//}
-//#include <ntstatus.h>
-//
-//#include <Wdm.h>
-//#include <Ntstrsafe.h>
-
-//#if defined(_CRT_SECURE_NO_WARNINGS)
-//  #undef _CRT_SECURE_NO_WARNINGS
-//  #define _CRT_SECURE_NO_WARNINGS
-//#endif
-//#undef _CRT_SECURE_NO_WARNINGS
-//#define _CRT_SECURE_NO_WARNINGS 1       // msvc mandatory error nonsense when using some standard C functions like fopen 
-//
-//#if !defined(_CRT_SECURE_NO_WARNINGS)
-//  #define _CRT_SECURE_NO_WARNINGS        // msvc mandatory error nonsense when using some standard C functions like fopen 
-//#endif
-
-//template<class MATCH_FUNC> 
-//VerIdx   delHashed(const void *const key, u32 klen, u32 hash) const // MATCH_FUNC match)            const
-//{  
-//  using namespace std;
-//  static const VerIdx   empty =   empty_kv();
-//  static const VerIdx deleted = deleted_kv();
-//
-//  u32  i = hash;
-//  u32 en = prevIdx(i); // min(hash%m_sz - 1, m_sz-1); // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap? 
-//  for(;; ++i)
-//  {
-//    i %= m_sz;
-//    VerIdx probedKv = load_kv(i);
-//
-//    if(probedKv.idx==EMPTY_KEY)   return empty;
-//    if(probedKv.idx==DELETED_KEY) return deleted;
-//
-//    Match m = checkMatch(probedKv.version, probedKv.idx, match);
-//    if(m==MATCH_TRUE){
-//      bool success = cmpex_vi(i, &probedKv, deleted);
-//      if(success){
-//        cleanDeletion(i);
-//        return probedKv;
-//      }else{ i==0? (m_sz-1)  : (i-1); continue; }  // retry the same loop again
-//
-//      return probedKv;   
-//    }
-//
-//    if(m==MATCH_REMOVED || i==en){ return empty; }
-//  }
-//
-//  return empty; 
-//}
-
-// len()
-//if(klen<1) return 0;
-//
-//auto hash = CncrHsh::HashBytes(key, klen);
-//
-//auto  ths = this;
-//auto matchFunc = [ths, key, klen, hash](u32 blkidx, u32 ver){
-//  return CompareBlock(ths,blkidx,ver,key,klen,hash);
-//};
-//
-//u32 len=0;
-//u32 ver=0;
-//auto runFunc = [ths, &len, &ver, out_vlen](VerIdx kv){
-//  len = IsEmpty(kv)?  0ull  :  ths->s_cs.len(kv.idx, kv.version, out_vlen);
-//  ver = kv.version;
-//};
-//
-//if( !s_ch.runMatch(hash, matchFunc, runFunc) ) return 0;
-//
-//if(out_version) *out_version = ver;
-//return len;
-
-// get()
-//if(klen<1) return 0;
-//
-//auto hash = CncrHsh::HashBytes(key, klen);
-//auto  ths = this;
-//auto matchFunc = [ths, key, klen, hash](u32 blkidx, u32 ver){
-//  return CompareBlock(ths,blkidx,ver,key,klen,hash);
-//};
-//
-//u32  out_klen = 0;
-//auto  runFunc = [ths, &out_klen, out_val, vlen](VerIdx kv){
-//  return ths->s_cs.get(kv.idx, kv.version, out_val, vlen);
-//};
-//
-//return s_ch.runMatch(hash, matchFunc, runFunc);
-
-// put()
-//assert(klen>0);
-//
-//u32   hash = CncrHsh::HashBytes(key, klen);
-//
-////i32  blkcnt = 0;    
-////BlkCnt blkcnt;
-//auto vi = s_cs.alloc(klen+vlen, klen, hash); // &blkcnt);                       // todo: use the VersionIdx struct // kidx is key index
-//if(vi.idx==LIST_END) return EMPTY_KEY;
-//
-//s_cs.put(vi.idx, key, klen, val, vlen);
-//
-//auto     ths = this;                                                            // this silly song and dance is because the this pointer can't be passed to a lambda
-//VerIdx    kv = s_ch.putHashed(hash, vi,                                         // this returns the previous VerIdx at the position
-//  [ths, key, klen, hash](u32 blkidx, u32 ver){
-//    return CompareBlock(ths,blkidx,ver,key,klen,hash);
-//  });
-//
-//if(kv.idx<DELETED_KEY) s_cs.free(kv.idx, kv.version);                           // putHashed returns the entry that was there before, which is the entry that was replaced. If it wasn't empty, we free it here. 
-//
-//return vi.idx;
-
-// del()
-//auto hash = CncrHsh::HashBytes(key, klen);
-//auto  ths = this;
-//VerIdx kv = s_ch.delHashed(hash,
-//  [ths, key, klen, hash](u32 blkidx, u32 ver){ return CompareBlock(ths,blkidx,ver,key,klen,hash); });
-//
-//bool doFree = kv.idx<DELETED_KEY;
-//if(doFree) s_cs.free(kv.idx, kv.version);
-//
-//return doFree; //kv.idx!=EMPTY_KEY;
-
-//i32          blockLen(i32  blkIdx)      // todo: change this to be either i64 or a 'BlkLen' struct that has the flag if nxt isn't valid?
-//{
-//  VerIdx nxt = nxtBlock(blkIdx);
-//  if(nxt.idx < 0) return -(nxt.idx);
-//
-//  return blockFreeSize();
-//}
-
-//return sizeof(*s_version) + CncrLst::sizeBytes(blockCount) + BlockLists::sizeBytes(blockCount);
-//
-//return CncrLst::sizeBytes(blockCount) + BlockLists::sizeBytes(blockCount) + blockSize*blockCount;
-//
-//return sizeof(*s_version);
-
-//u64 delkv = deleted_kv().asInt;                                         
-//rgtDel    = *((i64*)(&delkv));                                          
-//
-//desired = (32<<((u64)l)) & DELETED_KEY;                                       
-//
-//desired = (32<<(u64)EMPTY_KEY) && EMPTY_KEY
-
-//return ((u8*)stPtr(blkIdx)) + sizeof(IDX);
-//
-//return ((u8*)stPtr(blkIdx)) + sizeof(IDX);
-//
-//u32   cpyLen  =  nxt<0? -nxt : blkFree;             // if next is negative, then it will be the length of the bytes in that block
-
-//u32 asInt; - from KeyAndReaders
-//
-//struct { KeyAndReaders kr; u32 version; i32 idx; u32 len, klen; };
-
-// bl.idx, bl.kr.version };  // s_bls[blkIdx].kr.;
-//
-//return m_blockSize - sizeof(IDX);
-
-//bool       delToEmpty(u32 i)                const
-//{
-//  if(i%2==0)                                                                      // both indices are within a 128 bit boundary, so the 128 bit atomic can (and must) be used
-//  {                                                                               
-//  }else
-//  {
-//  }
-//}
-
-//
-// delDupe(prevIdx(i));                                    // now that the next VerIdx is duplicated into the current slot, compare the indices of both and if they are the same, set the right index (the original VerIdx) to DELETED_IDX
-
-//loop_start: while( (nxtVi=load_kv(nxtIdx(i))).idx < DELETED_KEY )
-//{
-//  do{ 
-//    curVi = load_kv(i);
-//    if(curVi.idx != DELETED_KEY){ return false; }
-//
-//    nxtVp = ipd(nxtVi);
-//    if(nxtVp.version!=nxtVi.version){ goto loop_start; }  // the versions don't match, so start over on the same index and skip the compare exchange 
-//    else if(nxtVp.ipd==0){ return true; }                 // next slot's versions match and its VerIdx is in its ideal position, so we are done 
-//  }while( !compexchange_kv(i, &curVi.asInt, nxtVi.asInt) );
-//  
-//  ++i;
-//}
-
-//u32 nxti = nxtIdx(i);
-//nxtVi = load_kv(nxti);
-//if(nxtVi.idx==DELETED_KEY || nxtVi.idx==EMPTY_KEY){ return true; }
-
-//if(vp.version!=vi.version && vp.ipd>0){
-//  //compexchange_kv(i, &curVi.asInt, vi.asInt);       // write next index's VerIdx to the current index if it is still deleted
-//}
-
-//using   i8     =  int8_t;
-//using  u32     =  uint32_t;
-//using  u64     =  uint64_t;
-//using  u32     =  uint32_t;
-//using  u64     =  uint64_t;
-
-//bool  compexchange_kv(u32 i, u64* expected, u64 desired) const
-//{
-//  using namespace std;
-//  
-//  //kv    keyval;
-//  //keyval.asInt    =  atomic_load<u64>( (Au64*)&m_kvs.data()[i].asInt );
-//  //keyval.key      =  key;
-//  //keyval.val      =  val;
-//  //return success;
-//
-//  return atomic_compare_exchange_strong( (Au64*)&(m_kvs.data()[i].asInt), expected, desired);                      // The entry was free. Now let's try to take it using a CAS. 
-//}
-
-//HeadUnion  curHead;
-//HeadUnion  nxtHead;
-//
-//return nxtHead.idx;
-
-//new (&m_ch) CncrHsh( ((i8*)m_mem.data())+OffsetBytes(), m_blockCount->load(), m_mem.owner);
-//new (&m_cs) ConcurrentStore( ((i8*)m_mem.data())+m_ch.sizeBytes(m_blockCount->load())+OffsetBytes(), m_blockSize->load(), m_blockCount->load(), m_mem.owner);                 // todo: change this to a void*
-
-//new (&m_mem) SharedMem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount)) );
-//new (&m_ch) CncrHsh( ( ((i8*)m_mem.data())+OffsetBytes(), blockCount, m_mem.owner) );
-//new (&m_cs) ConcurrentStore(  ((i8*)m_mem.data())+m_ch.sizeBytes(blockCount)+OffsetBytes(), blockSize, blockCount, m_mem.owner);                 // todo: change this to a void*
-
-//m_mem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount)) ),
-//m_ch( ((i8*)m_mem.data())+OffsetBytes(), blockCount, m_mem.owner),
-//m_cs( ((i8*)m_mem.data())+m_ch.sizeBytes(blockCount)+OffsetBytes(), blockSize, blockCount, m_mem.owner),                 // todo: change this to a void*
-//m_blockCount( ((au64*)m_mem.data())+2 ),
-//m_blockSize(  ((au64*)m_mem.data())+1 ),
-//m_flags(       (au64*)m_mem.data() )
-
-//static BlkLst   make_BlkLst(bool isKey, i32 readers, u32 idx, u32 ver, u32 len, u32 klen)
-//{
-//  BlkLst bl;
-//  bl.kr.isKey    = isKey;
-//  bl.kr.readers  = readers;
-//  bl.idx         = idx;
-//  bl.kr.version  = ver;
-//
-//  if(isKey){
-//    bl.len  = len;
-//    bl.klen = klen;
-//  }else{
-//    bl.len  = 0;
-//    bl.klen = 0;
-//  }
-//
-//  return bl;
-//}
-
-//i32      nxt  =  nxtBlock(curidx);
-//
-//if(curlen < blksz){ return MATCH_FALSE; }
-//auto cmplen = min(curlen, (ui32)blksz);
-//Match   cmp = memcmpBlk(curidx, curbuf, p, cmplen);
-//}else if(-nxt != curlen){ return MATCH_FALSE; }
-// return MATCH_TRUE; // never reached
-
-//m_cl(m_blockCount)
-//
-//if(owner) *((u64*)addr) = blockCount;
-//
-//BlkLst def; 
-//def.idx     = 0; 
-//def.readers = 0; 
-//for(u64 i=0; i<m_bls.size(); ++i) m_bls[i]=def;
-
-//
-//using BlockLists  =  lava_vec<IDX>;
-
-//using ListVec  =  std::vector< std::atomic<ui32> >;  // does this need to be atomic? all the contention should be over the head
-//
-//using HeadInt  =  ui64;
-//using    Head  =  std::atomic<ui64>;
-//
-//ui64   m_szBytes;
-//
-//ConcurrentList(ui32 size) : 
-//  m_lv(size)
-//{
-//  for(uint32_t i=0; i<(size-1); ++i) m_lv[i]=i+1;
-//  m_lv[size-1] = LIST_END;
-//
-//  m_h = 0;
-//}
-//
-//ConcurrentList(void* addr) :           // this constructor is for memory that is not owned and so does not need to be initialized, just used
-//  m_lv(addr)
-//{
-//  m_h = (aui64*)addr;
-//  //m_h->asInt = 0;
-//}
-//
-//ui64  sizeBytes() const
-//{
-//  return *((ui64*)addr);
-//}
-
-//dblVerIdx.hi  =  idxAddr->hi;
-//dblVerIdx.hi  =  idxAddr->hi;
-//
-//auto tmp = dblVerIdx->hi;
-
-//i32             stPtr(i32  blkIdx)  const
-//{
-  //return (i32*)( ((i8*)m_blksAddr) + blkIdx*m_blockSize );
-  //return (i32*)&(m_bls.data()[blkIdx]);
-  //return m_bls[blkIdx].idx;
-  //return m_bls[blkIdx].idx;
-//}
-
-//auto      realloc(VerIdx st, i32 size, ui32 klen, i32* out_blocks=nullptr) -> VerIdx     // todo: doesn't this need to give back the blocks if allocation fails?
-//{
-//  i32  byteRem  =  0;
-//  i32 blksNeed  =  blocksNeeded(size, &byteRem);
-//
-//  //ui32   st = s_cl.nxt();                                     // stBlk  is starting block
-//  //SECTION(get the starting block index and handle errors)
-//  //{
-//  //  if(st==LIST_END){
-//  //    if(out_blocks) *out_blocks = 0; 
-//  //    return List_End();
-//  //  }
-//  //}
-//
-//  ui32    kvlen = len(st.idx, st.version);
-//  i32  blksHave = blocksNeeded(size);
-//  if(blksNeed > blksHave){
-//    SECTION(add more blocks the current list)
-//    {
-//    }
-//    SECTION(write )
-//  }else{
-//  }
-//
-//  //ui32 ver  =  (ui32)s_version->fetch_add(1);
-//  //i32  cur  =  st;
-//  //i32  nxt  =   0;
-//  //i32  cnt  =   0;
-//  //SECTION(loop for the number of blocks needed and get new block and link it to the list)
-//  //{
-//  //  for(i32 i=0; i<blocks-1; ++i)
-//  //  {
-//  //    nxt    = s_cl.nxt();
-//  //    if(nxt==LIST_END){ free(st, ver); VerIdx empty={LIST_END,0}; return empty; }
-//  //
-//  //    if(i==0)  s_bls[cur] =  make_BlkLst(true,  0, nxt, ver, size, klen);
-//  //    else      s_bls[cur] =  make_BlkLst(false, 0, nxt, ver, 0, 0);
-//  //    cur        =  nxt;
-//  //    ++cnt;
-//  //    m_blocksUsed.fetch_add(1);
-//  //  }
-//  //}
-//
-//  SECTION(add the last index into the list, set out_blocks and return the start index with its version)
-//  {
-//    ui32 blockRemainder = byteRem? -byteRem : -blockFreeSize();
-//    BlkLst  bl = make_BlkLst(cur==st, 0, blockRemainder, ver, size, klen);
-//    s_bls[cur] = bl;
-//    s_bls[st].kr.isKey = true;
-//
-//    if(out_blocks){ *out_blocks = nxt==LIST_END? -cnt : cnt; }
-//    VerIdx vi = { st, ver };
-//    return vi;
-//  }
-//}
-
-//namespace WINNT { 
-//  #include <Ntdef.h> 
-////#include <Ntifs.h>
-//}
-
-//int s = (int)status;
-//printf("\nstatus: %0xh error: %s\n", s, GetLastErrorStdStr().c_str() );
-//if(status==STATUS_SUCCESS){
-//  printf("status success");
-//}
-
-//wprintf(L"\n%s \n", mempth);
-//buf;  // /*(WINNT::PWCH)*/ mempth;
-//sizeof(buf); 
-
-//typedef struct _RTLP_CURDIR_REF
-//{
-//	LONG RefCount;
-//	HANDLE Handle;
-//} RTLP_CURDIR_REF, *PRTLP_CURDIR_REF;
-// typedef struct RTL_RELATIVE_NAME_U {
-//	WINNT::UNICODE_STRING RelativeName;
-//	HANDLE ContainingDirectory;
-//	PRTLP_CURDIR_REF CurDirRef;
-//} RTL_RELATIVE_NAME_U, *PRTL_RELATIVE_NAME_U;
-//typedef BOOLEAN (NTAPI *RtlDosPathNameToNtPathName_U_t)(
-//                          WINNT::PCWSTR DosName,
-//                          WINNT::PUNICODE_STRING NtName,
-//                          PCWSTR *PartName,
-//                          PRTL_RELATIVE_NAME_U RelativeName);
-
-/*
-template<class T>
-i64          get(vec<T> const& key, void*  out_buf) const     // todo: needs to be redone
-{
-  Reader r = read((void*)key.data(), (ui32)(key.size() * sizeof(T)));
-  if(isEmpty(r.kv)) return -1;
-  //if(r.kv.key == EMPTY_KEY || r.kv.readers <= 0){ return -1; }
-
-  ui64 len = getFromBlkIdx(r.kv.val, out_buf);
-  if(r.doRm()){ m_cs.free(r.kv.val); m_cs.free(r.kv.idx); }
-
-  return len;
-}
-*/
-
-// typedef NTSTATUS(WINAPI *NTOPENDIRECTORYOBJECT)(
-//_Out_  PHANDLE DirectoryHandle,
-//_In_   ACCESS_MASK DesiredAccess,
-//_In_   POBJECT_ATTRIBUTES ObjectAttributes
-//);
-// 
-//typedef NTSTATUS(WINAPI *NTQUERYDIRECTORYOBJECT)(
-// _In_       HANDLE DirectoryHandle,
-// _Out_opt_  PVOID Buffer,
-// _In_       ULONG Length,
-// _In_       BOOLEAN ReturnSingleEntry,
-// _In_       BOOLEAN RestartScan,
-// _Inout_    PULONG Context,
-// _Out_opt_  PULONG ReturnLength
-// );
-
-//s = (int)status;
-//printf("\nstatus: %0xh error: %s retlen: %llu \n", s, GetLastErrorStdStr().c_str(), retLen );
-//wprintf(L"Buffer name: %s  type: %s\n\n", info->name.Buffer, info->type.Buffer );
-//if(status==STATUS_SUCCESS){
-//  printf("status success");
-//}
-
-//if(!_hModule){ LoadLibrary( _T("ntdll.dll") ); }
-//if(!_hModule){ return ret; }
-//if(!NtOpenDirectoryObject){  NtOpenDirectoryObject  = (NTOPENDIRECTORYOBJECT)GetProcAddress( _hModule, "NtOpenDirectoryObject");  }
-//if(!NtQueryDirectoryObject){ NtQueryDirectoryObject = (NTQUERYDIRECTORYOBJECT)GetProcAddress(_hModule, "NtQueryDirectoryObject"); }
-//
-//printf("error: %s", GetLastErrorStdStr().c_str() );
-//
-//if(!RtlInitUnicodeString){
-//  RtlInitUnicodeString = (RTLINITUNICODESTRING)GetLibraryProcAddress( _T("NtosKrnl.exe"), "RtlInitUnicodeString");
-//}
-//
-// static RtlDosPathNameToNtPathName_U_t RtlDosPathNameToNtPathName_U;
-//if(!RtlDosPathNameToNtPathName_U)
-// if(!(RtlDosPathNameToNtPathName_U=(RtlDosPathNameToNtPathName_U_t) GetProcAddress(GetModuleHandleA("NTDLL.DLL"), "RtlDosPathNameToNtPathName_U")))
-//  abort();
-
-//RtlInitUnicodeString(&usDirectoryName, DIRECTORY_NAME);
-//(WINNT::PUNICODE_STRING)
-//oattr    
-//WINNT::WCHAR* mempth = L"c:";
-//
-//printf("error: %s", GetLastErrorStdStr().c_str() ); 
-//wprintf(L"\n%s \n", pth.Buffer);
-//
-//RtlDosPathNameToNtPathName_U(mempth, &pth, NULL, NULL);
-//RtlInitUnicodeString(&UName, pszDir);
-//
-//oa.ObjectName         = NULL;                                
-//
-// status = NtOpenFile(
-//   &hDir, 
-//   FILE_LIST_DIRECTORY|SYNCHRONIZE, 
-//   &oa, &isb, 
-//   FILE_SHARE_READ|FILE_SHARE_WRITE|FILE_SHARE_DELETE,
-	//0x01 /*FILE_DIRECTORY_FILE*/ | 0x20/*FILE_SYNCHRONOUS_IO_NONALERT*/ | 0x4000/*FILE_OPEN_FOR_BACKUP_INTENT*/);
-//InitializeObjectAttributes(&objectAttributes, L("\BaseNamedObjects"), OBJ_CASE_INSENSITIVE, NULL, NULL);
-//
-// /*0x20001*/ /*SECTION_MAP_READ*/
-
-//auto        alloc(i32    size, ui32 klen, i32* out_blocks=nullptr) -> VerIdx   // todo: doesn't this need to give back the blocks if allocation fails?
-//{
-//  i32 byteRem  =  0;
-//  i32  blocks  =  blocksNeeded(size, &byteRem);
-//  //if(out_blocks) *out_blocks = blocks;
-//
-//  ui32   st = s_cl.nxt();                                     // stBlk  is starting block
-//  if(st==LIST_END){
-//    if(out_blocks) *out_blocks = 0; 
-//    return List_End(); // LIST_END; 
-//  }
-//
-//  ui32 ver  =  (ui32)s_version->fetch_add(1);
-//  i32  cur  =  st;
-//  i32  cnt  =   0;
-//  i32  nxt  =   0;
-//  for(i32 i=0; i<blocks-1; ++i)
-//  {
-//    nxt    = s_cl.nxt();
-//    if(nxt==LIST_END){ free(st, ver); VerIdx empty={LIST_END,0}; return empty; }
-//
-//    if(i==0)  s_bls[cur] =  make_BlkLst(true,  0, nxt, ver, size, klen);
-//    else      s_bls[cur] =  make_BlkLst(false, 0, nxt, ver, 0, 0);
-//    cur        =  nxt;
-//    ++cnt;
-//    m_blocksUsed.fetch_add(1);
-//  }
-//
-//  BlkLst bl  = make_BlkLst(cur==st, 0, byteRem? -byteRem : -blockFreeSize(), ver, size, klen);
-//  s_bls[cur] = bl;
-//
-//  if(out_blocks){ *out_blocks = nxt==LIST_END? -cnt : cnt; }     
-//
-//  s_bls[st].kr.isKey = true;
-//
-//  VerIdx vi = { st, ver };
-//  return vi;
-//}
-
-//str       nxtKey(ui32* out_version=nullptr)         const
-//{
-//  ui32 klen, vlen;
-//  bool    ok = false;
-//  VerIdx nxt = this->nxt();                           if(nxt.idx==EMPTY_KEY) return "";
-//  ok         = this->len(nxt.idx, nxt.version, 
-//                         &klen, &vlen);               if(!ok) return "";
-//  str key(klen,'\0');
-//  ok         = this->getKey(nxt.idx, nxt.version, 
-//                            (void*)key.data(), klen); if(!ok) return "";
-//
-//  if(out_version) *out_version = nxt.version;
-//  return key;                    // copy elision 
-//}
-
-//template< template<class> class V, class T>
-//using VAL_TYPE = V::value_type;
-//vec<int>::value_type
-
-//if(blkcnt<0){
-//  s_cs.free(vi.idx, vi.version);
-//  return EMPTY_KEY;
-//}    
-
-//template<class MATCH_FUNC> 
-//VerIdx       checkMatch(ui32 i, ui32 key, MATCH_FUNC match) const -> Match //  decltype(match(empty_kv()))
-//{
-//  Match ret = match(key);
-//  
-//  return ret;
-//}
-
-// todo: WRONG? check needs to be run on each spin if the entry is different
-//if( checkMatch(i, probedKv.version, probedKv.idx, match)==MATCH_TRUE ){
-  //return store_vi(i, desired);
-//}
-
-//
-//i  &=  m_sz - 1;
-
 
 /*
 open system call reference from http://www.unix.com/man-page/FreeBSD/2/open/
