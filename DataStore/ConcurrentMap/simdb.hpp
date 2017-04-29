@@ -12,9 +12,9 @@
 // -todo: debug some (all?) CncrHsh indices not being deleted - only the last index? - cmpex_vi was being used with a pointer into s_vis on some functions and a pointer to a swapped vi on the stack in other functions
 // -todo: redo simdb::len(blkIdx) to fit the functions as they stand now - klen and vlen were labeled out_vlen and out_version 
 // -todo: take out runRead - used by direct simdb::len(blkIdx) function - also used by getKey - was previously used to wrap incReaders() and decReaders() calls around a function 
+// -todo: flatten runIfMatch function to only take a function template argument but not a match function template argument - take it out all together
+// -todo: figure out what to do about indices on the ends in CncrHsh - just leave a DELETED_KEY and don't turn it into an EMPTY_KEY, since it will then just be skipped over when looking for an index - make sure that cleanDeletion() and delDupe() skip the last index when they are the primary/left/lo index
 
-// todo: flatten runIfMatch function to only take a function template argument but not a match function template argument - take it out all together
-// todo: figure out what to do about indices on the ends in CncrHsh - just leave a DELETED_KEY and don't turn it into an EMPTY_KEY, since it will then just be skipped over when looking for an index - make sure that cleanDeletion() and delDupe() skip the last index when they are the primary/left/lo index
 // todo: test with larger keys and values that span multiple blocks
 // todo: make sure that the start and end are taken care of with regards to cleaning up deletions - need to not go off the end of the array and need to figure out how to deal with spans between them
 // todo: make sure readers is only used on the key block list
@@ -1235,10 +1235,6 @@ public:
 
     return v;
   }
-  static bool  DefaultKeyCompare(u32 a, u32 b)
-  {
-    return a == b;
-  }
   static u32           HashBytes(const void *const buf, u32 len)
   {
     u64 hsh = fnv_64a_buf(buf, len);
@@ -1390,15 +1386,14 @@ private:
   {
     VerIdx curVi, nxtVi; VerIpd nxtVp; u32 nxtI;
 
-    clean_loop: while( (nxtVi=load_vi(nxtI=nxtIdx(i))).idx <= DELETED_KEY )           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
+    clean_loop: while(i!=m_sz-1 && (nxtVi=load_vi(nxtI=nxtIdx(i))).idx <= DELETED_KEY )           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
     {
       curVi = load_vi(i);
       if(curVi.idx == EMPTY_KEY){ return false; }
 
       nxtVp = ipd(nxtI, nxtVi);
-      if(nxtVp.version!=nxtVi.version){ continue; /*goto clean_loop;*/ }             // the versions don't match, so start over on the same index and skip the compare exchange 
+      if(nxtVp.version!=nxtVi.version){ continue; }                                  // the versions don't match, so start over on the same index and skip the compare exchange 
       else if(nxtVp.ipd==0){ return true; }                                          // should this be converted to an empty slot since it is the end of a span? // next slot's versions match and its VerIdx is in its ideal position, so we are done 
-      //else if( cmpex_vi(i, &curVi, nxtVi) ){ 
       else if( cmpex_vi(i, curVi, nxtVi) ){ 
         delDupe(i);
         i = nxtIdx(i);
@@ -1406,25 +1401,25 @@ private:
 
     }
 
-    if(nxtVi.idx == DELETED_KEY){                                                    // if the next index is deleted, try to clean the next index, then come back and try to delete this one again
-      if(depth<1){ cleanDeletion(nxtIdx(i), depth+1); }                              // could this recurse to the depth of the number of blocks?
-      //i = nxtIdx(i);                                                               // this could mean the current slot has a deleted key and isn't cleanup by this function
-      goto clean_loop;
-    }else if(nxtVi.idx==EMPTY_KEY){
-      delDupe(i);    
+    if(i!=m_sz-1){
+      if(nxtVi.idx == DELETED_KEY){                                                    // if the next index is deleted, try to clean the next index, then come back and try to delete this one again
+        if(depth<1){ cleanDeletion(nxtIdx(i), depth+1); }                              // could this recurse to the depth of the number of blocks?
+        goto clean_loop;
+      }else if(nxtVi.idx==EMPTY_KEY){
+        delDupe(i);    
+      }
     }
 
     return true;
   }
 
-  template<class MATCH_FUNC, class FUNC> 
-  bool       runIfMatch(u32 i, u32 version, u32 key, MATCH_FUNC match, FUNC f) const
+  template<class FUNC> 
+  bool       runIfMatch(VerIdx vi, const void* const buf, u32 len, u32 hash, FUNC f) const
   {
     //VerIdx kv = incReaders(i);    
-      Match      m = match(key, version);
-      //Match      m = m_csp->compare(blkIdx, version, keybuf, klen);
+      Match      m = m_csp->compare(vi.idx, vi.version, buf, len, hash);
       bool matched = false;                                                   // not inside a scope
-      if(m==MATCH_TRUE){ matched=true; f(load_vi(i)); }          
+      if(m==MATCH_TRUE){ matched=true; f(vi); }          
     //decReaders(i);
     
     return matched;
@@ -1458,34 +1453,26 @@ public:
     return s_vis[idx];
   }
 
-  VerIdx   putHashed(u32 hash, VerIdx lstVi, const void *const key, u32 klen)     const
+  VerIdx   putHashed(u32 hash, VerIdx lstVi, const void *const key, u32 klen) const
   {
     using namespace std;
     static const VerIdx empty   = empty_kv();
-    static const VerIdx deleted = deleted_kv();
 
-    VerIdx desired   =  empty;
-    desired.idx      =  lstVi.idx;
-    desired.version  =  lstVi.version;
-    u32           i  =  hash % m_sz;
-    u32          en  =  prevIdx(i);
+    VerIdx desired = lstVi;
+    u32 i=hash%m_sz, en=prevIdx(i);
     for(;; i=nxtIdx(i) )
     {
       VerIdx vi = load_vi(i);
-      if(vi.idx>=DELETED_KEY)                                                               // it is either deleted or empty
-      {          
-        //bool    success  =  cmpex_vi(i, s_vis.data()+i, desired);
-        bool    success  =  cmpex_vi(i, vi, desired);
-        if(success) return vi;
+      if(vi.idx>=DELETED_KEY){                                                              // it is either deleted or empty
+        bool success = cmpex_vi(i, vi, desired);
+        if(success){return vi;}
         else{ i=prevIdx(i); continue; }                                                     // retry the same loop again if a good slot was found but it was changed by another thread between the load and the compare-exchange
       }                                                                                     // Either we just added the key, or another thread did.
-      
-      //if( checkMatch(vi.version, vi.idx, match)!=MATCH_TRUE ){ continue; }
-      if(m_csp->compare(vi.idx,vi.version,key,klen,hash)!=MATCH_TRUE ){ continue; }
 
-      //bool success = cmpex_vi(i, s_vis.data()+i, desired);
+      if(m_csp->compare(vi.idx,vi.version,key,klen,hash) != MATCH_TRUE){continue;}
+
       bool success = cmpex_vi(i, vi, desired);
-      if(success) return vi;
+      if(success){ return vi; }
       else{ i=prevIdx(i); continue; }
 
       if(i==en) break;
@@ -1494,8 +1481,8 @@ public:
     return empty;  // should never be reached
   }
 
-  template<class MATCH_FUNC, class FUNC> 
-  bool      runMatch(u32 hash, MATCH_FUNC match, FUNC f)        const 
+  template<class FUNC> 
+  bool      runMatch(const void *const key, u32 klen, u32 hash, FUNC f)       const 
   {
     using namespace std;
     
@@ -1506,19 +1493,12 @@ public:
       VerIdx vi = load_vi(i);
       if(vi.idx == EMPTY_KEY){ return false;  }                                             // only EMPTY_KEY is the short circuit, since DELETED_KEY means you are still within a span and need to keep searching
       else if(vi.idx == DELETED_KEY){ continue; }
-      else if( runIfMatch(i, vi.version, vi.idx, match, f) ){ return true; }
+      else if( runIfMatch(vi, key, klen, hash, f) ){ return true; }
       else if(i==en){ return false; }
     }
   }
   
-  //template<class FUNC> 
-  //auto       runRead(u32  idx, u32 version, FUNC f)             const -> decltype( f(VerIdx()) )
-  //{  
-  //  auto  vi = load_vi(idx);        if(vi.version!=version) return false;
-  //  return f(vi);
-  //}
-
-  VerIdx   delHashed(const void *const key, u32 klen, u32 hash) const
+  VerIdx   delHashed(const void *const key, u32 klen, u32 hash)               const
   {  
     using namespace std;
     static const VerIdx   empty = empty_kv();
@@ -1655,28 +1635,17 @@ public:
 
     return len;                                                                     // shouldn't be hit
   }
-  bool           get(const void *const key, u32 klen, void *const   out_val, u32 vlen) const
+  bool           get(const void *const key, u32 klen, void *const out_val, u32 vlen) const
   {
-    if(klen<1) return 0;
+    if(klen<1){ return 0; }
 
-    //auto hash = CncrHsh::HashBytes(key, klen);
-    ////auto  ths = this;
-    //auto matchFunc = [ths, key, klen, hash](u32 blkidx, u32 ver){
-    //  return CompareBlock(ths,blkidx,ver,key,klen,hash);
-    //};
-
-    u32       hash = HashBytes(key, klen);
-    CncrStr*   csp = m_csp;
-    auto matchFunc = [csp, key, klen, hash](u32 blkidx, u32 ver){
-      return csp->compare(blkidx,ver,key,klen,hash);
-    };
-    
-    u32  out_klen = 0;
-    auto  runFunc = [csp, &out_klen, out_val, vlen](VerIdx kv){
-      return csp->get(kv.idx, kv.version, out_val, vlen);
+    u32 hash=HashBytes(key,klen); 
+    CncrStr*  csp = m_csp;
+    auto  runFunc = [csp, out_val, vlen](VerIdx vi){
+      return csp->get(vi.idx, vi.version, out_val, vlen);
     };
 
-    return runMatch(hash, matchFunc, runFunc);
+    return runMatch(key, klen, hash, runFunc);
   }
   bool           put(const void *const key, u32 klen, const void *const val, u32 vlen, u32* out_startBlock=nullptr) 
   {
@@ -2165,6 +2134,62 @@ public:
 
 
 
+
+
+
+//static bool  DefaultKeyCompare(u32 a, u32 b)
+//{
+//  return a == b;
+//}
+
+// goto clean_loop;
+//else if( cmpex_vi(i, &curVi, nxtVi) ){ 
+//i = nxtIdx(i);                                                               // this could mean the current slot has a deleted key and isn't cleanup by this function
+
+//bool       runIfMatch(u32 i, u32 version, u32 key, MATCH_FUNC match, FUNC f) const
+//
+//Match      m = match(key, version);
+//VerIdx    vi = load_vi(i);
+//
+//template<class MATCH_FUNC, class FUNC> 
+//bool      runMatch(u32 hash, MATCH_FUNC match, FUNC f)        const 
+//else if( runIfMatch(i, vi.version, vi.idx, match, f) ){ return true; }
+
+//auto hash = CncrHsh::HashBytes(key, klen);
+////auto  ths = this;
+//auto matchFunc = [ths, key, klen, hash](u32 blkidx, u32 ver){
+//  return CompareBlock(ths,blkidx,ver,key,klen,hash);
+//};
+//
+//u32       hash = HashBytes(key, klen);
+//auto matchFunc = [csp, key, klen, hash](u32 blkidx, u32 ver){
+//  return csp->compare(blkidx,ver,key,klen,hash);
+//};
+//    
+//return runMatch(hash, matchFunc, runFunc);
+//u32  out_klen = 0;
+// out_klen=0;
+
+//static const VerIdx deleted = deleted_kv();
+//
+//VerIdx desired   =  empty;
+//desired.idx      =  lstVi.idx;
+//desired.version  =  lstVi.version;
+//u32           i  =  hash % m_sz;
+//u32          en  =  prevIdx(i);
+
+//template<class FUNC> 
+//auto       runRead(u32  idx, u32 version, FUNC f)             const -> decltype( f(VerIdx()) )
+//{  
+//  auto  vi = load_vi(idx);        if(vi.version!=version) return false;
+//  return f(vi);
+//}
+
+//bool    success  =  cmpex_vi(i, s_vis.data()+i, desired);      
+//
+//if( checkMatch(vi.version, vi.idx, match)!=MATCH_TRUE ){ continue; }
+//
+//bool success = cmpex_vi(i, s_vis.data()+i, desired);
 
 //if(klen<1) return false;
 //
