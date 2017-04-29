@@ -10,8 +10,9 @@
 // -todo: does a BlkLst need to be loaded atomically by a read operation? is it possible that a read could be out of date and use an incorrect cached version? - a thread will eventually atomically decrement the readers after reading all the blocks so it should be fine 
 // -todo: try to take out checkMatch from CncrHsh - checkMatch is unused
 // -todo: debug some (all?) CncrHsh indices not being deleted - only the last index? - cmpex_vi was being used with a pointer into s_vis on some functions and a pointer to a swapped vi on the stack in other functions
+// -todo: redo simdb::len(blkIdx) to fit the functions as they stand now - klen and vlen were labeled out_vlen and out_version 
+// -todo: take out runRead - used by direct simdb::len(blkIdx) function - also used by getKey - was previously used to wrap incReaders() and decReaders() calls around a function 
 
-// todo: take out runRead - used by simdb::len()
 // todo: flatten runIfMatch function to only take a function template argument but not a match function template argument - take it out all together
 // todo: figure out what to do about indices on the ends in CncrHsh - just leave a DELETED_KEY and don't turn it into an EMPTY_KEY, since it will then just be skipped over when looking for an index - make sure that cleanDeletion() and delDupe() skip the last index when they are the primary/left/lo index
 // todo: test with larger keys and values that span multiple blocks
@@ -1292,10 +1293,6 @@ private:
     au64* avi = (au64*)(s_vis.data()+i);                            // avi is atomic versioned index
     u64   cur = swp32(avi->load());                                 // need because of endianess? // atomic_load<u64>( (au64*)(m_vis.data()+i) );              // Load the key that was there.
 
-    //VerIdx ret;
-    //if(i%2==1) ret.asInt = swp32(cur);
-    //else       ret.asInt = cur;
-
     if(i%2==1) return VerIdx(hi32(cur), lo32(cur));
     else       return VerIdx(lo32(cur), hi32(cur));
   }
@@ -1313,7 +1310,6 @@ private:
     if(odd) return VerIdx(lo32(prev), hi32(prev));
     else    return VerIdx(hi32(prev), lo32(prev));
   }
-  //bool         cmpex_vi(u32 i, VerIdx* volatile expected, VerIdx desired) const
   bool         cmpex_vi(u32 i, VerIdx expected, VerIdx desired) const
   {
     using namespace std;
@@ -1421,29 +1417,6 @@ private:
     return true;
   }
 
-  //template<class MATCH_FUNC> 
-  //auto       checkMatch(u32 version, u32 key, MATCH_FUNC match) const -> Match //  decltype(match(empty_kv()))
-  //{
-  //  //incReaders(i);  // todo: have incReaders return a VerIdx?
-  //    Match ret = match(key, version);
-  //  //decReaders(i);
-  //  
-  //  return ret;
-  //}
-  //
-  //template<class MATCH_FUNC, class FUNC> 
-  //bool       runIfMatch(u32 i, u32 version, u32 key, MATCH_FUNC match, FUNC f) const // const -> bool
-  //{
-  //  //VerIdx kv = incReaders(i);    
-  //    //Match      m = match(key, version);
-  //    Match      m = m_csp->compare(blkIdx, version, keybuf, klen);
-  //    bool matched = false;                                       // not inside a scope
-  //    if(m==MATCH_TRUE){ matched=true; f(load_vi(i)); }          
-  //  //decReaders(i);
-  //  
-  //  return matched;
-  //}
-
   template<class MATCH_FUNC, class FUNC> 
   bool       runIfMatch(u32 i, u32 version, u32 key, MATCH_FUNC match, FUNC f) const
   {
@@ -1537,13 +1510,13 @@ public:
       else if(i==en){ return false; }
     }
   }
-  template<class FUNC> 
   
-  auto       runRead(u32  idx, u32 version, FUNC f)             const -> decltype( f(VerIdx()) )
-  {  
-    auto  vi = load_vi(idx);        if(vi.version!=version) return false;
-    return f(vi);
-  }
+  //template<class FUNC> 
+  //auto       runRead(u32  idx, u32 version, FUNC f)             const -> decltype( f(VerIdx()) )
+  //{  
+  //  auto  vi = load_vi(idx);        if(vi.version!=version) return false;
+  //  return f(vi);
+  //}
 
   VerIdx   delHashed(const void *const key, u32 klen, u32 hash) const
   {  
@@ -1731,7 +1704,14 @@ public:
 
     return doFree;
   }
+  VerIdx        load(u32 i)                    const
+  {    
+    au64* avi = (au64*)(s_vis.data()+i);                            // avi is atomic versioned index
+    u64   cur = swp32(avi->load());                                 // need because of endianess? // atomic_load<u64>( (au64*)(m_vis.data()+i) );              // Load the key that was there.
 
+    if(i%2==1) return VerIdx(hi32(cur), lo32(cur));
+    else       return VerIdx(lo32(cur), hi32(cur));
+  }
 };
 struct  SharedMem       // in a halfway state right now - will need to use arbitrary memory and have other OS implementations for shared memory eventually
 {
@@ -2018,22 +1998,14 @@ public:
   {
     return get(key, (u32)strlen(key), val, vlen);
   }
-  bool         len(u32 idx, u32 version, u32* out_vlen=nullptr, u32* out_version=nullptr) const  // todo: this needs to be redone to fit the functions as they stand now
-  {
-    auto  ths = this;
-    bool   ok = s_ch.runRead(idx, version, 
-    [ths, out_vlen, out_version](VerIdx kv)
-    {
-      u32 vlen = 0;
-      auto tlen = ths->s_cs.len(kv.idx, kv.version, out_vlen);
-      if(tlen>0){
-        *out_vlen = tlen - *out_vlen;
-        return true;
-      }
-      return false;
-    });
-  
-    return ok;
+  i64          len(u32 idx, u32 version, u32* out_klen=nullptr, u32* out_vlen=nullptr) const
+  { 
+    u32 total_len = s_cs.len(idx, version, out_vlen); 
+    if(total_len>0){
+      *out_klen = total_len - *out_vlen;
+      return total_len;
+    }
+    return 0;
   }
   void       flush() const
   {
@@ -2059,16 +2031,13 @@ public:
   bool      getKey(u32 idx, u32 version, void *const out_buf, u32 klen) const
   {
     if(klen<1) return false;
-    
-    auto     ths = this;
-    auto runFunc = [ths, klen, out_buf](VerIdx kv){
-      if(IsEmpty(kv)) return false;
-      auto getlen = ths->s_cs.getKey(kv.idx, kv.version, out_buf, klen);
-      if(getlen<1) return false;
-      
-      return true;
-    };
-    return s_ch.runRead(idx, version, runFunc);
+
+    VerIdx vi = s_ch.load(idx);  
+    if(vi.idx <= CncrHsh::DELETED_KEY || vi.version!=version){ return false; }
+    u32 l = s_cs.getKey(vi.idx, vi.version, out_buf, klen);                         // l is length
+    if(l<1){return false;}
+
+    return true;
   }
   u32          cur() const { return m_curChIdx; }
   auto        data() const -> const void* const { return s_cs.data(); }
@@ -2121,10 +2090,13 @@ public:
     if(nxt.idx==EMPTY_KEY) 
       return {nxt.version, ""};
     
-    ok         = this->len(nxt.idx, nxt.version, 
-                           &klen, &vlen);               
-    if(!ok)
-      return {nxt.version, ""};
+    //ok         = this->len(nxt.idx, nxt.version, 
+    //                       &klen, &vlen);               
+    //if(!ok)
+    //  return {nxt.version, ""};
+
+    i64 total_len = this->len(nxt.idx, nxt.version, &klen, &vlen);               
+    if(total_len==0){ return {nxt.version, ""}; }
     
     str key(klen,'\0');
     ok         = this->getKey(nxt.idx, nxt.version, 
@@ -2192,6 +2164,63 @@ public:
 
 
 
+
+
+//if(klen<1) return false;
+//
+//auto     ths = this;
+//auto runFunc = [ths, klen, out_buf](VerIdx kv){
+//  if(IsEmpty(kv)) return false;
+//  auto getlen = ths->s_cs.getKey(kv.idx, kv.version, out_buf, klen);
+//  if(getlen<1) return false;
+//  
+//  return true;
+//};
+//return s_ch.runRead(idx, version, runFunc);
+
+//VerIdx ret;
+//if(i%2==1) ret.asInt = swp32(cur);
+//else       ret.asInt = cur;
+
+//auto  ths = this;
+//bool   ok = s_ch.runRead(idx, version, 
+//[ths, out_vlen, out_version](VerIdx kv)
+//{
+//  u32 vlen = 0;
+//  auto tlen = ths->s_cs.len(kv.idx, kv.version, out_vlen);
+//  if(tlen>0){
+//    *out_vlen = tlen - *out_vlen;
+//    return true;
+//  }
+//  return false;
+//});  
+//return ok;
+
+//
+//bool         cmpex_vi(u32 i, VerIdx* volatile expected, VerIdx desired) const
+
+//template<class MATCH_FUNC> 
+//auto       checkMatch(u32 version, u32 key, MATCH_FUNC match) const -> Match //  decltype(match(empty_kv()))
+//{
+//  //incReaders(i);  // todo: have incReaders return a VerIdx?
+//    Match ret = match(key, version);
+//  //decReaders(i);
+//  
+//  return ret;
+//}
+//
+//template<class MATCH_FUNC, class FUNC> 
+//bool       runIfMatch(u32 i, u32 version, u32 key, MATCH_FUNC match, FUNC f) const // const -> bool
+//{
+//  //VerIdx kv = incReaders(i);    
+//    //Match      m = match(key, version);
+//    Match      m = m_csp->compare(blkIdx, version, keybuf, klen);
+//    bool matched = false;                                       // not inside a scope
+//    if(m==MATCH_TRUE){ matched=true; f(load_vi(i)); }          
+//  //decReaders(i);
+//  
+//  return matched;
+//}
 
 // decltype( (f(empty_kv())) )
 //
