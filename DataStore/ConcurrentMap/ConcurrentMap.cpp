@@ -228,8 +228,9 @@ void printdb(simdb const& db)
   vec<i8> memv(db.memsize(), 0);
   memcpy( (void*)memv.data(), db.mem(), db.memsize() );
 
-  str memstr( (const char*)db.data(), (const char*)db.data() + db.size());
-  Println("\nmem: ", memstr, "\n" );
+  //str memstr( (const char*)db.data(), (const char*)db.data() + db.size());
+  //Println("\nmem: ", memstr, "\n" );
+  TO(memv.size(),i) putc(memv[i] ,stdout);
 }
 
 void printhsh(simdb const& db)
@@ -544,7 +545,7 @@ int main()
 
   //Println("simdb stack sz: ", sizeof(simdb) );
 
-  simdb db("test", 32, 8);
+  simdb db("test", 32, 256);
 
   printhsh(db);
 
@@ -578,20 +579,24 @@ int main()
   str       wut  =       "wut";
   str  skidoosh  =  "skidoosh";
   str    kablam  =    "kablam";
+  str   longkey  =  "this is a super long key as a test";
+  str   longval  =  "value that is really long as a really long value test";
 
   //Println("put: ", db.put( wat.data(),   (u32)wat.length(),    skidoosh.data(), (u32)skidoosh.length()) );
   //Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
   if( db.isOwner() ){
-    Println("put: ", db.put(wat, skidoosh) );
-    db.del("wat");
-    Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
-    db.del("wut");
-    Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
-    db.del("kablam");
-    printdb(db);
+    //Println("put: ", db.put(wat, skidoosh) );
+    //db.del("wat");
+    //Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
+    //db.del("wut");
+    //Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
+    //db.del("kablam");
 
-    Println("put: ", db.put(wat, skidoosh) );
+    //Println("put: ", db.put(wat, skidoosh) );
     //Println("del wat: ", db.del("wat") );
+
+    Println("put: ", db.put(longkey, longval) );
+    printdb(db);
 
     Println();
   }
@@ -608,6 +613,11 @@ int main()
   str val(vlen, '\0');
   bool  ok = db.get( wat.data(), (u32)wat.length(), (void*)val.data(), (u32)val.length() );
   Println("ok: ", ok, " value: ", val, "  wat total len: ", len, " wat val len: ", vlen, "\n");
+
+  len = db.len( longkey.data(), (u32)longkey.length(), &vlen, &ver);
+  val = str(vlen, '\0');
+  ok  = db.get( longkey.data(), (u32)longkey.length(), (void*)val.data(), (u32)val.length() );
+  Println("ok: ", ok, " longkey value: ", val, "  longkey total len: ", len, " longkey val len: ", vlen, "\n");
 
   str v; 
   db.get(wat,   &v);  Println("value: ", v);
