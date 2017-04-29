@@ -1,107 +1,4 @@
 
-// -todo: test 128 bit atomics
-// -todo: find memory corruption bug on looping insert of random numbers - just put key where value should be in C++ string put
-// -todo: figure out why all keys are being printed - getKeys() returns a single empty string
-// -todo: figure out why getKeys returns one empty string - for short blocks, the last block is a key/starting block because it is also the first block. The make_BlkLst function made non keys have length and key length automatically set to 0.
-// -todo: figure out why duplicate keys aren't overwriting each other - putHashed needs to match without using version, then compare and swap using version, checking the match each time
-// -todo: test with multiple threads in a loop
-// -todo: take out infinite loop possibility in rm
-// -todo: take out any inf loops in runMatch
-// -todo: change getKeyStrs() to get the number looped through by nxtKey() so it isn't O(n^2)
-// -todo: put in osx stuff here - likely mmmap with shared memory
-// -todo: try using NtOpenFile
-// -todo: make a standard "simdb" shared memory file that contains the paths of all other shared memory files? - not needed for now
-// -todo: make realloc that changes the size of a block list - would have to find a way to not break concurrency to be able to resize block lists, with reference counting and some sort of flag, it would still be the same as blinking the key out of existence while a thread updates the block list size
-// -todo: make windows version have permissions for just read and write
-// -todo: check if memset to 0 is still anywhere in the release build - line 1827 still has a memset to 0 on free
-// -todo: get compiler warning out of windows build - just need to take out unneccesary headers and copy in any struct and function definitions?
-// -todo: make function to swap two VerIdxs of ConcurrentHash
-// -todo: make function to swap the hi and low 32 bits of VerIdx, swapping the order
-// -todo: make sure that versions for even and odd VerIdx are kept to be even and odd version numbers - odds need to start at 1 and both need to be incremented by 2
-// -todo: make VerIdx layout in ConcurrentHash have a ping pong memory layout
-// -todo: make 128 bit swap increment both versions - no need
-// -todo: make versions increment by 2 - no need, versions come from the block version
-// -todo: make 128 bit atomic function
-// -todo: make resize function so block lists can be resized rather than freed, only to be reallocated - doesn't work like this!
-// -todo: convert to 64 bit integers - not now, just need to clean up type aliases and signs
-// -todo: test windows permissions - ok now that \\Global isn't used and the shared memory 'Segment' goes into the current session?
-// -todo: take out WINNT namespace for windows NT definitions
-// -todo: make readers for blocks only exist on the head of the list? - not needed
-// -todo: move make_BlkLst to constructor
-// -todo: change BlkLst union to hold hash values
-// -todo: writeup why robin hood hashing will work for put, get, and delete (and their interactions)
-// -todo: store hash of key in ConcurrentStore
-// -todo: make alloc give back the blocks if allocation fails - already done
-// -todo: make sure when comparing VerIdxs that they compare both the version and the index - already done, compared as a single 64 bit int ?
-// -todo: make sure ConcurrentStore.put() tests each block for LIST_END - not needed because alloc checks for LIST_END
-// -todo: make the BlkLst hash be checked before comparing keys
-// -todo: make ConcurrentStore get() stop before exceeding maxlen? - already done
-// -todo: clean up type aliases with ui32 to u32
-// -todo: make arguments to listDBs for the prefix? 'type' is windows specific and should be ok to be hardcoded - not neccesary because windows will be hardcoded and unix and linux don't have types
-// -todo: make a macro to have separate windows and unix paths
-// -todo: initialize ConcurrentHash with a pointer to ConcurrentStore
-// -todo: change rm() to del()
-// -todo: change i8* to u8* and ui8* to u8*
-// -todo: get rid of unused uiX type aliases
-// -todo: take out IDX alias
-// -todo: make del() delete a VerIdx, duplicate the VerIdx ahead into the deleted slot, check that the indices are the same, and if they are, mark the one further ahead as deleted
-// -todo: make a DELETED value for hash entries so that when something is removed, it doesn't block a linear search
-// -todo: take out stack based m_blocksUsed
-// -todo: give a ConcurrentStore pointer to ConcurrentHash 
-// -todo: change ConcurrentHash  to CncrHsh or LfHsh
-// -todo: change ConcurrentStore to CncrStr
-// -todo: change ConcurrentList  to CncrLst
-// -todo: make compexchange_kv take VerIdx instead u64
-// -todo: make deleted_i64 function - made a vi_i64 function instead
-// -todo: make deleted indices that have an empty index on their right side become empty indices
-// -todo: take out simdb_ prefix? - if this happens, how will listDBs be able to find, think about this later, an answer will likely become clear
-// -todo: change compexchange_kv to cmpex_vi
-// -todo: need to do anything special to guarantee that readers is aligned so it is atomic? - no it is 64 bit so alignement doesn't matter for atomicity and barely matters for performance
-// -todo: clean up inconsitent signs and usage of negative numbers - VerIdx and BlkLst both have i32 for their idx field
-// -todo: switch negative numbers to a bitfield struct instead of implicitly using the sign bit for different purposes - use a bitfield struct with a flag for hitting LIST_END for out_blocks in alloc()
-// -todo: this conflates and assumes that EMPTY_KEY is both the CncrStr block index EMPTY_KEY and the CncrHsh EMPTY_KEY - probably fine
-// -todo: use the VersionIdx struct with the return from alloc()
-// -todo: stop using lambdas and templates - step 1, moving functions to CncrHsh
-//       | len()
-//       | get()
-//       | del()
-//       | put()
-// -todo: stop using match function as a template in del() 
-// -todo: change load_kv and store_kv to load_vi and store_vi
-// -todo: check the hash in each BlkLst index as an early out for failed reads - already done through CncrStr::compare()
-// -todo: get() - short circuit as not found on finding an empty slot - will need a deleted value - already was returning false on EMPTY, but needed to keep going on DELETED_KEY
-// -todo: check if reads can be made non-atomic if they already aren't - not worth looking in to now
-// -todo: redo EMPTY_KEY and DELETED_KEY to use last two values of u32
-// -todo: put supporting windows functions into anonymous namespace - only typedefs needed to be outside the anonymous namespace
-// -todo: put prefetching into reading of blocks - put in to nxtBlock()
-// -todo: look at making a memory access to the next block that can't be optimized away
-// -todo: prefetch memory for next block when looping through blocks - does this require a system call for shared memory and does it lock? it should just be the prefetch instruction or an unoptimized away load? use intrinsic?
-// -todo: change CncrStr::get() to check the version after reading and not before - is this not technically correct!!1! this checks that the next version is the same and then reads it, but shouldn't it read the block and then check if the version is still the same? - version is checked in readblock already
-// -todo: fix infinite loop on put
-// -todo: fix infinite loop on delete
-// -todo: make a swapped VerIdx type? - no because it won't do any good due to the VerIdx struct being used moslty to store the info on the stack and store it in memory 
-// -todo: make sure that 128 bit atomics are actually being called - breakpoint is hit when setting inside the function
-// -todo: refine putHashed to have proper names
-// -todo: change CncrStr::free() to take a VerIdx instead of separate variables? - might as well not 
-// -todo: fix infinite loop when deleting "wat" for the second time - alloc was not setting the first BlkLst index correctly
-// -todo: re-evaluate CncrHsh main loops' back tracking on compare exchange failure - just use prevIdx(i) - could use a goto to the top of the loop to avoid running prevIdx and then nxtIdx
-// -todo: make cmpex_vi swap hi and lo on odd indices - also had to feed it the actual address of the shared memory vi instead of the address of the copied (and possibly swapped)
-// -todo: rename m_kvs to m_vis
-// -todo: flatten putHashed into having the block comparison embedded 
-// -todo: print or visualize CncrHsh 
-// -todo: rename m_vis to s_vis since it is a lava_vec of Version Indexes in shared memory
-// -todo: debug compare exchange not working - dereferencing a pointer passed to the function failed silently while returning true - the value needed to be assigned to another local variable and that variable used as a reference
-// -todo: redo alloc so that there isn't a branch in the BlkLst construction
-// -todo: debug len returning 0 when key seems to exist in memory - not making it in to CncrHsh? - not using the shared memory for CncrHsh finally causing a problem? - put() not setting the hash? - alloc() was not setting the hash correctly
-// -todo: redo CncrHsh to use the shared memory instead of the lava_vec allocated on heap mistake - will this require aligning to 128 bit memory?
-// -todo: make BlkLst hash 64 bits instead of 32? - leave this until there is a reason to change it 
-// -todo: make put return a bool and output the index in a separate out variable? -  make put give back FAILED_PUT on error - isn't EMPTY_KEY enough? - no, because the put might fail due to no blocks left
-// -todo: make put return VerIdx ? - is having an out_version pointer enough? - revisit this if it becomes an issue
-// -todo: redo the BlkLst struct with calibrated bitfield size and without sub structures
-// -todo: debug new BlkLst struct with get() / len() no longer working - put() seems to work, len() seems to not work -  incReaders() and decReaders() needed a union of isKey and readers to be an integer
-// -todo: change CncrHsh init to set ints directly instead of using store_vi
-// -todo: make alloc() set up a list with LIST_END as the last index
-// -todo: redo KeyReaders, incReaders() and decReaders()
 // -todo: make CncrLst::idx() an atomic load
 // -todo: figure out why neither version of CncrStr::free() is being hit - wasn't calling del()....
 // -todo: figure out 128 bit alignement of CncrHsh's VerIdx memory - padded sizeBytes() by 16 and offset the address in which the lava_vec is created with to land on the 128 bit boundary
@@ -111,8 +8,11 @@
 // -todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
 // -todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
 // -todo: does a BlkLst need to be loaded atomically by a read operation? is it possible that a read could be out of date and use an incorrect cached version? - a thread will eventually atomically decrement the readers after reading all the blocks so it should be fine 
+// -todo: try to take out checkMatch from CncrHsh - checkMatch is unused
+// -todo: debug some (all?) CncrHsh indices not being deleted - only the last index? - cmpex_vi was being used with a pointer into s_vis on some functions and a pointer to a swapped vi on the stack in other functions
 
-// todo: flatten runIfMatch function to only take a function template argument but not a match function template argument
+// todo: take out runRead - used by simdb::len()
+// todo: flatten runIfMatch function to only take a function template argument but not a match function template argument - take it out all together
 // todo: figure out what to do about indices on the ends in CncrHsh - just leave a DELETED_KEY and don't turn it into an EMPTY_KEY, since it will then just be skipped over when looking for an index - make sure that cleanDeletion() and delDupe() skip the last index when they are the primary/left/lo index
 // todo: test with larger keys and values that span multiple blocks
 // todo: make sure that the start and end are taken care of with regards to cleaning up deletions - need to not go off the end of the array and need to figure out how to deal with spans between them
@@ -1413,12 +1313,14 @@ private:
     if(odd) return VerIdx(lo32(prev), hi32(prev));
     else    return VerIdx(hi32(prev), lo32(prev));
   }
-  bool         cmpex_vi(u32 i, VerIdx* volatile expected, VerIdx desired) const
+  //bool         cmpex_vi(u32 i, VerIdx* volatile expected, VerIdx desired) const
+  bool         cmpex_vi(u32 i, VerIdx expected, VerIdx desired) const
   {
     using namespace std;
 
-    u64     exp = *((u64*)expected);     // i%2? swp32(*((u64*)expected)) : *((u64*)expected);
-    u64    desi = desired.asInt;         // i%2? swp32(desired.asInt) : desired.asInt;                                 // desi is desired int
+    //u64     exp = *((u64*)expected);     // i%2? swp32(*((u64*)expected)) : *((u64*)expected);
+    u64     exp = i%2? swp32(expected.asInt) : expected.asInt;
+    u64    desi = i%2? swp32(desired.asInt) : desired.asInt;  //desired.asInt;                                          // desi is desired int
     au64*  addr = (au64*)(s_vis.data()+i);
     auto before = addr->load();
     bool     ok = addr->compare_exchange_strong( exp, desi );
@@ -1500,7 +1402,8 @@ private:
       nxtVp = ipd(nxtI, nxtVi);
       if(nxtVp.version!=nxtVi.version){ continue; /*goto clean_loop;*/ }             // the versions don't match, so start over on the same index and skip the compare exchange 
       else if(nxtVp.ipd==0){ return true; }                                          // should this be converted to an empty slot since it is the end of a span? // next slot's versions match and its VerIdx is in its ideal position, so we are done 
-      else if( cmpex_vi(i, &curVi, nxtVi) ){ 
+      //else if( cmpex_vi(i, &curVi, nxtVi) ){ 
+      else if( cmpex_vi(i, curVi, nxtVi) ){ 
         delDupe(i);
         i = nxtIdx(i);
       }
@@ -1518,22 +1421,36 @@ private:
     return true;
   }
 
-  template<class MATCH_FUNC> 
-  auto       checkMatch(u32 version, u32 key, MATCH_FUNC match) const -> Match //  decltype(match(empty_kv()))
-  {
-    //incReaders(i);  // todo: have incReaders return a VerIdx?
-      Match ret = match(key, version);
-    //decReaders(i);
-    
-    return ret;
-  }
+  //template<class MATCH_FUNC> 
+  //auto       checkMatch(u32 version, u32 key, MATCH_FUNC match) const -> Match //  decltype(match(empty_kv()))
+  //{
+  //  //incReaders(i);  // todo: have incReaders return a VerIdx?
+  //    Match ret = match(key, version);
+  //  //decReaders(i);
+  //  
+  //  return ret;
+  //}
+  //
+  //template<class MATCH_FUNC, class FUNC> 
+  //bool       runIfMatch(u32 i, u32 version, u32 key, MATCH_FUNC match, FUNC f) const // const -> bool
+  //{
+  //  //VerIdx kv = incReaders(i);    
+  //    //Match      m = match(key, version);
+  //    Match      m = m_csp->compare(blkIdx, version, keybuf, klen);
+  //    bool matched = false;                                       // not inside a scope
+  //    if(m==MATCH_TRUE){ matched=true; f(load_vi(i)); }          
+  //  //decReaders(i);
+  //  
+  //  return matched;
+  //}
 
   template<class MATCH_FUNC, class FUNC> 
-  bool       runIfMatch(u32 i, u32 version, u32 key, MATCH_FUNC match, FUNC f) const // const -> bool
+  bool       runIfMatch(u32 i, u32 version, u32 key, MATCH_FUNC match, FUNC f) const
   {
     //VerIdx kv = incReaders(i);    
       Match      m = match(key, version);
-      bool matched = false;                                       // not inside a scope
+      //Match      m = m_csp->compare(blkIdx, version, keybuf, klen);
+      bool matched = false;                                                   // not inside a scope
       if(m==MATCH_TRUE){ matched=true; f(load_vi(i)); }          
     //decReaders(i);
     
@@ -1584,7 +1501,8 @@ public:
       VerIdx vi = load_vi(i);
       if(vi.idx>=DELETED_KEY)                                                               // it is either deleted or empty
       {          
-        bool    success  =  cmpex_vi(i, s_vis.data()+i, desired);
+        //bool    success  =  cmpex_vi(i, s_vis.data()+i, desired);
+        bool    success  =  cmpex_vi(i, vi, desired);
         if(success) return vi;
         else{ i=prevIdx(i); continue; }                                                     // retry the same loop again if a good slot was found but it was changed by another thread between the load and the compare-exchange
       }                                                                                     // Either we just added the key, or another thread did.
@@ -1592,7 +1510,8 @@ public:
       //if( checkMatch(vi.version, vi.idx, match)!=MATCH_TRUE ){ continue; }
       if(m_csp->compare(vi.idx,vi.version,key,klen,hash)!=MATCH_TRUE ){ continue; }
 
-      bool success = cmpex_vi(i, s_vis.data()+i, desired);
+      //bool success = cmpex_vi(i, s_vis.data()+i, desired);
+      bool success = cmpex_vi(i, vi, desired);
       if(success) return vi;
       else{ i=prevIdx(i); continue; }
 
@@ -1619,12 +1538,9 @@ public:
     }
   }
   template<class FUNC> 
-  auto       runRead(u32  idx, u32 version, FUNC f)             const -> decltype( f(VerIdx()) )    // decltype( (f(empty_kv())) )
-  {
-    //VerIdx kv = incReaders(idx);
-    //auto ret = f(vi);
-    //decReaders(idx);
-
+  
+  auto       runRead(u32  idx, u32 version, FUNC f)             const -> decltype( f(VerIdx()) )
+  {  
     auto  vi = load_vi(idx);        if(vi.version!=version) return false;
     return f(vi);
   }
@@ -1646,7 +1562,7 @@ public:
 
       Match m = m_csp->compare(vi.idx, vi.version, key, klen, hash);
       if(m==MATCH_TRUE){
-        bool success = cmpex_vi(i, &vi, deleted);
+        bool success = cmpex_vi(i, vi, deleted);
         if(success){
           cleanDeletion(i);
           return vi;
@@ -1752,25 +1668,19 @@ public:
   {
     if(klen<1) return 0;
 
-    u32       hash = HashBytes(key, klen);
-    CncrStr*   csp = m_csp;
-    auto matchFunc = [csp, key, klen, hash](u32 blkidx, u32 ver){
-      return csp->compare(blkidx,ver,key,klen,hash);
-    };
+    u32 hash=HashBytes(key,klen), len=0, ver=0, i=hash%m_sz, en=prevIdx(i);
+    for(;; i=nxtIdx(i) )
+    {
+      VerIdx vi = load_vi(i);
+      if(vi.idx == EMPTY_KEY){ return 0ull;  }                                      // only EMPTY_KEY is the short circuit, since DELETED_KEY means you are still within a span and need to keep searching
+      else if(vi.idx == DELETED_KEY){ continue; }
+      
+      Match      m = m_csp->compare(vi.idx, vi.version, key, klen, hash);
+      if(m==MATCH_TRUE){ return m_csp->len(vi.idx, vi.version, out_vlen); }
+      if(i==en){ return 0ull; }
+    }
 
-    //m_csp->compare(blkIdx, version, buf, len, hash);
-    
-    u32 len=0; u32 ver=0;
-    auto runFunc = [csp, &len, &ver, out_vlen](VerIdx kv){
-      len = IsEmpty(kv)?  0ull  :  csp->len(kv.idx, kv.version, out_vlen);
-      ver = kv.version;
-    };
-
-    if(out_version){ *out_version = ver; }
-    if( !runMatch(hash, matchFunc, runFunc) ) return 0;
-    if(out_version){ *out_version = ver; }
-
-    return len;
+    return len;                                                                     // shouldn't be hit
   }
   bool           get(const void *const key, u32 klen, void *const   out_val, u32 vlen) const
   {
@@ -2279,6 +2189,39 @@ public:
 
 
 
+
+
+
+
+// decltype( (f(empty_kv())) )
+//
+//VerIdx kv = incReaders(idx);
+//auto ret = f(vi);
+//decReaders(idx);
+
+//u32       hash = HashBytes(key, klen);    
+//CncrStr*   csp = m_csp;
+//auto matchFunc = [csp, key, klen, hash](u32 blkidx, u32 ver){
+//  return csp->compare(blkidx,ver,key,klen,hash);
+//};
+//
+////m_csp->compare(blkIdx, version, buf, len, hash);
+//
+//u32 len=0; u32 ver=0;
+//auto runFunc = [csp, &len, &ver, out_vlen](VerIdx kv){
+//  len = IsEmpty(kv)?  0ull  :  csp->len(kv.idx, kv.version, out_vlen);
+//  ver = kv.version;
+//};
+//    
+//u32  i = hash % m_sz;
+//u32 en = prevIdx(i);
+//
+//if( runIfMatch(i, vi.version, vi.idx, match, f) ){ return true; }
+//else if(i==en){ return false; }
+//
+//if(out_version){ *out_version = ver; }
+//if( !runMatch(hash, matchFunc, runFunc) ) return 0;
+//if(out_version){ *out_version = ver; }
 
 //if(curVi.idx >= DELETED_KEY){ return false; }
 //

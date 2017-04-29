@@ -588,7 +588,7 @@ int main()
     printdb(db);
 
     Println("put: ", db.put(wat, skidoosh) );
-    Println("del wat: ", db.del("wat") );
+    //Println("del wat: ", db.del("wat") );
 
     Println();
   }
