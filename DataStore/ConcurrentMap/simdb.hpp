@@ -105,14 +105,15 @@
 // -todo: make CncrLst::idx() an atomic load
 // -todo: figure out why neither version of CncrStr::free() is being hit - wasn't calling del()....
 // -todo: figure out 128 bit alignement of CncrHsh's VerIdx memory - padded sizeBytes() by 16 and offset the address in which the lava_vec is created with to land on the 128 bit boundary
+// -todo: debug clean deletions leaving slots in a DELETED_KEY state - one side of the 128 bit alignment not being swapped - now duplicate DELETED_KEY entries are being created without being cleaned up - also deleting an adjacent EMPTY_KEY? - had to switch around bit swapping functions, lo and hi now only describe the low and high addresses
+// -todo: figure out how to set the indices into a list in CncrLst so that free() can use the start and end indices to free multiple blocks
+// -todo: make a CncrStr function to free a series of blocks with a begin and end, returning failure or success
+// -todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
+// -todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
+// -todo: does a BlkLst need to be loaded atomically by a read operation? is it possible that a read could be out of date and use an incorrect cached version? - a thread will eventually atomically decrement the readers after reading all the blocks so it should be fine 
 
-// todo: debug clean deletions leaving slots in a DELETED_KEY state - one side of the 128 bit alignment not being swapped - now duplicate DELETED_KEY entries are being created without being cleaned up - also deleting an adjacent EMPTY_KEY?
-// todo: figure out how to set the indices into a list in CncrLst so that free() can use the start and end indices to free multiple blocks
-// todo: make a CncrStr function to free a series of blocks with a begin and end, returning failure or success
-// todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
-// todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
+// todo: figure out what to do about indices on the ends in CncrHsh
 // todo: test with larger keys and values that span multiple blocks
-// todo: does a BlkLst need to be loaded atomically by a read operation? is it possible that a read could be out of date and use an incorrect cached version?
 // todo: flatten runIfMatch function to only take a function template argument but not a match function template argument
 // todo: find any remnants of KeyVal or kv and change them to VerIdx or vi
 // todo: stop using match function as a template in and just run a function in CncrHsh
@@ -1416,8 +1417,8 @@ private:
   {
     using namespace std;
 
-    u64     exp = *((u64*)expected);
-    u64    desi = i%2? swp32(desired.asInt) : desired.asInt;                                 // desi is desired int
+    u64     exp = *((u64*)expected);     // i%2? swp32(*((u64*)expected)) : *((u64*)expected);
+    u64    desi = desired.asInt;         // i%2? swp32(desired.asInt) : desired.asInt;                                 // desi is desired int
     au64*  addr = (au64*)(s_vis.data()+i);
     auto before = addr->load();
     bool     ok = addr->compare_exchange_strong( exp, desi );
