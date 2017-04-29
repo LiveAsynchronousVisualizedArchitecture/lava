@@ -112,24 +112,24 @@
 // -todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
 // -todo: does a BlkLst need to be loaded atomically by a read operation? is it possible that a read could be out of date and use an incorrect cached version? - a thread will eventually atomically decrement the readers after reading all the blocks so it should be fine 
 
-// todo: figure out what to do about indices on the ends in CncrHsh
-// todo: test with larger keys and values that span multiple blocks
 // todo: flatten runIfMatch function to only take a function template argument but not a match function template argument
+// todo: figure out what to do about indices on the ends in CncrHsh - just leave a DELETED_KEY and don't turn it into an EMPTY_KEY, since it will then just be skipped over when looking for an index - make sure that cleanDeletion() and delDupe() skip the last index when they are the primary/left/lo index
+// todo: test with larger keys and values that span multiple blocks
+// todo: make sure that the start and end are taken care of with regards to cleaning up deletions - need to not go off the end of the array and need to figure out how to deal with spans between them
+// todo: make sure readers is only used on the key block list
+// todo: make sure readers deletes the block list if it is the last reader after deletion
+// todo: reference count initializations so that the last process out can destroy the db
 // todo: find any remnants of KeyVal or kv and change them to VerIdx or vi
 // todo: stop using match function as a template in and just run a function in CncrHsh
 //       | len()
 //       | get()
 //       | put()
-// todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries?
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
-// todo: make sure that the start and end are taken care of with regards to cleaning up deletions - need to not go off the end of the array and need to figure out how to deal with spans between them
-// todo: make sure readers is only used on the key block list
-// todo: make sure readers deletes the block list if it is the last reader after deletion
-// todo: reference count initializations so that the last process out can destroy the db
-// todo: re-evaluate if the high bits of the lava vec pointer still need to contain extra information
+// todo: re-evaluate if the high bits of the lava vec pointer still need to contain extra information - one bit is being used for ownership - it can probably be made into a flat only container and ownership can just be a matter of who runs the constructor
 // todo: redo basic type definitions and put them only into class definitions
 // todo: re-evaluate strong vs weak ordering
+// todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries?
 // todo: search for any embedded todo comments
 // todo: clean out old commented lines
 // todo: compile with maximum warnings
