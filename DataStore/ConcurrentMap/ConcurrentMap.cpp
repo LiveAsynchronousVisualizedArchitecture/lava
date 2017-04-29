@@ -195,6 +195,7 @@ template<class T1, class... T> inline void
 //using vec        =  std::vector<T, _Alloc>;
 
 using std::thread;
+using str   =   std::string;
 
 inline void prefetch2(char const* const p)
 {
@@ -215,6 +216,8 @@ inline void prefetch0(char const* const p)
 
 //struct _u128 { u64 hi, lo; };
 //using u128 = __declspec(align(128)) volatile _u128;
+
+template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  // will need C++ ifdefs eventually
 
 void printdb(simdb const& db)
 {

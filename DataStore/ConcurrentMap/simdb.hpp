@@ -14,21 +14,21 @@
 // -todo: take out runRead - used by direct simdb::len(blkIdx) function - also used by getKey - was previously used to wrap incReaders() and decReaders() calls around a function 
 // -todo: flatten runIfMatch function to only take a function template argument but not a match function template argument - take it out all together
 // -todo: figure out what to do about indices on the ends in CncrHsh - just leave a DELETED_KEY and don't turn it into an EMPTY_KEY, since it will then just be skipped over when looking for an index - make sure that cleanDeletion() and delDupe() skip the last index when they are the primary/left/lo index
-
-// todo: test with larger keys and values that span multiple blocks
-// todo: make sure that the start and end are taken care of with regards to cleaning up deletions - need to not go off the end of the array and need to figure out how to deal with spans between them
-// todo: make sure readers is only used on the key block list
-// todo: make sure readers deletes the block list if it is the last reader after deletion
-// todo: reference count initializations so that the last process out can destroy the db
-// todo: find any remnants of KeyVal or kv and change them to VerIdx or vi
-// todo: stop using match function as a template in and just run a function in CncrHsh
+// -todo: make sure that the start and end are taken care of with regards to cleaning up deletions - need to not go off the end of the array and need to figure out how to deal with spans between them
+// -todo: stop using match function as a template in and just run a function in CncrHsh
 //       | len()
 //       | get()
 //       | put()
+// -todo: find any remnants of KeyVal or kv and change them to VerIdx or vi
+// -todo: redo basic type definitions and put them only into class definitions
+
+// todo: test with larger keys and values that span multiple blocks
+// todo: make sure readers is only used on the key block list
+// todo: make sure readers deletes the block list if it is the last reader after deletion
+// todo: reference count initializations so that the last process out can destroy the db
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
 // todo: re-evaluate if the high bits of the lava vec pointer still need to contain extra information - one bit is being used for ownership - it can probably be made into a flat only container and ownership can just be a matter of who runs the constructor
-// todo: redo basic type definitions and put them only into class definitions
 // todo: re-evaluate strong vs weak ordering
 // todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries?
 // todo: search for any embedded todo comments
@@ -244,23 +244,6 @@
 #include <algorithm>
 #include <cassert>
 
-using    i8   =   int8_t;
-using    u8   =   uint8_t;
-using   i64   =   int64_t;
-using   u64   =   uint64_t;
-using   i32   =   int32_t;
-using   u32   =   uint32_t;
-using   f32   =   float;
-using   f64   =   double;
-using  au64   =   std::atomic<u64>;
-using  au32   =   std::atomic<u32>;
-using  ai32   =   std::atomic<i64>;
-using   ai8   =   std::atomic<i8>;
-using  cstr   =   const char*;
-using   str   =   std::string;             // will need C++ ifdefs eventually or just need to be taken out
-
-template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  // will need C++ ifdefs eventually
-
 // platform specific type definitions
 #ifdef _WIN32                         // these have to be outside the anonymous namespace
   typedef void        *HANDLE;
@@ -271,6 +254,16 @@ template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  //
 #endif
 
 namespace {
+  using    u8   =   uint8_t;
+  using   u32   =   uint32_t;
+  using   u64   =   uint64_t;
+  using    i8   =   int8_t;
+  using   i32   =   int32_t;
+  using   i64   =   int64_t;
+  using  au64   =   std::atomic<u64>;
+  using  au32   =   std::atomic<u32>;
+
+
   enum Match { MATCH_FALSE=0, MATCH_TRUE=1, MATCH_REMOVED=-1  };
 
   struct _u128
@@ -1241,8 +1234,8 @@ public:
 
     return (u32)( (hsh>>32) ^ ((u32)hsh));
   }
-  static VerIdx         empty_kv(){ return VerIdx(EMPTY_KEY,0); }
-  static VerIdx       deleted_kv()
+  static VerIdx         empty_vi(){ return VerIdx(EMPTY_KEY,0); }
+  static VerIdx       deleted_vi()
   {
     VerIdx empty;
     empty.idx      =  DELETED_KEY;
@@ -1255,10 +1248,10 @@ public:
     return *((i64*)(&iVi));                                              // interpret the u64 bits directly as a signed 64 bit integer instead    
   }
   static i64              vi_i64(u64  i){ return *((i64*)&i); }          // interpret the u64 bits directly as a signed 64 bit integer instead    
-  static bool            IsEmpty(VerIdx kv)
+  static bool            IsEmpty(VerIdx vi)
   {
-    static VerIdx emptykv = empty_kv();
-    return emptykv.asInt == kv.asInt;
+    static VerIdx emptyvi = empty_vi();
+    return emptyvi.asInt == vi.asInt;
   }
   static u32                lo32(u64 n){ return (n>>32); }
   static u32                hi32(u64 n){ return (n<<32)>>32; }
@@ -1326,7 +1319,7 @@ private:
   }
   void           doFree(u32 i)                 const
   {
-    store_vi(i, empty_kv().asInt);
+    store_vi(i, empty_vi().asInt);
   }
   VerIpd            ipd(u32 i, VerIdx vi)      const  // ipd is Ideal Position Distance - it is the distance a CncrHsh index value is from the position that it gets hashed to 
   {
@@ -1351,14 +1344,14 @@ private:
         if(l==DELETED_KEY && r==EMPTY_KEY){
           //u64 rgtSwp = viDbl.lo;
           //rgtDel     = *((i64*)&rgtSwp);
-          rgtDel = vi_i64( swp32(empty_kv().asInt) );
-          lftDel = vi_i64( empty_kv() );
+          rgtDel = vi_i64( swp32(empty_vi().asInt) );
+          lftDel = vi_i64( empty_vi() );
         }else if(l!=r || l>=DELETED_KEY){                                           // check if both the indices are the same and if they are, that they aren't both deleted or both empty 
           return false;                     
         }else{
           u64 lftSwp = swp32(viDbl.hi);
           lftDel     = *((i64*)&lftSwp);                                            // if both the indices are the same, make a new right side VerIdx with the idx set to DELETED_KEY
-          rgtDel     = vi_i64( deleted_kv() );                                      // interpret the u64 bits directly as a signed 64 bit integer instead
+          rgtDel     = vi_i64( deleted_vi() );                                      // interpret the u64 bits directly as a signed 64 bit integer instead
         }
       }while( !compex128( (i64*)viDblAddr, rgtDel, lftDel, (i64*)&viDbl) );         // then compare and swap for a version with the new right side VerIdx // todo: does this need to be in a loop that only breaks when the two indices are not the same?
     }else
@@ -1456,7 +1449,7 @@ public:
   VerIdx   putHashed(u32 hash, VerIdx lstVi, const void *const key, u32 klen) const
   {
     using namespace std;
-    static const VerIdx empty   = empty_kv();
+    static const VerIdx empty   = empty_vi();
 
     VerIdx desired = lstVi;
     u32 i=hash%m_sz, en=prevIdx(i);
@@ -1501,8 +1494,8 @@ public:
   VerIdx   delHashed(const void *const key, u32 klen, u32 hash)               const
   {  
     using namespace std;
-    static const VerIdx   empty = empty_kv();
-    static const VerIdx deleted = deleted_kv();
+    static const VerIdx   empty = empty_vi();
+    static const VerIdx deleted = deleted_vi();
 
     u32  i = hash % m_sz;
     u32 en = prevIdx(i); 
@@ -1533,7 +1526,7 @@ public:
   bool          init(u32    sz, CncrStr* cs)
   {
     using namespace std;
-    static const u64 iempty    =  empty_kv().asInt;
+    static const u64 iempty    =  empty_vi().asInt;
     static const u64 swpempty  =  swp32(iempty);
 
     u32 hi = hi32(iempty);
@@ -1544,8 +1537,8 @@ public:
     //new (&m_vis) lava_vec<VerIdx>(m_sz);                   // placement new because the copy constructor and assignment operator are deleted.  msvc doesn't care, but clang does
     
     //u64 ver0, ver1;
-    //ver0         =  empty_kv().asInt;
-    //ver1         =  swp32(empty_kv().asInt);
+    //ver0         =  empty_vi().asInt;
+    //ver1         =  swp32(empty_vi().asInt);
     //ver1.version  =  1;
     
     //for(u32 i=0; i<sz; i+=2) store_vi(i, iempty);            // evens 
@@ -1566,10 +1559,10 @@ public:
   u32            nxt(u32 stIdx)                const
   {
     auto idx = stIdx;
-    VerIdx empty = empty_kv();
+    VerIdx empty = empty_vi();
     do{
-      VerIdx kv = load_vi(idx);
-      if(kv.idx != empty.idx) break;
+      VerIdx vi = load_vi(idx);
+      if(vi.idx != empty.idx) break;
       idx = (idx+1) % m_sz;                                             // don't increment idx above since break comes before it here
 
       if(idx==stIdx) return empty.idx;
@@ -1864,8 +1857,10 @@ public:
 class       simdb
 {
 public:
-  using BlkCnt = CncrStr::BlkCnt;
-  using VerIdx = CncrHsh::VerIdx;
+  using    u8   =  uint8_t;
+  using   str   =  std::string;
+  using BlkCnt  =  CncrStr::BlkCnt;
+  using VerIdx  =  CncrHsh::VerIdx;
 
 private:
   au64*      s_flags;
@@ -1900,7 +1895,7 @@ public:
   { 
     return ths->s_cs.compare(blkIdx, version, buf, len, hash);
   }
-  static bool           IsEmpty(VerIdx kv){return CncrHsh::IsEmpty(kv);}         // special value for CncrHsh
+  static bool           IsEmpty(VerIdx vi){return CncrHsh::IsEmpty(vi);}         // special value for CncrHsh
   static bool         IsListEnd(VerIdx vi){return CncrStr::IsListEnd(vi);}       // special value for CncrStr
 
 public:
@@ -1983,7 +1978,7 @@ public:
   VerIdx       nxt() const                                   // this version index represents a hash index, not an block storage index
   {
     auto        st = m_nxtChIdx;
-    VerIdx   empty = s_ch.empty_kv();
+    VerIdx   empty = s_ch.empty_vi();
     u32    chNxt; // = empty.key;
     VerIdx     vi;
     do{
@@ -2031,8 +2026,8 @@ public:
   }
   bool         get(str    const& key, str*   out_value) const
   {
-    u32   vlen = 0;
-    auto  kvLen = len(key.data(), (u32)key.length(), &vlen);
+    u32    vlen = 0;
+    len(key.data(), (u32)key.length(), &vlen);
     new (out_value) std::string(vlen,'\0');
     bool     ok = get(key.data(), (u32)key.length(), (void*)out_value->data(), vlen);
 
@@ -2076,7 +2071,7 @@ public:
 
     return { nxt.version, key };                    // copy elision 
   }
-  auto  getKeyStrs() const -> vec<VerStr>            // vec<u32>* out_versions=nullptr
+  auto  getKeyStrs() const -> std::vector<VerStr>
   {
     using namespace std;
     
@@ -2106,7 +2101,7 @@ public:
     }
 
     //if(out_versions) new (out_versions) vec<u32>()
-    return vec<VerStr>(keys.begin(), keys.end());
+    return vector<VerStr>(keys.begin(), keys.end());
   }
   bool         del(str const& key)
   {
@@ -2114,7 +2109,7 @@ public:
   }
 
   template<class T>
-  i64          put(str    const& key, vec<T> const& val)
+  i64          put(str    const& key, std::vector<T> const& val)
   {    
     return put(key.data(), (u32)key.length(), val.data(), (u32)(val.size()*sizeof(T)) );
   }
@@ -2135,7 +2130,24 @@ public:
 
 
 
+//
+//template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  // will need C++ ifdefs eventually
 
+//using    i8   =   int8_t;
+//using    u8   =   uint8_t;
+//using   i64   =   int64_t;
+//using   u64   =   uint64_t;
+//using   i32   =   int32_t;
+//using   u32   =   uint32_t;
+//using   f32   =   float;
+//using   f64   =   double;
+//using  au64   =   std::atomic<u64>;
+//using  au32   =   std::atomic<u32>;
+//using  ai32   =   std::atomic<i64>;
+//using   ai8   =   std::atomic<i8>;
+//using  cstr   =   const char*;
+//using   str   =   std::string;             // will need C++ ifdefs eventually or just need to be taken out
+//using    u8   =   uint8_t;
 
 //static bool  DefaultKeyCompare(u32 a, u32 b)
 //{
