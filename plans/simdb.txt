@@ -42,4 +42,14 @@
 
 
 
+Could a simplified spreadsheet database structure be created by using tbl.hpp with simdb.hpp?
+|  All the types of tbl.hpp would be available 
+|  Every key/entry would effectivly become a tree due to tbl.hpp
+|  The spreadsheet could be visualized in the visualizer
+|  Each row could have a key, and if the key is a number, it could be treated as a string of numbers
+|  A new row being created would have to know the lowest free number slot despite the db representation being a string
+
+
+
+
 

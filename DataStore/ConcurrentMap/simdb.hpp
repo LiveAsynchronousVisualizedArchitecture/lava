@@ -23,16 +23,18 @@
 // -todo: redo basic type definitions and put them only into class definitions
 // -todo: debug larger key not being found - length not being stored in every BlkLst
 // -todo: test with larger keys and values that span multiple blocks
+// -todo: re-evaluate if the high bits of the lava vec pointer still need to contain extra information - one bit is being used for ownership - it can probably be made into a flat only container and ownership can just be a matter of who runs the constructor
 
+// todo: make lava_vec flat only so that it never needs to be destructed
+// todo: make sure that the linked list of BlkLst structures is re-initialized on freeing 
 // todo: make sure readers is only used on the key block list
 // todo: make sure readers deletes the block list if it is the last reader after deletion
 // todo: reference count initializations so that the last process out can destroy the db
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
-// todo: re-evaluate if the high bits of the lava vec pointer still need to contain extra information - one bit is being used for ownership - it can probably be made into a flat only container and ownership can just be a matter of who runs the constructor
 // todo: test with visualizer
 // todo: re-evaluate strong vs weak ordering
-// todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries?
+// todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - will 
 // todo: search for any embedded todo comments
 // todo: clean out old commented lines
 // todo: compile with maximum warnings
