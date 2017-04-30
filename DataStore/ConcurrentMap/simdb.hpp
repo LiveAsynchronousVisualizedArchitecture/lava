@@ -27,8 +27,9 @@
 // -todo: compile with maximum warnings - warnings /all gives warning on the standard library and functions not being inlined - warning level 4 has no issues except for the errant potential mod by 0
 // -todo: create public close function that will also be called on destruction
 // -todo: reference count initializations so that the last process out can destroy the db
+// -todo: make sure that the linked list of BlkLst structures is re-initialized on freeing - does head need to also make sure that it's version never uses a special value like 0 or LIST_END?
+// -todo: make a special version number that is checked for and skipped
 
-// todo: make sure that the linked list of BlkLst structures is re-initialized on freeing - does head need to also make sure that it's version never uses a special value like 0 or LIST_END?
 // todo: make lava_vec flat only so that it never needs to be destructed
 // todo: make sure readers is only used on the key block list
 // todo: make sure readers deletes the block list if it is the last reader after deletion
@@ -641,15 +642,20 @@ public:
   using ListVec  =  lava_vec<u32>;
 
   const static u32 LIST_END = 0xFFFFFFFF;
+  const static u32 NXT_VER_SPECIAL = 0xFFFFFFFF;
 
 private:
   ListVec     m_lv;
   au64*        m_h;
 
 public:
-  static u64 sizeBytes(u32 size)
+  static u64   sizeBytes(u32 size)
   {
     return ListVec::sizeBytes(size);
+  }
+  static u32  incVersion(u32    v)
+  {
+    return v==NXT_VER_SPECIAL?  1  :  v+1;
   }
 
   CncrLst(){}
@@ -676,7 +682,7 @@ public:
       if(curHead.idx==LIST_END){return LIST_END;}
 
       nxtHead.idx  =  m_lv[curHead.idx];
-      nxtHead.ver  =  curHead.ver + 1;
+      nxtHead.ver  =  curHead.ver==NXT_VER_SPECIAL? 1  :  curHead.ver+1;
     }while( !m_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
 
     return curHead.idx;
@@ -875,10 +881,11 @@ private:
 
     return blocks;
   }
-  u32       findListEnd(u32  blkIdx)  const                  // find the last BlkLst slot in the linked list of blocks to free 
+  u32 findEndSetVersion(u32  blkIdx, u32 version)  const                  // find the last BlkLst slot in the linked list of blocks to free 
   {
     u32 cur=blkIdx, prev=blkIdx;
     while(cur != LIST_END){
+      s_bls[prev].version = version;
       prev = cur;
       cur  = s_bls[cur].idx;
     }
@@ -887,7 +894,7 @@ private:
   }
   void           doFree(u32  blkIdx)  const        // frees a list/chain of blocks - don't need to zero out the memory of the blocks or reset any of the BlkLsts' variables since they will be re-initialized anyway
   {
-    u32 listEnd  =  findListEnd(blkIdx); 
+    u32 listEnd  =  findEndSetVersion(blkIdx, 0); 
     s_cl.free(blkIdx, listEnd);
   }
   u32        writeBlock(u32  blkIdx, void const* const bytes, u32 len=0, u32 ofst=0)      // don't need to increment readers since write should be done before the block is exposed to any other threads
