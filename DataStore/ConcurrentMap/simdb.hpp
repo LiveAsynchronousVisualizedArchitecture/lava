@@ -22,8 +22,8 @@
 // -todo: find any remnants of KeyVal or kv and change them to VerIdx or vi
 // -todo: redo basic type definitions and put them only into class definitions
 // -todo: debug larger key not being found - length not being stored in every BlkLst
+// -todo: test with larger keys and values that span multiple blocks
 
-// todo: test with larger keys and values that span multiple blocks
 // todo: make sure readers is only used on the key block list
 // todo: make sure readers deletes the block list if it is the last reader after deletion
 // todo: reference count initializations so that the last process out can destroy the db
