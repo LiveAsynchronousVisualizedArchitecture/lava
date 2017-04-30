@@ -21,8 +21,8 @@
 //       | put()
 // -todo: find any remnants of KeyVal or kv and change them to VerIdx or vi
 // -todo: redo basic type definitions and put them only into class definitions
+// -todo: debug larger key not being found - length not being stored in every BlkLst
 
-// todo: debug larger key not being found
 // todo: test with larger keys and values that span multiple blocks
 // todo: make sure readers is only used on the key block list
 // todo: make sure readers deletes the block list if it is the last reader after deletion
@@ -766,13 +766,13 @@ public:
       //kr.readers  = readers;
       //kr.version  = ver;
 
-      if(isKey){
+      //if(isKey){
         len  = _len;
         klen = _klen;
-      }else{
-        len  = 0;
-        klen = 0;
-      }
+      //}else{
+      //  len  = 0;
+      //  klen = 0;
+      //}
     } 
   };
   struct  BlkCnt { u32 end : 1; u32 cnt : 31; };                                       // this is returned from alloc() and may not be neccesary - it is the number of blocks allocated and if the end was reached
@@ -959,7 +959,7 @@ public:
         nxt = s_cl.nxt();
         if(nxt==LIST_END){ free(st, ver); VerIdx empty={LIST_END,0}; return empty; }
 
-        s_bls[cur] = BlkLst(false, 0, nxt, ver);
+        s_bls[cur] = BlkLst(false, 0, nxt, ver, size);
         cur        = nxt;
         ++cnt;
         //m_blocksUsed.fetch_add(1);
@@ -968,7 +968,7 @@ public:
 
     SECTION(add the last index into the list, set out_blocks and return the start index with its version)
     {      
-      s_bls[cur] = BlkLst(false,0,LIST_END,ver,0,0,0);       // if there is only one block needed, cur and st could be the same
+      s_bls[cur] = BlkLst(false,0,LIST_END,ver,size,0,0);       // if there is only one block needed, cur and st could be the same
 
       s_bls[st].isKey = true;
       s_bls[st].hash  = hash;
