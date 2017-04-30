@@ -24,21 +24,24 @@
 // -todo: debug larger key not being found - length not being stored in every BlkLst
 // -todo: test with larger keys and values that span multiple blocks
 // -todo: re-evaluate if the high bits of the lava vec pointer still need to contain extra information - one bit is being used for ownership - it can probably be made into a flat only container and ownership can just be a matter of who runs the constructor
+// -todo: compile with maximum warnings - warnings /all gives warning on the standard library and functions not being inlined - warning level 4 has no issues except for the errant potential mod by 0
+// -todo: create public close function that will also be called on destruction
+// -todo: reference count initializations so that the last process out can destroy the db
 
+// todo: make sure that the linked list of BlkLst structures is re-initialized on freeing - does head need to also make sure that it's version never uses a special value like 0 or LIST_END?
 // todo: make lava_vec flat only so that it never needs to be destructed
-// todo: make sure that the linked list of BlkLst structures is re-initialized on freeing 
 // todo: make sure readers is only used on the key block list
 // todo: make sure readers deletes the block list if it is the last reader after deletion
-// todo: reference count initializations so that the last process out can destroy the db
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
+// todo: test flush()
 // todo: test with visualizer
 // todo: re-evaluate strong vs weak ordering
-// todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - will 
+// todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
 // todo: search for any embedded todo comments
 // todo: clean out old commented lines
-// todo: compile with maximum warnings
 // todo: run existing tests
+// todo: build in the ability to explicitly set the path of the shared memory file
 
 // robin hood hashing
 // todo: do rm()/del() first and make deletion take care of holes in spans?
@@ -189,8 +192,10 @@
 
 */
 
+
 #ifdef _MSC_VER
   #pragma once
+  #pragma warning(push, 0)
 #endif
 
 #ifndef __SIMDB_HEADER_GUARD__
@@ -613,6 +618,10 @@ namespace {
   // gcc/clang/linux ?
   #include <alloca.h>
   #define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);  
+#endif
+
+#ifdef _WIN32
+  #pragma warning(pop)
 #endif
 
 class     CncrLst
@@ -1466,13 +1475,16 @@ public:
         else{ i=prevIdx(i); continue; }                                                     // retry the same loop again if a good slot was found but it was changed by another thread between the load and the compare-exchange
       }                                                                                     // Either we just added the key, or another thread did.
 
-      if(m_csp->compare(vi.idx,vi.version,key,klen,hash) != MATCH_TRUE){continue;}
+      if(m_csp->compare(vi.idx,vi.version,key,klen,hash) != MATCH_TRUE){
+        if(i==en){break;}
+        else{continue;}
+      }
 
       bool success = cmpex_vi(i, vi, desired);
       if(success){ return vi; }
       else{ i=prevIdx(i); continue; }
 
-      if(i==en) break;
+      //if(i==en) break;
     }
 
     return empty;  // should never be reached
@@ -1518,13 +1530,13 @@ public:
           return vi;
         }else{ i=prevIdx(i); continue; }
 
-        return vi;
+        //return vi;  // unreachable
       }
 
       if(m==MATCH_REMOVED || i==en){ return empty; }
     }
 
-    return empty; 
+    //return empty;   // unreachable
   }
 
   bool          init(u32    sz, CncrStr* cs)
@@ -1630,7 +1642,7 @@ public:
       if(i==en){ return 0ull; }
     }
 
-    return len;                                                                     // shouldn't be hit
+    //return len;                                                                     // shouldn't be hit
   }
   bool           get(const void *const key, u32 klen, void *const out_val, u32 vlen) const
   {
@@ -1691,7 +1703,7 @@ struct  SharedMem       // in a halfway state right now - will need to use arbit
 
   void*       hndlPtr;
   void*           ptr;
-  u64           size;
+  u64            size;
   bool          owner;
 
   static  bool file_exists(char const* filename)
@@ -1843,7 +1855,7 @@ public:
   }
   ~SharedMem()
   {
-    SharedMem::FreeAnon(*this);
+    if(ptr){ SharedMem::FreeAnon(*this); }
   }
   void clear()
   {
@@ -1879,6 +1891,7 @@ private:
   mutable u32    m_curChIdx;
   u64              m_blkCnt;
   u64               m_blkSz;
+  bool             m_isOpen;
 
 public:
   static const u32    EMPTY_KEY = CncrHsh::EMPTY_KEY;          // 28 bits set 
@@ -1905,19 +1918,23 @@ public:
 public:
   simdb(){}
   simdb(const char* name, u32 blockSize, u32 blockCount) : 
-    m_curChIdx(0)
+    m_curChIdx(0),
+    m_isOpen(false)
   {
     new (&m_mem) SharedMem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount)) );
 
-    s_blockCount =  ((au64*)m_mem.data())+2;
-    s_blockSize  =  ((au64*)m_mem.data())+1;
-    s_flags      =   (au64*)m_mem.data();
+    s_blockCount  =  ((au64*)m_mem.data())+2;
+    s_blockSize   =  ((au64*)m_mem.data())+1;
+    s_flags       =   (au64*)m_mem.data();
 
     if(isOwner()){
       s_blockCount->store(blockCount);
       s_blockSize->store(blockSize);
+      s_flags->store(1);
     }else{                                                      // need to spin until ready
-      while(s_flags->load()==false){}
+      //while(s_flags->load()==false){}
+      while(s_flags->load() < 1){continue;}
+      s_flags->fetch_add(1);
       m_mem.size = MemSize(s_blockSize->load(), s_blockCount->load());
     }
 
@@ -1936,9 +1953,12 @@ public:
     m_blkCnt = s_blockCount->load();
     m_blkSz  = s_blockSize->load();
 
-    // todo: initialized flag and reference count
-    if(isOwner()) s_flags->store(1);                             // set to 1 to signal construction is done
+    m_isOpen = true;
+
+    //// todo: initialized flag and reference count
+    //if(isOwner()) s_flags->store(1);                             // set to 1 to signal construction is done
   }
+  ~simdb(){ close(); }
 
   i64          len(const void *const key, u32 klen, u32* out_vlen=nullptr, u32* out_version=nullptr) const
   {
@@ -1977,7 +1997,9 @@ public:
   }
   void       flush() const
   {
-    FlushViewOfFile(m_mem.hndlPtr, m_mem.size);
+    #ifdef _WIN32
+      FlushViewOfFile(m_mem.hndlPtr, m_mem.size);
+    #endif
   }
   VerIdx       nxt() const                                   // this version index represents a hash index, not an block storage index
   {
@@ -2008,13 +2030,25 @@ public:
     return true;
   }
   u32          cur() const { return m_curChIdx; }
-  auto        data() const -> const void* const { return s_cs.data(); }
+  auto        data() const -> const void* const { return s_cs.data(); }                   // return a pointer to the start of the block data
   u64         size() const { return CncrStr::sizeBytes( (u32)s_blockSize->load(), (u32)s_blockCount->load()); }
   bool     isOwner() const { return m_mem.owner; }
-  u64       blocks() const { return s_blockCount->load(); }
-  auto         mem() const -> void* { return m_mem.hndlPtr; }
+  u64       blocks() const { return s_blockCount->load(); }                               // return the total number of blocks the shared memory
+  auto         mem() const -> void* { return m_mem.hndlPtr; }                             // returns a pointer to the start of the shared memory, which will contain the data structures first
   u64      memsize() const { return m_mem.size; }
   auto    hashData() const -> void const* const { return s_ch.data(); }
+  bool       close()
+  {
+    if(m_isOpen){
+      m_isOpen = false;
+      u64 prev = s_flags->fetch_sub(1);                                                  // prev is previous flags value - the number of simdb instances across process that had the shared memory file open
+      if(prev==1){                                                                       // if the previous value was 1, that means the value is now 0, and we are the last one to stop using the file, which also means we need to be the one to clean it up
+        SharedMem::FreeAnon(m_mem);                                                       // close and delete the shared memory - this is done automatically on windows when all processes are no longer accessing a shared memory file
+        return true;
+      }
+    }
+    return false;
+  }
 
   // separated C++ functions - these won't need to exist if compiled for a C interface
   struct VerStr { 

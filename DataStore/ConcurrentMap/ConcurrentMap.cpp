@@ -2,6 +2,10 @@
 // todo: test 128 bit atomic with native C++
 // todo: look into 128 bit atomic with windows
 
+#ifdef _MSC_VER
+ #pragma warning(push, 0)
+#endif
+
 #include <stdint.h>
 #include <atomic>
 #include <mutex>
@@ -20,8 +24,13 @@
 
 //#include <SIM/SIM_GeneralTemplateUtil.hpp>
 
+#ifndef COMBINE
+  #define COMBINE2(a,b) a ## b
+  #define COMBINE(a,b) COMBINE2(a,b)
+#endif
+
 #ifndef PAUSE
-  #define PAUSE std::cout << "Paused at line " << __LINE__ << std::endl; int VAR##__LINE__; std::cin >> VAR##__LINE__;
+  #define PAUSE std::cout << "Paused at line " << __LINE__ << std::endl; int COMBINE(VAR,__LINE__); std::cin >> COMBINE(VAR,__LINE__);
 #endif
 
 #ifndef TO
@@ -545,7 +554,7 @@ int main()
 
   //Println("simdb stack sz: ", sizeof(simdb) );
 
-  simdb db("test", 32, 256);
+  simdb db("test", 32, 64);
 
   printhsh(db);
 
@@ -585,14 +594,14 @@ int main()
   //Println("put: ", db.put( wat.data(),   (u32)wat.length(),    skidoosh.data(), (u32)skidoosh.length()) );
   //Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
   if( db.isOwner() ){
-    //Println("put: ", db.put(wat, skidoosh) );
-    //db.del("wat");
-    //Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
-    //db.del("wut");
-    //Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
-    //db.del("kablam");
+    Println("put: ", db.put(wat, skidoosh) );
+    db.del("wat");
+    Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
+    db.del("wut");
+    Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
+    db.del("kablam");
 
-    //Println("put: ", db.put(wat, skidoosh) );
+    Println("put: ", db.put(wat, skidoosh) );
     //Println("del wat: ", db.del("wat") );
 
     Println("put: ", db.put(longkey, longval) );
@@ -704,10 +713,16 @@ int main()
 
   Println("\n\n DONE \n\n");
   PAUSE
+  db.close();
+  Println("\n\n CLOSED \n\n");
+  PAUSE
 
   return 0;
 }
 
+#ifdef _MSC_VER
+ #pragma warning(pop)
+#endif
 
 
 
