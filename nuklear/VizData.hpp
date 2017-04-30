@@ -34,6 +34,10 @@
 //enum struct AtrId : GLuint { POSITION=0, NORMAL=1, COLOR=2, TEXCOORD=3 };  // this coresponds to the the Vertex struct in IndexedVerts
 enum AtrId : GLuint { POSITION=0, NORMAL=1, COLOR=2, TEXCOORD=3 };  // this coresponds to the the Vertex struct in IndexedVerts
 
+template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  // will need C++ ifdefs eventually
+
+using f32     =  float;
+using f64     =  double;
 using std::map;
 using str     =  std::string;
 using VerStr  =  simdb::VerStr;
@@ -73,8 +77,8 @@ private:
 public:
   bool      owner;
   int      active;
-  ui32    version, mode, indsz;          // mode is the openGL type of geometry to draw, indsz is the number of indices
-  GLuint  vertbuf, vertary, idxbuf, tx;  // normals, colors, uvcoords, image data 
+  u32      version, mode, indsz;          // mode is the openGL type of geometry to draw, indsz is the number of indices
+  GLuint   vertbuf, vertary, idxbuf, tx;  // normals, colors, uvcoords, image data 
   GLuint   shader;                       // the shader ID is not owned by the shape 
 
   Shape() :

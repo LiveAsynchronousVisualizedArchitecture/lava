@@ -18,7 +18,7 @@
 
 #include "update_test_data.hpp"
 
-inline vec<ui8>      makeCube()
+inline vec<u8>      makeCube()
 {
   const unsigned int NUM_VERTICES = 8;
   const unsigned int NUM_INDICES = 36;
@@ -96,7 +96,7 @@ inline vec<ui8>      makeCube()
   };
 
   // Copy index data into IndexedVerts.indices
-  memcpy(iv->indices, cubeIndices, sizeof(ui32) * NUM_INDICES);
+  memcpy(iv->indices, cubeIndices, sizeof(u32) * NUM_INDICES);
 
   // copy pixel data 
   //memset(iv->pixels, 0, sizeof(float)*4);                 // 4 floats, all 0, meaning black color and black alpha
@@ -106,14 +106,14 @@ inline vec<ui8>      makeCube()
   // Call once to get byteLen
   size_t byteLen = 0;
   IndexedVertsSave(iv, nullptr, &byteLen);
-  vec<ui8> bytes(byteLen);
+  vec<u8> bytes(byteLen);
   // Call again to serialize
   IndexedVertsSave(iv, bytes.data(), &byteLen);
   IndexedVertsDestroy(iv);
 
   return bytes;
 }
-inline vec<ui8>  makeTriangle(bool left)
+inline vec<u8>  makeTriangle(bool left)
 {
   // Create triangle Vertex data
   const unsigned int NUM_VERTICES = 3;
@@ -162,10 +162,10 @@ inline vec<ui8>  makeTriangle(bool left)
       };
   }
 
-  ui32 indices[NUM_INDICES] = {0, 1, 2};
+  u32 indices[NUM_INDICES] = {0, 1, 2};
 
   // Copy index data into IndexedVerts.indices
-  memcpy(iv->indices, indices, sizeof(ui32)* NUM_INDICES);
+  memcpy(iv->indices, indices, sizeof(u32)* NUM_INDICES);
 
   // copy pixel data 
   memset(iv->pixels, 0, sizeof(float)*4);                 // 4 floats, all 0, meaning black color and black alpha
@@ -174,7 +174,7 @@ inline vec<ui8>  makeTriangle(bool left)
   // Call once to get byteLen
   size_t byteLen = 0;
   IndexedVertsSave(iv, nullptr, &byteLen);
-  vec<ui8> bytes(byteLen);
+  vec<u8> bytes(byteLen);
   // Call again to serialize
   IndexedVertsSave(iv, bytes.data(), &byteLen);
   IndexedVertsDestroy(iv);

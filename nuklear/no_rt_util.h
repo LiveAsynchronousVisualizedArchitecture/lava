@@ -33,12 +33,12 @@ This file is meant to be made up of utilities that avoid using the C runtime
 #   define NO_RT_USED __attribute__ ((__used__))
 #endif
 
-using  ui8  =  unsigned      char;
-using ui32  =  unsigned       int;
-using ui64  =  unsigned long long;
-using  i64  =           long long;
-using  f32  =               float;
-using  f64  =              double;
+//using  ui8  =  unsigned      char;
+//using ui32  =  unsigned       int;
+//using ui64  =  unsigned long long;
+//using  i64  =           long long;
+//using  f32  =               float;
+//using  f64  =              double;
 
 
 #define PIf 3.141592653589f

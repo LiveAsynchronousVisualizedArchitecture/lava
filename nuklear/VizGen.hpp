@@ -13,7 +13,7 @@
 
 #include "VizData.hpp"
 
-inline vec<ui8>      makeCube(size_t& byteLen)
+inline vec<u8>      makeCube(size_t& byteLen)
 {
   const unsigned int NUM_VERTICES = 8;
   const unsigned int NUM_INDICES = 36;
@@ -99,14 +99,14 @@ inline vec<ui8>      makeCube(size_t& byteLen)
 
   // Call once to get byteLen
   IndexedVertsSave(iv, nullptr, &byteLen);
-  vec<ui8> bytes(byteLen);
+  vec<u8> bytes(byteLen);
   // Call again to serialize
   IndexedVertsSave(iv, bytes.data(), &byteLen);
   IndexedVertsDestroy(iv);
 
   return bytes;
 }
-inline vec<ui8>  makeTriangle(size_t& byteLen, bool left)
+inline vec<u8>  makeTriangle(size_t& byteLen, bool left)
 {
   // Create triangle Vertex data
   const unsigned int NUM_VERTICES = 3;
@@ -166,7 +166,7 @@ inline vec<ui8>  makeTriangle(size_t& byteLen, bool left)
 
   // Call once to get byteLen
   IndexedVertsSave(iv, nullptr, &byteLen);
-  vec<ui8> bytes(byteLen);
+  vec<u8> bytes(byteLen);
   // Call again to serialize
   IndexedVertsSave(iv, bytes.data(), &byteLen);
   IndexedVertsDestroy(iv);

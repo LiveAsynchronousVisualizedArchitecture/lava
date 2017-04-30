@@ -30,13 +30,13 @@
 // -todo: make sure that the linked list of BlkLst structures is re-initialized on freeing - does head need to also make sure that it's version never uses a special value like 0 or LIST_END?
 // -todo: make a special version number that is checked for and skipped
 
+// todo: test with visualizer
 // todo: make lava_vec flat only so that it never needs to be destructed
 // todo: make sure readers is only used on the key block list
 // todo: make sure readers deletes the block list if it is the last reader after deletion
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
 // todo: test flush()
-// todo: test with visualizer
 // todo: re-evaluate strong vs weak ordering
 // todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
 // todo: search for any embedded todo comments

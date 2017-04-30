@@ -414,13 +414,13 @@ vec_vs      shapesFromKeys(simdb const& db, vec_vs dbKeys, VizData* vd)  // vec<
       continue;
     }
 
-    ui32    vlen = 0;
-    ui32 version = 0;
-    auto     len = db.len(vs.s.data(), (ui32)vs.s.length(), &vlen, &version);          // todo: make ui64 as the input length
+    u32    vlen = 0;
+    u32 version = 0;
+    auto     len = db.len(vs.s.data(), (u32)vs.s.length(), &vlen, &version);          // todo: make ui64 as the input length
     vs.v = version;
 
     vec<i8> ivbuf(vlen);
-    db.get(vs.s.data(), (ui32)vs.s.length(), ivbuf.data(), (ui32)ivbuf.size());
+    db.get(vs.s.data(), (u32)vs.s.length(), ivbuf.data(), (u32)ivbuf.size());
 
     Shape  s      = ivbuf_to_shape(ivbuf.data(), len);      PRINT_GL_ERRORS
     s.shader      = vd->shaderId;
@@ -455,17 +455,17 @@ vec_vs    eraseMissingKeys(vec_vs dbKeys, KeyShapes* shps)           // vec<str>
   return dbKeys;
   //return cnt;
 }
-bool             updateKey(simdb const& db, str const& key, ui32 version, VizData* vd)
+bool             updateKey(simdb const& db, str const& key, u32 version, VizData* vd)
 {
   using namespace std;
 
-  ui32 dbVersion = 0;
-  ui32      vlen = 0;
-  auto       len = db.len(key.data(), (ui32)key.length(), &vlen, &dbVersion);
+  u32 dbVersion = 0;
+  u32      vlen = 0;
+  auto       len = db.len(key.data(), (u32)key.length(), &vlen, &dbVersion);
 
   if(len>0 && dbVersion!=version){ //key.v){
     vec<i8> ivbuf(vlen);
-    db.get(key.data(), (ui32)key.length(), ivbuf.data(), (ui32)ivbuf.size());
+    db.get(key.data(), (u32)key.length(), ivbuf.data(), (u32)ivbuf.size());
 
     Shape  s  = ivbuf_to_shape(ivbuf.data(), len);
     s.shader  = vd->shaderId;
@@ -496,9 +496,9 @@ void       genTestGeo(simdb* db)
   
   // Create serialized IndexedVerts
   size_t leftLen, rightLen, cubeLen;
-  vec<ui8>  leftData = makeTriangle(leftLen, true);
-  vec<ui8> rightData = makeTriangle(rightLen, false);
-  vec<ui8>  cubeData = makeCube(cubeLen);
+  vec<u8>  leftData = makeTriangle(leftLen, true);
+  vec<u8> rightData = makeTriangle(rightLen, false);
+  vec<u8>  cubeData = makeCube(cubeLen);
 
   // Store serialized IndexedVerts in the db
   str  leftTriangle = "leftTriangle";

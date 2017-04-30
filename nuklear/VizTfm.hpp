@@ -77,7 +77,7 @@ inline GLuint  shadersrc_to_shaderid(const char* vert, const char* frag)
 
   return shaderProgramId;
 }
-inline Shape          ivbuf_to_shape(void* buf, ui64 len)    //IndexedVerts* iv)
+inline Shape          ivbuf_to_shape(void* buf, u64 len)    //IndexedVerts* iv)
 {
   using namespace std;
   
@@ -176,12 +176,12 @@ inline vec4         shapes_to_bndsph(VizData const& vd)
     if(!kv.second.active) continue;
 
     auto&    key = kv.first;
-    ui32    vlen = 0;
-    ui32 version = 0;
-    auto     len = db.len(key.data(), (ui32)key.length(), &vlen, &version);          // todo: make ui64 as the input length
+    u32    vlen = 0;
+    u32 version = 0;
+    auto     len = db.len(key.data(), (u32)key.length(), &vlen, &version);          // todo: make ui64 as the input length
 
     vec<i8> ivbuf(vlen);
-    db.get(key.data(), (ui32)key.length(), ivbuf.data(), (ui32)ivbuf.size());
+    db.get(key.data(), (u32)key.length(), ivbuf.data(), (u32)ivbuf.size());
 
     IndexedVerts* iv = (IndexedVerts*)IndexedVertsLoad(ivbuf.data());
     vec3*          v = (vec3*)iv->verts;
