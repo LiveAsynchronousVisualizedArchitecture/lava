@@ -32,6 +32,7 @@
 // -todo: debug len(idx) returning 0 - is free resetting the block indices causing problems? -  no, len() wasn't looking up from the CncrHsh first and getIdx() was returning false when less or equal to DELETED_KEY and not greater or equal
 // -todo: test with visualizer
 
+// todo: make lava_vec pointer point to 16 bytes in, giving operator[] a way to dereference the memory without any additional offsets
 // todo: make lava_vec flat only so that it never needs to be destructed
 // todo: make sure readers checks the version number after reading each block when finding a key
 // todo: make sure readers is only used on the key block list
@@ -275,7 +276,6 @@ namespace {
   using  au64   =   std::atomic<u64>;
   using  au32   =   std::atomic<u32>;
 
-
   enum Match { MATCH_FALSE=0, MATCH_TRUE=1, MATCH_REMOVED=-1  };
 
   struct _u128
@@ -290,49 +290,21 @@ namespace {
     void operator()(){}
   };
 
-  template<class T, class Deleter=std::default_delete<T>, class Allocator=std::allocator<T> >
-  class lava_vec
+  template<class T> class lava_vec
   {
   private:
     void* p;
 
-    void       set_size(u64  s)
-    { 
-      *((u64*)clearBits(p) + 1) = s;
-    }
-    void  set_sizeBytes(u64 sb)
-    {
-      *((u64*)clearBits(p)) = sb;      // first 8 bytes should be the total size of the buffer in bytes
-    } 
+    void       set_size(u64  s){ ((u64*)p)[1] = s; }
+    void  set_sizeBytes(u64 sb){ ((u64*)p)[0] = sb; } 
 
   public:
-    static void*  setDestructorBit(void* p)
-    {
-      //return (void*)((u64)p ^ (((u64)1l)<<63));
-      return (void*)((u64)p | (1llu<<63));
-    }
-    static bool   getDestructorBit(void* p)
-    {
-      return (((u64)p)>>63)!=0;
-    }
-    static void*         clearBits(void* p)
-    {
-      return (void*)( ((u64)p) & 0x0000FFFFFFFFFFFF);
-    }
-    static u64          sizeBytes(u64 count)  // sizeBytes is meant to take the same arguments as a constructor and return the total number of bytes to hold the entire stucture given those arguments 
+    static u64 sizeBytes(u64 count)  // sizeBytes is meant to take the same arguments as a constructor and return the total number of bytes to hold the entire stucture given those arguments 
     {
       return sizeof(u64)*2 + count*sizeof(T);
     }
 
     lava_vec(){}
-    lava_vec(u64  count)
-    {
-      u64 sb = lava_vec::sizeBytes(count);
-      p       = Allocator().allocate(sb);
-      p       = setDestructorBit(p);
-      set_size(count);
-      set_sizeBytes(sb);
-    }
     lava_vec(void*  addr, u64 count, bool owner=true) :
       p(addr)
     {
@@ -341,38 +313,18 @@ namespace {
         set_size(count);
       }
     }
-    lava_vec(void*  addr) :
-      p(addr)
-    {
-      //u64 sb = lava_vec::sizeBytes(count);
-      //set_size(count);
-      //set_sizeBytes(sb);
-      //
-      //p = addr;
-    }
-    lava_vec(lava_vec const&) = delete;
+    lava_vec(void*  addr) : p(addr) {}
+    lava_vec(lava_vec const&)       = delete;
     void operator=(lava_vec const&) = delete;
-    lava_vec(lava_vec&& rval)
-    {
-      p      = rval.p;
-      rval.p = nullptr;
-    }
-    ~lava_vec()
-    {
-      if(p && getDestructorBit(p)){
-        Deleter().operator()((T*)clearBits(p));  //free(p);
-        p = nullptr;
-      }
-    }
 
-    T& operator[](u64 i)
-    {
-      return data()[i];
-    }
+    lava_vec(lava_vec&& rval){ p=rval.p; rval.p=nullptr; }
+    ~lava_vec(){}
 
-    T*         data()
-    {
-      u64* maskptr = (u64*)clearBits(p); 
+    T& operator[](u64 i){ return data()[i]; }
+
+    T*        data()
+    { 
+      u64* maskptr = (u64*)p; 
       return (T*)(maskptr+2);
     }
     u64   capacity() const
@@ -383,10 +335,7 @@ namespace {
     {
       return *((u64*)clearBits(p) + 1);   // second 8 bytes should be the number of elements
     } 
-    u64  sizeBytes() const
-    {
-      return *((u64*)clearBits(p));   // first 8 bytes should be the total size of the buffer in bytes
-    } 
+    u64  sizeBytes() const { return ((u64*)p)[0]; }                                    // first 8 bytes should be the total size of the buffer in bytes
     auto      addr() const -> void*
     {
       return p;
@@ -2165,7 +2114,51 @@ public:
 
 
 
+//static void*  setDestructorBit(void* p)
+//{
+//  //return (void*)((u64)p ^ (((u64)1l)<<63));
+//  return (void*)((u64)p | (1llu<<63));
+//}
+//static bool   getDestructorBit(void* p)
+//{
+//  return (((u64)p)>>63)!=0;
+//}
+//*((u64*)clearBits(p) + 1) = s;
+//*((u64*)clearBits(p)) = sb;      // first 8 bytes should be the total size of the buffer in bytes
+//static void*         clearBits(void* p)
+//{
+//  return (void*)( ((u64)p) & 0x0000FFFFFFFFFFFF);
+//}
+//
+// return *((u64*)clearBits(p));   
+//
+//return (T*)p; 
 
+//
+// class Deleter=std::default_delete<T>, class Allocator=std::allocator<T> >
+
+//lava_vec(u64  count)
+//{
+//  u64 sb = lava_vec::sizeBytes(count);
+//  p       = Allocator().allocate(sb);
+//  p       = setDestructorBit(p);
+//  set_size(count);
+//  set_sizeBytes(sb);
+//}
+//
+//u64 sb = lava_vec::sizeBytes(count);
+//set_size(count);
+//set_sizeBytes(sb);
+//
+//p = addr;
+//
+//if(p && getDestructorBit(p)){
+//  Deleter().operator()((T*)clearBits(p));  //free(p);
+//  p = nullptr;
+//}
+//
+//u64* maskptr = (u64*)clearBits(p); 
+//return (T*)(maskptr+2);
 
 //unordered_set<str> keys;
 //
