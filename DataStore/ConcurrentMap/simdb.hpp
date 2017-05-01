@@ -31,9 +31,9 @@
 // -todo: make a special version number that is checked for and skipped
 // -todo: debug len(idx) returning 0 - is free resetting the block indices causing problems? -  no, len() wasn't looking up from the CncrHsh first and getIdx() was returning false when less or equal to DELETED_KEY and not greater or equal
 // -todo: test with visualizer
+// -todo: make lava_vec flat only so that it never needs to be destructed
+// -todo: make lava_vec pointer point to 16 bytes in, giving operator[] a way to dereference the memory without any additional offsets
 
-// todo: make lava_vec pointer point to 16 bytes in, giving operator[] a way to dereference the memory without any additional offsets
-// todo: make lava_vec flat only so that it never needs to be destructed
 // todo: make sure readers checks the version number after reading each block when finding a key
 // todo: make sure readers is only used on the key block list
 // todo: make sure readers deletes the block list if it is the last reader after deletion
@@ -295,8 +295,8 @@ namespace {
   private:
     void* p;
 
-    void       set_size(u64  s){ ((u64*)p)[1] = s; }
-    void  set_sizeBytes(u64 sb){ ((u64*)p)[0] = sb; } 
+    void       set_size(u64  s){ ((u64*)p)[-1] = s; }
+    void  set_sizeBytes(u64 sb){ ((u64*)p)[-2] = sb; }   // an offset of -2 should be the first 8 bytes, which store the size in bytes of the whole memory span of this lava_vec
 
   public:
     static u64 sizeBytes(u64 count)  // sizeBytes is meant to take the same arguments as a constructor and return the total number of bytes to hold the entire stucture given those arguments 
@@ -306,14 +306,14 @@ namespace {
 
     lava_vec(){}
     lava_vec(void*  addr, u64 count, bool owner=true) :
-      p(addr)
+      p( ((u64*)addr) + 2 )
     {
       if(owner){
         set_sizeBytes( lava_vec::sizeBytes(count) );
         set_size(count);
       }
     }
-    lava_vec(void*  addr) : p(addr) {}
+    lava_vec(void*  addr) : p( ((u64*)addr) + 2 ) {}
     lava_vec(lava_vec const&)       = delete;
     void operator=(lava_vec const&) = delete;
 
@@ -322,19 +322,11 @@ namespace {
 
     T& operator[](u64 i){ return data()[i]; }
 
-    T*        data()
-    { 
-      u64* maskptr = (u64*)p; 
-      return (T*)(maskptr+2);
-    }
+    T*        data(){ return (T*)p; }
     u64   capacity() const
     {
       return (sizeBytes() - sizeof(u64)*2) / sizeof(T);
     }
-    u64       size() const
-    {
-      return *((u64*)clearBits(p) + 1);   // second 8 bytes should be the number of elements
-    } 
     u64  sizeBytes() const { return ((u64*)p)[0]; }                                    // first 8 bytes should be the total size of the buffer in bytes
     auto      addr() const -> void*
     {
@@ -2113,6 +2105,14 @@ public:
 
 
 
+
+//u64       size() const
+//{
+//  return *((u64*)clearBits(p) + 1);   // second 8 bytes should be the number of elements
+//} 
+
+//u64* maskptr = (u64*)p; 
+//return (T*)(maskptr+2);
 
 //static void*  setDestructorBit(void* p)
 //{
