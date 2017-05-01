@@ -39,14 +39,14 @@
 // -todo: make sure readers deletes the block list if it is the last reader after deletion - still true
 // -todo: build in the ability to explicitly set the path of the shared memory file - relative paths work, but absolute paths on windows don't seem to 
 // -todo: test flush() - doesn't seem to write to the file leave for now
+// -todo: search for any embedded todo comments
 
-// todo: search for any embedded todo comments
-// todo: re-evaluate strong vs weak ordering
+// todo: run existing tests - some bugs fixed, one outstanding CncrHsh slot is not being deleted
 // todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
 // todo: clean out old commented lines
-// todo: run existing tests
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
+// todo: re-evaluate strong vs weak ordering
 
 // robin hood hashing
 // todo: do rm()/del() first and make deletion take care of holes in spans?
@@ -1338,8 +1338,8 @@ private:
       idxDblAddr    = (au64*)leftAddr;                                              // increment the address by 4 bytes so that it lines up with the start of the two indices, then cast it to an atomic 64 bit unsigned integer for the compare and switch
       idxDbl        = idxDblAddr->load();
       do{
-        u32  l = lo32(idxDbl);
-        u32  r = hi32(idxDbl);
+        u32  l = hi32(idxDbl);
+        u32  r = lo32(idxDbl);
         if(l==DELETED_KEY && r==EMPTY_KEY){                                         // change the deleted key to empty if it is to the left of an empty slot and therefore at the end of a span
           desired = make64(EMPTY_KEY, EMPTY_KEY);
         }else if(l!=r || l>=DELETED_KEY){
@@ -1356,7 +1356,7 @@ private:
   {
     VerIdx curVi, nxtVi; VerIpd nxtVp; u32 nxtI;
 
-    clean_loop: while(i!=m_sz-1 && (nxtVi=load_vi(nxtI=nxtIdx(i))).idx <= DELETED_KEY )           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
+    clean_loop: while(i!=m_sz-1 && (nxtVi=load_vi(nxtI=nxtIdx(i))).idx < DELETED_KEY )           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
     {
       curVi = load_vi(i);
       if(curVi.idx == EMPTY_KEY){ return false; }
@@ -1368,12 +1368,12 @@ private:
         delDupe(i);
         i = nxtIdx(i);
       }
-
     }
 
     if(i!=m_sz-1){
       if(nxtVi.idx == DELETED_KEY){                                                    // if the next index is deleted, try to clean the next index, then come back and try to delete this one again
-        if(depth<1){ cleanDeletion(nxtIdx(i), depth+1); }                              // could this recurse to the depth of the number of blocks?
+        i=nxtIdx(i);
+        if(depth<1){ cleanDeletion(i, depth+1); }                              // could this recurse to the depth of the number of blocks?
         goto clean_loop;
       }else if(nxtVi.idx==EMPTY_KEY){
         delDupe(i);    

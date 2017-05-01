@@ -554,7 +554,7 @@ int main()
 
   //Println("simdb stack sz: ", sizeof(simdb) );
 
-  simdb db("test", 32, 64);
+  simdb db("test", 32, 16);
   //simdb db("H:\\projects\\lava\\test.simdb", 32, 64, true);
   //simdb db("test.simdb", 32, 64, true);
 
@@ -563,28 +563,30 @@ int main()
   str numkey[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"};
   str  label[] = {"zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven"};
   
+  int sz = 12;
   vec<thread>            thrds;
   vec<RngInt<u32>> rngSwitches;
-  TO(12,i) rngSwitches.emplace_back(0,1,i);
+  TO(sz,i){ rngSwitches.emplace_back(0,1,i); }
 
   //int sz = (int)thrds.size(); 
   
-  //TO(12,i)
-  //{
-  //  int idx = i % 12;
-  //  thrds.emplace_back([i, idx, &rngSwitches, &numkey, &label, &db]
-  //  {
-  //    auto& numk = numkey[idx];
-  //    auto&  lbl = label[idx]; 
-  //    TO(10,j){ 
-  //      db.put(numk, lbl); 
-  //      if(rngSwitches[idx]()) db.rm(numk);
-  //    }
-  //    
-  //    Println(i, " done");
-  //  });
-  //}
-  //TO(thrds.size(),i) thrds[i].join();
+  TO(sz,i)
+  {
+    int idx = i % sz;
+    thrds.emplace_back([i, idx, &rngSwitches, &numkey, &label, &db]
+    {
+      auto& numk = numkey[idx];
+      auto&  lbl = label[idx]; 
+      TO(10,j){ 
+        db.put(numk, lbl); 
+        //if(rngSwitches[idx]()){ db.del(numk); }
+        db.del(numk);
+      }
+      
+      Println(i, " done");
+    });
+  }
+  TO(thrds.size(),i){ thrds[i].join(); }
 
   str       wat  =       "wat";
   str       wut  =       "wut";
@@ -598,21 +600,23 @@ int main()
 
   if( db.isOwner() ){
     Println("put: ", db.put(wat, skidoosh) );
-    //db.del("wat");
+    db.del("wat");
     Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
-    //db.del("wut");
+    db.del("wut");
     Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
-    //db.del("kablam");
+    db.del("kablam");
 
     Println("put: ", db.put(wat, skidoosh) );
-    //Println("del wat: ", db.del("wat") );
+    Println("del wat: ", db.del("wat") );
 
     Println("put: ", db.put(longkey, longval) );
+    Println("del wat: ", db.del(longkey) );
+
     printdb(db);
 
     Println();
   }
-  db.flush();
+  //db.flush();
 
   //else{
   //  Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
@@ -717,7 +721,7 @@ int main()
   ////lv.~lava_vec();  // running the destructor explicitly tests double destrucion since it will be destructed at the end of the function also
 
   Println("\n\n DONE \n\n");
-  PAUSE
+  //PAUSE
   db.close();
   Println("\n\n CLOSED \n\n");
   PAUSE
