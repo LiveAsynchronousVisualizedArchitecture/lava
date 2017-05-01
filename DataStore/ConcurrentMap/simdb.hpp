@@ -1721,19 +1721,30 @@ public:
       //char path[512] = "Global\\simdb_";
       char path[512] = ""; 
       if(!raw_path){ strcpy(path, "simdb_"); }
-    //#elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
     #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
       char path[512] = "/tmp/simdb_15_";
       //char path[512] = "simdb_15_";
     #endif
 
-    // todo: need to check that name and path are less than sizeof(path) here
     u64 len = strlen(path) + strlen(name);
     if(len > sizeof(path)-1){ /* todo: handle errors here */ }
     else{ strcat(path, name); }
 
     #ifdef _WIN32      // windows
+      if(raw_path)
+      {
+        sm.fileHndl = CreateFile(
+          path, 
+          FILE_MAP_READ|FILE_MAP_WRITE, 
+          FILE_SHARE_READ|FILE_SHARE_WRITE, 
+          NULL,
+          CREATE_NEW,
+          FILE_ATTRIBUTE_NORMAL,        //_In_ DWORD dwFlagsAndAttributes
+          NULL                          //_In_opt_ HANDLE hTemplateFile
+        );
+      }
       sm.fileHndl = OpenFileMapping(FILE_MAP_READ | FILE_MAP_WRITE, FALSE, path);
+
       if(sm.fileHndl==NULL)
       {
         sm.fileHndl = CreateFileMapping(
@@ -1745,8 +1756,7 @@ public:
           path);
         if(sm.fileHndl!=NULL){ sm.owner=true; }
       }
-    
-      //if(sm.fileHndl==NULL){return move(sm);}
+      
       if(sm.fileHndl != nullptr){
         sm.hndlPtr = MapViewOfFile(sm.fileHndl,   // handle to map object
           FILE_MAP_READ | FILE_MAP_WRITE, // FILE_MAP_ALL_ACCESS,   // read/write permission
@@ -1760,22 +1770,13 @@ public:
         LPSTR msgBuf = nullptr;
         size_t  size = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
                                      NULL, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&msgBuf, 0, NULL);
-        //string message(msgBuf, size);
         win_printf("simdb initialization error: %d - %s", err, msgBuf);
         LocalFree(msgBuf);
-
-        //DWORD bytesWritten;
-        //WriteFile(  GetStdHandle(STD_OUTPUT_HANDLE), szBuff, retValue,
-        //        &bytesWritten, 0 )
-        //show_memory_error_nr("Could not map view of file", (int) GetLastError());
 
         CloseHandle(sm.fileHndl); 
         sm.clear(); 
         return move(sm); 
       }
-
-      // END windows
-    //#elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
     #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
       //sm.fileHndl = open(path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH ); // O_CREAT | O_SHLOCK ); // | O_NONBLOCK );
       sm.owner   = true; // todo: have to figure out how to detect which process is the owner
@@ -2141,6 +2142,25 @@ public:
 
 
 
+
+//string message(msgBuf, size);
+//
+//DWORD bytesWritten;
+//WriteFile(  GetStdHandle(STD_OUTPUT_HANDLE), szBuff, retValue,
+//        &bytesWritten, 0 )
+//show_memory_error_nr("Could not map view of file", (int) GetLastError());
+//
+// END windows
+//#elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
+
+//#elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
+//
+// todo: need to check that name and path are less than sizeof(path) here
+//
+//else{
+//if(sm.fileHndl==NULL){ //}
+//
+//if(sm.fileHndl==NULL){return move(sm);}
 
 //while(s_flags->load()==false){}
 //
