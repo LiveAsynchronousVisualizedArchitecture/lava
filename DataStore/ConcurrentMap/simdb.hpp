@@ -37,13 +37,12 @@
 // -todo: make sure readers checks the version number after reading each block when finding a key - doesn't matter since for now readers is incremented and decremented
 // -todo: make sure readers is only used on the key block list - should be fine
 // -todo: make sure readers deletes the block list if it is the last reader after deletion - still true
+// -todo: build in the ability to explicitly set the path of the shared memory file - relative paths work, but absolute paths on windows don't seem to 
+// -todo: test flush() - doesn't seem to write to the file leave for now
 
-// todo: change simdb to use init() that return error codes
-// todo: build in the ability to explicitly set the path of the shared memory file
-// todo: test flush()
+// todo: search for any embedded todo comments
 // todo: re-evaluate strong vs weak ordering
 // todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
-// todo: search for any embedded todo comments
 // todo: clean out old commented lines
 // todo: run existing tests
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
@@ -62,6 +61,7 @@
 //       | even without robin hood hashing are 128 bit atomics needed to swap/bubble sort keys into the new free slot?
 //       | when deleting, instead of swapping the deleted key, duplicate the next key to the previous key and so on until reaching either an empty slot, a key that is further from its optimal distance, or two of the same key in a row (indicating another thread is moving keys around)
 
+// todo: change simdb to use init() that return error codes
 // todo: make a 'waiting' flag or type for keys so that they can be rewritten and resized in place? - would mean that they could not be read from at any time like they can be now
 // todo: make alloc look for multiple blocks then check the next block variable for its version and if the version has not changed, allocate all blocks at once?
 // todo: make a resize/realloc function to change the size of a block list instead of destroying and creating all indices when updating a key? - would need a different putWeak, since the writing of the index needs  to be atomic and re-writing the currently used blocks would not work with concurrency
@@ -595,7 +595,7 @@ class     CncrLst
 public:
   union Head
   {
-    struct { u32 ver; u32 idx; };                      // ver is version, idx is index // todo: change cnt to version
+    struct { u32 ver; u32 idx; };                           // ver is version, idx is index
     u64 asInt;
   };
   
@@ -724,7 +724,7 @@ public:
     union{
       KeyReaders kr;
       struct{ u32 isKey : 1; i32 readers : 31; };
-    };                                                              //  4 bytes   -   kr is key readers  // todo: make sure that kr can be incremented safely
+    };                                                              //  4 bytes  -  kr is key readers  
     u32 idx, version, len, klen, hash;                             // 20 bytes
     // 24 bytes total
 
@@ -776,10 +776,9 @@ public:
 
   BlkLst    incReaders(u32 blkIdx, u32 version) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
-
     KeyReaders cur, nxt;
     BlkLst*     bl  =  &s_bls[blkIdx];
-    au32* areaders  =  (au32*)&(bl->kr);                               // todo: desperatly need to check and redo this - if readers is signed, 31 bits, and part of a bit set with a flag, the flag needs to be kept while the 31 bit signed int is incremented
+    au32* areaders  =  (au32*)&(bl->kr);
     cur.asInt       =  areaders->load();
     do{
       if(bl->version!=version || cur.readers<0){ return BlkLst(); }    // make_BlkLst(0,0,0,0,0,0);
@@ -817,7 +816,7 @@ private:
   u32                m_blockSize;
   u32               m_blockCount;
   u64                  m_szBytes;
-  //mutable ai32      m_blocksUsed;       // todo: this is a mistake and does no good unless it is in the shared memory
+  //mutable ai32      m_blocksUsed;      // this is a mistake and does no good unless it is in the shared memory - CncrLst should return LIST_END when out of memory
 
   VerIdx       nxtBlock(u32  blkIdx)  const
   {
@@ -910,7 +909,7 @@ public:
   {
     if(owner){
       for(u32 i=0; i<m_blockCount; ++i){ s_bls[i] = BlkLst(); }
-      s_version->store(1);                            // todo: redo this, with 32 bit integers, 0 shouldn't be a special value because it could loop around start at 1, use 0 as a special value - 
+      s_version->store(1);                            // todo: what is this version for if CncrLst already has a version?
     }
     assert(blockSize > sizeof(i32));
   }
@@ -1108,7 +1107,7 @@ public:
     //  //if(nxt<0 || nxt==LIST_END) break;
     //}
   }
-  Match   memcmpBlk(u32  blkIdx, u32 version, void const *const buf1, void const *const buf2, u32 len) const  // todo: eventually take out the inc and dec readers and only do them when dealing with the whole chain of blocks
+  Match   memcmpBlk(u32  blkIdx, u32 version, void const *const buf1, void const *const buf2, u32 len) const    // todo: eventually take out the inc and dec readers and only do them when actually reading and dealing with the whole chain of blocks 
   {
     if(incReaders(blkIdx, version).len==0){ return MATCH_REMOVED; }
       auto ret = memcmp(buf1, buf2, len);
@@ -1308,10 +1307,7 @@ private:
   {
     BlkLst bl = m_csp->blkLst(vi.idx);
     u32    ip = bl.hash % m_sz;     // ip is Ideal Position
-    //u32   ipd = vi.idx>ip?  vi.idx-ip  :  m_csp->blockCount() - ip + vi.idx;  // todo: change vi.idx to u32 so that there aren't sign mismatch warnings
-    u32   ipd = i>ip?  i-ip  :  m_csp->blockCount() - ip + i;  // todo: change vi.idx to u32 so that there aren't sign mismatch warnings
-
-    //return {bl.kr.version, ipd};
+    u32   ipd = i>ip?  i-ip  :  m_csp->blockCount() - ip + i;
     return {bl.version, ipd};
   }
   bool          delDupe(u32 i)                 const                                 // delete duplicate indices - l is left index, r is right index - will do something different depending on if the two slots are within 128 bit alignment or not
@@ -1320,13 +1316,11 @@ private:
     {                                                                               // both indices are within a 128 bit boundary, so the 128 bit atomic can (and must) be used
       i64 rgtDel, lftDel;  _u128 viDbl;
       _u128* viDblAddr = (_u128*)&s_vis[i];                                         // find 128 bit offset address
-      viDbl            = *viDblAddr;                                                // todo: should this use a 128 bit atomic load? if it isn't the same, the atomic compare exchange will load it atomically
+      viDbl            = *viDblAddr;                                                // if it isn't the same, the atomic compare exchange will load it atomically
       do{
         u32 l = hi32(viDbl.lo);
-        u32 r = lo32(viDbl.hi);                                                     //  this unintuitivness might be because of endianness, need to look into it
+        u32 r = lo32(viDbl.hi);                                                     
         if(l==DELETED_KEY && r==EMPTY_KEY){
-          //u64 rgtSwp = viDbl.lo;
-          //rgtDel     = *((i64*)&rgtSwp);
           rgtDel = vi_i64( swp32(empty_vi().asInt) );
           lftDel = vi_i64( empty_vi() );
         }else if(l!=r || l>=DELETED_KEY){                                           // check if both the indices are the same and if they are, that they aren't both deleted or both empty 
@@ -1336,7 +1330,7 @@ private:
           lftDel     = *((i64*)&lftSwp);                                            // if both the indices are the same, make a new right side VerIdx with the idx set to DELETED_KEY
           rgtDel     = vi_i64( deleted_vi() );                                      // interpret the u64 bits directly as a signed 64 bit integer instead
         }
-      }while( !compex128( (i64*)viDblAddr, rgtDel, lftDel, (i64*)&viDbl) );         // then compare and swap for a version with the new right side VerIdx // todo: does this need to be in a loop that only breaks when the two indices are not the same?
+      }while( !compex128( (i64*)viDblAddr, rgtDel, lftDel, (i64*)&viDbl) );         // then compare and swap for a version with the new right side VerIdx
     }else
     {
       au64* idxDblAddr; u64 idxDbl, desired;
@@ -1700,7 +1694,7 @@ public:
         munmap(sm.hndlPtr, sm.size);  // todo: size here needs to be the total size, and errors need to be checked
       }
       if(sm.fileHndl){
-        close(sm.fileHndl); // todo: get close to work
+        close(sm.fileHndl);
         // todo: deal with errors here as well?
       }
     #endif
@@ -1778,7 +1772,6 @@ public:
         return move(sm); 
       }
     #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
-      //sm.fileHndl = open(path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH ); // O_CREAT | O_SHLOCK ); // | O_NONBLOCK );
       sm.owner   = true; // todo: have to figure out how to detect which process is the owner
 
       FILE* fp = fopen(path,"rw");
@@ -1798,27 +1791,18 @@ public:
       }
 
       if(sm.owner){  // todo: still need more concrete race protection
-        //fstore_t store = {F_ALLOCATECONTIG, F_PEOFPOSMODE, 0, (off_t)size};
-
-        //struct flock lck = {0,0,0};
         fcntl(sm.fileHndl, F_GETLK, &flock);
 
-        flock(sm.fileHndl, LOCK_EX);   // exclusive lock  // LOCK_NB
-        fcntl(sm.fileHndl, F_PREALLOCATE); //  todo: try F_ALLOCATECONTIG at some point
-        ftruncate(sm.fileHndl, size);   // todo: don't truncate if not the owner, and don't pre-allocate either ?
+        flock(sm.fileHndl, LOCK_EX);        // exclusive lock  // LOCK_NB
+        fcntl(sm.fileHndl, F_PREALLOCATE);  //  todo: try F_ALLOCATECONTIG at some point
+        ftruncate(sm.fileHndl, size);       // todo: don't truncate if not the owner, and don't pre-allocate either ?
         flock(sm.fileHndl, LOCK_EX);
         // get the error number and handle the error
       }
-      //sm.hndlPtr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, sm.fileHndl, 0);
 
-      //auto zeromem = malloc(size);
-      //memset(zeromem, 0, size);
-      //write(sm.fileHndl, zeromem, size);
-      //free(zeromem);
       sm.hndlPtr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED , sm.fileHndl, 0); // MAP_PREFAULT_READ  | MAP_NOSYNC
       close(sm.fileHndl);
       sm.fileHndl = 0;
-      // memset(sm.hndlPtr, 0, size);
  
       if(sm.hndlPtr==MAP_FAILED){
         printf("mmap failed\nError number: %d \n\n", errno);
@@ -1934,7 +1918,7 @@ public:
     new (&s_cs) CncrStr( ((u8*)m_mem.data())+cncrHashSize+OffsetBytes(), 
                                  (u32)s_blockSize->load(), 
                                  (u32)s_blockCount->load(), 
-                                 m_mem.owner);                  // todo: change this to a void* - ? why change the owner flag to a void pointer?
+                                 m_mem.owner);
 
     new (&s_ch) CncrHsh( ((u8*)m_mem.data())+OffsetBytes(), 
                                 (u32)s_blockCount->load(),
@@ -1969,7 +1953,7 @@ public:
     assert(strlen(key)>0);
     return put(key, (u32)strlen(key), val, vlen, out_startBlock);
   }
-  bool         get(char const* const key, void *const val, u32 vlen) const // todo: should val not be a const pointer?
+  bool         get(char const* const key, void* val, u32 vlen) const
   {
     return get(key, (u32)strlen(key), val, vlen);
   }
@@ -2142,6 +2126,28 @@ public:
 
 
 
+
+//fstore_t store = {F_ALLOCATECONTIG, F_PEOFPOSMODE, 0, (off_t)size};
+//
+//struct flock lck = {0,0,0};
+//
+//sm.hndlPtr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, sm.fileHndl, 0);
+//
+//auto zeromem = malloc(size);
+//memset(zeromem, 0, size);
+//write(sm.fileHndl, zeromem, size);
+//free(zeromem);
+//
+// memset(sm.hndlPtr, 0, size);
+
+//
+//sm.fileHndl = open(path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH ); // O_CREAT | O_SHLOCK ); // | O_NONBLOCK );
+
+//u64 rgtSwp = viDbl.lo;
+//rgtDel     = *((i64*)&rgtSwp);
+
+//u32   ipd = vi.idx>ip?  vi.idx-ip  :  m_csp->blockCount() - ip + vi.idx;  // todo: change vi.idx to u32 so that there aren't sign mismatch warnings
+//return {bl.kr.version, ipd};
 
 //string message(msgBuf, size);
 //
