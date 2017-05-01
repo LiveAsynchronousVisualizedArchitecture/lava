@@ -488,6 +488,23 @@ namespace {
     {
       return GetProcAddress(GetModuleHandleA(LibraryName), ProcName);
     }
+    int               win_printf(const char * format, ...)
+    {
+      char szBuff[1024];
+      int retValue;
+      DWORD cbWritten;
+      va_list argptr;
+          
+      va_start( argptr, format );
+      retValue = wvsprintf( szBuff, format, argptr );
+      va_end( argptr );
+
+      WriteFile(  GetStdHandle(STD_OUTPUT_HANDLE), szBuff, retValue,
+                  &cbWritten, 0 );
+
+      return retValue;
+    }
+
   #endif
 }
 
@@ -1695,8 +1712,10 @@ public:
     using namespace std;
     
     SharedMem sm;
-    sm.owner = false;
-    sm.size  = alignment==0? size  :  alignment-(size%alignment);
+    sm.fileHndl = nullptr;
+    sm.hndlPtr  = nullptr;
+    sm.owner    = false;
+    sm.size     = alignment==0? size  :  alignment-(size%alignment);
 
     #ifdef _WIN32      // windows
       //char path[512] = "Global\\simdb_";
@@ -1727,14 +1746,34 @@ public:
         if(sm.fileHndl!=NULL){ sm.owner=true; }
       }
     
-      if(sm.fileHndl==NULL){return move(sm);}
+      //if(sm.fileHndl==NULL){return move(sm);}
+      if(sm.fileHndl != nullptr){
+        sm.hndlPtr = MapViewOfFile(sm.fileHndl,   // handle to map object
+          FILE_MAP_READ | FILE_MAP_WRITE, // FILE_MAP_ALL_ACCESS,   // read/write permission
+          0,
+          0,
+          0);
+      }
 
-      sm.hndlPtr = MapViewOfFile(sm.fileHndl,   // handle to map object
-        FILE_MAP_READ | FILE_MAP_WRITE, // FILE_MAP_ALL_ACCESS,   // read/write permission
-        0,
-        0,
-        0);
-      if(sm.hndlPtr==nullptr){ CloseHandle(sm.fileHndl); sm.clear(); return move(sm); }
+      if(sm.hndlPtr==nullptr){ 
+        int      err = (int)GetLastError();
+        LPSTR msgBuf = nullptr;
+        size_t  size = FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+                                     NULL, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&msgBuf, 0, NULL);
+        //string message(msgBuf, size);
+        win_printf("simdb initialization error: %d - %s", err, msgBuf);
+        LocalFree(msgBuf);
+
+        //DWORD bytesWritten;
+        //WriteFile(  GetStdHandle(STD_OUTPUT_HANDLE), szBuff, retValue,
+        //        &bytesWritten, 0 )
+        //show_memory_error_nr("Could not map view of file", (int) GetLastError());
+
+        CloseHandle(sm.fileHndl); 
+        sm.clear(); 
+        return move(sm); 
+      }
+
       // END windows
     //#elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
     #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
@@ -1868,11 +1907,11 @@ public:
 
 public:
   simdb(){}
-  simdb(const char* name, u32 blockSize, u32 blockCount) : 
+  simdb(const char* name, u32 blockSize, u32 blockCount, bool raw_path=false) : 
     m_curChIdx(0),
     m_isOpen(false)
   {
-    new (&m_mem) SharedMem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount), false) );
+    new (&m_mem) SharedMem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount), raw_path) );
 
     if(!m_mem.hndlPtr){ return; /*error*/ }
 
@@ -1885,13 +1924,11 @@ public:
       s_blockSize->store(blockSize);
       s_flags->store(1);
     }else{                                                      // need to spin until ready
-      //while(s_flags->load()==false){}
       while(s_flags->load() < 1){continue;}
       s_flags->fetch_add(1);
       m_mem.size = MemSize(s_blockSize->load(), s_blockCount->load());
     }
 
-    //auto chSz = s_ch.sizeBytes();
     auto cncrHashSize = CncrHsh::sizeBytes(blockCount);
     new (&s_cs) CncrStr( ((u8*)m_mem.data())+cncrHashSize+OffsetBytes(), 
                                  (u32)s_blockSize->load(), 
@@ -2104,6 +2141,10 @@ public:
 
 
 
+
+//while(s_flags->load()==false){}
+//
+//auto chSz = s_ch.sizeBytes();
 
 //// todo: initialized flag and reference count
 //if(isOwner()) s_flags->store(1);                             // set to 1 to signal construction is done

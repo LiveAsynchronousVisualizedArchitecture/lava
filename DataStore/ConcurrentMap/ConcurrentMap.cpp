@@ -554,7 +554,8 @@ int main()
 
   //Println("simdb stack sz: ", sizeof(simdb) );
 
-  simdb db("test", 32, 64);
+  //simdb db("test", 32, 64);
+  simdb db("H:\\projects\\lava\\test.simdb", 32, 64, true);
 
   printhsh(db);
 
