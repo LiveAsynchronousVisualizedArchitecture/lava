@@ -33,6 +33,7 @@
 // -todo: test with visualizer
 
 // todo: make lava_vec flat only so that it never needs to be destructed
+// todo: make sure readers checks the version number after reading each block when finding a key
 // todo: make sure readers is only used on the key block list
 // todo: make sure readers deletes the block list if it is the last reader after deletion
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
