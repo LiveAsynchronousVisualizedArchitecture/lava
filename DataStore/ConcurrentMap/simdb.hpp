@@ -29,20 +29,21 @@
 // -todo: reference count initializations so that the last process out can destroy the db
 // -todo: make sure that the linked list of BlkLst structures is re-initialized on freeing - does head need to also make sure that it's version never uses a special value like 0 or LIST_END?
 // -todo: make a special version number that is checked for and skipped
+// -todo: debug len(idx) returning 0 - is free resetting the block indices causing problems? -  no, len() wasn't looking up from the CncrHsh first and getIdx() was returning false when less or equal to DELETED_KEY and not greater or equal
+// -todo: test with visualizer
 
-// todo: test with visualizer
 // todo: make lava_vec flat only so that it never needs to be destructed
 // todo: make sure readers is only used on the key block list
 // todo: make sure readers deletes the block list if it is the last reader after deletion
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
+// todo: build in the ability to explicitly set the path of the shared memory file
 // todo: test flush()
 // todo: re-evaluate strong vs weak ordering
 // todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
 // todo: search for any embedded todo comments
 // todo: clean out old commented lines
 // todo: run existing tests
-// todo: build in the ability to explicitly set the path of the shared memory file
 
 // robin hood hashing
 // todo: do rm()/del() first and make deletion take care of holes in spans?
@@ -1995,7 +1996,10 @@ public:
   }
   i64          len(u32 idx, u32 version, u32* out_klen=nullptr, u32* out_vlen=nullptr) const
   { 
-    u32 total_len = s_cs.len(idx, version, out_vlen); 
+    VerIdx vi = s_ch.load(idx);
+    if(vi.version != version){return 0;}
+    //u32 total_len = s_cs.len(idx, version, out_vlen); 
+    u32 total_len = s_cs.len(vi.idx, vi.version, out_vlen); 
     if(total_len>0){
       *out_klen = total_len - *out_vlen;
       return total_len;
@@ -2030,7 +2034,7 @@ public:
     if(klen<1) return false;
 
     VerIdx vi = s_ch.load(idx);  
-    if(vi.idx <= CncrHsh::DELETED_KEY || vi.version!=version){ return false; }
+    if(vi.idx >= CncrHsh::DELETED_KEY || vi.version!=version){ return false; }
     u32 l = s_cs.getKey(vi.idx, vi.version, out_buf, klen);                         // l is length
     if(l<1){return false;}
 
@@ -2120,19 +2124,8 @@ public:
   {
     using namespace std;
     
-    //unordered_set<str> keys;
-    
-    //template<> struct hash<VerStr>{
-    //  size_t operator()(VerStr const& vs){ 
-    //    return hash<str>()(vs.str);
-    //  }  
-    //};
-    //unordered_set<VerStr> keys;
-
     set<VerStr> keys;
 
-    //u32       i = 0;
-    //str nxt = nxtKey();
     u64 srchCnt = 0;
     auto     nxt = nxtKey();                             
     while( srchCnt<m_blkCnt && keys.find(nxt)==keys.end() )
@@ -2142,10 +2135,8 @@ public:
       u64 searched = 0;
       nxt = nxtKey(&searched);
       srchCnt += searched;
-      //++i;
     }
 
-    //if(out_versions) new (out_versions) vec<u32>()
     return vector<VerStr>(keys.begin(), keys.end());
   }
   bool         del(str const& key)
@@ -2174,6 +2165,22 @@ public:
 
 
 
+
+//unordered_set<str> keys;
+//
+//template<> struct hash<VerStr>{
+//  size_t operator()(VerStr const& vs){ 
+//    return hash<str>()(vs.str);
+//  }  
+//};
+//unordered_set<VerStr> keys;
+//
+//u32       i = 0;
+//str nxt = nxtKey();
+//
+//++i;
+//
+//if(out_versions) new (out_versions) vec<u32>()
 
 //
 //template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  // will need C++ ifdefs eventually
