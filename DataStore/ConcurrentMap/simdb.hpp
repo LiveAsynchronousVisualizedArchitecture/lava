@@ -38,6 +38,7 @@
 // -todo: make sure readers is only used on the key block list - should be fine
 // -todo: make sure readers deletes the block list if it is the last reader after deletion - still true
 
+// todo: change simdb to use init() that return error codes
 // todo: build in the ability to explicitly set the path of the shared memory file
 // todo: test flush()
 // todo: re-evaluate strong vs weak ordering
@@ -1689,7 +1690,7 @@ public:
 
     sm.clear();
   }
-  static SharedMem  AllocAnon(const char* name, u64 size)
+  static SharedMem  AllocAnon(const char* name, u64 size, bool raw_path=false)
   {
     using namespace std;
     
@@ -1699,7 +1700,8 @@ public:
 
     #ifdef _WIN32      // windows
       //char path[512] = "Global\\simdb_";
-      char path[512] = "simdb_";
+      char path[512] = ""; 
+      if(!raw_path){ strcpy(path, "simdb_"); }
     //#elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
     #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
       char path[512] = "/tmp/simdb_15_";
@@ -1722,7 +1724,7 @@ public:
           0,
           (DWORD)size,
           path);
-        if(sm.fileHndl!=NULL) sm.owner=true;
+        if(sm.fileHndl!=NULL){ sm.owner=true; }
       }
     
       if(sm.fileHndl==NULL){return move(sm);}
@@ -1787,8 +1789,8 @@ public:
   
     u64      addr = (u64)(sm.hndlPtr);
     u64 alignAddr = addr;
-    if(alignment!=0) alignAddr = addr + ((alignment-addr%alignment)%alignment);       // why was the second modulo needed?
-    sm.ptr         = (void*)(alignAddr);
+    if(alignment!=0){ alignAddr = addr + ((alignment-addr%alignment)%alignment); }          // why was the second modulo needed?
+    sm.ptr        = (void*)(alignAddr);
 
     return move(sm);
   }
@@ -1850,10 +1852,7 @@ public:
   static const u32  DELETED_KEY = CncrHsh::DELETED_KEY;        // 28 bits set 
   static const u32   FAILED_PUT = CncrHsh::EMPTY_KEY;          // 28 bits set 
   static const u32     LIST_END = CncrStr::LIST_END;
-  static u64        OffsetBytes()
-  {
-    return sizeof(au64)*3;
-  }
+  static u64        OffsetBytes(){ return sizeof(au64)*3; }
   static u64            MemSize(u64 blockSize, u64 blockCount)
   {
     auto  hashbytes = CncrHsh::sizeBytes((u32)blockCount);
@@ -1873,7 +1872,9 @@ public:
     m_curChIdx(0),
     m_isOpen(false)
   {
-    new (&m_mem) SharedMem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount)) );
+    new (&m_mem) SharedMem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount), false) );
+
+    if(!m_mem.hndlPtr){ return; /*error*/ }
 
     s_blockCount  =  ((au64*)m_mem.data())+2;
     s_blockSize   =  ((au64*)m_mem.data())+1;
@@ -1904,11 +1905,7 @@ public:
 
     m_blkCnt = s_blockCount->load();
     m_blkSz  = s_blockSize->load();
-
     m_isOpen = true;
-
-    //// todo: initialized flag and reference count
-    //if(isOwner()) s_flags->store(1);                             // set to 1 to signal construction is done
   }
   ~simdb(){ close(); }
 
@@ -2107,6 +2104,9 @@ public:
 
 
 
+
+//// todo: initialized flag and reference count
+//if(isOwner()) s_flags->store(1);                             // set to 1 to signal construction is done
 
 //u64       size() const
 //{
