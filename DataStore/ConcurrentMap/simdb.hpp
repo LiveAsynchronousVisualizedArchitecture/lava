@@ -33,12 +33,11 @@
 // -todo: test with visualizer
 // -todo: make lava_vec flat only so that it never needs to be destructed
 // -todo: make lava_vec pointer point to 16 bytes in, giving operator[] a way to dereference the memory without any additional offsets
+// -todo: make memcmpBlk return MATCH_REMOVED if the key was deleted
+// -todo: make sure readers checks the version number after reading each block when finding a key - doesn't matter since for now readers is incremented and decremented
+// -todo: make sure readers is only used on the key block list - should be fine
+// -todo: make sure readers deletes the block list if it is the last reader after deletion - still true
 
-// todo: make sure readers checks the version number after reading each block when finding a key
-// todo: make sure readers is only used on the key block list
-// todo: make sure readers deletes the block list if it is the last reader after deletion
-// todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
-// todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
 // todo: build in the ability to explicitly set the path of the shared memory file
 // todo: test flush()
 // todo: re-evaluate strong vs weak ordering
@@ -46,6 +45,8 @@
 // todo: search for any embedded todo comments
 // todo: clean out old commented lines
 // todo: run existing tests
+// todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
+// todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
 
 // robin hood hashing
 // todo: do rm()/del() first and make deletion take care of holes in spans?
@@ -763,7 +764,7 @@ public:
     au32* areaders  =  (au32*)&(bl->kr);                               // todo: desperatly need to check and redo this - if readers is signed, 31 bits, and part of a bit set with a flag, the flag needs to be kept while the 31 bit signed int is incremented
     cur.asInt       =  areaders->load();
     do{
-      if(bl->version!=version || cur.readers<0) return BlkLst(); // make_BlkLst(0,0,0,0,0,0);
+      if(bl->version!=version || cur.readers<0){ return BlkLst(); }    // make_BlkLst(0,0,0,0,0,0);
       nxt = cur;
       nxt.readers += 1;
     }while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
@@ -777,8 +778,8 @@ public:
     au32* areaders  =  (au32*)&(bl->kr);
     cur.asInt       =  areaders->load();
     do{
-      if(bl->version!=version) return false;
-      nxt = cur;
+      if(bl->version!=version){ return false; }
+      nxt          = cur;
       nxt.readers -= 1;
     }while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
     
@@ -1091,11 +1092,12 @@ public:
   }
   Match   memcmpBlk(u32  blkIdx, u32 version, void const *const buf1, void const *const buf2, u32 len) const  // todo: eventually take out the inc and dec readers and only do them when dealing with the whole chain of blocks
   {
-    if(incReaders(blkIdx, version).len==0) return MATCH_REMOVED;
+    if(incReaders(blkIdx, version).len==0){ return MATCH_REMOVED; }
       auto ret = memcmp(buf1, buf2, len);
-    decReaders(blkIdx, version);
+    bool freed = !decReaders(blkIdx, version);
 
-    if(ret==0) return MATCH_TRUE;
+    if(freed){       return MATCH_REMOVED; }
+    else if(ret==0){ return MATCH_TRUE;    }
 
     return MATCH_FALSE;
   }
@@ -1107,10 +1109,10 @@ public:
     if(s_bls[blkIdx].hash!=hash) return MATCH_FALSE;  // vast majority of calls should end here
 
     u32   curidx  =  blkIdx;
-    VerIdx   nxt  =  nxtBlock(curidx);                            if(nxt.version!=version) return MATCH_FALSE;
-    u32    blksz  =  (u32)blockFreeSize();  // todo: change this to u32
+    VerIdx   nxt  =  nxtBlock(curidx);                              if(nxt.version!=version) return MATCH_FALSE;
+    u32    blksz  =  (u32)blockFreeSize();
     u8*   curbuf  =  (u8*)buf;
-    auto    klen  =  s_bls[blkIdx].klen;                          if(klen!=len) return MATCH_FALSE;
+    auto    klen  =  s_bls[blkIdx].klen;                            if(klen!=len) return MATCH_FALSE;
     auto  curlen  =  len;
     while(true)
     {
@@ -1118,13 +1120,13 @@ public:
       if(blksz > curlen){
         return memcmpBlk(curidx, version, curbuf, p, curlen);
       }else{
-        Match cmp = memcmpBlk(curidx, version, curbuf, p, blksz); if(cmp!=MATCH_TRUE){ return cmp; }
+        Match cmp = memcmpBlk(curidx, version, curbuf, p, blksz);   if(cmp!=MATCH_TRUE){ return cmp; }
       }
 
       curbuf  +=  blksz;
       curlen  -=  blksz;
       curidx   =  nxt.idx;
-      nxt      =  nxtBlock(curidx);                               if(nxt.version!=version) return MATCH_FALSE;
+      nxt      =  nxtBlock(curidx);                                 if(nxt.version!=version) return MATCH_FALSE;
     }
   }
   u32           len(u32  blkIdx, u32 version, u32* out_vlen=nullptr) const

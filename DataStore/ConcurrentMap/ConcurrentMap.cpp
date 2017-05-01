@@ -593,13 +593,14 @@ int main()
 
   //Println("put: ", db.put( wat.data(),   (u32)wat.length(),    skidoosh.data(), (u32)skidoosh.length()) );
   //Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
+
   if( db.isOwner() ){
     Println("put: ", db.put(wat, skidoosh) );
-    db.del("wat");
+    //db.del("wat");
     Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
-    db.del("wut");
+    //db.del("wut");
     Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
-    db.del("kablam");
+    //db.del("kablam");
 
     Println("put: ", db.put(wat, skidoosh) );
     //Println("del wat: ", db.del("wat") );
@@ -609,6 +610,8 @@ int main()
 
     Println();
   }
+  db.flush();
+
   //else{
   //  Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
   //}
