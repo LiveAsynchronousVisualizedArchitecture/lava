@@ -41,8 +41,9 @@
 // -todo: test flush() - doesn't seem to write to the file leave for now
 // -todo: search for any embedded todo comments
 // -todo: run existing tests - some bugs fixed, one outstanding CncrHsh slot is not being deleted - possibly because it is in a 128 bit alignment at the end of the VerIdx array with another DELETED_KEY ahead of it
+// -todo: make cleanDeletion and delDupe() set a DELETED_KEY TO EMPTY_KEY if there is an EMPTY_KEY behind it
 
-// todo: make cleanDeletion and delDupe() set a DELETED_KEY TO EMPTY_KEY if there is an EMPTY_KEY behind it
+// todo: redo cleanDeletion to detect if the next slot is the end of a span and change the current slot to EMPTY if it is  
 // todo: make cleanDeletion and delDupe() check forward if setting the current slot to EMPTY_KEY based on the previous idx
 // todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
 // todo: clean out old commented lines
@@ -1325,7 +1326,7 @@ private:
       do{
         u32 l = hi32(viDbl.lo);
         u32 r = lo32(viDbl.hi);                                                     
-        if(l==DELETED_KEY && r==EMPTY_KEY){
+        if( (l==DELETED_KEY && r==EMPTY_KEY) || (l==EMPTY_KEY && r==DELETED_KEY) ){
           rgtDel = vi_i64( swp32(empty_vi().asInt) );
           lftDel = vi_i64( empty_vi() );
         }else if(l!=r || l>=DELETED_KEY){                                           // check if both the indices are the same and if they are, that they aren't both deleted or both empty 
@@ -1345,8 +1346,8 @@ private:
       do{
         u32  l = hi32(idxDbl);
         u32  r = lo32(idxDbl);
-        if(l==DELETED_KEY && r==EMPTY_KEY){                                         // change the deleted key to empty if it is to the left of an empty slot and therefore at the end of a span
-          desired = make64(EMPTY_KEY, EMPTY_KEY);
+        if( (l==DELETED_KEY && r==EMPTY_KEY) || (l==EMPTY_KEY && r==DELETED_KEY) ){           // change the deleted key to empty if it is to the left of an empty slot and therefore at the end of a span
+          desired = make64(EMPTY_KEY, EMPTY_KEY);          
         }else if(l!=r || l>=DELETED_KEY){
           return false; 
         }else{                                                                      // if the indices are the same then do the compare and swap
@@ -1357,18 +1358,26 @@ private:
 
     return true;
   }
+  VerIdx           prev(u32 i, u32* out_idx)   const
+  {
+    *out_idx=prevIdx(i);
+    return load(*out_idx);
+  }
   bool    cleanDeletion(u32 i, u8 depth=0)     const
   {
-    VerIdx curVi, nxtVi; VerIpd nxtVp; u32 nxtI;
+    VerIdx curVi, nxtVi, preVi; VerIpd nxtVp; u32 nxtI, preI;
 
-    clean_loop: while(i!=m_sz-1 && (nxtVi=load_vi(nxtI=nxtIdx(i))).idx < DELETED_KEY )           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
+    clean_loop: while( (nxtVi=load_vi(nxtI=nxtIdx(i))).idx < DELETED_KEY  && i!=m_sz-1)           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
     {
       curVi = load_vi(i);
       if(curVi.idx == EMPTY_KEY){ return false; }
 
       nxtVp = ipd(nxtI, nxtVi);
       if(nxtVp.version!=nxtVi.version){ continue; }                                  // the versions don't match, so start over on the same index and skip the compare exchange 
-      else if(nxtVp.ipd==0){ return true; }                                          // should this be converted to an empty slot since it is the end of a span? // next slot's versions match and its VerIdx is in its ideal position, so we are done 
+      else if(nxtVp.ipd==0){ 
+        // todo: convert the current slot to empty if the next is the end of a span (ipd of 0 or EMPTY)
+        return true; 
+      }                                          // should this be converted to an empty slot since it is the end of a span?  -  next slot's versions match and its VerIdx is in its ideal position, so we are done 
       else if( cmpex_vi(i, curVi, nxtVi) ){ 
         delDupe(i);
         i = nxtIdx(i);
@@ -1383,7 +1392,9 @@ private:
       }else if(nxtVi.idx==EMPTY_KEY){
         delDupe(i);    
       }
-    }
+    }else{}
+
+    if( (preVi=prev(i,&preI)).idx == EMPTY_KEY ){ delDupe(preI); }
 
     return true;
   }
