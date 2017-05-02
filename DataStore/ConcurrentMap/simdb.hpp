@@ -40,8 +40,10 @@
 // -todo: build in the ability to explicitly set the path of the shared memory file - relative paths work, but absolute paths on windows don't seem to 
 // -todo: test flush() - doesn't seem to write to the file leave for now
 // -todo: search for any embedded todo comments
+// -todo: run existing tests - some bugs fixed, one outstanding CncrHsh slot is not being deleted - possibly because it is in a 128 bit alignment at the end of the VerIdx array with another DELETED_KEY ahead of it
 
-// todo: run existing tests - some bugs fixed, one outstanding CncrHsh slot is not being deleted
+// todo: make cleanDeletion and delDupe() set a DELETED_KEY TO EMPTY_KEY if there is an EMPTY_KEY behind it
+// todo: make cleanDeletion and delDupe() check forward if setting the current slot to EMPTY_KEY based on the previous idx
 // todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
 // todo: clean out old commented lines
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
@@ -1310,7 +1312,10 @@ private:
     u32   ipd = i>ip?  i-ip  :  m_csp->blockCount() - ip + i;
     return {bl.version, ipd};
   }
-  bool          delDupe(u32 i)                 const                                 // delete duplicate indices - l is left index, r is right index - will do something different depending on if the two slots are within 128 bit alignment or not
+  bool     emptyIfAhead()                      const
+  {
+  }
+  bool          delDupe(u32 i)                 const                                // delete duplicate indices - l is left index, r is right index - will do something different depending on if the two slots are within 128 bit alignment or not
   {
     if(i%2==0)
     {                                                                               // both indices are within a 128 bit boundary, so the 128 bit atomic can (and must) be used
