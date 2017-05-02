@@ -49,7 +49,7 @@
 // todo: clean out old commented lines
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
-// todo: re-evaluate strong vs weak ordering
+// todo: re-evaluate strong vs weak ordering - weak ordering will likely work, but are there any places that depend on other threads doing operations in order?
 
 // robin hood hashing
 // todo: do rm()/del() first and make deletion take care of holes in spans?
@@ -1313,6 +1313,10 @@ private:
     u32   ipd = i>ip?  i-ip  :  m_csp->blockCount() - ip + i;
     return {bl.version, ipd};
   }
+  bool        isSpanEnd(u32 i, u32 blkIdx) const
+  {
+    return 
+  }
   bool     emptyIfAhead()                      const
   {
   }
@@ -1363,11 +1367,17 @@ private:
     *out_idx=prevIdx(i);
     return load(*out_idx);
   }
+  VerIdx            nxt(u32 i, u32* out_idx)   const
+  {
+    *out_idx=nxtIdx(i);
+    return load(*out_idx);
+  }
   bool    cleanDeletion(u32 i, u8 depth=0)     const
   {
     VerIdx curVi, nxtVi, preVi; VerIpd nxtVp; u32 nxtI, preI;
 
-    clean_loop: while( (nxtVi=load_vi(nxtI=nxtIdx(i))).idx < DELETED_KEY  && i!=m_sz-1)           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
+    //clean_loop: while( (nxtVi=load_vi(nxtI=nxtIdx(i))).idx < DELETED_KEY  && i!=m_sz-1)           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
+    clean_loop: while( (nxtVi=nxt(i,&nxtI)).idx < DELETED_KEY  && i!=m_sz-1)           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
     {
       curVi = load_vi(i);
       if(curVi.idx == EMPTY_KEY){ return false; }
