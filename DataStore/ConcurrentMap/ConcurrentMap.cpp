@@ -298,7 +298,7 @@ int main()
 {
   using namespace std;
 
-  simdb db("test", 32, 16);
+  simdb db("test", 16, 8);
   //simdb db("H:\\projects\\lava\\test.simdb", 32, 64, true);
   //simdb db("test.simdb", 32, 64, true);
 
@@ -345,14 +345,14 @@ int main()
   //Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
 
   if( db.isOwner() ){
-    Println("put: ", db.put(wat, skidoosh) );
+    //Println("put: ", db.put(wat, skidoosh) );
     //db.del("wat");
-    Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
+    //Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
     //db.del("wut");
-    Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
+    //Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
     //db.del("kablam");
 
-    Println("put: ", db.put(wat, skidoosh) );
+    //Println("put: ", db.put(wat, skidoosh) );
     //Println("del wat: ", db.del("wat") );
 
     Println("put: ", db.put(longkey, longval) );

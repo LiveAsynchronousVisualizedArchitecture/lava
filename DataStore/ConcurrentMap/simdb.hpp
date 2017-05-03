@@ -1093,23 +1093,25 @@ public:
     u32     len = 0;
     u32   rdLen = 0;
     u8*       b = (u8*)bytes;
-    u32     cur = blkIdx;
-    VerIdx  nxt = { blkIdx, version };
+    //u32     cur = blkIdx;
+    //VerIdx  nxt = { blkIdx, version };
+    VerIdx   vi = { blkIdx, version };
 
     //if(krem>0) --kblks;
     //if(krem>0){ ++kblks; }
     int i=0;
-    while( i<kblks && !(nxt.idx<0) && nxt.idx!=LIST_END && nxt.version==version)
+    while( i<kblks && vi.idx!=LIST_END && vi.version==version)                            // && !(nxt.idx<0) 
     {
-      cur    =  nxt.idx;
-      rdLen  =  readBlock(cur, version, b);          if(rdLen==0) goto read_failure;        // rdLen is read length
+      //cur    =  nxt.idx;
+      rdLen  =  readBlock(vi.idx, version, b);          if(rdLen==0) goto read_failure;        // rdLen is read length
       b     +=  rdLen;
       len   +=  rdLen;
-      nxt    =  nxtBlock(cur);
+      //nxt    =  nxtBlock(cur);
+      vi     =  nxtBlock(vi.idx);
       
       ++i;
     }
-    rdLen  =  readBlock(cur, version, b, 0, krem);
+    rdLen  =  readBlock(vi.idx, version, b, 0, krem);
     b     +=  rdLen;
     len   +=  rdLen;
 
