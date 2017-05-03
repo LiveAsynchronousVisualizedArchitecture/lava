@@ -57,7 +57,7 @@
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
 // todo: re-evaluate strong vs weak ordering - weak ordering will likely work, but are there any places that depend on other threads doing operations in order?
 // todo: test time penalty to query non-existant key
-// todo: make read use 128 bit compare and swap to know when the next slot has changed out from under it? - just return a bool of whether a change was detected and return it into an optional pointer, then let the user decide whether to loop again
+// todo: make read use 128 bit compare and swap to know when the next slot has changed out from under it? - just return a bool of whether a change was detected and return it into an optional pointer, then let the user decide whether to loop again - can IPD be used to guess if something has changed? if the next slot is only 1 more, then the idxs would have have to be the same, which isn't possible if nothing changed, if it is 2 more, then they should be in the process of being swapped
 // todo: make extra slot at the end of m_vis with 128 bit alignment, and make read look at both the extra slot and the first slot
 
 
@@ -68,6 +68,9 @@
 //    | would put() and del() need to set a flag and spinlock on the first index so that they could modify both the extra slot and the first slot without any other threads modifying them  
 // q: how can the last and first indices be handled so that the last index being deleted doesn't back up and result in all other indices before it ending up as DELETED because they can't know if they are at the end of a span?
 // q: can't set a DELETED_KEY to EMPTY_KEY just because it is in front of an EMPTY_KEY, because you need to atomically know that the slot ahead is the end of a span - if the slot ahead IS the end of a span, the DELETED_KEY can be made into an EMPTY_KEY - does this imply that the last slot in m_vis will end up DELETED and infect slots behind it that can never be freed into EMPTY slots? - maybe when searching for a match, never treat the last index as the end of a span, and always set the last slot directly to EMPTY instead of DELETED
+// q: make del() pay attention to finding an index whos version doesn't match, but how to handle that situation? just decrement readers? make sure to only care on the 128 bit alignment crossover - if del() is only looking for the key just as read is, then just decrement the readers? if the readers are already 0, then restart the search since it was already deleted
+// q: have a bitfield of flags so that put() and del() will spinlock when swapping over the 128 bit boundary? - 
+// q: have a third layer that is nothing but ordering? - have a bitfield that lets put() mark what boundaries it will swap? 
 
 // todo: make read start from the ideal position when it finds a key on a removed block list and move back one position if it finds a duplicate entry
 // todo: make put spin on returning to the CncrHsh and finding the same idx but a different version number - make put restart if 
