@@ -1454,8 +1454,9 @@ private:
       if(curVi.idx == EMPTY){ return false; }
 
       nxtVp = ipd(nxtI, nxtVi.idx);
-      if(nxtVp.version!=nxtVi.version){ continue; }                                  // the versions don't match, so start over on the same index and skip the compare exchange 
-      else if(nxtVp.ipd==0){ 
+      //if(nxtVp.version!=nxtVi.version){ continue; }                                  // the versions don't match, so start over on the same index and skip the compare exchange 
+      //else if(nxtVp.ipd==0){ 
+      if(nxtVp.version!=nxtVi.version || nxtVp.ipd==0){ 
         delDupe(i);                                                                  // todo: convert the current slot to empty if the next is the end of a span (ipd of 0 or EMPTY)
         return true; 
       }                                                                              // should this be converted to an empty slot since it is the end of a span?  -  next slot's versions match and its VerIdx is in its ideal position, so we are done 

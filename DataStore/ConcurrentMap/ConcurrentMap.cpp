@@ -289,8 +289,8 @@ int main()
       auto&  lbl = label[idx]; 
       TO(100,j){ 
         db.put(numk, lbl); 
-        if(rngSwitches[idx]()){ db.del(numk); }
-        //db.del(numk);
+        //if(rngSwitches[idx]()){ db.del(numk); }
+        db.del(numk);
       }
       
       Println(i, " done");
