@@ -2,7 +2,7 @@
 // -todo: make CncrLst::idx() an atomic load
 // -todo: figure out why neither version of CncrStr::free() is being hit - wasn't calling del()....
 // -todo: figure out 128 bit alignement of CncrHsh's VerIdx memory - padded sizeBytes() by 16 and offset the address in which the lava_vec is created with to land on the 128 bit boundary
-// -todo: debug clean deletions leaving slots in a DELETED_KEY state - one side of the 128 bit alignment not being swapped - now duplicate DELETED_KEY entries are being created without being cleaned up - also deleting an adjacent EMPTY_KEY? - had to switch around bit swapping functions, lo and hi now only describe the low and high addresses
+// -todo: debug clean deletions leaving slots in a DELETED_KEY state - one side of the 128 bit alignment not being swapped - now duplicate DELETED_KEY entries are being created without being cleaned up - also deleting an adjacent EMPTY? - had to switch around bit swapping functions, lo and hi now only describe the low and high addresses
 // -todo: figure out how to set the indices into a list in CncrLst so that free() can use the start and end indices to free multiple blocks
 // -todo: make a CncrStr function to free a series of blocks with a begin and end, returning failure or success
 // -todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
@@ -13,7 +13,7 @@
 // -todo: redo simdb::len(blkIdx) to fit the functions as they stand now - klen and vlen were labeled out_vlen and out_version 
 // -todo: take out runRead - used by direct simdb::len(blkIdx) function - also used by getKey - was previously used to wrap incReaders() and decReaders() calls around a function 
 // -todo: flatten runIfMatch function to only take a function template argument but not a match function template argument - take it out all together
-// -todo: figure out what to do about indices on the ends in CncrHsh - just leave a DELETED_KEY and don't turn it into an EMPTY_KEY, since it will then just be skipped over when looking for an index - make sure that cleanDeletion() and delDupe() skip the last index when they are the primary/left/lo index
+// -todo: figure out what to do about indices on the ends in CncrHsh - just leave a DELETED_KEY and don't turn it into an EMPTY, since it will then just be skipped over when looking for an index - make sure that cleanDeletion() and delDupe() skip the last index when they are the primary/left/lo index
 // -todo: make sure that the start and end are taken care of with regards to cleaning up deletions - need to not go off the end of the array and need to figure out how to deal with spans between them
 // -todo: stop using match function as a template in and just run a function in CncrHsh
 //       | len()
@@ -42,14 +42,31 @@
 // -todo: search for any embedded todo comments
 // -todo: run existing tests - some bugs fixed, one outstanding CncrHsh slot is not being deleted - possibly because it is in a 128 bit alignment at the end of the VerIdx array with another DELETED_KEY ahead of it
 // -todo: make cleanDeletion and delDupe() set a DELETED_KEY TO EMPTY_KEY if there is an EMPTY_KEY behind it
+// -todo: change to just DELETED and EMPTY instead of DELETED_KEY and EMPTY_KEY
+// -todo: redo cleanDeletion to detect if the next slot is the end of a span and change the current slot to EMPTY if it is  
+// -todo: make cleanDeletion and delDupe() check forward if setting the current slot to EMPTY_KEY based on the previous idx - can't set based on the previous index because you can't know atomically what the next index is
+// -todo: when searching for a match, never treat the last index as the end of a span, and always set the last slot directly to EMPTY instead of DELETED - can't do that because the second to last index could erroneously be set to EMPTY
 
-// todo: redo cleanDeletion to detect if the next slot is the end of a span and change the current slot to EMPTY if it is  
-// todo: make cleanDeletion and delDupe() check forward if setting the current slot to EMPTY_KEY based on the previous idx
 // todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
 // todo: clean out old commented lines
+// todo: compile on linux + gcc
+// todo: compile again on osx
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
 // todo: re-evaluate strong vs weak ordering - weak ordering will likely work, but are there any places that depend on other threads doing operations in order?
+// todo: test time penalty to query non-existant key
+
+// q: is it possible to have only 128 bit aligned values, use the first as the value to read, the second as the value to write, and switch them? - how does that help the sorting problem?
+// q: is it possible to go back to even / odd version numbers?  is it possible to simply update the version number on the block list if it still matches the old version number? - should new even and odd version numbers be gotten from the CncrLst each time?
+// q: can the first and last slots both be 128 bit aligned and use two VerIdx values, creating a double buffer where the low 64 bits of the last slot and the high bits of the first slot are used normally, but the other 64 bits of each can be used as a buffer to swap in values from the other side
+//    | read only needs to move forward and thus can use the extra slot as the first while skipping the actual first slot
+//    | would put() and del() need to set a flag and spinlock on the first index so that they could modify both the extra slot and the first slot without any other threads modifying them  
+// q: how can the last and first indices be handled so that the last index being deleted doesn't back up and result in all other indices before it ending up as DELETED because they can't know if they are at the end of a span?
+// q: can't set a DELETED_KEY to EMPTY_KEY just because it is in front of an EMPTY_KEY, because you need to atomically know that the slot ahead is the end of a span - if the slot ahead IS the end of a span, the DELETED_KEY can be made into an EMPTY_KEY - does this imply that the last slot in m_vis will end up DELETED and infect slots behind it that can never be freed into EMPTY slots? - maybe when searching for a match, never treat the last index as the end of a span, and always set the last slot directly to EMPTY instead of DELETED
+
+// todo: make read start from the ideal position when it finds a key on a removed block list and move back one position if it finds a duplicate entry
+// todo: make put spin on returning to the CncrHsh and finding the same idx but a different version number - make put restart if 
+// todo: make a bool flag (64 bytes aligned?) in CncrHsh that locks the first and last slots for swapping and makes any thread trying to swap the first and last slots spin and sleep(0) under contention
 
 // robin hood hashing
 // todo: do rm()/del() first and make deletion take care of holes in spans?
@@ -1192,8 +1209,8 @@ public:
   static const u8   FREE_READY       =      0;
   static const u8   MAX_READERS      =   0xFF;
   static const u32  KEY_MAX          =   0xFFFFFFFF; 
-  static const u32  EMPTY_KEY        =   KEY_MAX;            // first 21 bits set 
-  static const u32  DELETED_KEY      =   KEY_MAX - 1;        // 0xFFFFFFFE;       // 1 less than the EMPTY_KEY
+  static const u32  EMPTY        =   KEY_MAX;            // first 21 bits set 
+  static const u32  DELETED      =   KEY_MAX - 1;        // 0xFFFFFFFE;       // 1 less than the EMPTY
   static const u32  EMPTY_HASH_IDX   =   0xFFFFFFFF;         // 32 bits set - hash indices are different from block indices 
   static const u32  LIST_END         =   CncrStr::LIST_END;
 
@@ -1219,11 +1236,11 @@ public:
 
     return (u32)( (hsh>>32) ^ ((u32)hsh));
   }
-  static VerIdx         empty_vi(){ return VerIdx(EMPTY_KEY,0); }
+  static VerIdx         empty_vi(){ return VerIdx(EMPTY,0); }
   static VerIdx       deleted_vi()
   {
     VerIdx empty;
-    empty.idx      =  DELETED_KEY;
+    empty.idx      =  DELETED;
     empty.version  =  0;
     return empty;
   }
@@ -1306,16 +1323,16 @@ private:
   {
     store_vi(i, empty_vi().asInt);
   }
-  VerIpd            ipd(u32 i, VerIdx vi)      const  // ipd is Ideal Position Distance - it is the distance a CncrHsh index value is from the position that it gets hashed to 
+  VerIpd            ipd(u32 i, u32 blkIdx)     const    // ipd is Ideal Position Distance - it is the distance a CncrHsh index value is from the position that it gets hashed to 
   {
-    BlkLst bl = m_csp->blkLst(vi.idx);
+    BlkLst bl = m_csp->blkLst(blkIdx);
     u32    ip = bl.hash % m_sz;     // ip is Ideal Position
     u32   ipd = i>ip?  i-ip  :  m_csp->blockCount() - ip + i;
     return {bl.version, ipd};
   }
-  bool        isSpanEnd(u32 i, u32 blkIdx) const
-  {
-    return 
+  bool        isSpanEnd(u32 i, u32 blkIdx)     const
+  { 
+    return i!=m_sz-1 && load(i).idx==EMPTY || ipd(i,blkIdx).ipd==0;             // last slot is never treated as the end of a span since it cannot be manipulated atomically with the next slot (since the next slot is the first slot) - this is so that the rest of the table can be cleaned up
   }
   bool     emptyIfAhead()                      const
   {
@@ -1330,38 +1347,91 @@ private:
       do{
         u32 l = hi32(viDbl.lo);
         u32 r = lo32(viDbl.hi);                                                     
-        if( (l==DELETED_KEY && r==EMPTY_KEY) || (l==EMPTY_KEY && r==DELETED_KEY) ){
+        if( (l==DELETED && r==EMPTY) || (l==EMPTY && r==DELETED) ){
           rgtDel = vi_i64( swp32(empty_vi().asInt) );
           lftDel = vi_i64( empty_vi() );
-        }else if(l!=r || l>=DELETED_KEY){                                           // check if both the indices are the same and if they are, that they aren't both deleted or both empty 
+        }else if(l!=r || l>=DELETED){                                           // check if both the indices are the same and if they are, that they aren't both deleted or both empty 
           return false;                     
         }else{
           u64 lftSwp = swp32(viDbl.hi);
-          lftDel     = *((i64*)&lftSwp);                                            // if both the indices are the same, make a new right side VerIdx with the idx set to DELETED_KEY
+          lftDel     = *((i64*)&lftSwp);                                            // if both the indices are the same, make a new right side VerIdx with the idx set to DELETED
           rgtDel     = vi_i64( deleted_vi() );                                      // interpret the u64 bits directly as a signed 64 bit integer instead
         }
       }while( !compex128( (i64*)viDblAddr, rgtDel, lftDel, (i64*)&viDbl) );         // then compare and swap for a version with the new right side VerIdx
     }else
     {
       au64* idxDblAddr; u64 idxDbl, desired;
-      u32* leftAddr = ((u32*)(&s_vis[i]))+1;                                        // if the two VerIdxs are not in a 128 bit boundary, then use a 64 bit compare and swap to set the right side index to DELETED_KEY
+      u32* leftAddr = ((u32*)(&s_vis[i]))+1;                                        // if the two VerIdxs are not in a 128 bit boundary, then use a 64 bit compare and swap to set the right side index to DELETED
       idxDblAddr    = (au64*)leftAddr;                                              // increment the address by 4 bytes so that it lines up with the start of the two indices, then cast it to an atomic 64 bit unsigned integer for the compare and switch
       idxDbl        = idxDblAddr->load();
       do{
         u32  l = hi32(idxDbl);
         u32  r = lo32(idxDbl);
-        if( (l==DELETED_KEY && r==EMPTY_KEY) || (l==EMPTY_KEY && r==DELETED_KEY) ){           // change the deleted key to empty if it is to the left of an empty slot and therefore at the end of a span
-          desired = make64(EMPTY_KEY, EMPTY_KEY);          
-        }else if(l!=r || l>=DELETED_KEY){
+        if( (l==DELETED && r==EMPTY) || (l==EMPTY && r==DELETED) ){           // change the deleted key to empty if it is to the left of an empty slot and therefore at the end of a span
+          desired = make64(EMPTY, EMPTY);          
+        }else if(l!=r || l>=DELETED){
           return false; 
         }else{                                                                      // if the indices are the same then do the compare and swap
-          desired = make64(l, DELETED_KEY);                                         // make the new 64 bit integer with the right index set to DELETED_KEY
+          desired = make64(l, DELETED);                                         // make the new 64 bit integer with the right index set to DELETED
         }
       }while( !idxDblAddr->compare_exchange_strong(idxDbl, desired) );              // looping here would essentially mean that the indices change but are still identical to each other
     }
 
     return true;
   }
+  void      visFromAddr(_u128* viDbl, VerIdx* out_left, VerIdx* out_right) const
+  {
+    out_left->asInt   =  swp32(viDbl->lo);
+    out_right->asInt  =  viDbl->hi;
+  }
+  //bool          swpOnMatch(u32 i, bool useLeft, u32 cmpLeft, u32 left, bool useRight, u32 cmpRight, u32 right)                 const                                // delete duplicate indices - l is left index, r is right index - will do something different depending on if the two slots are within 128 bit alignment or not
+  //{
+  //  if(i%2==0)
+  //  {                                                                                 // both indices are within a 128 bit boundary, so the 128 bit atomic can (and must) be used
+  //    i64     rgtSwp, lftSwp; 
+  //    VerIdx  lftVi,  rgtVi;
+  //    _u128   viDbl;
+  //    _u128*  viDblAddr = (_u128*)&s_vis[i];                                          // find 128 bit offset address
+  //    visFromAddr(viDblAddr, &lftVi, &rgtVi);
+  //    //viDbl            = *viDblAddr;                                                // if it isn't the same, the atomic compare exchange will load it atomically
+  //    do{
+  //      u32 l = hi32(viDbl.lo);
+  //      u32 r = lo32(viDbl.hi);
+  //      bool  leftOk = ((useLeft  && l==cmpLeft)  || (!useLeft));
+  //      bool rightOk = ((useRight && l==cmpRight) || (!useRight));
+  //      if( leftOk && rightOk ){
+  //        lftSwp = useLeft?  vi_i64(VerIdx(left,lftVi.version))   :  vi_i64(lftVi);
+  //        rgtSwp = useLeft?  vi_i64(VerIdx(left,rgtVi.version))   :  vi_i64(rgtVi);
+  //        //rgtSwp = useRight? vi_i64(make64(left,lo32(viDbl.lo)))  :  vi_i64( swp32(empty_vi().asInt) );
+  //      }else if(l!=r || l>=DELETED){                                           // check if both the indices are the same and if they are, that they aren't both deleted or both empty 
+  //        return false;
+  //      }else{
+  //        u64 lftSwp = swp32(viDbl.hi);
+  //        lftDel     = *((i64*)&lftSwp);                                            // if both the indices are the same, make a new right side VerIdx with the idx set to DELETED
+  //        rgtDel     = vi_i64( deleted_vi() );                                      // interpret the u64 bits directly as a signed 64 bit integer instead
+  //      }
+  //    }while( !compex128( (i64*)viDblAddr, rgtSwp, lftSwp, (i64*)&viDbl) );         // then compare and swap for a version with the new right side VerIdx
+  //  }else
+  //  {
+  //    au64* idxDblAddr; u64 idxDbl, desired;
+  //    u32* leftAddr = ((u32*)(&s_vis[i]))+1;                                        // if the two VerIdxs are not in a 128 bit boundary, then use a 64 bit compare and swap to set the right side index to DELETED
+  //    idxDblAddr    = (au64*)leftAddr;                                              // increment the address by 4 bytes so that it lines up with the start of the two indices, then cast it to an atomic 64 bit unsigned integer for the compare and switch
+  //    idxDbl        = idxDblAddr->load();
+  //    do{
+  //      u32  l = hi32(idxDbl);
+  //      u32  r = lo32(idxDbl);
+  //      if( (l==DELETED && r==EMPTY) || (l==EMPTY && r==DELETED) ){           // change the deleted key to empty if it is to the left of an empty slot and therefore at the end of a span
+  //        desired = make64(EMPTY, EMPTY);          
+  //      }else if(l!=r || l>=DELETED){
+  //        return false; 
+  //      }else{                                                                      // if the indices are the same then do the compare and swap
+  //        desired = make64(l, DELETED);                                         // make the new 64 bit integer with the right index set to DELETED
+  //      }
+  //    }while( !idxDblAddr->compare_exchange_strong(idxDbl, desired) );              // looping here would essentially mean that the indices change but are still identical to each other
+  //  }
+  //
+  //  return true;
+  //}
   VerIdx           prev(u32 i, u32* out_idx)   const
   {
     *out_idx=prevIdx(i);
@@ -1376,18 +1446,19 @@ private:
   {
     VerIdx curVi, nxtVi, preVi; VerIpd nxtVp; u32 nxtI, preI;
 
-    //clean_loop: while( (nxtVi=load_vi(nxtI=nxtIdx(i))).idx < DELETED_KEY  && i!=m_sz-1)           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
-    clean_loop: while( (nxtVi=nxt(i,&nxtI)).idx < DELETED_KEY  && i!=m_sz-1)           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
+    if( (preVi=prev(i,&preI)).idx == EMPTY )
+
+    clean_loop: while( (nxtVi=nxt(i,&nxtI)).idx < DELETED  && i!=m_sz-1)             // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
     {
       curVi = load_vi(i);
-      if(curVi.idx == EMPTY_KEY){ return false; }
+      if(curVi.idx == EMPTY){ return false; }
 
-      nxtVp = ipd(nxtI, nxtVi);
+      nxtVp = ipd(nxtI, nxtVi.idx);
       if(nxtVp.version!=nxtVi.version){ continue; }                                  // the versions don't match, so start over on the same index and skip the compare exchange 
       else if(nxtVp.ipd==0){ 
-        // todo: convert the current slot to empty if the next is the end of a span (ipd of 0 or EMPTY)
+        delDupe(i);                                                                  // todo: convert the current slot to empty if the next is the end of a span (ipd of 0 or EMPTY)
         return true; 
-      }                                          // should this be converted to an empty slot since it is the end of a span?  -  next slot's versions match and its VerIdx is in its ideal position, so we are done 
+      }                                                                              // should this be converted to an empty slot since it is the end of a span?  -  next slot's versions match and its VerIdx is in its ideal position, so we are done 
       else if( cmpex_vi(i, curVi, nxtVi) ){ 
         delDupe(i);
         i = nxtIdx(i);
@@ -1395,19 +1466,55 @@ private:
     }
 
     if(i!=m_sz-1){
-      if(nxtVi.idx == DELETED_KEY){                                                    // if the next index is deleted, try to clean the next index, then come back and try to delete this one again
+      if(nxtVi.idx == DELETED){                                                     // if the next index is deleted, try to clean the next index, then come back and try to delete this one again
         i=nxtIdx(i);
-        if(depth<1){ cleanDeletion(i, depth+1); }                              // could this recurse to the depth of the number of blocks?
+        if(depth<1){ cleanDeletion(i, depth+1); }                                   // could this recurse to the depth of the number of blocks?
         goto clean_loop;
-      }else if(nxtVi.idx==EMPTY_KEY){
+      }else if(nxtVi.idx==EMPTY){
         delDupe(i);    
       }
     }else{}
 
-    if( (preVi=prev(i,&preI)).idx == EMPTY_KEY ){ delDupe(preI); }
+    //if( (preVi=prev(i,&preI)).idx == EMPTY ){ delDupe(preI); }
 
     return true;
   }
+  //bool    cleanDeletion(u32 i, u8 depth=0)     const
+  //{
+  //  VerIdx curVi, nxtVi, preVi; VerIpd nxtVp; u32 nxtI, preI;
+  //
+  //  //clean_loop: while( (nxtVi=load_vi(nxtI=nxtIdx(i))).idx < DELETED  && i!=m_sz-1)           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
+  //  clean_loop: while( (nxtVi=nxt(i,&nxtI)).idx < DELETED  && i!=m_sz-1)           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
+  //  {
+  //    curVi = load_vi(i);
+  //    if(curVi.idx == EMPTY){ return false; }
+  //
+  //    nxtVp = ipd(nxtI, nxtVi.idx);
+  //    if(nxtVp.version!=nxtVi.version){ continue; }                                  // the versions don't match, so start over on the same index and skip the compare exchange 
+  //    else if(nxtVp.ipd==0){ 
+  //      // todo: convert the current slot to empty if the next is the end of a span (ipd of 0 or EMPTY)
+  //      return true; 
+  //    }                                          // should this be converted to an empty slot since it is the end of a span?  -  next slot's versions match and its VerIdx is in its ideal position, so we are done 
+  //    else if( cmpex_vi(i, curVi, nxtVi) ){ 
+  //      delDupe(i);
+  //      i = nxtIdx(i);
+  //    }
+  //  }
+  //
+  //  if(i!=m_sz-1){
+  //    if(nxtVi.idx == DELETED){                                                    // if the next index is deleted, try to clean the next index, then come back and try to delete this one again
+  //      i=nxtIdx(i);
+  //      if(depth<1){ cleanDeletion(i, depth+1); }                              // could this recurse to the depth of the number of blocks?
+  //      goto clean_loop;
+  //    }else if(nxtVi.idx==EMPTY){
+  //      delDupe(i);    
+  //    }
+  //  }else{}
+  //
+  //  if( (preVi=prev(i,&preI)).idx == EMPTY ){ delDupe(preI); }
+  //
+  //  return true;
+  //}
 
   template<class FUNC> 
   bool       runIfMatch(VerIdx vi, const void* const buf, u32 len, u32 hash, FUNC f) const
@@ -1459,7 +1566,7 @@ public:
     for(;; i=nxtIdx(i) )
     {
       VerIdx vi = load_vi(i);
-      if(vi.idx>=DELETED_KEY){                                                              // it is either deleted or empty
+      if(vi.idx>=DELETED){                                                              // it is either deleted or empty
         bool success = cmpex_vi(i, vi, desired);
         if(success){return vi;}
         else{ i=prevIdx(i); continue; }                                                     // retry the same loop again if a good slot was found but it was changed by another thread between the load and the compare-exchange
@@ -1490,8 +1597,8 @@ public:
     for(;; i=nxtIdx(i) )
     {
       VerIdx vi = load_vi(i);
-      if(vi.idx == EMPTY_KEY){ return false;  }                                             // only EMPTY_KEY is the short circuit, since DELETED_KEY means you are still within a span and need to keep searching
-      else if(vi.idx == DELETED_KEY){ continue; }
+      if(vi.idx == EMPTY){ return false;  }                                             // only EMPTY is the short circuit, since DELETED means you are still within a span and need to keep searching
+      else if(vi.idx == DELETED){ continue; }
       else if( runIfMatch(vi, key, klen, hash, f) ){ return true; }
       else if(i==en){ return false; }
     }
@@ -1509,8 +1616,8 @@ public:
     {
       VerIdx vi = load_vi(i);
 
-      if(vi.idx==EMPTY_KEY){   return empty;   }
-      if(vi.idx==DELETED_KEY){ return deleted; }
+      if(vi.idx==EMPTY){   return empty;   }
+      if(vi.idx==DELETED){ return deleted; }
 
       Match m = m_csp->compare(vi.idx, vi.version, key, klen, hash);
       if(m==MATCH_TRUE){
@@ -1553,8 +1660,8 @@ public:
     //for(u32 i=0; i<sz; i+=2) *((u64*)(&m_vis[i])) = iempty;          // evens 
     //for(u32 i=1; i<sz; i+=2) *((u64*)(&m_vis[i])) = swpempty;        // odds
 
-    for(u32 i=0; i<sz; i+=2) s_vis[i] = VerIdx(EMPTY_KEY,0);         // evens 
-    for(u32 i=1; i<sz; i+=2) s_vis[i] = VerIdx(0,EMPTY_KEY);         // odds
+    for(u32 i=0; i<sz; i+=2) s_vis[i] = VerIdx(EMPTY,0);         // evens 
+    for(u32 i=1; i<sz; i+=2) s_vis[i] = VerIdx(0,EMPTY);         // odds
     
     return true;
   }
@@ -1624,8 +1731,8 @@ public:
     for(;; i=nxtIdx(i) )
     {
       VerIdx vi = load_vi(i);
-      if(vi.idx == EMPTY_KEY){ return 0ull;  }                                      // only EMPTY_KEY is the short circuit, since DELETED_KEY means you are still within a span and need to keep searching
-      else if(vi.idx == DELETED_KEY){ continue; }
+      if(vi.idx == EMPTY){ return 0ull;  }                                      // only EMPTY is the short circuit, since DELETED means you are still within a span and need to keep searching
+      else if(vi.idx == DELETED){ continue; }
       
       Match      m = m_csp->compare(vi.idx, vi.version, key, klen, hash);
       if(m==MATCH_TRUE){ return m_csp->len(vi.idx, vi.version, out_vlen); }
@@ -1658,7 +1765,7 @@ public:
     m_csp->put(lstVi.idx, key, klen, val, vlen);
 
     VerIdx vi = putHashed(hash, lstVi, key, klen);
-    if(vi.idx<DELETED_KEY){ m_csp->free(vi.idx, vi.version); }                          // putHashed returns the entry that was there before, which is the entry that was replaced. If it wasn't empty, we free it here. 
+    if(vi.idx<DELETED){ m_csp->free(vi.idx, vi.version); }                          // putHashed returns the entry that was there before, which is the entry that was replaced. If it wasn't empty, we free it here. 
 
     return true;
   }
@@ -1667,7 +1774,7 @@ public:
     CncrStr*  csp = m_csp;
     auto     hash = CncrHsh::HashBytes(key, klen);
     VerIdx     vi = delHashed(key, klen, hash);
-    bool   doFree = vi.idx<DELETED_KEY;
+    bool   doFree = vi.idx<DELETED;
     if(doFree){ m_csp->free(vi.idx, vi.version); }
 
     return doFree;
@@ -1898,9 +2005,9 @@ private:
   bool             m_isOpen;
 
 public:
-  static const u32    EMPTY_KEY = CncrHsh::EMPTY_KEY;          // 28 bits set 
-  static const u32  DELETED_KEY = CncrHsh::DELETED_KEY;        // 28 bits set 
-  static const u32   FAILED_PUT = CncrHsh::EMPTY_KEY;          // 28 bits set 
+  static const u32    EMPTY = CncrHsh::EMPTY;          // 28 bits set 
+  static const u32  DELETED = CncrHsh::DELETED;        // 28 bits set 
+  static const u32   FAILED_PUT = CncrHsh::EMPTY;          // 28 bits set 
   static const u32     LIST_END = CncrStr::LIST_END;
   static u64        OffsetBytes(){ return sizeof(au64)*3; }
   static u64            MemSize(u64 blockSize, u64 blockCount)
@@ -2023,7 +2130,7 @@ public:
     if(klen<1) return false;
 
     VerIdx vi = s_ch.load(idx);  
-    if(vi.idx >= CncrHsh::DELETED_KEY || vi.version!=version){ return false; }
+    if(vi.idx >= CncrHsh::DELETED || vi.version!=version){ return false; }
     u32 l = s_cs.getKey(vi.idx, vi.version, out_buf, klen);                         // l is length
     if(l<1){return false;}
 
@@ -2089,7 +2196,7 @@ public:
       i64 sprev = (i64)prev;          // sprev is signed previous
       *searched = (sidx-sprev)>0?  sidx-sprev  :  (m_blkCnt-sprev-1) + sidx+1;
     }
-    if(nxt.idx==EMPTY_KEY) 
+    if(nxt.idx==EMPTY) 
       return {nxt.version, ""};
     
     //ok         = this->len(nxt.idx, nxt.version, 
@@ -2152,6 +2259,8 @@ public:
 
 
 
+//
+//clean_loop: while( (nxtVi=load_vi(nxtI=nxtIdx(i))).idx < DELETED  && i!=m_sz-1)           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
 
 //fstore_t store = {F_ALLOCATECONTIG, F_PEOFPOSMODE, 0, (off_t)size};
 //
@@ -2441,7 +2550,7 @@ public:
 //  i = nxtIdx(i);
 //}
 //
-//if(nxtVi.idx==EMPTY_KEY){ 
+//if(nxtVi.idx==EMPTY){ 
 //  if(delDupe(i)){ return true; }
 //  
 //  i = nxtIdx(i); continue;

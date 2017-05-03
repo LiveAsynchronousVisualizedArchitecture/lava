@@ -199,10 +199,6 @@ template<class T1, class... T> inline void
   Println();
 }
 
-
-//      template<class T, class _Alloc=std::allocator<T> > 
-//using vec        =  std::vector<T, _Alloc>;
-
 using std::thread;
 using str   =   std::string;
 
@@ -221,10 +217,6 @@ inline void prefetch0(char const* const p)
   _mm_prefetch(p, _MM_HINT_T0);
   //_m_prefetch((void*)p);
 }
-
-
-//struct _u128 { u64 hi, lo; };
-//using u128 = __declspec(align(128)) volatile _u128;
 
 template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  // will need C++ ifdefs eventually
 
@@ -272,288 +264,6 @@ int main()
 {
   using namespace std;
 
-  //SECTION(128 bit atomic compare and exchange)
-  //{
-  //  u128 dest = { 101, 102 };
-  //  u128 comp = { 101, 102 };
-  //  u128 desired = { 85, 86 };
-  //
-  //  _InterlockedCompareExchange128(
-  //    (i64*)(&dest), 
-  //    desired.hi,
-  //    desired.lo,
-  //    (i64*)(&comp) );
-  //
-  //  Println("dest: ", dest.hi, " ", dest.lo);
-  //  Println("comp: ", comp.hi, " ", comp.lo);
-  //  Println("\n\n");
-  //
-  //  //u128 dest = { 101, 102 };
-  //  //u128 comp = { 101, 102 };
-  //  //u128 desired = { 85, 86 };
-  //
-  //  _InterlockedCompareExchange128(
-  //    (i64*)(&dest), 
-  //    desired.hi,
-  //    desired.lo,
-  //    (i64*)(&comp) );
-  //
-  //  Println("dest: ", dest.hi, " ", dest.lo);
-  //  Println("comp: ", comp.hi, " ", comp.lo);
-  //  Println("\n\n");
-  //}
-
-  //u32 sz = 18921703;
-  //u32 sz = 400;
-  //ConcurrentMap cm(sz);
-
-  //ScopeTime t;
-  //t.start();
-  //cm.init(sz);
-  //t.stop("Init");
-
-  //Println( (i64)t.stop() );
-  //t.start();
-  //
-  //Println("sz: ", cm.size());
-  //
-  //TO(100,i) {
-  //  Println("i: ",i," ", intHash(i) );
-  //}
-  //
-  //TO(100,i) {
-  //  Println("i: ",i," ", nextPowerOf2(i));
-  //}
-
-  //
-  //u32 loopSz  =  (u32)( double(cm.size()) / 1.5);
-
-  //
-  //RngInt<int> rng(1, 2);
-
-  //vec<thread> thrds;
-  //TO(5,tid)
-  //{
-  //  thrds.push_back( thread([&cm, &rng, loopSz, tid]()
-  //  {
-  //    ScopeTime t;
-  //
-  //    t.start();
-  //    TO(loopSz, i) {
-  //      auto val = i*10 + tid;
-  //      u32 pidx = cm.put(i, val);
-  //      SleepMs( rng() );
-  //
-  //      //SleepMs( (int)pow(4-tid,2) );
-  //      //cout << pidx << "  ";
-  //      //Println("Put Idx: ", (i64)pidx);
-  //    }
-  //    t.stop("Put");
-  //    //Println( t.getSeconds() );
-  //
-  //    //t.start();
-  //    //TO(loopSz, i) {
-  //    //  u32 gidx = cm.get(i);
-  //    //  cout << gidx << "  ";
-  //    //  //Println("Get Idx: ", (i64)gidx);
-  //    //}
-  //    //t.stop("Get");
-  //    //Println( t.getSeconds() );
-  //  })); // .detach();
-  //  //thrds.back().detach();
-  //}
-  ////for(auto& th : thrds) th.detach();
-  //for(auto& th : thrds) th.join();
-
-  // test getting back from the map
-  //t.start();
-  //TO(loopSz, i) {
-  //  u32 gidx = cm.get(i);
-  //  cout << gidx << "  ";
-  //  //Println("Get Idx: ", (i64)gidx);
-  //}
-  //Println();
-  //t.stop("Get");
-
-  //RngInt<int> rngb(0,1);
-  //RngInt<int> rngl(0,loopSz-1);
-  //ConcurrentList cl(loopSz);
-
-  //// serial test of ConcurrentList
-  ////t.start();
-  ////TO(loopSz, i){
-  ////  Print(cl.idx(),":", cl.alloc(), " ");
-  ////}
-  ////TO(loopSz, i){
-  ////  Print(cl.idx(),":", cl.free(i), " ");
-  ////}
-  ////Println();
-  ////auto lv = cl.list();
-  ////TO(lv->size(), i){
-  ////  Print( i,":",(*lv)[i], " ");
-  ////}
-  ////Println();
-  ////t.stop("List");
-
-  //Println("\nLinks: ", cl.lnkCnt(), " ");
-  //vec<thread> thrds;
-  //TO(12,tid)
-  //{
-  //  thrds.push_back( thread([&cl, &rngb, &rngl, loopSz, tid]()
-  //  {
-  //    ScopeTime t;
-
-  //    t.start();
-  //    TO(loopSz/5, i){
-  //      //if(rngb()) 
-  //      Print(tid,":",cl.nxt()," ");
-  //      //else       Print(tid,":",cl.free(rngl()), " ");
-  //      SleepMs( rngb() );
-  //    }
-  //    t.stop("alloc/free");
-  //  }));
-  //}
-  //for(auto& th : thrds) th.join();
-
-  //Println();
-  //auto lv = cl.list();
-  //TO(lv->size(), i){
-  //  Print( i,":",(*lv)[i], " ");
-  //}
-  //Println();
-  //Println("\nLinks: ", cl.lnkCnt(), " ");
-
-  //i32 blkSz  = 5;
-  //i32 blocks = 2;
-  //vec<ui8> mem(blocks*blkSz, 0);
-  //ConcurrentStore cs(mem.data(), blkSz, (u32)(blocks) );
-  //
-  //Println("\n");
-  //
-  //TO(cs.m_cl.list()->size(), i){
-  //  Println( (*cs.m_cl.list())[i] );
-  //}
-  //Println("\n\n");
-  //
-  //TO(2,i){
-  //  i32  blks = 0;
-  //  auto    s = "w";
-  //  i32  slen = (i32)strlen(s)+1;
-  //  //i32  slen = 1;
-  //  auto  idx = cs.alloc(slen, &blks);   // must allocate the exact number of bytes and no more, since that number will be used to read and write
-  //  cs.put(idx, (void*)s, slen);
-  //
-  //  vec<char> gs(slen,0);
-  //  cs.get(idx, gs.data(), slen);
-  //  Println(gs.data());
-  //  cs.free(idx);
-  //
-  //  TO(cs.m_blockCount, b){
-  //    Println(cs.nxtBlock(b));
-  //  }
-  //  Println("\n\n");
-  //  TO(cs.m_cl.list()->size(), i){
-  //    Println( (*cs.m_cl.list())[i] );
-  //  }
-  //  Println("\n\n");
-  //
-  //}
-
-  //ConcurrentHash ch(64);
-  //vec<thread> thrds;
-  //TO(24,tid)
-  //{
-  //  thrds.push_back( thread([&ch, &rng, tid]()
-  //  {
-  //    TO(64,h)
-  //    {
-  //      ch.put(h, h*h);
-  //      //Print(h,": ", ch.put(h, h*h) );
-  //      Print(h,":", ch.get(h)==h*h, " ");
-  //    }
-  //  } ));
-  //  thrds.back().detach();
-  //}
-
-  //auto fileHndl = CreateFileMapping(
-  //  INVALID_HANDLE_VALUE,
-  //  NULL,
-  //  PAGE_READWRITE,
-  //  0,
-  //  0x0000FFFF,
-  //  "Global\\simdb_15");
-  //
-  //if(fileHndl==NULL){/*error*/}
-  //
-  //i32  memSz  = 256;
-  //auto mapmem = MapViewOfFile(fileHndl,   // handle to map object
-  //  FILE_MAP_ALL_ACCESS,   // read/write permission
-  //  0,
-  //  0,
-  //  memSz);
-
-  // OpenFileMapping if the file exists
-  //
-  //Println(fileHndl);
-  //Println("\n\n");
-  //Println(mapmem);
-
-  //
-  //Println("kv sz: ", sizeof(simdb::KV) );
-
-  //u32    isKey :  1;
-  //i32   readers : 31;
-
-  //union KeyAndReaders
-  //{
-  //  struct{ u32    isKey :  1; i32   readers : 31; };
-  //  u32 asInt;
-  //};
-  //union BlkLst
-  //{
-  //  struct { KeyAndReaders kr; u32 idx; };
-  //  ui64 asInt;
-  //};
-  //Println("KeyAndReaders sz: ", sizeof(KeyAndReaders) );
-  //Println("BlkLst sz: ",        sizeof(BlkLst) );
-
-  //union      KV         // 256 million keys (28 bits), 256 million values (28 bit),  255 readers (8 bits)
-  //{
-  //  struct
-  //  {
-  //    ui64     key : 28;
-  //    ui64     val : 28;
-  //    ui64 readers :  8;
-  //  };
-  //  ui64 asInt;
-  //};
-
-  //Println("KV sz: ", sizeof(ConcurrentHash::KV) );
-  //Println("empty kv: ", ConcurrentHash::empty_kv().key == ConcurrentHash::EMPTY_KEY );
-  //Println("empty kv: ", ConcurrentHash::EMPTY_KEY );
-
-  //Println("\n");
-  //struct ui128_t { uint64_t lo, hi; };
-  ////struct ui128_t { uint64_t low; };
-
-  //bool lkFree = atomic<ui128_t>{}.is_lock_free();
-  //Println("is lock free 128: ",  lkFree );
-
-  //ui128_t a = {0, 101};
-  //i8 alignmem[256];
-  //void* mem = (void*)(alignmem+(128-((ui64)alignmem % 128)));
-  ////Println("mem: ", mem, "  rem: ", ((ui64)mem)%128 );
-  //memcpy(mem, &a, sizeof(a));
-  //int ok = _InterlockedCompareExchange128((volatile long long*)mem, 202, 1, (long long*)&a);
-  //memcpy(&a, mem, sizeof(a));
-  //ui128_t* b = (ui128_t*)mem;
-  ////Println("ok: [", ok, "]  lo: [", b->lo, "]  hi: [", b->hi, "]");
-
-  //auto sz = sizeof(ConcurrentStore::BlkLst);
-  //Println("Blklst sz: ", sz);
-
-  //Println("simdb stack sz: ", sizeof(simdb) );
-
   simdb db("test", 32, 16);
   //simdb db("H:\\projects\\lava\\test.simdb", 32, 64, true);
   //simdb db("test.simdb", 32, 64, true);
@@ -577,10 +287,10 @@ int main()
     {
       auto& numk = numkey[idx];
       auto&  lbl = label[idx]; 
-      TO(10,j){ 
+      TO(100,j){ 
         db.put(numk, lbl); 
-        //if(rngSwitches[idx]()){ db.del(numk); }
-        db.del(numk);
+        if(rngSwitches[idx]()){ db.del(numk); }
+        //db.del(numk);
       }
       
       Println(i, " done");
@@ -737,6 +447,296 @@ int main()
 
 
 
+
+
+//      template<class T, class _Alloc=std::allocator<T> > 
+//using vec        =  std::vector<T, _Alloc>;
+
+//struct _u128 { u64 hi, lo; };
+//using u128 = __declspec(align(128)) volatile _u128;
+
+//SECTION(128 bit atomic compare and exchange)
+//{
+//  u128 dest = { 101, 102 };
+//  u128 comp = { 101, 102 };
+//  u128 desired = { 85, 86 };
+//
+//  _InterlockedCompareExchange128(
+//    (i64*)(&dest), 
+//    desired.hi,
+//    desired.lo,
+//    (i64*)(&comp) );
+//
+//  Println("dest: ", dest.hi, " ", dest.lo);
+//  Println("comp: ", comp.hi, " ", comp.lo);
+//  Println("\n\n");
+//
+//  //u128 dest = { 101, 102 };
+//  //u128 comp = { 101, 102 };
+//  //u128 desired = { 85, 86 };
+//
+//  _InterlockedCompareExchange128(
+//    (i64*)(&dest), 
+//    desired.hi,
+//    desired.lo,
+//    (i64*)(&comp) );
+//
+//  Println("dest: ", dest.hi, " ", dest.lo);
+//  Println("comp: ", comp.hi, " ", comp.lo);
+//  Println("\n\n");
+//}
+
+//u32 sz = 18921703;
+//u32 sz = 400;
+//ConcurrentMap cm(sz);
+
+//ScopeTime t;
+//t.start();
+//cm.init(sz);
+//t.stop("Init");
+
+//Println( (i64)t.stop() );
+//t.start();
+//
+//Println("sz: ", cm.size());
+//
+//TO(100,i) {
+//  Println("i: ",i," ", intHash(i) );
+//}
+//
+//TO(100,i) {
+//  Println("i: ",i," ", nextPowerOf2(i));
+//}
+
+//
+//u32 loopSz  =  (u32)( double(cm.size()) / 1.5);
+
+//
+//RngInt<int> rng(1, 2);
+
+//vec<thread> thrds;
+//TO(5,tid)
+//{
+//  thrds.push_back( thread([&cm, &rng, loopSz, tid]()
+//  {
+//    ScopeTime t;
+//
+//    t.start();
+//    TO(loopSz, i) {
+//      auto val = i*10 + tid;
+//      u32 pidx = cm.put(i, val);
+//      SleepMs( rng() );
+//
+//      //SleepMs( (int)pow(4-tid,2) );
+//      //cout << pidx << "  ";
+//      //Println("Put Idx: ", (i64)pidx);
+//    }
+//    t.stop("Put");
+//    //Println( t.getSeconds() );
+//
+//    //t.start();
+//    //TO(loopSz, i) {
+//    //  u32 gidx = cm.get(i);
+//    //  cout << gidx << "  ";
+//    //  //Println("Get Idx: ", (i64)gidx);
+//    //}
+//    //t.stop("Get");
+//    //Println( t.getSeconds() );
+//  })); // .detach();
+//  //thrds.back().detach();
+//}
+////for(auto& th : thrds) th.detach();
+//for(auto& th : thrds) th.join();
+
+// test getting back from the map
+//t.start();
+//TO(loopSz, i) {
+//  u32 gidx = cm.get(i);
+//  cout << gidx << "  ";
+//  //Println("Get Idx: ", (i64)gidx);
+//}
+//Println();
+//t.stop("Get");
+
+//RngInt<int> rngb(0,1);
+//RngInt<int> rngl(0,loopSz-1);
+//ConcurrentList cl(loopSz);
+
+//// serial test of ConcurrentList
+////t.start();
+////TO(loopSz, i){
+////  Print(cl.idx(),":", cl.alloc(), " ");
+////}
+////TO(loopSz, i){
+////  Print(cl.idx(),":", cl.free(i), " ");
+////}
+////Println();
+////auto lv = cl.list();
+////TO(lv->size(), i){
+////  Print( i,":",(*lv)[i], " ");
+////}
+////Println();
+////t.stop("List");
+
+//Println("\nLinks: ", cl.lnkCnt(), " ");
+//vec<thread> thrds;
+//TO(12,tid)
+//{
+//  thrds.push_back( thread([&cl, &rngb, &rngl, loopSz, tid]()
+//  {
+//    ScopeTime t;
+
+//    t.start();
+//    TO(loopSz/5, i){
+//      //if(rngb()) 
+//      Print(tid,":",cl.nxt()," ");
+//      //else       Print(tid,":",cl.free(rngl()), " ");
+//      SleepMs( rngb() );
+//    }
+//    t.stop("alloc/free");
+//  }));
+//}
+//for(auto& th : thrds) th.join();
+
+//Println();
+//auto lv = cl.list();
+//TO(lv->size(), i){
+//  Print( i,":",(*lv)[i], " ");
+//}
+//Println();
+//Println("\nLinks: ", cl.lnkCnt(), " ");
+
+//i32 blkSz  = 5;
+//i32 blocks = 2;
+//vec<ui8> mem(blocks*blkSz, 0);
+//ConcurrentStore cs(mem.data(), blkSz, (u32)(blocks) );
+//
+//Println("\n");
+//
+//TO(cs.m_cl.list()->size(), i){
+//  Println( (*cs.m_cl.list())[i] );
+//}
+//Println("\n\n");
+//
+//TO(2,i){
+//  i32  blks = 0;
+//  auto    s = "w";
+//  i32  slen = (i32)strlen(s)+1;
+//  //i32  slen = 1;
+//  auto  idx = cs.alloc(slen, &blks);   // must allocate the exact number of bytes and no more, since that number will be used to read and write
+//  cs.put(idx, (void*)s, slen);
+//
+//  vec<char> gs(slen,0);
+//  cs.get(idx, gs.data(), slen);
+//  Println(gs.data());
+//  cs.free(idx);
+//
+//  TO(cs.m_blockCount, b){
+//    Println(cs.nxtBlock(b));
+//  }
+//  Println("\n\n");
+//  TO(cs.m_cl.list()->size(), i){
+//    Println( (*cs.m_cl.list())[i] );
+//  }
+//  Println("\n\n");
+//
+//}
+
+//ConcurrentHash ch(64);
+//vec<thread> thrds;
+//TO(24,tid)
+//{
+//  thrds.push_back( thread([&ch, &rng, tid]()
+//  {
+//    TO(64,h)
+//    {
+//      ch.put(h, h*h);
+//      //Print(h,": ", ch.put(h, h*h) );
+//      Print(h,":", ch.get(h)==h*h, " ");
+//    }
+//  } ));
+//  thrds.back().detach();
+//}
+
+//auto fileHndl = CreateFileMapping(
+//  INVALID_HANDLE_VALUE,
+//  NULL,
+//  PAGE_READWRITE,
+//  0,
+//  0x0000FFFF,
+//  "Global\\simdb_15");
+//
+//if(fileHndl==NULL){/*error*/}
+//
+//i32  memSz  = 256;
+//auto mapmem = MapViewOfFile(fileHndl,   // handle to map object
+//  FILE_MAP_ALL_ACCESS,   // read/write permission
+//  0,
+//  0,
+//  memSz);
+
+// OpenFileMapping if the file exists
+//
+//Println(fileHndl);
+//Println("\n\n");
+//Println(mapmem);
+
+//
+//Println("kv sz: ", sizeof(simdb::KV) );
+
+//u32    isKey :  1;
+//i32   readers : 31;
+
+//union KeyAndReaders
+//{
+//  struct{ u32    isKey :  1; i32   readers : 31; };
+//  u32 asInt;
+//};
+//union BlkLst
+//{
+//  struct { KeyAndReaders kr; u32 idx; };
+//  ui64 asInt;
+//};
+//Println("KeyAndReaders sz: ", sizeof(KeyAndReaders) );
+//Println("BlkLst sz: ",        sizeof(BlkLst) );
+
+//union      KV         // 256 million keys (28 bits), 256 million values (28 bit),  255 readers (8 bits)
+//{
+//  struct
+//  {
+//    ui64     key : 28;
+//    ui64     val : 28;
+//    ui64 readers :  8;
+//  };
+//  ui64 asInt;
+//};
+
+//Println("KV sz: ", sizeof(ConcurrentHash::KV) );
+//Println("empty kv: ", ConcurrentHash::empty_kv().key == ConcurrentHash::EMPTY_KEY );
+//Println("empty kv: ", ConcurrentHash::EMPTY_KEY );
+
+//Println("\n");
+//struct ui128_t { uint64_t lo, hi; };
+////struct ui128_t { uint64_t low; };
+
+//bool lkFree = atomic<ui128_t>{}.is_lock_free();
+//Println("is lock free 128: ",  lkFree );
+
+//ui128_t a = {0, 101};
+//i8 alignmem[256];
+//void* mem = (void*)(alignmem+(128-((ui64)alignmem % 128)));
+////Println("mem: ", mem, "  rem: ", ((ui64)mem)%128 );
+//memcpy(mem, &a, sizeof(a));
+//int ok = _InterlockedCompareExchange128((volatile long long*)mem, 202, 1, (long long*)&a);
+//memcpy(&a, mem, sizeof(a));
+//ui128_t* b = (ui128_t*)mem;
+////Println("ok: [", ok, "]  lo: [", b->lo, "]  hi: [", b->hi, "]");
+
+//auto sz = sizeof(ConcurrentStore::BlkLst);
+//Println("Blklst sz: ", sz);
+
+//
+//Println("simdb stack sz: ", sizeof(simdb) );
 
 //thrds[i] = move(thread( [i,&label,&db]
 //RngInt<u32> rnd(i*10, ((i+1)*10)-1);
