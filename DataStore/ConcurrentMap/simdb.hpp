@@ -49,8 +49,9 @@
 // -todo: look back at cleanDeletion() for how to handle version mismatch - just return since not being deleted but having a version mismatch means the nxtVi is stale and the thread that deleted it should be cleaning it up
 // -todo: add a len() that takes a std::string
 // -todo: figure out why some deletions are failing - cleanDeletions() has some side effect where the hashs don't match - take out cleanDeletions() all together, save for another time
+// -todo: figure out why non-deleted keys are not listed in printkeys() - bug in getting keys
+// -todo: figure out why third key entry is not being found despite being in the block memory - getKeys() loop needed to be redone
 
-// todo: figure out why non-deleted keys are not listed in printkeys()s
 // todo: change VerStr to have str and ver intead of s and v
 // todo: test inserting more than the total size of memory
 // todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
@@ -2108,16 +2109,13 @@ public:
   {
     using namespace std;
     
-    set<VerStr> keys;
-
-    u64  srchCnt = 0;
-    auto     nxt = nxtKey();                             
-    while( srchCnt<m_blkCnt && keys.find(nxt)==keys.end() )
+    set<VerStr> keys; VerStr nxt; u64 searched=0, srchCnt=0;
+    while(srchCnt < m_blkCnt)
     {
-      if(nxt.s.length()>0) keys.insert(nxt);
-    
-      u64 searched = 0;
       nxt = nxtKey(&searched);
+      if( keys.find(nxt) != keys.end() ){break;}
+      else if(nxt.s.length() > 0){ keys.insert(nxt); }
+      
       srchCnt += searched;
     }
 
