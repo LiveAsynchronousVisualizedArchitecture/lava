@@ -51,9 +51,10 @@
 // -todo: figure out why some deletions are failing - cleanDeletions() has some side effect where the hashs don't match - take out cleanDeletions() all together, save for another time
 // -todo: figure out why non-deleted keys are not listed in printkeys() - bug in getting keys
 // -todo: figure out why third key entry is not being found despite being in the block memory - getKeys() loop needed to be redone
+// -todo: change VerStr to have str and ver intead of s and v
+// -todo: test inserting more than the total size of memory - seems to return false just fine
+// -todo: figure out why only one key is returned by getKeys() when there are more in memory - starting point was 0, which made getting the element at 0 be treated as if it has searched the whole db and wrapped back around
 
-// todo: change VerStr to have str and ver intead of s and v
-// todo: test inserting more than the total size of memory
 // todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
 // todo: clean out old commented lines
 // todo: compile on linux + gcc
@@ -1873,10 +1874,11 @@ public:
 class       simdb
 {
 public:
-  using    u8   =  uint8_t;
-  using   str   =  std::string;
+  using     u8  =  uint8_t;
+  using    str  =  std::string;
   using BlkCnt  =  CncrStr::BlkCnt;
   using VerIdx  =  CncrHsh::VerIdx;
+  using string  =  std::string;
 
 private:
   au64*      s_flags;
@@ -2049,10 +2051,10 @@ public:
 
   // separated C++ functions - these won't need to exist if compiled for a C interface
   struct VerStr { 
-    u32 v; str s; 
-    bool  operator<(VerStr const& vs) const { if(s==vs.s) return v<vs.v; else return s<vs.s; }  
-    bool  operator<(str const&    rs) const { return s<rs;    }
-    bool operator==(VerStr const& vs) const { return s==vs.s && v==vs.v; } 
+    u32 ver; string str; 
+    bool  operator<(VerStr const& vs) const { if(str==vs.str) return ver<vs.ver; else return str<vs.str; }  
+    bool  operator<(string const& rs) const { return str<rs;    }
+    bool operator==(VerStr const& vs) const { return str==vs.str && ver==vs.ver; } 
   };   
 
   i64          len(str    const& key, u32* out_vlen=nullptr, u32* out_version=nullptr) const
@@ -2088,7 +2090,7 @@ public:
     if(searched){
       i64 sidx  = (i64)nxt.idx;       // sidx is signed index
       i64 sprev = (i64)prev;          // sprev is signed previous
-      *searched = (sidx-sprev)>0?  sidx-sprev  :  (m_blkCnt-sprev-1) + sidx+1;
+      *searched = (sidx-sprev)>=0?  sidx-sprev  :  (m_blkCnt-sprev-1) + sidx+1;
     }
     if(nxt.idx==EMPTY) 
       return {nxt.version, ""};
@@ -2114,7 +2116,7 @@ public:
     {
       nxt = nxtKey(&searched);
       if( keys.find(nxt) != keys.end() ){break;}
-      else if(nxt.s.length() > 0){ keys.insert(nxt); }
+      else if(nxt.str.length() > 0){ keys.insert(nxt); }
       
       srchCnt += searched;
     }
