@@ -1083,7 +1083,7 @@ public:
   {
     if(blkIdx == LIST_END){ return 0; }
 
-    BlkLst bl = incReaders(blkIdx, version);   
+    BlkLst bl = incReaders(blkIdx, version);                          // todo: need to check for 0 here?
     
     if(bl.len==0 || (bl.klen)>maxlen ) return 0;
 
@@ -2027,6 +2027,7 @@ public:
   u64         size() const { return CncrStr::sizeBytes( (u32)s_blockSize->load(), (u32)s_blockCount->load()); }
   bool     isOwner() const { return m_mem.owner; }
   u64       blocks() const { return s_blockCount->load(); }                               // return the total number of blocks the shared memory
+  u64    blockSize() const { return s_blockSize->load();  }
   auto         mem() const -> void* { return m_mem.hndlPtr; }                             // returns a pointer to the start of the shared memory, which will contain the data structures first
   u64      memsize() const { return m_mem.size; }
   auto    hashData() const -> void const* const { return s_ch.data(); }
@@ -2089,11 +2090,6 @@ public:
     if(nxt.idx==EMPTY) 
       return {nxt.version, ""};
     
-    //ok         = this->len(nxt.idx, nxt.version, 
-    //                       &klen, &vlen);               
-    //if(!ok)
-    //  return {nxt.version, ""};
-
     i64 total_len = this->len(nxt.idx, nxt.version, &klen, &vlen);
     if(total_len==0){ return {nxt.version, ""}; }
     
@@ -2148,6 +2144,11 @@ public:
 
 
 
+
+//ok         = this->len(nxt.idx, nxt.version, 
+//                       &klen, &vlen);               
+//if(!ok)
+//  return {nxt.version, ""};
 
 //VerIdx        load_vi(u32 i)                 const
 //{

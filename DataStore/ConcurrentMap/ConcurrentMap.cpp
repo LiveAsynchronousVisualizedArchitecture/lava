@@ -245,7 +245,15 @@ void printdb(simdb const& db)
   //str memstr( (const char*)db.data(), (const char*)db.data() + db.size());
   //Println("\nmem: ", memstr, "\n" );
 
-  TO(memv.size(),i) putc(memv[i] ,stdout);
+  Println("\n");
+
+  u64 blksz = db.blockSize();
+  TO(memv.size(),i){ 
+    if(i % blksz == 0){
+      putc('|', stdout);
+    }
+    putc(memv[i] ,stdout);
+  }
 }
 
 void printkeys(simdb const& db)
@@ -253,7 +261,8 @@ void printkeys(simdb const& db)
   Println("\n---Keys---");
   auto keys = db.getKeyStrs();
   TO(keys.size(), i){
-    printkey(db, db.get(keys[i].s) );
+    Println(keys[i].s, ": ", db.get(keys[i].s) );
+    //printkey(db, db.get(keys[i].s) );
   }
   
   //printkey(db, keys[i].s );
