@@ -220,18 +220,43 @@ inline void prefetch0(char const* const p)
 
 template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  // will need C++ ifdefs eventually
 
+void printkey(simdb const& db, str const& key)
+{
+  u32 vlen;
+  //auto len = db.len(key, &vlen);
+  auto val = db.get(key);
+
+  //auto val = str(vlen, '\0');
+  //auto  ok = db.get(key);
+
+  Println(key,": ", val);
+}
+
 void printdb(simdb const& db)
 {
   Println("size: ", db.size());
 
   //str memstr;
   //memstr.resize(db.size()+1);
+
   vec<i8> memv(db.memsize(), 0);
   memcpy( (void*)memv.data(), db.mem(), db.memsize() );
 
   //str memstr( (const char*)db.data(), (const char*)db.data() + db.size());
   //Println("\nmem: ", memstr, "\n" );
+
   TO(memv.size(),i) putc(memv[i] ,stdout);
+}
+
+void printkeys(simdb const& db)
+{
+  Println("\n---Keys---");
+  auto keys = db.getKeyStrs();
+  TO(keys.size(), i){
+    printkey(db, db.get(keys[i].s) );
+  }
+  
+  //printkey(db, keys[i].s );
 }
 
 void printhsh(simdb const& db)
@@ -268,35 +293,37 @@ int main()
   //simdb db("H:\\projects\\lava\\test.simdb", 32, 64, true);
   //simdb db("test.simdb", 32, 64, true);
 
-  printhsh(db);
+  //printhsh(db);
 
   str numkey[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"};
   str  label[] = {"zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven"};
   
-  int sz = 12;
-  vec<thread>            thrds;
-  vec<RngInt<u32>> rngSwitches;
-  TO(sz,i){ rngSwitches.emplace_back(0,1,i); }
-
-  //int sz = (int)thrds.size(); 
-  
-  TO(sz,i)
-  {
-    int idx = i % sz;
-    thrds.emplace_back([i, idx, &rngSwitches, &numkey, &label, &db]
-    {
-      auto& numk = numkey[idx];
-      auto&  lbl = label[idx]; 
-      TO(100,j){ 
-        db.put(numk, lbl); 
-        //if(rngSwitches[idx]()){ db.del(numk); }
-        db.del(numk);
-      }
-      
-      Println(i, " done");
-    });
-  }
-  TO(thrds.size(),i){ thrds[i].join(); }
+  //int sz = 12;
+  //vec<thread>            thrds;
+  //vec<RngInt<u32>> rngSwitches;
+  //TO(sz,i){ rngSwitches.emplace_back(0,1,i); }
+  //
+  ////int sz = (int)thrds.size(); 
+  //
+  //TO(sz,i)
+  //{
+  //  int idx = i % sz;
+  //  thrds.emplace_back([i, idx, &rngSwitches, &numkey, &label, &db]
+  //  {
+  //    auto& numk = numkey[idx];
+  //    auto&  lbl = label[idx]; 
+  //    TO(100,j){ 
+  //      db.put(numk, lbl); 
+  //      //if(rngSwitches[idx]()){ db.del(numk); }
+  //      //bool ok = db.del(numk);
+  //      //if(!ok){ Println(numk," not deleted"); }
+  //      //while(!db.del(numk)){}
+  //    }
+  //    
+  //    Println(i, " done");
+  //  });
+  //}
+  //TO(thrds.size(),i){ thrds[i].join(); }
 
   str       wat  =       "wat";
   str       wut  =       "wut";
@@ -310,47 +337,52 @@ int main()
 
   if( db.isOwner() ){
     Println("put: ", db.put(wat, skidoosh) );
-    db.del("wat");
+    //db.del("wat");
     Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
-    db.del("wut");
+    //db.del("wut");
     Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
-    db.del("kablam");
+    //db.del("kablam");
 
     Println("put: ", db.put(wat, skidoosh) );
-    Println("del wat: ", db.del("wat") );
+    //Println("del wat: ", db.del("wat") );
 
     Println("put: ", db.put(longkey, longval) );
-    Println("del wat: ", db.del(longkey) );
-
-    printdb(db);
+    //Println("del wat: ", db.del(longkey) );
 
     Println();
   }
   //db.flush();
 
+  Println();
+  printdb(db);
+
   //else{
   //  Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
   //}
 
+  Println();
   printhsh(db); // Println();
 
-  Println("BlkLst size: ", sizeof(CncrHsh::BlkLst) );
+  //Println("BlkLst size: ", sizeof(CncrHsh::BlkLst) );
+  //
+  //u32 vlen=0,ver=0;
+  //i64  len = db.len( wat.data(), (u32)wat.length(), &vlen, &ver);
+  //str val(vlen, '\0');
+  //bool  ok = db.get( wat.data(), (u32)wat.length(), (void*)val.data(), (u32)val.length() );
+  //Println("ok: ", ok, " value: ", val, "  wat total len: ", len, " wat val len: ", vlen, "\n");
+  //
+  //len = db.len( longkey.data(), (u32)longkey.length(), &vlen, &ver);
+  //val = str(vlen, '\0');
+  //ok  = db.get( longkey.data(), (u32)longkey.length(), (void*)val.data(), (u32)val.length() );
+  //Println("ok: ", ok, " longkey value: ", val, "  longkey total len: ", len, " longkey val len: ", vlen, "\n");
+  //
+  //str v; 
+  //db.get(wat,   &v);  Println("value: ", v);
+  //db.get(wut,   &v);  Println("value: ", v);
+  //db.get(kablam,&v);  Println("value: ", v);
 
-  u32 vlen=0,ver=0;
-  i64  len = db.len( wat.data(), (u32)wat.length(), &vlen, &ver);
-  str val(vlen, '\0');
-  bool  ok = db.get( wat.data(), (u32)wat.length(), (void*)val.data(), (u32)val.length() );
-  Println("ok: ", ok, " value: ", val, "  wat total len: ", len, " wat val len: ", vlen, "\n");
 
-  len = db.len( longkey.data(), (u32)longkey.length(), &vlen, &ver);
-  val = str(vlen, '\0');
-  ok  = db.get( longkey.data(), (u32)longkey.length(), (void*)val.data(), (u32)val.length() );
-  Println("ok: ", ok, " longkey value: ", val, "  longkey total len: ", len, " longkey val len: ", vlen, "\n");
-
-  str v; 
-  db.get(wat,   &v);  Println("value: ", v);
-  db.get(wut,   &v);  Println("value: ", v);
-  db.get(kablam,&v);  Println("value: ", v);
+  printkeys(db);
 
   //Println("\nKEYS");
   //auto keys = db.getKeyStrs();
