@@ -1484,8 +1484,6 @@ public:
     }while(true);
 
     return  idx;
-
-    /* && kv.readers>=0 */
   }
   u32           size()                         const
   {
