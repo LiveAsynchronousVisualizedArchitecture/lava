@@ -300,5 +300,62 @@
 
 
 
+// 5.4.2017
+// -todo: make CncrLst::idx() an atomic load
+// -todo: figure out why neither version of CncrStr::free() is being hit - wasn't calling del()....
+// -todo: figure out 128 bit alignement of CncrHsh's VerIdx memory - padded sizeBytes() by 16 and offset the address in which the lava_vec is created with to land on the 128 bit boundary
+// -todo: debug clean deletions leaving slots in a DELETED_KEY state - one side of the 128 bit alignment not being swapped - now duplicate DELETED_KEY entries are being created without being cleaned up - also deleting an adjacent EMPTY? - had to switch around bit swapping functions, lo and hi now only describe the low and high addresses
+// -todo: figure out how to set the indices into a list in CncrLst so that free() can use the start and end indices to free multiple blocks
+// -todo: make a CncrStr function to free a series of blocks with a begin and end, returning failure or success
+// -todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
+// -todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
+// -todo: does a BlkLst need to be loaded atomically by a read operation? is it possible that a read could be out of date and use an incorrect cached version? - a thread will eventually atomically decrement the readers after reading all the blocks so it should be fine 
+// -todo: try to take out checkMatch from CncrHsh - checkMatch is unused
+// -todo: debug some (all?) CncrHsh indices not being deleted - only the last index? - cmpex_vi was being used with a pointer into s_vis on some functions and a pointer to a swapped vi on the stack in other functions
+// -todo: redo simdb::len(blkIdx) to fit the functions as they stand now - klen and vlen were labeled out_vlen and out_version 
+// -todo: take out runRead - used by direct simdb::len(blkIdx) function - also used by getKey - was previously used to wrap incReaders() and decReaders() calls around a function 
+// -todo: flatten runIfMatch function to only take a function template argument but not a match function template argument - take it out all together
+// -todo: figure out what to do about indices on the ends in CncrHsh - just leave a DELETED_KEY and don't turn it into an EMPTY, since it will then just be skipped over when looking for an index - make sure that cleanDeletion() and delDupe() skip the last index when they are the primary/left/lo index
+// -todo: make sure that the start and end are taken care of with regards to cleaning up deletions - need to not go off the end of the array and need to figure out how to deal with spans between them
+// -todo: stop using match function as a template in and just run a function in CncrHsh
+//       | len()
+//       | get()
+//       | put()
+// -todo: find any remnants of KeyVal or kv and change them to VerIdx or vi
+// -todo: redo basic type definitions and put them only into class definitions
+// -todo: debug larger key not being found - length not being stored in every BlkLst
+// -todo: test with larger keys and values that span multiple blocks
+// -todo: re-evaluate if the high bits of the lava vec pointer still need to contain extra information - one bit is being used for ownership - it can probably be made into a flat only container and ownership can just be a matter of who runs the constructor
+// -todo: compile with maximum warnings - warnings /all gives warning on the standard library and functions not being inlined - warning level 4 has no issues except for the errant potential mod by 0
+// -todo: create public close function that will also be called on destruction
+// -todo: reference count initializations so that the last process out can destroy the db
+// -todo: make sure that the linked list of BlkLst structures is re-initialized on freeing - does head need to also make sure that it's version never uses a special value like 0 or LIST_END?
+// -todo: make a special version number that is checked for and skipped
+// -todo: debug len(idx) returning 0 - is free resetting the block indices causing problems? -  no, len() wasn't looking up from the CncrHsh first and getIdx() was returning false when less or equal to DELETED_KEY and not greater or equal
+// -todo: test with visualizer
+// -todo: make lava_vec flat only so that it never needs to be destructed
+// -todo: make lava_vec pointer point to 16 bytes in, giving operator[] a way to dereference the memory without any additional offsets
+// -todo: make memcmpBlk return MATCH_REMOVED if the key was deleted
+// -todo: make sure readers checks the version number after reading each block when finding a key - doesn't matter since for now readers is incremented and decremented
+// -todo: make sure readers is only used on the key block list - should be fine
+// -todo: make sure readers deletes the block list if it is the last reader after deletion - still true
+// -todo: build in the ability to explicitly set the path of the shared memory file - relative paths work, but absolute paths on windows don't seem to 
+// -todo: test flush() - doesn't seem to write to the file leave for now
+// -todo: search for any embedded todo comments
+// -todo: run existing tests - some bugs fixed, one outstanding CncrHsh slot is not being deleted - possibly because it is in a 128 bit alignment at the end of the VerIdx array with another DELETED_KEY ahead of it
+// -todo: make cleanDeletion and delDupe() set a DELETED_KEY TO EMPTY_KEY if there is an EMPTY_KEY behind it
+// -todo: change to just DELETED and EMPTY instead of DELETED_KEY and EMPTY_KEY
+// -todo: redo cleanDeletion to detect if the next slot is the end of a span and change the current slot to EMPTY if it is  
+// -todo: make cleanDeletion and delDupe() check forward if setting the current slot to EMPTY_KEY based on the previous idx - can't set based on the previous index because you can't know atomically what the next index is
+// -todo: when searching for a match, never treat the last index as the end of a span, and always set the last slot directly to EMPTY instead of DELETED - can't do that because the second to last index could erroneously be set to EMPTY
+// -todo: look back at cleanDeletion() for how to handle version mismatch - just return since not being deleted but having a version mismatch means the nxtVi is stale and the thread that deleted it should be cleaning it up
+// -todo: add a len() that takes a std::string
+// -todo: figure out why some deletions are failing - cleanDeletions() has some side effect where the hashs don't match - take out cleanDeletions() all together, save for another time
+// -todo: figure out why non-deleted keys are not listed in printkeys() - bug in getting keys
+// -todo: figure out why third key entry is not being found despite being in the block memory - getKeys() loop needed to be redone
+// -todo: change VerStr to have str and ver intead of s and v
+// -todo: test inserting more than the total size of memory - seems to return false just fine
+// -todo: figure out why only one key is returned by getKeys() when there are more in memory - starting point was 0, which made getting the element at 0 be treated as if it has searched the whole db and wrapped back around
+
 
 

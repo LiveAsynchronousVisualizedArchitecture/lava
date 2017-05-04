@@ -1,62 +1,215 @@
 
-// -todo: make CncrLst::idx() an atomic load
-// -todo: figure out why neither version of CncrStr::free() is being hit - wasn't calling del()....
-// -todo: figure out 128 bit alignement of CncrHsh's VerIdx memory - padded sizeBytes() by 16 and offset the address in which the lava_vec is created with to land on the 128 bit boundary
-// -todo: debug clean deletions leaving slots in a DELETED_KEY state - one side of the 128 bit alignment not being swapped - now duplicate DELETED_KEY entries are being created without being cleaned up - also deleting an adjacent EMPTY? - had to switch around bit swapping functions, lo and hi now only describe the low and high addresses
-// -todo: figure out how to set the indices into a list in CncrLst so that free() can use the start and end indices to free multiple blocks
-// -todo: make a CncrStr function to free a series of blocks with a begin and end, returning failure or success
-// -todo: make bulk free by setting all list blocks first, then freeing the head of the list - does only the head of the list need to be freed anyway since the rest of the list is already linked together? could this reduce contention over the block atomic?
-// -todo: Make frees happen from the last block to the first so that allocation might happen with contiguous blocks
-// -todo: does a BlkLst need to be loaded atomically by a read operation? is it possible that a read could be out of date and use an incorrect cached version? - a thread will eventually atomically decrement the readers after reading all the blocks so it should be fine 
-// -todo: try to take out checkMatch from CncrHsh - checkMatch is unused
-// -todo: debug some (all?) CncrHsh indices not being deleted - only the last index? - cmpex_vi was being used with a pointer into s_vis on some functions and a pointer to a swapped vi on the stack in other functions
-// -todo: redo simdb::len(blkIdx) to fit the functions as they stand now - klen and vlen were labeled out_vlen and out_version 
-// -todo: take out runRead - used by direct simdb::len(blkIdx) function - also used by getKey - was previously used to wrap incReaders() and decReaders() calls around a function 
-// -todo: flatten runIfMatch function to only take a function template argument but not a match function template argument - take it out all together
-// -todo: figure out what to do about indices on the ends in CncrHsh - just leave a DELETED_KEY and don't turn it into an EMPTY, since it will then just be skipped over when looking for an index - make sure that cleanDeletion() and delDupe() skip the last index when they are the primary/left/lo index
-// -todo: make sure that the start and end are taken care of with regards to cleaning up deletions - need to not go off the end of the array and need to figure out how to deal with spans between them
-// -todo: stop using match function as a template in and just run a function in CncrHsh
-//       | len()
-//       | get()
-//       | put()
-// -todo: find any remnants of KeyVal or kv and change them to VerIdx or vi
-// -todo: redo basic type definitions and put them only into class definitions
-// -todo: debug larger key not being found - length not being stored in every BlkLst
-// -todo: test with larger keys and values that span multiple blocks
-// -todo: re-evaluate if the high bits of the lava vec pointer still need to contain extra information - one bit is being used for ownership - it can probably be made into a flat only container and ownership can just be a matter of who runs the constructor
-// -todo: compile with maximum warnings - warnings /all gives warning on the standard library and functions not being inlined - warning level 4 has no issues except for the errant potential mod by 0
-// -todo: create public close function that will also be called on destruction
-// -todo: reference count initializations so that the last process out can destroy the db
-// -todo: make sure that the linked list of BlkLst structures is re-initialized on freeing - does head need to also make sure that it's version never uses a special value like 0 or LIST_END?
-// -todo: make a special version number that is checked for and skipped
-// -todo: debug len(idx) returning 0 - is free resetting the block indices causing problems? -  no, len() wasn't looking up from the CncrHsh first and getIdx() was returning false when less or equal to DELETED_KEY and not greater or equal
-// -todo: test with visualizer
-// -todo: make lava_vec flat only so that it never needs to be destructed
-// -todo: make lava_vec pointer point to 16 bytes in, giving operator[] a way to dereference the memory without any additional offsets
-// -todo: make memcmpBlk return MATCH_REMOVED if the key was deleted
-// -todo: make sure readers checks the version number after reading each block when finding a key - doesn't matter since for now readers is incremented and decremented
-// -todo: make sure readers is only used on the key block list - should be fine
-// -todo: make sure readers deletes the block list if it is the last reader after deletion - still true
-// -todo: build in the ability to explicitly set the path of the shared memory file - relative paths work, but absolute paths on windows don't seem to 
-// -todo: test flush() - doesn't seem to write to the file leave for now
-// -todo: search for any embedded todo comments
-// -todo: run existing tests - some bugs fixed, one outstanding CncrHsh slot is not being deleted - possibly because it is in a 128 bit alignment at the end of the VerIdx array with another DELETED_KEY ahead of it
-// -todo: make cleanDeletion and delDupe() set a DELETED_KEY TO EMPTY_KEY if there is an EMPTY_KEY behind it
-// -todo: change to just DELETED and EMPTY instead of DELETED_KEY and EMPTY_KEY
-// -todo: redo cleanDeletion to detect if the next slot is the end of a span and change the current slot to EMPTY if it is  
-// -todo: make cleanDeletion and delDupe() check forward if setting the current slot to EMPTY_KEY based on the previous idx - can't set based on the previous index because you can't know atomically what the next index is
-// -todo: when searching for a match, never treat the last index as the end of a span, and always set the last slot directly to EMPTY instead of DELETED - can't do that because the second to last index could erroneously be set to EMPTY
-// -todo: look back at cleanDeletion() for how to handle version mismatch - just return since not being deleted but having a version mismatch means the nxtVi is stale and the thread that deleted it should be cleaning it up
-// -todo: add a len() that takes a std::string
-// -todo: figure out why some deletions are failing - cleanDeletions() has some side effect where the hashs don't match - take out cleanDeletions() all together, save for another time
-// -todo: figure out why non-deleted keys are not listed in printkeys() - bug in getting keys
-// -todo: figure out why third key entry is not being found despite being in the block memory - getKeys() loop needed to be redone
-// -todo: change VerStr to have str and ver intead of s and v
-// -todo: test inserting more than the total size of memory - seems to return false just fine
-// -todo: figure out why only one key is returned by getKeys() when there are more in memory - starting point was 0, which made getting the element at 0 be treated as if it has searched the whole db and wrapped back around
+/*
+                                Apache License
+                          Version 2.0, January 2004
+                      http://www.apache.org/licenses/
 
-// todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
+  TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+  1. Definitions.
+
+    "License" shall mean the terms and conditions for use, reproduction,
+    and distribution as defined by Sections 1 through 9 of this document.
+
+    "Licensor" shall mean the copyright owner or entity authorized by
+    the copyright owner that is granting the License.
+
+    "Legal Entity" shall mean the union of the acting entity and all
+    other entities that control, are controlled by, or are under common
+    control with that entity. For the purposes of this definition,
+    "control" means (i) the power, direct or indirect, to cause the
+    direction or management of such entity, whether by contract or
+    otherwise, or (ii) ownership of fifty percent (50%) or more of the
+    outstanding shares, or (iii) beneficial ownership of such entity.
+
+    "You" (or "Your") shall mean an individual or Legal Entity
+    exercising permissions granted by this License.
+
+    "Source" form shall mean the preferred form for making modifications,
+    including but not limited to software source code, documentation
+    source, and configuration files.
+
+    "Object" form shall mean any form resulting from mechanical
+    transformation or translation of a Source form, including but
+    not limited to compiled object code, generated documentation,
+    and conversions to other media types.
+
+    "Work" shall mean the work of authorship, whether in Source or
+    Object form, made available under the License, as indicated by a
+    copyright notice that is included in or attached to the work
+    (an example is provided in the Appendix below).
+
+    "Derivative Works" shall mean any work, whether in Source or Object
+    form, that is based on (or derived from) the Work and for which the
+    editorial revisions, annotations, elaborations, or other modifications
+    represent, as a whole, an original work of authorship. For the purposes
+    of this License, Derivative Works shall not include works that remain
+    separable from, or merely link (or bind by name) to the interfaces of,
+    the Work and Derivative Works thereof.
+
+    "Contribution" shall mean any work of authorship, including
+    the original version of the Work and any modifications or additions
+    to that Work or Derivative Works thereof, that is intentionally
+    submitted to Licensor for inclusion in the Work by the copyright owner
+    or by an individual or Legal Entity authorized to submit on behalf of
+    the copyright owner. For the purposes of this definition, "submitted"
+    means any form of electronic, verbal, or written communication sent
+    to the Licensor or its representatives, including but not limited to
+    communication on electronic mailing lists, source code control systems,
+    and issue tracking systems that are managed by, or on behalf of, the
+    Licensor for the purpose of discussing and improving the Work, but
+    excluding communication that is conspicuously marked or otherwise
+    designated in writing by the copyright owner as "Not a Contribution."
+
+    "Contributor" shall mean Licensor and any individual or Legal Entity
+    on behalf of whom a Contribution has been received by Licensor and
+    subsequently incorporated within the Work.
+
+  2. Grant of Copyright License. Subject to the terms and conditions of
+    this License, each Contributor hereby grants to You a perpetual,
+    worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+    copyright license to reproduce, prepare Derivative Works of,
+    publicly display, publicly perform, sublicense, and distribute the
+    Work and such Derivative Works in Source or Object form.
+
+  3. Grant of Patent License. Subject to the terms and conditions of
+    this License, each Contributor hereby grants to You a perpetual,
+    worldwide, non-exclusive, no-charge, royalty-free, irrevocable
+    (except as stated in this section) patent license to make, have made,
+    use, offer to sell, sell, import, and otherwise transfer the Work,
+    where such license applies only to those patent claims licensable
+    by such Contributor that are necessarily infringed by their
+    Contribution(s) alone or by combination of their Contribution(s)
+    with the Work to which such Contribution(s) was submitted. If You
+    institute patent litigation against any entity (including a
+    cross-claim or counterclaim in a lawsuit) alleging that the Work
+    or a Contribution incorporated within the Work constitutes direct
+    or contributory patent infringement, then any patent licenses
+    granted to You under this License for that Work shall terminate
+    as of the date such litigation is filed.
+
+  4. Redistribution. You may reproduce and distribute copies of the
+    Work or Derivative Works thereof in any medium, with or without
+    modifications, and in Source or Object form, provided that You
+    meet the following conditions:
+
+    (a) You must give any other recipients of the Work or
+        Derivative Works a copy of this License; and
+
+    (b) You must cause any modified files to carry prominent notices
+        stating that You changed the files; and
+
+    (c) You must retain, in the Source form of any Derivative Works
+        that You distribute, all copyright, patent, trademark, and
+        attribution notices from the Source form of the Work,
+        excluding those notices that do not pertain to any part of
+        the Derivative Works; and
+
+    (d) If the Work includes a "NOTICE" text file as part of its
+        distribution, then any Derivative Works that You distribute must
+        include a readable copy of the attribution notices contained
+        within such NOTICE file, excluding those notices that do not
+        pertain to any part of the Derivative Works, in at least one
+        of the following places: within a NOTICE text file distributed
+        as part of the Derivative Works; within the Source form or
+        documentation, if provided along with the Derivative Works; or,
+        within a display generated by the Derivative Works, if and
+        wherever such third-party notices normally appear. The contents
+        of the NOTICE file are for informational purposes only and
+        do not modify the License. You may add Your own attribution
+        notices within Derivative Works that You distribute, alongside
+        or as an addendum to the NOTICE text from the Work, provided
+        that such additional attribution notices cannot be construed
+        as modifying the License.
+
+    You may add Your own copyright statement to Your modifications and
+    may provide additional or different license terms and conditions
+    for use, reproduction, or distribution of Your modifications, or
+    for any such Derivative Works as a whole, provided Your use,
+    reproduction, and distribution of the Work otherwise complies with
+    the conditions stated in this License.
+
+  5. Submission of Contributions. Unless You explicitly state otherwise,
+    any Contribution intentionally submitted for inclusion in the Work
+    by You to the Licensor shall be under the terms and conditions of
+    this License, without any additional terms or conditions.
+    Notwithstanding the above, nothing herein shall supersede or modify
+    the terms of any separate license agreement you may have executed
+    with Licensor regarding such Contributions.
+
+  6. Trademarks. This License does not grant permission to use the trade
+    names, trademarks, service marks, or product names of the Licensor,
+    except as required for reasonable and customary use in describing the
+    origin of the Work and reproducing the content of the NOTICE file.
+
+  7. Disclaimer of Warranty. Unless required by applicable law or
+    agreed to in writing, Licensor provides the Work (and each
+    Contributor provides its Contributions) on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or
+    implied, including, without limitation, any warranties or conditions
+    of TITLE, NON-INFRINGEMENT, MERCHANTABILITY, or FITNESS FOR A
+    PARTICULAR PURPOSE. You are solely responsible for determining the
+    appropriateness of using or redistributing the Work and assume any
+    risks associated with Your exercise of permissions under this License.
+
+  8. Limitation of Liability. In no event and under no legal theory,
+    whether in tort (including negligence), contract, or otherwise,
+    unless required by applicable law (such as deliberate and grossly
+    negligent acts) or agreed to in writing, shall any Contributor be
+    liable to You for damages, including any direct, indirect, special,
+    incidental, or consequential damages of any character arising as a
+    result of this License or out of the use or inability to use the
+    Work (including but not limited to damages for loss of goodwill,
+    work stoppage, computer failure or malfunction, or any and all
+    other commercial damages or losses), even if such Contributor
+    has been advised of the possibility of such damages.
+
+  9. Accepting Warranty or Additional Liability. While redistributing
+    the Work or Derivative Works thereof, You may choose to offer,
+    and charge a fee for, acceptance of support, warranty, indemnity,
+    or other liability obligations and/or rights consistent with this
+    License. However, in accepting such obligations, You may act only
+    on Your own behalf and on Your sole responsibility, not on behalf
+    of any other Contributor, and only if You agree to indemnify,
+    defend, and hold each Contributor harmless for any liability
+    incurred by, or claims asserted against, such Contributor by reason
+    of your accepting any such warranty or additional liability.
+
+  END OF TERMS AND CONDITIONS
+
+  APPENDIX: How to apply the Apache License to your work.
+
+    To apply the Apache License to your work, attach the following
+    boilerplate notice, with the fields enclosed by brackets "{}"
+    replaced with your own identifying information. (Don't include
+    the brackets!)  The text should be enclosed in the appropriate
+    comment syntax for the file format. We also recommend that a
+    file or class name and description of purpose be included on the
+    same "printed page" as the copyright notice for easier
+    identification within third-party archives.
+
+  Copyright {yyyy} {name of copyright owner}
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+      http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+// -todo: add apache 2.0 license
+// -todo: make sure asserts/_NDEBUG are not in release mode
+
 // todo: clean out old commented lines
+// todo: make sure listDBs will list the 'sections' for windows in the current namespace/session
+// todo: look back over comment explanation
+// todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
 // todo: compile on linux + gcc
 // todo: compile again on osx
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
@@ -147,7 +300,6 @@
 
 */
 
-
 #ifdef _MSC_VER
   #pragma once
   #pragma warning(push, 0)
@@ -156,15 +308,19 @@
 #ifndef __SIMDB_HEADER_GUARD__
 #define __SIMDB_HEADER_GUARD__
 
+// turn asserts on an off - not sure of the best way to handle this with gcc and clang yet
+#ifdef _MSC_VER
+  #if !defined(_DEBUG)
+    #define NDEBUG
+  #endif
+#endif
+
 #if !defined(SECTION)
   #define       SECTION(_msvc_only_collapses_macros_with_arguments, ...)
 #endif
 
 // platform specific includes - mostly for shared memory mapping and auxillary functions like open, close and the windows equivilents
-#if defined(_WIN32)      // windows
-  // use _malloca ? - would need to use _freea and also know that _malloca always allocates on the heap in debug mode for some crazy reason
-  #define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);
-  
+#if defined(_WIN32)      // windows  
   #include <tchar.h>
   #define NOMINMAX
   #define WIN32_LEAN_AND_MEAN
@@ -180,8 +336,6 @@
       #define _SCL_SECURE_NO_WARNINGS
     #endif
   #endif
-
-
 #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
   // for mmap and munmap
   // PROT_READ and PROT_WRITE  to allow reading and writing but not executing of the mapped memory pages
@@ -229,10 +383,7 @@ namespace {
 
   enum Match { MATCH_FALSE=0, MATCH_TRUE=1, MATCH_REMOVED=-1  };
 
-  struct _u128
-  {
-   volatile u64 lo; volatile u64 hi; 
-  };
+  struct _u128 { volatile u64 lo; volatile u64 hi; };
 
   template<class T>
   class lava_noop
@@ -284,18 +435,13 @@ namespace {
     }
   };
 
-  inline u64 fnv_64a_buf(void const *const buf, u64 len)
+  inline u64 fnv_64a_buf(void const *const buf, u64 len)                              // I know basically nothing about hash functions and there is likely a better one out there 
   {
-    // const u64 FNV_64_PRIME = 0x100000001b3;
-    u64 hval = 0xcbf29ce484222325;    // FNV1_64_INIT;  // ((Fnv64_t)0xcbf29ce484222325ULL)
-    u8*   bp = (u8*)buf;	           /* start of buffer */
-    u8*   be = bp + len;		           /* beyond end of buffer */
-
-    while(bp < be)                     // FNV-1a hash each octet of the buffer
-    {
-      hval ^= (u64)*bp++;             /* xor the bottom with the current octet */
-
-      //hval *= FNV_64_PRIME; // does this do the same thing?  /* multiply by the 64 bit FNV magic prime mod 2^64 */
+    u64 hval = 0xCBF29CE484222325;
+    u8*   bp = (u8*)buf;	             // start of buffer 
+    u8*   be = bp + len;		           // beyond end of buffer 
+    while(bp < be){                    // FNV-1a hash each octet of the buffer
+      hval ^= (u64)*bp++;              // xor the bottom with the current octet */
       hval += (hval << 1) + (hval << 4) + (hval << 5) +
               (hval << 7) + (hval << 8) + (hval << 40);
     }
@@ -318,16 +464,14 @@ namespace {
 
   inline void prefetch1(char const* const p)
   {
-    // if msvc or intel compilers
-    _mm_prefetch(p, _MM_HINT_T1);
-    // else 
-
-    //endif
-    //_m_prefetch((void*)p);
+    #ifdef _MSC_VER                              // if msvc or intel compilers
+      _mm_prefetch(p, _MM_HINT_T1);
+    #else 
+    #endif
   }
 
   #ifdef _WIN32
-    using  u128 = __declspec(align(128)) /*volatile*/ _u128;
+    using  u128 = __declspec(align(128)) _u128;
   #else
     using  u128 = volatile _u128;
   #endif
@@ -357,7 +501,7 @@ namespace {
     typedef long LONG;
     typedef LONG NTSTATUS;
 
-    // the following is api poison and is a cancerous abomination, but it seems to be the only way to list the global anonymous memory maps in windows  
+    // the following is api poison, but seems to be the only way to list the global anonymous memory maps in windows  
     #define DIRECTORY_QUERY              0x0001  
     #define STATUS_SUCCESS               ((NTSTATUS)0x00000000L)    // ntsubauth
     #define OBJ_CASE_INSENSITIVE         0x00000040L
@@ -399,11 +543,7 @@ namespace {
       _In_opt_ PCWSTR          SourceString
     );
 
-    struct OBJECT_DIRECTORY_INFORMATION
-    {
-      UNICODE_STRING    name;
-      UNICODE_STRING    type;
-    };
+    struct OBJECT_DIRECTORY_INFORMATION { UNICODE_STRING name; UNICODE_STRING type; };
 
     auto      GetLastErrorStdStr() -> std::string
     {
@@ -452,8 +592,7 @@ namespace {
 
       return retValue;
     }
-
-  #endif
+  #endif // end  #ifdef _WIN32
 }
 
 #ifdef _WIN32
@@ -527,8 +666,6 @@ namespace {
   }
 #else
   // gcc/clang/linux ?
-  #include <alloca.h>
-  #define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);  
 #endif
 
 #ifdef _WIN32
@@ -540,6 +677,8 @@ class     CncrLst
 // Internally this is an array of indices that makes a linked list
 // Externally indices can be gotten atomically and given back atomically
 // | This is used to get free indices one at a time, and give back in-use indices one at a time
+// Uses the first 8 bytes that would normally store sizeBytes as the 64 bits of memory for the Head structure
+// todo: 64 byte align the Head structure and make it use 64 bytes so that there is no false sharing due to constantly hammering on its cache line - the Head structure is the most used atomic memory and is likely the synchronization bottlneck
 public:
   union Head
   {
@@ -559,14 +698,8 @@ private:
   au64*        m_h;
 
 public:
-  static u64   sizeBytes(u32 size)
-  {
-    return ListVec::sizeBytes(size);
-  }
-  static u32  incVersion(u32    v)
-  {
-    return v==NXT_VER_SPECIAL?  1  :  v+1;
-  }
+  static u64   sizeBytes(u32 size) { return ListVec::sizeBytes(size); }
+  static u32  incVersion(u32    v) { return v==NXT_VER_SPECIAL?  1  :  v+1; }
 
   CncrLst(){}
   CncrLst(void* addr, u32 size, bool owner=true) :           // this constructor is for when the memory is owned an needs to be initialized
@@ -581,10 +714,9 @@ public:
       ((Head*)m_h)->idx = 0;
       ((Head*)m_h)->ver = 0;
     }
-                                          // uses the first 8 bytes that would normally store sizeBytes as the 64 bits of memory for the Head structure
   }
 
-  u32        nxt()                                               // moves forward in the list and return the previous index
+  u32        nxt()                                                             // moves forward in the list and return the previous index
   {
     Head  curHead, nxtHead;
     curHead.asInt  =  m_h->load();
@@ -597,7 +729,7 @@ public:
 
     return curHead.idx;
   }
-  u32        free(u32 idx)                         // not thread safe when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway, since the CncrHsh will already have the index taken out and the free will only be triggered after the last reader has read from it 
+  u32        free(u32 idx)                                                    // not thread safe when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway, since the CncrHsh will already have the index taken out and the free will only be triggered after the last reader has read from it 
   {
     Head curHead, nxtHead; u32 retIdx;
     curHead.asInt = m_h->load();
@@ -609,7 +741,7 @@ public:
 
     return retIdx;
   }
-  u32        free(u32 st, u32 en)                                // not thread safe when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway, since the CncrHsh will already have the index taken out and the free will only be triggered after the last reader has read from it 
+  u32        free(u32 st, u32 en)                                            // not thread safe when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway, since the CncrHsh will already have the index taken out and the free will only be triggered after the last reader has read from it 
   {
     Head curHead, nxtHead; u32 retIdx;
     curHead.asInt = m_h->load();
@@ -621,42 +753,32 @@ public:
 
     return retIdx;
   }
-  auto      count() const -> u32
-  {
-    //return ((HeadUnion*)(&m_h))->cnt;
-    //return ((Head*)(&m_h))->ver;
-    return ((Head*)m_h)->ver;
-  }
+  auto      count() const -> u32 { return ((Head*)m_h)->ver; }
   auto        idx() const -> u32
   {
     Head h; 
     h.asInt = m_h->load();
     return h.idx;
   }
-  auto       list() -> ListVec const* 
-  {
-    return &m_lv;
-  }            // not thread safe
-  u32      lnkCnt()                     // not thread safe
+  auto       list() -> ListVec const* { return &m_lv; }                    // not thread safe
+  u32      lnkCnt()                                                // not thread safe
   {
     u32    cnt = 0;
-    //auto      l = list();
     u32 curIdx = idx();
     while( curIdx != LIST_END ){
-      //curIdx = l->at(curIdx).load();
-      curIdx = m_lv[curIdx];   //  l->at(curIdx).load();
+      curIdx = m_lv[curIdx];
       ++cnt;
     }
     return cnt;
   }
   auto       head() -> Head* { return (Head*)m_h; }
 };
-class     CncrStr                                                                      // CncrStr is Concurrent Store 
+class     CncrStr                                                          // CncrStr is Concurrent Store 
 {
 public:
   union   VerIdx
   {
-    struct { u32 idx; u32 version; }; // declaring the version first and idx second puts the 
+    struct { u32 idx; u32 version; }; 
     u64 asInt;
 
     VerIdx(){}
@@ -667,21 +789,15 @@ public:
     struct{ u32 isKey : 1; i32 readers : 31; };
     u32 asInt;
   };
-  struct  BlkLst
+  struct  BlkLst                                                   // 24 bytes total
   {    
     union{
       KeyReaders kr;
       struct{ u32 isKey : 1; i32 readers : 31; };
-    };                                                              //  4 bytes  -  kr is key readers  
+    };                                                             //  4 bytes  -  kr is key readers  
     u32 idx, version, len, klen, hash;                             // 20 bytes
-    // 24 bytes total
 
-    BlkLst() : isKey(0), readers(0), idx(0), version(0), len(0), klen(0), hash(0)
-    { 
-      //kr.isKey    = 0;
-      //kr.readers  = 0;
-      //kr.version  = 0;
-    }
+    BlkLst() : isKey(0), readers(0), idx(0), version(0), len(0), klen(0), hash(0) {}
     BlkLst(bool _isKey, i32 _readers, u32 _idx, u32 _version, u32 _len=0, u32 _klen=0, u32 _hash=0) : 
       isKey(_isKey),
       readers(_readers),
@@ -689,17 +805,8 @@ public:
       version(_version),
       hash(_hash)
     {
-      //kr.isKey    = isKey;
-      //kr.readers  = readers;
-      //kr.version  = ver;
-
-      //if(isKey){
-        len  = _len;
-        klen = _klen;
-      //}else{
-      //  len  = 0;
-      //  klen = 0;
-      //}
+      len  = _len;
+      klen = _klen;
     } 
   };
   struct  BlkCnt { u32 end : 1; u32 cnt : 31; };                                       // this is returned from alloc() and may not be neccesary - it is the number of blocks allocated and if the end was reached
@@ -722,14 +829,14 @@ public:
     return empty.asInt == vi.asInt;
   }
 
-  BlkLst    incReaders(u32 blkIdx, u32 version) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
+  BlkLst    incReaders(u32 blkIdx, u32 version) const                                  // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
     KeyReaders cur, nxt;
     BlkLst*     bl  =  &s_bls[blkIdx];
     au32* areaders  =  (au32*)&(bl->kr);
     cur.asInt       =  areaders->load();
     do{
-      if(bl->version!=version || cur.readers<0){ return BlkLst(); }    // make_BlkLst(0,0,0,0,0,0);
+      if(bl->version!=version || cur.readers<0){ return BlkLst(); }
       nxt = cur;
       nxt.readers += 1;
     }while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
@@ -753,9 +860,9 @@ public:
     return true;
   }
 
-private:   
-
-  // On the thread's stack
+private:
+  // s_ variables are used to indicate data structures and memory that is in the shared memory, usually just a pointer on the stack and of course, nothing on the heap
+  // The order of the shared memory as it is in the memory mapped file: Version, CncrLst, BlockLists, Blocks
   mutable CncrLst           s_cl;        // flat data structure - pointer to memory 
   mutable BlockLists       s_bls;        // flat data structure - pointer to memory - bl is Block Lists
   void*               s_blksAddr;        // points to the block space in the shared memory
@@ -764,7 +871,6 @@ private:
   u32                m_blockSize;
   u32               m_blockCount;
   u64                  m_szBytes;
-  //mutable ai32      m_blocksUsed;      // this is a mistake and does no good unless it is in the shared memory - CncrLst should return LIST_END when out of memory
 
   VerIdx       nxtBlock(u32  blkIdx)  const
   {
@@ -819,12 +925,11 @@ private:
   }
   u32         readBlock(u32  blkIdx, u32 version, void *const bytes, u32 ofst=0, u32 len=0) const
   {
-    BlkLst bl = incReaders(blkIdx, version);               if(bl.version==0) return 0;  // if(bl.kr.version==0) return 0;
+    BlkLst bl = incReaders(blkIdx, version);               if(bl.version==0){ return 0; }
       u32   blkFree  =  blockFreeSize();
       u8*         p  =  blockFreePtr(blkIdx);
       u32       nxt  =  bl.idx;
       u32    cpyLen  =  len==0?  blkFree-ofst  :  len;
-      //cpyLen        -=  ofst;
       memcpy(bytes, p+ofst, cpyLen);
     decReaders(blkIdx, version);
 
@@ -832,13 +937,6 @@ private:
   }
 
 public:
-  /* 
-    The order of the shared memory is:
-    Version
-    CncrLst
-    BlockLists
-    Blocks
-  */
   static u64    BlockListsOfst(){ return sizeof(u64); }
   static u64         CListOfst(u32 blockCount){ return BlockListsOfst() + BlockLists::sizeBytes(blockCount); }      // BlockLists::sizeBytes ends up being sizeof(BlkLst)*blockCount + 2 u64 variables
   static u64          BlksOfst(u32 blockCount){ return CListOfst(blockCount) + CncrLst::sizeBytes(blockCount); }
@@ -848,7 +946,6 @@ public:
   CncrStr(void* addr, u32 blockSize, u32 blockCount, bool owner=true) :
     m_blockSize(blockSize),
     m_blockCount(blockCount),
-    //m_blocksUsed(0),
     s_blksAddr( (u8*)addr + BlksOfst(blockCount) ),
     s_cl(       (u8*)addr + CListOfst(blockCount), blockCount, owner),
     s_bls(      (u8*)addr + BlockListsOfst(),      blockCount, owner),
@@ -857,7 +954,7 @@ public:
   {
     if(owner){
       for(u32 i=0; i<m_blockCount; ++i){ s_bls[i] = BlkLst(); }
-      s_version->store(1);                            // todo: what is this version for if CncrLst already has a version?
+      s_version->store(1);                                                                                   // todo: what is this version for if CncrLst already has a version?
     }
     assert(blockSize > sizeof(i32));
   }
@@ -889,7 +986,6 @@ public:
         s_bls[cur] = BlkLst(false, 0, nxt, ver, size);
         cur        = nxt;
         ++cnt;
-        //m_blocksUsed.fetch_add(1);
       }
     }
 
@@ -993,13 +1089,13 @@ public:
   read_failure:
     decReaders(blkIdx, version);
 
-    return len;                                           // only one return after the top to make sure readers can be decremented - maybe it should be wrapped in a struct with a destructor
+    return len;                                                        // only one return after the top to make sure readers can be decremented - maybe it should be wrapped in a struct with a destructor
   }
   u32        getKey(u32  blkIdx, u32 version, void *const bytes, u32 maxlen) const
   {
     if(blkIdx == LIST_END){ return 0; }
 
-    BlkLst bl = incReaders(blkIdx, version);                          // todo: need to check for 0 here?
+    BlkLst bl = incReaders(blkIdx, version);                           // todo: need to check for 0 here?
     
     if(bl.len==0 || (bl.klen)>maxlen ) return 0;
 
@@ -1009,20 +1105,14 @@ public:
     u32     len = 0;
     u32   rdLen = 0;
     u8*       b = (u8*)bytes;
-    //u32     cur = blkIdx;
-    //VerIdx  nxt = { blkIdx, version };
     VerIdx   vi = { blkIdx, version };
 
-    //if(krem>0) --kblks;
-    //if(krem>0){ ++kblks; }
     int i=0;
-    while( i<kblks && vi.idx!=LIST_END && vi.version==version)                            // && !(nxt.idx<0) 
+    while( i<kblks && vi.idx!=LIST_END && vi.version==version) 
     {
-      //cur    =  nxt.idx;
-      rdLen  =  readBlock(vi.idx, version, b);          if(rdLen==0) goto read_failure;        // rdLen is read length
+      rdLen  =  readBlock(vi.idx, version, b);          if(rdLen==0){ goto read_failure; }     // rdLen is read length
       b     +=  rdLen;
       len   +=  rdLen;
-      //nxt    =  nxtBlock(cur);
       vi     =  nxtBlock(vi.idx);
       
       ++i;
@@ -1034,31 +1124,7 @@ public:
   read_failure:
     decReaders(blkIdx, version);
 
-    return len;                                           // only one return after the top to make sure readers can be decremented - maybe it should be wrapped in a struct with a destructor
-    
-    //for(int i=0; i<kblks; ++i){ 
-    //  nxt    =  nxtBlock(cur);                 if(nxt.version!=version){ goto read_failure; }
-    //  rdLen  =  readBlock(cur, version, b);
-    //  b     +=  rdLen;
-    //  len   +=  rdLen;
-    //  cur    =  nxt.idx;
-    //}
-    //
-    //rdLen  =  readBlock(cur, version, b, krem);
-    //b     +=  rdLen;
-    //len   +=  rdLen;
-    //nxt    =  nxtBlock(cur);                  if(nxt.version!=version){ goto read_failure; }
-    //
-    ////while(true)
-    //while( !(nxt.idx<0) && nxt.idx!=LIST_END && nxt.version==version)
-    //{
-    //  cur    =  nxt.idx;
-    //  rdLen  =  readBlock(cur, version, b);  if(rdLen==0) break;        // rdLen is read length
-    //  b     +=  rdLen;
-    //  len   +=  rdLen;
-    //  nxt    =  nxtBlock(cur);
-    //  //if(nxt<0 || nxt==LIST_END) break;
-    //}
+    return len;                                           // only one return after the top to make sure readers can be decremented - maybe it should be wrapped in a struct with a destructor    
   }
   Match   memcmpBlk(u32  blkIdx, u32 version, void const *const buf1, void const *const buf2, u32 len) const    // todo: eventually take out the inc and dec readers and only do them when actually reading and dealing with the whole chain of blocks 
   {
@@ -1077,7 +1143,7 @@ public:
     
     BlkLst     bl = s_bls[blkIdx];
     u32 blklstHsh = bl.hash;
-    if(s_bls[blkIdx].hash!=hash) return MATCH_FALSE;                // vast majority of calls should end here
+    if(s_bls[blkIdx].hash!=hash){ return MATCH_FALSE; }              // vast majority of calls should end here
 
     u32   curidx  =  blkIdx;
     VerIdx   nxt  =  nxtBlock(curidx);                              if(nxt.version!=version) return MATCH_FALSE;
@@ -1103,29 +1169,16 @@ public:
   u32           len(u32  blkIdx, u32 version, u32* out_vlen=nullptr) const
   {
     BlkLst bl = s_bls[blkIdx];
-    //if(version==bl.kr.version && bl.len>0){
     if(version==bl.version && bl.len>0){
       if(out_vlen) *out_vlen = bl.len - bl.klen;
       return bl.len;
     }else 
       return 0;
   }
-  auto         list()      const -> CncrLst const&
-  {
-    return s_cl;
-  }
-  auto         data()      const -> const void*
-  {
-    return (void*)s_blksAddr;
-  }
-  u32    blockCount()      const
-  {
-    return m_blockCount; // m_cl.sizeBytes();
-  }
-  auto       blkLst(u32 i) const -> BlkLst
-  {
-    return s_bls[i];
-  }
+  auto         list()      const -> CncrLst const& { return s_cl; }
+  auto         data()      const -> const void* { return (void*)s_blksAddr; }
+  u32    blockCount()      const { return m_blockCount; }
+  auto       blkLst(u32 i) const -> BlkLst { return s_bls[i]; }
 
   friend class CncrHsh;
 };
@@ -1137,6 +1190,7 @@ public:
 
   struct VerIpd { u32 version, ipd; };                       // ipd is Ideal Position Distance
 
+  // todo: take out unused constants
   static const i8   RM_OWNER         =     -1;               // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
   static const u8   LAST_READER      =      0;               // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
   static const u8   INIT_READERS     =      0;               // eventually make this 1 again? - to catch when readers has dropped to 0
@@ -1364,7 +1418,7 @@ public:
     for(;; i=nxtIdx(i) )
     {
       VerIdx vi = load(i);
-      if(vi.idx>=DELETED){                                                              // it is either deleted or empty
+      if(vi.idx>=DELETED){                                                                  // it is either deleted or empty
         bool success = cmpex_vi(i, vi, desired);
         if(success){return vi;}
         else{ i=prevIdx(i); continue; }                                                     // retry the same loop again if a good slot was found but it was changed by another thread between the load and the compare-exchange
@@ -1897,7 +1951,6 @@ public:
   { 
     VerIdx vi = s_ch.load(idx);
     if(vi.idx>=DELETED || vi.version!=version){return 0;}
-    //u32 total_len = s_cs.len(idx, version, out_vlen); 
     u32 total_len = s_cs.len(vi.idx, vi.version, out_vlen); 
     if(total_len>0){
       *out_klen = total_len - *out_vlen;
@@ -2057,390 +2110,79 @@ public:
 
 
 
+//u32     cur = blkIdx;
+//VerIdx  nxt = { blkIdx, version };
 //
-//_u128& operator=(_u128 l){ hi = l.hi; lo = l.lo; return *this; };
-
-//ok         = this->len(nxt.idx, nxt.version, 
-//                       &klen, &vlen);               
-//if(!ok)
-//  return {nxt.version, ""};
-
-//VerIdx        load_vi(u32 i)                 const
+//if(krem>0) --kblks;
+//if(krem>0){ ++kblks; }
+//
+//cur    =  nxt.idx;
+//nxt    =  nxtBlock(cur);
+//
+// && !(nxt.idx<0)
+//
+//for(int i=0; i<kblks; ++i){ 
+//  nxt    =  nxtBlock(cur);                 if(nxt.version!=version){ goto read_failure; }
+//  rdLen  =  readBlock(cur, version, b);
+//  b     +=  rdLen;
+//  len   +=  rdLen;
+//  cur    =  nxt.idx;
+//}
+//
+//rdLen  =  readBlock(cur, version, b, krem);
+//b     +=  rdLen;
+//len   +=  rdLen;
+//nxt    =  nxtBlock(cur);                  if(nxt.version!=version){ goto read_failure; }
+//
+////while(true)
+//while( !(nxt.idx<0) && nxt.idx!=LIST_END && nxt.version==version)
 //{
-//  using namespace std;
-//  
-//  au64* avi = (au64*)(s_vis.data()+i);                            // avi is atomic versioned index
-//  u64   cur = swp32(avi->load());                                 // need because of endianess? // atomic_load<u64>( (au64*)(m_vis.data()+i) );              // Load the key that was there.
-//
-//  if(i%2==1) return VerIdx(hi32(cur), lo32(cur));
-//  else       return VerIdx(lo32(cur), hi32(cur));
+//  cur    =  nxt.idx;
+//  rdLen  =  readBlock(cur, version, b);  if(rdLen==0) break;        // rdLen is read length
+//  b     +=  rdLen;
+//  len   +=  rdLen;
+//  nxt    =  nxtBlock(cur);
+//  //if(nxt<0 || nxt==LIST_END) break;
 //}
 
-// if( (preVi=prev(i,&preI)).idx == EMPTY )
-//
-//if(nxtVp.version!=nxtVi.version){ continue; }                               // the versions don't match, so start over on the same index and skip the compare exchange 
-//else if(nxtVp.ipd==0){ 
-//
-//delDupe(i);                                                               // todo: convert the current slot to empty if the next is the end of a span (ipd of 0 or EMPTY) - only will matter after full robin hood hashing, since without short circuiting on EMPTY slots, EMPTY won't matter
-//
-//if( (preVi=prev(i,&preI)).idx == EMPTY ){ delDupe(preI); }
-//
-//bool    cleanDeletion(u32 i, u8 depth=0)     const
-//{
-//  VerIdx curVi, nxtVi, preVi; VerIpd nxtVp; u32 nxtI, preI;
-//
-//  //clean_loop: while( (nxtVi=load_vi(nxtI=nxtIdx(i))).idx < DELETED  && i!=m_sz-1)           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
-//  clean_loop: while( (nxtVi=nxt(i,&nxtI)).idx < DELETED  && i!=m_sz-1)           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
-//  {
-//    curVi = load_vi(i);
-//    if(curVi.idx == EMPTY){ return false; }
-//
-//    nxtVp = ipd(nxtI, nxtVi.idx);
-//    if(nxtVp.version!=nxtVi.version){ continue; }                                  // the versions don't match, so start over on the same index and skip the compare exchange 
-//    else if(nxtVp.ipd==0){ 
-//      // todo: convert the current slot to empty if the next is the end of a span (ipd of 0 or EMPTY)
-//      return true; 
-//    }                                          // should this be converted to an empty slot since it is the end of a span?  -  next slot's versions match and its VerIdx is in its ideal position, so we are done 
-//    else if( cmpex_vi(i, curVi, nxtVi) ){ 
-//      delDupe(i);
-//      i = nxtIdx(i);
-//    }
-//  }
-//
-//  if(i!=m_sz-1){
-//    if(nxtVi.idx == DELETED){                                                    // if the next index is deleted, try to clean the next index, then come back and try to delete this one again
-//      i=nxtIdx(i);
-//      if(depth<1){ cleanDeletion(i, depth+1); }                              // could this recurse to the depth of the number of blocks?
-//      goto clean_loop;
-//    }else if(nxtVi.idx==EMPTY){
-//      delDupe(i);    
-//    }
-//  }else{}
-//
-//  if( (preVi=prev(i,&preI)).idx == EMPTY ){ delDupe(preI); }
-//
-//  return true;
-//}
+// if(bl.kr.version==0) return 0;
+//cpyLen        -=  ofst;
 
 //
-//clean_loop: while( (nxtVi=load_vi(nxtI=nxtIdx(i))).idx < DELETED  && i!=m_sz-1)           // dupe_nxt stands for duplicate next, since we are duplicating the next VerIdx into the current (deleted) VerIdx slot
+//mutable ai32      m_blocksUsed;      // this is a mistake and does no good unless it is in the shared memory - CncrLst should return LIST_END when out of memory
 
-//fstore_t store = {F_ALLOCATECONTIG, F_PEOFPOSMODE, 0, (off_t)size};
+//kr.isKey    = isKey;
+//kr.readers  = readers;
+//kr.version  = ver;
 //
-//struct flock lck = {0,0,0};
-//
-//sm.hndlPtr = mmap(NULL, size, PROT_READ|PROT_WRITE, MAP_SHARED|MAP_ANONYMOUS, sm.fileHndl, 0);
-//
-//auto zeromem = malloc(size);
-//memset(zeromem, 0, size);
-//write(sm.fileHndl, zeromem, size);
-//free(zeromem);
-//
-// memset(sm.hndlPtr, 0, size);
-
-//
-//sm.fileHndl = open(path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IWGRP|S_IROTH|S_IWOTH ); // O_CREAT | O_SHLOCK ); // | O_NONBLOCK );
-
-//u64 rgtSwp = viDbl.lo;
-//rgtDel     = *((i64*)&rgtSwp);
-
-//u32   ipd = vi.idx>ip?  vi.idx-ip  :  m_csp->blockCount() - ip + vi.idx;  // todo: change vi.idx to u32 so that there aren't sign mismatch warnings
-//return {bl.kr.version, ipd};
-
-//string message(msgBuf, size);
-//
-//DWORD bytesWritten;
-//WriteFile(  GetStdHandle(STD_OUTPUT_HANDLE), szBuff, retValue,
-//        &bytesWritten, 0 )
-//show_memory_error_nr("Could not map view of file", (int) GetLastError());
-//
-// END windows
-//#elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
-
-//#elif defined(__APPLE__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
-//
-// todo: need to check that name and path are less than sizeof(path) here
-//
-//else{
-//if(sm.fileHndl==NULL){ //}
-//
-//if(sm.fileHndl==NULL){return move(sm);}
-
-//while(s_flags->load()==false){}
-//
-//auto chSz = s_ch.sizeBytes();
-
-//// todo: initialized flag and reference count
-//if(isOwner()) s_flags->store(1);                             // set to 1 to signal construction is done
-
-//u64       size() const
-//{
-//  return *((u64*)clearBits(p) + 1);   // second 8 bytes should be the number of elements
-//} 
-
-//u64* maskptr = (u64*)p; 
-//return (T*)(maskptr+2);
-
-//static void*  setDestructorBit(void* p)
-//{
-//  //return (void*)((u64)p ^ (((u64)1l)<<63));
-//  return (void*)((u64)p | (1llu<<63));
-//}
-//static bool   getDestructorBit(void* p)
-//{
-//  return (((u64)p)>>63)!=0;
-//}
-//*((u64*)clearBits(p) + 1) = s;
-//*((u64*)clearBits(p)) = sb;      // first 8 bytes should be the total size of the buffer in bytes
-//static void*         clearBits(void* p)
-//{
-//  return (void*)( ((u64)p) & 0x0000FFFFFFFFFFFF);
+//if(isKey){
+//}else{
+//  len  = 0;
+//  klen = 0;
 //}
 //
-// return *((u64*)clearBits(p));   
 //
-//return (T*)p; 
+//kr.isKey    = 0;
+//kr.readers  = 0;
+//kr.version  = 0;
 
 //
-// class Deleter=std::default_delete<T>, class Allocator=std::allocator<T> >
-
-//lava_vec(u64  count)
-//{
-//  u64 sb = lava_vec::sizeBytes(count);
-//  p       = Allocator().allocate(sb);
-//  p       = setDestructorBit(p);
-//  set_size(count);
-//  set_sizeBytes(sb);
-//}
-//
-//u64 sb = lava_vec::sizeBytes(count);
-//set_size(count);
-//set_sizeBytes(sb);
-//
-//p = addr;
-//
-//if(p && getDestructorBit(p)){
-//  Deleter().operator()((T*)clearBits(p));  //free(p);
-//  p = nullptr;
-//}
-//
-//u64* maskptr = (u64*)clearBits(p); 
-//return (T*)(maskptr+2);
-
-//unordered_set<str> keys;
-//
-//template<> struct hash<VerStr>{
-//  size_t operator()(VerStr const& vs){ 
-//    return hash<str>()(vs.str);
-//  }  
-//};
-//unordered_set<VerStr> keys;
-//
-//u32       i = 0;
-//str nxt = nxtKey();
-//
-//++i;
-//
-//if(out_versions) new (out_versions) vec<u32>()
+// declaring the version first and idx second puts the
 
 //
-//template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  // will need C++ ifdefs eventually
+//u32 total_len = s_cs.len(idx, version, out_vlen); 
 
-//using    i8   =   int8_t;
-//using    u8   =   uint8_t;
-//using   i64   =   int64_t;
-//using   u64   =   uint64_t;
-//using   i32   =   int32_t;
-//using   u32   =   uint32_t;
-//using   f32   =   float;
-//using   f64   =   double;
-//using  au64   =   std::atomic<u64>;
-//using  au32   =   std::atomic<u32>;
-//using  ai32   =   std::atomic<i64>;
-//using   ai8   =   std::atomic<i8>;
-//using  cstr   =   const char*;
-//using   str   =   std::string;             // will need C++ ifdefs eventually or just need to be taken out
-//using    u8   =   uint8_t;
-
-//static bool  DefaultKeyCompare(u32 a, u32 b)
-//{
-//  return a == b;
-//}
-
-// goto clean_loop;
-//else if( cmpex_vi(i, &curVi, nxtVi) ){ 
-//i = nxtIdx(i);                                                               // this could mean the current slot has a deleted key and isn't cleanup by this function
-
-//bool       runIfMatch(u32 i, u32 version, u32 key, MATCH_FUNC match, FUNC f) const
+//auto      l = list();
 //
-//Match      m = match(key, version);
-//VerIdx    vi = load_vi(i);
-//
-//template<class MATCH_FUNC, class FUNC> 
-//bool      runMatch(u32 hash, MATCH_FUNC match, FUNC f)        const 
-//else if( runIfMatch(i, vi.version, vi.idx, match, f) ){ return true; }
+//curIdx = l->at(curIdx).load();
+//  l->at(curIdx).load();
 
-//auto hash = CncrHsh::HashBytes(key, klen);
-////auto  ths = this;
-//auto matchFunc = [ths, key, klen, hash](u32 blkidx, u32 ver){
-//  return CompareBlock(ths,blkidx,ver,key,klen,hash);
-//};
-//
-//u32       hash = HashBytes(key, klen);
-//auto matchFunc = [csp, key, klen, hash](u32 blkidx, u32 ver){
-//  return csp->compare(blkidx,ver,key,klen,hash);
-//};
-//    
-//return runMatch(hash, matchFunc, runFunc);
-//u32  out_klen = 0;
-// out_klen=0;
+//return ((HeadUnion*)(&m_h))->cnt;
+//return ((Head*)(&m_h))->ver;
 
-//static const VerIdx deleted = deleted_kv();
+//#include <alloca.h>
+//#define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);  
 //
-//VerIdx desired   =  empty;
-//desired.idx      =  lstVi.idx;
-//desired.version  =  lstVi.version;
-//u32           i  =  hash % m_sz;
-//u32          en  =  prevIdx(i);
-
-//template<class FUNC> 
-//auto       runRead(u32  idx, u32 version, FUNC f)             const -> decltype( f(VerIdx()) )
-//{  
-//  auto  vi = load_vi(idx);        if(vi.version!=version) return false;
-//  return f(vi);
-//}
-
-//bool    success  =  cmpex_vi(i, s_vis.data()+i, desired);      
-//
-//if( checkMatch(vi.version, vi.idx, match)!=MATCH_TRUE ){ continue; }
-//
-//bool success = cmpex_vi(i, s_vis.data()+i, desired);
-
-//if(klen<1) return false;
-//
-//auto     ths = this;
-//auto runFunc = [ths, klen, out_buf](VerIdx kv){
-//  if(IsEmpty(kv)) return false;
-//  auto getlen = ths->s_cs.getKey(kv.idx, kv.version, out_buf, klen);
-//  if(getlen<1) return false;
-//  
-//  return true;
-//};
-//return s_ch.runRead(idx, version, runFunc);
-
-//VerIdx ret;
-//if(i%2==1) ret.asInt = swp32(cur);
-//else       ret.asInt = cur;
-
-//auto  ths = this;
-//bool   ok = s_ch.runRead(idx, version, 
-//[ths, out_vlen, out_version](VerIdx kv)
-//{
-//  u32 vlen = 0;
-//  auto tlen = ths->s_cs.len(kv.idx, kv.version, out_vlen);
-//  if(tlen>0){
-//    *out_vlen = tlen - *out_vlen;
-//    return true;
-//  }
-//  return false;
-//});  
-//return ok;
-
-//
-//bool         cmpex_vi(u32 i, VerIdx* volatile expected, VerIdx desired) const
-
-//template<class MATCH_FUNC> 
-//auto       checkMatch(u32 version, u32 key, MATCH_FUNC match) const -> Match //  decltype(match(empty_kv()))
-//{
-//  //incReaders(i);  // todo: have incReaders return a VerIdx?
-//    Match ret = match(key, version);
-//  //decReaders(i);
-//  
-//  return ret;
-//}
-//
-//template<class MATCH_FUNC, class FUNC> 
-//bool       runIfMatch(u32 i, u32 version, u32 key, MATCH_FUNC match, FUNC f) const // const -> bool
-//{
-//  //VerIdx kv = incReaders(i);    
-//    //Match      m = match(key, version);
-//    Match      m = m_csp->compare(blkIdx, version, keybuf, klen);
-//    bool matched = false;                                       // not inside a scope
-//    if(m==MATCH_TRUE){ matched=true; f(load_vi(i)); }          
-//  //decReaders(i);
-//  
-//  return matched;
-//}
-
-// decltype( (f(empty_kv())) )
-//
-//VerIdx kv = incReaders(idx);
-//auto ret = f(vi);
-//decReaders(idx);
-
-//u32       hash = HashBytes(key, klen);    
-//CncrStr*   csp = m_csp;
-//auto matchFunc = [csp, key, klen, hash](u32 blkidx, u32 ver){
-//  return csp->compare(blkidx,ver,key,klen,hash);
-//};
-//
-////m_csp->compare(blkIdx, version, buf, len, hash);
-//
-//u32 len=0; u32 ver=0;
-//auto runFunc = [csp, &len, &ver, out_vlen](VerIdx kv){
-//  len = IsEmpty(kv)?  0ull  :  csp->len(kv.idx, kv.version, out_vlen);
-//  ver = kv.version;
-//};
-//    
-//u32  i = hash % m_sz;
-//u32 en = prevIdx(i);
-//
-//if( runIfMatch(i, vi.version, vi.idx, match, f) ){ return true; }
-//else if(i==en){ return false; }
-//
-//if(out_version){ *out_version = ver; }
-//if( !runMatch(hash, matchFunc, runFunc) ) return 0;
-//if(out_version){ *out_version = ver; }
-
-//if(curVi.idx >= DELETED_KEY){ return false; }
-//
-////nxtVp = ipd(nxtIdx(i), nxtVi);
-//nxtVp = ipd(nxtI, nxtVi);
-//if(nxtVp.version!=nxtVi.version){ continue; /*goto clean_loop;*/ }             // the versions don't match, so start over on the same index and skip the compare exchange 
-//else if(nxtVp.ipd==0){ return true; }                                          // should this be converted to an empty slot since it is the end of a span? // next slot's versions match and its VerIdx is in its ideal position, so we are done 
-//else if( cmpex_vi(i, &curVi, nxtVi) ){ 
-//  delDupe(i);
-//  i = nxtIdx(i);
-//}
-//
-//if(nxtVi.idx==EMPTY){ 
-//  if(delDupe(i)){ return true; }
-//  
-//  i = nxtIdx(i); continue;
-//}
-
-/*
-open system call reference from http://www.unix.com/man-page/FreeBSD/2/open/
-
-           O_RDONLY	   open for reading only
-	   O_WRONLY	   open for writing only
-	   O_RDWR	   open for reading and writing
-	   O_EXEC	   open for execute only
-	   O_NONBLOCK	   do not block on open
-	   O_APPEND	   append on each write
-	   O_CREAT	   create file if it does not exist
-	   O_TRUNC	   truncate size to 0
-	   O_EXCL	   error if create and file exists
-	   O_SHLOCK	   atomically obtain a shared lock
-	   O_EXLOCK	   atomically obtain an exclusive lock
-	   O_DIRECT	   eliminate or reduce cache effects
-	   O_FSYNC	   synchronous writes
-	   O_SYNC	   synchronous writes
-	   O_NOFOLLOW	   do not follow symlinks
-	   O_NOCTTY	   don't assign controlling terminal
-	   O_TTY_INIT	   restore default terminal attributes
-	   O_DIRECTORY	   error if file is not a directory
-	   O_CLOEXEC	   set FD_CLOEXEC upon open
-*/
-
+// use _malloca ? - would need to use _freea and also know that _malloca always allocates on the heap in debug mode for some crazy reason
+//#define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);
 
