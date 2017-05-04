@@ -363,14 +363,14 @@ int main()
   //db.flush();
 
   Println();
-  printdb(db);
+  //printdb(db);
 
   //else{
   //  Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
   //}
 
   Println();
-  printhsh(db); // Println();
+  //printhsh(db); // Println();
 
   //Println("BlkLst size: ", sizeof(CncrHsh::BlkLst) );
   //
@@ -389,7 +389,6 @@ int main()
   //db.get(wat,   &v);  Println("value: ", v);
   //db.get(wut,   &v);  Println("value: ", v);
   //db.get(kablam,&v);  Println("value: ", v);
-
 
   printkeys(db);
 
@@ -470,6 +469,13 @@ int main()
   ////TO((i32)lv.size(), i) Print(" ",i,":",lv[i]);
   ////TO(lv.size(), i) cout << lv[i] << " ";
   ////lv.~lava_vec();  // running the destructor explicitly tests double destrucion since it will be destructed at the end of the function also
+
+  auto dbs = simdb_listDBs();
+  Println("\n");
+  //TO(dbs.size(),i) wcout << dbs[i] << "\n";
+  TO(dbs.size(),i){ cout << dbs[i] << "\n"; }
+  Println("\n");
+
 
   Println("\n\n DONE \n\n");
   //PAUSE

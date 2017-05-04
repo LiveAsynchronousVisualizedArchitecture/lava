@@ -409,24 +409,24 @@ vec_vs      shapesFromKeys(simdb const& db, vec_vs dbKeys, VizData* vd)  // vec<
   TO(dbKeys.size(),i)
   {
     auto& vs = dbKeys[i];
-    auto cur = vd->shapes.find(vs.s);
+    auto cur = vd->shapes.find(vs.str);
     if(cur!=vd->shapes.end() ){
       continue;
     }
 
     u32    vlen = 0;
     u32 version = 0;
-    auto     len = db.len(vs.s.data(), (u32)vs.s.length(), &vlen, &version);          // todo: make ui64 as the input length
-    vs.v = version;
+    auto     len = db.len(vs.str.data(), (u32)vs.str.length(), &vlen, &version);          // todo: make ui64 as the input length
+    vs.ver = version;
 
     vec<i8> ivbuf(vlen);
-    db.get(vs.s.data(), (u32)vs.s.length(), ivbuf.data(), (u32)ivbuf.size());
+    db.get(vs.str.data(), (u32)vs.str.length(), ivbuf.data(), (u32)ivbuf.size());
 
     Shape  s      = ivbuf_to_shape(ivbuf.data(), len);      PRINT_GL_ERRORS
     s.shader      = vd->shaderId;
-    s.active      = vd->shapes[vs.s].active;
+    s.active      = vd->shapes[vs.str].active;
     s.version     = version; //vs.v; // version;
-    vd->shapes[vs.s] = move(s);
+    vd->shapes[vs.str] = move(s);
   };
 
   return dbKeys;
@@ -443,9 +443,9 @@ vec_vs    eraseMissingKeys(vec_vs dbKeys, KeyShapes* shps)           // vec<str>
   {
     auto const& kv = *it;
     VerStr vs;
-    vs.v = kv.second.version;
-    vs.s = kv.first;
-    bool isKeyInDb = binary_search(ALL(dbKeys),vs, [](VerStr const& a, VerStr const& b){ return a.s < b.s; } );
+    vs.ver = kv.second.version;
+    vs.str = kv.first;
+    bool isKeyInDb = binary_search(ALL(dbKeys),vs, [](VerStr const& a, VerStr const& b){ return a.str < b.str; } );
     if( !isKeyInDb ){
       it = shps->erase(it);
       ++cnt;

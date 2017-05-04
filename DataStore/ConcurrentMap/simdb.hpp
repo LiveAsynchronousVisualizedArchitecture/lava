@@ -207,15 +207,19 @@
 // -todo: make sure asserts/_NDEBUG are not in release mode
 // -todo: clean out old commented lines
 // -todo: put in check for 0 after incReaders in CncrStr::getKeys() - //todo: need to check for 0 here? - no because bl.len is 0 on error
+// todo: make sure listDBs will list the 'sections' for windows in the current namespace/session - doesn't work initially
+// -todo: re-evaluate strong vs weak ordering - weak ordering will likely work, but are there any places that depend on other threads doing operations in order? - possibly techniques that depend on the CncrHsh value first and the block list second? 
+// -todo: fix simdb_listDBs() - now the path uses the sessionId on windows
+// -todo: figure out how to convert wchar strings to char strings for simdb_listDBs - <local> and <codecvt> needed along with a wstring_convert object with type utf8 and wchar_t
+// -todo: handle hDir return NULL - also checking for a status that isn't STATUS_SUCCESS
 
-// todo: make sure listDBs will list the 'sections' for windows in the current namespace/session
 // todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
 // todo: look back over comment explanation
 // todo: compile on linux + gcc
 // todo: compile again on osx
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
-// todo: re-evaluate strong vs weak ordering - weak ordering will likely work, but are there any places that depend on other threads doing operations in order?
+// todo: handle a current db existing but being too small to hold the the constructor arguments?
 // todo: test time penalty to query non-existant key
 // todo: make read use 128 bit compare and swap to know when the next slot has changed out from under it? - just return a bool of whether a change was detected and return it into an optional pointer, then let the user decide whether to loop again - can IPD be used to guess if something has changed? if the next slot is only 1 more, then the idxs would have have to be the same, which isn't possible if nothing changed, if it is 2 more, then they should be in the process of being swapped
 // todo: make extra slot at the end of m_vis with 128 bit alignment, and make read look at both the extra slot and the first slot
@@ -322,6 +326,9 @@
 
 // platform specific includes - mostly for shared memory mapping and auxillary functions like open, close and the windows equivilents
 #if defined(_WIN32)      // windows  
+  #include <locale>
+  #include <codecvt>
+
   #include <tchar.h>
   #define NOMINMAX
   #define WIN32_LEAN_AND_MEAN
@@ -597,9 +604,9 @@ namespace {
 }
 
 #ifdef _WIN32
-  auto listDBs() -> std::vector<std::wstring>
+  auto simdb_listDBs() -> std::vector<std::string>
   {
-    //using namespace WINNT;
+    using namespace std;
 
     static HMODULE _hModule = nullptr; 
     static NTOPENDIRECTORYOBJECT  NtOpenDirectoryObject  = nullptr;
@@ -607,7 +614,7 @@ namespace {
     static NTQUERYDIRECTORYOBJECT NtQueryDirectoryObject = nullptr;
     static RTLINITUNICODESTRING   RtlInitUnicodeString   = nullptr;
     
-    std::vector<std::wstring> ret;
+    vector<string> ret;
 
     if(!NtOpenDirectoryObject){  
       NtOpenDirectoryObject  = (NTOPENDIRECTORYOBJECT)GetLibraryProcAddress( _T("ntdll.dll"), "NtOpenDirectoryObject");
@@ -619,23 +626,28 @@ namespace {
       NtOpenFile = (NTOPENFILE)GetLibraryProcAddress(_T("ntdll.dll"), "NtOpenFile");
     }
 
-    HANDLE   hDir = NULL;
+    HANDLE     hDir = NULL;
     IO_STATUS_BLOCK  isb = { 0 };
-    WCHAR* mempth = L"\\BaseNamedObjects";
+    DWORD sessionId;
+    BOOL         ok = ProcessIdToSessionId(GetCurrentProcessId(), &sessionId);
+    if(!ok){ return { "Could not get current session" }; }
+
+    wstring     sesspth = L"\\Sessions\\" + to_wstring(sessionId) + L"\\BaseNamedObjects";
+    const WCHAR* mempth = sesspth.data();
     
     WCHAR buf[4096];
-    UNICODE_STRING   pth = { 0 };
-    pth.Buffer        = mempth;
-    pth.Length        = (USHORT)lstrlenW(mempth) * sizeof(WCHAR);
-    pth.MaximumLength = pth.Length;
+    UNICODE_STRING pth = { 0 };
+    pth.Buffer         = (WCHAR*)mempth;
+    pth.Length         = (USHORT)lstrlenW(mempth) * sizeof(WCHAR);
+    pth.MaximumLength  = pth.Length;
 
     OBJECT_ATTRIBUTES oa = { 0 };
-    oa.Length = sizeof( OBJECT_ATTRIBUTES );
+    oa.Length             = sizeof( OBJECT_ATTRIBUTES );
     oa.RootDirectory      = NULL;
     oa.Attributes         = OBJ_CASE_INSENSITIVE;                               
     oa.ObjectName         = &pth;
     oa.SecurityDescriptor = NULL;                        
-    oa.SecurityQualityOfService = NULL;               
+    oa.SecurityQualityOfService = NULL;
 
     NTSTATUS status;
     status = NtOpenDirectoryObject(
@@ -643,7 +655,8 @@ namespace {
       /*STANDARD_RIGHTS_READ |*/ DIRECTORY_QUERY, 
       &oa);
 
-    if(status==STATUS_SUCCESS){ return ret; }
+    // todo: handle hDir being NULL here 
+    if(hDir==NULL || status!=STATUS_SUCCESS){ return { "Could not open file" }; }
 
     BOOLEAN rescan = TRUE;
     ULONG      ctx = 0;
@@ -656,10 +669,13 @@ namespace {
 
       if( lstrcmpW(info->type.Buffer, L"Section")!=0 ){ continue; }
       WCHAR wPrefix[] = L"simdb_";
-      size_t pfxSz = sizeof(wPrefix);
+      size_t  pfxSz   = sizeof(wPrefix);
       if( strncmp( (char*)info->name.Buffer, (char*)wPrefix, pfxSz)!=0 ){  continue; }
 
-      std::wstring name =  std::wstring( (WCHAR*)info->name.Buffer );
+      wstring  wname = wstring( (WCHAR*)info->name.Buffer );
+      wstring_convert<codecvt_utf8<wchar_t>> cnvrtr;
+      string    name = cnvrtr.to_bytes(wname);
+
       ret.push_back(name);
     }while(status!=STATUS_NO_MORE_ENTRIES);
     
@@ -2053,3 +2069,15 @@ public:
 #endif
 
 
+
+
+//using namespace WINNT;
+//
+//std::vector<std::wstring> ret;
+//vector<wstring> ret;
+//
+//WCHAR* mempth = L"\\BaseNamedObjects";
+//
+//WCHAR*   mempth = L"\\Sessions\\1\\BaseNamedObjects";
+//WCHAR* mempth = L"\\Sessions\\BaseNamedObjects";
+//WCHAR* mempth = L"\\Sessions\\BaseNamedObjects";

@@ -122,7 +122,7 @@ int    main(void)
   //idx = db.put("update test Image Gradient", gradIvBuf);
   //assert(idx!=simdb::FAILED_PUT);
 
-  auto dbs = listDBs();
+  auto dbs = simdb_listDBs();
   TO(dbs.size(),i) wprintf(L"%s\n", dbs[i].c_str() );
   //TO(dbs.size(),i) wcout << dbs[i] << endl;
 
