@@ -122,6 +122,9 @@
 // -todo: update reserve() and constructor to set map capacity
 // -todo: make operator-- be shrink_to_fit() and ++ be expand() ?
 
+// todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
+// | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
+// | does this imply that there should be a separate array type or is specializing string enough? 
 // todo: make operator()() take integers so that the map can also be used as an iterable list through sub-tables
 // todo: make operator+=(const char*) create a key in the map
 // todo: make operator-=(const char*) delete a key in the map

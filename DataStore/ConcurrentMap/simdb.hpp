@@ -205,10 +205,11 @@
 
 // -todo: add apache 2.0 license
 // -todo: make sure asserts/_NDEBUG are not in release mode
+// -todo: clean out old commented lines
 
-// todo: clean out old commented lines
-// todo: make sure listDBs will list the 'sections' for windows in the current namespace/session
+// todo: put in check for 0 after incReaders in getKeys()
 // todo: look back over comment explanation
+// todo: make sure listDBs will list the 'sections' for windows in the current namespace/session
 // todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
 // todo: compile on linux + gcc
 // todo: compile again on osx
@@ -1006,7 +1007,7 @@ public:
       return vi;
     }
   }
-  bool         free(u32  blkIdx, u32 version)        // frees a list/chain of blocks
+  bool         free(u32  blkIdx, u32 version)                                                             // doesn't always free a list/chain of blocks - it decrements the readers and when the readers gets below the value that it started at, only then it is deleted (by the first thread to take it below the starting number)
   {
     return decReaders(blkIdx, version);
   }
@@ -1652,8 +1653,8 @@ public:
       char path[512] = ""; 
       if(!raw_path){ strcpy(path, "simdb_"); }
     #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
-      char path[512] = "/tmp/simdb_15_";
-      //char path[512] = "simdb_15_";
+      char path[512] = "/tmp/simdb_";
+      //char path[512] = "simdb_";
     #endif
 
     u64 len = strlen(path) + strlen(name);
@@ -1880,20 +1881,8 @@ public:
   {
     return s_ch.put(key, klen, val, vlen, out_startBlock);
   }
-  bool         del(const void *const key, u32 klen)
-  {
-    return s_ch.del(key, klen);
-  }
+  bool         del(const void *const key, u32 klen){ return s_ch.del(key, klen); }
 
-  bool         put(char const* const key, const void *const val, u32 vlen, u32* out_startBlock=nullptr)
-  {
-    assert(strlen(key)>0);
-    return put(key, (u32)strlen(key), val, vlen, out_startBlock);
-  }
-  bool         get(char const* const key, void* val, u32 vlen) const
-  {
-    return get(key, (u32)strlen(key), val, vlen);
-  }
   i64          len(u32 idx, u32 version, u32* out_klen=nullptr, u32* out_vlen=nullptr) const
   { 
     VerIdx vi = s_ch.load(idx);
@@ -1905,23 +1894,33 @@ public:
     }
     return 0;
   }
+  bool         get(char const* const key, void* val, u32 vlen) const
+  {
+    return get(key, (u32)strlen(key), val, vlen);
+  }
+  bool         put(char const* const key, const void *const val, u32 vlen, u32* out_startBlock=nullptr)
+  {
+    assert(strlen(key)>0);
+    return put(key, (u32)strlen(key), val, vlen, out_startBlock);
+  }
+
   void       flush() const
   {
     #ifdef _WIN32
       FlushViewOfFile(m_mem.hndlPtr, m_mem.size);
     #endif
   }
-  VerIdx       nxt() const                                   // this version index represents a hash index, not an block storage index
+  VerIdx       nxt() const                                                                  // this version index represents a hash index, not an block storage index
   {
     auto        st = m_nxtChIdx;
     VerIdx   empty = s_ch.empty_vi();
-    u32     chNxt; // = empty.key;
+    u32     chNxt;
     VerIdx     vi;
     do{
-           chNxt = s_ch.nxt(m_nxtChIdx);      if(chNxt==empty.idx) return empty;             // can return the same index - it does not do the iteration after finding a non empty key
+           chNxt = s_ch.nxt(m_nxtChIdx);      if(chNxt==empty.idx){return empty;}           // can return the same index - it does not do the iteration after finding a non empty key
               vi = s_ch.at(chNxt);
       m_nxtChIdx = (chNxt + 1) % m_blkCnt;
-    }while( IsEmpty(vi) );                               // m_nxtChIdx!=st && 
+    }while( IsEmpty(vi) );
 
     m_curChIdx = chNxt;
     VerIdx ret = {chNxt, vi.version};
@@ -1933,7 +1932,7 @@ public:
     if(klen<1) return false;
 
     VerIdx vi = s_ch.load(idx);  
-    if(vi.idx >= CncrHsh::DELETED || vi.version!=version){ return false; }
+    if(vi.idx >= CncrHsh::DELETED || vi.version!=version){return false;}
     u32 l = s_cs.getKey(vi.idx, vi.version, out_buf, klen);                         // l is length
     if(l<1){return false;}
 
@@ -1952,8 +1951,8 @@ public:
   {
     if(m_isOpen){
       m_isOpen = false;
-      u64 prev = s_flags->fetch_sub(1);                                                  // prev is previous flags value - the number of simdb instances across process that had the shared memory file open
-      if(prev==1){                                                                       // if the previous value was 1, that means the value is now 0, and we are the last one to stop using the file, which also means we need to be the one to clean it up
+      u64 prev = s_flags->fetch_sub(1);                                                   // prev is previous flags value - the number of simdb instances across process that had the shared memory file open
+      if(prev==1){                                                                        // if the previous value was 1, that means the value is now 0, and we are the last one to stop using the file, which also means we need to be the one to clean it up
         SharedMem::FreeAnon(m_mem);                                                       // close and delete the shared memory - this is done automatically on windows when all processes are no longer accessing a shared memory file
         return true;
       }
@@ -2053,120 +2052,4 @@ public:
 
 #endif
 
-
-
-
-
-
-
-//if(vi.idx == EMPTY){ return 0ull;  }                                      // only EMPTY is the short circuit, since DELETED means you are still within a span and need to keep searching
-//else if(vi.idx == DELETED){ continue; }                                   // way wrong since there is no short circuiting yet
-
-//swpvi.hi = incLo32(swpvi.hi, 2);                              // swpvi.hi is the left VerIdx, actually ordered as IdxVer, so the lo 32 bits of that are the version number
-//swpvi.lo = incHi32(swpvi.lo, 2);                              // swpvi.lo is the right VerIdx, ordered as VerIdx since the versions are in the middle of the 128 bit alignments and the indices are on the outside
-
-//new (&m_vis) lava_vec<VerIdx>(m_sz);                   // placement new because the copy constructor and assignment operator are deleted.  msvc doesn't care, but clang does
-//    
-//u64 ver0, ver1;
-//ver0         =  empty_vi().asInt;
-//ver1         =  swp32(empty_vi().asInt);
-//ver1.version  =  1;
-//  
-//for(u32 i=0; i<sz; i+=2) store_vi(i, iempty);            // evens 
-//for(u32 i=1; i<sz; i+=2) store_vi(i, iempty);            // odds
-//
-//for(u32 i=0; i<sz; i+=2) *((u64*)(&m_vis[i])) = iempty;          // evens 
-//for(u32 i=1; i<sz; i+=2) *((u64*)(&m_vis[i])) = swpempty;        // odds
-
-//if(vi.idx == EMPTY){ return false;  }                                             // only EMPTY is the short circuit, since DELETED means you are still within a span and need to keep searching
-//else if(vi.idx == DELETED){ continue; }
-
-//u64     exp = *((u64*)expected);     // i%2? swp32(*((u64*)expected)) : *((u64*)expected);
-//
-//return atomic_compare_exchange_strong(addr, (u64*)expected, desi);                      // The entry was free. Now let's try to take it using a CAS. 
-//addr->store(desi);
-//return true;
-
-//{
-//  VerIdx empty;
-//  empty.idx      =  DELETED;
-//  empty.version  =  0;
-//  return empty;
-//}
-
-//u32     cur = blkIdx;
-//VerIdx  nxt = { blkIdx, version };
-//
-//if(krem>0) --kblks;
-//if(krem>0){ ++kblks; }
-//
-//cur    =  nxt.idx;
-//nxt    =  nxtBlock(cur);
-//
-// && !(nxt.idx<0)
-//
-//for(int i=0; i<kblks; ++i){ 
-//  nxt    =  nxtBlock(cur);                 if(nxt.version!=version){ goto read_failure; }
-//  rdLen  =  readBlock(cur, version, b);
-//  b     +=  rdLen;
-//  len   +=  rdLen;
-//  cur    =  nxt.idx;
-//}
-//
-//rdLen  =  readBlock(cur, version, b, krem);
-//b     +=  rdLen;
-//len   +=  rdLen;
-//nxt    =  nxtBlock(cur);                  if(nxt.version!=version){ goto read_failure; }
-//
-////while(true)
-//while( !(nxt.idx<0) && nxt.idx!=LIST_END && nxt.version==version)
-//{
-//  cur    =  nxt.idx;
-//  rdLen  =  readBlock(cur, version, b);  if(rdLen==0) break;        // rdLen is read length
-//  b     +=  rdLen;
-//  len   +=  rdLen;
-//  nxt    =  nxtBlock(cur);
-//  //if(nxt<0 || nxt==LIST_END) break;
-//}
-
-// if(bl.kr.version==0) return 0;
-//cpyLen        -=  ofst;
-
-//
-//mutable ai32      m_blocksUsed;      // this is a mistake and does no good unless it is in the shared memory - CncrLst should return LIST_END when out of memory
-
-//kr.isKey    = isKey;
-//kr.readers  = readers;
-//kr.version  = ver;
-//
-//if(isKey){
-//}else{
-//  len  = 0;
-//  klen = 0;
-//}
-//
-//
-//kr.isKey    = 0;
-//kr.readers  = 0;
-//kr.version  = 0;
-
-//
-// declaring the version first and idx second puts the
-
-//
-//u32 total_len = s_cs.len(idx, version, out_vlen); 
-
-//auto      l = list();
-//
-//curIdx = l->at(curIdx).load();
-//  l->at(curIdx).load();
-
-//return ((HeadUnion*)(&m_h))->cnt;
-//return ((Head*)(&m_h))->ver;
-
-//#include <alloca.h>
-//#define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);  
-//
-// use _malloca ? - would need to use _freea and also know that _malloca always allocates on the heap in debug mode for some crazy reason
-//#define STACK_VEC(TYPE, COUNT) lava_vec<TYPE>(_alloca(lava_vec<TYPE>::sizeBytes(COUNT)), COUNT, true);
 
