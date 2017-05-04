@@ -206,11 +206,11 @@
 // -todo: add apache 2.0 license
 // -todo: make sure asserts/_NDEBUG are not in release mode
 // -todo: clean out old commented lines
+// -todo: put in check for 0 after incReaders in CncrStr::getKeys() - //todo: need to check for 0 here? - no because bl.len is 0 on error
 
-// todo: put in check for 0 after incReaders in getKeys()
-// todo: look back over comment explanation
 // todo: make sure listDBs will list the 'sections' for windows in the current namespace/session
 // todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
+// todo: look back over comment explanation
 // todo: compile on linux + gcc
 // todo: compile again on osx
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
@@ -1096,7 +1096,7 @@ public:
   {
     if(blkIdx == LIST_END){ return 0; }
 
-    BlkLst bl = incReaders(blkIdx, version);                           // todo: need to check for 0 here?
+    BlkLst bl = incReaders(blkIdx, version);
     
     if(bl.len==0 || (bl.klen)>maxlen ) return 0;
 

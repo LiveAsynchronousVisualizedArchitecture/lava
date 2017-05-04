@@ -1,0 +1,21 @@
+
+possibly come up with a more general set of data structures for inter-process communication
+|  how to find other programs and how to register your own program to be communicated with 
+|  |  tags? 
+|  |  declare interfaces? 
+|  |  declare data transformations? 
+|  |  declare data types that you accept and give back?  
+|  |  combinations or heirarchies of these things? - declare as a program that you accept utf-8 strings that are URLs for example 
+|  |  is the communication always going to come down to data formats, and if so, can tbl.hpp be used effectivly for any data format?
+|  how to actually do the communication?
+|  |  common shared memory where each program has a messege queue 
+|  |  messeges can have a key into the shared memory database (simdb.hpp)
+|  what other data structures might be useful between programs? 
+|  |  heap
+|  |  stack
+|  |  list
+|  |  strings
+|  |  sorted/ordered maps
+|  |  sets
+
+
