@@ -232,7 +232,6 @@ namespace {
   struct _u128
   {
    volatile u64 lo; volatile u64 hi; 
-    //_u128& operator=(_u128 l){ hi = l.hi; lo = l.lo; return *this; };
   };
 
   template<class T>
@@ -247,10 +246,10 @@ namespace {
     void* p;
 
     void       set_size(u64  s){ ((u64*)p)[-1] = s; }
-    void  set_sizeBytes(u64 sb){ ((u64*)p)[-2] = sb; }   // an offset of -2 should be the first 8 bytes, which store the size in bytes of the whole memory span of this lava_vec
+    void  set_sizeBytes(u64 sb){ ((u64*)p)[-2] = sb; }                                // an offset of -2 should be the first 8 bytes, which store the size in bytes of the whole memory span of this lava_vec
 
   public:
-    static u64 sizeBytes(u64 count)  // sizeBytes is meant to take the same arguments as a constructor and return the total number of bytes to hold the entire stucture given those arguments 
+    static u64 sizeBytes(u64 count)                                                   // sizeBytes is meant to take the same arguments as a constructor and return the total number of bytes to hold the entire stucture given those arguments 
     {
       return sizeof(u64)*2 + count*sizeof(T);
     }
@@ -2058,7 +2057,8 @@ public:
 
 
 
-
+//
+//_u128& operator=(_u128 l){ hi = l.hi; lo = l.lo; return *this; };
 
 //ok         = this->len(nxt.idx, nxt.version, 
 //                       &klen, &vlen);               
