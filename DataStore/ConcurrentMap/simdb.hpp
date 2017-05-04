@@ -1221,17 +1221,10 @@ public:
   static u32           HashBytes(const void *const buf, u32 len)
   {
     u64 hsh = fnv_64a_buf(buf, len);
-
     return (u32)( (hsh>>32) ^ ((u32)hsh));
   }
   static VerIdx         empty_vi(){ return VerIdx(EMPTY,0); }
-  static VerIdx       deleted_vi()
-  {
-    VerIdx empty;
-    empty.idx      =  DELETED;
-    empty.version  =  0;
-    return empty;
-  }
+  static VerIdx       deleted_vi(){ return VerIdx(DELETED,0); }
   static i64              vi_i64(VerIdx vi){ u64 iVi=vi.asInt; return *((i64*)(&iVi)); }                                              // interpret the u64 bits directly as a signed 64 bit integer instead  
   static i64              vi_i64(u64  i){ return *((i64*)&i); }          // interpret the u64 bits directly as a signed 64 bit integer instead    
   static bool            IsEmpty(VerIdx vi)
@@ -1255,18 +1248,18 @@ private:
   using UnqLock  =  std::unique_lock<Mut>;
 
           u32       m_sz;
-  mutable VerIdxs   s_vis;           // s_vis is key value(s) - needs to be changed to versioned indices, m_vis
-          CncrStr*  m_csp;           // csp is concurrent store pointer
+  mutable VerIdxs   s_vis;                         // s_vis is key value(s) - needs to be changed to versioned indices, m_vis
+          CncrStr*  m_csp;                         // csp is concurrent store pointer
 
   u32            nxtIdx(u32 i)                 const { return (i+1)%m_sz; }
-  u32           prevIdx(u32 i)                 const { return std::min(i-1, m_sz-1); } // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap
+  u32           prevIdx(u32 i)                 const { return std::min(i-1, m_sz-1); }        // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap
   VerIdx       store_vi(u32 i, u64 vi)         const
   {
     using namespace std;
         
     bool odd = i%2 == 1;
     VerIdx strVi;
-    if(odd) strVi = VerIdx(lo32(vi), hi32(vi));            // the odd numbers need to be swapped so that their indices are on the outer border of 128 bit alignment - the indices need to be on the border of the 128 bit boundary so they can be swapped with an unaligned 64 bit atomic operation
+    if(odd) strVi = VerIdx(lo32(vi), hi32(vi));                                               // the odd numbers need to be swapped so that their indices are on the outer border of 128 bit alignment - the indices need to be on the border of the 128 bit boundary so they can be swapped with an unaligned 64 bit atomic operation
     else    strVi = VerIdx(hi32(vi), lo32(vi));
 
     u64 prev = atomic_exchange<u64>( (au64*)(s_vis.data()+i), *((u64*)(&strVi)) );
@@ -1278,38 +1271,31 @@ private:
   {
     using namespace std;
 
-    //u64     exp = *((u64*)expected);     // i%2? swp32(*((u64*)expected)) : *((u64*)expected);
     u64     exp = i%2? swp32(expected.asInt) : expected.asInt;
-    u64    desi = i%2? swp32(desired.asInt) : desired.asInt;  //desired.asInt;                                          // desi is desired int
+    u64    desi = i%2? swp32(desired.asInt) : desired.asInt;                        // desi is desired int
     au64*  addr = (au64*)(s_vis.data()+i);
     auto before = addr->load();
     bool     ok = addr->compare_exchange_strong( exp, desi );
     auto  after = addr->load();
     
-    //return atomic_compare_exchange_strong(addr, (u64*)expected, desi);                      // The entry was free. Now let's try to take it using a CAS. 
-    //addr->store(desi);
-    //return true;
-
     return ok;
   }
   void           doFree(u32 i)                 const
   {
     store_vi(i, empty_vi().asInt);
   }
-  VerIpd            ipd(u32 i, u32 blkIdx)     const    // ipd is Ideal Position Distance - it is the distance a CncrHsh index value is from the position that it gets hashed to 
+  VerIpd            ipd(u32 i, u32 blkIdx)     const                                // ipd is Ideal Position Distance - it is the distance a CncrHsh index value is from the position that it gets hashed to 
   {
     BlkLst bl = m_csp->blkLst(blkIdx);
-    u32    ip = bl.hash % m_sz;     // ip is Ideal Position
+    u32    ip = bl.hash % m_sz;                                                     // ip is Ideal Position
     u32   ipd = i>ip?  i-ip  :  m_csp->blockCount() - ip + i;
     return {bl.version, ipd};
   }
   bool        isSpanEnd(u32 i, u32 blkIdx)     const
   { 
-    return i!=m_sz-1 && load(i).idx==EMPTY || ipd(i,blkIdx).ipd==0;             // last slot is never treated as the end of a span since it cannot be manipulated atomically with the next slot (since the next slot is the first slot) - this is so that the rest of the table can be cleaned up
+    return i!=m_sz-1 && load(i).idx==EMPTY || ipd(i,blkIdx).ipd==0;                 // last slot is never treated as the end of a span since it cannot be manipulated atomically with the next slot (since the next slot is the first slot) - this is so that the rest of the table can be cleaned up
   }
-  bool     emptyIfAhead()                      const
-  {
-  }
+  bool     emptyIfAhead()                      const{}
   bool          delDupe(u32 i)                 const                                // delete duplicate indices - l is left index, r is right index - will do something different depending on if the two slots are within 128 bit alignment or not
   {
     if(i%2==0)
@@ -1319,7 +1305,7 @@ private:
       viDbl            = *viDblAddr;                                                // if it isn't the same, the atomic compare exchange will load it atomically
       do{
         u32 l = hi32(viDbl.lo);
-        u32 r = lo32(viDbl.hi);                                                     
+        u32 r = lo32(viDbl.hi);                                           
         if( (l==DELETED && r==EMPTY) ){ //|| (l==EMPTY && r==DELETED) ){
           rgtDel = vi_i64( swp32(empty_vi().asInt) );
           lftDel = vi_i64( empty_vi() );
@@ -1340,12 +1326,12 @@ private:
       do{
         u32  l = hi32(idxDbl);
         u32  r = lo32(idxDbl);
-        if( (l==DELETED && r==EMPTY) ){    //|| (l==EMPTY && r==DELETED) ){           // change the deleted key to empty if it is to the left of an empty slot and therefore at the end of a span
+        if( (l==DELETED && r==EMPTY) ){    //|| (l==EMPTY && r==DELETED) ){         // change the deleted key to empty if it is to the left of an empty slot and therefore at the end of a span
           desired = make64(EMPTY, EMPTY);          
         }else if(l!=r || l>=DELETED){
           return false; 
         }else{                                                                      // if the indices are the same then do the compare and swap
-          desired = make64(l, DELETED);                                         // make the new 64 bit integer with the right index set to DELETED
+          desired = make64(l, DELETED);                                             // make the new 64 bit integer with the right index set to DELETED
         }
       }while( !idxDblAddr->compare_exchange_strong(idxDbl, desired) );              // looping here would essentially mean that the indices change but are still identical to each other
     }
@@ -1369,8 +1355,8 @@ private:
   }
 
   template<class FUNC> 
-  bool       runIfMatch(VerIdx vi, const void* const buf, u32 len, u32 hash, FUNC f) const  // todo: should this increment and decrement the readers, as well as doing something different if it was the thread that freed the blocks?
-  {
+  bool       runIfMatch(VerIdx vi, const void* const buf, u32 len, u32 hash, FUNC f) const 
+  { // todo: should this increment and decrement the readers, as well as doing something different if it was the thread that freed the blocks
     //VerIdx kv = incReaders(i);    
       Match      m = m_csp->compare(vi.idx, vi.version, buf, len, hash);
       bool matched = false;                                                   // not inside a scope
@@ -1384,7 +1370,6 @@ public:
   CncrHsh(){}
   CncrHsh(void* addr, u32 size, CncrStr* cs, bool owner=true) :
     m_sz(nextPowerOf2(size)),
-    //s_vis(addr, m_sz),
     m_csp(cs)
   {
     u64     paddr  =  (u64)addr;                // paddr is padded address
@@ -1403,10 +1388,7 @@ public:
   CncrHsh& operator=(CncrHsh const& lval) = delete;
   CncrHsh& operator=(CncrHsh&&      rval) = delete;
 
-  VerIdx  operator[](u32 idx) const
-  {
-    return s_vis[idx];
-  }
+  VerIdx  operator[](u32 idx) const { return s_vis[idx]; }
 
   VerIdx   putHashed(u32 hash, VerIdx lstVi, const void *const key, u32 klen) const
   {
@@ -1425,18 +1407,16 @@ public:
       }                                                                                     // Either we just added the key, or another thread did.
 
       if(m_csp->compare(vi.idx,vi.version,key,klen,hash) != MATCH_TRUE){
-        if(i==en){break;}
+        if(i==en){return empty;}
         else{continue;}
       }
 
       bool success = cmpex_vi(i, vi, desired);
       if(success){ return vi; }
       else{ i=prevIdx(i); continue; }
-
-      //if(i==en) break;
     }
 
-    return empty;  // should never be reached
+    // return empty;  // should never be reached
   }
 
   template<class FUNC> 
@@ -1449,10 +1429,6 @@ public:
     for(;; i=nxtIdx(i) )
     {
       VerIdx vi = load(i);
-
-      //if(vi.idx == EMPTY){ return false;  }                                             // only EMPTY is the short circuit, since DELETED means you are still within a span and need to keep searching
-      //else if(vi.idx == DELETED){ continue; }
-
       if(vi.idx!=EMPTY && vi.idx!=DELETED && runIfMatch(vi,key,klen,hash,f) ){ return true; }
       
       if(i==en){ return false; }
@@ -1487,7 +1463,6 @@ public:
 
       if(m==MATCH_REMOVED || i==en){ return empty; }
     }
-
     //return empty;   // unreachable
   }
 
@@ -1502,28 +1477,13 @@ public:
     
     m_csp   =  cs;
     m_sz    =  sz;
-    //new (&m_vis) lava_vec<VerIdx>(m_sz);                   // placement new because the copy constructor and assignment operator are deleted.  msvc doesn't care, but clang does
-    
-    //u64 ver0, ver1;
-    //ver0         =  empty_vi().asInt;
-    //ver1         =  swp32(empty_vi().asInt);
-    //ver1.version  =  1;
-    
-    //for(u32 i=0; i<sz; i+=2) store_vi(i, iempty);            // evens 
-    //for(u32 i=1; i<sz; i+=2) store_vi(i, iempty);            // odds
-
-    //for(u32 i=0; i<sz; i+=2) *((u64*)(&m_vis[i])) = iempty;          // evens 
-    //for(u32 i=1; i<sz; i+=2) *((u64*)(&m_vis[i])) = swpempty;        // odds
 
     for(u32 i=0; i<sz; i+=2) s_vis[i] = VerIdx(EMPTY,0);         // evens 
     for(u32 i=1; i<sz; i+=2) s_vis[i] = VerIdx(0,EMPTY);         // odds
     
     return true;
   }
-  VerIdx          at(u32   idx)                const
-  {
-    return load(idx);
-  }
+  VerIdx          at(u32   idx)                const { return load(idx); }
   u32            nxt(u32 stIdx)                const
   {
     auto idx = stIdx;
@@ -1538,15 +1498,9 @@ public:
 
     return  idx;
   }
-  u32           size()                         const
-  {
-    return m_sz;
-  }
+  u32           size()                         const { return m_sz; }
   auto          data()                         const -> void* { return s_vis.data(); }
-  u64      sizeBytes()                         const
-  {
-    return s_vis.sizeBytes();
-  }
+  u64      sizeBytes()                         const { return s_vis.sizeBytes(); }
   i64        swapNxt(u32   idx)                const
   {
     i64 retries = -1;
@@ -1559,8 +1513,6 @@ public:
         ++retries;                                                    // this will need to swap the side of VerIdx too
         dblvi = *idxAddr;                   
         swpvi = { swp32(idxAddr->lo), swp32(idxAddr->hi) };           // not needed? can use the values directly?
-        //swpvi.hi = incLo32(swpvi.hi, 2);                              // swpvi.hi is the left VerIdx, actually ordered as IdxVer, so the lo 32 bits of that are the version number
-        //swpvi.lo = incHi32(swpvi.lo, 2);                              // swpvi.lo is the right VerIdx, ordered as VerIdx since the versions are in the middle of the 128 bit alignments and the indices are on the outside
       }while( compex128( (i64*)(idxAddr), swpvi.hi, swpvi.lo, (i64*)(&dblvi) )==1 );
     }
     else                                                              // must be on an odd number, and so will need to use a 64 bit atomic to swap the indices in the middle
@@ -1578,15 +1530,12 @@ public:
   }
   i64            len(const void *const key, u32 klen, u32* out_vlen=nullptr, u32* out_version=nullptr) const
   {
-    if(klen<1) return 0;
+    if(klen<1){return 0;}
 
     u32 hash=HashBytes(key,klen), len=0, ver=0, i=hash%m_sz, en=prevIdx(i);
     for(;; i=nxtIdx(i) )
     {
-      VerIdx vi = load(i);
-      //if(vi.idx == EMPTY){ return 0ull;  }                                      // only EMPTY is the short circuit, since DELETED means you are still within a span and need to keep searching
-      //else if(vi.idx == DELETED){ continue; }                                   // way wrong since there is no short circuiting yet
-      
+      VerIdx vi = load(i);      
       if(vi.idx!=EMPTY && vi.idx!=DELETED){
         Match m = m_csp->compare(vi.idx, vi.version, key, klen, hash);
         if(m==MATCH_TRUE){ return m_csp->len(vi.idx, vi.version, out_vlen); }        
@@ -1594,8 +1543,6 @@ public:
       
       if(i==en){ return 0ull; }
     }
-
-    //return len;                                                                     // shouldn't be hit
   }
   bool           get(const void *const key, u32 klen, void *const out_val, u32 vlen) const
   {
@@ -1621,7 +1568,7 @@ public:
     m_csp->put(lstVi.idx, key, klen, val, vlen);
 
     VerIdx vi = putHashed(hash, lstVi, key, klen);
-    if(vi.idx<DELETED){ m_csp->free(vi.idx, vi.version); }                          // putHashed returns the entry that was there before, which is the entry that was replaced. If it wasn't empty, we free it here. 
+    if(vi.idx<DELETED){ m_csp->free(vi.idx, vi.version); }                              // putHashed returns the entry that was there before, which is the entry that was replaced. If it wasn't empty, we free it here. 
 
     return true;
   }
@@ -2109,6 +2056,43 @@ public:
 
 
 
+
+
+
+//if(vi.idx == EMPTY){ return 0ull;  }                                      // only EMPTY is the short circuit, since DELETED means you are still within a span and need to keep searching
+//else if(vi.idx == DELETED){ continue; }                                   // way wrong since there is no short circuiting yet
+
+//swpvi.hi = incLo32(swpvi.hi, 2);                              // swpvi.hi is the left VerIdx, actually ordered as IdxVer, so the lo 32 bits of that are the version number
+//swpvi.lo = incHi32(swpvi.lo, 2);                              // swpvi.lo is the right VerIdx, ordered as VerIdx since the versions are in the middle of the 128 bit alignments and the indices are on the outside
+
+//new (&m_vis) lava_vec<VerIdx>(m_sz);                   // placement new because the copy constructor and assignment operator are deleted.  msvc doesn't care, but clang does
+//    
+//u64 ver0, ver1;
+//ver0         =  empty_vi().asInt;
+//ver1         =  swp32(empty_vi().asInt);
+//ver1.version  =  1;
+//  
+//for(u32 i=0; i<sz; i+=2) store_vi(i, iempty);            // evens 
+//for(u32 i=1; i<sz; i+=2) store_vi(i, iempty);            // odds
+//
+//for(u32 i=0; i<sz; i+=2) *((u64*)(&m_vis[i])) = iempty;          // evens 
+//for(u32 i=1; i<sz; i+=2) *((u64*)(&m_vis[i])) = swpempty;        // odds
+
+//if(vi.idx == EMPTY){ return false;  }                                             // only EMPTY is the short circuit, since DELETED means you are still within a span and need to keep searching
+//else if(vi.idx == DELETED){ continue; }
+
+//u64     exp = *((u64*)expected);     // i%2? swp32(*((u64*)expected)) : *((u64*)expected);
+//
+//return atomic_compare_exchange_strong(addr, (u64*)expected, desi);                      // The entry was free. Now let's try to take it using a CAS. 
+//addr->store(desi);
+//return true;
+
+//{
+//  VerIdx empty;
+//  empty.idx      =  DELETED;
+//  empty.version  =  0;
+//  return empty;
+//}
 
 //u32     cur = blkIdx;
 //VerIdx  nxt = { blkIdx, version };
