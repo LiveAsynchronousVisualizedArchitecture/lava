@@ -212,14 +212,14 @@
 // -todo: fix simdb_listDBs() - now the path uses the sessionId on windows
 // -todo: figure out how to convert wchar strings to char strings for simdb_listDBs - <local> and <codecvt> needed along with a wstring_convert object with type utf8 and wchar_t
 // -todo: handle hDir return NULL - also checking for a status that isn't STATUS_SUCCESS
+// -todo: handle a current db existing but being too small to hold the the constructor arguments? - won't it take the data from the shared memory?
+// -todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
 
-// todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
 // todo: look back over comment explanation
 // todo: compile on linux + gcc
 // todo: compile again on osx
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
-// todo: handle a current db existing but being too small to hold the the constructor arguments?
 // todo: test time penalty to query non-existant key
 // todo: make read use 128 bit compare and swap to know when the next slot has changed out from under it? - just return a bool of whether a change was detected and return it into an optional pointer, then let the user decide whether to loop again - can IPD be used to guess if something has changed? if the next slot is only 1 more, then the idxs would have have to be the same, which isn't possible if nothing changed, if it is 2 more, then they should be in the process of being swapped
 // todo: make extra slot at the end of m_vis with 128 bit alignment, and make read look at both the extra slot and the first slot
@@ -715,14 +715,22 @@ private:
   au64*        m_h;
 
 public:
-  static u64   sizeBytes(u32 size) { return ListVec::sizeBytes(size); }
+  static u64   sizeBytes(u32 size) { return ListVec::sizeBytes(size) + 128; }         // an extra 128 bytes so that Head can be placed
   static u32  incVersion(u32    v) { return v==NXT_VER_SPECIAL?  1  :  v+1; }
 
   CncrLst(){}
-  CncrLst(void* addr, u32 size, bool owner=true) :           // this constructor is for when the memory is owned an needs to be initialized
-    m_lv(addr, size, owner)
+  CncrLst(void* addr, u32 size, bool owner=true)            // this constructor is for when the memory is owned an needs to be initialized
+    //m_lv(addr, size, owner)
   {                                                          // separate out initialization and let it be done explicitly in the simdb constructor?
-    m_h = (au64*)addr;
+    
+    u64   addrRem  =  (u64)addr % 64;
+    u64 alignAddr  =  (u64)addr + (64-addrRem);
+    assert( alignAddr % 64 == 0 );
+    m_h = (au64*)alignAddr;
+    //m_h = (au64*)addr;
+
+    u32* listAddr = (u32*)((u64)alignAddr+64);
+    new (&m_lv) ListVec(listAddr, size, owner);
 
     if(owner){
       for(u32 i=0; i<(size-1); ++i) m_lv[i] = i+1;
@@ -777,7 +785,7 @@ public:
     h.asInt = m_h->load();
     return h.idx;
   }
-  auto       list() -> ListVec const* { return &m_lv; }                    // not thread safe
+  auto       list() -> ListVec const* { return &m_lv; }                               // not thread safe
   u32      lnkCnt()                                                // not thread safe
   {
     u32    cnt = 0;
