@@ -207,7 +207,7 @@
 // -todo: make sure asserts/_NDEBUG are not in release mode
 // -todo: clean out old commented lines
 // -todo: put in check for 0 after incReaders in CncrStr::getKeys() - //todo: need to check for 0 here? - no because bl.len is 0 on error
-// todo: make sure listDBs will list the 'sections' for windows in the current namespace/session - doesn't work initially
+// -todo: make sure listDBs will list the 'sections' for windows in the current namespace/session - doesn't work initially
 // -todo: re-evaluate strong vs weak ordering - weak ordering will likely work, but are there any places that depend on other threads doing operations in order? - possibly techniques that depend on the CncrHsh value first and the block list second? 
 // -todo: fix simdb_listDBs() - now the path uses the sessionId on windows
 // -todo: figure out how to convert wchar strings to char strings for simdb_listDBs - <local> and <codecvt> needed along with a wstring_convert object with type utf8 and wchar_t
@@ -216,9 +216,9 @@
 // -todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
 // todo: make an ascii diagram of the memory layout
 // -todo: look back over comment explanation
+// -todo: take capacity out of lava_vec
+// -todo: change CncrLst to use s_ variables
 
-// todo: take capacity out of lava_vec
-// todo: change CncrLst to use s_ variables
 // todo: compile on linux + gcc
 // todo: compile again on osx
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
@@ -304,9 +304,9 @@
  -----------------
    ______________________________________________________________________________________________________________________
    |Flags|BlockSize|BlockCount|ConcurrentHash|ConcurrentStore|ConcurentList|...BlockCount*BlockSize bytes for blocks....|
-    ________________________________/               \_______       \_____________________________________________________________________
- ___|________________________________________________   ___|___________________________________________________________________    _____|________________________________________________________
- |size(bytes)|capacity|...array of VerIdx structs...|   |Block List Version|size(bytes)|capacity|...array of BlkLst structs...|    |size(bytes)|capacity|...array of unsigned 32 bit ints (u32) |
+       _____________________________/               \_______       \______________________________________________________
+ ______|____________________________________   ____________|_________________________________________________    ________|___________________________________________
+ |size(bytes)|...array of VerIdx structs...|   |Block List Version|size(bytes)|...array of BlkLst structs...|    |size(bytes)|...array of unsigned 32 bit ints (u32)|
 
 
  First 24 bytes (in 8 byte / unsigned 64 bit chunks): 
@@ -316,7 +316,6 @@
   Flags:      Right now holds count of the number of processes that have the db open.  When the count goes to 0, the last process will delete the shared memory file.
   BlockSize:  The size in bytes of a block.  A good default would be to set this to the common page size of 4096 bytes.  
   BlockCount: The number of blocks.  This hash table array, block list array and concurrent list array will all be the same length.  This multiplied by the BlockSize will give the total amount of bytes available for key and value data. More blocks will also mean the hash table will have less collisions as well as less contention between threads.
-
 
 */
 
@@ -419,22 +418,20 @@ namespace {
   private:
     void* p;
 
-    void       set_size(u64  s){ ((u64*)p)[-1] = s; }
-    void  set_sizeBytes(u64 sb){ ((u64*)p)[-2] = sb; }                                // an offset of -2 should be the first 8 bytes, which store the size in bytes of the whole memory span of this lava_vec
+    void  set_sizeBytes(u64 sb){ ((u64*)p)[-1] = sb; }                                // an offset of -2 should be the first 8 bytes, which store the size in bytes of the whole memory span of this lava_vec
 
   public:
     static u64 sizeBytes(u64 count)                                                   // sizeBytes is meant to take the same arguments as a constructor and return the total number of bytes to hold the entire stucture given those arguments 
     {
-      return sizeof(u64)*2 + count*sizeof(T);
+      return sizeof(u64) + count*sizeof(T);
     }
 
     lava_vec(){}
     lava_vec(void*  addr, u64 count, bool owner=true) :
-      p( ((u64*)addr) + 2 )
+      p( ((u64*)addr) + 1 )
     {
       if(owner){
         set_sizeBytes( lava_vec::sizeBytes(count) );
-        set_size(count);
       }
     }
     lava_vec(void*  addr) : p( ((u64*)addr) + 2 ) {}
@@ -447,10 +444,6 @@ namespace {
     T& operator[](u64 i){ return data()[i]; }
 
     T*        data(){ return (T*)p; }
-    u64   capacity() const
-    {
-      return (sizeBytes() - sizeof(u64)*2) / sizeof(T);
-    }
     u64  sizeBytes() const { return ((u64*)p)[0]; }                                    // first 8 bytes should be the total size of the buffer in bytes
     auto      addr() const -> void*
     {
@@ -722,12 +715,12 @@ public:
   using     u64  =  uint64_t;
   using ListVec  =  lava_vec<u32>;
 
-  const static u32 LIST_END = 0xFFFFFFFF;
+  const static u32        LIST_END = 0xFFFFFFFF;
   const static u32 NXT_VER_SPECIAL = 0xFFFFFFFF;
 
 private:
-  ListVec     m_lv;   // todo: change these to s_ variables
-  au64*        m_h;
+  ListVec     s_lv;   // todo: change these to s_ variables
+  au64*        s_h;
 
 public:
   static u64   sizeBytes(u32 size) { return ListVec::sizeBytes(size) + 128; }         // an extra 128 bytes so that Head can be placed
@@ -735,83 +728,83 @@ public:
 
   CncrLst(){}
   CncrLst(void* addr, u32 size, bool owner=true)            // this constructor is for when the memory is owned an needs to be initialized
-    //m_lv(addr, size, owner)
+    //s_lv(addr, size, owner)
   {                                                          // separate out initialization and let it be done explicitly in the simdb constructor?
     
     u64   addrRem  =  (u64)addr % 64;
     u64 alignAddr  =  (u64)addr + (64-addrRem);
     assert( alignAddr % 64 == 0 );
-    m_h = (au64*)alignAddr;
-    //m_h = (au64*)addr;
+    s_h = (au64*)alignAddr;
+    //s_h = (au64*)addr;
 
     u32* listAddr = (u32*)((u64)alignAddr+64);
-    new (&m_lv) ListVec(listAddr, size, owner);
+    new (&s_lv) ListVec(listAddr, size, owner);
 
     if(owner){
-      for(u32 i=0; i<(size-1); ++i) m_lv[i] = i+1;
-      m_lv[size-1] = LIST_END;
+      for(u32 i=0; i<(size-1); ++i) s_lv[i] = i+1;
+      s_lv[size-1] = LIST_END;
 
-      ((Head*)m_h)->idx = 0;
-      ((Head*)m_h)->ver = 0;
+      ((Head*)s_h)->idx = 0;
+      ((Head*)s_h)->ver = 0;
     }
   }
 
   u32        nxt()                                                             // moves forward in the list and return the previous index
   {
     Head  curHead, nxtHead;
-    curHead.asInt  =  m_h->load();
+    curHead.asInt  =  s_h->load();
     do{
       if(curHead.idx==LIST_END){return LIST_END;}
 
-      nxtHead.idx  =  m_lv[curHead.idx];
+      nxtHead.idx  =  s_lv[curHead.idx];
       nxtHead.ver  =  curHead.ver==NXT_VER_SPECIAL? 1  :  curHead.ver+1;
-    }while( !m_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
+    }while( !s_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
 
     return curHead.idx;
   }
   u32        free(u32 idx)                                                    // not thread safe when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway, since the CncrHsh will already have the index taken out and the free will only be triggered after the last reader has read from it 
   {
     Head curHead, nxtHead; u32 retIdx;
-    curHead.asInt = m_h->load();
+    curHead.asInt = s_h->load();
     do{
-      retIdx = m_lv[idx] = curHead.idx;
+      retIdx = s_lv[idx] = curHead.idx;
       nxtHead.idx  =  idx;
       nxtHead.ver  =  curHead.ver + 1;
-    }while( !m_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
+    }while( !s_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
 
     return retIdx;
   }
   u32        free(u32 st, u32 en)                                            // not thread safe when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway, since the CncrHsh will already have the index taken out and the free will only be triggered after the last reader has read from it 
   {
     Head curHead, nxtHead; u32 retIdx;
-    curHead.asInt = m_h->load();
+    curHead.asInt = s_h->load();
     do{
-      retIdx = m_lv[en] = curHead.idx;
+      retIdx = s_lv[en] = curHead.idx;
       nxtHead.idx  =  st;
       nxtHead.ver  =  curHead.ver + 1;
-    }while( !m_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
+    }while( !s_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
 
     return retIdx;
   }
-  auto      count() const -> u32 { return ((Head*)m_h)->ver; }
+  auto      count() const -> u32 { return ((Head*)s_h)->ver; }
   auto        idx() const -> u32
   {
     Head h; 
-    h.asInt = m_h->load();
+    h.asInt = s_h->load();
     return h.idx;
   }
-  auto       list() -> ListVec const* { return &m_lv; }                               // not thread safe
+  auto       list() -> ListVec const* { return &s_lv; }                               // not thread safe
   u32      lnkCnt()                                                // not thread safe
   {
     u32    cnt = 0;
     u32 curIdx = idx();
     while( curIdx != LIST_END ){
-      curIdx = m_lv[curIdx];
+      curIdx = s_lv[curIdx];
       ++cnt;
     }
     return cnt;
   }
-  auto       head() -> Head* { return (Head*)m_h; }
+  auto       head() -> Head* { return (Head*)s_h; }
 };
 class     CncrStr                                                          // CncrStr is Concurrent Store 
 {
@@ -2093,6 +2086,26 @@ public:
 
 
 
+
+//    ______________________________________________________________________________________________________________________
+//  |Flags|BlockSize|BlockCount|ConcurrentHash|ConcurrentStore|ConcurentList|...BlockCount*BlockSize bytes for blocks....|
+//   ________________________________/               \_______       \_____________________________________________________________________
+//___|________________________________________________   ___|___________________________________________________________________    _____|________________________________________________________
+//|size(bytes)|capacity|...array of VerIdx structs...|   |Block List Version|size(bytes)|capacity|...array of BlkLst structs...|    |size(bytes)|capacity|...array of unsigned 32 bit ints (u32) |
+
+// after taking capacity out of lava_vec
+//void       set_size(u64  s){ ((u64*)p)[-1] = s; }
+//
+//return sizeof(u64)*2 + count*sizeof(T);
+//  
+//p( ((u64*)addr) + 2 )
+//
+//set_size(count);
+//
+//u64   capacity() const
+//{
+//  return (sizeBytes() - sizeof(u64)*2) / sizeof(T);
+//}
 
 //using namespace WINNT;
 //
