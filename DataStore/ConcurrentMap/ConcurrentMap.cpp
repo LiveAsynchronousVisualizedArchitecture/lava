@@ -298,7 +298,10 @@ int main()
 {
   using namespace std;
 
+  Println("size of simdb on the stack: ", sizeof(simdb));
+
   simdb db("test", 16, 8);
+
   //simdb db("H:\\projects\\lava\\test.simdb", 32, 64, true);
   //simdb db("test.simdb", 32, 64, true);
 
