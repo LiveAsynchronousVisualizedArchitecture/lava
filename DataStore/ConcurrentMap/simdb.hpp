@@ -216,6 +216,7 @@
 // -todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
 
 // todo: look back over comment explanation
+// todo: change CncrLst to use s_ variables
 // todo: compile on linux + gcc
 // todo: compile again on osx
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
@@ -249,14 +250,16 @@
    |-ConcurrentStore:
    |  |  Keeps track of block lists.
    |  |  This primarily uses an array of BlkLst structs (which are 24 bytes each). 
+   |  |  The BlkLst lava_vec is used to make linked lists of block indices. 
    |  |  The idea of a block list ends up being a starting index (from the VerIdx struct in the concurrent hash). The BlkLst struct at the starting index contains an index of the next BlkLst struct and so on until reaching a BlkLst that has an index of LIST_END. This means that one array contains multiple linked lists (using indices and not pointers of course).
    |  |  This exposes an alloc() function and a free() function. 
    |  |  alloc() gets the index of the next block from CncrLst (concurrent list).
-   |  |  The BlkLst lava_vec is used to make linked lists of block indices. 
-   |  |  It is an array of one integer per block with the integer at a given index representing the index of the next block.  
-   |  |  This keeps the total length and the key length / value offset since it is already reference counted
-   |  |-BlockStore:
-   |  |-BlockList (lava_vec):
+   |  |  The BlkLst struct keeps the total length and the key length / value offset since it does not have to be atomic and is only initialized and used when one thread allocates and only destroyed when one thread frees, just like the actual data blocks.
+   |-ConcurrentList:
+   |  |  The concurrent list is an array integers.
+   |  |  The number of elements (like all the arrays) is the number of blocks.
+   |  |  There is one integer per block with the integer at a given index representing the next slot in the list.
+   |  |  The end of the list will have value LIST_END.  On initialization the array's values would be |1|2|3|4| ... LIST_END, which makes a list from the start to the end. This means s_lv[0] would return 1.
 
  Terms:
  |-Block List: 
@@ -313,6 +316,29 @@
 
  Other notables:
  | All of the main classes have a static sizeBytes() function that takes in the same arguments as a constructor and return the number of bytes that it will need in the shared memory
+ | Classes have member variables that are used as interfaces to the shared memory denoted with s_ (s for shared)
+ | Normal member variables that are just data on the stack are denoted with m_ (m for member)
+
+ |  |-BlockStore:
+ |  |-BlockList (lava_vec):
+
+ _________________
+ | Memory Layout | 
+ -----------------
+   ______________________________________________________________________________________________________________________
+   |Flags|BlockSize|BlockCount|ConcurrentHash|ConcurrentStore|ConcurentList|...BlockCount*BlockSize bytes for blocks....|
+    ________________________________/               \_______       \__________________________________________________
+ ___|________________________________________________   ___|________________________________________________    _____|________________________________________________________
+ |size(bytes)|capacity|...array of VerIdx structs...|   |size(bytes)|capacity|...array of BlkLst structs...|    |size(bytes)|capacity|...array of unsigned 32 bit ints (u32) |
+
+ First 24 bytes (in 8 byte / unsigned 64 bit chunks): 
+     ____________________________ 
+     |Flags|BlockSize|BlockCount|
+  
+  Flags:      Right now holds count of the number of processes that have the db open.  When the count goes to 0, the last process will delete the shared memory file.
+  BlockSize:  The size in bytes of a block.  A good default would be to set this to the common page size of 4096 bytes.  
+  BlockCount: The number of blocks.  This hash table array, block list array and concurrent list array will all be the same length.  This multiplied by the BlockSize will give the total amount of bytes available for key and value data. More blocks will also mean the hash table will have less collisions as well as less contention between threads.
+
 
 */
 
@@ -722,7 +748,7 @@ public:
   const static u32 NXT_VER_SPECIAL = 0xFFFFFFFF;
 
 private:
-  ListVec     m_lv;
+  ListVec     m_lv;   // todo: change these to s_ variables
   au64*        m_h;
 
 public:
