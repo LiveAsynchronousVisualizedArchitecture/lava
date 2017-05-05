@@ -1,5 +1,33 @@
 
 
+// 4. Use version from that struct to verify that each block is part of the list given by the ConcurrenHash entry.
+
+/*
+Robin Hood Hashing:
+ |  The ConcurrentHash indices are organized so that when searching for a key by linear search, no encountered key has an ideal position distance lower than the key being searched for
+ |  To do this concurrently, instead of looking for an empty or deleted slot in the ConcurrentHash array and simply inserting there (as with linear search), the VerIdx is put into a free slot and continuously swapped with its VerIdx to the left if the distance to its ideal position is larger.
+ |  The concurrent swapping of two 64 bit structures is complicated by the fact that while 128 bit atomic compare and exchange instructions are present on most modern CPUs, they are only able to operate on 128 bit aligned memory. 
+ |  While half the 128 bit pairs of two 64 bit structures could be swapped with this instruction, the other half can not.
+ |  On x64 64 bit atomic compare and exchanges CAN be unaligned, meaning that if Index values are next to each other in memory, they can be compare-exchanged atomically or read atomically
+ |  There are multiple insights and techniques working together that allow the concurrent swapping to happen:
+ |  |  The Index of the VerIdx struct stored in the ConcurrentHash array is always unique, since it is the index into the block list.
+ |  |  The Version of the VerIdx struct stored in the ConcurrentHash array is always unique if the BlockList's atomic version counter has not wrapped around after overflow
+ |  |  Because both the Version AND the Index are unique, the same Version + Index combination cannot occur twice over the lifetime of the database unless the version has overflowed and wrapped around (and the same index into the BlockList ends up with the same Version)
+ |  |  The 64 bit Version+Index structure (Version is 32 bits and Index is 32 bits) is flipped on even indices in the ConcurrentHash array. The memory is ordered as  |Idx Ver Ver Idx|Idx Ver Ver Idx| with '|' here representing 128 bit alignment boundaries
+ |  |  The Index values, next to each other in an unaligned 64 bit configuration can be swapped atomically, though their indices can not be 
+ |  del():
+ |  |  Finds the matching key
+ |  |  Makes sure the VerIdx matches in ConcurrentHash and atomically comapare exchanges it for a VerIdx with a DELETED_KEY index value
+ |  |  Calls cleanupDeleted(i) with the current ConcurrentHash slot
+ |  |  |  Checks the next slot to see if there is a VerIdx in it, and if so, check to see what its ideal position distance is
+ |  |  |  If the ideal position distance is more than 0, it can be moved backwards, so duplicate it into the current slot with an atomic compare-exchange to make sure it is deleted
+ |  |  |  Check the indices of the current and next slots to see if the indices are still identical and atomically compare-exchange the right index value to DELETED_KEY if they are
+ |  |  |  The possibility exists that after duplication but before deletion of the duplicate, put() could swap the duplicate to the right (higher slot). Because of this, put will need to delete any indices that it finds that link to non-key block lists
+ |  |  |  put() will also need to check for duplicate indices, since if they are bubble sorting a robin hood span, they could separate duplicate indices from being next to each other, but also sort them back together
+ |  |  |  should get() also check for duplicates? - probably, since it would have tighter cleanup of the ConcurrentHash only at the expense of one or two extra atomic loads per read
+*/
+
+
 // q: is it possible to have only 128 bit aligned values, use the first as the value to read, the second as the value to write, and switch them? - how does that help the sorting problem?
 // q: is it possible to go back to even / odd version numbers?  is it possible to simply update the version number on the block list if it still matches the old version number? - should new even and odd version numbers be gotten from the CncrLst each time?
 // q: can the first and last slots both be 128 bit aligned and use two VerIdx values, creating a double buffer where the low 64 bits of the last slot and the high bits of the first slot are used normally, but the other 64 bits of each can be used as a buffer to swap in values from the other side
