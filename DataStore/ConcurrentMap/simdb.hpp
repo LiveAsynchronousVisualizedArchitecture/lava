@@ -215,8 +215,8 @@
 // -todo: handle a current db existing but being too small to hold the the constructor arguments? - won't it take the data from the shared memory?
 // -todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
 // todo: make an ascii diagram of the memory layout
+// -todo: look back over comment explanation
 
-// todo: look back over comment explanation
 // todo: take capacity out of lava_vec
 // todo: change CncrLst to use s_ variables
 // todo: compile on linux + gcc
