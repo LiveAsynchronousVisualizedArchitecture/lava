@@ -315,9 +315,9 @@ int main()
   //vec<thread>            thrds;
   //vec<RngInt<u32>> rngSwitches;
   //TO(sz,i){ rngSwitches.emplace_back(0,1,i); }
-  
+  //
   //int sz = (int)thrds.size(); 
-  
+  //
   //TO(sz,i)
   //{
   //  int idx = i % sz;
@@ -355,13 +355,13 @@ int main()
   //  //db.del("wut");
   //  Println("put: ", db.put(kablam, skidoosh) ); //Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
   //  db.del("kablam");
-
+  //
   //  //Println("put: ", db.put(wat, skidoosh) );
   //  //Println("del wat: ", db.del("wat") );
-
+  //
   //  Println("put: ", db.put(longkey, longval) );
   //  //Println("del wat: ", db.del(longkey) );
-
+  //
   //  Println();
   //}
   //db.flush();

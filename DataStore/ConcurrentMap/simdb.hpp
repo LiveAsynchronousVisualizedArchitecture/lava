@@ -445,6 +445,8 @@ namespace {
        _ExchangeHigh,
        _ExchangeLow,
        _CompareAndResult) == 1;
+     #else
+       return true; // todo: change this to work for gcc and clang
      #endif
   }
 
@@ -918,19 +920,19 @@ private:
   au64*                s_version;        // pointer to the shared version number
 
   u32                m_blockSize;
-  u32               m_blockCount;
+  //u32               m_blockCount;
   u64                  m_szBytes;
 
   VerIdx       nxtBlock(u32  blkIdx)  const
   {
     BlkLst bl  = s_bls[blkIdx];
-    VerIdx vi;
-    vi.idx     = bl.idx;
-    vi.version = bl.version;
+    //VerIdx vi;
+    //vi.idx     = bl.idx;
+    //vi.version = bl.version;
 
     prefetch1( (char const* const)blockFreePtr(bl.idx) );
 
-    return vi;
+    return VerIdx(bl.idx, bl.version);
   }
   u32     blockFreeSize()             const { return m_blockSize; }
   u8*      blockFreePtr(u32  blkIdx)  const { return ((u8*)s_blksAddr) + blkIdx*m_blockSize; }
@@ -965,7 +967,8 @@ private:
   {
     u32  blkFree  =  blockFreeSize();
     u8*        p  =  blockFreePtr(blkIdx);
-    auto     nxt  =  nxtBlock(blkIdx);
+    //auto     nxt  =  nxtBlock(blkIdx);
+    nxtBlock(blkIdx);
     u32   cpyLen  =  len==0? blkFree : len;             // if next is negative, then it will be the length of the bytes in that block
     p      += ofst;
     memcpy(p, bytes, cpyLen);
@@ -977,7 +980,7 @@ private:
     BlkLst bl = incReaders(blkIdx, version);               if(bl.version==0){ return 0; }
       u32   blkFree  =  blockFreeSize();
       u8*         p  =  blockFreePtr(blkIdx);
-      u32       nxt  =  bl.idx;
+      //u32       nxt  =  bl.idx;
       u32    cpyLen  =  len==0?  blkFree-ofst  :  len;
       memcpy(bytes, p+ofst, cpyLen);
     decReaders(blkIdx, version);
@@ -993,16 +996,16 @@ public:
 
   CncrStr(){}
   CncrStr(void* addr, u32 blockSize, u32 blockCount, bool owner=true) :
-    m_blockSize(blockSize),
-    m_blockCount(blockCount),
-    s_blksAddr( (u8*)addr + BlksOfst(blockCount) ),
+    //m_blockCount(blockCount),
     s_cl(       (u8*)addr + CListOfst(blockCount), blockCount, owner),
     s_bls(      (u8*)addr + BlockListsOfst(),      blockCount, owner),
+    s_blksAddr( (u8*)addr + BlksOfst(blockCount) ),
     s_version(  (au64*)addr ),
+    m_blockSize(blockSize),
     m_szBytes( *((u64*)addr) )
   {
     if(owner){
-      for(u32 i=0; i<m_blockCount; ++i){ s_bls[i] = BlkLst(); }
+      for(u32 i=0; i<blockCount; ++i){ s_bls[i] = BlkLst(); }
       s_version->store(1);                                                                                   // todo: what is this version for if CncrLst already has a version?
     }
     assert(blockSize > sizeof(i32));
@@ -1226,7 +1229,7 @@ public:
   }
   auto         list()      const -> CncrLst const& { return s_cl; }
   auto         data()      const -> const void* { return (void*)s_blksAddr; }
-  u32    blockCount()      const { return m_blockCount; }
+  //u32    blockCount()      const { return m_blockCount; }
   auto       blkLst(u32 i) const -> BlkLst { return s_bls[i]; }
 
   friend class CncrHsh;
@@ -1337,7 +1340,8 @@ private:
   {
     BlkLst bl = m_csp->blkLst(blkIdx);
     u32    ip = bl.hash % m_sz;                                                     // ip is Ideal Position
-    u32   ipd = i>ip?  i-ip  :  m_csp->blockCount() - ip + i;
+    //u32   ipd = i>ip?  i-ip  :  m_csp->blockCount() - ip + i;
+    u32   ipd = i>ip?  i-ip  :  m_sz - ip + i;
     return {bl.version, ipd};
   }
   bool        isSpanEnd(u32 i, u32 blkIdx)     const
