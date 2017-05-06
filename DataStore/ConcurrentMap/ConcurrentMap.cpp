@@ -225,11 +225,11 @@ void printkey(simdb const& db, str const& key)
 {
   //u32 vlen;
   //auto len = db.len(key, &vlen);
-  auto val = db.get(key);
-
+  //
   //auto val = str(vlen, '\0');
   //auto  ok = db.get(key);
 
+  auto val = db.get(key);
   Println(key,": ", val);
 }
 
@@ -348,22 +348,22 @@ int main()
   //Println("put: ", db.put( wat.data(),   (u32)wat.length(),    skidoosh.data(), (u32)skidoosh.length()) );
   //Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
 
-  //if( db.isOwner() ){
-  //  Println("put: ", db.put(wat, skidoosh) );
-  //  //db.del("wat");
-  //  Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
-  //  //db.del("wut");
-  //  Println("put: ", db.put(kablam, skidoosh) ); //Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
-  //  db.del("kablam");
-  //
-  //  //Println("put: ", db.put(wat, skidoosh) );
-  //  //Println("del wat: ", db.del("wat") );
-  //
-  //  Println("put: ", db.put(longkey, longval) );
-  //  //Println("del wat: ", db.del(longkey) );
-  //
-  //  Println();
-  //}
+  if( db.isOwner() ){
+    Println("put: ", db.put(wat, skidoosh) );
+    //db.del("wat");
+    //Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
+    //db.del("wut");
+    //Println("put: ", db.put(kablam, skidoosh) ); //Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
+    //db.del("kablam");
+  
+    //Println("put: ", db.put(wat, skidoosh) );
+    //Println("del wat: ", db.del("wat") );
+  
+    //Println("put: ", db.put(longkey, longval) );
+    //Println("del wat: ", db.del(longkey) );
+  
+    Println();
+  }
   //db.flush();
 
   Println();

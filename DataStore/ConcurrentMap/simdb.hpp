@@ -1538,6 +1538,8 @@ public:
   VerIdx          at(u32   idx)                const { return load(idx); }
   u32            nxt(u32 stIdx)                const
   {
+    assert(stIdx < m_sz);
+
     auto idx = stIdx;
     VerIdx empty = empty_vi();
     do{
@@ -1637,6 +1639,8 @@ public:
   }
   VerIdx        load(u32 i)                    const
   {    
+    assert(i < m_sz);
+
     au64* avi = (au64*)(s_vis.data()+i);                            // avi is atomic versioned index
     u64   cur = swp32(avi->load());                                 // need because of endianess? // atomic_load<u64>( (au64*)(m_vis.data()+i) );              // Load the key that was there.
 
@@ -1847,11 +1851,11 @@ public:
 class       simdb
 {
 public:
-  using     u8  =  uint8_t;
-  using    str  =  std::string;
-  using BlkCnt  =  CncrStr::BlkCnt;
-  using VerIdx  =  CncrHsh::VerIdx;
-  using string  =  std::string;
+  using      u8  =  uint8_t;
+  using     str  =  std::string;
+  using  BlkCnt  =  CncrStr::BlkCnt;
+  using  VerIdx  =  CncrHsh::VerIdx;
+  using  string  =  std::string;
 
 private:
   au64*      s_flags;
@@ -1890,6 +1894,7 @@ public:
 public:
   simdb(){}
   simdb(const char* name, u32 blockSize, u32 blockCount, bool raw_path=false) : 
+    m_nxtChIdx(0),
     m_curChIdx(0),
     m_isOpen(false)
   {
@@ -1972,7 +1977,7 @@ public:
   VerIdx       nxt() const                                                                  // this version index represents a hash index, not an block storage index
   {
     //auto        st = m_nxtChIdx;
-    VerIdx   empty = s_ch.empty_vi();
+    VerIdx  empty = s_ch.empty_vi();
     u32     chNxt;
     VerIdx     vi;
     do{
@@ -2062,8 +2067,7 @@ public:
       i64 sprev = (i64)prev;          // sprev is signed previous
       *searched = (sidx-sprev)>=0?  sidx-sprev  :  (m_blkCnt-sprev-1) + sidx+1;
     }
-    if(nxt.idx==EMPTY) 
-      return {nxt.version, ""};
+    if(nxt.idx==EMPTY){ return {nxt.version, ""}; }
     
     i64 total_len = this->len(nxt.idx, nxt.version, &klen, &vlen);
     if(total_len==0){ return {nxt.version, ""}; }
