@@ -223,7 +223,7 @@ template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  //
 
 void printkey(simdb const& db, str const& key)
 {
-  u32 vlen;
+  //u32 vlen;
   //auto len = db.len(key, &vlen);
   auto val = db.get(key);
 

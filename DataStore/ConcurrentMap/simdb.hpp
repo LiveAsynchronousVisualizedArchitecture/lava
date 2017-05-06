@@ -454,7 +454,10 @@ namespace {
   {
     #ifdef _MSC_VER                              // if msvc or intel compilers
       _mm_prefetch(p, _MM_HINT_T1);
-    #else 
+    #elif defined(__GNUC__) || defined(__clang__)
+      __builtin_prefetch(p);
+    #else
+
     #endif
   }
 
@@ -968,7 +971,7 @@ private:
     u32  blkFree  =  blockFreeSize();
     u8*        p  =  blockFreePtr(blkIdx);
     //auto     nxt  =  nxtBlock(blkIdx);
-    nxtBlock(blkIdx);
+    //nxtBlock(blkIdx);
     u32   cpyLen  =  len==0? blkFree : len;             // if next is negative, then it will be the length of the bytes in that block
     p      += ofst;
     memcpy(p, bytes, cpyLen);
@@ -1114,7 +1117,7 @@ public:
     u32     len = 0;
     u32   rdLen = 0;
     u8*       b = (u8*)bytes;
-    u8*      en = b + maxlen;
+    //u8*      en = b + maxlen;
     i32     cur = blkIdx;
     VerIdx  nxt;
     for(int i=0; i<kblks; ++i){ 
@@ -1195,7 +1198,8 @@ public:
     
     BlkLst     bl = s_bls[blkIdx];
     u32 blklstHsh = bl.hash;
-    if(s_bls[blkIdx].hash!=hash){ return MATCH_FALSE; }              // vast majority of calls should end here
+    //if(s_bls[blkIdx].hash!=hash){ return MATCH_FALSE; }              // vast majority of calls should end here
+    if(blklstHsh!=hash){ return MATCH_FALSE; }                      // vast majority of calls should end here
 
     u32   curidx  =  blkIdx;
     VerIdx   nxt  =  nxtBlock(curidx);                              if(nxt.version!=version) return MATCH_FALSE;
@@ -1326,9 +1330,9 @@ private:
     u64     exp = i%2? swp32(expected.asInt) : expected.asInt;
     u64    desi = i%2? swp32(desired.asInt) : desired.asInt;                        // desi is desired int
     au64*  addr = (au64*)(s_vis.data()+i);
-    auto before = addr->load();
+    //auto before = addr->load();
     bool     ok = addr->compare_exchange_strong( exp, desi );
-    auto  after = addr->load();
+    //auto  after = addr->load();
     
     return ok;
   }
@@ -1344,11 +1348,6 @@ private:
     u32   ipd = i>ip?  i-ip  :  m_sz - ip + i;
     return {bl.version, ipd};
   }
-  bool        isSpanEnd(u32 i, u32 blkIdx)     const
-  { 
-    return i!=m_sz-1 && load(i).idx==EMPTY || ipd(i,blkIdx).ipd==0;                 // last slot is never treated as the end of a span since it cannot be manipulated atomically with the next slot (since the next slot is the first slot) - this is so that the rest of the table can be cleaned up
-  }
-  bool     emptyIfAhead()                      const{}
   bool          delDupe(u32 i)                 const                                // delete duplicate indices - l is left index, r is right index - will do something different depending on if the two slots are within 128 bit alignment or not
   {
     if(i%2==0)
@@ -1522,11 +1521,11 @@ public:
   bool          init(u32    sz, CncrStr* cs)
   {
     using namespace std;
-    static const u64 iempty    =  empty_vi().asInt;
-    static const u64 swpempty  =  swp32(iempty);
+    //static const u64 iempty    =  empty_vi().asInt;
+    //static const u64 swpempty  =  swp32(iempty);
 
-    u32 hi = hi32(iempty);
-    u32 lo = lo32(iempty);
+    //u32 hi = hi32(iempty);
+    //u32 lo = lo32(iempty);
     
     m_csp   =  cs;
     m_sz    =  sz;
@@ -1586,7 +1585,7 @@ public:
   {
     if(klen<1){return 0;}
 
-    u32 hash=HashBytes(key,klen), len=0, ver=0, i=hash%m_sz, en=prevIdx(i);
+    u32 hash=HashBytes(key,klen), /*len=0, ver=0,*/ i=hash%m_sz, en=prevIdx(i);
     for(;; i=nxtIdx(i) )
     {
       VerIdx vi = load(i);      
@@ -1628,7 +1627,7 @@ public:
   }
   bool           del(const void *const key, u32 klen)
   {
-    CncrStr*  csp = m_csp;
+    //CncrStr*  csp = m_csp;
     auto     hash = CncrHsh::HashBytes(key, klen);
     VerIdx     vi = delHashed(key, klen, hash);
     bool   doFree = vi.idx<DELETED;
@@ -1972,7 +1971,7 @@ public:
   }
   VerIdx       nxt() const                                                                  // this version index represents a hash index, not an block storage index
   {
-    auto        st = m_nxtChIdx;
+    //auto        st = m_nxtChIdx;
     VerIdx   empty = s_ch.empty_vi();
     u32     chNxt;
     VerIdx     vi;

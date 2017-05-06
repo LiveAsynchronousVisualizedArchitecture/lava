@@ -1,5 +1,6 @@
 
 
+
 // 4. Use version from that struct to verify that each block is part of the list given by the ConcurrenHash entry.
 
 /*
@@ -26,6 +27,9 @@ Robin Hood Hashing:
  |  |  |  put() will also need to check for duplicate indices, since if they are bubble sorting a robin hood span, they could separate duplicate indices from being next to each other, but also sort them back together
  |  |  |  should get() also check for duplicates? - probably, since it would have tighter cleanup of the ConcurrentHash only at the expense of one or two extra atomic loads per read
 */
+
+
+
 
 
 // q: is it possible to have only 128 bit aligned values, use the first as the value to read, the second as the value to write, and switch them? - how does that help the sorting problem?
@@ -114,6 +118,12 @@ Robin Hood Hashing:
 
 
 
+bool     emptyIfAhead()                      const{}
+
+bool        isSpanEnd(u32 i, u32 blkIdx)     const
+{ 
+  return (i!=m_sz-1 && load(i).idx==EMPTY) || ipd(i,blkIdx).ipd==0;                 // last slot is never treated as the end of a span since it cannot be manipulated atomically with the next slot (since the next slot is the first slot) - this is so that the rest of the table can be cleaned up
+}
 
   bool    cleanDeletion(u32 i, u8 depth=0)     const
   {

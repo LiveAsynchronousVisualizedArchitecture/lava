@@ -138,6 +138,9 @@
 // todo: make flatten method that has creates a new tbl with no extra capacity and takes all tbl references and makes them into offset/children tbls that are stored in the sub-tbl segment - instead of child type, make a read only type? read only could have template specializations or static asserts that prevent changing the tbl or the KV objects from it
 // todo: make non owned type always read only? - still need owned and non-owned types within tbl
 // todo: make resize()
+// todo: use inline assembly to vectorize basic math operations
+// todo: use the restrict keyword on basic math operations 
+// todo: put an assert that the two tbl pointers are not the same
 
 // todo: try template constructor that returns a tbl<type> with a default value set? - can't have a constructor that reserves elems with this? would need a reserve_elems() function? reserve_elems() not needed since adding a key will allocate map_capacity memory  - will have to try after turning into a template
 // todo: make copy use resize? - should it just be a memcpy?
@@ -997,7 +1000,7 @@ public:
 private:
   static const ui32 HASH_MASK = 0x07FFFFFF;
 
-  static ui64 memberBytes()
+  static ui64  memberBytes()
   {
     return sizeof(ui64) * 5;
     // Memory Layout (5 ui64 variables before m_mem)
