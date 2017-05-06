@@ -214,16 +214,17 @@
 // -todo: handle hDir return NULL - also checking for a status that isn't STATUS_SUCCESS
 // -todo: handle a current db existing but being too small to hold the the constructor arguments? - won't it take the data from the shared memory?
 // -todo: make sure that the important atomic variables like BlockLst next are aligned? need to be aligned on cache line false sharing boundaries and not just 64 bit boundaries? - should the Head struct be a more complex structure that has its own sizeBytes and will align itself on construction?  - CncrStr may be able to do this by itself, since keeping Head as a 64 bit union is simple
-// todo: make an ascii diagram of the memory layout
+// -todo: make an ascii diagram of the memory layout
 // -todo: look back over comment explanation
 // -todo: take capacity out of lava_vec
 // -todo: change CncrLst to use s_ variables
 // -todo: compile on linux + gcc
+// -todo: make cleanup of memory mapped file happen under linux
+// -todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths - just in /tmp/
+// -todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ? - using the tmp directoy macro in C
 
-// todo: make cleanup of memory mapped file happen under linux
 // todo: test multiple threads with linux + gcc
-// todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
-// todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
+// todo: make a 'initialized' flag separate from the reference count? // todo: decide ownership with the reference count?
 // todo: compile again on osx
 // todo: test time penalty to query non-existant key
 // todo: make read use 128 bit compare and swap to know when the next slot has changed out from under it? - just return a bool of whether a change was detected and return it into an optional pointer, then let the user decide whether to loop again - can IPD be used to guess if something has changed? if the next slot is only 1 more, then the idxs would have have to be the same, which isn't possible if nothing changed, if it is 2 more, then they should be in the process of being swapped
@@ -448,12 +449,19 @@ namespace {
        _ExchangeLow,
        _CompareAndResult) == 1;
      #else
-       _u128 ex; 
-       ex.hi = _ExchangeHigh;
-       ex.lo = _ExchangeLow;
-       return __atomic_compare_exchange(_Destination, _CompareAndResult, &ex, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+       //__int128 ex;
+       //u64*  ex64 = (u64*)&ex;
+       //ex64[0] = _ExchangeLow;
+       //ex64[1] = _ExchangeHigh;
 
-       //return true; // todo: change this to work for gcc and clang
+       //__sync_val_compare_and_swap(_Destination, );
+
+       //_u128 ex; 
+       //ex.hi = _ExchangeHigh;
+       //ex.lo = _ExchangeLow;
+       //return __atomic_compare_exchange(_Destination, _CompareAndResult, &ex, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+
+       return true; // todo: change this to work for gcc and clang
      #endif
 
   }
@@ -1666,10 +1674,11 @@ struct  SharedMem       // in a halfway state right now - will need to use arbit
     int        fileHndl;
   #endif
 
-  void*       hndlPtr;
-  void*           ptr;
-  u64            size;
-  bool          owner;
+  void*         hndlPtr;
+  void*             ptr;
+  u64              size;
+  bool            owner;
+  char             path[256];
 
   static  bool file_exists(char const* filename)
   {
@@ -1690,14 +1699,19 @@ public:
       if(sm.fileHndl){
         CloseHandle(sm.fileHndl);
       }
-    #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
+    #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)     // osx, linux and freebsd
+
       if(sm.hndlPtr){
         munmap(sm.hndlPtr, sm.size);  // todo: size here needs to be the total size, and errors need to be checked
       }
-      if(sm.fileHndl){
-        close(sm.fileHndl);
-        // todo: deal with errors here as well?
-      }
+
+      //printf("path is: <%s>   %d ", sm.path, remove(sm.path) );
+      //assert( );
+      remove(sm.path);
+      //if(sm.fileHndl){
+      //  close(sm.fileHndl);
+      //  // todo: deal with errors here as well?
+      //}
     #endif
 
     sm.clear();
@@ -1714,24 +1728,28 @@ public:
     #ifdef _WIN32      // windows
       sm.fileHndl = nullptr;
       //char path[512] = "Global\\simdb_";
-      char path[512] = ""; 
-      if(!raw_path){ strcpy(path, "simdb_"); }
+      //char path[512] = ""; 
+      if(!raw_path){ strcpy(sm.path, "simdb_"); }
     #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
       sm.fileHndl = 0;
 
-      char path[512] = "/tmp/simdb_";
+      //strcpy(sm.path, "/tmp/simdb_");
+      strcpy(sm.path, P_tmpdir "/simdb_");
+      //char path[512] = "/tmp/simdb_";
+      //sm.path = P_tmpdir "/simdb_";
+      //char path[512] = P_tmpdir "/simdb_";
       //char path[512] = "simdb_";
     #endif
 
-    u64 len = strlen(path) + strlen(name);
-    if(len > sizeof(path)-1){ /* todo: handle errors here */ }
-    else{ strcat(path, name); }
+    u64 len = strlen(sm.path) + strlen(name);
+    if(len > sizeof(sm.path)-1){ /* todo: handle errors here */ }
+    else{ strcat(sm.path, name); }
 
     #ifdef _WIN32      // windows
       if(raw_path)
       {
         sm.fileHndl = CreateFile(
-          path, 
+          sm.path, 
           FILE_MAP_READ|FILE_MAP_WRITE, 
           FILE_SHARE_READ|FILE_SHARE_WRITE, 
           NULL,
@@ -1740,7 +1758,7 @@ public:
           NULL                          //_In_opt_ HANDLE hTemplateFile
         );
       }
-      sm.fileHndl = OpenFileMapping(FILE_MAP_READ | FILE_MAP_WRITE, FALSE, path);
+      sm.fileHndl = OpenFileMapping(FILE_MAP_READ | FILE_MAP_WRITE, FALSE, sm.path);
 
       if(sm.fileHndl==NULL)
       {
@@ -1750,7 +1768,7 @@ public:
           PAGE_READWRITE,
           0,
           (DWORD)size,
-          path);
+          sm.path);
         if(sm.fileHndl!=NULL){ sm.owner=true; }
       }
       
@@ -1777,15 +1795,15 @@ public:
     #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
       sm.owner   = true; // todo: have to figure out how to detect which process is the owner
 
-      FILE* fp = fopen(path,"rw");
+      FILE* fp = fopen(sm.path,"rw");
       if(fp){
         fclose(fp);
-        sm.fileHndl = open(path, O_RDWR);
+        sm.fileHndl = open(sm.path, O_RDWR);
         sm.owner = false;
       }else{
-        sm.fileHndl = open(path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR |S_IRGRP|S_IWGRP | S_IROTH|S_IWOTH ); // O_CREAT | O_SHLOCK ); // | O_NONBLOCK );
+        sm.fileHndl = open(sm.path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR |S_IRGRP|S_IWGRP | S_IROTH|S_IWOTH ); // O_CREAT | O_SHLOCK ); // | O_NONBLOCK );
         if(sm.fileHndl == -1){
-          printf("open failed, file handle was -1 \nFile name: %s \nError number: %d \n\n", path, errno); 
+          printf("open failed, file handle was -1 \nFile name: %s \nError number: %d \n\n", sm.path, errno); 
           fflush(stdout);
         }
         else{
@@ -1804,7 +1822,7 @@ public:
         #endif
 
         ftruncate(sm.fileHndl, size);       // todo: don't truncate if not the owner, and don't pre-allocate either ?
-        flock(sm.fileHndl, LOCK_EX);
+        flock(sm.fileHndl, LOCK_UN);
         // get the error number and handle the error
       }
 
@@ -1837,11 +1855,18 @@ public:
     size           =  rval.size;
     owner          =  rval.owner;
 
+    strncpy(path, rval.path, sizeof(path));
+
     rval.clear();
   }
   ~SharedMem()
   {
-    if(ptr){ SharedMem::FreeAnon(*this); }
+    if(ptr){
+      au64* flags = (au64*)ptr;
+      u64    prev = 0;
+      if(flags->load()>0){ prev = flags->fetch_sub(1); }
+      if(prev==1){ SharedMem::FreeAnon(*this); }
+    }
   }
   void clear()
   {
@@ -1919,7 +1944,7 @@ public:
       s_blockSize->store(blockSize);
       s_flags->store(1);
     }else{                                                      // need to spin until ready
-      while(s_flags->load() < 1){continue;}
+      //while(s_flags->load() < 1){continue;}
       s_flags->fetch_add(1);
       m_mem.size = MemSize(s_blockSize->load(), s_blockCount->load());
     }
