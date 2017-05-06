@@ -405,50 +405,13 @@ namespace {
 
   enum Match { MATCH_FALSE=0, MATCH_TRUE=1, MATCH_REMOVED=-1  };
 
-  struct _u128 { volatile u64 lo; volatile u64 hi; };
+  //struct _u128 { volatile u64 lo; volatile u64 hi; };
+  struct _u128 { u64 lo; u64 hi; };
 
   template<class T>
   class lava_noop
   {
     void operator()(){}
-  };
-
-  template<class T> class lava_vec
-  {
-  private:
-    void* p;
-
-    void  set_sizeBytes(u64 sb){ ((u64*)p)[-1] = sb; }                                // an offset of -2 should be the first 8 bytes, which store the size in bytes of the whole memory span of this lava_vec
-
-  public:
-    static u64 sizeBytes(u64 count)                                                   // sizeBytes is meant to take the same arguments as a constructor and return the total number of bytes to hold the entire stucture given those arguments 
-    {
-      return sizeof(u64) + count*sizeof(T);
-    }
-
-    lava_vec(){}
-    lava_vec(void*  addr, u64 count, bool owner=true) :
-      p( ((u64*)addr) + 1 )
-    {
-      if(owner){
-        set_sizeBytes( lava_vec::sizeBytes(count) );
-      }
-    }
-    lava_vec(void*  addr) : p( ((u64*)addr) + 2 ) {}
-    lava_vec(lava_vec const&)       = delete;
-    void operator=(lava_vec const&) = delete;
-
-    lava_vec(lava_vec&& rval){ p=rval.p; rval.p=nullptr; }
-    ~lava_vec(){}
-
-    T& operator[](u64 i){ return data()[i]; }
-
-    T*        data(){ return (T*)p; }
-    u64  sizeBytes() const { return ((u64*)p)[0]; }                                    // first 8 bytes should be the total size of the buffer in bytes
-    auto      addr() const -> void*
-    {
-      return p;
-    }
   };
 
   inline u64 fnv_64a_buf(void const *const buf, u64 len)                              // I know basically nothing about hash functions and there is likely a better one out there 
@@ -465,17 +428,24 @@ namespace {
   }
   
   inline bool compex128(
-    volatile long long*  _Destination, 
-    long long           _ExchangeHigh, 
-    long long            _ExchangeLow, 
-    long long*      _CompareAndResult)
+    //long long*          _Destination, 
+    //long long           _ExchangeHigh, 
+    //long long            _ExchangeLow, 
+    //long long*      _CompareAndResult)
+    i64*           _Destination, 
+    i64           _ExchangeHigh, 
+    i64            _ExchangeLow, 
+    i64*      _CompareAndResult)
   {
+
     //assert( ((u64)_Destination) % 16 == 0 );
-    return _InterlockedCompareExchange128(
-     _Destination,
-     _ExchangeHigh,
-     _ExchangeLow,
-     _CompareAndResult) == 1;
+    #ifdef _MSC_VER
+      return _InterlockedCompareExchange128(
+       _Destination,
+       _ExchangeHigh,
+       _ExchangeLow,
+       _CompareAndResult) == 1;
+     #endif
   }
 
   inline void prefetch1(char const* const p)
@@ -489,7 +459,7 @@ namespace {
   #ifdef _WIN32
     using  u128 = __declspec(align(128)) _u128;
   #else
-    using  u128 = volatile _u128;
+    using  u128 = _u128;
   #endif
 
   #ifdef _WIN32
@@ -690,6 +660,14 @@ namespace {
     return ret;
   }
 #else
+  auto simdb_listDBs() -> std::vector<std::string>
+  {
+    using namespace std;
+
+    vector<string> ret;
+
+    return ret;
+  }
   // gcc/clang/linux ?
 #endif
 
@@ -697,6 +675,44 @@ namespace {
   #pragma warning(pop)
 #endif
 
+template<class T> 
+class    lava_vec
+  {
+  private:
+    void* p;
+
+    void  set_sizeBytes(u64 sb){ ((u64*)p)[-1] = sb; }                                // an offset of -2 should be the first 8 bytes, which store the size in bytes of the whole memory span of this lava_vec
+
+  public:
+    static u64 sizeBytes(u64 count)                                                   // sizeBytes is meant to take the same arguments as a constructor and return the total number of bytes to hold the entire stucture given those arguments 
+    {
+      return sizeof(u64) + count*sizeof(T);
+    }
+
+    lava_vec(){}
+    lava_vec(void*  addr, u64 count, bool owner=true) :
+      p( ((u64*)addr) + 1 )
+    {
+      if(owner){
+        set_sizeBytes( lava_vec::sizeBytes(count) );
+      }
+    }
+    lava_vec(void*  addr) : p( ((u64*)addr) + 2 ) {}
+    lava_vec(lava_vec const&)       = delete;
+    void operator=(lava_vec const&) = delete;
+
+    lava_vec(lava_vec&& rval){ p=rval.p; rval.p=nullptr; }
+    ~lava_vec(){}
+
+    T& operator[](u64 i){ return data()[i]; }
+
+    T*        data(){ return (T*)p; }
+    u64  sizeBytes() const { return ((u64*)p)[0]; }                                    // first 8 bytes should be the total size of the buffer in bytes
+    auto      addr() const -> void*
+    {
+      return p;
+    }
+  };
 class     CncrLst
 {
 // Internally this is an array of indices that makes a linked list
@@ -1544,7 +1560,8 @@ public:
       u128   swpvi;                                                   // swpvi is swapped version index - the two indices swapped - this is the desired value 
       do{           
         ++retries;                                                    // this will need to swap the side of VerIdx too
-        dblvi = *idxAddr;                   
+        //dblvi = *idxAddr;                   
+        memcpy(&dblvi, idxAddr, sizeof(dblvi));
         swpvi = { swp32(idxAddr->lo), swp32(idxAddr->hi) };           // not needed? can use the values directly?
       }while( compex128( (i64*)(idxAddr), swpvi.hi, swpvi.lo, (i64*)(&dblvi) )==1 );
     }
@@ -1673,18 +1690,20 @@ public:
   static SharedMem  AllocAnon(const char* name, u64 size, bool raw_path=false)
   {
     using namespace std;
-    
+
     SharedMem sm;
-    sm.fileHndl = nullptr;
     sm.hndlPtr  = nullptr;
     sm.owner    = false;
     sm.size     = alignment==0? size  :  alignment-(size%alignment);
 
     #ifdef _WIN32      // windows
+      sm.fileHndl = nullptr;
       //char path[512] = "Global\\simdb_";
       char path[512] = ""; 
       if(!raw_path){ strcpy(path, "simdb_"); }
     #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
+      sm.fileHndl = 0;
+
       char path[512] = "/tmp/simdb_";
       //char path[512] = "simdb_";
     #endif
@@ -1763,7 +1782,12 @@ public:
         fcntl(sm.fileHndl, F_GETLK, &flock);
 
         flock(sm.fileHndl, LOCK_EX);        // exclusive lock  // LOCK_NB
-        fcntl(sm.fileHndl, F_PREALLOCATE);  //  todo: try F_ALLOCATECONTIG at some point
+        //fcntl(sm.fileHndl, F_PREALLOCATE);  //  todo: try F_ALLOCATECONTIG at some point
+        #if defined(__linux__) 
+        #else 
+          fcntl(sm.fileHndl, F_ALLOCATECONTIG);  //  todo: try F_ALLOCATECONTIG at some point
+        #endif
+
         ftruncate(sm.fileHndl, size);       // todo: don't truncate if not the owner, and don't pre-allocate either ?
         flock(sm.fileHndl, LOCK_EX);
         // get the error number and handle the error

@@ -11,6 +11,7 @@
 #include <mutex>
 #include <vector>
 #include <string>
+#include <regex>
 #include <random>
 #include <iostream>
 #include <sstream>
@@ -34,7 +35,8 @@
 #endif
 
 #ifndef TO
-  #define TO(to, var)      for(std::remove_const<decltype(to)>::type var = 0; var < to; ++var)
+  #define TO(to, var) for(std::remove_const<decltype(to)>::type var = 0; var < to; ++var)
+  //#define TO(to, var) for(auto var = 0ull; var < (unsigned long long)to; ++var)
 #endif
 
 u32       intHash(u32    h)
@@ -108,7 +110,6 @@ STR1 subNonFilename(STR1 const& s, STR2 const& substr)
   return regex_replace(s, pattern, substr);
 }
 
-
 template<class T> inline auto
 Concat(const T& a) -> T
 { return a; }
@@ -146,18 +147,18 @@ toString(const T1& a, const T&... args)
   return toString(a) + toString(args...) ;
 }
 
-template< template<class...> class L, class... T, int IDX = 0> std::string 
-toString(const std::tuple<T...>& tpl)
-{
-  using namespace std;
-  
-  const auto len = mp_len<T...>::value;
-  
-  string ret;
-  ret  +=  toString(get<IDX>(tpl), " ");
-  if(IDX < len-1) ret  += toString(get<IDX+1>(tpl));
-  return ret;
-}
+//template< template<class...> class L, class... T, int IDX = 0> std::string 
+//toString(const std::tuple<T...>& tpl)
+//{
+//  using namespace std;
+//  
+//  const auto len = mp_len<T...>::value;
+//  
+//  string ret;
+//  ret  +=  toString(get<IDX>(tpl), " ");
+//  if(IDX < len-1) ret  += toString(get<IDX+1>(tpl));
+//  return ret;
+//}
 
 inline std::ostream&  Print(std::ostream& o) { return o; }
 template<class... T> inline std::ostream&
@@ -317,25 +318,25 @@ int main()
   
   //int sz = (int)thrds.size(); 
   
-  TO(sz,i)
-  {
-    int idx = i % sz;
-    thrds.emplace_back([i, idx, &rngSwitches, &numkey, &label, &db]
-    {
-      auto& numk = numkey[idx];
-      auto&  lbl = label[idx]; 
-      TO(100,j){ 
-        db.put(numk, lbl); 
-        //if(rngSwitches[idx]()){ db.del(numk); }
-        //bool ok = db.del(numk);
-        //if(!ok){ Println(numk," not deleted"); }
-        //while(!db.del(numk)){}
-      }
-      
-      Println(i, " done");
-    });
-  }
-  TO(thrds.size(),i){ thrds[i].join(); }
+  //TO(sz,i)
+  //{
+  //  int idx = i % sz;
+  //  thrds.emplace_back([i, idx, &rngSwitches, &numkey, &label, &db]
+  //  {
+  //    auto& numk = numkey[idx];
+  //    auto&  lbl = label[idx]; 
+  //    TO(100,j){ 
+  //      db.put(numk, lbl); 
+  //      //if(rngSwitches[idx]()){ db.del(numk); }
+  //      //bool ok = db.del(numk);
+  //      //if(!ok){ Println(numk," not deleted"); }
+  //      //while(!db.del(numk)){}
+  //    }
+  //    
+  //    Println(i, " done");
+  //  });
+  //}
+  //TO(thrds.size(),i){ thrds[i].join(); }
 
   str       wat  =       "wat";
   str       wut  =       "wut";
