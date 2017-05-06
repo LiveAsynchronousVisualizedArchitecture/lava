@@ -299,7 +299,7 @@ int main()
 {
   using namespace std;
 
-  Println("size of simdb on the stack: ", sizeof(simdb));
+  //Println("size of simdb on the stack: ", sizeof(simdb));
 
   simdb db("test", 16, 8);
 
@@ -311,10 +311,10 @@ int main()
   str numkey[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"};
   str  label[] = {"zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven"};
   
-  int sz = 12;
-  vec<thread>            thrds;
-  vec<RngInt<u32>> rngSwitches;
-  TO(sz,i){ rngSwitches.emplace_back(0,1,i); }
+  //int sz = 12;
+  //vec<thread>            thrds;
+  //vec<RngInt<u32>> rngSwitches;
+  //TO(sz,i){ rngSwitches.emplace_back(0,1,i); }
   
   //int sz = (int)thrds.size(); 
   
@@ -348,22 +348,22 @@ int main()
   //Println("put: ", db.put( wat.data(),   (u32)wat.length(),    skidoosh.data(), (u32)skidoosh.length()) );
   //Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
 
-  if( db.isOwner() ){
-    Println("put: ", db.put(wat, skidoosh) );
-    //db.del("wat");
-    Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
-    //db.del("wut");
-    Println("put: ", db.put(kablam, skidoosh) ); //Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
-    db.del("kablam");
+  //if( db.isOwner() ){
+  //  Println("put: ", db.put(wat, skidoosh) );
+  //  //db.del("wat");
+  //  Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
+  //  //db.del("wut");
+  //  Println("put: ", db.put(kablam, skidoosh) ); //Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
+  //  db.del("kablam");
 
-    //Println("put: ", db.put(wat, skidoosh) );
-    //Println("del wat: ", db.del("wat") );
+  //  //Println("put: ", db.put(wat, skidoosh) );
+  //  //Println("del wat: ", db.del("wat") );
 
-    Println("put: ", db.put(longkey, longval) );
-    //Println("del wat: ", db.del(longkey) );
+  //  Println("put: ", db.put(longkey, longval) );
+  //  //Println("del wat: ", db.del(longkey) );
 
-    Println();
-  }
+  //  Println();
+  //}
   //db.flush();
 
   Println();
