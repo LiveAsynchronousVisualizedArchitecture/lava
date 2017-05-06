@@ -218,11 +218,13 @@
 // -todo: look back over comment explanation
 // -todo: take capacity out of lava_vec
 // -todo: change CncrLst to use s_ variables
+// -todo: compile on linux + gcc
 
-// todo: compile on linux + gcc
-// todo: compile again on osx
+// todo: make cleanup of memory mapped file happen under linux
+// todo: test multiple threads with linux + gcc
 // todo: make a function to use a temp directory that can be called on linux and osx - use tmpnam/tmpfile/tmpfile from stdio.h ?
 // todo: put files in /tmp/var/simdb/ ? have to work out consistent permissions and paths
+// todo: compile again on osx
 // todo: test time penalty to query non-existant key
 // todo: make read use 128 bit compare and swap to know when the next slot has changed out from under it? - just return a bool of whether a change was detected and return it into an optional pointer, then let the user decide whether to loop again - can IPD be used to guess if something has changed? if the next slot is only 1 more, then the idxs would have have to be the same, which isn't possible if nothing changed, if it is 2 more, then they should be in the process of being swapped
 // todo: make extra slot at the end of m_vis with 128 bit alignment, and make read look at both the extra slot and the first slot
@@ -446,8 +448,14 @@ namespace {
        _ExchangeLow,
        _CompareAndResult) == 1;
      #else
-       return true; // todo: change this to work for gcc and clang
+       _u128 ex; 
+       ex.hi = _ExchangeHigh;
+       ex.lo = _ExchangeLow;
+       return __atomic_compare_exchange(_Destination, _CompareAndResult, &ex, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+
+       //return true; // todo: change this to work for gcc and clang
      #endif
+
   }
 
   inline void prefetch1(char const* const p)
@@ -1538,7 +1546,7 @@ public:
   VerIdx          at(u32   idx)                const { return load(idx); }
   u32            nxt(u32 stIdx)                const
   {
-    assert(stIdx < m_sz);
+    //assert(stIdx < m_sz);
 
     auto idx = stIdx;
     VerIdx empty = empty_vi();
