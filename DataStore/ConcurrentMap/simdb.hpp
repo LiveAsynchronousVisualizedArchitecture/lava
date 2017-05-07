@@ -40,9 +40,11 @@
 // -todo: make an 'initialized' flag separate from the reference count // todo: decide ownership with the reference count?
 // -todo: compile again on osx
 // -todo: test on osx
+// -todo: 64 byte align the Head structure and make it use 64 bytes so that there is no false sharing due to constantly hammering on its cache line - the Head structure is the most used atomic memory and is likely the synchronization bottlneck
 
-// todo: test time penalty to query non-existant key
-// todo: make extra slot at the end of m_vis with 128 bit alignment, and make read look at both the extra slot and the first slot
+// todo: clean up comments from cleaning up warnings
+// todo: take out unused constants
+// todo: implement simdb_listDBs for linux and osx
 
 /*
  SimDB
@@ -185,7 +187,7 @@
   #include <sys/fcntl.h>
   #include <sys/errno.h>
   #include <sys/unistd.h>
-  #include <sys/file.h>         // for flock
+  #include <sys/file.h>         // for flock (file lock)
   #include <unistd.h>
 #endif
 
@@ -222,7 +224,6 @@ namespace {
 
   enum Match { MATCH_FALSE=0, MATCH_TRUE=1, MATCH_REMOVED=-1  };
 
-  //struct _u128 { volatile u64 lo; volatile u64 hi; };
   struct _u128 { u64 lo; u64 hi; };
 
   template<class T>
@@ -231,7 +232,7 @@ namespace {
     void operator()(){}
   };
 
-  inline u64 fnv_64a_buf(void const *const buf, u64 len)                              // I know basically nothing about hash functions and there is likely a better one out there 
+  inline u64 fnv_64a_buf(void const *const buf, u64 len)                              // sbassett - I know basically nothing about hash functions and there is likely a better one out there 
   {
     u64 hval = 0xCBF29CE484222325;
     u8*   bp = (u8*)buf;	             // start of buffer 
@@ -245,16 +246,11 @@ namespace {
   }
   
   inline bool compex128(
-    //long long*          _Destination, 
-    //long long           _ExchangeHigh, 
-    //long long            _ExchangeLow, 
-    //long long*      _CompareAndResult)
     i64*           _Destination, 
     i64           _ExchangeHigh, 
     i64            _ExchangeLow, 
     i64*      _CompareAndResult)
   {
-
     //assert( ((u64)_Destination) % 16 == 0 );
     #ifdef _MSC_VER
       return _InterlockedCompareExchange128(
@@ -277,7 +273,6 @@ namespace {
 
        return true; // todo: change this to work for gcc and clang
      #endif
-
   }
 
   inline void prefetch1(char const* const p)
@@ -468,7 +463,6 @@ namespace {
       /*STANDARD_RIGHTS_READ |*/ DIRECTORY_QUERY, 
       &oa);
 
-    // todo: handle hDir being NULL here 
     if(hDir==NULL || status!=STATUS_SUCCESS){ return { "Could not open file" }; }
 
     BOOLEAN rescan = TRUE;
@@ -554,7 +548,7 @@ class     CncrLst
 // Externally indices can be gotten atomically and given back atomically
 // | This is used to get free indices one at a time, and give back in-use indices one at a time
 // Uses the first 8 bytes that would normally store sizeBytes as the 64 bits of memory for the Head structure
-// todo: 64 byte align the Head structure and make it use 64 bytes so that there is no false sharing due to constantly hammering on its cache line - the Head structure is the most used atomic memory and is likely the synchronization bottlneck
+// Aligns the head on a 64 bytes boundary with the rest of the memory on a separate 64 byte boudary. This puts them on separate cache lines which should eliminate false sharing between cores when atomicallyaccessing the Head union (which will happen quite a bit) 
 public:
   union Head
   {
@@ -562,7 +556,7 @@ public:
     u64 asInt;
   };
   
-  using     u32  =  uint32_t;                               // need to be i32 instead for the ConcurrentStore indices?
+  using     u32  =  uint32_t;
   using     u64  =  uint64_t;
   using ListVec  =  lava_vec<u32>;
 
@@ -570,7 +564,7 @@ public:
   const static u32 NXT_VER_SPECIAL = 0xFFFFFFFF;
 
 private:
-  ListVec     s_lv;   // todo: change these to s_ variables
+  ListVec     s_lv;
   au64*        s_h;
 
 public:
@@ -578,15 +572,12 @@ public:
   static u32  incVersion(u32    v) { return v==NXT_VER_SPECIAL?  1  :  v+1; }
 
   CncrLst(){}
-  CncrLst(void* addr, u32 size, bool owner=true)            // this constructor is for when the memory is owned an needs to be initialized
-    //s_lv(addr, size, owner)
-  {                                                          // separate out initialization and let it be done explicitly in the simdb constructor?
-    
+  CncrLst(void* addr, u32 size, bool owner=true)             // this constructor is for when the memory is owned an needs to be initialized
+  {                                                          // separate out initialization and let it be done explicitly in the simdb constructor?    
     u64   addrRem  =  (u64)addr % 64;
     u64 alignAddr  =  (u64)addr + (64-addrRem);
     assert( alignAddr % 64 == 0 );
     s_h = (au64*)alignAddr;
-    //s_h = (au64*)addr;
 
     u32* listAddr = (u32*)((u64)alignAddr+64);
     new (&s_lv) ListVec(listAddr, size, owner);
@@ -753,18 +744,12 @@ private:
   au64*                s_version;        // pointer to the shared version number
 
   u32                m_blockSize;
-  //u32               m_blockCount;
   u64                  m_szBytes;
 
   VerIdx       nxtBlock(u32  blkIdx)  const
   {
     BlkLst bl  = s_bls[blkIdx];
-    //VerIdx vi;
-    //vi.idx     = bl.idx;
-    //vi.version = bl.version;
-
     prefetch1( (char const* const)blockFreePtr(bl.idx) );
-
     return VerIdx(bl.idx, bl.version);
   }
   u32     blockFreeSize()             const { return m_blockSize; }
@@ -774,7 +759,7 @@ private:
   {
     u32  freeSz   = blockFreeSize();
     u32  byteRem  = len % freeSz;
-    u32  blocks   = len / freeSz + (byteRem? 1 : 0);    // should never be 0 if blocksize is greater than the size of the index type
+    u32  blocks   = len / freeSz + (byteRem? 1 : 0);                      // should never be 0 if blocksize is greater than the size of the index type
 
     if(out_rem) *out_rem = byteRem;
 
@@ -791,18 +776,16 @@ private:
 
     return prev;
   }
-  void           doFree(u32  blkIdx)  const        // frees a list/chain of blocks - don't need to zero out the memory of the blocks or reset any of the BlkLsts' variables since they will be re-initialized anyway
+  void           doFree(u32  blkIdx)  const                                                // frees a list/chain of blocks - don't need to zero out the memory of the blocks or reset any of the BlkLsts' variables since they will be re-initialized anyway
   {
     u32 listEnd  =  findEndSetVersion(blkIdx, 0); 
     s_cl.free(blkIdx, listEnd);
   }
-  u32        writeBlock(u32  blkIdx, void const* const bytes, u32 len=0, u32 ofst=0)      // don't need to increment readers since write should be done before the block is exposed to any other threads
+  u32        writeBlock(u32  blkIdx, void const* const bytes, u32 len=0, u32 ofst=0)       // don't need to increment readers since write should be done before the block is exposed to any other threads
   {
     u32  blkFree  =  blockFreeSize();
     u8*        p  =  blockFreePtr(blkIdx);
-    //auto     nxt  =  nxtBlock(blkIdx);
-    //nxtBlock(blkIdx);
-    u32   cpyLen  =  len==0? blkFree : len;             // if next is negative, then it will be the length of the bytes in that block
+    u32   cpyLen  =  len==0? blkFree : len;                                              // if next is negative, then it will be the length of the bytes in that block
     p      += ofst;
     memcpy(p, bytes, cpyLen);
 
@@ -813,7 +796,6 @@ private:
     BlkLst bl = incReaders(blkIdx, version);               if(bl.version==0){ return 0; }
       u32   blkFree  =  blockFreeSize();
       u8*         p  =  blockFreePtr(blkIdx);
-      //u32       nxt  =  bl.idx;
       u32    cpyLen  =  len==0?  blkFree-ofst  :  len;
       memcpy(bytes, p+ofst, cpyLen);
     decReaders(blkIdx, version);
@@ -829,7 +811,6 @@ public:
 
   CncrStr(){}
   CncrStr(void* addr, u32 blockSize, u32 blockCount, bool owner=true) :
-    //m_blockCount(blockCount),
     s_cl(       (u8*)addr + CListOfst(blockCount), blockCount, owner),
     s_bls(      (u8*)addr + BlockListsOfst(),      blockCount, owner),
     s_blksAddr( (u8*)addr + BlksOfst(blockCount) ),
@@ -947,7 +928,6 @@ public:
     u32     len = 0;
     u32   rdLen = 0;
     u8*       b = (u8*)bytes;
-    //u8*      en = b + maxlen;
     i32     cur = blkIdx;
     VerIdx  nxt;
     for(int i=0; i<kblks; ++i){ 
@@ -961,7 +941,7 @@ public:
     len   +=  rdLen;
     nxt    =  nxtBlock(cur);         if(nxt.version!=version){ goto read_failure; }
 
-    while(len<maxlen && nxt.idx!=LIST_END && nxt.version==version)  // && !(nxt.idx<0) 
+    while(len<maxlen && nxt.idx!=LIST_END && nxt.version==version) 
     {
       vrdLen =  min<u32>(blockFreeSize(), maxlen-len);
       cur    =  nxt.idx;
@@ -1028,8 +1008,7 @@ public:
     
     BlkLst     bl = s_bls[blkIdx];
     u32 blklstHsh = bl.hash;
-    //if(s_bls[blkIdx].hash!=hash){ return MATCH_FALSE; }              // vast majority of calls should end here
-    if(blklstHsh!=hash){ return MATCH_FALSE; }                      // vast majority of calls should end here
+    if(blklstHsh!=hash){ return MATCH_FALSE; }                         // vast majority of calls should end here
 
     u32   curidx  =  blkIdx;
     VerIdx   nxt  =  nxtBlock(curidx);                              if(nxt.version!=version) return MATCH_FALSE;
@@ -1063,7 +1042,6 @@ public:
   }
   auto         list()      const -> CncrLst const& { return s_cl; }
   auto         data()      const -> const void* { return (void*)s_blksAddr; }
-  //u32    blockCount()      const { return m_blockCount; }
   auto       blkLst(u32 i) const -> BlkLst { return s_bls[i]; }
 
   friend class CncrHsh;
@@ -1076,7 +1054,6 @@ public:
 
   struct VerIpd { u32 version, ipd; };                       // ipd is Ideal Position Distance
 
-  // todo: take out unused constants
   static const i8   RM_OWNER         =     -1;               // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
   static const u8   LAST_READER      =      0;               // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
   static const u8   INIT_READERS     =      0;               // eventually make this 1 again? - to catch when readers has dropped to 0
@@ -1160,9 +1137,7 @@ private:
     u64     exp = i%2? swp32(expected.asInt) : expected.asInt;
     u64    desi = i%2? swp32(desired.asInt) : desired.asInt;                        // desi is desired int
     au64*  addr = (au64*)(s_vis.data()+i);
-    //auto before = addr->load();
     bool     ok = addr->compare_exchange_strong( exp, desi );
-    //auto  after = addr->load();
     
     return ok;
   }
@@ -1174,7 +1149,6 @@ private:
   {
     BlkLst bl = m_csp->blkLst(blkIdx);
     u32    ip = bl.hash % m_sz;                                                     // ip is Ideal Position
-    //u32   ipd = i>ip?  i-ip  :  m_csp->blockCount() - ip + i;
     u32   ipd = i>ip?  i-ip  :  m_sz - ip + i;
     return {bl.version, ipd};
   }
@@ -1351,12 +1325,7 @@ public:
   bool          init(u32    sz, CncrStr* cs)
   {
     using namespace std;
-    //static const u64 iempty    =  empty_vi().asInt;
-    //static const u64 swpempty  =  swp32(iempty);
-
-    //u32 hi = hi32(iempty);
-    //u32 lo = lo32(iempty);
-    
+        
     m_csp   =  cs;
     m_sz    =  sz;
 
@@ -1368,8 +1337,6 @@ public:
   VerIdx          at(u32   idx)                const { return load(idx); }
   u32            nxt(u32 stIdx)                const
   {
-    //assert(stIdx < m_sz);
-
     auto idx = stIdx;
     VerIdx empty = empty_vi();
     do{
@@ -1395,7 +1362,6 @@ public:
       u128   swpvi;                                                   // swpvi is swapped version index - the two indices swapped - this is the desired value 
       do{           
         ++retries;                                                    // this will need to swap the side of VerIdx too
-        //dblvi = *idxAddr;                   
         memcpy(&dblvi, idxAddr, sizeof(dblvi));
         swpvi = { swp32(idxAddr->lo), swp32(idxAddr->hi) };           // not needed? can use the values directly?
       }while( compex128( (i64*)(idxAddr), swpvi.hi, swpvi.lo, (i64*)(&dblvi) )==1 );
@@ -1417,7 +1383,7 @@ public:
   {
     if(klen<1){return 0;}
 
-    u32 hash=HashBytes(key,klen), /*len=0, ver=0,*/ i=hash%m_sz, en=prevIdx(i);
+    u32 hash=HashBytes(key,klen), i=hash%m_sz, en=prevIdx(i);
     for(;; i=nxtIdx(i) )
     {
       VerIdx vi = load(i);      
@@ -1459,7 +1425,6 @@ public:
   }
   bool           del(const void *const key, u32 klen)
   {
-    //CncrStr*  csp = m_csp;
     auto     hash = CncrHsh::HashBytes(key, klen);
     VerIdx     vi = delHashed(key, klen, hash);
     bool   doFree = vi.idx<DELETED;
@@ -1478,7 +1443,7 @@ public:
     else       return VerIdx(lo32(cur), hi32(cur));
   }
 };
-struct  SharedMem       // in a halfway state right now - will need to use arbitrary memory and have other OS implementations for shared memory eventually
+struct  SharedMem
 {
   static const int alignment = 0;
   
@@ -1514,19 +1479,11 @@ public:
         CloseHandle(sm.fileHndl);
       }
     #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)     // osx, linux and freebsd
-
       if(sm.hndlPtr){
         munmap(sm.hndlPtr, sm.size);  // todo: size here needs to be the total size, and errors need to be checked
       }
-
-      //remove(sm.path);
-
-      //printf("path is: <%s>   %d ", sm.path, remove(sm.path) );
-      //assert( );
-      //if(sm.fileHndl){
-      //  close(sm.fileHndl);
-      //  // todo: deal with errors here as well?
-      //}
+      remove(sm.path);
+      // todo: deal with errors here as well
     #endif
 
     sm.clear();
@@ -1542,18 +1499,10 @@ public:
 
     #ifdef _WIN32      // windows
       sm.fileHndl = nullptr;
-      //char path[512] = "Global\\simdb_";
-      //char path[512] = ""; 
       if(!raw_path){ strcpy(sm.path, "simdb_"); }
     #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
       sm.fileHndl = 0;
-
-      //strcpy(sm.path, "/tmp/simdb_");
       strcpy(sm.path, P_tmpdir "/simdb_");
-      //char path[512] = "/tmp/simdb_";
-      //sm.path = P_tmpdir "/simdb_";
-      //char path[512] = P_tmpdir "/simdb_";
-      //char path[512] = "simdb_";
     #endif
 
     u64 len = strlen(sm.path) + strlen(name);
@@ -1629,14 +1578,14 @@ public:
       if(sm.owner){  // todo: still need more concrete race protection
         fcntl(sm.fileHndl, F_GETLK, &flock);
 
-        flock(sm.fileHndl, LOCK_EX);        // exclusive lock  // LOCK_NB
-        //fcntl(sm.fileHndl, F_PREALLOCATE);  //  todo: try F_ALLOCATECONTIG at some point
+        flock(sm.fileHndl, LOCK_EX);              // exclusive lock  // LOCK_NB
+        //fcntl(sm.fileHndl, F_PREALLOCATE);
         #if defined(__linux__) 
         #else 
-          fcntl(sm.fileHndl, F_ALLOCATECONTIG);  //  todo: try F_ALLOCATECONTIG at some point
+          fcntl(sm.fileHndl, F_ALLOCATECONTIG);
         #endif
 
-        ftruncate(sm.fileHndl, size);       // todo: don't truncate if not the owner, and don't pre-allocate either ?
+        ftruncate(sm.fileHndl, size);
         flock(sm.fileHndl, LOCK_UN);
         // get the error number and handle the error
       }
@@ -1830,7 +1779,6 @@ public:
   }
   VerIdx       nxt() const                                                                  // this version index represents a hash index, not an block storage index
   {
-    //auto        st = m_nxtChIdx;
     VerIdx  empty = s_ch.empty_vi();
     u32     chNxt;
     VerIdx     vi;
@@ -1971,6 +1919,70 @@ public:
 
 
 
+
+//char path[512] = "Global\\simdb_";
+//char path[512] = ""; 
+//
+//strcpy(sm.path, "/tmp/simdb_");
+//char path[512] = "/tmp/simdb_";
+//sm.path = P_tmpdir "/simdb_";
+//char path[512] = P_tmpdir "/simdb_";
+//char path[512] = "simdb_";
+
+//printf("path is: <%s>   %d ", sm.path, remove(sm.path) );
+//assert( );
+//if(sm.fileHndl){
+//  close(sm.fileHndl);
+//}
+
+//
+// in a halfway state right now - will need to use arbitrary memory and have other OS implementations for shared memory eventually
+
+//static const u64 iempty    =  empty_vi().asInt;
+//static const u64 swpempty  =  swp32(iempty);
+//
+//u32 hi = hi32(iempty);
+//u32 lo = lo32(iempty);
+//
+//dblvi = *idxAddr;                   
+// len=0, ver=0,
+
+//
+//u32   ipd = i>ip?  i-ip  :  m_csp->blockCount() - ip + i;
+
+//auto before = addr->load();
+//auto  after = addr->load();
+
+//if(s_bls[blkIdx].hash!=hash){ return MATCH_FALSE; }              // vast majority of calls should end here
+//
+//u32    blockCount()      const { return m_blockCount; }
+
+//u8*      en = b + maxlen;
+//
+// && !(nxt.idx<0)
+
+//auto     nxt  =  nxtBlock(blkIdx);
+//nxtBlock(blkIdx);
+//
+//u32       nxt  =  bl.idx;
+//
+//m_blockCount(blockCount),
+
+//u32               m_blockCount;
+//
+//VerIdx vi;
+//vi.idx     = bl.idx;
+//vi.version = bl.version;
+
+//s_lv(addr, size, owner)
+//s_h = (au64*)addr;
+
+//struct _u128 { volatile u64 lo; volatile u64 hi; };
+//
+//long long*          _Destination, 
+//long long           _ExchangeHigh, 
+//long long            _ExchangeLow, 
+//long long*      _CompareAndResult)
 
 //    ______________________________________________________________________________________________________________________
 //  |Flags|BlockSize|BlockCount|ConcurrentHash|ConcurrentStore|ConcurentList|...BlockCount*BlockSize bytes for blocks....|

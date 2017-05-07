@@ -1,5 +1,8 @@
 
 
+// todo: test time penalty to query non-existant key
+// todo: make extra slot at the end of m_vis with 128 bit alignment, and make read look at both the extra slot and the first slot
+
 
 // 4. Use version from that struct to verify that each block is part of the list given by the ConcurrenHash entry.
 
