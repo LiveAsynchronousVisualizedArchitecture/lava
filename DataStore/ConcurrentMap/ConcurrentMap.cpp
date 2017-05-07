@@ -482,7 +482,7 @@ int main()
 
 
   Println("\n\n DONE \n\n");
-  //PAUSE
+  PAUSE
   db.close();
   Println("\n\n CLOSED \n\n");
   PAUSE

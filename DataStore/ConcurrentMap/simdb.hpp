@@ -38,7 +38,7 @@
 // -todo: test multiple threads with linux + gcc - works, just needs -lpthread specified in gcc after .cpp file
 // -todo: make read use 128 bit compare and swap to know when the next slot has changed out from under it? - just return a bool of whether a change was detected and return it into an optional pointer, then let the user decide whether to loop again - can IPD be used to guess if something has changed? if the next slot is only 1 more, then the idxs would have have to be the same, which isn't possible if nothing changed, if it is 2 more, then they should be in the process of being swapped
 
-// todo: make a 'initialized' flag separate from the reference count? // todo: decide ownership with the reference count?
+// todo: make an 'initialized' flag separate from the reference count // todo: decide ownership with the reference count?
 // todo: compile again on osx
 // todo: test on osx
 // todo: test time penalty to query non-existant key
@@ -1519,9 +1519,10 @@ public:
         munmap(sm.hndlPtr, sm.size);  // todo: size here needs to be the total size, and errors need to be checked
       }
 
+      //remove(sm.path);
+
       //printf("path is: <%s>   %d ", sm.path, remove(sm.path) );
       //assert( );
-      remove(sm.path);
       //if(sm.fileHndl){
       //  close(sm.fileHndl);
       //  // todo: deal with errors here as well?
@@ -1676,9 +1677,9 @@ public:
   ~SharedMem()
   {
     if(ptr){
-      au64* flags = (au64*)ptr;
+      au32*   cnt = ((au32*)ptr)+1;
       u64    prev = 0;
-      if(flags->load()>0){ prev = flags->fetch_sub(1); }
+      if(cnt->load()>0){ prev = cnt->fetch_sub(1); }
       if(prev==1){ SharedMem::FreeAnon(*this); }
     }
   }
@@ -1705,7 +1706,8 @@ public:
   using  string  =  std::string;
 
 private:
-  au64*      s_flags;
+  au32*      s_flags;
+  au32*      s_cnt;
   au64*      s_blockSize;
   au64*      s_blockCount;
   CncrStr    s_cs;               // store data in blocks and get back indices
@@ -1751,15 +1753,19 @@ public:
 
     s_blockCount  =  ((au64*)m_mem.data())+2;
     s_blockSize   =  ((au64*)m_mem.data())+1;
-    s_flags       =   (au64*)m_mem.data();
+    s_flags       =   (au32*)m_mem.data();
+    s_cnt         =  ((au32*)m_mem.data())+1;
 
     if(isOwner()){
       s_blockCount->store(blockCount);
       s_blockSize->store(blockSize);
       s_flags->store(1);
-    }else{                                                      // need to spin until ready
-      //while(s_flags->load() < 1){continue;}
-      s_flags->fetch_add(1);
+      s_cnt->store(1);
+    }else{
+      #if defined(_WIN32)                                          // do we need to spin until ready on windows? unix has file locks built in to the system calls
+        while(s_flags->load()<1){continue;}
+      #endif
+      s_cnt->fetch_add(1);
       m_mem.size = MemSize(s_blockSize->load(), s_blockCount->load());
     }
 
