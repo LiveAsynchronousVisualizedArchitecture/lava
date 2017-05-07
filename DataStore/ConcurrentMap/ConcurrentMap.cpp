@@ -311,32 +311,32 @@ int main()
   str numkey[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"};
   str  label[] = {"zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven"};
   
-  //int sz = 12;
-  //vec<thread>            thrds;
-  //vec<RngInt<u32>> rngSwitches;
-  //TO(sz,i){ rngSwitches.emplace_back(0,1,i); }
-  //
   //int sz = (int)thrds.size(); 
-  //
-  //TO(sz,i)
-  //{
-  //  int idx = i % sz;
-  //  thrds.emplace_back([i, idx, &rngSwitches, &numkey, &label, &db]
-  //  {
-  //    auto& numk = numkey[idx];
-  //    auto&  lbl = label[idx]; 
-  //    TO(100,j){ 
-  //      db.put(numk, lbl); 
-  //      //if(rngSwitches[idx]()){ db.del(numk); }
-  //      //bool ok = db.del(numk);
-  //      //if(!ok){ Println(numk," not deleted"); }
-  //      //while(!db.del(numk)){}
-  //    }
-  //    
-  //    Println(i, " done");
-  //  });
-  //}
-  //TO(thrds.size(),i){ thrds[i].join(); }
+
+  int sz = 12;
+  vec<thread>            thrds;
+  vec<RngInt<u32>> rngSwitches;
+  TO(sz,i){ rngSwitches.emplace_back(0,1,i); }
+    
+  TO(sz,i)
+  {
+    int idx = i % sz;
+    thrds.emplace_back([i, idx, &rngSwitches, &numkey, &label, &db]
+    {
+      auto& numk = numkey[idx];
+      auto&  lbl = label[idx]; 
+      TO(100,j){ 
+        db.put(numk, lbl); 
+        if(rngSwitches[idx]()){ db.del(numk); }
+        //bool ok = db.del(numk);
+        //if(!ok){ Println(numk," not deleted"); }
+        //while(!db.del(numk)){}
+      }
+      
+      Println(i, " done");
+    });
+  }
+  TO(thrds.size(),i){ thrds[i].join(); }
 
   str       wat  =       "wat";
   str       wut  =       "wut";
