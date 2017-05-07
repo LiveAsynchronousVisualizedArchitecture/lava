@@ -37,8 +37,8 @@
 // -todo: cut down apache 2.0 license 
 // -todo: test multiple threads with linux + gcc - works, just needs -lpthread specified in gcc after .cpp file
 // -todo: make read use 128 bit compare and swap to know when the next slot has changed out from under it? - just return a bool of whether a change was detected and return it into an optional pointer, then let the user decide whether to loop again - can IPD be used to guess if something has changed? if the next slot is only 1 more, then the idxs would have have to be the same, which isn't possible if nothing changed, if it is 2 more, then they should be in the process of being swapped
+// -todo: make an 'initialized' flag separate from the reference count // todo: decide ownership with the reference count?
 
-// todo: make an 'initialized' flag separate from the reference count // todo: decide ownership with the reference count?
 // todo: compile again on osx
 // todo: test on osx
 // todo: test time penalty to query non-existant key
