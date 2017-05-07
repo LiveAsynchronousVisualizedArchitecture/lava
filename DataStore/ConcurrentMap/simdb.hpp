@@ -1759,7 +1759,6 @@ public:
     if(isOwner()){
       s_blockCount->store(blockCount);
       s_blockSize->store(blockSize);
-      s_flags->store(1);
       s_cnt->store(1);
     }else{
       #if defined(_WIN32)                                          // do we need to spin until ready on windows? unix has file locks built in to the system calls
@@ -1783,6 +1782,8 @@ public:
     m_blkCnt = s_blockCount->load();
     m_blkSz  = s_blockSize->load();
     m_isOpen = true;
+
+    if(isOwner()){ s_flags->store(1); }
   }
   ~simdb(){ close(); }
 
