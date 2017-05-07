@@ -203,21 +203,21 @@ template<class T1, class... T> inline void
 using std::thread;
 using str   =   std::string;
 
-inline void prefetch2(char const* const p)
-{
-  _mm_prefetch(p, _MM_HINT_T2);
-  //_m_prefetch((void*)p);
-}
-inline void prefetch1(char const* const p)
-{
-  _mm_prefetch(p, _MM_HINT_T1);
-  //_m_prefetch((void*)p);
-}
-inline void prefetch0(char const* const p)
-{
-  _mm_prefetch(p, _MM_HINT_T0);
-  //_m_prefetch((void*)p);
-}
+//inline void prefetch2(char const* const p)
+//{
+//  _mm_prefetch(p, _MM_HINT_T2);
+//  //_m_prefetch((void*)p);
+//}
+//inline void prefetch1(char const* const p)
+//{
+//  _mm_prefetch(p, _MM_HINT_T1);
+//  //_m_prefetch((void*)p);
+//}
+//inline void prefetch0(char const* const p)
+//{
+//  _mm_prefetch(p, _MM_HINT_T0);
+//  //_m_prefetch((void*)p);
+//}
 
 template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  // will need C++ ifdefs eventually
 

@@ -961,7 +961,7 @@ public:
     len   +=  rdLen;
     nxt    =  nxtBlock(cur);         if(nxt.version!=version){ goto read_failure; }
 
-    while(len<maxlen && !(nxt.idx<0) && nxt.idx!=LIST_END && nxt.version==version)
+    while(len<maxlen && nxt.idx!=LIST_END && nxt.version==version)  // && !(nxt.idx<0) 
     {
       vrdLen =  min<u32>(blockFreeSize(), maxlen-len);
       cur    =  nxt.idx;
