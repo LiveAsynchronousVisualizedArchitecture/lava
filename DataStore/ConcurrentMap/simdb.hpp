@@ -41,8 +41,8 @@
 // -todo: compile again on osx
 // -todo: test on osx
 // -todo: 64 byte align the Head structure and make it use 64 bytes so that there is no false sharing due to constantly hammering on its cache line - the Head structure is the most used atomic memory and is likely the synchronization bottlneck
+// -todo: clean up comments from cleaning up warnings
 
-// todo: clean up comments from cleaning up warnings
 // todo: take out unused constants
 // todo: implement simdb_listDBs for linux and osx
 
@@ -188,7 +188,10 @@
   #include <sys/errno.h>
   #include <sys/unistd.h>
   #include <sys/file.h>         // for flock (file lock)
+  #include <sys/stat.h>
+  #include <sys/param.h>
   #include <unistd.h>
+  #include <dirent.h>
 #endif
 
 #include <cstdint>
@@ -493,11 +496,49 @@ namespace {
   {
     using namespace std;
 
+    char   prefix[] = "simdb_";
+    size_t  pfxSz   = sizeof(prefix)-1;
+
     vector<string> ret;
+
+    DIR* d;                                          // d is directory handle
+    if((d = opendir(P_tmpdir)) == NULL)
+    //if((d = opendir("/tmp/")) == NULL)
+    { return ret; }
+ 
+    struct dirent*   dent;                           // dent is directory entry 
+    struct stat  stat_buf;
+    while( (dent = readdir(d)) != NULL )
+    {
+      //if(stat(dent->d_name, &stat_buf) == -1){continue;}
+        //return ret;
+      //}
+
+      //if( S_ISREG(stat_buf.st_mode) ){ 
+        //printf("name %-25s - %s  %d \n", dent->d_name, prefix, (int)pfxSz);
+        if(strncmp(dent->d_name, prefix, pfxSz)==0){
+          //printf("pushing %-25s - \n", dent->d_name);
+          ret.push_back(dent->d_name);
+        }
+      //} 
+
+      //printf("%-25s - \n", dent->d_name);
+     }
+     closedir(d);
 
     return ret;
   }
   // gcc/clang/linux ?
+      //perror("stat ERROR");
+      //exit(3);
+      //str = "regular"; 
+      //string name = dent->d_name;
+      //
+      //}else if( S_ISDIR(stat_buf.st_mode) ){
+        //str = "directory"; 
+      //}else{ 
+        //str = "other"; 
+      //}
 #endif
 
 #ifdef _WIN32
