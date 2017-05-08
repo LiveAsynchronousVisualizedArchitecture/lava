@@ -42,9 +42,11 @@
 // -todo: test on osx
 // -todo: 64 byte align the Head structure and make it use 64 bytes so that there is no false sharing due to constantly hammering on its cache line - the Head structure is the most used atomic memory and is likely the synchronization bottlneck
 // -todo: clean up comments from cleaning up warnings
+// -todo: implement simdb_listDBs for linux and osx
+// -todo: take out unused constants
+// -todo: recompile with osx again
 
-// todo: take out unused constants
-// todo: implement simdb_listDBs for linux and osx
+// todo: move comments and todone lines to other files
 
 /*
  SimDB
@@ -1095,15 +1097,9 @@ public:
 
   struct VerIpd { u32 version, ipd; };                       // ipd is Ideal Position Distance
 
-  static const i8   RM_OWNER         =     -1;               // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
-  static const u8   LAST_READER      =      0;               // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
-  static const u8   INIT_READERS     =      0;               // eventually make this 1 again? - to catch when readers has dropped to 0
-  static const u8   FREE_READY       =      0;
-  static const u8   MAX_READERS      =   0xFF;
   static const u32  KEY_MAX          =   0xFFFFFFFF; 
   static const u32  EMPTY            =   KEY_MAX;            // first 21 bits set 
   static const u32  DELETED          =   KEY_MAX - 1;        // 0xFFFFFFFE;       // 1 less than the EMPTY
-  static const u32  EMPTY_HASH_IDX   =   0xFFFFFFFF;         // 32 bits set - hash indices are different from block indices 
   static const u32  LIST_END         =   CncrStr::LIST_END;
 
   static u64           sizeBytes(u32 size)                   // the size in bytes that this structure will take up in the shared memory
@@ -1960,6 +1956,15 @@ public:
 
 
 
+
+
+
+//static const i8   RM_OWNER         =     -1;               // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
+//static const u8   LAST_READER      =      0;               // keep this at 0 if INIT_READERS is changed to 1, then take out remove flag
+//static const u8   INIT_READERS     =      0;               // eventually make this 1 again? - to catch when readers has dropped to 0
+//static const u8   FREE_READY       =      0;
+//static const u8   MAX_READERS      =   0xFF;
+//static const u32  EMPTY_HASH_IDX   =   0xFFFFFFFF;         // 32 bits set - hash indices are different from block indices 
 
 //char path[512] = "Global\\simdb_";
 //char path[512] = ""; 
