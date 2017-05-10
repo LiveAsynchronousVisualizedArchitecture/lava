@@ -19,3 +19,21 @@ possibly come up with a more general set of data structures for inter-process co
 |  |  sets
 
 
+
+shared memory queue
+|  use indices and blocks like simdb?
+|  |  make the concurrent store into a template and use the concurrent list as is?
+|  integrate into simdb, giving names to each of the queue channels? 
+|  have different version for data types that are all the same size?
+
+shared memory priority queue
+|  figure out lock free concurrent heap
+|  does having only a version number, then a mapping of the version to the index help?
+|  does having some sort of loose sorting, then reading multiple versions/indices at a time help?
+|  does it help to have packets of indices, each with their own packet version help? would this imply a heirarchy?
+|  would it work to have the index buffer be in 128 bit aligned chunks, with each chunk representing a double buffering of versioned indices? 
+|  |  put versions in the middle with flag bits that determine which side to use 
+|  |  put next versions on the opposing sides, then check the versions in the middle and swap the bits 
+
+
+
