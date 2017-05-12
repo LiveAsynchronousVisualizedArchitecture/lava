@@ -1,3 +1,4 @@
+
 #ifndef __LAVA_INDEXED_VERTS_HEADER_GUARD_H__
 #define __LAVA_INDEXED_VERTS_HEADER_GUARD_H__
 
@@ -68,7 +69,13 @@ extern "C"
   }
 }
 
+#endif
+
 #ifdef LAVA_INDEXED_VERTS_IMPL
+
+#ifndef __LAVA_INDEXED_VERTS_IMPL_GUARD_H__
+#define __LAVA_INDEXED_VERTS_IMPL_GUARD_H__
+
 #include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
@@ -208,6 +215,6 @@ extern "C"
         free(iv);
     }
 }
+#endif  // #define __LAVA_INDEXED_VERTS_IMPLs_GUARD_H__
 #endif  // #ifdef LAVA_INDEXED_VERTS_IMPL
 
-#endif

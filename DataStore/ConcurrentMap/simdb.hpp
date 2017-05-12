@@ -15,6 +15,9 @@
   limitations under the License.
 */
 
+// todo: move all type aliases into classes
+// todo: test with external process
+
 /*
  SimDB
 

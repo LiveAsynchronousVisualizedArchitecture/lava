@@ -301,7 +301,7 @@ int main()
 
   //Println("size of simdb on the stack: ", sizeof(simdb));
 
-  simdb db("test", 16, 8);
+  simdb db("test", 2<<10, 2<<12);
 
   //simdb db("H:\\projects\\lava\\test.simdb", 32, 64, true);
   //simdb db("test.simdb", 32, 64, true);
@@ -325,7 +325,7 @@ int main()
     {
       auto& numk = numkey[idx];
       auto&  lbl = label[idx]; 
-      TO(100,j){ 
+      TO(10000000,j){ 
         db.put(numk, lbl); 
         if(rngSwitches[idx]()){ db.del(numk); }
         //bool ok = db.del(numk);

@@ -36,4 +36,15 @@ shared memory priority queue
 |  |  put next versions on the opposing sides, then check the versions in the middle and swap the bits 
 
 
+single writer single reader table
+|  have a table sitting in shared memory
+|  make sure that it can't return corrupted results by any reading processes 
+|  just have to make sure that a key that is in progress of being written doesn't end up being a match? 
+|  |  if the key is in progress of being written, then it wouldn't match its own hash (probably), but definitely wouldn't match its own length if it was zeroed out from the start 
+|  |  zeroing out from the start of the string would mean that the first bytes could be set to 0 atomically
+|  |  this could create a way to atomically switch off key strings, but would mean that keys could blink out of existence 
+|  |  keys blinking out of existence might be ok, since it would be rare, and the value would be the important part, which could be made atomic
+|  |  the value type could be included in a 128 bit aligned chunk with the value (and the hash? and the length?)
+|  |  this would mean that the key-value pair should be on 64 bytes cache line boundaries and the value + type would need to be 128 bit aligned
+|  |  this would only matter for atomic reads though, so that the value and type don't get out of sync
 
