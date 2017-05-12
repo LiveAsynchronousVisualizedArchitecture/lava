@@ -51,7 +51,6 @@ Could a simplified spreadsheet database structure be created by using tbl.hpp wi
 
 
 
-
 thread local optimizations to get around the 
 |  The bottleneck seems to be allocating blocks from the list and freeing them back to the list
 |  Is there a good way to allocate more blocks at once and free more at once
@@ -60,6 +59,10 @@ thread local optimizations to get around the
 |  Can a thread_local array be used to cache blocks? How many blocks should it cache? 4096?
 |  |  Have a maximum of 4096, but set a dynamic caching limit that is possibly lower in the constructor? 
 |  |  This would mean there would be 49,152 blocks cached for 12 threads.
+|  When freeing a list of blocks, can the list be rearranged / sorted to go from lowest to highest?
+|  |  Should this just require a straight sort?
+|  |  Would need to put them into an array and then sort?
+|  |  Because freed blocks could be put back into the local cache, when the cache is full and blocks are getting freed or allocated, sort the cache and free it? 
 
 
 build in a preferred alignment into the flat memory classes
