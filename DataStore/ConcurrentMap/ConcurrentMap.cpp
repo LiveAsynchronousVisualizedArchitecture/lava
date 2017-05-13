@@ -18,6 +18,15 @@
 #include <thread>
 #include "simdb.hpp"
 
+using    u8   =   uint8_t;
+using   u32   =   uint32_t;
+using   u64   =   uint64_t;
+using    i8   =   int8_t;
+using   i32   =   int32_t;
+using   i64   =   int64_t;
+using  au64   =   std::atomic<u64>;
+using  au32   =   std::atomic<u32>;
+
 #ifdef _WIN32
   #include <intrin.h>
   #include <windows.h>
@@ -325,7 +334,7 @@ int main()
     {
       auto& numk = numkey[idx];
       auto&  lbl = label[idx]; 
-      TO(10000000,j){ 
+      TO(1000,j){ 
         db.put(numk, lbl); 
         if(rngSwitches[idx]()){ db.del(numk); }
         //bool ok = db.del(numk);
@@ -345,10 +354,22 @@ int main()
   str   longkey  =  "this is a super long key as a test";
   str   longval  =  "value that is really long as a really long value test";
 
+  string  lf = "lock free";
+  string way = "is the way to be";
+  //db.put( lf.data(), (u32)lf.length(), way.data(), (u32)way.length() );
+  
+  i64    len = db.len( lf.data(), (u32)lf.length() );
+  string way2(len,'\0');
+  /*bool    ok =*/ db.get( lf.data(), (u32)lf.length(), (void*)way.data(), (u32)way.length() );
+
+  Println("\n",way,"\n");
+
   //Println("put: ", db.put( wat.data(),   (u32)wat.length(),    skidoosh.data(), (u32)skidoosh.length()) );
   //Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
 
   if( db.isOwner() ){
+    Println("put: ", db.put("lock free", "is the way to be") );
+
     Println("put: ", db.put(wat, skidoosh) );
     //db.del("wat");
     Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 

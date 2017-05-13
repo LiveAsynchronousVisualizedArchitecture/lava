@@ -1,9 +1,4 @@
 
-- need to take the block count and block size from the existing database on
-  creation when shared memory already exists
-
-- make a separate file for atomic pointers?
-
 
 ===========================================================================================
 | Make each parameter passed to a node be an iterator instead of a single data structure? |
@@ -51,7 +46,7 @@ Could a simplified spreadsheet database structure be created by using tbl.hpp wi
 
 
 
-thread local optimizations to get around the 
+thread local optimizations to get around the alloc and free bottleneck 
 |  The bottleneck seems to be allocating blocks from the list and freeing them back to the list
 |  Is there a good way to allocate more blocks at once and free more at once
 |  |  Follow multiple blocks in the list and only do a compare and swap after finding N blocks forward? - Maybe something like 8, 16, or 32.
@@ -69,6 +64,11 @@ build in a preferred alignment into the flat memory classes
 |  Blocks should be aligned on page boundaries if possible
 |  CncrHsh needs alignment for the map slots
 |  Other classes would do better with certain alignments as well
+
+
+misc optimizations
+|  prefetch the first block on every hash map slot - before reading the first BlkLst struct
+|  SIMD hashing (if hashing ever becomes a bottleneck)
 
 
 

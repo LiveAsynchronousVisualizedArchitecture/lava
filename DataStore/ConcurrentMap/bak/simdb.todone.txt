@@ -1,4 +1,6 @@
 
+// todo: get rid of icc warnings 
+
 // plan: 
 // - ConcurrentHash is a lava_vec and is at the start of the memory
 // - ConcurrentStore takes up the rest of the memory

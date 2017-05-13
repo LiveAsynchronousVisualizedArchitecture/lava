@@ -9,9 +9,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ConcurrentMap.hpp">
-      <Filter>hpp</Filter>
-    </ClInclude>
     <ClInclude Include="simdb.hpp" />
   </ItemGroup>
 </Project>
