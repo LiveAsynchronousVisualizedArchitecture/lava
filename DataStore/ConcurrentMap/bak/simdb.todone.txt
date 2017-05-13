@@ -1,5 +1,8 @@
 
-// todo: get rid of icc warnings 
+// -todo: get rid of icc warnings 
+// -todo: move all type aliases into classes
+// -todo: clean out commented aliases and unused lines that are for robin hood hashing
+
 
 // plan: 
 // - ConcurrentHash is a lava_vec and is at the start of the memory

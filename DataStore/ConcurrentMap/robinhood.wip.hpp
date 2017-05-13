@@ -211,4 +211,134 @@ bool          swpOnMatch(u32 i, bool useLeft, u32 cmpLeft, u32 left, bool useRig
   return true;
 }
 
+//i64        swapNxt(u32   idx)                const
+//{
+//  i64 retries = -1;
+//  if(idx%2==0)
+//  {                                                                 // if idx is even just use 128 bit atomic straight    
+//    u128*  idxAddr  =  (u128*)( ((u64*)s_vis.addr())+idx );
+//    u128   dblvi;                                                   // dblvi is double Version Index - it is used to point to two VerIdx structs at the same time 
+//    u128   swpvi;                                                   // swpvi is swapped version index - the two indices swapped - this is the desired value 
+//    do{           
+//      ++retries;                                                    // this will need to swap the side of VerIdx too
+//      memcpy(&dblvi, idxAddr, sizeof(dblvi));
+//      swpvi = { swp32(idxAddr->lo), swp32(idxAddr->hi) };           // not needed? can use the values directly?
+//    }while( compex128( (i64*)(idxAddr), swpvi.hi, swpvi.lo, (i64*)(&dblvi) )==1 );
+//  }
+//  else                                                              // must be on an odd number, and so will need to use a 64 bit atomic to swap the indices in the middle
+//  {
+//    au64* idxAddr = (au64*)( ((u32*)s_vis.addr())+(idx*2+1) );      // offsets using u32, so idx needs to be double, then one more to point to the two indices that are on either side of the 128 bit atomic boundary    
+//    u64       cur = idxAddr->load();
+//    u64      swpd;
+//    do{
+//      ++retries;
+//      swpd = swp32(cur);
+//    }while( !idxAddr->compare_exchange_strong(cur, swpd) );           // compare and swap the hi and lo 32 bits
+//  }
+//
+//  return retries;
+//}
+
+//bool          delDupe(u32 i)                 const                                // delete duplicate indices - l is left index, r is right index - will do something different depending on if the two slots are within 128 bit alignment or not
+//{
+//  if(i%2==0)
+//  {                                                                               // both indices are within a 128 bit boundary, so the 128 bit atomic can (and must) be used
+//    i64 rgtDel, lftDel;  _u128 viDbl;
+//    _u128* viDblAddr = (_u128*)&s_vis[i];                                         // find 128 bit offset address
+//    viDbl            = *viDblAddr;                                                // if it isn't the same, the atomic compare exchange will load it atomically
+//    do{
+//      u32 l = hi32(viDbl.lo);
+//      u32 r = lo32(viDbl.hi);                                           
+//      if( (l==DELETED && r==EMPTY) ){ //|| (l==EMPTY && r==DELETED) ){
+//        rgtDel = vi_i64( swp32(empty_vi().asInt) );
+//        lftDel = vi_i64( empty_vi() );
+//      }else if(l!=r || l>=DELETED){                                               // check if both the indices are the same and if they are, that they aren't both deleted or both empty 
+//        return false;                     
+//      }else{
+//        u64 lftSwp = swp32(viDbl.hi);
+//        lftDel     = *((i64*)&lftSwp);                                            // if both the indices are the same, make a new right side VerIdx with the idx set to DELETED
+//        rgtDel     = vi_i64( deleted_vi() );                                      // interpret the u64 bits directly as a signed 64 bit integer instead
+//      }
+//    }while( !compex128( (i64*)viDblAddr, rgtDel, lftDel, (i64*)&viDbl) );         // then compare and swap for a version with the new right side VerIdx
+//  }else
+//  {
+//    au64* idxDblAddr; u64 idxDbl, desired;
+//    u32* leftAddr = ((u32*)(&s_vis[i]))+1;                                        // if the two VerIdxs are not in a 128 bit boundary, then use a 64 bit compare and swap to set the right side index to DELETED
+//    idxDblAddr    = (au64*)leftAddr;                                              // increment the address by 4 bytes so that it lines up with the start of the two indices, then cast it to an atomic 64 bit unsigned integer for the compare and switch
+//    idxDbl        = idxDblAddr->load();
+//    do{
+//      u32  l = hi32(idxDbl);
+//      u32  r = lo32(idxDbl);
+//      if( (l==DELETED && r==EMPTY) ){    //|| (l==EMPTY && r==DELETED) ){         // change the deleted key to empty if it is to the left of an empty slot and therefore at the end of a span
+//        desired = make64(EMPTY, EMPTY);          
+//      }else if(l!=r || l>=DELETED){
+//        return false; 
+//      }else{                                                                      // if the indices are the same then do the compare and swap
+//        desired = make64(l, DELETED);                                             // make the new 64 bit integer with the right index set to DELETED
+//      }
+//    }while( !idxDblAddr->compare_exchange_strong(idxDbl, desired) );              // looping here would essentially mean that the indices change but are still identical to each other
+//  }
+//
+//  return true;
+//}
+//void      visFromAddr(_u128* viDbl, VerIdx* out_left, VerIdx* out_right) const
+//{
+//  out_left->asInt   =  swp32(viDbl->lo);
+//  out_right->asInt  =  viDbl->hi;
+//}
+
+//using    u8   =   uint8_t;
+//using   u32   =   uint32_t;
+//using   u64   =   uint64_t;
+//using    i8   =   int8_t;
+//using   i32   =   int32_t;
+//using   i64   =   int64_t;
+//using  au64   =   std::atomic<u64>;
+//using  au32   =   std::atomic<u32>;
+  
+//struct _u128 { u64 lo; u64 hi; };
+
+//inline bool compex128(
+//  i64*           _Destination, 
+//  i64           _ExchangeHigh, 
+//  i64            _ExchangeLow, 
+//  i64*      _CompareAndResult)
+//{
+//  //assert( ((u64)_Destination) % 16 == 0 );
+//  #ifdef _MSC_VER
+//    return _InterlockedCompareExchange128(
+//     _Destination,
+//     _ExchangeHigh,
+//     _ExchangeLow,
+//     _CompareAndResult) == 1;
+//   #else
+//     //__int128 ex;
+//     //u64*  ex64 = (u64*)&ex;
+//     //ex64[0] = _ExchangeLow;
+//     //ex64[1] = _ExchangeHigh;
+//
+//     //__sync_val_compare_and_swap(_Destination, );
+//
+//     //_u128 ex; 
+//     //ex.hi = _ExchangeHigh;
+//     //ex.lo = _ExchangeLow;
+//     //return __atomic_compare_exchange(_Destination, _CompareAndResult, &ex, false, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST);
+//
+//     return true; // todo: change this to work for gcc and clang
+//   #endif
+//}
+
+//#ifdef _WIN32
+//  using  u128 = /*__declspec(align(128))*/ _u128;
+//#else
+//  using  u128 = _u128;
+//#endif
+
+//using Au32     =  std::atomic<u32>;
+//using Au64     =  std::atomic<u64>;
+//using Mut      =  std::mutex;
+//using UnqLock  =  std::unique_lock<Mut>;
+
+// todo: output index from len() as well
+
 
