@@ -24,8 +24,8 @@
 // -todo: make init function that returns error codes - set an error code member variable instead
 // -todo: put errors into the error member variable
 // -todo: make error getter
+// -todo: make convenience function for passing a vector pointer into get()
 
-// todo: make convenience funtion for passing a vector pointer into get()
 // todo: make get take an out_readlen optional output variable
 // todo: build in convenience function for returning a vector of a given type
 // todo: build in a convenience funtion to return a tbl and surround it with preproccessor defines so that it is declared only if tbl.hpp is included before simdb.hpp
@@ -787,13 +787,13 @@ public:
       b   +=  writeBlock(cur, b, remvlen);
     }
   }
-  u32           get(u32  blkIdx, u32 version, void *const bytes, u32 maxlen) const
+  u32           get(u32  blkIdx, u32 version, void *const bytes, u32 maxlen, u32* out_readlen=nullptr) const
   {
     using namespace std;
 
     if(blkIdx == LIST_END){ return 0; }
 
-    BlkLst bl = incReaders(blkIdx, version);   
+    BlkLst bl = incReaders(blkIdx, version);
     
     u32 vlen = bl.len-bl.klen;
     if(bl.len==0 || vlen>maxlen ) return 0;
@@ -827,6 +827,8 @@ public:
       len   +=  rdLen;
       nxt    =  nxtBlock(cur);
     }
+
+    if(out_readlen){ *out_readlen = len; }
 
   read_failure:
     decReaders(blkIdx, version);
@@ -1196,14 +1198,14 @@ public:
       if(i==en){ return 0ull; }
     }
   }
-  bool           get(const void *const key, u32 klen, void *const out_val, u32 vlen) const
+  bool           get(const void *const key, u32 klen, void *const out_val, u32 vlen, u32* out_readlen=nullptr) const
   {
     if(klen<1){ return 0; }
 
     u32 hash=HashBytes(key,klen); 
     CncrStr*  csp = m_csp;
-    auto  runFunc = [csp, out_val, vlen](VerIdx vi){
-      return csp->get(vi.idx, vi.version, out_val, vlen);
+    auto  runFunc = [csp, out_val, vlen, out_readlen](VerIdx vi){
+      return csp->get(vi.idx, vi.version, out_val, vlen, out_readlen);
     };
 
     return runMatch(key, klen, hash, runFunc);
@@ -1540,9 +1542,9 @@ public:
   {
     return s_ch.len(key, klen, out_vlen, out_version);
   }
-  bool         get(const void *const key, u32 klen, void *const   out_val, u32 vlen) const
+  bool         get(const void *const key, u32 klen, void *const   out_val, u32 vlen, u32* out_readlen=nullptr) const
   {
-    return s_ch.get(key, klen, out_val, vlen);
+    return s_ch.get(key, klen, out_val, vlen, out_readlen);
   }
   bool         put(const void *const key, u32 klen, const void *const val, u32 vlen, u32* out_startBlock=nullptr)
   {
