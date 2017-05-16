@@ -1255,15 +1255,6 @@ struct  SharedMem
   bool            owner;
   char             path[256];
 
-  static  bool file_exists(char const* filename)
-  {
-    if(FILE* file = fopen(filename, "r")){
-      fclose(file);
-      return true;
-    }
-    return false;
-  }
-
 public:
   static void        FreeAnon(SharedMem& sm)
   {
@@ -1357,22 +1348,12 @@ public:
     #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
       sm.owner  = true; // todo: have to figure out how to detect which process is the owner
 
-      //FILE* fp  = fopen(sm.path,"rw");
-      //if(fp){
-      //  fclose(fp);
-      //  sm.fileHndl = open(sm.path, O_RDWR);
-      //  sm.owner    = false;
-      //
-      //if(fp){
-      //  fclose(fp);
-
       sm.fileHndl = open(sm.path, O_RDWR);
       if(sm.fileHndl == -1)
       {
         sm.fileHndl = open(sm.path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR |S_IRGRP|S_IWGRP | S_IROTH|S_IWOTH ); // O_CREAT | O_SHLOCK ); // | O_NONBLOCK );
         if(sm.fileHndl == -1){
           if(error_code){ *error_code = simdb_error::COULD_NOT_OPEN_MAP_FILE; }
-          //fflush(stdout);
         }
         else{
           //flock(sm.fileHndl, LOCK_EX);   // exclusive lock  // LOCK_NB
@@ -1399,7 +1380,6 @@ public:
  
       if(sm.hndlPtr==MAP_FAILED){
         if(error_code){ *error_code = simdb_error::COULD_NOT_MEMORY_MAP_FILE; }
-        fflush(stdout);
       }
     #endif       
   
@@ -1819,7 +1799,6 @@ public:
     }
  
     struct dirent*     dent;                         // dent is directory entry 
-    struct stat    stat_buf;
     while( (dent=readdir(d)) != NULL )
     {
       if(errno != ENOENT){
@@ -1845,6 +1824,28 @@ public:
 
 
 
+
+
+//static  bool file_exists(char const* filename)
+//{
+//  if(FILE* file = fopen(filename, "r")){
+//    fclose(file);
+//    return true;
+//  }
+//  return false;
+//}
+
+//
+//struct stat    stat_buf;
+
+//FILE* fp  = fopen(sm.path,"rw");
+//if(fp){
+//  fclose(fp);
+//  sm.fileHndl = open(sm.path, O_RDWR);
+//  sm.owner    = false;
+//
+//if(fp){
+//  fclose(fp);
 
 //
 //enum error_code = { NO_ERRORS=2 };
