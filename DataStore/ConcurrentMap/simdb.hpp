@@ -18,13 +18,15 @@
 // -todo: fix line 427 that doesn't report errors
 // -todo: fix 433 directory loop reporting
 // -todo: take out printf statements
+// -todo: fix double open 
+// -todo: fix no error check on memory map file open
+// -todo: fix error handling in the posix path
+// -todo: make init function that returns error codes - set an error code member variable instead
+// -todo: put errors into the error member variable
+// -todo: make error getter
 
-// todo: fix double open 
-// todo: fix no error check on memory map file open
-// todo: fix error handling in the posix path
-// todo: make init function that returns error codes
-// todo: make get take an out_readlen optional output variable
 // todo: make convenience funtion for passing a vector pointer into get()
+// todo: make get take an out_readlen optional output variable
 // todo: build in convenience function for returning a vector of a given type
 // todo: build in a convenience funtion to return a tbl and surround it with preproccessor defines so that it is declared only if tbl.hpp is included before simdb.hpp
 // todo: change readers to be a struct that has a dedicated deleted flag - is it possible that the readers can be decremented multiple times by multiple deletes and the block list could be removed while it is still being read?
@@ -358,7 +360,14 @@ namespace {
   #pragma warning(pop)
 #endif
 
-enum class simdb_error { NO_ERRORS=2, DIR_NOT_FOUND, DIR_ENTRY_ERROR, COULD_NOT_OPEN_MAP_FILE, COULD_NOT_MEMORY_MAP_FILE };
+enum class simdb_error { 
+  NO_ERRORS=2, 
+  DIR_NOT_FOUND, 
+  DIR_ENTRY_ERROR, 
+  COULD_NOT_OPEN_MAP_FILE, 
+  COULD_NOT_MEMORY_MAP_FILE,
+  SHARED_MEMORY_ERROR
+};
 
 template<class T> 
 class    lava_vec
@@ -1451,12 +1460,13 @@ private:
   CncrHsh    s_ch;               // store the indices of keys and values - contains a ConcurrentList
 
   // these variables are local to the stack where simdb lives, unlike the others, they are not simply a pointer into the shared memory
-  SharedMem           m_mem;
-  mutable u32    m_nxtChIdx;
-  mutable u32    m_curChIdx;
-  u64              m_blkCnt;
-  u64               m_blkSz;
-  bool             m_isOpen;
+  SharedMem             m_mem;
+  mutable simdb_error m_error;
+  mutable u32      m_nxtChIdx;
+  mutable u32      m_curChIdx;
+  u64                m_blkCnt;
+  u64                 m_blkSz;
+  bool               m_isOpen;
 
 public:
   static const u32        EMPTY = CncrHsh::EMPTY;              // 28 bits set 
@@ -1484,9 +1494,11 @@ public:
     m_curChIdx(0),
     m_isOpen(false)
   {
-    new (&m_mem) SharedMem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount), raw_path) );
+    simdb_error error_code = simdb_error::NO_ERRORS;
+    new (&m_mem) SharedMem( SharedMem::AllocAnon(name, MemSize(blockSize,blockCount), raw_path, &error_code) );
 
-    if(!m_mem.hndlPtr){ return; /*error*/ }
+    if(error_code!=simdb_error::NO_ERRORS){ m_error = error_code; return; }
+    if(!m_mem.hndlPtr){ m_error = simdb_error::SHARED_MEMORY_ERROR; return; }
 
     s_blockCount  =  ((au64*)m_mem.data())+2;
     s_blockSize   =  ((au64*)m_mem.data())+1;
@@ -1613,6 +1625,10 @@ public:
     }
     return false;
   }
+  auto       error() const -> simdb_error
+  {
+    return m_error;
+  }
 
   // separated C++ functions - these won't need to exist if compiled for a C interface
   struct VerStr { 
@@ -1693,6 +1709,14 @@ public:
   }
 
   template<class T>
+  auto         get(str const& key) -> std::vector<T>
+  {
+    u32 vlen = 0;
+    len(key.data(), (u32)key.length(), &vlen);
+    std::vector<T> ret(vlen);    
+    return get(key.data(), (u32)key.length(), (void*)ret.data(), vlen);
+  }
+  template<class T>
   i64          put(str    const& key, std::vector<T> const& val)
   {    
     return put(key.data(), (u32)key.length(), val.data(), (u32)(val.size()*sizeof(T)) );
@@ -1700,7 +1724,6 @@ public:
   // end separated C++ functions
 
 };
-
 
 // simdb_listDBs()
 #ifdef _WIN32
