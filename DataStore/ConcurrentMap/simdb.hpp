@@ -17,8 +17,10 @@
 
 // -todo: fix line 427 that doesn't report errors
 // -todo: fix 433 directory loop reporting
+// -todo: take out printf statements
 
-// todo: take out printf statements
+// todo: fix double open 
+// todo: fix no error check on memory map file open
 // todo: fix error handling in the posix path
 // todo: make init function that returns error codes
 // todo: make get take an out_readlen optional output variable
@@ -1239,8 +1241,6 @@ struct  SharedMem
   using    u64  =  uint64_t;
   using   au32  =  std::atomic<u32>;
 
-  //enum error_code = { NO_ERRORS=2 };
-
   static const int alignment = 0;
   
   #ifdef _WIN32
@@ -1357,21 +1357,27 @@ public:
     #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
       sm.owner  = true; // todo: have to figure out how to detect which process is the owner
 
-      FILE* fp  = fopen(sm.path,"rw");
-      if(fp){
-        fclose(fp);
-        sm.fileHndl = open(sm.path, O_RDWR);
-        sm.owner    = false;
-      }else{
+      //FILE* fp  = fopen(sm.path,"rw");
+      //if(fp){
+      //  fclose(fp);
+      //  sm.fileHndl = open(sm.path, O_RDWR);
+      //  sm.owner    = false;
+      //
+      //if(fp){
+      //  fclose(fp);
+
+      sm.fileHndl = open(sm.path, O_RDWR);
+      if(sm.fileHndl == -1)
+      {
         sm.fileHndl = open(sm.path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR |S_IRGRP|S_IWGRP | S_IROTH|S_IWOTH ); // O_CREAT | O_SHLOCK ); // | O_NONBLOCK );
         if(sm.fileHndl == -1){
           if(error_code){ *error_code = simdb_error::COULD_NOT_OPEN_MAP_FILE; }
-          fflush(stdout);
+          //fflush(stdout);
         }
         else{
           //flock(sm.fileHndl, LOCK_EX);   // exclusive lock  // LOCK_NB
         }
-      }
+      }else{ sm.owner = false; }
 
       if(sm.owner){  // todo: still need more concrete race protection
         fcntl(sm.fileHndl, F_GETLK, &flock);
@@ -1840,6 +1846,8 @@ public:
 
 
 
+//
+//enum error_code = { NO_ERRORS=2 };
 
 //printf("open failed, file handle was -1 \nFile name: %s \nError number: %d \n\n", sm.path, errno); 
 //printf("mmap failed\nError number: %d \n\n", errno);
