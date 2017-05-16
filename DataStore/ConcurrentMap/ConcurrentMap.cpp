@@ -334,7 +334,7 @@ int main()
     {
       auto& numk = numkey[idx];
       auto&  lbl = label[idx]; 
-      TO(10000000,j){ 
+      TO(100000,j){ 
         db.put(numk, lbl); 
         if(rngSwitches[idx]()){ db.del(numk); }
         //bool ok = db.del(numk);

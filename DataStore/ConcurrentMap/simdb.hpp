@@ -15,6 +15,21 @@
   limitations under the License.
 */
 
+// -todo: fix line 427 that doesn't report errors
+// -todo: fix 433 directory loop reporting
+
+// todo: take out printf statements
+// todo: fix error handling in the posix path
+// todo: make init function that returns error codes
+// todo: make get take an out_readlen optional output variable
+// todo: make convenience funtion for passing a vector pointer into get()
+// todo: build in convenience function for returning a vector of a given type
+// todo: build in a convenience funtion to return a tbl and surround it with preproccessor defines so that it is declared only if tbl.hpp is included before simdb.hpp
+// todo: change readers to be a struct that has a dedicated deleted flag - is it possible that the readers can be decremented multiple times by multiple deletes and the block list could be removed while it is still being read?
+//       | need to make sure that deleted flag is only set once
+//       | don't let deleted decrement readers, but make readers start at 0 and every time it comes back to 0, check if it is deleted - make sure del() sets the deleted flag, increments readers, finds the index, deletes the index, then comes back and decrements readers - if readers is 0, and the deleted flag is set (which it must be since it was already set), then free the blocks
+
+
 /*
  SimDB
 
@@ -161,6 +176,7 @@
   #include <sys/param.h>
   #include <unistd.h>
   #include <dirent.h>
+  #include <errno.h>
 #endif
 
 #include <cstdint>
@@ -337,135 +353,10 @@ namespace {
 }
 
 #ifdef _WIN32
-  auto simdb_listDBs() -> std::vector<std::string>
-  {
-    using namespace std;
-
-    static HMODULE _hModule = nullptr; 
-    static NTOPENDIRECTORYOBJECT  NtOpenDirectoryObject  = nullptr;
-    static NTOPENFILE             NtOpenFile             = nullptr;
-    static NTQUERYDIRECTORYOBJECT NtQueryDirectoryObject = nullptr;
-    static RTLINITUNICODESTRING   RtlInitUnicodeString   = nullptr;
-    
-    vector<string> ret;
-
-    if(!NtOpenDirectoryObject){  
-      NtOpenDirectoryObject  = (NTOPENDIRECTORYOBJECT)GetLibraryProcAddress( _T("ntdll.dll"), "NtOpenDirectoryObject");
-    }
-    if(!NtQueryDirectoryObject){ 
-      NtQueryDirectoryObject = (NTQUERYDIRECTORYOBJECT)GetLibraryProcAddress(_T("ntdll.dll"), "NtQueryDirectoryObject");
-    }
-    if(!NtOpenFile){ 
-      NtOpenFile = (NTOPENFILE)GetLibraryProcAddress(_T("ntdll.dll"), "NtOpenFile");
-    }
-
-    HANDLE     hDir = NULL;
-    IO_STATUS_BLOCK  isb = { 0 };
-    DWORD sessionId;
-    BOOL         ok = ProcessIdToSessionId(GetCurrentProcessId(), &sessionId);
-    if(!ok){ return { "Could not get current session" }; }
-
-    wstring     sesspth = L"\\Sessions\\" + to_wstring(sessionId) + L"\\BaseNamedObjects";
-    const WCHAR* mempth = sesspth.data();
-    
-    WCHAR buf[4096];
-    UNICODE_STRING pth = { 0 };
-    pth.Buffer         = (WCHAR*)mempth;
-    pth.Length         = (USHORT)lstrlenW(mempth) * sizeof(WCHAR);
-    pth.MaximumLength  = pth.Length;
-
-    OBJECT_ATTRIBUTES oa = { 0 };
-    oa.Length             = sizeof( OBJECT_ATTRIBUTES );
-    oa.RootDirectory      = NULL;
-    oa.Attributes         = OBJ_CASE_INSENSITIVE;                               
-    oa.ObjectName         = &pth;
-    oa.SecurityDescriptor = NULL;                        
-    oa.SecurityQualityOfService = NULL;
-
-    NTSTATUS status;
-    status = NtOpenDirectoryObject(
-      &hDir, 
-      /*STANDARD_RIGHTS_READ |*/ DIRECTORY_QUERY, 
-      &oa);
-
-    if(hDir==NULL || status!=STATUS_SUCCESS){ return { "Could not open file" }; }
-
-    BOOLEAN rescan = TRUE;
-    ULONG      ctx = 0;
-    ULONG   retLen = 0;
-    do
-    {
-      status = NtQueryDirectoryObject(hDir, buf, sizeof(buf), TRUE, rescan, &ctx, &retLen);
-      rescan = FALSE;
-      auto info = (OBJECT_DIRECTORY_INFORMATION*)buf;
-
-      if( lstrcmpW(info->type.Buffer, L"Section")!=0 ){ continue; }
-      WCHAR wPrefix[] = L"simdb_";
-      size_t  pfxSz   = sizeof(wPrefix);
-      if( strncmp( (char*)info->name.Buffer, (char*)wPrefix, pfxSz)!=0 ){  continue; }
-
-      wstring  wname = wstring( (WCHAR*)info->name.Buffer );
-      wstring_convert<codecvt_utf8<wchar_t>> cnvrtr;
-      string    name = cnvrtr.to_bytes(wname);
-
-      ret.push_back(name);
-    }while(status!=STATUS_NO_MORE_ENTRIES);
-    
-    return ret;
-  }
-#else
-  auto simdb_listDBs() -> std::vector<std::string>
-  {
-    using namespace std;
-
-    char   prefix[] = "simdb_";
-    size_t  pfxSz   = sizeof(prefix)-1;
-
-    vector<string> ret;
-
-    DIR* d;                                          // d is directory handle
-    if((d = opendir(P_tmpdir)) == NULL)
-    //if((d = opendir("/tmp/")) == NULL)
-    { return ret; }
- 
-    struct dirent*   dent;                           // dent is directory entry 
-    struct stat  stat_buf;
-    while( (dent = readdir(d)) != NULL )
-    {
-      //if(stat(dent->d_name, &stat_buf) == -1){continue;}
-        //return ret;
-      //}
-
-      //if( S_ISREG(stat_buf.st_mode) ){ 
-        //printf("name %-25s - %s  %d \n", dent->d_name, prefix, (int)pfxSz);
-        if(strncmp(dent->d_name, prefix, pfxSz)==0){
-          //printf("pushing %-25s - \n", dent->d_name);
-          ret.push_back(dent->d_name);
-        }
-      //} 
-
-      //printf("%-25s - \n", dent->d_name);
-     }
-     closedir(d);
-
-    return ret;
-  }
-  // gcc/clang/linux ?
-      //perror("stat ERROR");
-      //exit(3);
-      //str = "regular"; 
-      //string name = dent->d_name;
-      //
-      //}else if( S_ISDIR(stat_buf.st_mode) ){
-        //str = "directory"; 
-      //}else{ 
-        //str = "other"; 
-      //}
-#endif
-
-#ifdef _WIN32
   #pragma warning(pop)
 #endif
+
+enum class simdb_error { NO_ERRORS=2, DIR_NOT_FOUND, DIR_ENTRY_ERROR, COULD_NOT_OPEN_MAP_FILE, COULD_NOT_MEMORY_MAP_FILE };
 
 template<class T> 
 class    lava_vec
@@ -1348,6 +1239,8 @@ struct  SharedMem
   using    u64  =  uint64_t;
   using   au32  =  std::atomic<u32>;
 
+  //enum error_code = { NO_ERRORS=2 };
+
   static const int alignment = 0;
   
   #ifdef _WIN32
@@ -1391,7 +1284,7 @@ public:
 
     sm.clear();
   }
-  static SharedMem  AllocAnon(const char* name, u64 sizeBytes, bool raw_path=false)
+  static SharedMem  AllocAnon(const char* name, u64 sizeBytes, bool raw_path=false, simdb_error* error_code=nullptr)
   {
     using namespace std;
 
@@ -1400,6 +1293,7 @@ public:
     sm.owner    = false;
     //sm.size     = alignment==0? sizeBytes  :  alignment-(sizeBytes%alignment);
     sm.size     = sizeBytes;
+    if(error_code){ *error_code = simdb_error::NO_ERRORS; }
 
     #ifdef _WIN32      // windows
       sm.fileHndl = nullptr;
@@ -1418,7 +1312,7 @@ public:
       {
         sm.fileHndl = CreateFile(
           sm.path, 
-          FILE_MAP_READ|FILE_MAP_WRITE, 
+          GENERIC_READ|GENERIC_WRITE,   //FILE_MAP_READ|FILE_MAP_WRITE,  // apparently FILE_MAP constants have no effects here
           FILE_SHARE_READ|FILE_SHARE_WRITE, 
           NULL,
           CREATE_NEW,
@@ -1430,7 +1324,7 @@ public:
 
       if(sm.fileHndl==NULL)
       {
-        sm.fileHndl = CreateFileMapping(
+        sm.fileHndl = CreateFileMapping(  // todo: simplify and call this right away, it will open the section if it already exists
           INVALID_HANDLE_VALUE,
           NULL,
           PAGE_READWRITE,
@@ -1461,17 +1355,17 @@ public:
         return move(sm); 
       }
     #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
-      sm.owner   = true; // todo: have to figure out how to detect which process is the owner
+      sm.owner  = true; // todo: have to figure out how to detect which process is the owner
 
-      FILE* fp = fopen(sm.path,"rw");
+      FILE* fp  = fopen(sm.path,"rw");
       if(fp){
         fclose(fp);
         sm.fileHndl = open(sm.path, O_RDWR);
-        sm.owner = false;
+        sm.owner    = false;
       }else{
         sm.fileHndl = open(sm.path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR |S_IRGRP|S_IWGRP | S_IROTH|S_IWOTH ); // O_CREAT | O_SHLOCK ); // | O_NONBLOCK );
         if(sm.fileHndl == -1){
-          printf("open failed, file handle was -1 \nFile name: %s \nError number: %d \n\n", sm.path, errno); 
+          if(error_code){ *error_code = simdb_error::COULD_NOT_OPEN_MAP_FILE; }
           fflush(stdout);
         }
         else{
@@ -1481,7 +1375,6 @@ public:
 
       if(sm.owner){  // todo: still need more concrete race protection
         fcntl(sm.fileHndl, F_GETLK, &flock);
-
         flock(sm.fileHndl, LOCK_EX);              // exclusive lock  // LOCK_NB
         //fcntl(sm.fileHndl, F_PREALLOCATE);
         #if defined(__linux__) 
@@ -1494,14 +1387,13 @@ public:
         // get the error number and handle the error
       }
 
-      sm.hndlPtr = mmap(NULL, sizeBytes, PROT_READ|PROT_WRITE, MAP_SHARED , sm.fileHndl, 0); // MAP_PREFAULT_READ  | MAP_NOSYNC
+      sm.hndlPtr  = mmap(NULL, sizeBytes, PROT_READ|PROT_WRITE, MAP_SHARED , sm.fileHndl, 0); // MAP_PREFAULT_READ  | MAP_NOSYNC
       close(sm.fileHndl);
       sm.fileHndl = 0;
  
       if(sm.hndlPtr==MAP_FAILED){
-        printf("mmap failed\nError number: %d \n\n", errno);
+        if(error_code){ *error_code = simdb_error::COULD_NOT_MEMORY_MAP_FILE; }
         fflush(stdout);
-        /*todo: handle this error*/ 
       }
     #endif       
   
@@ -1824,6 +1716,159 @@ public:
 };
 
 
+// simdb_listDBs()
+#ifdef _WIN32
+  auto simdb_listDBs(simdb_error* error_code=nullptr) -> std::vector<std::string>
+  {
+    using namespace std;
+
+    static HMODULE                _hModule               = nullptr; 
+    static NTOPENDIRECTORYOBJECT  NtOpenDirectoryObject  = nullptr;
+    static NTOPENFILE             NtOpenFile             = nullptr;
+    static NTQUERYDIRECTORYOBJECT NtQueryDirectoryObject = nullptr;
+    static RTLINITUNICODESTRING   RtlInitUnicodeString   = nullptr;
+    
+    vector<string> ret;
+
+    if(!NtOpenDirectoryObject){  
+      NtOpenDirectoryObject  = (NTOPENDIRECTORYOBJECT)GetLibraryProcAddress( _T("ntdll.dll"), "NtOpenDirectoryObject");
+    }
+    if(!NtQueryDirectoryObject){ 
+      NtQueryDirectoryObject = (NTQUERYDIRECTORYOBJECT)GetLibraryProcAddress(_T("ntdll.dll"), "NtQueryDirectoryObject");
+    }
+    if(!NtOpenFile){ 
+      NtOpenFile = (NTOPENFILE)GetLibraryProcAddress(_T("ntdll.dll"), "NtOpenFile");
+    }
+
+    HANDLE     hDir = NULL;
+    IO_STATUS_BLOCK  isb = { 0 };
+    DWORD sessionId;
+    BOOL         ok = ProcessIdToSessionId(GetCurrentProcessId(), &sessionId);
+    if(!ok){ return { "Could not get current session" }; }
+
+    wstring     sesspth = L"\\Sessions\\" + to_wstring(sessionId) + L"\\BaseNamedObjects";
+    const WCHAR* mempth = sesspth.data();
+    
+    WCHAR buf[4096];
+    UNICODE_STRING pth = { 0 };
+    pth.Buffer         = (WCHAR*)mempth;
+    pth.Length         = (USHORT)lstrlenW(mempth) * sizeof(WCHAR);
+    pth.MaximumLength  = pth.Length;
+
+    OBJECT_ATTRIBUTES oa = { 0 };
+    oa.Length             = sizeof( OBJECT_ATTRIBUTES );
+    oa.RootDirectory      = NULL;
+    oa.Attributes         = OBJ_CASE_INSENSITIVE;                               
+    oa.ObjectName         = &pth;
+    oa.SecurityDescriptor = NULL;                        
+    oa.SecurityQualityOfService = NULL;
+
+    NTSTATUS status;
+    status = NtOpenDirectoryObject(
+      &hDir, 
+      /*STANDARD_RIGHTS_READ |*/ DIRECTORY_QUERY, 
+      &oa);
+
+    if(hDir==NULL || status!=STATUS_SUCCESS){ return { "Could not open file" }; }
+
+    BOOLEAN rescan = TRUE;
+    ULONG      ctx = 0;
+    ULONG   retLen = 0;
+    do
+    {
+      status = NtQueryDirectoryObject(hDir, buf, sizeof(buf), TRUE, rescan, &ctx, &retLen);
+      rescan = FALSE;
+      auto info = (OBJECT_DIRECTORY_INFORMATION*)buf;
+
+      if( lstrcmpW(info->type.Buffer, L"Section")!=0 ){ continue; }
+      WCHAR wPrefix[] = L"simdb_";
+      size_t  pfxSz   = sizeof(wPrefix);
+      if( strncmp( (char*)info->name.Buffer, (char*)wPrefix, pfxSz)!=0 ){  continue; }
+
+      wstring  wname = wstring( (WCHAR*)info->name.Buffer );
+      wstring_convert<codecvt_utf8<wchar_t>> cnvrtr;
+      string    name = cnvrtr.to_bytes(wname);
+
+      ret.push_back(name);
+    }while(status!=STATUS_NO_MORE_ENTRIES);
+    
+    return ret;
+  }
+#else
+  auto simdb_listDBs(simdb_error* error_code=nullptr) -> std::vector<std::string>
+  {
+    using namespace std;
+
+    char   prefix[] = "simdb_";
+    size_t  pfxSz   = sizeof(prefix)-1;
+
+    vector<string> ret;
+
+    DIR* d;                                          // d is directory handle
+    errno = ENOENT;
+    if( (d=opendir(P_tmpdir))==NULL || errno!=ENOENT){
+      closedir(d);
+      if(error_code){ *error_code = simdb_error::DIR_NOT_FOUND; }
+      return ret;
+    }
+ 
+    struct dirent*     dent;                         // dent is directory entry 
+    struct stat    stat_buf;
+    while( (dent=readdir(d)) != NULL )
+    {
+      if(errno != ENOENT){
+        closedir(d);
+        if(error_code){ *error_code = simdb_error::DIR_ENTRY_ERROR; }        
+        return ret;
+      }
+
+      if(strncmp(dent->d_name, prefix, pfxSz)==0){
+        ret.push_back(dent->d_name);
+      }
+    }
+
+    closedir(d);
+    if(error_code){ *error_code = simdb_error::NO_ERRORS; }
+    return ret;
+  }
+#endif
+
 
 #endif
 
+
+
+
+
+
+//printf("open failed, file handle was -1 \nFile name: %s \nError number: %d \n\n", sm.path, errno); 
+//printf("mmap failed\nError number: %d \n\n", errno);
+
+//class simdb;
+//enum  simdb::error_code;
+
+//if((d = opendir("/tmp/")) == NULL)
+//
+//if(stat(dent->d_name, &stat_buf) == -1){continue;}
+//return ret;
+//}
+//
+//if( S_ISREG(stat_buf.st_mode) ){ 
+//printf("name %-25s - %s  %d \n", dent->d_name, prefix, (int)pfxSz);
+//
+//printf("pushing %-25s - \n", dent->d_name);
+//
+//} 
+//printf("%-25s - \n", dent->d_name);
+
+// gcc/clang/linux ?
+//perror("stat ERROR");
+//exit(3);
+//str = "regular"; 
+//string name = dent->d_name;
+//
+//}else if( S_ISDIR(stat_buf.st_mode) ){
+//str = "directory"; 
+//}else{ 
+//str = "other"; 
+//}
