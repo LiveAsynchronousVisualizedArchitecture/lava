@@ -1726,7 +1726,7 @@ public:
       //*searched = (sidx-sprev)>=0?  sidx-sprev  :  (m_blkCnt-sprev-1) + sidx+1;
       *searched = (cur-prev)>=0?  cur-prev  :  (m_blkCnt-prev-1) + cur+1;
     }
-    if(viNxt.idx==EMPTY){ return {viNxt.version, ""}; }
+    if(viNxt.idx>=DELETED){ return {viNxt.version, ""}; }
     
     i64 total_len = this->len(viNxt.idx, viNxt.version, &klen, &vlen);
     if(total_len==0){ return {viNxt.version, ""}; }
