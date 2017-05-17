@@ -25,13 +25,14 @@
 // -todo: put errors into the error member variable
 // -todo: make error getter
 // -todo: make convenience function for passing a vector pointer into get()
-
-// todo: make get take an out_readlen optional output variable
-// todo: build in convenience function for returning a vector of a given type
-// todo: build in a convenience funtion to return a tbl and surround it with preproccessor defines so that it is declared only if tbl.hpp is included before simdb.hpp
-// todo: change readers to be a struct that has a dedicated deleted flag - is it possible that the readers can be decremented multiple times by multiple deletes and the block list could be removed while it is still being read?
+// -todo: make get take an out_readlen optional output variable
+// -todo: build in convenience function for returning a vector of a given type
+// -todo: test on linux
+// -todo: change readers to be a struct -that has a dedicated deleted flag - is it possible that the readers can be decremented multiple times by multiple deletes and the block list could be removed while it is still being read?
 //       | need to make sure that deleted flag is only set once
 //       | don't let deleted decrement readers, but make readers start at 0 and every time it comes back to 0, check if it is deleted - make sure del() sets the deleted flag, increments readers, finds the index, deletes the index, then comes back and decrements readers - if readers is 0, and the deleted flag is set (which it must be since it was already set), then free the blocks
+
+// todo: build in a convenience funtion to return a tbl and surround it with preproccessor defines so that it is declared only if tbl.hpp is included before simdb.hpp
 
 
 /*
@@ -538,14 +539,14 @@ public:
   };
   union   KeyReaders
   {
-    struct{ u32 isKey : 1; i32 readers : 31; };
+    struct{ u32 isKey : 1; u32 isDeleted : 1; i32 readers : 30; };
     u32 asInt;
   };
   struct  BlkLst                                                   // 24 bytes total
   {    
     union{
       KeyReaders kr;
-      struct{ u32 isKey : 1; i32 readers : 31; };
+      struct{ u32 isKey : 1; u32 isDeleted : 1; i32 readers : 30; };
     };                                                             //  4 bytes  -  kr is key readers  
     u32 idx, version, len, klen, hash;                             // 20 bytes
 
@@ -595,7 +596,7 @@ public:
     
     return *bl;  // after readers has been incremented this block list entry is not going away. The only thing that would change would be the readers and that doesn't matter to the calling function.
   }
-  bool      decReaders(u32 blkIdx, u32 version) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
+  bool      decReadersOrDel(u32 blkIdx, u32 version, bool del=false) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
     KeyReaders cur, nxt;
     BlkLst*     bl  =  &s_bls[blkIdx];
@@ -604,10 +605,11 @@ public:
     do{
       if(bl->version!=version){ return false; }
       nxt          = cur;
-      nxt.readers -= 1;
+      if(del){ nxt.isDeleted=true; } 
+      else{ nxt.readers -= 1; }
     }while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
     
-    if(cur.readers==0){ doFree(blkIdx); return false; }
+    if(cur.readers==0 && cur.isDeleted){ doFree(blkIdx); return false; }
 
     return true;
   }
@@ -675,7 +677,7 @@ private:
       u8*         p  =  blockFreePtr(blkIdx);
       u32    cpyLen  =  len==0?  blkFree-ofst  :  len;
       memcpy(bytes, p+ofst, cpyLen);
-    decReaders(blkIdx, version);
+    decReadersOrDel(blkIdx, version);
 
     return cpyLen;
   }
@@ -751,7 +753,7 @@ public:
   }
   bool         free(u32  blkIdx, u32 version)                                                             // doesn't always free a list/chain of blocks - it decrements the readers and when the readers gets below the value that it started at, only then it is deleted (by the first thread to take it below the starting number)
   {
-    return decReaders(blkIdx, version);
+    return decReadersOrDel(blkIdx, version, true);
   }
   void          put(u32  blkIdx, void const *const kbytes, u32 klen, void const *const vbytes, u32 vlen)  // don't need version because this will only be used after allocating and therefore will only be seen by one thread until it is inserted into the ConcurrentHash
   {
@@ -831,7 +833,7 @@ public:
     if(out_readlen){ *out_readlen = len; }
 
   read_failure:
-    decReaders(blkIdx, version);
+    decReadersOrDel(blkIdx, version);
 
     return len;                                                        // only one return after the top to make sure readers can be decremented - maybe it should be wrapped in a struct with a destructor
   }
@@ -866,7 +868,7 @@ public:
     len   +=  rdLen;
 
   read_failure:
-    decReaders(blkIdx, version);
+    decReadersOrDel(blkIdx, version);
 
     return len;                                           // only one return after the top to make sure readers can be decremented - maybe it should be wrapped in a struct with a destructor    
   }
@@ -874,7 +876,7 @@ public:
   {
     if(incReaders(blkIdx, version).len==0){ return MATCH_REMOVED; }
       auto ret = memcmp(buf1, buf2, len);
-    bool freed = !decReaders(blkIdx, version);
+    bool freed = !decReadersOrDel(blkIdx, version);
 
     if(freed){       return MATCH_REMOVED; }
     else if(ret==0){ return MATCH_TRUE;    }
@@ -1601,7 +1603,7 @@ public:
 
     VerIdx vi = s_ch.load(idx);  
     if(vi.idx >= CncrHsh::DELETED || vi.version!=version){return false;}
-    u32 l = s_cs.getKey(vi.idx, vi.version, out_buf, klen);                         // l is length
+    u32 l = s_cs.getKey(vi.idx, vi.version, out_buf, klen);                               // l is length
     if(l<1){return false;}
 
     return true;
@@ -1850,6 +1852,21 @@ public:
 
 
 
+
+//KeyReaders cur, nxt;
+//BlkLst*     bl  =  &s_bls[blkIdx];
+//au32* areaders  =  (au32*)&(bl->kr);
+//cur.asInt       =  areaders->load();
+//do{
+//  if(bl->version!=version){ return false; }
+//  nxt           = cur;
+//  //nxt.readers -= 1;
+//  nxt.isDeleted = 1;
+//}while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
+//
+//if(cur.readers==0){ doFree(blkIdx); return false; }
+//
+//return true;
 
 //static  bool file_exists(char const* filename)
 //{
