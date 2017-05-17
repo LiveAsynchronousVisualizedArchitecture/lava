@@ -304,13 +304,28 @@ void printhsh(simdb const& db)
   //printf("\n\n");
 }
 
+void printidx(simdb const& db)
+{
+  u32* d = (u32*)db.hashData();
+  for(u32 i=0; i<(db.blocks()*2); ++i /*i+=2*/){
+    if(i%4==0) printf("|");
+    else if(i%2==0) printf(" ");
+
+    //u32 idx = i%2? i+1  :  i;
+    //printf(" %o ", d[idx]);
+
+    printf(" %o ", d[i]);
+  }
+  printf("\n\n");
+}
+
 int main()
 {
   using namespace std;
 
   //Println("size of simdb on the stack: ", sizeof(simdb));
 
-  simdb db("test", 2<<10, 2<<4);
+  simdb db("test", 2<<6, 2<<3);
 
   //simdb db("H:\\projects\\lava\\test.simdb", 32, 64, true);
   //simdb db("test.simdb", 32, 64, true);
@@ -334,7 +349,7 @@ int main()
     {
       auto& numk = numkey[idx];
       auto&  lbl = label[idx]; 
-      TO(100000,j){ 
+      TO(1000000,j){ 
         db.put(numk, lbl); 
         db.del(numk);
         //if(rngSwitches[idx]()){ db.del(numk); }
@@ -369,28 +384,28 @@ int main()
   //Println("put: ", db.put( wat.data(),   (u32)wat.length(),    skidoosh.data(), (u32)skidoosh.length()) );
   //Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
 
-  if( db.isOwner() ){
-    Println("put: ", db.put("lock free", "is the way to be") );
-
-    Println("put: ", db.put(wat, skidoosh) );
-    //db.del("wat");
-    Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
-    //db.del("wut");
-    Println("put: ", db.put(kablam, skidoosh) ); //Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
-    //db.del("kablam");
-  
-    Println("put: ", db.put(wat, skidoosh) );
-    //Println("del wat: ", db.del("wat") );
-  
-    //Println("put: ", db.put(longkey, longval) );
-    //Println("del wat: ", db.del(longkey) );
-  
-    Println();
-  }
+  //if( db.isOwner() ){
+  //  Println("put: ", db.put("lock free", "is the way to be") );
+  //
+  //  Println("put: ", db.put(wat, skidoosh) );
+  //  //db.del("wat");
+  //  Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
+  //  //db.del("wut");
+  //  Println("put: ", db.put(kablam, skidoosh) ); //Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
+  //  //db.del("kablam");
+  //
+  //  Println("put: ", db.put(wat, skidoosh) );
+  //  //Println("del wat: ", db.del("wat") );
+  //
+  //  //Println("put: ", db.put(longkey, longval) );
+  //  //Println("del wat: ", db.del(longkey) );
+  //
+  //  Println();
+  //}
   //db.flush();
 
   Println();
-  //printdb(db);
+  printdb(db);
 
   //else{
   //  Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
@@ -398,6 +413,7 @@ int main()
 
   Println();
   //printhsh(db); // Println();
+  printidx(db);
 
   //Println("BlkLst size: ", sizeof(CncrHsh::BlkLst) );
   //

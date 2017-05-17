@@ -36,6 +36,7 @@
 // -todo: change getKeyStrs() to just skip inserting duplicate keys but not break from the loop
 // -todo: fix duplicate keys in msvc getKeyStrs loop - VerStr comparison of version numbers as well as the string led to duplicate entries in a set
 
+// todo: fix infinite loop with no keys
 // todo: fix printing of deleted keys
 // todo: make sure only one deleting thread can delete
 // todo: build in a convenience funtion to return a tbl and surround it with preproccessor defines so that it is declared only if tbl.hpp is included before simdb.hpp
@@ -890,7 +891,7 @@ public:
     return len;                                           // only one return after the top to make sure readers can be decremented - maybe it should be wrapped in a struct with a destructor    
   }
   Match   memcmpBlk(u32  blkIdx, u32 version, void const *const buf1, void const *const buf2, u32 len) const    // todo: eventually take out the inc and dec readers and only do them when actually reading and dealing with the whole chain of blocks 
-  {
+  { // todo: take out inc and dec here, since the whole block list should be read and protected by start of the list
     if(incReaders(blkIdx, version).len==0){ return MATCH_REMOVED; }
       auto ret = memcmp(buf1, buf2, len);
     bool freed = !decReadersOrDel(blkIdx, version);
@@ -1027,7 +1028,7 @@ private:
   {
     using namespace std;
 
-    u64     exp = i%2? swp32(expected.asInt) : expected.asInt;
+    u64     exp = i%2? swp32(expected.asInt) : expected.asInt;                      // if the index (i) is odd, swap the upper and lower 32 bits around
     u64    desi = i%2? swp32(desired.asInt) : desired.asInt;                        // desi is desired int
     au64*  addr = (au64*)(s_vis.data()+i);
     bool     ok = addr->compare_exchange_strong( exp, desi );
@@ -1059,10 +1060,11 @@ private:
   template<class FUNC> 
   bool       runIfMatch(VerIdx vi, const void* const buf, u32 len, u32 hash, FUNC f) const 
   { // todo: should this increment and decrement the readers, as well as doing something different if it was the thread that freed the blocks
-    //VerIdx kv = incReaders(i);    
+    //VerIdx kv = incReaders(vi.idx, vi.version);
       Match      m = m_csp->compare(vi.idx, vi.version, buf, len, hash);
       bool matched = false;                                                   // not inside a scope
-      if(m==MATCH_TRUE){ matched=true; f(vi); }          
+      if(m==MATCH_TRUE){ matched=true; f(vi); }
+    //decReaders(vi.idx, vi.version);    
     //decReaders(i);
     
     return matched;
@@ -1104,8 +1106,12 @@ public:
       VerIdx vi = load(i);
       if(vi.idx>=DELETED){                                                                  // it is either deleted or empty
         bool success = cmpex_vi(i, vi, desired);
-        if(success){return vi;}
-        else{ i=prevIdx(i); continue; }                                                     // retry the same loop again if a good slot was found but it was changed by another thread between the load and the compare-exchange
+        if(success){
+          return vi;
+        }else{ 
+          i=prevIdx(i); 
+          continue; 
+        }                                                                                   // retry the same loop again if a good slot was found but it was changed by another thread between the load and the compare-exchange
       }                                                                                     // Either we just added the key, or another thread did.
 
       if(m_csp->compare(vi.idx,vi.version,key,klen,hash) != MATCH_TRUE){
@@ -1114,8 +1120,12 @@ public:
       }
 
       bool success = cmpex_vi(i, vi, desired);
-      if(success){ return vi; }
-      else{ i=prevIdx(i); continue; }
+      if(success){ 
+        return vi;
+      }else{ 
+        i=prevIdx(i); 
+        continue; 
+      }
     }
 
     // return empty;  // should never be reached
@@ -1158,7 +1168,9 @@ public:
         if(success){
           //cleanDeletion(i);
           return vi;
-        }else{ i=prevIdx(i); continue; }
+        }else{ 
+          i=prevIdx(i); continue; 
+        }
 
         //return vi;  // unreachable
       }
@@ -1181,13 +1193,14 @@ public:
     return true;
   }
   VerIdx          at(u32   idx)                const { return load(idx); }
- /* __declspec(noinline)*/ u32            nxt(u32 stIdx)                const
+  u32            nxt(u32 stIdx)                const
   {
     auto     idx = stIdx;
     VerIdx empty = empty_vi();
     do{
       VerIdx vi = load(idx);
-      if(vi.idx != empty.idx) break;
+      //if(vi.idx != empty.idx){break;}
+      if(vi.idx < DELETED){break;}
       idx = (idx+1) % m_sz;                                             // don't increment idx above since break comes before it here
 
       if(idx==stIdx) return empty.idx;
@@ -1603,17 +1616,30 @@ public:
   }
   VerIdx       nxt() const                                                                  // this version index represents a hash index, not an block storage index
   {
-    VerIdx  empty = s_ch.empty_vi();
-    u32     chNxt;
-    VerIdx     vi;
-    do{
-           chNxt = s_ch.nxt(m_nxtChIdx);      if(chNxt==empty.idx){return empty;}           // can return the same index - it does not do the iteration after finding a non empty key
-              vi = s_ch.at(chNxt);
+    //VerIdx  empty = s_ch.empty_vi();
+    //u32     chNxt;
+    ////u32     chPrev = s_ch.prev()
+    //VerIdx     vi;
+    //do{
+    //       chNxt = s_ch.nxt(m_nxtChIdx);            // chNxt can't be DELETED or EMPTY since it is the slot index // if(chNxt >= DELETED){return empty;}  // if(chNxt==empty.idx){return empty;}           // can return the same index - it does not do the iteration after finding a non empty key
+    //          vi = s_ch.at(chNxt);
+    //  m_nxtChIdx = (chNxt + 1) % m_blkCnt;
+    //}while( vi.idx >= DELETED);                    // todo: why check for empty twice? should this make sure not to loop around? 
+    ////}while( IsEmpty(vi) );                        // todo: why check for empty twice? should this make sure not to loop around? 
+    //
+    //m_curChIdx = chNxt;
+    //VerIdx ret = {chNxt, vi.version};
+    //
+    //return ret;
+    
+    VerIdx ret = s_ch.empty_vi();
+    u32  chNxt = s_ch.nxt(m_nxtChIdx);
+    if(chNxt!=EMPTY){ 
       m_nxtChIdx = (chNxt + 1) % m_blkCnt;
-    }while( IsEmpty(vi) );
-
-    m_curChIdx = chNxt;
-    VerIdx ret = {chNxt, vi.version};
+      ret        = s_ch.at(chNxt);
+    }else{
+      m_nxtChIdx = (m_nxtChIdx + 1) % m_blkCnt;      
+    }
     
     return ret;
   }
