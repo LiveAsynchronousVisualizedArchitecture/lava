@@ -1,1 +1,1 @@
-g++ std=c++11 -lpthread ConcurrentMap.cpp -o simdb.out -lpthread
+g++ -g -std=c++11 -lpthread ConcurrentMap.cpp -o simdb.out -lpthread

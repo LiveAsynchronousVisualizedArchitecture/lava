@@ -32,6 +32,8 @@
 //       | need to make sure that deleted flag is only set once
 //       | don't let deleted decrement readers, but make readers start at 0 and every time it comes back to 0, check if it is deleted - make sure del() sets the deleted flag, increments readers, finds the index, deletes the index, then comes back and decrements readers - if readers is 0, and the deleted flag is set (which it must be since it was already set), then free the blocks
 
+// todo: add deleting flag? - readers, isDeleted, and deleting must all be separate since either a decrement to the readers or a setting of the isDeleted flag can trigger deletion, and either one could come first - shouldn't it be possible to tell if the deleted changed and readers was 0 and if readers was already 0 and deleted changed?
+// todo: make sure only one deleting thread can delete
 // todo: build in a convenience funtion to return a tbl and surround it with preproccessor defines so that it is declared only if tbl.hpp is included before simdb.hpp
 
 
@@ -599,17 +601,23 @@ public:
   bool      decReadersOrDel(u32 blkIdx, u32 version, bool del=false) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
     KeyReaders cur, nxt;
+    bool doDelete   =  false;
     BlkLst*     bl  =  &s_bls[blkIdx];
     au32* areaders  =  (au32*)&(bl->kr);
     cur.asInt       =  areaders->load();
     do{
       if(bl->version!=version){ return false; }
       nxt          = cur;
-      if(del){ nxt.isDeleted=true; } 
-      else{ nxt.readers -= 1; }
+      if(del){
+        if(cur.readers==0 && !cur.isDeleted){ doDelete=true; }
+        nxt.isDeleted = true;
+      }else{
+        if(cur.readers==1 &&  cur.isDeleted){ doDelete=true; }
+        nxt.readers  -= 1;    
+      }
     }while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
     
-    if(cur.readers==0 && cur.isDeleted){ doFree(blkIdx); return false; }
+    if(doDelete){ doFree(blkIdx); return false; }
 
     return true;
   }
