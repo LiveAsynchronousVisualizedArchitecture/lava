@@ -31,8 +31,12 @@
 // -todo: change readers to be a struct -that has a dedicated deleted flag - is it possible that the readers can be decremented multiple times by multiple deletes and the block list could be removed while it is still being read?
 //       | need to make sure that deleted flag is only set once
 //       | don't let deleted decrement readers, but make readers start at 0 and every time it comes back to 0, check if it is deleted - make sure del() sets the deleted flag, increments readers, finds the index, deletes the index, then comes back and decrements readers - if readers is 0, and the deleted flag is set (which it must be since it was already set), then free the blocks
+// -todo: fix getKeyStrs loop - isDeleted was not initialized 
+// -todo: add deleting flag? - readers, isDeleted, and deleting must all be separate since either a decrement to the readers or a setting of the isDeleted flag can trigger deletion, and either one could come first - shouldn't it be possible to tell if the deleted changed and readers was 0 and if readers was already 0 and deleted changed? - don't need it, should be able to tell if the thread is the deleter through readers and isDeleted
+// -todo: change getKeyStrs() to just skip inserting duplicate keys but not break from the loop
+// -todo: fix duplicate keys in msvc getKeyStrs loop - VerStr comparison of version numbers as well as the string led to duplicate entries in a set
 
-// todo: add deleting flag? - readers, isDeleted, and deleting must all be separate since either a decrement to the readers or a setting of the isDeleted flag can trigger deletion, and either one could come first - shouldn't it be possible to tell if the deleted changed and readers was 0 and if readers was already 0 and deleted changed?
+// todo: fix printing of deleted keys
 // todo: make sure only one deleting thread can delete
 // todo: build in a convenience funtion to return a tbl and surround it with preproccessor defines so that it is declared only if tbl.hpp is included before simdb.hpp
 
@@ -369,7 +373,9 @@ enum class simdb_error {
   DIR_ENTRY_ERROR, 
   COULD_NOT_OPEN_MAP_FILE, 
   COULD_NOT_MEMORY_MAP_FILE,
-  SHARED_MEMORY_ERROR
+  SHARED_MEMORY_ERROR,
+  FTRUNCATE_FAILURE,
+  FLOCK_FAILURE
 };
 
 template<class T> 
@@ -552,9 +558,10 @@ public:
     };                                                             //  4 bytes  -  kr is key readers  
     u32 idx, version, len, klen, hash;                             // 20 bytes
 
-    BlkLst() : isKey(0), readers(0), idx(0), version(0), len(0), klen(0), hash(0) {}
+    BlkLst() : isKey(0), isDeleted(0), readers(0), idx(0), version(0), len(0), klen(0), hash(0) {}
     BlkLst(bool _isKey, i32 _readers, u32 _idx, u32 _version, u32 _len=0, u32 _klen=0, u32 _hash=0) : 
       isKey(_isKey),
+      isDeleted(0),
       readers(_readers),
       idx(_idx),
       version(_version),
@@ -600,12 +607,13 @@ public:
   }
   bool      decReadersOrDel(u32 blkIdx, u32 version, bool del=false) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
-    KeyReaders cur, nxt;
-    bool doDelete   =  false;
+    KeyReaders cur, nxt; bool doDelete;
+
     BlkLst*     bl  =  &s_bls[blkIdx];
     au32* areaders  =  (au32*)&(bl->kr);
     cur.asInt       =  areaders->load();
     do{
+      doDelete = false;
       if(bl->version!=version){ return false; }
       nxt          = cur;
       if(del){
@@ -620,6 +628,7 @@ public:
     if(doDelete){ doFree(blkIdx); return false; }
 
     return true;
+    //return cur.isDeleted;
   }
 
 private:
@@ -1172,9 +1181,9 @@ public:
     return true;
   }
   VerIdx          at(u32   idx)                const { return load(idx); }
-  u32            nxt(u32 stIdx)                const
+ /* __declspec(noinline)*/ u32            nxt(u32 stIdx)                const
   {
-    auto idx = stIdx;
+    auto     idx = stIdx;
     VerIdx empty = empty_vi();
     do{
       VerIdx vi = load(idx);
@@ -1390,9 +1399,12 @@ public:
           fcntl(sm.fileHndl, F_ALLOCATECONTIG);
         #endif
 
-        ftruncate(sm.fileHndl, sizeBytes);
-        flock(sm.fileHndl, LOCK_UN);
-        // get the error number and handle the error
+        if( ftruncate(sm.fileHndl, sizeBytes)!=0 ){
+          if(error_code){ *error_code = simdb_error::FTRUNCATE_FAILURE; }
+        }
+        if( flock(sm.fileHndl, LOCK_UN)!=0 ){
+          if(error_code){ *error_code = simdb_error::FLOCK_FAILURE; }
+        }
       }
 
       sm.hndlPtr  = mmap(NULL, sizeBytes, PROT_READ|PROT_WRITE, MAP_SHARED , sm.fileHndl, 0); // MAP_PREFAULT_READ  | MAP_NOSYNC
@@ -1645,8 +1657,9 @@ public:
   // separated C++ functions - these won't need to exist if compiled for a C interface
   struct VerStr { 
     u32 ver; string str; 
-    bool  operator<(VerStr const& vs) const { if(str==vs.str) return ver<vs.ver; else return str<vs.str; }  
-    bool  operator<(string const& rs) const { return str<rs;    }
+    //bool  operator<(VerStr const& vs) const { if(str==vs.str) return ver<vs.ver; else return str<vs.str; }  
+    bool  operator<(VerStr const& vs) const { return str<vs.str; }
+    bool  operator<(string const& rs) const { return str<rs;     }
     bool operator==(VerStr const& vs) const { return str==vs.str && ver==vs.ver; } 
   };   
 
@@ -1676,28 +1689,30 @@ public:
   VerStr    nxtKey(u64* searched=nullptr)               const
   {
     u32 klen, vlen;
-    bool    ok = false;
-    i64   prev = (i64)m_nxtChIdx;
-    VerIdx nxt = this->nxt();
+    bool      ok = false;
+    i64     prev = (i64)m_nxtChIdx;
+    VerIdx viNxt = this->nxt();
+    i64      cur = (i64)m_nxtChIdx;
 
     if(searched){
-      i64 sidx  = (i64)nxt.idx;       // sidx is signed index
-      i64 sprev = (i64)prev;          // sprev is signed previous
-      *searched = (sidx-sprev)>=0?  sidx-sprev  :  (m_blkCnt-sprev-1) + sidx+1;
+      //i64 sidx  = (i64)viNxt.idx;       // sidx is signed index
+      //i64 sprev = (i64)prev;          // sprev is signed previous
+      //*searched = (sidx-sprev)>=0?  sidx-sprev  :  (m_blkCnt-sprev-1) + sidx+1;
+      *searched = (cur-prev)>=0?  cur-prev  :  (m_blkCnt-prev-1) + cur+1;
     }
-    if(nxt.idx==EMPTY){ return {nxt.version, ""}; }
+    if(viNxt.idx==EMPTY){ return {viNxt.version, ""}; }
     
-    i64 total_len = this->len(nxt.idx, nxt.version, &klen, &vlen);
-    if(total_len==0){ return {nxt.version, ""}; }
+    i64 total_len = this->len(viNxt.idx, viNxt.version, &klen, &vlen);
+    if(total_len==0){ return {viNxt.version, ""}; }
     
     str key(klen,'\0');
-    ok         = this->getKey(nxt.idx, nxt.version, 
+    ok         = this->getKey(viNxt.idx, viNxt.version, 
                               (void*)key.data(), klen); 
                               
     if(!ok || strlen(key.c_str())!=key.length() )
-      return {nxt.version, ""};
+      return {viNxt.version, ""};
 
-    return { nxt.version, key };                    // copy elision 
+    return { viNxt.version, key };                    // copy elision 
   }
   auto  getKeyStrs() const -> std::vector<VerStr>
   {
@@ -1707,8 +1722,9 @@ public:
     while(srchCnt < m_blkCnt)
     {
       nxt = nxtKey(&searched);
-      if( keys.find(nxt) != keys.end() ){break;}
-      else if(nxt.str.length() > 0){ keys.insert(nxt); }
+      //if( keys.find(nxt) != keys.end() ){break;}
+      //else if(nxt.str.length() > 0){ keys.insert(nxt); }
+      if(nxt.str.length() > 0){ keys.insert(nxt); }
       
       srchCnt += searched;
     }

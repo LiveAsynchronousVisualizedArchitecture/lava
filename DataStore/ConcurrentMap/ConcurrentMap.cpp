@@ -310,7 +310,7 @@ int main()
 
   //Println("size of simdb on the stack: ", sizeof(simdb));
 
-  simdb db("test", 2<<10, 2<<12);
+  simdb db("test", 2<<10, 2<<4);
 
   //simdb db("H:\\projects\\lava\\test.simdb", 32, 64, true);
   //simdb db("test.simdb", 32, 64, true);
@@ -322,30 +322,32 @@ int main()
   
   //int sz = (int)thrds.size(); 
 
-  //int sz = 12;
-  //vec<thread>            thrds;
-  //vec<RngInt<u32>> rngSwitches;
-  //TO(sz,i){ rngSwitches.emplace_back(0,1,i); }
-  //  
-  //TO(sz,i)
-  //{
-  //  int idx = i % sz;
-  //  thrds.emplace_back([i, idx, &rngSwitches, &numkey, &label, &db]
-  //  {
-  //    auto& numk = numkey[idx];
-  //    auto&  lbl = label[idx]; 
-  //    TO(1,j){ 
-  //      db.put(numk, lbl); 
-  //      if(rngSwitches[idx]()){ db.del(numk); }
-  //      //bool ok = db.del(numk);
-  //      //if(!ok){ Println(numk," not deleted"); }
-  //      //while(!db.del(numk)){}
-  //    }
-  //    
-  //    Println(i, " done");
-  //  });
-  //}
-  //TO(thrds.size(),i){ thrds[i].join(); }
+  int sz = 12;
+  vec<thread>            thrds;
+  vec<RngInt<u32>> rngSwitches;
+  TO(sz,i){ rngSwitches.emplace_back(0,1,i); }
+    
+  TO(sz,i)
+  {
+    int idx = i % sz;
+    thrds.emplace_back([i, idx, &rngSwitches, &numkey, &label, &db]
+    {
+      auto& numk = numkey[idx];
+      auto&  lbl = label[idx]; 
+      TO(100000,j){ 
+        db.put(numk, lbl); 
+        db.del(numk);
+        //if(rngSwitches[idx]()){ db.del(numk); }
+
+        //bool ok = db.del(numk);
+        //if(!ok){ Println(numk," not deleted"); }
+        //while(!db.del(numk)){}
+      }
+      
+      Println(i, " done");
+    });
+  }
+  TO(thrds.size(),i){ thrds[i].join(); }
 
   str       wat  =       "wat";
   str       wut  =       "wut";
