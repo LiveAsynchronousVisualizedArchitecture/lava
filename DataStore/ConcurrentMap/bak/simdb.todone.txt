@@ -1,4 +1,37 @@
 
+
+// -todo: fix line 427 that doesn't report errors
+// -todo: fix 433 directory loop reporting
+// -todo: take out printf statements
+// -todo: fix double open 
+// -todo: fix no error check on memory map file open
+// -todo: fix error handling in the posix path
+// -todo: make init function that returns error codes - set an error code member variable instead
+// -todo: put errors into the error member variable
+// -todo: make error getter
+// -todo: make convenience function for passing a vector pointer into get()
+// -todo: make get take an out_readlen optional output variable
+// -todo: build in convenience function for returning a vector of a given type
+// -todo: test on linux
+// -todo: change readers to be a struct -that has a dedicated deleted flag - is it possible that the readers can be decremented multiple times by multiple deletes and the block list could be removed while it is still being read?
+//       | need to make sure that deleted flag is only set once
+//       | don't let deleted decrement readers, but make readers start at 0 and every time it comes back to 0, check if it is deleted - make sure del() sets the deleted flag, increments readers, finds the index, deletes the index, then comes back and decrements readers - if readers is 0, and the deleted flag is set (which it must be since it was already set), then free the blocks
+// -todo: fix getKeyStrs loop - isDeleted was not initialized 
+// -todo: add deleting flag? - readers, isDeleted, and deleting must all be separate since either a decrement to the readers or a setting of the isDeleted flag can trigger deletion, and either one could come first - shouldn't it be possible to tell if the deleted changed and readers was 0 and if readers was already 0 and deleted changed? - don't need it, should be able to tell if the thread is the deleter through readers and isDeleted
+// -todo: change getKeyStrs() to just skip inserting duplicate keys but not break from the loop
+// -todo: fix duplicate keys in msvc getKeyStrs loop - VerStr comparison of version numbers as well as the string led to duplicate entries in a set
+// -todo: fix infinite loop with no keys
+// -todo: fix printing of deleted keys
+// -todo: make sure only one deleting thread can delete
+// -todo: fix keys not being printed - number of keys searched was off by one in the normal case and possibly in the wrap around case
+// -todo: make CncrHsh::nxt return LIST_END instead of empty and compare to LIST_END instead of empty in 
+// -todo: clean comments 
+// -todo: push to simdb repo
+
+// todo: build in a convenience funtion to return a tbl and surround it with preproccessor defines so that it is declared only if tbl.hpp is included before simdb.hpp
+
+
+
 // -todo: get rid of icc warnings 
 // -todo: move all type aliases into classes
 // -todo: clean out commented aliases and unused lines that are for robin hood hashing

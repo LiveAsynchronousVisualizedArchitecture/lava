@@ -15,37 +15,6 @@
   limitations under the License.
 */
 
-// -todo: fix line 427 that doesn't report errors
-// -todo: fix 433 directory loop reporting
-// -todo: take out printf statements
-// -todo: fix double open 
-// -todo: fix no error check on memory map file open
-// -todo: fix error handling in the posix path
-// -todo: make init function that returns error codes - set an error code member variable instead
-// -todo: put errors into the error member variable
-// -todo: make error getter
-// -todo: make convenience function for passing a vector pointer into get()
-// -todo: make get take an out_readlen optional output variable
-// -todo: build in convenience function for returning a vector of a given type
-// -todo: test on linux
-// -todo: change readers to be a struct -that has a dedicated deleted flag - is it possible that the readers can be decremented multiple times by multiple deletes and the block list could be removed while it is still being read?
-//       | need to make sure that deleted flag is only set once
-//       | don't let deleted decrement readers, but make readers start at 0 and every time it comes back to 0, check if it is deleted - make sure del() sets the deleted flag, increments readers, finds the index, deletes the index, then comes back and decrements readers - if readers is 0, and the deleted flag is set (which it must be since it was already set), then free the blocks
-// -todo: fix getKeyStrs loop - isDeleted was not initialized 
-// -todo: add deleting flag? - readers, isDeleted, and deleting must all be separate since either a decrement to the readers or a setting of the isDeleted flag can trigger deletion, and either one could come first - shouldn't it be possible to tell if the deleted changed and readers was 0 and if readers was already 0 and deleted changed? - don't need it, should be able to tell if the thread is the deleter through readers and isDeleted
-// -todo: change getKeyStrs() to just skip inserting duplicate keys but not break from the loop
-// -todo: fix duplicate keys in msvc getKeyStrs loop - VerStr comparison of version numbers as well as the string led to duplicate entries in a set
-// -todo: fix infinite loop with no keys
-// -todo: fix printing of deleted keys
-// -todo: make sure only one deleting thread can delete
-// -todo: fix keys not being printed - number of keys searched was off by one in the normal case and possibly in the wrap around case
-
-// todo: make CncrHsh::nxt return LIST_END instead of empty and compare to LIST_END instead of empty in 
-// todo: clean comments 
-// todo: push to simdb repo
-// todo: build in a convenience funtion to return a tbl and surround it with preproccessor defines so that it is declared only if tbl.hpp is included before simdb.hpp
-
-
 /*
  SimDB
 
@@ -687,7 +656,7 @@ private:
   {
     u32  blkFree  =  blockFreeSize();
     u8*        p  =  blockFreePtr(blkIdx);
-    u32   cpyLen  =  len==0? blkFree : len;                                              // if next is negative, then it will be the length of the bytes in that block
+    u32   cpyLen  =  len==0? blkFree : len;                                                // if next is negative, then it will be the length of the bytes in that block
     p      += ofst;
     memcpy(p, bytes, cpyLen);
 
@@ -707,7 +676,7 @@ private:
 
 public:
   static u64    BlockListsOfst(){ return sizeof(u64); }
-  static u64         CListOfst(u32 blockCount){ return BlockListsOfst() + BlockLists::sizeBytes(blockCount); }      // BlockLists::sizeBytes ends up being sizeof(BlkLst)*blockCount + 2 u64 variables
+  static u64         CListOfst(u32 blockCount){ return BlockListsOfst() + BlockLists::sizeBytes(blockCount); }                 // BlockLists::sizeBytes ends up being sizeof(BlkLst)*blockCount + 2 u64 variables
   static u64          BlksOfst(u32 blockCount){ return CListOfst(blockCount) + CncrLst::sizeBytes(blockCount); }
   static u64         sizeBytes(u32 blockSize, u32 blockCount){ return BlksOfst(blockCount) + blockSize*blockCount; }
 
@@ -1886,109 +1855,3 @@ public:
 
 
 
-
-//if(idx==stIdx) return empty.idx;
-//if(chNxt!=EMPTY){  // todo: don't compare this to EMPTY, it is a slot index and not a block list index
-
-//if(vi.idx==EMPTY){   return empty;   }
-//if(vi.idx==DELETED){ return deleted; }
-
-//
-//if(vi.idx != empty.idx){break;}
-
-//VerIdx  empty = s_ch.empty_vi();
-//u32     chNxt;
-////u32     chPrev = s_ch.prev()
-//VerIdx     vi;
-//do{
-//       chNxt = s_ch.nxt(m_nxtChIdx);            // chNxt can't be DELETED or EMPTY since it is the slot index // if(chNxt >= DELETED){return empty;}  // if(chNxt==empty.idx){return empty;}           // can return the same index - it does not do the iteration after finding a non empty key
-//          vi = s_ch.at(chNxt);
-//  m_nxtChIdx = (chNxt + 1) % m_blkCnt;
-//}while( vi.idx >= DELETED);                    // todo: why check for empty twice? should this make sure not to loop around? 
-////}while( IsEmpty(vi) );                        // todo: why check for empty twice? should this make sure not to loop around? 
-//
-//m_curChIdx = chNxt;
-//VerIdx ret = {chNxt, vi.version};
-//
-//return ret;
-
-//
-//bool  operator<(VerStr const& vs) const { if(str==vs.str) return ver<vs.ver; else return str<vs.str; }  
-
-//if( keys.find(nxt) != keys.end() ){break;}
-//else if(nxt.str.length() > 0){ keys.insert(nxt); }
-
-//i64 sidx  = (i64)viNxt.idx;       // sidx is signed index
-//i64 sprev = (i64)prev;          // sprev is signed previous
-//*searched = (sidx-sprev)>=0?  sidx-sprev  :  (m_blkCnt-sprev-1) + sidx+1;
-
-//KeyReaders cur, nxt;
-//BlkLst*     bl  =  &s_bls[blkIdx];
-//au32* areaders  =  (au32*)&(bl->kr);
-//cur.asInt       =  areaders->load();
-//do{
-//  if(bl->version!=version){ return false; }
-//  nxt           = cur;
-//  //nxt.readers -= 1;
-//  nxt.isDeleted = 1;
-//}while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
-//
-//if(cur.readers==0){ doFree(blkIdx); return false; }
-//
-//return true;
-
-//static  bool file_exists(char const* filename)
-//{
-//  if(FILE* file = fopen(filename, "r")){
-//    fclose(file);
-//    return true;
-//  }
-//  return false;
-//}
-
-//
-//struct stat    stat_buf;
-
-//FILE* fp  = fopen(sm.path,"rw");
-//if(fp){
-//  fclose(fp);
-//  sm.fileHndl = open(sm.path, O_RDWR);
-//  sm.owner    = false;
-//
-//if(fp){
-//  fclose(fp);
-
-//
-//enum error_code = { NO_ERRORS=2 };
-
-//printf("open failed, file handle was -1 \nFile name: %s \nError number: %d \n\n", sm.path, errno); 
-//printf("mmap failed\nError number: %d \n\n", errno);
-
-//class simdb;
-//enum  simdb::error_code;
-
-//if((d = opendir("/tmp/")) == NULL)
-//
-//if(stat(dent->d_name, &stat_buf) == -1){continue;}
-//return ret;
-//}
-//
-//if( S_ISREG(stat_buf.st_mode) ){ 
-//printf("name %-25s - %s  %d \n", dent->d_name, prefix, (int)pfxSz);
-//
-//printf("pushing %-25s - \n", dent->d_name);
-//
-//} 
-//printf("%-25s - \n", dent->d_name);
-
-// gcc/clang/linux ?
-//perror("stat ERROR");
-//exit(3);
-//str = "regular"; 
-//string name = dent->d_name;
-//
-//}else if( S_ISDIR(stat_buf.st_mode) ){
-//str = "directory"; 
-//}else{ 
-//str = "other"; 
-//}

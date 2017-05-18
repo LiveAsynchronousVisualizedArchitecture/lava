@@ -72,3 +72,9 @@ misc optimizations
 
 
 
+large scale todo:
+|  thread local caching
+|  robin hood hashing
+|  tbl integration
+
+
