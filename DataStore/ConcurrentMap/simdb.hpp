@@ -38,8 +38,11 @@
 // -todo: fix infinite loop with no keys
 // -todo: fix printing of deleted keys
 // -todo: make sure only one deleting thread can delete
+// -todo: fix keys not being printed - number of keys searched was off by one in the normal case and possibly in the wrap around case
 
-// todo: fix keys not being printed
+// todo: make CncrHsh::nxt return LIST_END instead of empty and compare to LIST_END instead of empty in 
+// todo: clean comments 
+// todo: push to simdb repo
 // todo: build in a convenience funtion to return a tbl and surround it with preproccessor defines so that it is declared only if tbl.hpp is included before simdb.hpp
 
 
@@ -226,9 +229,9 @@ namespace {
   {
     uint64_t hval = 0xCBF29CE484222325;
     uint8_t*   bp = (uint8_t*)buf;	             // start of buffer 
-    uint8_t*   be = bp + len;		           // beyond end of buffer 
-    while(bp < be){                    // FNV-1a hash each octet of the buffer
-      hval ^= (uint64_t)*bp++;              // xor the bottom with the current octet */
+    uint8_t*   be = bp + len;		                 // beyond end of buffer 
+    while(bp < be){                              // FNV-1a hash each octet of the buffer
+      hval ^= (uint64_t)*bp++;                   // xor the bottom with the current octet */
       hval += (hval << 1) + (hval << 4) + (hval << 5) +
               (hval << 7) + (hval << 8) + (hval << 40);
     }
@@ -377,7 +380,8 @@ enum class simdb_error {
   COULD_NOT_MEMORY_MAP_FILE,
   SHARED_MEMORY_ERROR,
   FTRUNCATE_FAILURE,
-  FLOCK_FAILURE
+  FLOCK_FAILURE,
+  PATH_TOO_LONG
 };
 
 template<class T> 
@@ -515,8 +519,8 @@ public:
     h.asInt = s_h->load();
     return h.idx;
   }
-  auto       list() -> ListVec const* { return &s_lv; }                               // not thread safe
-  u32      lnkCnt()                                                // not thread safe
+  auto       list() -> ListVec const* { return &s_lv; }                      // not thread safe
+  u32      lnkCnt()                                                          // not thread safe
   {
     u32    cnt = 0;
     u32 curIdx = idx();
@@ -854,7 +858,7 @@ public:
   read_failure:
     decReadersOrDel(blkIdx, version);
 
-    return len;                                                        // only one return after the top to make sure readers can be decremented - maybe it should be wrapped in a struct with a destructor
+    return len;                                                                    // only one return after the top to make sure readers can be decremented - maybe it should be wrapped in a struct with a destructor
   }
   u32        getKey(u32  blkIdx, u32 version, void *const bytes, u32 maxlen) const
   {
@@ -911,10 +915,10 @@ public:
     if(blklstHsh!=hash){ return MATCH_FALSE; }                         // vast majority of calls should end here
 
     u32   curidx  =  blkIdx;
-    VerIdx   nxt  =  nxtBlock(curidx);                              if(nxt.version!=version) return MATCH_FALSE;
+    VerIdx   nxt  =  nxtBlock(curidx);                              if(nxt.version!=version){ return MATCH_FALSE; }
     u32    blksz  =  (u32)blockFreeSize();
     u8*   curbuf  =  (u8*)buf;
-    auto    klen  =  s_bls[blkIdx].klen;                            if(klen!=len) return MATCH_FALSE;
+    auto    klen  =  s_bls[blkIdx].klen;                            if(klen!=len){ return MATCH_FALSE; }
     auto  curlen  =  len;
     while(true)
     {
@@ -928,7 +932,7 @@ public:
       curbuf  +=  blksz;
       curlen  -=  blksz;
       curidx   =  nxt.idx;
-      nxt      =  nxtBlock(curidx);                                 if(nxt.version!=version) return MATCH_FALSE;
+      nxt      =  nxtBlock(curidx);                                 if(nxt.version!=version){ return MATCH_FALSE; }
     }
   }
   u32           len(u32  blkIdx, u32 version, u32* out_vlen=nullptr) const
@@ -957,12 +961,13 @@ public:
   using  VerIdx  =  CncrStr::VerIdx;
   using  BlkLst  =  CncrStr::BlkLst;
 
-  struct VerIpd { u32 version, ipd; };                       // ipd is Ideal Position Distance
+  struct VerIpd { u32 version, ipd; };                         // ipd is Ideal Position Distance
 
   static const u32  KEY_MAX          =   0xFFFFFFFF; 
-  static const u32  EMPTY            =   KEY_MAX;            // first 21 bits set 
-  static const u32  DELETED          =   KEY_MAX - 1;        // 0xFFFFFFFE;       // 1 less than the EMPTY
+  static const u32  EMPTY            =   KEY_MAX;              // first 21 bits set 
+  static const u32  DELETED          =   KEY_MAX - 1;          // 0xFFFFFFFE;       // 1 less than the EMPTY
   static const u32  LIST_END         =   CncrStr::LIST_END;
+  static const u32  SLOT_END         =   CncrStr::LIST_END;
 
   static u64           sizeBytes(u32 size)                   // the size in bytes that this structure will take up in the shared memory
   {
@@ -1029,8 +1034,8 @@ private:
   {
     using namespace std;
 
-    u64     exp = i%2? swp32(expected.asInt) : expected.asInt;                      // if the index (i) is odd, swap the upper and lower 32 bits around
-    u64    desi = i%2? swp32(desired.asInt) : desired.asInt;                        // desi is desired int
+    u64     exp = i%2? swp32(expected.asInt) : expected.asInt;                                // if the index (i) is odd, swap the upper and lower 32 bits around
+    u64    desi = i%2? swp32(desired.asInt) : desired.asInt;                                  // desi is desired int
     au64*  addr = (au64*)(s_vis.data()+i);
     bool     ok = addr->compare_exchange_strong( exp, desi );
     
@@ -1040,10 +1045,10 @@ private:
   {
     store_vi(i, empty_vi().asInt);
   }
-  VerIpd            ipd(u32 i, u32 blkIdx)     const                                // ipd is Ideal Position Distance - it is the distance a CncrHsh index value is from the position that it gets hashed to 
+  VerIpd            ipd(u32 i, u32 blkIdx)     const                                          // ipd is Ideal Position Distance - it is the distance a CncrHsh index value is from the position that it gets hashed to 
   {
     BlkLst bl = m_csp->blkLst(blkIdx);
-    u32    ip = bl.hash % m_sz;                                                     // ip is Ideal Position
+    u32    ip = bl.hash % m_sz;                                                               // ip is Ideal Position
     u32   ipd = i>ip?  i-ip  :  m_sz - ip + i;
     return {bl.version, ipd};
   }
@@ -1159,9 +1164,6 @@ public:
     for(;; i=nxtIdx(i) )
     {
       VerIdx vi = load(i);
-
-      //if(vi.idx==EMPTY){   return empty;   }
-      //if(vi.idx==DELETED){ return deleted; }
       if(vi.idx>=DELETED){continue;}
 
       Match m = m_csp->compare(vi.idx, vi.version, key, klen, hash);
@@ -1201,11 +1203,10 @@ public:
     VerIdx empty = empty_vi();
     do{
       VerIdx vi = load(idx);
-      //if(vi.idx != empty.idx){break;}
       if(vi.idx < DELETED){break;}
       idx = (idx+1) % m_sz;                                             // don't increment idx above since break comes before it here
 
-      if(idx==stIdx) return empty.idx;
+      if(idx==stIdx) return SLOT_END;
     }while(true);
 
     return  idx;
@@ -1249,14 +1250,14 @@ public:
     assert(klen>0);
 
     u32     hash = CncrHsh::HashBytes(key, klen);
-    VerIdx lstVi = m_csp->alloc(klen+vlen, klen, hash);                                 // lstVi is block list versioned index
+    VerIdx lstVi = m_csp->alloc(klen+vlen, klen, hash);                            // lstVi is block list versioned index
     if(out_startBlock){ *out_startBlock = lstVi.idx; }
     if(lstVi.idx==LIST_END){ return false; }
 
     m_csp->put(lstVi.idx, key, klen, val, vlen);
 
     VerIdx vi = putHashed(hash, lstVi, key, klen);
-    if(vi.idx<DELETED){ m_csp->free(vi.idx, vi.version); }                              // putHashed returns the entry that was there before, which is the entry that was replaced. If it wasn't empty, we free it here. 
+    if(vi.idx<DELETED){ m_csp->free(vi.idx, vi.version); }                         // putHashed returns the entry that was there before, which is the entry that was replaced. If it wasn't empty, we free it here. 
 
     return true;
   }
@@ -1273,8 +1274,8 @@ public:
   {    
     assert(i < m_sz);
 
-    au64* avi = (au64*)(s_vis.data()+i);                            // avi is atomic versioned index
-    u64   cur = swp32(avi->load());                                 // need because of endianess? // atomic_load<u64>( (au64*)(m_vis.data()+i) );              // Load the key that was there.
+    au64* avi = (au64*)(s_vis.data()+i);                                           // avi is atomic versioned index
+    u64   cur = swp32(avi->load());                                                // need because of endianess? // atomic_load<u64>( (au64*)(m_vis.data()+i) );              // Load the key that was there.
 
     if(i%2==1) return VerIdx(hi32(cur), lo32(cur));
     else       return VerIdx(lo32(cur), hi32(cur));
@@ -1340,8 +1341,10 @@ public:
     #endif
 
     u64 len = strlen(sm.path) + strlen(name);
-    if(len > sizeof(sm.path)-1){ /* todo: handle errors here */ }
-    else{ strcat(sm.path, name); }
+    if(len > sizeof(sm.path)-1){
+      *error_code = simdb_error::PATH_TOO_LONG;
+      return;
+    }else{ strcat(sm.path, name); }
 
     #ifdef _WIN32      // windows
       if(raw_path)
@@ -1405,7 +1408,7 @@ public:
         }
       }else{ sm.owner = false; }
 
-      if(sm.owner){  // todo: still need more concrete race protection
+      if(sm.owner){  // todo: still need more concrete race protection?
         fcntl(sm.fileHndl, F_GETLK, &flock);
         flock(sm.fileHndl, LOCK_EX);              // exclusive lock  // LOCK_NB
         //fcntl(sm.fileHndl, F_PREALLOCATE);
@@ -1511,7 +1514,9 @@ public:
   static const u32        EMPTY = CncrHsh::EMPTY;              // 28 bits set 
   static const u32      DELETED = CncrHsh::DELETED;            // 28 bits set 
   static const u32   FAILED_PUT = CncrHsh::EMPTY;              // 28 bits set 
+  static const u32     SLOT_END = CncrHsh::SLOT_END;
   static const u32     LIST_END = CncrStr::LIST_END;
+
   static u64        OffsetBytes(){ return sizeof(au64)*3; }
   static u64            MemSize(u64 blockSize, u64 blockCount)
   {
@@ -1617,26 +1622,10 @@ public:
     #endif
   }
   VerIdx       nxt() const                                                                  // this version index represents a hash index, not an block storage index
-  {
-    //VerIdx  empty = s_ch.empty_vi();
-    //u32     chNxt;
-    ////u32     chPrev = s_ch.prev()
-    //VerIdx     vi;
-    //do{
-    //       chNxt = s_ch.nxt(m_nxtChIdx);            // chNxt can't be DELETED or EMPTY since it is the slot index // if(chNxt >= DELETED){return empty;}  // if(chNxt==empty.idx){return empty;}           // can return the same index - it does not do the iteration after finding a non empty key
-    //          vi = s_ch.at(chNxt);
-    //  m_nxtChIdx = (chNxt + 1) % m_blkCnt;
-    //}while( vi.idx >= DELETED);                    // todo: why check for empty twice? should this make sure not to loop around? 
-    ////}while( IsEmpty(vi) );                        // todo: why check for empty twice? should this make sure not to loop around? 
-    //
-    //m_curChIdx = chNxt;
-    //VerIdx ret = {chNxt, vi.version};
-    //
-    //return ret;
-    
+  {    
     VerIdx ret = s_ch.empty_vi();
     u32  chNxt = s_ch.nxt(m_nxtChIdx);
-    if(chNxt!=EMPTY){  // todo: don't compare this to EMPTY, it is a slot index and not a block list index
+    if(chNxt!=SLOT_END){
       m_nxtChIdx = (chNxt + 1) % m_blkCnt;
       ret        = s_ch.at(chNxt);
     }else{
@@ -1685,7 +1674,6 @@ public:
   // separated C++ functions - these won't need to exist if compiled for a C interface
   struct VerStr { 
     u32 ver; string str; 
-    //bool  operator<(VerStr const& vs) const { if(str==vs.str) return ver<vs.ver; else return str<vs.str; }  
     bool  operator<(VerStr const& vs) const { return str<vs.str; }
     bool  operator<(string const& rs) const { return str<rs;     }
     bool operator==(VerStr const& vs) const { return str==vs.str && ver==vs.ver; } 
@@ -1723,9 +1711,6 @@ public:
     i64      cur = (i64)m_nxtChIdx;
 
     if(searched){
-      //i64 sidx  = (i64)viNxt.idx;       // sidx is signed index
-      //i64 sprev = (i64)prev;          // sprev is signed previous
-      //*searched = (sidx-sprev)>=0?  sidx-sprev  :  (m_blkCnt-sprev-1) + sidx+1;
       *searched = (cur-prev)>=0?  cur-prev-1  :  (m_blkCnt-prev)+cur;   //(m_blkCnt-prev-1) + cur+1;
     }
     if(viNxt.idx>=DELETED){ return {viNxt.version, ""}; }
@@ -1750,8 +1735,6 @@ public:
     while(srchCnt < m_blkCnt)
     {
       nxt = nxtKey(&searched);
-      //if( keys.find(nxt) != keys.end() ){break;}
-      //else if(nxt.str.length() > 0){ keys.insert(nxt); }
       if(nxt.str.length() > 0){ keys.insert(nxt); }
       
       srchCnt += searched;
@@ -1904,6 +1887,40 @@ public:
 
 
 
+//if(idx==stIdx) return empty.idx;
+//if(chNxt!=EMPTY){  // todo: don't compare this to EMPTY, it is a slot index and not a block list index
+
+//if(vi.idx==EMPTY){   return empty;   }
+//if(vi.idx==DELETED){ return deleted; }
+
+//
+//if(vi.idx != empty.idx){break;}
+
+//VerIdx  empty = s_ch.empty_vi();
+//u32     chNxt;
+////u32     chPrev = s_ch.prev()
+//VerIdx     vi;
+//do{
+//       chNxt = s_ch.nxt(m_nxtChIdx);            // chNxt can't be DELETED or EMPTY since it is the slot index // if(chNxt >= DELETED){return empty;}  // if(chNxt==empty.idx){return empty;}           // can return the same index - it does not do the iteration after finding a non empty key
+//          vi = s_ch.at(chNxt);
+//  m_nxtChIdx = (chNxt + 1) % m_blkCnt;
+//}while( vi.idx >= DELETED);                    // todo: why check for empty twice? should this make sure not to loop around? 
+////}while( IsEmpty(vi) );                        // todo: why check for empty twice? should this make sure not to loop around? 
+//
+//m_curChIdx = chNxt;
+//VerIdx ret = {chNxt, vi.version};
+//
+//return ret;
+
+//
+//bool  operator<(VerStr const& vs) const { if(str==vs.str) return ver<vs.ver; else return str<vs.str; }  
+
+//if( keys.find(nxt) != keys.end() ){break;}
+//else if(nxt.str.length() > 0){ keys.insert(nxt); }
+
+//i64 sidx  = (i64)viNxt.idx;       // sidx is signed index
+//i64 sprev = (i64)prev;          // sprev is signed previous
+//*searched = (sidx-sprev)>=0?  sidx-sprev  :  (m_blkCnt-sprev-1) + sidx+1;
 
 //KeyReaders cur, nxt;
 //BlkLst*     bl  =  &s_bls[blkIdx];
