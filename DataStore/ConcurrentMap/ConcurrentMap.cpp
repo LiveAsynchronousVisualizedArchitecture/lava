@@ -325,7 +325,7 @@ int main()
 
   //Println("size of simdb on the stack: ", sizeof(simdb));
 
-  simdb db("test", 2<<5, 2<<3);
+  simdb db("test", 2<<6, 2<<4);
 
   //simdb db("H:\\projects\\lava\\test.simdb", 32, 64, true);
   //simdb db("test.simdb", 32, 64, true);
@@ -349,11 +349,11 @@ int main()
     {
       auto& numk = numkey[idx];
       auto&  lbl = label[idx]; 
-      TO(1000000,j){ 
+      TO(100000,j){ 
         bool putok = db.put(numk, lbl); 
         //db.del(numk);
         //if(rngSwitches[idx]()){ db.del(numk); }
-
+  
         if(putok){
           bool delok = db.del(numk);
           if(!delok){
@@ -381,7 +381,7 @@ int main()
 
   string  lf = "lock free";
   string way = "is the way to be";
-  //db.put( lf.data(), (u32)lf.length(), way.data(), (u32)way.length() );
+  db.put( lf.data(), (u32)lf.length(), way.data(), (u32)way.length() );
   
   i64    len = db.len( lf.data(), (u32)lf.length() );
   string way2(len,'\0');
@@ -391,26 +391,25 @@ int main()
 
   //Println("put: ", db.put( wat.data(),   (u32)wat.length(),    skidoosh.data(), (u32)skidoosh.length()) );
   //Println("put: ", db.put( (void*)wat.data(),   (u32)wat.length(),    (void*)skidoosh.data(), (u32)skidoosh.length()) );
-
-  //if( db.isOwner() ){
-  //  Println("put: ", db.put("lock free", "is the way to be") );
-  //
-  //  Println("put: ", db.put(wat, skidoosh) );
-  //  //db.del("wat");
-  //  Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
-  //  //db.del("wut");
-  //  Println("put: ", db.put(kablam, skidoosh) ); //Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
-  //  //db.del("kablam");
-  //
-  //  Println("put: ", db.put(wat, skidoosh) );
-  //  //Println("del wat: ", db.del("wat") );
-  //
-  //  //Println("put: ", db.put(longkey, longval) );
-  //  //Println("del wat: ", db.del(longkey) );
-  //
-  //  Println();
-  //}
-  //db.flush();
+  if( db.isOwner() ){
+    Println("put: ", db.put("lock free", "is the way to be") );
+  
+    Println("put: ", db.put(wat, skidoosh) );
+    //db.del("wat");
+    Println("put: ", db.put( wut.data(),   (u32)wut.length(),    kablam.data(),   (u32)kablam.length())   ); 
+    //db.del("wut");
+    Println("put: ", db.put(kablam, skidoosh) ); //Println("put: ", db.put( kablam.data(),(u32)kablam.length(), skidoosh.data(), (u32)skidoosh.length()) ); 
+    //db.del("kablam");
+  
+    Println("put: ", db.put(wat, skidoosh) );
+    //Println("del wat: ", db.del("wat") );
+  
+    //Println("put: ", db.put(longkey, longval) );
+    //Println("del wat: ", db.del(longkey) );
+  
+    Println();
+  }
+  db.flush();
 
   Println();
   printdb(db);

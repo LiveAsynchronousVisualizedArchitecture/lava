@@ -35,10 +35,11 @@
 // -todo: add deleting flag? - readers, isDeleted, and deleting must all be separate since either a decrement to the readers or a setting of the isDeleted flag can trigger deletion, and either one could come first - shouldn't it be possible to tell if the deleted changed and readers was 0 and if readers was already 0 and deleted changed? - don't need it, should be able to tell if the thread is the deleter through readers and isDeleted
 // -todo: change getKeyStrs() to just skip inserting duplicate keys but not break from the loop
 // -todo: fix duplicate keys in msvc getKeyStrs loop - VerStr comparison of version numbers as well as the string led to duplicate entries in a set
+// -todo: fix infinite loop with no keys
+// -todo: fix printing of deleted keys
+// -todo: make sure only one deleting thread can delete
 
-// todo: fix infinite loop with no keys
-// todo: fix printing of deleted keys
-// todo: make sure only one deleting thread can delete
+// todo: fix keys not being printed
 // todo: build in a convenience funtion to return a tbl and surround it with preproccessor defines so that it is declared only if tbl.hpp is included before simdb.hpp
 
 
@@ -1635,7 +1636,7 @@ public:
     
     VerIdx ret = s_ch.empty_vi();
     u32  chNxt = s_ch.nxt(m_nxtChIdx);
-    if(chNxt!=EMPTY){ 
+    if(chNxt!=EMPTY){  // todo: don't compare this to EMPTY, it is a slot index and not a block list index
       m_nxtChIdx = (chNxt + 1) % m_blkCnt;
       ret        = s_ch.at(chNxt);
     }else{
@@ -1725,15 +1726,15 @@ public:
       //i64 sidx  = (i64)viNxt.idx;       // sidx is signed index
       //i64 sprev = (i64)prev;          // sprev is signed previous
       //*searched = (sidx-sprev)>=0?  sidx-sprev  :  (m_blkCnt-sprev-1) + sidx+1;
-      *searched = (cur-prev)>=0?  cur-prev  :  (m_blkCnt-prev-1) + cur+1;
+      *searched = (cur-prev)>=0?  cur-prev-1  :  (m_blkCnt-prev)+cur;   //(m_blkCnt-prev-1) + cur+1;
     }
     if(viNxt.idx>=DELETED){ return {viNxt.version, ""}; }
     
-    i64 total_len = this->len(viNxt.idx, viNxt.version, &klen, &vlen);
+    i64 total_len = this->len(cur-1, viNxt.version, &klen, &vlen);
     if(total_len==0){ return {viNxt.version, ""}; }
     
     str key(klen,'\0');
-    ok         = this->getKey(viNxt.idx, viNxt.version, 
+    ok         = this->getKey(cur-1, viNxt.version, 
                               (void*)key.data(), klen); 
                               
     if(!ok || strlen(key.c_str())!=key.length() )
