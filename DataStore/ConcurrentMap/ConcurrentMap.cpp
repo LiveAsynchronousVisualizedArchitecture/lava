@@ -354,13 +354,15 @@ int main()
         //db.del(numk);
         //if(rngSwitches[idx]()){ db.del(numk); }
 
-        bool delok = db.del(numk);
-        if(putok && !delok){
-          printdb(db);
-          printidx(db);
-          printkeys(db);
-          bool ok = db.del(numk);
-          Println(numk," not deleted");
+        if(putok){
+          bool delok = db.del(numk);
+          if(!delok){
+            printdb(db);
+            printidx(db);
+            printkeys(db);
+            bool ok = db.del(numk);
+            Println(numk," not deleted");
+          }
         }
         //while(!db.del(numk)){}
       }

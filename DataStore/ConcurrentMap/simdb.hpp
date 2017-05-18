@@ -599,7 +599,7 @@ public:
     au32* areaders  =  (au32*)&(bl->kr);
     cur.asInt       =  areaders->load();
     do{
-      if(bl->version!=version || cur.readers<0){ return BlkLst(); }
+      if(bl->version!=version || cur.readers<0 || cur.isDeleted){ return BlkLst(); }
       nxt = cur;
       nxt.readers += 1;
     }while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
@@ -1159,8 +1159,9 @@ public:
     {
       VerIdx vi = load(i);
 
-      if(vi.idx==EMPTY){   return empty;   }
-      if(vi.idx==DELETED){ return deleted; }
+      //if(vi.idx==EMPTY){   return empty;   }
+      //if(vi.idx==DELETED){ return deleted; }
+      if(vi.idx>=DELETED){continue;}
 
       Match m = m_csp->compare(vi.idx, vi.version, key, klen, hash);
       if(m==MATCH_TRUE){
