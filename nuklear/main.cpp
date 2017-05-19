@@ -68,6 +68,8 @@
 // -todo: add control to set line and particle thickness
 // -todo: make separate settings struct under viz data - can just use the ui struct for this?
 
+
+// todo: compile with nanogui
 // todo: fix nuklear ui disappearing when panning on rays changing - first it was a crash due to a gl function returning a null buffer and it not being checked for by nuklear - doesn't come back when resetting the camera
 // todo: write visualizer overview for Readme.md  
 // todo: make save button or menu to save serialized files 
@@ -118,6 +120,8 @@
 #include "glm/gtx/matrix_decompose.hpp"
 
 #include "glfw3.h"
+
+//#include "nanogui/include/nanogui/nanogui.h"
 
 #include "VizData.hpp"
 #include "VizGen.hpp"

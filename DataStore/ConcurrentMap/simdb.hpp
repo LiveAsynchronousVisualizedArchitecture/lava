@@ -983,8 +983,6 @@ private:
   mutable VerIdxs   s_vis;                         // s_vis is key value(s) - needs to be changed to versioned indices, m_vis
           CncrStr*  m_csp;                         // csp is concurrent store pointer
 
-  u32            nxtIdx(u32 i)                 const { return (i+1)%m_sz; }
-  u32           prevIdx(u32 i)                 const { return std::min(i-1, m_sz-1); }        // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap
   VerIdx       store_vi(u32 i, u64 vi)         const
   {
     using namespace std;
@@ -1249,6 +1247,9 @@ public:
     if(i%2==1) return VerIdx(hi32(cur), lo32(cur));
     else       return VerIdx(lo32(cur), hi32(cur));
   }
+  u32         nxtIdx(u32 i) const { return (i+1)%m_sz; }
+  u32        prevIdx(u32 i) const { return std::min(i-1, m_sz-1); }        // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap
+
 };
 struct  SharedMem
 {
@@ -1486,6 +1487,7 @@ public:
   static const u32     SLOT_END = CncrHsh::SLOT_END;
   static const u32     LIST_END = CncrStr::LIST_END;
 
+private:
   static u64        OffsetBytes(){ return sizeof(au64)*3; }
   static u64            MemSize(u64 blockSize, u64 blockCount)
   {
@@ -1499,6 +1501,8 @@ public:
   }
   static bool           IsEmpty(VerIdx vi){return CncrHsh::IsEmpty(vi);}         // special value for CncrHsh
   static bool         IsListEnd(VerIdx vi){return CncrStr::IsListEnd(vi);}       // special value for CncrStr
+
+  
 
 public:
   simdb(){}
@@ -1677,18 +1681,19 @@ public:
     bool      ok = false;
     i64     prev = (i64)m_nxtChIdx;
     VerIdx viNxt = this->nxt();
-    i64      cur = (i64)m_nxtChIdx;
+    i64     inxt = (i64)m_nxtChIdx;
+    u32      cur = s_ch.prevIdx((u32)(inxt));
 
     if(searched){
-      *searched = (cur-prev)>=0?  cur-prev-1  :  (m_blkCnt-prev)+cur;   //(m_blkCnt-prev-1) + cur+1;
+      *searched = (inxt-prev)>=0?  inxt-prev-1  :  (m_blkCnt-prev)+inxt;   //(m_blkCnt-prev-1) + inxt+1;
     }
     if(viNxt.idx>=DELETED){ return {viNxt.version, ""}; }
     
-    i64 total_len = this->len(cur-1, viNxt.version, &klen, &vlen);
+    i64 total_len = this->len(cur, viNxt.version, &klen, &vlen);
     if(total_len==0){ return {viNxt.version, ""}; }
     
     str key(klen,'\0');
-    ok         = this->getKey(cur-1, viNxt.version, 
+    ok         = this->getKey(cur, viNxt.version, 
                               (void*)key.data(), klen); 
                               
     if(!ok || strlen(key.c_str())!=key.length() )

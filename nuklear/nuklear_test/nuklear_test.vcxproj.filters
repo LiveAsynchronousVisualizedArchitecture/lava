@@ -21,6 +21,9 @@
     <Filter Include="unified">
       <UniqueIdentifier>{e22355bb-80f1-40a9-b263-2c9c730ab978}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\nanogui">
+      <UniqueIdentifier>{a4701faf-fd6e-491c-9149-8400c84e1173}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\nuklear.h">

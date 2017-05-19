@@ -36,19 +36,26 @@ enum AtrId : GLuint { POSITION=0, NORMAL=1, COLOR=2, TEXCOORD=3 };  // this core
 
 template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  // will need C++ ifdefs eventually
 
-using f32     =  float;
-using f64     =  double;
-using std::map;
-using str     =  std::string;
-using VerStr  =  simdb::VerStr;
-using vec2    =  glm::vec2;
-using vec3    =  glm::vec3;
-using vec4    =  glm::vec4;
-using quat    =  glm::quat;
-using mat4    =  glm::mat4;
-using glm::perspective;
-using glm::rotate;
-using glm::length;
+using   i8     =    int8_t;
+using   u8     =   uint8_t;
+using  u32     =  uint32_t;
+using  u64     =  uint64_t;
+using  i64     =   int64_t;
+using  au64    =  std::atomic<u64>;
+using  u32     =  uint32_t;
+using  f32     =  float;
+using  f64     =  double;
+using  str     =  std::string;
+using  VerStr  =  simdb::VerStr;
+using  vec2    =  glm::vec2;
+using  vec3    =  glm::vec3;
+using  vec4    =  glm::vec4;
+using  quat    =  glm::quat;
+using  mat4    =  glm::mat4;
+using  std::map;
+using  glm::perspective;
+using  glm::rotate;
+using  glm::length;
 
 using vec_vs  =  std::vector<VerStr>;
 using   vecb  =  std::vector<bool>;
@@ -79,7 +86,7 @@ public:
   int      active;
   u32      version, mode, indsz;          // mode is the openGL type of geometry to draw, indsz is the number of indices
   GLuint   vertbuf, vertary, idxbuf, tx;  // normals, colors, uvcoords, image data 
-  GLuint   shader;                       // the shader ID is not owned by the shape 
+  GLuint   shader;                        // the shader ID is not owned by the shape 
 
   Shape() :
       owner(false),
