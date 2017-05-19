@@ -82,6 +82,7 @@ ipch/
 
 bak/
 nuklear/nuklear_test/nuklear_test/
+nuklear/nuklear_test/nanogui/*
 
 *.swp
 
@@ -91,6 +92,4 @@ nuklear/nuklear_test/nuklear_test/
 
 nuklear/.VizDataStructures.hpp.swp
 
-nuklear/simdb_15_test
 
-nuklear/simdb_15_test
