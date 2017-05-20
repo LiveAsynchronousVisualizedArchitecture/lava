@@ -308,13 +308,13 @@ GLFWwindow*       initGLFW(VizData* vd)
   glfwMakeContextCurrent(win);
   glfwGetWindowSize(win, &vd->ui.w, &vd->ui.h);
 
-  glfwSetCharCallback(win,             charCallback);         // in glfw charCallback is for typing letters and is different than the keyCallback for keys like backspace 
-  glfwSetKeyCallback(win,               keyCallback);
-  glfwSetScrollCallback(win,         scrollCallback);
-  glfwSetCursorPosCallback(win,   cursorPosCallback);
-  glfwSetMouseButtonCallback(win,  mouseBtnCallback);
-  glfwSetDropCallback(win,             dropCallback);
-  glfwSetFramebufferSizeCallback(win, );
+  glfwSetCharCallback(win,              charCallback);         // in glfw charCallback is for typing letters and is different than the keyCallback for keys like backspace 
+  glfwSetKeyCallback(win,                keyCallback);
+  glfwSetScrollCallback(win,          scrollCallback);
+  glfwSetCursorPosCallback(win,    cursorPosCallback);
+  glfwSetMouseButtonCallback(win,   mouseBtnCallback);
+  glfwSetDropCallback(win,              dropCallback);
+  glfwSetFramebufferSizeCallback(win, framebufferSizeCallback);
   //glfwSetScrollCallback(win, )
 
   #ifdef _WIN32
