@@ -24,21 +24,18 @@
     <Filter Include="Source Files\nanogui">
       <UniqueIdentifier>{a4701faf-fd6e-491c-9149-8400c84e1173}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\nanogui">
+      <UniqueIdentifier>{8b26c1c1-5b2c-4a0a-9e77-36c95a694b62}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\glfw">
+      <UniqueIdentifier>{efd23ca1-c868-4625-9e04-7345592e83fe}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\nuklear">
+      <UniqueIdentifier>{032ce513-c9b3-4c3b-8731-ca3292325515}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\nuklear.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\glfw3.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\glfw3native.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\no_rt_util.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\nuklear_glfw_gl3.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\VizData.hpp">
@@ -59,6 +56,27 @@
     <ClInclude Include="..\IndexedVerts.h">
       <Filter>unified</Filter>
     </ClInclude>
+    <ClInclude Include="..\glfw3native.h">
+      <Filter>Header Files\glfw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\glfw3.h">
+      <Filter>Header Files\glfw</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nuklear.h">
+      <Filter>Header Files\nuklear</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nuklear_glfw_gl3.h">
+      <Filter>Header Files\nuklear</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nanogui\include\nanogui_resources.h">
+      <Filter>Header Files\nanogui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nanogui\include\stb_image.h">
+      <Filter>Header Files\nanogui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nanogui\include\stb_truetype.h">
+      <Filter>Header Files\nanogui</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\unified.cpp">
@@ -72,6 +90,93 @@
     </ClCompile>
     <ClCompile Include="..\main.cpp">
       <Filter>unified</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\button.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\checkbox.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\colorpicker.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\colorwheel.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\combobox.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\common.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\glcanvas.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\glutil.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\graph.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\imagepanel.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\imageview.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\label.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\layout.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\messagedialog.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\popup.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\popupbutton.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\progressbar.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\screen.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\serializer.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\slider.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\stackedwidget.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\tabheader.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\tabwidget.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\textbox.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\theme.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\vscrollpanel.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\widget.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanogui\src\window.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanovg.c">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

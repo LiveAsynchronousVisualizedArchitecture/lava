@@ -82,7 +82,7 @@ ipch/
 
 bak/
 nuklear/nuklear_test/nuklear_test/
-nuklear/nuklear_test/nanogui/*
+nuklear/nuklear_test/nanogui/
 
 *.swp
 

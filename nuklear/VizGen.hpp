@@ -136,7 +136,7 @@ inline vec<u8>  makeTriangle(size_t& byteLen, bool left)
   }
   else {
       iv->verts[0] = {
-          {-0.17, -1.0f, 0.0f},     //pos
+          {-0.17f, -1.0f, 0.0f},     //pos
           {0.0f, 0.0f, -1.0f},      //norm
           {1.0f, 1.0f, 1.0f, 1.0f}, //color
           {0.0f, 0.0f}              //texCoord

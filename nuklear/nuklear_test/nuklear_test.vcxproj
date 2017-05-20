@@ -1,5 +1,5 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
-<Project DefaultTargets="Build" ToolsVersion="12.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
       <Configuration>Debug</Configuration>
@@ -21,32 +21,33 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{B239B157-0F59-4468-BC10-642A6565889D}</ProjectGuid>
     <RootNamespace>nuklear_test</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.15063.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <CharacterSet>MultiByte</CharacterSet>
     <WholeProgramOptimization>true</WholeProgramOptimization>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Application</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v120</PlatformToolset>
+    <PlatformToolset>v141</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>MultiByte</CharacterSet>
   </PropertyGroup>
@@ -83,7 +84,7 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
-      <WarningLevel>Level3</WarningLevel>
+      <WarningLevel>Level2</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -95,6 +96,9 @@
       <MinimalRebuild>false</MinimalRebuild>
       <AdditionalOptions>
       </AdditionalOptions>
+      <WholeProgramOptimization>true</WholeProgramOptimization>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <LanguageStandard>stdcpp14</LanguageStandard>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -156,6 +160,37 @@
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
     </ClCompile>
+    <ClCompile Include="..\nanogui\src\button.cpp" />
+    <ClCompile Include="..\nanogui\src\checkbox.cpp" />
+    <ClCompile Include="..\nanogui\src\colorpicker.cpp" />
+    <ClCompile Include="..\nanogui\src\colorwheel.cpp" />
+    <ClCompile Include="..\nanogui\src\combobox.cpp" />
+    <ClCompile Include="..\nanogui\src\common.cpp" />
+    <ClCompile Include="..\nanogui\src\glcanvas.cpp" />
+    <ClCompile Include="..\nanogui\src\glutil.cpp" />
+    <ClCompile Include="..\nanogui\src\graph.cpp" />
+    <ClCompile Include="..\nanogui\src\imagepanel.cpp" />
+    <ClCompile Include="..\nanogui\src\imageview.cpp" />
+    <ClCompile Include="..\nanogui\src\label.cpp" />
+    <ClCompile Include="..\nanogui\src\layout.cpp" />
+    <ClCompile Include="..\nanogui\src\messagedialog.cpp" />
+    <ClCompile Include="..\nanogui\src\popup.cpp" />
+    <ClCompile Include="..\nanogui\src\popupbutton.cpp" />
+    <ClCompile Include="..\nanogui\src\progressbar.cpp" />
+    <ClCompile Include="..\nanogui\src\screen.cpp" />
+    <ClCompile Include="..\nanogui\src\serializer.cpp" />
+    <ClCompile Include="..\nanogui\src\slider.cpp" />
+    <ClCompile Include="..\nanogui\src\stackedwidget.cpp" />
+    <ClCompile Include="..\nanogui\src\tabheader.cpp" />
+    <ClCompile Include="..\nanogui\src\tabwidget.cpp" />
+    <ClCompile Include="..\nanogui\src\textbox.cpp" />
+    <ClCompile Include="..\nanogui\src\theme.cpp" />
+    <ClCompile Include="..\nanogui\src\vscrollpanel.cpp" />
+    <ClCompile Include="..\nanogui\src\widget.cpp" />
+    <ClCompile Include="..\nanogui\src\window.cpp" />
+    <ClCompile Include="..\nanovg.c">
+      <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsC</CompileAs>
+    </ClCompile>
     <ClCompile Include="..\unified.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -163,6 +198,9 @@
     <ClInclude Include="..\glfw3.h" />
     <ClInclude Include="..\glfw3native.h" />
     <ClInclude Include="..\glfw_3.2.1.h" />
+    <ClInclude Include="..\nanogui\include\nanogui_resources.h" />
+    <ClInclude Include="..\nanogui\include\stb_image.h" />
+    <ClInclude Include="..\nanogui\include\stb_truetype.h" />
     <ClInclude Include="..\no_rt_util.h" />
     <ClInclude Include="..\nuklear.h" />
     <ClInclude Include="..\nuklear_glfw_gl3.h" />
