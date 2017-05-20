@@ -78,7 +78,27 @@
 #define MAX_VERTEX_BUFFER  512 * 1024
 #define MAX_ELEMENT_BUFFER 128 * 1024
 
+using namespace nanogui;
+
+enum test_enum {
+  Item1 = 0,
+  Item2,
+  Item3
+};
+
+Screen*     screen = nullptr;
+bool       enabled = true;
+bool          bvar = true;
+int           ivar = 12345678;
+double        dvar = 3.1415926;
+float         fvar = (float)dvar;
+std::string strval = "A string";
+test_enum  enumval = Item2;
+Color colval(0.5f, 0.5f, 0.7f, 1.f);
+
 namespace {
+
+using v2i  =  Eigen::Vector2i;
 
 vec3                   pos(mat4 const& m)
 { return m[3];                      }
@@ -453,7 +473,6 @@ ENTRY_DECLARATION
   using namespace std;
   using namespace nanogui;
 
-  Screen *screen = nullptr;
 
   SECTION(initialize static simdb and static VizData)
   {
@@ -516,12 +535,38 @@ ENTRY_DECLARATION
     PRINT_GL_ERRORS
   }
   SECTION(initialize nanogui)
-  {
+  { // everything leaks memory now
     nanogui::init();
 
     screen = new Screen(Vector2i(500, 700), "NanoGUI test");
 
     FormHelper *gui = new FormHelper(screen);
+
+    //ref<Window> window = gui->addWindow(v2i(10, 10), "Form helper example");
+    auto window = gui->addWindow(v2i(10, 10), "Form helper example");
+
+    gui->addGroup("Basic types");
+    gui->addVariable("bool", bvar);
+    gui->addVariable("string", strval);
+
+    gui->addGroup("Validating fields");
+    gui->addVariable("int", ivar)->setSpinnable(true);
+    gui->addVariable("float", fvar);
+    gui->addVariable("double", dvar)->setSpinnable(true);
+
+    gui->addGroup("Complex types");
+    gui->addVariable("Enumeration", enumval, enabled)
+      ->setItems({ "Item 1", "Item 2", "Item 3" });
+    gui->addVariable("Color", colval);
+
+    gui->addGroup("Other widgets");
+    gui->addButton("A button", []() { std::cout << "Button pressed." << std::endl; });
+
+    screen->setVisible(true);
+    screen->performLayout();
+    window->center();
+
+    nanogui::mainloop();
   }
 
   while(!glfwWindowShouldClose(vd.win))
