@@ -1,20 +1,21 @@
 
-
-
 // -todo: compile with nanogui
+// -todo: take out nuklear 
+// -todo: make initital nanogui window
+// -todo: fix nuklear ui disappearing when panning on rays changing - first it was a crash due to a gl function returning a null buffer and it not being checked for by nuklear - doesn't come back when resetting the camera - nuklear taken out
+// -todo: replace nuklear with nanogui
+// -todo: put database name/list in visualizer title
+// -todo: integrate nanogui with openGL drawing
 
-// todo: take out nuklear 
-// todo: fix nuklear ui disappearing when panning on rays changing - first it was a crash due to a gl function returning a null buffer and it not being checked for by nuklear - doesn't come back when resetting the camera
-// todo: write visualizer overview for Readme.md  
-// todo: make save button or menu to save serialized files 
-// todo: make camera fitting use the field of view and change the dist to fit all geometry - use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
-// todo: replace nuklear with nanogui
-// todo: make text field or file dialog for typing in database name
+// todo: set up events to get nanogui window to be interactive
 // todo: add fps counter in the corner
-// todo: add color under cursor like previous visualizer - use the gl get frame like the previous visualizer - check if the cursor is over the gl window first as an optimization? - sort of in but not working
-// todo: put vd.now as a variable loop?
-// todo: put database name/list in visualizer title
 // todo: add list of databases to select and/or databases currently open
+// todo: make drop down menu or text field or file dialog for typing in database name
+// todo: add color under cursor like previous visualizer - use the gl get frame like the previous visualizer - check if the cursor is over the gl window first as an optimization? - sort of in but not working
+// todo: write visualizer overview for Readme.md  
+// todo: make camera fitting use the field of view and change the dist to fit all geometry - use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
+// todo: put vd.now as a variable loop?
+// todo: make save button or menu to save serialized files 
 
 // todo: figure out reference counting so that files are cleaned up on exit
 // todo: move and rename project to LavaViz or any non test name
@@ -78,6 +79,8 @@
 #define MAX_VERTEX_BUFFER  512 * 1024
 #define MAX_ELEMENT_BUFFER 128 * 1024
 
+
+// start nanogui test stuff
 using namespace nanogui;
 
 enum test_enum {
@@ -86,7 +89,8 @@ enum test_enum {
   Item3
 };
 
-Screen*     screen = nullptr;
+//Screen*     screen = nullptr;
+Screen      screen;
 bool       enabled = true;
 bool          bvar = true;
 int           ivar = 12345678;
@@ -95,6 +99,7 @@ float         fvar = (float)dvar;
 std::string strval = "A string";
 test_enum  enumval = Item2;
 Color colval(0.5f, 0.5f, 0.7f, 1.f);
+// end nanogui test stuff
 
 namespace {
 
@@ -473,7 +478,6 @@ ENTRY_DECLARATION
   using namespace std;
   using namespace nanogui;
 
-
   SECTION(initialize static simdb and static VizData)
   {
     new (&db) simdb("test", 4096, 1<<14);             // inititialize the DB with placement new into the data segment
@@ -500,47 +504,17 @@ ENTRY_DECLARATION
 
     glfwSetWindowUserPointer(vd.win, &vd);
 
-    //vd.ctx = initNuklear(vd.win);                    assert(vd.ctx!=nullptr);
-    //struct nk_color table[NK_COLOR_COUNT];
-    //table[NK_COLOR_TEXT] = nk_rgba(210, 210, 210, 255);
-    //table[NK_COLOR_WINDOW] = nk_rgba(0, 0, 0, 0);
-    //table[NK_COLOR_HEADER] = nk_rgba(51, 51, 56, 220);
-    //table[NK_COLOR_BORDER] = nk_rgba(46, 46, 46, 255);
-    //table[NK_COLOR_BUTTON] = nk_rgba(48, 83, 111, 255);
-    //table[NK_COLOR_BUTTON_HOVER] = nk_rgba(58, 93, 121, 255);
-    //table[NK_COLOR_BUTTON_ACTIVE] = nk_rgba(63, 98, 126, 255);
-    //table[NK_COLOR_TOGGLE] = nk_rgba(50, 58, 61, 255);
-    //table[NK_COLOR_TOGGLE_HOVER] = nk_rgba(45, 53, 56, 255);
-    //table[NK_COLOR_TOGGLE_CURSOR] = nk_rgba(48, 83, 111, 255);
-    //table[NK_COLOR_SELECT] = nk_rgba(57, 67, 61, 0);
-    //table[NK_COLOR_SELECT_ACTIVE] = nk_rgba(48, 83, 111, 128);
-    //table[NK_COLOR_SLIDER] = nk_rgba(50, 58, 61, 255);
-    //table[NK_COLOR_SLIDER_CURSOR] = nk_rgba(48, 83, 111, 245);
-    //table[NK_COLOR_SLIDER_CURSOR_HOVER] = nk_rgba(53, 88, 116, 255);
-    //table[NK_COLOR_SLIDER_CURSOR_ACTIVE] = nk_rgba(58, 93, 121, 255);
-    //table[NK_COLOR_PROPERTY] = nk_rgba(50, 58, 61, 255);
-    //table[NK_COLOR_EDIT] = nk_rgba(50, 58, 61, 225);
-    //table[NK_COLOR_EDIT_CURSOR] = nk_rgba(210, 210, 210, 255);
-    //table[NK_COLOR_COMBO] = nk_rgba(50, 58, 61, 255);
-    //table[NK_COLOR_CHART] = nk_rgba(50, 58, 61, 255);
-    //table[NK_COLOR_CHART_COLOR] = nk_rgba(48, 83, 111, 255);
-    //table[NK_COLOR_CHART_COLOR_HIGHLIGHT] = nk_rgba(255, 0, 0, 255);
-    //table[NK_COLOR_SCROLLBAR] = nk_rgba(50, 58, 61, 255);
-    //table[NK_COLOR_SCROLLBAR_CURSOR] = nk_rgba(48, 83, 111, 255);
-    //table[NK_COLOR_SCROLLBAR_CURSOR_HOVER] = nk_rgba(53, 88, 116, 255);
-    //table[NK_COLOR_SCROLLBAR_CURSOR_ACTIVE] = nk_rgba(58, 93, 121, 255);
-    //table[NK_COLOR_TAB_HEADER] = nk_rgba(48, 83, 111, 255);
-    //nk_style_from_table(vd.ctx, table);
-
     PRINT_GL_ERRORS
   }
   SECTION(initialize nanogui)
   { // everything leaks memory now
-    nanogui::init();
+    //nanogui::init();
 
-    screen = new Screen(Vector2i(500, 700), "NanoGUI test");
+    //screen = new Screen(Vector2i(500, 700), "NanoGUI test");
+    //screen = new Screen();  // Vector2i(500, 700), "NanoGUI test");
+    screen.initialize(vd.win, true);
 
-    FormHelper *gui = new FormHelper(screen);
+    FormHelper *gui = new FormHelper(&screen);  // leak
 
     //ref<Window> window = gui->addWindow(v2i(10, 10), "Form helper example");
     auto window = gui->addWindow(v2i(10, 10), "Form helper example");
@@ -562,11 +536,11 @@ ENTRY_DECLARATION
     gui->addGroup("Other widgets");
     gui->addButton("A button", []() { std::cout << "Button pressed." << std::endl; });
 
-    screen->setVisible(true);
-    screen->performLayout();
+    screen.setVisible(true);
+    screen.performLayout();
     window->center();
 
-    nanogui::mainloop();
+    nanogui::mainloop(6);
   }
 
   while(!glfwWindowShouldClose(vd.win))
@@ -613,35 +587,6 @@ ENTRY_DECLARATION
       glfwGetWindowSize(vd.win, &vd.ui.w, &vd.ui.h);
       PRINT_GL_ERRORS
     }
-    //SECTION(draw nuklear)
-    //{
-    //  nk_glfw3_new_frame();
-    //  vd.ui.rect = winbnd_to_sidebarRect((float)vd.ui.w, (float)vd.ui.h);
-    //
-    //  //struct nk_panel layout;
-    //  //if(nk_begin(vd.ctx, &layout, "fps", vd.ui.rect, NK_WINDOW_BACKGROUND))
-    //  //{
-    //
-    //  sidebar(vd.ctx, vd.ui.rect, &vd.shapes);                     // alters the shapes by setting their active flags
-    //
-    //  //nk_flags window_flags = NK_WINDOW_DYNAMIC;                 /* window flags */
-    //    //struct nk_rect fpsRect;
-    //    //struct nk_panel fpsLayout;
-    //    //fpsRect.x = fpsRect.y = 0.f;
-    //    //fpsRect.w = fpsRect.h = 256.f;
-    //    //if(nk_group_begin(vd.ctx, &fpsLayout, "fps", window_flags)){
-    //    //  nk_layout_row_begin(vd.ctx, NK_DYNAMIC, 20, 3);
-    //    //    nk_layout_row_push(vd.ctx, 1.f);
-    //    //    nk_label(vd.ctx, "Frames Per Second: ", NK_TEXT_LEFT);
-    //    //  nk_layout_row_end(vd.ctx);
-    //    //
-    //    //  nk_group_end(vd.ctx);
-    //    //}
-    //  //}  
-    //  //nk_end(vd.ctx);
-    //  
-    //  PRINT_GL_ERRORS
-    //}
     SECTION(openGL frame setup)
     {
       glViewport(0, 0, vd.ui.w, vd.ui.h);
@@ -721,25 +666,14 @@ ENTRY_DECLARATION
       PRINT_GL_ERRORS
     }
 
-    //nk_glfw3_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_BUFFER, MAX_ELEMENT_BUFFER);
-
-    /* 
-    * IMPORTANT: `nk_glfw_render` modifies some global OpenGL state
-    * with blending, scissor, face culling, depth test and viewport and
-    * defaults everything back into a default state.
-    * Make sure to either a.) save and restore or b.) reset your own state after
-    * rendering the UI. 
-    */
     glfwSwapBuffers(vd.win);
     PRINT_GL_ERRORS
 
     // todo: mouse position goes here to read back the color under the mouse 
-    //glReadPixels( (GLint)(vd.camera.xDiff * vd.ui.w), (GLint)(vd.camera.yDiff * vd.ui.h), 1, 1, GL_RGB, GL_FLOAT, vd.mouseRGB);
     glReadPixels( (GLint)(vd.camera.mouseDelta.x), (GLint)(vd.camera.mouseDelta.y), 1, 1, GL_RGB, GL_FLOAT, vd.mouseRGB);
-    //printf("%f %f: %f %f %f \n", vd.camera.xDiff, vd.camera.yDiff, vd.mouseRGB[0], vd.mouseRGB[1], vd.mouseRGB[2]);
   }
 
-  //nk_glfw3_shutdown();
+  nanogui::shutdown();
   glfwTerminate();
   return 0;
 }
@@ -750,6 +684,84 @@ ENTRY_DECLARATION
 
 
 
+//SECTION(draw nuklear)
+//{
+//  nk_glfw3_new_frame();
+//  vd.ui.rect = winbnd_to_sidebarRect((float)vd.ui.w, (float)vd.ui.h);
+//
+//  //struct nk_panel layout;
+//  //if(nk_begin(vd.ctx, &layout, "fps", vd.ui.rect, NK_WINDOW_BACKGROUND))
+//  //{
+//
+//  sidebar(vd.ctx, vd.ui.rect, &vd.shapes);                     // alters the shapes by setting their active flags
+//
+//  //nk_flags window_flags = NK_WINDOW_DYNAMIC;                 /* window flags */
+//    //struct nk_rect fpsRect;
+//    //struct nk_panel fpsLayout;
+//    //fpsRect.x = fpsRect.y = 0.f;
+//    //fpsRect.w = fpsRect.h = 256.f;
+//    //if(nk_group_begin(vd.ctx, &fpsLayout, "fps", window_flags)){
+//    //  nk_layout_row_begin(vd.ctx, NK_DYNAMIC, 20, 3);
+//    //    nk_layout_row_push(vd.ctx, 1.f);
+//    //    nk_label(vd.ctx, "Frames Per Second: ", NK_TEXT_LEFT);
+//    //  nk_layout_row_end(vd.ctx);
+//    //
+//    //  nk_group_end(vd.ctx);
+//    //}
+//  //}  
+//  //nk_end(vd.ctx);
+//  
+//  PRINT_GL_ERRORS
+//}
+
+//
+//nk_glfw3_shutdown();
+
+//glReadPixels( (GLint)(vd.camera.xDiff * vd.ui.w), (GLint)(vd.camera.yDiff * vd.ui.h), 1, 1, GL_RGB, GL_FLOAT, vd.mouseRGB);
+//printf("%f %f: %f %f %f \n", vd.camera.xDiff, vd.camera.yDiff, vd.mouseRGB[0], vd.mouseRGB[1], vd.mouseRGB[2]);
+
+//vd.ctx = initNuklear(vd.win);                    assert(vd.ctx!=nullptr);
+//struct nk_color table[NK_COLOR_COUNT];
+//table[NK_COLOR_TEXT] = nk_rgba(210, 210, 210, 255);
+//table[NK_COLOR_WINDOW] = nk_rgba(0, 0, 0, 0);
+//table[NK_COLOR_HEADER] = nk_rgba(51, 51, 56, 220);
+//table[NK_COLOR_BORDER] = nk_rgba(46, 46, 46, 255);
+//table[NK_COLOR_BUTTON] = nk_rgba(48, 83, 111, 255);
+//table[NK_COLOR_BUTTON_HOVER] = nk_rgba(58, 93, 121, 255);
+//table[NK_COLOR_BUTTON_ACTIVE] = nk_rgba(63, 98, 126, 255);
+//table[NK_COLOR_TOGGLE] = nk_rgba(50, 58, 61, 255);
+//table[NK_COLOR_TOGGLE_HOVER] = nk_rgba(45, 53, 56, 255);
+//table[NK_COLOR_TOGGLE_CURSOR] = nk_rgba(48, 83, 111, 255);
+//table[NK_COLOR_SELECT] = nk_rgba(57, 67, 61, 0);
+//table[NK_COLOR_SELECT_ACTIVE] = nk_rgba(48, 83, 111, 128);
+//table[NK_COLOR_SLIDER] = nk_rgba(50, 58, 61, 255);
+//table[NK_COLOR_SLIDER_CURSOR] = nk_rgba(48, 83, 111, 245);
+//table[NK_COLOR_SLIDER_CURSOR_HOVER] = nk_rgba(53, 88, 116, 255);
+//table[NK_COLOR_SLIDER_CURSOR_ACTIVE] = nk_rgba(58, 93, 121, 255);
+//table[NK_COLOR_PROPERTY] = nk_rgba(50, 58, 61, 255);
+//table[NK_COLOR_EDIT] = nk_rgba(50, 58, 61, 225);
+//table[NK_COLOR_EDIT_CURSOR] = nk_rgba(210, 210, 210, 255);
+//table[NK_COLOR_COMBO] = nk_rgba(50, 58, 61, 255);
+//table[NK_COLOR_CHART] = nk_rgba(50, 58, 61, 255);
+//table[NK_COLOR_CHART_COLOR] = nk_rgba(48, 83, 111, 255);
+//table[NK_COLOR_CHART_COLOR_HIGHLIGHT] = nk_rgba(255, 0, 0, 255);
+//table[NK_COLOR_SCROLLBAR] = nk_rgba(50, 58, 61, 255);
+//table[NK_COLOR_SCROLLBAR_CURSOR] = nk_rgba(48, 83, 111, 255);
+//table[NK_COLOR_SCROLLBAR_CURSOR_HOVER] = nk_rgba(53, 88, 116, 255);
+//table[NK_COLOR_SCROLLBAR_CURSOR_ACTIVE] = nk_rgba(58, 93, 121, 255);
+//table[NK_COLOR_TAB_HEADER] = nk_rgba(48, 83, 111, 255);
+//nk_style_from_table(vd.ctx, table);
+
+//nk_glfw3_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_BUFFER, MAX_ELEMENT_BUFFER);
+//
+
+/*
+* IMPORTANT: `nk_glfw_render` modifies some global OpenGL state
+* with blending, scissor, face culling, depth test and viewport and
+* defaults everything back into a default state.
+* Make sure to either a.) save and restore or b.) reset your own state after
+* rendering the UI.
+*/
 
 //mat4 view, projection;
 //view          = lookAt(vec3(0.f, 0.f, 1.f), vd.camera.lookAt, vd.camera.up);
