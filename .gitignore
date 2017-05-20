@@ -45,6 +45,7 @@
 *.suo
 *.psess
 *.vsp
+*.db*
 
 # intel compiler nonsense
 *.amplxeproj
@@ -78,15 +79,9 @@ ipch/
 *.VC.db
 *.VC.VC.opendb
 
-
-
 bak/
 nuklear/nuklear_test/nuklear_test/
 nuklear/nuklear_test/nanogui/
-
-*.swp
-
-*.swp
 
 *.swp
 
