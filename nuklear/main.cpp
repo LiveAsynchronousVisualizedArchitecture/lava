@@ -6,8 +6,10 @@
 // -todo: replace nuklear with nanogui
 // -todo: put database name/list in visualizer title
 // -todo: integrate nanogui with openGL drawing
+// -todo: set up events to get nanogui window to be interactive
 
-// todo: set up events to get nanogui window to be interactive
+// todo: set drop, scroll and framebuffer callbacks for nanogui
+// todo: look into taking out ui lag
 // todo: add fps counter in the corner
 // todo: add list of databases to select and/or databases currently open
 // todo: make drop down menu or text field or file dialog for typing in database name
@@ -79,7 +81,6 @@
 #define MAX_VERTEX_BUFFER  512 * 1024
 #define MAX_ELEMENT_BUFFER 128 * 1024
 
-
 // start nanogui test stuff
 using namespace nanogui;
 
@@ -105,9 +106,9 @@ namespace {
 
 using v2i  =  Eigen::Vector2i;
 
-vec3                   pos(mat4 const& m)
+vec3                     pos(mat4 const& m)
 { return m[3];                      }
-void               set_pos(mat4* m, vec3 const p)
+void                 set_pos(mat4* m, vec3 const p)
 {
   //(*m)[0].w = p.x;
   //(*m)[1].w = p.y;
@@ -116,18 +117,18 @@ void               set_pos(mat4* m, vec3 const p)
   (*m)[3].y = p.y;
   (*m)[3].z = p.z;
 }
-float     wrapAngleRadians(float angle)     
+float       wrapAngleRadians(float angle)     
 {
   using namespace glm;
   const static float _2PI = 2.f*pi<float>();
 
   return fmodf(angle, _2PI);
 }
-void         errorCallback(int e, const char *d) {
+void           errorCallback(int e, const char *d) {
   printf("Error %d: %s\n", e, d);
   fflush(stdout);
 }
-void              initGlew()
+void                initGlew()
 {
   //glewExperimental = 1;
   if(glewInit() != GLEW_OK) {
@@ -135,7 +136,7 @@ void              initGlew()
     exit(1);
   }
 }
-auto           initNuklear(GLFWwindow* win) -> struct nk_context*
+auto             initNuklear(GLFWwindow* win) -> struct nk_context*
 {
   struct nk_context*      ctx = nk_glfw3_init(win, NK_GLFW3_INSTALL_CALLBACKS);
   struct nk_font_atlas* atlas;
@@ -144,7 +145,7 @@ auto           initNuklear(GLFWwindow* win) -> struct nk_context*
 
   return ctx;
 }
-Camera          initCamera()
+Camera            initCamera()
 {
   Camera cam;
   cam.fov             = PIf * 0.5f;
@@ -165,12 +166,12 @@ Camera          initCamera()
 
   return cam;
 }
-void           keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+void             keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
   //using namespace glm;
 
   if(key==GLFW_KEY_ESCAPE && action==GLFW_PRESS)
-      glfwSetWindowShouldClose(window, GL_TRUE);
+    glfwSetWindowShouldClose(window, GL_TRUE);
 
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
   auto&   cam = vd->camera;
@@ -202,8 +203,9 @@ void           keyCallback(GLFWwindow* window, int key, int scancode, int action
     break;
   }
 
+  screen.keyCallbackEvent(key, scancode, action, mods);
 }
-void        scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
+void          scrollCallback(GLFWwindow* window, double xofst, double yofst)
 {
   using namespace std;
   
@@ -211,21 +213,15 @@ void        scrollCallback(GLFWwindow* window, double xoffset, double yoffset)
 
   VizData*   vd = (VizData*)glfwGetWindowUserPointer(window);
   auto&     cam = vd->camera;
-  float    ofst = (float) -(cam.dist*yoffset*dollySens);
+  float    ofst = (float) -(cam.dist*yofst*dollySens);
   float  prvDst = cam.dist;                                        // prvDst is previous distance
   float  nxtDst = cam.dist;
   nxtDst        = cam.dist + ofst;
+  cam.dist      = nxtDst;
 
-  cam.dist = nxtDst;
-
-  //if(cam.dis > 0)
-  //else
-  //  nxtDst = cam.dist * 1.f/abs(sense);
-
-  //if     (nxtDst < prvDst*0.9f) cam.dist = prvDst*0.9f;
-  //else if(nxtDst > prvDst/0.9f) cam.dist = prvDst/0.9f;
+  screen.scrollCallbackEvent(xofst, yofst);
 }
-void      mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
+void        mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 {
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
 
@@ -240,15 +236,18 @@ void      mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
       vd->camera.rightButtonDown = false;
     }
   }
+
+  screen.mouseButtonCallbackEvent(button, action, mods);
 }
-void     cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
+void       cursorPosCallback(GLFWwindow* window, double x, double y)
 {
   //using namespace glm;
   const static float _2PI = 2.f* PIf; //  pi<float>();
 
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
+
   Camera& cam = vd->camera;
-  vec2 newMousePosition = vec2((float)xposition, (float)yposition);
+  vec2 newMousePosition = vec2((float)x, (float)y);
 
   if(cam.leftButtonDown){
     cam.mouseDelta = (newMousePosition - cam.oldMousePos);
@@ -273,6 +272,22 @@ void     cursorPosCallback(GLFWwindow* window, double xposition, double ypositio
   }
 
   cam.oldMousePos = newMousePosition;
+
+  screen.cursorPosCallbackEvent(x,y);
+}
+void            charCallback(GLFWwindow* window, unsigned int codepoint)
+{
+  VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
+
+  screen.charCallbackEvent(codepoint);
+}
+void            dropCallback(GLFWwindow* window, int count, const char** filenames)
+{
+  screen.dropCallbackEvent(count, filenames);
+}
+void framebufferSizeCallback(GLFWwindow* window, int w, int h)
+{
+  screen.resizeCallbackEvent(w, h);
 }
 GLFWwindow*       initGLFW(VizData* vd)
 {
@@ -293,10 +308,14 @@ GLFWwindow*       initGLFW(VizData* vd)
   glfwMakeContextCurrent(win);
   glfwGetWindowSize(win, &vd->ui.w, &vd->ui.h);
 
-  glfwSetKeyCallback(win, keyCallback);
-  glfwSetScrollCallback(win, scrollCallback);
-  glfwSetCursorPosCallback(win, cursorPosCallback);
-  glfwSetMouseButtonCallback(win, mouseBtnCallback);
+  glfwSetCharCallback(win,             charCallback);         // in glfw charCallback is for typing letters and is different than the keyCallback for keys like backspace 
+  glfwSetKeyCallback(win,               keyCallback);
+  glfwSetScrollCallback(win,         scrollCallback);
+  glfwSetCursorPosCallback(win,   cursorPosCallback);
+  glfwSetMouseButtonCallback(win,  mouseBtnCallback);
+  glfwSetDropCallback(win,             dropCallback);
+  glfwSetFramebufferSizeCallback(win, );
+  //glfwSetScrollCallback(win, )
 
   #ifdef _WIN32
     //GLFWimage images[2];
@@ -683,6 +702,13 @@ ENTRY_DECLARATION
 
 
 
+
+//if(cam.dis > 0)
+//else
+//  nxtDst = cam.dist * 1.f/abs(sense);
+//
+//if     (nxtDst < prvDst*0.9f) cam.dist = prvDst*0.9f;
+//else if(nxtDst > prvDst/0.9f) cam.dist = prvDst/0.9f;
 
 //SECTION(draw nuklear)
 //{
