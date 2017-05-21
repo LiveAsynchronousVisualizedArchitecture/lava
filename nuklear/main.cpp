@@ -8,9 +8,9 @@
 // -todo: integrate nanogui with openGL drawing
 // -todo: set up events to get nanogui window to be interactive
 // -todo: set drop, scroll and framebuffer callbacks for nanogui
+// -todo: get release mode to work
+// -todo: look into taking out ui lag
 
-// todo: get release mode to work
-// todo: look into taking out ui lag
 // todo: add fps counter in the corner
 // todo: add list of databases to select and/or databases currently open
 // todo: make drop down menu or text field or file dialog for typing in database name
@@ -548,22 +548,22 @@ ENTRY_DECLARATION
     //auto window = gui->addWindow(v2i(10, 10), "Form helper example");
     win = gui->addWindow(v2i(10, 10), "Form helper example");
 
-    //gui->addGroup("Basic types");
-    //gui->addVariable("bool", bvar);
-    //gui->addVariable("string", strval);
+    gui->addGroup("Basic types");
+    gui->addVariable("bool", bvar);
+    gui->addVariable("string", strval);
 
-    //gui->addGroup("Validating fields");
-    //gui->addVariable("int", ivar)->setSpinnable(true);
-    //gui->addVariable("float", fvar);
-    //gui->addVariable("double", dvar)->setSpinnable(true);
+    gui->addGroup("Validating fields");
+    gui->addVariable("int", ivar)->setSpinnable(true);
+    gui->addVariable("float", fvar);
+    gui->addVariable("double", dvar)->setSpinnable(true);
 
-    //gui->addGroup("Complex types");
-    //gui->addVariable("Enumeration", enumval, enabled)
-    //  ->setItems({ "Item 1", "Item 2", "Item 3" });
-    //gui->addVariable("Color", colval);
+    gui->addGroup("Complex types");
+    gui->addVariable("Enumeration", enumval, enabled)
+      ->setItems({ "Item 1", "Item 2", "Item 3" });
+    gui->addVariable("Color", colval);
 
-    //gui->addGroup("Other widgets");
-    //gui->addButton("A button", []() { std::cout << "Button pressed." << std::endl; });
+    gui->addGroup("Other widgets");
+    gui->addButton("A button", []() { std::cout << "Button pressed." << std::endl; });
 
     screen.setVisible(true);
     screen.performLayout();
