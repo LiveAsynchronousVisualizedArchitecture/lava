@@ -7,8 +7,9 @@
 // -todo: put database name/list in visualizer title
 // -todo: integrate nanogui with openGL drawing
 // -todo: set up events to get nanogui window to be interactive
+// -todo: set drop, scroll and framebuffer callbacks for nanogui
 
-// todo: set drop, scroll and framebuffer callbacks for nanogui
+// todo: get release mode to work
 // todo: look into taking out ui lag
 // todo: add fps counter in the corner
 // todo: add list of databases to select and/or databases currently open
@@ -92,6 +93,9 @@ enum test_enum {
 
 //Screen*     screen = nullptr;
 Screen      screen;
+FormHelper*    gui = nullptr;
+Window*        win = nullptr;
+
 bool       enabled = true;
 bool          bvar = true;
 int           ivar = 12345678;
@@ -528,36 +532,42 @@ ENTRY_DECLARATION
   SECTION(initialize nanogui)
   { // everything leaks memory now
     //nanogui::init();
+    
+    glfwSwapInterval(0);
+    glfwSwapBuffers(vd.win);
+    glfwMakeContextCurrent(vd.win);
 
     //screen = new Screen(Vector2i(500, 700), "NanoGUI test");
     //screen = new Screen();  // Vector2i(500, 700), "NanoGUI test");
     screen.initialize(vd.win, true);
 
-    FormHelper *gui = new FormHelper(&screen);  // leak
+    //FormHelper *gui = new FormHelper(&screen);  // leak
+    gui = new FormHelper(&screen);                // leak
 
     //ref<Window> window = gui->addWindow(v2i(10, 10), "Form helper example");
-    auto window = gui->addWindow(v2i(10, 10), "Form helper example");
+    //auto window = gui->addWindow(v2i(10, 10), "Form helper example");
+    win = gui->addWindow(v2i(10, 10), "Form helper example");
 
-    gui->addGroup("Basic types");
-    gui->addVariable("bool", bvar);
-    gui->addVariable("string", strval);
+    //gui->addGroup("Basic types");
+    //gui->addVariable("bool", bvar);
+    //gui->addVariable("string", strval);
 
-    gui->addGroup("Validating fields");
-    gui->addVariable("int", ivar)->setSpinnable(true);
-    gui->addVariable("float", fvar);
-    gui->addVariable("double", dvar)->setSpinnable(true);
+    //gui->addGroup("Validating fields");
+    //gui->addVariable("int", ivar)->setSpinnable(true);
+    //gui->addVariable("float", fvar);
+    //gui->addVariable("double", dvar)->setSpinnable(true);
 
-    gui->addGroup("Complex types");
-    gui->addVariable("Enumeration", enumval, enabled)
-      ->setItems({ "Item 1", "Item 2", "Item 3" });
-    gui->addVariable("Color", colval);
+    //gui->addGroup("Complex types");
+    //gui->addVariable("Enumeration", enumval, enabled)
+    //  ->setItems({ "Item 1", "Item 2", "Item 3" });
+    //gui->addVariable("Color", colval);
 
-    gui->addGroup("Other widgets");
-    gui->addButton("A button", []() { std::cout << "Button pressed." << std::endl; });
+    //gui->addGroup("Other widgets");
+    //gui->addButton("A button", []() { std::cout << "Button pressed." << std::endl; });
 
     screen.setVisible(true);
     screen.performLayout();
-    window->center();
+   // win->center();
 
     nanogui::mainloop(6);
   }
@@ -565,6 +575,8 @@ ENTRY_DECLARATION
   while(!glfwWindowShouldClose(vd.win))
   {
     PRINT_GL_ERRORS
+    glfwPollEvents();                                             /* Input */
+
     SECTION(add the time passed to refresh clocks)
     {
       vd.now  = nowd();
@@ -602,25 +614,13 @@ ENTRY_DECLARATION
     {
       vd.camera.mouseDelta = vec2(0,0);
       vd.camera.btn2Delta  = vec2(0,0);
-      glfwPollEvents();                                             /* Input */
       glfwGetWindowSize(vd.win, &vd.ui.w, &vd.ui.h);
       PRINT_GL_ERRORS
     }
     SECTION(openGL frame setup)
     {
       glViewport(0, 0, vd.ui.w, vd.ui.h);
-      
-      //glDisable(GL_CLIP_PLANE0);
-      //glDisable(GL_CLIP_PLANE1);
-      //glDisable(GL_CLIP_PLANE2);
-      //glDisable(GL_CLIP_PLANE3);
-      //glDisable(GL_FOG);
-      //glDisable(GL_CULL_FACE);
-      //glDisable(GL_SCISSOR_TEST);
-      //glDisable(GL_STENCIL_TEST);
-      //glDisable(GL_DEPTH);
-      //glDisable(GL_DEPTH_TEST);                                    // glDepthFunc(GL_LESS);
-      
+            
       glEnable(GL_TEXTURE_2D);
       glEnable(GL_DEPTH);
       glEnable(GL_DEPTH_TEST);                                   // glDepthFunc(GL_LESS);
@@ -692,7 +692,7 @@ ENTRY_DECLARATION
     glReadPixels( (GLint)(vd.camera.mouseDelta.x), (GLint)(vd.camera.mouseDelta.y), 1, 1, GL_RGB, GL_FLOAT, vd.mouseRGB);
   }
 
-  nanogui::shutdown();
+  //nanogui::shutdown();
   glfwTerminate();
   return 0;
 }
@@ -702,6 +702,16 @@ ENTRY_DECLARATION
 
 
 
+//glDisable(GL_CLIP_PLANE0);
+//glDisable(GL_CLIP_PLANE1);
+//glDisable(GL_CLIP_PLANE2);
+//glDisable(GL_CLIP_PLANE3);
+//glDisable(GL_FOG);
+//glDisable(GL_CULL_FACE);
+//glDisable(GL_SCISSOR_TEST);
+//glDisable(GL_STENCIL_TEST);
+//glDisable(GL_DEPTH);
+//glDisable(GL_DEPTH_TEST);                                    // glDepthFunc(GL_LESS);
 
 //if(cam.dis > 0)
 //else
