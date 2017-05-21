@@ -301,6 +301,25 @@ public:
     /// Set the stretch factor of a given column
     void setColStretch(int index, float stretch) { mColStretch.at(index) = stretch; }
 
+    void clear(int cols, int rows)
+    {
+ 
+      mCols.clear();
+      mCols.resize(cols); 
+      mCols.shrink_to_fit();
+
+      mRows.clear();
+      mRows.resize(rows);
+      mRows.shrink_to_fit();
+
+      mRowStretch.resize(0);
+      mRowStretch.shrink_to_fit();
+      mColStretch.resize(0);
+      mColStretch.shrink_to_fit();
+
+      //mAnchor.clear();
+    }  // sbassett
+
     /// Specify the anchor data structure for a given widget
     void setAnchor(const Widget *widget, const Anchor &anchor) { mAnchor[widget] = anchor; }
 

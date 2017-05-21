@@ -20,8 +20,10 @@
 // -todo: get opengl and nanogui to work at the same time - take out nanogui's screen drawing? - set the screen to be smaller?
 // -todo: get input working to change the camera as before
 // -todo: use callback for focus on sidebar to take away mouse button presses so that the camera doesn't move on the side - used window boolean for 'focused' which half works - doesn't prevent camera controls until the window is clicked
+// -todo: get keys working on the side as buttons or labels
+// -todo: erase key ui elements and recreate them on refresh
 
-// todo: get keys working on the side as buttons or labels
+// todo: have toggle button presses turn active on and off
 // todo: add fps counter in the corner - use nanovg alone?
 // todo: add list of databases to select and/or databases currently open
 // todo: make drop down menu or text field or file dialog for typing in database name
@@ -103,6 +105,7 @@ NAMESPACE_END(nanogui)
 
 Screen         screen;
 Window*        keyWin = nullptr;
+BoxLayout*     keyLay = nullptr;
 FormHelper*      keys = nullptr;
 
 // start nanogui test stuff
@@ -521,12 +524,17 @@ ENTRY_DECLARATION
     SECTION(sidebar)
     {
       keys   = new FormHelper(&screen);
-      keyWin = keys->addWindow(v2i(10,10), "Keys");
-      keyWin->setTooltip("The Keys in the database");
-      keys->addGroup("IdxVrt");
-      keys->addWidget("label label", new Label(keyWin, "One Key"));
-      keys->addButton("Key One", []() { std::cout << "One pressed." << std::endl; });
-      keys->addButton("Key Two", []() { std::cout << "Two pressed." << std::endl; });
+      //keyWin = keys->addWindow(v2i(10,10), "Keys");
+      keyWin = new Window(&screen, "Keys");
+      keyLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 10, 10);
+      keyWin->setLayout(keyLay);
+      //keyWin->setTooltip("The Keys in the database");
+      //keys->addGroup("IdxVrt");
+      //keyWin->removeChildren();
+      //((Widget*)keys)->removeChildren();
+      //keys->addWidget("label label", new Label(keyWin, "One Key"));
+      //keys->addButton("Key One", []() { std::cout << "One pressed." << std::endl; });
+      //keys->addButton("Key Two", []() { std::cout << "Two pressed." << std::endl; });
 
       Theme* thm = keyWin->theme();
       thm->mTransparent         = v4f( .0f,  .0f,  .0f,    .0f );
@@ -563,17 +571,6 @@ ENTRY_DECLARATION
     
     screen.setVisible(true);
     screen.performLayout();
-    //screen.setBackground(Color(0, 0, 0, 0));
-
-    Theme* scrnThm = screen.theme();
-    
-    //scrnThm->mTransparent = v4f(0,0,0,0);
-    //scrnThm->mWindowFillFocused   = v4f(0,0,0,0);
-    //scrnThm->mWindowFillUnfocused = v4f(0,0,0,0);
-
-    //win->center();
-    
-    //nanogui::mainloop(0);
   }
 
   genTestGeo(&db);
@@ -593,9 +590,33 @@ ENTRY_DECLARATION
     SECTION(check updates if enough time stored in refresh clock variables)
     {
       if( vd.keyRefreshClock > vd.keyRefresh ){
-        auto dbKeys = db.getKeyStrs();                           // Get all keys in DB - this will need to be ran in the main loop, but not every frame
+        auto dbKeys = db.getKeyStrs();                              // Get all keys in DB - this will need to be ran in the main loop, but not every frame
         dbKeys      = shapesFromKeys(db, move(dbKeys), &vd);
-        eraseMissingKeys(move(dbKeys), &vd.shapes);
+        dbKeys      = eraseMissingKeys(move(dbKeys), &vd.shapes);
+
+        keyWin->removeChildren();
+        //keys->clear(10,10);
+        for(auto key : dbKeys){
+          //Label* lbl = new Label(keyWin, key.str);
+          
+          //auto tgl = new 
+          auto b = new Button(keyWin, key.str);
+          b->setFlags(Button::ToggleButton);
+          b->setPushed( vd.shapes[key.str].active  );
+          //button->setCallback(cb);
+          b->setFixedHeight(25);
+          //if (keyLay->rowCount() > 0)
+            //keyLay->appendRow(mVariableSpacing);
+          //keyLay->appendRow(0);
+          //keyLay->setAnchor(button, AdvancedGridLayout::Anchor(1, keyLay->rowCount() - 1, 3, 1));
+          
+
+          //keyWin ->addButton(key.str, [](){ printf("wat\n\n"); });
+        }
+        screen.performLayout();
+
+        //keys->addWidget("", new Label(keyWin, "One Key"));
+
 
         vd.keyRefreshClock -= vd.keyRefresh;
         vd.verRefreshClock -= vd.verRefresh;
@@ -756,6 +777,17 @@ ENTRY_DECLARATION
 
 
 
+//screen.setBackground(Color(0, 0, 0, 0));
+//
+//Theme* scrnThm = screen.theme();
+//
+//scrnThm->mTransparent = v4f(0,0,0,0);
+//scrnThm->mWindowFillFocused   = v4f(0,0,0,0);
+//scrnThm->mWindowFillUnfocused = v4f(0,0,0,0);
+//
+//win->center();
+//
+//nanogui::mainloop(0);
 
 //set_pos(&cam.pantfm, vec3(0,0,0) );
 //

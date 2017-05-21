@@ -124,6 +124,12 @@ public:
     /// Create a helper class to construct NanoGUI widgets on the given screen
     FormHelper(Screen *screen) : mScreen(screen) { }
 
+    void clear(int cols, int rows)
+    { 
+      mWindow->removeChildren(); 
+      mLayout->clear(cols, rows);
+    }                                          // sbassett
+
     /// Add a new top-level window
     Window *addWindow(const Vector2i &pos,
                          const std::string &title = "Untitled") {

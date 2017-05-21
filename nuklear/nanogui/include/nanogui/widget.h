@@ -144,6 +144,9 @@ public:
     /// Remove a child widget by value
     void removeChild(const Widget *widget);
 
+    void removeChildren() { mChildren.resize(0); mChildren.shrink_to_fit(); }   // sbassett
+    void clear(); //{ removeChildren(); mLayout->clear(); }                                          // sbassett
+
     /// Retrieves the child at the specific position
     const Widget* childAt(int index) const { return mChildren[index]; }
 
