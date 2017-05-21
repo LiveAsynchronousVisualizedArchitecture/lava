@@ -357,13 +357,13 @@ void Screen::setSize(const Vector2i &size) {
 }
 
 void Screen::drawAll() {
-    glClearColor(mBackground[0], mBackground[1], mBackground[2], mBackground[3]);
-    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    //glClearColor(mBackground[0], mBackground[1], mBackground[2], mBackground[3]);
+    //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
 
     drawContents();
     drawWidgets();
 
-    glfwSwapBuffers(mGLFWWindow);
+    //glfwSwapBuffers(mGLFWWindow);
 }
 
 void Screen::drawWidgets() {

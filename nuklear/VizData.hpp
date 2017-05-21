@@ -15,17 +15,17 @@
 #include "GL/glew.h"
 #include "glm/glm.hpp"
 
-#define NK_INCLUDE_FIXED_TYPES
-#define NK_INCLUDE_STANDARD_IO
-#define NK_INCLUDE_STANDARD_VARARGS
-#define NK_INCLUDE_DEFAULT_ALLOCATOR
-#define NK_INCLUDE_VERTEX_BUFFER_OUTPUT
-#define NK_INCLUDE_FONT_BAKING
-#define NK_INCLUDE_DEFAULT_FONT
-#define NK_IMPLEMENTATION
-#define NK_GLFW_GL3_IMPLEMENTATION
-#include "nuklear.h"
-#include "nuklear_glfw_gl3.h"
+//#define NK_INCLUDE_FIXED_TYPES
+//#define NK_INCLUDE_STANDARD_IO
+//#define NK_INCLUDE_STANDARD_VARARGS
+//#define NK_INCLUDE_DEFAULT_ALLOCATOR
+//#define NK_INCLUDE_VERTEX_BUFFER_OUTPUT
+//#define NK_INCLUDE_FONT_BAKING
+//#define NK_INCLUDE_DEFAULT_FONT
+//#define NK_IMPLEMENTATION
+//#define NK_GLFW_GL3_IMPLEMENTATION
+//#include "nuklear.h"
+//#include "nuklear_glfw_gl3.h"
 
 #include "../DataStore/ConcurrentMap/simdb.hpp"
 #include "IndexedVerts.h"
@@ -154,8 +154,8 @@ struct VizData
   struct
   {
     int w, h;
-    struct nk_rect      rect;                // rect is the rectangle of the sidebar gui
-    struct nk_color    bgclr;
+    //struct nk_rect      rect;                // rect is the rectangle of the sidebar gui
+    //struct nk_color    bgclr;
     float ptSz;
   } ui;
   double  keyRefresh, keyRefreshClock, verRefresh, verRefreshClock, prev, now;

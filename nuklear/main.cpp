@@ -17,8 +17,10 @@
 // -todo: make sidebar transparent - already is, make it more transparent
 // -todo: figure out reference counting so that files are cleaned up on exit - taken care of by simdb
 // -todo: turn on geometry by default to test openGL rendering - turn nanogui off to test, maybe it is drawing the screen over - works
+// -todo: get opengl and nanogui to work at the same time - take out nanogui's screen drawing? - set the screen to be smaller?
+// -todo: get input working to change the camera as before
+// -todo: use callback for focus on sidebar to take away mouse button presses so that the camera doesn't move on the side - used window boolean for 'focused' which half works - doesn't prevent camera controls until the window is clicked
 
-// todo: get opengl and nanogui to work at the same time - take out nanogui's screen drawing? - set the screen to be smaller?
 // todo: get keys working on the side as buttons or labels
 // todo: add fps counter in the corner - use nanovg alone?
 // todo: add list of databases to select and/or databases currently open
@@ -132,9 +134,9 @@ namespace {
 using v2i  =  Eigen::Vector2i;
 using v4f  =  Eigen::Vector4f;
 
-vec3                     pos(mat4 const& m)
+vec3                      pos(mat4 const& m)
 { return m[3];                      }
-void                 set_pos(mat4* m, vec3 const p)
+void                  set_pos(mat4* m, vec3 const p)
 {
   //(*m)[0].w = p.x;
   //(*m)[1].w = p.y;
@@ -143,18 +145,18 @@ void                 set_pos(mat4* m, vec3 const p)
   (*m)[3].y = p.y;
   (*m)[3].z = p.z;
 }
-float       wrapAngleRadians(float angle)     
+float        wrapAngleRadians(float angle)     
 {
   using namespace glm;
   const static float _2PI = 2.f*pi<float>();
 
   return fmodf(angle, _2PI);
 }
-void           errorCallback(int e, const char *d) {
+void            errorCallback(int e, const char *d) {
   printf("Error %d: %s\n", e, d);
   fflush(stdout);
 }
-void                initGlew()
+void                 initGlew()
 {
   //glewExperimental = 1;
   if(glewInit() != GLEW_OK) {
@@ -162,16 +164,7 @@ void                initGlew()
     exit(1);
   }
 }
-auto             initNuklear(GLFWwindow* win) -> struct nk_context*
-{
-  struct nk_context*      ctx = nk_glfw3_init(win, NK_GLFW3_INSTALL_CALLBACKS);
-  struct nk_font_atlas* atlas;
-  nk_glfw3_font_stash_begin(&atlas);
-  nk_glfw3_font_stash_end();
-
-  return ctx;
-}
-Camera            initCamera()
+Camera             initCamera()
 {
   Camera cam;
   cam.fov             = PIf * 0.5f;
@@ -192,7 +185,7 @@ Camera            initCamera()
 
   return cam;
 }
-void             keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+void              keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
   //using namespace glm;
 
@@ -231,7 +224,7 @@ void             keyCallback(GLFWwindow* window, int key, int scancode, int acti
 
   screen.keyCallbackEvent(key, scancode, action, mods);
 }
-void          scrollCallback(GLFWwindow* window, double xofst, double yofst)
+void           scrollCallback(GLFWwindow* window, double xofst, double yofst)
 {
   using namespace std;
   
@@ -247,7 +240,7 @@ void          scrollCallback(GLFWwindow* window, double xofst, double yofst)
 
   screen.scrollCallbackEvent(xofst, yofst);
 }
-void        mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
+void         mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 {
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
 
@@ -265,7 +258,7 @@ void        mouseBtnCallback(GLFWwindow* window, int button, int action, int mod
 
   screen.mouseButtonCallbackEvent(button, action, mods);
 }
-void       cursorPosCallback(GLFWwindow* window, double x, double y)
+void        cursorPosCallback(GLFWwindow* window, double x, double y)
 {
   //using namespace glm;
   const static float _2PI = 2.f* PIf; //  pi<float>();
@@ -289,33 +282,27 @@ void       cursorPosCallback(GLFWwindow* window, double x, double y)
     quat rot;
     decompose(cam.tfm, scale, rot, pos, skew, persp);
     cam.pantfm  =  (mat4)conjugate(rot);
-
-    //set_pos(&cam.pantfm, vec3(0,0,0) );
-    //
-    //cam.tfm     =  lookAt(cam.pos, cam.lookAt, cam.up);
-    //cam.pantfm  =  cam.tfm;
-    //set_pos(&cam.pantfm, vec3(0,0,0) );
   }
 
   cam.oldMousePos = newMousePosition;
 
   screen.cursorPosCallbackEvent(x,y);
 }
-void            charCallback(GLFWwindow* window, unsigned int codepoint)
+void             charCallback(GLFWwindow* window, unsigned int codepoint)
 {
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
 
   screen.charCallbackEvent(codepoint);
 }
-void            dropCallback(GLFWwindow* window, int count, const char** filenames)
+void             dropCallback(GLFWwindow* window, int count, const char** filenames)
 {
   screen.dropCallbackEvent(count, filenames);
 }
-void framebufferSizeCallback(GLFWwindow* window, int w, int h)
+void  framebufferSizeCallback(GLFWwindow* window, int w, int h)
 {
   screen.resizeCallbackEvent(w, h);
 }
-GLFWwindow*       initGLFW(VizData* vd)
+GLFWwindow*          initGLFW(VizData* vd)
 {
   glfwSetErrorCallback(errorCallback);
   if( !glfwInit() ){
@@ -352,7 +339,7 @@ GLFWwindow*       initGLFW(VizData* vd)
 
   return win;
 }
-void           RenderShape(Shape const& shp, mat4 const& m) // GLuint shaderId)
+void              RenderShape(Shape const& shp, mat4 const& m) // GLuint shaderId)
 {
   glUseProgram(shp.shader);  //shader.use();
 
@@ -381,7 +368,7 @@ void           RenderShape(Shape const& shp, mat4 const& m) // GLuint shaderId)
   glBindVertexArray(0);
   glBindTexture(GL_TEXTURE_2D, 0);
 }
-vec_vs      shapesFromKeys(simdb const& db, vec_vs dbKeys, VizData* vd)  // vec<str> const& dbKeys
+vec_vs         shapesFromKeys(simdb const& db, vec_vs dbKeys, VizData* vd)  // vec<str> const& dbKeys
 {
   using namespace std;
 
@@ -411,7 +398,7 @@ vec_vs      shapesFromKeys(simdb const& db, vec_vs dbKeys, VizData* vd)  // vec<
 
   return dbKeys;
 }
-vec_vs    eraseMissingKeys(vec_vs dbKeys, KeyShapes* shps)           // vec<str> dbKeys,
+vec_vs       eraseMissingKeys(vec_vs dbKeys, KeyShapes* shps)           // vec<str> dbKeys,
 {
   int cnt = 0;
   sort( ALL(dbKeys) );
@@ -435,7 +422,7 @@ vec_vs    eraseMissingKeys(vec_vs dbKeys, KeyShapes* shps)           // vec<str>
   return dbKeys;
   //return cnt;
 }
-bool             updateKey(simdb const& db, str const& key, u32 version, VizData* vd)
+bool                updateKey(simdb const& db, str const& key, u32 version, VizData* vd)
 {
   using namespace std;
 
@@ -458,7 +445,7 @@ bool             updateKey(simdb const& db, str const& key, u32 version, VizData
 
   return false;
 }
-double                nowd()
+double                   nowd()
 {
   using namespace std;
   using namespace std::chrono;
@@ -501,7 +488,7 @@ ENTRY_DECLARATION
 
     vd.ui.w             =  1024; 
     vd.ui.h             =   768;
-    vd.ui.bgclr         =  nk_rgb(16,16,16);         // darker than this may risk not seeing the difference between black and the background
+    //vd.ui.bgclr         =  nk_rgb(16,16,16);         // darker than this may risk not seeing the difference between black and the background
     vd.ui.ptSz          =  0.25f;
 
     vd.now              =  nowd();
@@ -528,22 +515,23 @@ ENTRY_DECLARATION
     glfwSwapBuffers(vd.win);
     glfwMakeContextCurrent(vd.win);
 
-    screen.initialize(vd.win, true);
-    screen.setBackground(Color(0.0625f,0.f));                                       //  16 / 256 for a dark background that still leaves enough of a difference to black 
+    screen.initialize(vd.win, false);
+    //screen.setBackground(Color(0.0625f,0.f));                                       //  16 / 256 for a dark background that still leaves enough of a difference to black 
 
     SECTION(sidebar)
     {
       keys   = new FormHelper(&screen);
       keyWin = keys->addWindow(v2i(10,10), "Keys");
+      keyWin->setTooltip("The Keys in the database");
       keys->addGroup("IdxVrt");
       keys->addWidget("label label", new Label(keyWin, "One Key"));
       keys->addButton("Key One", []() { std::cout << "One pressed." << std::endl; });
       keys->addButton("Key Two", []() { std::cout << "Two pressed." << std::endl; });
 
       Theme* thm = keyWin->theme();
-      thm->mTransparent         = v4f( .0f,  .0f,  .0f,   .0f );
-      thm->mWindowFillUnfocused = v4f( .2f,  .2f,  .25f,  .1f );
-      thm->mWindowFillFocused   = v4f( .3f,  .3f,  .25f,  .1f );      
+      thm->mTransparent         = v4f( .0f,  .0f,  .0f,    .0f );
+      thm->mWindowFillUnfocused = v4f( .2f,  .2f,  .225f,  .3f );
+      thm->mWindowFillFocused   = v4f( .3f,  .28f, .275f,  .3f );      
     }
 
     //SECTION(example 2)
@@ -578,7 +566,8 @@ ENTRY_DECLARATION
     //screen.setBackground(Color(0, 0, 0, 0));
 
     Theme* scrnThm = screen.theme();
-    scrnThm->mTransparent = v4f(0,0,0,0);
+    
+    //scrnThm->mTransparent = v4f(0,0,0,0);
     //scrnThm->mWindowFillFocused   = v4f(0,0,0,0);
     //scrnThm->mWindowFillUnfocused = v4f(0,0,0,0);
 
@@ -586,12 +575,12 @@ ENTRY_DECLARATION
     
     //nanogui::mainloop(0);
   }
+
   genTestGeo(&db);
 
   while(!glfwWindowShouldClose(vd.win))
   {
     PRINT_GL_ERRORS
-    glfwPollEvents();                                             /* Input */
 
     SECTION(add the time passed to refresh clocks)
     {
@@ -630,60 +619,31 @@ ENTRY_DECLARATION
     {
       vd.camera.mouseDelta = vec2(0,0);
       vd.camera.btn2Delta  = vec2(0,0);
+      glfwPollEvents();                                             // PollEvents must be done after zeroing out the deltas
       glfwGetWindowSize(vd.win, &vd.ui.w, &vd.ui.h);
+
       PRINT_GL_ERRORS
     }
-    SECTION(nanogui)
-    {
-      v2i   winsz = keyWin->size();
-      v2i keyspos = v2i(screen.width() - winsz.x(), 0);
-      keyWin->setPosition(keyspos);
-      keyWin->setSize(v2i(winsz.x(), screen.height()));
 
-      screen.setWidth(winsz.x());
-
-      SECTION(main loop from nanogui / common.cpp)
-      {
-        int numScreens = 0;
-        for (auto kv : __nanogui_screens) {
-          Screen *screen = kv.second;
-          if (!screen->visible()) {
-            continue;
-          }
-          else if (glfwWindowShouldClose(screen->glfwWindow())) {
-            screen->setVisible(false);
-            continue;
-          }
-
-          screen->drawAll();
-          numScreens++;
-        }
-
-        if (numScreens == 0) {
-          //mainloop_active = false;                          /* Give up if there was nothing to draw */
-          break;
-        }
-      }
-    }
     SECTION(openGL frame setup)
     {
       glViewport(0, 0, vd.ui.w, vd.ui.h);
 
-      glEnable(GL_TEXTURE_2D);
-      glEnable(GL_DEPTH);
+      //glEnable(GL_TEXTURE_2D);
+      //glEnable(GL_DEPTH);
       glEnable(GL_DEPTH_TEST);                                   // glDepthFunc(GL_LESS);
       glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+      PRINT_GL_ERRORS
 
       glEnable(GL_BLEND);
       glLineWidth(vd.ui.ptSz);
       glPointSize(vd.ui.ptSz);
 
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-      float bg[4];
-      nk_color_fv(bg, vd.ui.bgclr);
-      glClearColor(bg[0], bg[1], bg[2], bg[3]);
+      glClearColor(0.0625, 0.0625, 0.0625, 0.0625);
       PRINT_GL_ERRORS
     }
+
     SECTION(render the shapes in VizData::shapes)
     {
       const static auto XAXIS = vec3(1.f, 0.f, 0.f);
@@ -703,9 +663,9 @@ ENTRY_DECLARATION
         mat4    xzmat = rotate(mat4(), ry, YAXIS);
         mat4     ymat = rotate(mat4(), rx, XAXIS);
         vec4        p = vec4(cam.pos, 1.f);
-        cam.pos    =  xzmat * p;
-        vec4 ypos(0, p.y, dst, 1.f);
-        cam.pos.y  = (ymat * ypos).y;
+        cam.pos       =  xzmat * p;
+        vec4     ypos(0, p.y, dst, 1.f);
+        cam.pos.y     = (ymat * ypos).y;
 
         vec3 lookOfst = normalize(cam.pos-cam.lookAt)*dst;
         cam.pos = cam.lookAt + lookOfst;
@@ -737,6 +697,47 @@ ENTRY_DECLARATION
       PRINT_GL_ERRORS
     }
 
+    SECTION(nanogui)
+    {
+      if (keyWin->focused()) {
+        vd.camera.mouseDelta = vec2(0, 0);
+        vd.camera.btn2Delta = vec2(0, 0);
+        vd.camera.leftButtonDown = false;
+        vd.camera.rightButtonDown = false;
+      }
+
+      v2i   winsz = keyWin->size();
+      v2i keyspos = v2i(screen.width() - winsz.x(), 0);
+      keyWin->setPosition(keyspos);
+      keyWin->setSize(v2i(winsz.x(), screen.height()));
+
+      //screen.setWidth(winsz.x());
+      screen.drawContents();
+      screen.drawWidgets();
+
+      //SECTION(main loop from nanogui / common.cpp)
+      //{
+      //  int numScreens = 0;
+      //  for(auto kv : __nanogui_screens){
+      //    Screen *screen = kv.second;
+      //    if(!screen->visible()){
+      //      continue;
+      //    }else if(glfwWindowShouldClose(screen->glfwWindow())){
+      //      screen->setVisible(false);
+      //      continue;
+      //    }
+      //
+      //    screen->drawAll();
+      //    numScreens++;
+      //  }
+      //
+      //  if(numScreens == 0){
+      //    //mainloop_active = false;                          /* Give up if there was nothing to draw */
+      //    break;
+      //  }
+      //}
+    }
+
     glfwSwapBuffers(vd.win);
     PRINT_GL_ERRORS
 
@@ -756,7 +757,25 @@ ENTRY_DECLARATION
 
 
 
+//set_pos(&cam.pantfm, vec3(0,0,0) );
+//
+//cam.tfm     =  lookAt(cam.pos, cam.lookAt, cam.up);
+//cam.pantfm  =  cam.tfm;
+//set_pos(&cam.pantfm, vec3(0,0,0) );
 
+//auto              initNuklear(GLFWwindow* win) -> struct nk_context*
+//{
+//  struct nk_context*      ctx = nk_glfw3_init(win, NK_GLFW3_INSTALL_CALLBACKS);
+//  struct nk_font_atlas* atlas;
+//  nk_glfw3_font_stash_begin(&atlas);
+//  nk_glfw3_font_stash_end();
+//
+//  return ctx;
+//}
+
+//float bg[4];
+//nk_color_fv(bg, vd.ui.bgclr);
+//glClearColor(bg[0], bg[1], bg[2], bg[3]);
 
 //int                sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* shps) // VizData* vd)
 //{

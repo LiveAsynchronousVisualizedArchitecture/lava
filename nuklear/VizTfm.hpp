@@ -140,15 +140,6 @@ inline Shape          ivbuf_to_shape(void* buf, u64 len)    //IndexedVerts* iv)
 
   return move(shp);
 }
-inline auto    winbnd_to_sidebarRect(float w, float h) -> struct nk_rect
-{
-  using namespace std;
-  
-  float sbw = max(192.f, (1/6.f)*w );            // sbw is sidebar width
-  float sbx = w - sbw;                           // sbx is sidebar x position
-  
-  return nk_rect(sbx, 0, sbw, h);    //struct nk_rect rect =
-}
 inline mat4           camera_to_mat4(Camera const& cam, float w, float h)
 {
   //using namespace glm;
@@ -208,6 +199,15 @@ inline vec4         shapes_to_bndsph(VizData const& vd)
 
 
 
+//inline auto    winbnd_to_sidebarRect(float w, float h) -> struct nk_rect
+//{
+//  using namespace std;
+//  
+//  float sbw = max(192.f, (1/6.f)*w );            // sbw is sidebar width
+//  float sbx = w - sbw;                           // sbx is sidebar x position
+//  
+//  return nk_rect(sbx, 0, sbw, h);    //struct nk_rect rect =
+//}
 
 //auto tfm    =  vd.camera.tfm;
 //auto P      =  pos(tfm);
