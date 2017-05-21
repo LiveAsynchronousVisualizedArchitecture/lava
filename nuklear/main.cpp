@@ -10,8 +10,14 @@
 // -todo: set drop, scroll and framebuffer callbacks for nanogui
 // -todo: get release mode to work
 // -todo: look into taking out ui lag
+// -todo: make sidebar
+// -todo: make sidebar the height of the window with a custom width
+// -todo: make background color back to the original dark color
+// -todo: make sidebar stick to the side
+// -todo: make sidebar transparent - already is, make it more transparent
 
-// todo: add fps counter in the corner
+// todo: get keys working on the side as buttons or labels
+// todo: add fps counter in the corner - use nanovg alone?
 // todo: add list of databases to select and/or databases currently open
 // todo: make drop down menu or text field or file dialog for typing in database name
 // todo: add color under cursor like previous visualizer - use the gl get frame like the previous visualizer - check if the cursor is over the gl window first as an optimization? - sort of in but not working
@@ -43,6 +49,7 @@
 // idea: ability to display points of an indexed verts type as numbers - this would give the ability to have numbers floating in space
 
 #include <chrono>
+#include <memory>
 #include <algorithm>
 #include <fstream>
 #include <sstream>
@@ -71,7 +78,7 @@
   #pragma comment(lib, "opengl32.lib")
   //#pragma comment(lib, "glew32.lib")
 
-  //#define USE_CONSOLE                                 // turning this off will use the windows subsystem in the linker and change the entry point to WinMain() so that no command line/console will appear
+  #define USE_CONSOLE                                 // turning this off will use the windows subsystem in the linker and change the entry point to WinMain() so that no command line/console will appear
   #ifndef USE_CONSOLE
     #pragma comment( linker, "/subsystem:windows" )
     #undef ENTRY_DECLARATION
@@ -82,33 +89,43 @@
 #define MAX_VERTEX_BUFFER  512 * 1024
 #define MAX_ELEMENT_BUFFER 128 * 1024
 
-// start nanogui test stuff
 using namespace nanogui;
 
+NAMESPACE_BEGIN(nanogui)
+extern std::map<GLFWwindow *, Screen *> __nanogui_screens;
+NAMESPACE_END(nanogui)
+
+Screen         screen;
+Window*        keyWin = nullptr;
+FormHelper*      keys = nullptr;
+
+// start nanogui test stuff
 enum test_enum {
   Item1 = 0,
   Item2,
   Item3
 };
 
-//Screen*     screen = nullptr;
-Screen      screen;
-FormHelper*    gui = nullptr;
-Window*        win = nullptr;
+using uWindow = std::unique_ptr<nanogui::Window>;
 
-bool       enabled = true;
-bool          bvar = true;
-int           ivar = 12345678;
-double        dvar = 3.1415926;
-float         fvar = (float)dvar;
-std::string strval = "A string";
-test_enum  enumval = Item2;
-Color colval(0.5f, 0.5f, 0.7f, 1.f);
+//Screen*     screen = nullptr;
+//uWindow        keyWin = nullptr;
+FormHelper*       gui = nullptr;
+Window*           win = nullptr;
+bool          enabled = true;
+bool             bvar = true;
+int              ivar = 12345678;
+double           dvar = 3.1415926;
+float            fvar = (float)dvar;
+std::string    strval = "A string";
+test_enum     enumval = Item2;
+Color          colval(0.5f, 0.5f, 0.7f, 1.f);
 // end nanogui test stuff
 
 namespace {
 
 using v2i  =  Eigen::Vector2i;
+using v4f  =  Eigen::Vector4f;
 
 vec3                     pos(mat4 const& m)
 { return m[3];                      }
@@ -518,10 +535,9 @@ ENTRY_DECLARATION
     vd.keyRefreshClock  =  vd.keyRefresh;
     vd.camera           =  initCamera();
   }
-  genTestGeo(&db);
   SECTION(initialize glfw window, glew)
   {
-    vd.win = initGLFW( &vd );                        assert(vd.win!=nullptr);
+    vd.win      = initGLFW( &vd );                        assert(vd.win!=nullptr);
     initGlew();
     vd.shaderId = shadersrc_to_shaderid(vertShader, fragShader);   PRINT_GL_ERRORS
 
@@ -530,47 +546,64 @@ ENTRY_DECLARATION
     PRINT_GL_ERRORS
   }
   SECTION(initialize nanogui)
-  { // everything leaks memory now
-    //nanogui::init();
-    
+  {
     glfwSwapInterval(0);
     glfwSwapBuffers(vd.win);
     glfwMakeContextCurrent(vd.win);
 
-    //screen = new Screen(Vector2i(500, 700), "NanoGUI test");
-    //screen = new Screen();  // Vector2i(500, 700), "NanoGUI test");
     screen.initialize(vd.win, true);
+    screen.setBackground(Color(0.0625f,1.f));                                       //  16 / 256 for a dark background that still leaves enough of a difference to black 
 
-    //FormHelper *gui = new FormHelper(&screen);  // leak
-    gui = new FormHelper(&screen);                // leak
+    SECTION(sidebar)
+    {
+      keys   = new FormHelper(&screen);
+      keyWin = keys->addWindow(v2i(10,10), "Keys");
+      keys->addGroup("IdxVrt");
+      keys->addWidget("label label", new Label(keyWin, "One Key"));
+      keys->addButton("Key One", []() { std::cout << "One pressed." << std::endl; });
+      keys->addButton("Key Two", []() { std::cout << "Two pressed." << std::endl; });
 
-    //ref<Window> window = gui->addWindow(v2i(10, 10), "Form helper example");
-    //auto window = gui->addWindow(v2i(10, 10), "Form helper example");
-    win = gui->addWindow(v2i(10, 10), "Form helper example");
+      Theme* thm = keyWin->theme();
+      thm->mTransparent         = v4f( .0f,  .0f,  .0f,   .0f  );
+      thm->mWindowFillUnfocused = v4f( .2f,  .2f,  .25f,  .05f );
+      thm->mWindowFillFocused   = v4f( .3f,  .3f,  .25f,  .05f );      
+    }
 
-    gui->addGroup("Basic types");
-    gui->addVariable("bool", bvar);
-    gui->addVariable("string", strval);
-
-    gui->addGroup("Validating fields");
-    gui->addVariable("int", ivar)->setSpinnable(true);
-    gui->addVariable("float", fvar);
-    gui->addVariable("double", dvar)->setSpinnable(true);
-
-    gui->addGroup("Complex types");
-    gui->addVariable("Enumeration", enumval, enabled)
-      ->setItems({ "Item 1", "Item 2", "Item 3" });
-    gui->addVariable("Color", colval);
-
-    gui->addGroup("Other widgets");
-    gui->addButton("A button", []() { std::cout << "Button pressed." << std::endl; });
+    //SECTION(example 2)
+    //{
+    //  //FormHelper *gui = new FormHelper(&screen);  // leak
+    //  gui = new FormHelper(&screen);                // leak
+    //
+    //  //ref<Window> window = gui->addWindow(v2i(10, 10), "Form helper example");
+    //  //auto window = gui->addWindow(v2i(10, 10), "Form helper example");
+    //  win = gui->addWindow(v2i(10, 10), "Form helper example");
+    //
+    //  gui->addGroup("Basic types");
+    //  gui->addVariable("bool", bvar);
+    //  gui->addVariable("string", strval);
+    //
+    //  gui->addGroup("Validating fields");
+    //  gui->addVariable("int", ivar)->setSpinnable(true);
+    //  gui->addVariable("float", fvar);
+    //  gui->addVariable("double", dvar)->setSpinnable(true);
+    //
+    //  gui->addGroup("Complex types");
+    //  gui->addVariable("Enumeration", enumval, enabled)
+    //    ->setItems({ "Item 1", "Item 2", "Item 3" });
+    //  gui->addVariable("Color", colval);
+    //
+    //  gui->addGroup("Other widgets");
+    //  gui->addButton("A button", []() { std::cout << "Button pressed." << std::endl; });
+    //}
 
     screen.setVisible(true);
     screen.performLayout();
-   // win->center();
 
-    nanogui::mainloop(6);
+    //win->center();
+    
+    //nanogui::mainloop(0);
   }
+  genTestGeo(&db);
 
   while(!glfwWindowShouldClose(vd.win))
   {
@@ -685,6 +718,36 @@ ENTRY_DECLARATION
       PRINT_GL_ERRORS
     }
 
+    SECTION(nanogui)
+    {
+      v2i   winsz = keyWin->size();
+      v2i keyspos = v2i(screen.width() - winsz.x(), 0);
+      keyWin->setPosition(keyspos);
+      keyWin->setSize(v2i(winsz.x(), screen.height()));
+
+      SECTION(main loop from nanogui/common.cpp)
+      {
+        int numScreens = 0;
+        for(auto kv : __nanogui_screens){
+          Screen *screen = kv.second;
+          if(!screen->visible()){
+            continue;
+          }else if(glfwWindowShouldClose(screen->glfwWindow())){
+            screen->setVisible(false);
+            continue;
+          }
+
+          screen->drawAll();
+          numScreens++;
+        }
+
+        if(numScreens == 0){
+          //mainloop_active = false;                          /* Give up if there was nothing to draw */
+          break;
+        }
+      }
+    }
+
     glfwSwapBuffers(vd.win);
     PRINT_GL_ERRORS
 
@@ -692,8 +755,11 @@ ENTRY_DECLARATION
     glReadPixels( (GLint)(vd.camera.mouseDelta.x), (GLint)(vd.camera.mouseDelta.y), 1, 1, GL_RGB, GL_FLOAT, vd.mouseRGB);
   }
 
-  //nanogui::shutdown();
+  nanogui::shutdown();
   glfwTerminate();
+
+  int a; cin >> a;
+
   return 0;
 }
 
@@ -701,6 +767,23 @@ ENTRY_DECLARATION
 
 
 
+//keyWin->setTheme(new Theme() );
+//thm->mTransparent.w() = 0.1f;
+//thm->mTransparent = v4f(0.9f, 0.9f, 0.9f, 0.9f);
+
+//keyWin = make_unique<Window>(new Window(&screen, "Keys"));
+//keyWin = new Window(&screen, "Keys");
+//keyWin->setEnabled(false);
+//keyWin->setModal(true);
+//keys->add<Label>();
+
+//keyWin->absolutePosition();
+//v2i keyspos = v2i(screen.width(), 0);
+//printf("\nhit\n");
+
+//nanogui::init();
+//screen = new Screen(Vector2i(500, 700), "NanoGUI test");
+//screen = new Screen();  // Vector2i(500, 700), "NanoGUI test");
 
 //glDisable(GL_CLIP_PLANE0);
 //glDisable(GL_CLIP_PLANE1);
