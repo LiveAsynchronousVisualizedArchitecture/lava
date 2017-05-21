@@ -15,7 +15,10 @@
 // -todo: make background color back to the original dark color
 // -todo: make sidebar stick to the side
 // -todo: make sidebar transparent - already is, make it more transparent
+// -todo: figure out reference counting so that files are cleaned up on exit - taken care of by simdb
+// -todo: turn on geometry by default to test openGL rendering - turn nanogui off to test, maybe it is drawing the screen over - works
 
+// todo: get opengl and nanogui to work at the same time - take out nanogui's screen drawing? - set the screen to be smaller?
 // todo: get keys working on the side as buttons or labels
 // todo: add fps counter in the corner - use nanovg alone?
 // todo: add list of databases to select and/or databases currently open
@@ -25,8 +28,9 @@
 // todo: make camera fitting use the field of view and change the dist to fit all geometry - use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
 // todo: put vd.now as a variable loop?
 // todo: make save button or menu to save serialized files 
+// todo: integrate font files as .h files so that .exe is contained with no dependencies
 
-// todo: figure out reference counting so that files are cleaned up on exit
+// todo: make label switches not only turn keys on and off, but fade their transparency too?
 // todo: move and rename project to LavaViz or any non test name
 // todo: put sensitivity into a separate settings struct
 // idea: make IndexedVerts restore without copying bytes? - this would mean that there would need to be a pointer to the head and each member would be pointers filled in on deserialization? 
@@ -92,7 +96,7 @@
 using namespace nanogui;
 
 NAMESPACE_BEGIN(nanogui)
-extern std::map<GLFWwindow *, Screen *> __nanogui_screens;
+  extern std::map<GLFWwindow *, Screen *> __nanogui_screens;
 NAMESPACE_END(nanogui)
 
 Screen         screen;
@@ -110,6 +114,7 @@ using uWindow = std::unique_ptr<nanogui::Window>;
 
 //Screen*     screen = nullptr;
 //uWindow        keyWin = nullptr;
+
 FormHelper*       gui = nullptr;
 Window*           win = nullptr;
 bool          enabled = true;
@@ -347,34 +352,6 @@ GLFWwindow*       initGLFW(VizData* vd)
 
   return win;
 }
-int                sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* shps) // VizData* vd)
-{
-  using namespace std;
-
-  nk_flags window_flags = 0;                 /* window flags */
-  struct nk_panel layout;                    /* popups */
-
-  ctx->style.window.header.align = NK_HEADER_RIGHT;   // header_align;   /* window flags */
-
-  if(ctx->active){
-    memcpy( &ctx->active->bounds, &rect, sizeof(struct nk_rect) );
-  }
-
-  if(nk_begin(ctx, &layout, "Overview", rect, window_flags))
-  //if(nk_group_begin(ctx, &layout, "Overview", window_flags))
-  {
-    nk_layout_row_static(ctx, 18, (int)(rect.w-25.f), 1);
-    //nk_layout_row_static(ctx, 18, 120, 1);
-    for(auto& kv : *shps){
-      if(kv.first.length()>0)
-        nk_selectable_label(ctx, kv.first.c_str(), NK_TEXT_RIGHT, &kv.second.active);
-    }
-    //nk_group_end(ctx);
-  }
-  nk_end(ctx);
-
-  return !nk_window_is_closed(ctx, "Overview");
-}
 void           RenderShape(Shape const& shp, mat4 const& m) // GLuint shaderId)
 {
   glUseProgram(shp.shader);  //shader.use();
@@ -417,8 +394,8 @@ vec_vs      shapesFromKeys(simdb const& db, vec_vs dbKeys, VizData* vd)  // vec<
       continue;
     }
 
-    u32    vlen = 0;
-    u32 version = 0;
+    u32     vlen = 0;
+    u32  version = 0;
     auto     len = db.len(vs.str.data(), (u32)vs.str.length(), &vlen, &version);          // todo: make ui64 as the input length
     vs.ver = version;
 
@@ -552,7 +529,7 @@ ENTRY_DECLARATION
     glfwMakeContextCurrent(vd.win);
 
     screen.initialize(vd.win, true);
-    screen.setBackground(Color(0.0625f,1.f));                                       //  16 / 256 for a dark background that still leaves enough of a difference to black 
+    screen.setBackground(Color(0.0625f,0.f));                                       //  16 / 256 for a dark background that still leaves enough of a difference to black 
 
     SECTION(sidebar)
     {
@@ -564,9 +541,9 @@ ENTRY_DECLARATION
       keys->addButton("Key Two", []() { std::cout << "Two pressed." << std::endl; });
 
       Theme* thm = keyWin->theme();
-      thm->mTransparent         = v4f( .0f,  .0f,  .0f,   .0f  );
-      thm->mWindowFillUnfocused = v4f( .2f,  .2f,  .25f,  .05f );
-      thm->mWindowFillFocused   = v4f( .3f,  .3f,  .25f,  .05f );      
+      thm->mTransparent         = v4f( .0f,  .0f,  .0f,   .0f );
+      thm->mWindowFillUnfocused = v4f( .2f,  .2f,  .25f,  .1f );
+      thm->mWindowFillFocused   = v4f( .3f,  .3f,  .25f,  .1f );      
     }
 
     //SECTION(example 2)
@@ -595,9 +572,15 @@ ENTRY_DECLARATION
     //  gui->addGroup("Other widgets");
     //  gui->addButton("A button", []() { std::cout << "Button pressed." << std::endl; });
     //}
-
+    
     screen.setVisible(true);
     screen.performLayout();
+    //screen.setBackground(Color(0, 0, 0, 0));
+
+    Theme* scrnThm = screen.theme();
+    scrnThm->mTransparent = v4f(0,0,0,0);
+    //scrnThm->mWindowFillFocused   = v4f(0,0,0,0);
+    //scrnThm->mWindowFillUnfocused = v4f(0,0,0,0);
 
     //win->center();
     
@@ -650,10 +633,42 @@ ENTRY_DECLARATION
       glfwGetWindowSize(vd.win, &vd.ui.w, &vd.ui.h);
       PRINT_GL_ERRORS
     }
+    SECTION(nanogui)
+    {
+      v2i   winsz = keyWin->size();
+      v2i keyspos = v2i(screen.width() - winsz.x(), 0);
+      keyWin->setPosition(keyspos);
+      keyWin->setSize(v2i(winsz.x(), screen.height()));
+
+      screen.setWidth(winsz.x());
+
+      SECTION(main loop from nanogui / common.cpp)
+      {
+        int numScreens = 0;
+        for (auto kv : __nanogui_screens) {
+          Screen *screen = kv.second;
+          if (!screen->visible()) {
+            continue;
+          }
+          else if (glfwWindowShouldClose(screen->glfwWindow())) {
+            screen->setVisible(false);
+            continue;
+          }
+
+          screen->drawAll();
+          numScreens++;
+        }
+
+        if (numScreens == 0) {
+          //mainloop_active = false;                          /* Give up if there was nothing to draw */
+          break;
+        }
+      }
+    }
     SECTION(openGL frame setup)
     {
       glViewport(0, 0, vd.ui.w, vd.ui.h);
-            
+
       glEnable(GL_TEXTURE_2D);
       glEnable(GL_DEPTH);
       glEnable(GL_DEPTH_TEST);                                   // glDepthFunc(GL_LESS);
@@ -710,6 +725,10 @@ ENTRY_DECLARATION
       SECTION(draw shapes)
       {
         for(auto& kv : vd.shapes){
+          kv.second.active = true;
+        }
+
+        for(auto& kv : vd.shapes){
           if(kv.second.active)
             RenderShape(kv.second, viewProj);
         }
@@ -718,47 +737,17 @@ ENTRY_DECLARATION
       PRINT_GL_ERRORS
     }
 
-    SECTION(nanogui)
-    {
-      v2i   winsz = keyWin->size();
-      v2i keyspos = v2i(screen.width() - winsz.x(), 0);
-      keyWin->setPosition(keyspos);
-      keyWin->setSize(v2i(winsz.x(), screen.height()));
-
-      SECTION(main loop from nanogui/common.cpp)
-      {
-        int numScreens = 0;
-        for(auto kv : __nanogui_screens){
-          Screen *screen = kv.second;
-          if(!screen->visible()){
-            continue;
-          }else if(glfwWindowShouldClose(screen->glfwWindow())){
-            screen->setVisible(false);
-            continue;
-          }
-
-          screen->drawAll();
-          numScreens++;
-        }
-
-        if(numScreens == 0){
-          //mainloop_active = false;                          /* Give up if there was nothing to draw */
-          break;
-        }
-      }
-    }
-
     glfwSwapBuffers(vd.win);
     PRINT_GL_ERRORS
 
     // todo: mouse position goes here to read back the color under the mouse 
-    glReadPixels( (GLint)(vd.camera.mouseDelta.x), (GLint)(vd.camera.mouseDelta.y), 1, 1, GL_RGB, GL_FLOAT, vd.mouseRGB);
+    //glReadPixels( (GLint)(vd.camera.mouseDelta.x), (GLint)(vd.camera.mouseDelta.y), 1, 1, GL_RGB, GL_FLOAT, vd.mouseRGB);
   }
 
   nanogui::shutdown();
   glfwTerminate();
 
-  int a; cin >> a;
+  //int a; cin >> a;
 
   return 0;
 }
@@ -766,6 +755,37 @@ ENTRY_DECLARATION
 
 
 
+
+
+
+//int                sidebar(struct nk_context *ctx, struct nk_rect rect, KeyShapes* shps) // VizData* vd)
+//{
+//  using namespace std;
+//
+//  nk_flags window_flags = 0;                 /* window flags */
+//  struct nk_panel layout;                    /* popups */
+//
+//  ctx->style.window.header.align = NK_HEADER_RIGHT;   // header_align;   /* window flags */
+//
+//  if(ctx->active){
+//    memcpy( &ctx->active->bounds, &rect, sizeof(struct nk_rect) );
+//  }
+//
+//  if(nk_begin(ctx, &layout, "Overview", rect, window_flags))
+//  //if(nk_group_begin(ctx, &layout, "Overview", window_flags))
+//  {
+//    nk_layout_row_static(ctx, 18, (int)(rect.w-25.f), 1);
+//    //nk_layout_row_static(ctx, 18, 120, 1);
+//    for(auto& kv : *shps){
+//      if(kv.first.length()>0)
+//        nk_selectable_label(ctx, kv.first.c_str(), NK_TEXT_RIGHT, &kv.second.active);
+//    }
+//    //nk_group_end(ctx);
+//  }
+//  nk_end(ctx);
+//
+//  return !nk_window_is_closed(ctx, "Overview");
+//}
 
 //keyWin->setTheme(new Theme() );
 //thm->mTransparent.w() = 0.1f;
