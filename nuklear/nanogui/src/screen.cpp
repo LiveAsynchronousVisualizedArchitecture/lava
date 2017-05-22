@@ -627,11 +627,11 @@ bool Screen::resizeCallbackEvent(int, int) {
     }
 }
 
-void Screen::updateFocus(Widget *widget) {
-    for (auto w: mFocusPath) {
-        if (!w->focused())
-            continue;
-        w->focusEvent(false);
+void Screen::updateFocus(Widget *widget){
+    for(auto w: mFocusPath) {
+      if(!w || !w->parent() || !w->focused()) continue;            // sbassett - if the widget is deleted, can this be called with a nullptr?
+      
+      w->focusEvent(false);
     }
     mFocusPath.clear();
     Widget *window = nullptr;

@@ -6,32 +6,13 @@
 #ifndef __VIZ_DATA_STRUCTURES_HEADERGUARD_HPP__
 #define __VIZ_DATA_STRUCTURES_HEADERGUARD_HPP__
 
-//#ifdef _MSC_VER
-//  #define _CRT_SECURE_NO_WARNINGS 1
-//  #define _SCL_SECURE_NO_WARNINGS 1
-//#endif
-
 #include <map>
 #include "GL/glew.h"
 #include "glm/glm.hpp"
 
-//#define NK_INCLUDE_FIXED_TYPES
-//#define NK_INCLUDE_STANDARD_IO
-//#define NK_INCLUDE_STANDARD_VARARGS
-//#define NK_INCLUDE_DEFAULT_ALLOCATOR
-//#define NK_INCLUDE_VERTEX_BUFFER_OUTPUT
-//#define NK_INCLUDE_FONT_BAKING
-//#define NK_INCLUDE_DEFAULT_FONT
-//#define NK_IMPLEMENTATION
-//#define NK_GLFW_GL3_IMPLEMENTATION
-//#include "nuklear.h"
-//#include "nuklear_glfw_gl3.h"
-
 #include "../DataStore/ConcurrentMap/simdb.hpp"
 #include "IndexedVerts.h"
 
-//enum struct AttribId { POSITION=0, NORMAL, COLOR, TEXCOORD };
-//enum struct AtrId : GLuint { POSITION=0, NORMAL=1, COLOR=2, TEXCOORD=3 };  // this coresponds to the the Vertex struct in IndexedVerts
 enum AtrId : GLuint { POSITION=0, NORMAL=1, COLOR=2, TEXCOORD=3 };  // this coresponds to the the Vertex struct in IndexedVerts
 
 template<class T, class A=std::allocator<T> > using vec = std::vector<T, A>;  // will need C++ ifdefs eventually
@@ -40,9 +21,9 @@ using   i8     =    int8_t;
 using   u8     =   uint8_t;
 using  u32     =  uint32_t;
 using  u64     =  uint64_t;
+using  i32     =   int32_t;
 using  i64     =   int64_t;
 using  au64    =  std::atomic<u64>;
-using  u32     =  uint32_t;
 using  f32     =  float;
 using  f64     =  double;
 using  str     =  std::string;
@@ -58,7 +39,10 @@ using  glm::rotate;
 using  glm::length;
 
 using vec_vs  =  std::vector<VerStr>;
+using vecstr  =  std::vector<str>;
 using   vecb  =  std::vector<bool>;
+using   vecu  =  std::vector<u32>;
+using   veci  =  std::vector<i32>;
 
 struct Shape {                     // todo: make rvalue constructor - make all constructors?
 private:
@@ -210,6 +194,25 @@ static VizData  vd;
 
 
 
+//enum struct AttribId { POSITION=0, NORMAL, COLOR, TEXCOORD };
+//enum struct AtrId : GLuint { POSITION=0, NORMAL=1, COLOR=2, TEXCOORD=3 };  // this coresponds to the the Vertex struct in IndexedVerts
+
+//#ifdef _MSC_VER
+//  #define _CRT_SECURE_NO_WARNINGS 1
+//  #define _SCL_SECURE_NO_WARNINGS 1
+//#endif
+
+//#define NK_INCLUDE_FIXED_TYPES
+//#define NK_INCLUDE_STANDARD_IO
+//#define NK_INCLUDE_STANDARD_VARARGS
+//#define NK_INCLUDE_DEFAULT_ALLOCATOR
+//#define NK_INCLUDE_VERTEX_BUFFER_OUTPUT
+//#define NK_INCLUDE_FONT_BAKING
+//#define NK_INCLUDE_DEFAULT_FONT
+//#define NK_IMPLEMENTATION
+//#define NK_GLFW_GL3_IMPLEMENTATION
+//#include "nuklear.h"
+//#include "nuklear_glfw_gl3.h"
 
 //using  KeyShapes = map<VerStr, Shape>;
 //

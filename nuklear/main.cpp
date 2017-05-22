@@ -26,7 +26,6 @@
 
 */
 
-
 // -todo: compile with nanogui
 // -todo: take out nuklear 
 // -todo: make initital nanogui window
@@ -56,10 +55,16 @@
 // -todo: add apache and bsd licenses
 // -todo: add color under cursor like previous visualizer - use the gl get frame like the previous visualizer - check if the cursor is over the gl window first as an optimization? - sort of in but not working
 // -todo: put vd.now as a variable loop? - isn't broke, don't fix
+// -todo: change to saving indices of buttons and the combo box, so that deleting is done by index instead of in bulk
+// -todo: integrate combo box into key list
 
-// todo: change to saving indices of buttons and the combo box, so that deleting is done by index instead of in bulk
-// todo: integrate combo box into key list
+// todo: fix crash on focus event while db list is open
+// todo: make database listing stick
+// todo: make database listing actually change on selection
+// todo: put actual db listing into db menu
 // todo: make combo box callback list the dbs
+// todo: make the sidebar re-layout on data base selection
+// todo: organize nanogui globals into global states
 // todo: add list of databases to select  -  add list of databases currently open?
 // todo: make drop down menu or text field or file dialog for typing in database name
 // todo: make save button or menu to save serialized files 
@@ -108,8 +113,6 @@
 #include "glfw3.h"
 
 #include <nanogui/nanogui.h>
-//#define NANOVG_GL3_IMPLEMENTATION
-//#include <nanovg_gl.h>
 
 #include "VizData.hpp"
 #include "VizGen.hpp"
@@ -141,6 +144,8 @@ BoxLayout*     keyLay = nullptr;
 ComboBox*       dbLst = nullptr;
 int          dbLstIdx = -1;
 NVGcontext*       nvg = nullptr;
+veci           dbIdxs;
+vecstr        dbNames;
 
 FormHelper*      keys = nullptr;
 f64 avgFps=60,prevt=0,cpuTime=0, t=0, dt=0;
@@ -191,10 +196,7 @@ float        wrapAngleRadians(float angle)
 
   return fmodf(angle, _2PI);
 }
-void            errorCallback(int e, const char *d) {
-  printf("Error %d: %s\n", e, d);
-  fflush(stdout);
-}
+
 void                 initGlew()
 {
   //glewExperimental = 1;
@@ -223,6 +225,11 @@ Camera             initCamera()
   cam.farClip         = 1000.0f;
 
   return cam;
+}
+
+void            errorCallback(int e, const char *d) {
+  printf("Error %d: %s\n", e, d);
+  fflush(stdout);
 }
 void              keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -378,9 +385,18 @@ GLFWwindow*          initGLFW(VizData* vd)
 
   return win;
 }
+
 void           buttonCallback(str key, bool pushed)
 {
   vd.shapes[key].active = pushed;
+}
+void            dbLstCallback(bool pressed)
+{
+  if(pressed){
+    dbNames = simdb_listDBs();                                         // all of these are globals
+    if(dbLst){ dbLst->setItems(dbNames); }
+    screen.performLayout();
+  }
 }
 void              RenderShape(Shape const& shp, mat4 const& m) // GLuint shaderId)
 {
@@ -564,10 +580,34 @@ ENTRY_DECLARATION
 
       SECTION(sidebar)
       {
-        //keys   = new FormHelper(&screen);
-        keyWin = new Window(&screen, "");
-        keyLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 5, 5);
+        keyLay     = new BoxLayout(Orientation::Vertical, Alignment::Fill, 2, 5);
+        keyWin     = new Window(&screen, "");
+        auto spcr1 = new nanogui::Label(keyWin, "");
+        auto spcr2 = new nanogui::Label(keyWin, "");
+        auto spcr3 = new nanogui::Label(keyWin, "");
+        dbLst      = new ComboBox(keyWin);
+        dbLst->setChangeCallback( dbLstCallback );
+        dbLstCallback(true);
+        dbLst->setCallback([](int i) {                                          // callback for the actual selection
+          screen.performLayout();
+          printf(" selected %d \n",i); 
+        });
+        //dbLst = new ComboBox(keyWin, { "  simdb_test  ", "  simdb_viz  ", "  simdb_run  " });
+        //dbLst->setChangeCallback([](bool pressed){
+        //  if(pressed){
+        //    dbNames = simdb_listDBs();                                         // all of these are globals
+        //    dbLst->setItems(dbNames);
+        //    screen.performLayout();
+        //  }
+        //  //printf(" pressed: %d \n", pressed); 
+        //});
+        auto spcr4 = new nanogui::Label(keyWin, "");
+        auto spcr5 = new nanogui::Label(keyWin, "");
+        auto spcr6 = new nanogui::Label(keyWin, "");
+
+        dbLstIdx = keyWin->childIndex(dbLst);                                  // only done once so not a problem even though it is a linear search
         keyWin->setLayout(keyLay);
+        dbLst->setSide(Popup::Left);
 
         Theme* thm = keyWin->theme();
         thm->mTransparent         = v4f( .0f,  .0f,  .0f,    .0f );
@@ -575,25 +615,8 @@ ENTRY_DECLARATION
         thm->mWindowFillFocused   = v4f( .3f,  .28f, .275f,  .3f );
       }
 
-      SECTION(db selector)
-      {
-             dbWin = new Window(&screen, "Keys");
-        auto dbLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 5, 5);
-        dbWin->setLayout(keyLay);
-
-        auto dbPth = new TextBox(dbWin, "simdb_");
-        //auto dbLst = new ComboBox(dbWin, { "simdb_test", "simdb_viz", "simdb_run" } );
-        //auto dbSel = new nanogui::detail::FormWidget(dbWin);
-        //dbWin->addGroup("Complex types");
-        //  gui->addVariable("Enumeration", enumval, enabled)
-        //    ->setItems({ "Item 1", "Item 2", "Item 3" });
-        //  gui->addVariable("Color", colval);
-      }
-
       screen.setVisible(true);
       screen.performLayout();
-
-      dbWin->center();
     }
     SECTION(nanovg)
     {
@@ -632,22 +655,19 @@ ENTRY_DECLARATION
     SECTION(database)
     {
       if( vd.keyRefreshClock > vd.keyRefresh ){
-        auto dbKeys = db.getKeyStrs();                              // Get all keys in DB - this will need to be ran in the main loop, but not every frame
+        auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
         dbKeys      = shapesFromKeys(db, move(dbKeys), &vd);
         dbKeys      = eraseMissingKeys(move(dbKeys), &vd.shapes);
-
-        if(dbLst){ 
-          dbLst->setPushed(false);
-          dbLst->setVisible(false);
-        }
-
-        keyWin->removeChild(dbLst);
-
-        keyWin->removeChildren();
-        dbLst = new ComboBox(keyWin, { "simdb_test", "simdb_viz", "simdb_run" });
-        dbLst->setSide(Popup::Left);
-        for(auto key : dbKeys){
+        
+        sort( ALL(dbIdxs) );                                                // sort the indices so the largest are removed first and the smaller indices don't change their position
+        FROM(dbIdxs.size(),i){ keyWin->removeChild(dbIdxs[i]); }
+        dbIdxs.resize(0);
+        dbIdxs.shrink_to_fit();
+        for(auto key : dbKeys)                                              // add the buttons back and keep track of their indices
+        {
           auto b = new Button(keyWin, key.str);
+          int  i = keyWin->childIndex(b);
+          if(i > -1){ dbIdxs.push_back(i); }
           b->setFlags(Button::ToggleButton);
           b->setChangeCallback( [k=key.str](bool pushed){ buttonCallback(k,pushed); } );
           b->setPushed(vd.shapes[key.str].active);
@@ -658,7 +678,7 @@ ENTRY_DECLARATION
         vd.keyRefreshClock -= vd.keyRefresh;
         vd.verRefreshClock -= vd.verRefresh;
 
-        if(vd.keyRefreshClock > vd.keyRefresh)                 // if there is already enough time saved up for another update make sure that less that two updates worth of time is kept 
+        if(vd.keyRefreshClock > vd.keyRefresh)                                 // if there is already enough time saved up for another update make sure that less that two updates worth of time is kept 
           vd.keyRefreshClock = vd.keyRefresh + fmod(vd.keyRefreshClock, vd.keyRefresh);
       }else if( vd.verRefreshClock > vd.verRefresh ){
         for(auto& kv : vd.shapes){
@@ -668,7 +688,7 @@ ENTRY_DECLARATION
         }
         vd.verRefreshClock -= vd.verRefresh;
 
-        if(vd.verRefreshClock > vd.verRefresh)                 // if there is already enough time saved up for another update make sure that less that two updates worth of time is kept 
+        if(vd.verRefreshClock > vd.verRefresh)                                // if there is already enough time saved up for another update make sure that less that two updates worth of time is kept 
           vd.verRefreshClock = vd.verRefresh + fmod(vd.verRefreshClock, vd.verRefresh);
       } // end of updates to shapes 
       PRINT_GL_ERRORS
@@ -837,6 +857,40 @@ ENTRY_DECLARATION
 
 
 
+//#define NANOVG_GL3_IMPLEMENTATION
+//#include <nanovg_gl.h>
+
+//SECTION(db selector)
+//{
+//}
+//
+//dbWin->center();
+
+//auto dbLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 5, 5);
+//dbWin      = new Window(&screen, "Keys");
+//
+//dbWin->setLayout(keyLay);
+//
+//auto dbPth = new TextBox(dbWin, "simdb_");
+
+//if(dbLst){ 
+//  dbLst->setPushed(false);
+//  dbLst->setVisible(false);
+//}
+//
+//keyWin->removeChild(dbLst);
+//keyWin->removeChildren();
+//
+//for(auto i : dbIdxs){ keyWin->removeChild(i); }
+
+//keys   = new FormHelper(&screen);
+//
+//auto dbLst = new ComboBox(dbWin, { "simdb_test", "simdb_viz", "simdb_run" } );
+//auto dbSel = new nanogui::detail::FormWidget(dbWin);
+//dbWin->addGroup("Complex types");
+//  gui->addVariable("Enumeration", enumval, enabled)
+//    ->setItems({ "Item 1", "Item 2", "Item 3" });
+//  gui->addVariable("Color", colval);
 
 //NAMESPACE_BEGIN(nanogui)
 //  extern std::map<GLFWwindow *, Screen *> __nanogui_screens;

@@ -55,7 +55,8 @@ This file is meant to be made up of utilities that avoid using the C runtime
 #define           ALL(collection) collection.begin(), collection.end()
 #define            TO(to, var) for(std::remove_const<decltype(to)>::type var = 0; var < to; ++var)
 #define         RANGE(st, to, var)  for(std::remove_const<decltype(to)>::type var = st; var < to; ++var)
-#define          FROM(from, var) for(std::remove_const<decltype(from)>::type var = from-1; var >= decltype(from)(0); --var )
+//#define          FROM(from, var) for(std::remove_const<decltype(from)>::type var = from-1; var >= decltype(from)(0); --var )  // doesn't work when 'from' is an unsigned integer set to 0
+#define          FROM(from, var) std::remove_const<decltype(from)>::type var = from; while(var-- > 0)
 #define       SECTION(_msvc_only_collapses_macros_with_arguments, ...)
 #define LONGSTR_MACRO(src)  #src
 

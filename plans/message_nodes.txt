@@ -14,4 +14,9 @@ sending messages means:
 |  Decrementing references must happen by the thread after it is finished with the incoming data
 
 
+is there value in a message passing node optionally being a state machine 
+|  constructed visually
+|  more constraints 
+|  more checks
+
 
