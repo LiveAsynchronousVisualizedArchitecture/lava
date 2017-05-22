@@ -1173,7 +1173,8 @@ public:
       if(vi.idx < DELETED){break;}
       idx = (idx+1) % m_sz;                                             // don't increment idx above since break comes before it here
 
-      if(idx==stIdx) return SLOT_END;
+      if(idx==stIdx)
+        return SLOT_END;
     }while(true);
 
     return  idx;
@@ -1528,7 +1529,7 @@ public:
       s_cnt->store(1);
     }else{
       #if defined(_WIN32)                                          // do we need to spin until ready on windows? unix has file locks built in to the system calls
-        while(s_flags->load()<1){continue;}
+        //while(s_flags->load()<1){continue;}
       #endif
       s_cnt->fetch_add(1);
       m_mem.size = MemSize(s_blockSize->load(), s_blockCount->load());
@@ -1685,7 +1686,7 @@ public:
     u32      cur = s_ch.prevIdx((u32)(inxt));
 
     if(searched){
-      *searched = (inxt-prev)>=0?  inxt-prev-1  :  (m_blkCnt-prev)+inxt;   //(m_blkCnt-prev-1) + inxt+1;
+      *searched = (inxt-prev-1)>0?  inxt-prev-1  :  (m_blkCnt-prev)+inxt;   //(m_blkCnt-prev-1) + inxt+1;
     }
     if(viNxt.idx>=DELETED){ return {viNxt.version, ""}; }
     

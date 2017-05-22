@@ -63,14 +63,20 @@
 // -todo: make combo box callback list the dbs
 // -todo: make the sidebar re-layout on data base selection
 // -todo: take out simdb_ prefix from database list
+// -todo: add list of databases to select  
+// -todo: make drop down menu or text field or file dialog for typing in database name - not neccesary due to listing databases and different UI approach
+// -todo: is it possible to turn off vertical sync? is it possible to skip the buffer swap if not enough time has passed? - swap interval is set to 0, probably good enough for now to avoid a rabbit hole
+// -todo: add list of databases currently open - only one currently open
+// -todo: test switching between two different databases
+// -todo: change font to normal and not bold for fps and color scanner
+// -todo: make separate database referesh function that can be called on a switch, but also subtracts time from the refresh counter
 
-// todo: is it possible to turn off vertical sync? is it possible to skip the buffer swap if not enough time has passed?
+// todo: make simdb_listDBs return unprefixed names
+// todo: fix refresh of db to not mangle names
 // todo: fix crash on focus event while db list is open
 // todo: organize nanogui globals into global states
-// todo: add list of databases to select  -  add list of databases currently open?
-// todo: make drop down menu or text field or file dialog for typing in database name
-// todo: make save button or menu to save serialized files 
 // todo: integrate font files as .h files so that .exe is contained with no dependencies
+// todo: make save button or menu to save serialized files 
 // todo: write visualizer overview for Readme.md  
 // todo: make camera fitting use the field of view and change the dist to fit all geometry - use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
 
@@ -173,7 +179,7 @@ test_enum     enumval = Item2;
 Color          colval(0.5f, 0.5f, 0.7f, 1.f);
 // end nanogui test stuff
 
-namespace {
+namespace {  // functions that are a transform from one datatype to another are in VizTfm.hpp - functions here are more state based
 
 using v2i  =  Eigen::Vector2i;
 using v4f  =  Eigen::Vector4f;
@@ -201,6 +207,7 @@ float        wrapAngleRadians(float angle)
 
 void                initSimDB(str const& name)
 {
+  db.close();
   new (&db) simdb(name.c_str(), 4096, 1 << 14);             // inititialize the DB with placement new into the data segment
 }
 void                 initGlew()
@@ -399,14 +406,15 @@ void           buttonCallback(str key, bool pushed)
 void            dbLstCallback(bool pressed)
 {
   if(pressed){
-    dbNames = simdb_listDBs();                                         // all of these are globals
+    dbNames = simdbNames_to_name(simdb_listDBs());                                         // all of these are globals
     if(dbLst){ 
-      vecstr names = simdbNames_to_name(move(dbNames));
-      dbLst->setItems(names);
+      //vecstr names = dbNames;
+      dbLst->setItems(dbNames);
     }
     screen.performLayout();
   }
 }
+
 void              RenderShape(Shape const& shp, mat4 const& m) // GLuint shaderId)
 {
   glUseProgram(shp.shader);  //shader.use();
@@ -522,12 +530,46 @@ double                   nowd()
 
   return nano.count() / 1000000000.0; 
 }
+void                refreshDB(VizData* vd)
+{
+  auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
+  dbKeys      = shapesFromKeys(db, move(dbKeys), vd);
+  dbKeys      = eraseMissingKeys(move(dbKeys), &vd->shapes);
+
+  sort(ALL(dbIdxs));                                                  // sort the indices so the largest are removed first and the smaller indices don't change their position
+  FROM(dbIdxs.size(), i){ keyWin->removeChild(dbIdxs[i]); }
+  dbIdxs.resize(0);
+  dbIdxs.shrink_to_fit();
+  for(auto key : dbKeys)                                              // add the buttons back and keep track of their indices
+  {
+    auto b = new Button(keyWin, key.str);
+    int  i = keyWin->childIndex(b);
+    if(i > -1){ dbIdxs.push_back(i); }
+    b->setFlags(Button::ToggleButton);
+    b->setChangeCallback([k = key.str](bool pushed){ buttonCallback(k, pushed); });
+    b->setPushed(vd->shapes[key.str].active);
+    b->setFixedHeight(25);
+  }
+  screen.performLayout();
+
+  vd->keyRefreshClock -= vd->keyRefresh;
+  vd->verRefreshClock -= vd->verRefresh;
+
+  if(vd->keyRefreshClock > vd->keyRefresh){                           // if there is already enough time saved up for another update make sure that less that two updates worth of time is kept 
+    vd->keyRefreshClock = vd->keyRefresh + fmod(vd->keyRefreshClock, vd->keyRefresh);
+  }
+}
 
 }
 
 void       genTestGeo(simdb* db)
 {
   using namespace std;
+  
+  static simdb db1("test 1", 4096, 1 << 14);
+  static simdb db2("test 2", 4096, 1 << 14);
+
+  // new (&db2) simdb(name.c_str(), 4096, 1 << 14);             // inititialize the DB with placement new into the data segment
 
   initSimDB("Viz Default");
 
@@ -545,6 +587,15 @@ void       genTestGeo(simdb* db)
   db->put(leftTriangle, leftData);
   db->put(rightTriangle, rightData);
   db->put(cube, cubeData);
+
+  db1.put("1", leftData);
+  db1.put("2", rightData);
+  db1.put("3", cubeData);
+
+  db2.put("one",    leftData);
+  db2.put("two",   rightData);
+  db2.put("three",  cubeData);
+
 }
 
 ENTRY_DECLARATION
@@ -563,7 +614,7 @@ ENTRY_DECLARATION
       vd.ui.w             = 1024; 
       vd.ui.h             =  768;
       vd.ui.ptSz          =    0.25f;
-      vd.ui.hudSz         =   20.0f;
+      vd.ui.hudSz         =   16.0f;
 
       vd.now              =  nowd();
       vd.prev             =  vd.now;
@@ -580,15 +631,14 @@ ENTRY_DECLARATION
       vd.shaderId = shadersrc_to_shaderid(vertShader, fragShader);   PRINT_GL_ERRORS
 
       glfwSetWindowUserPointer(vd.win, &vd);
+      glfwSwapInterval(0);
+      glfwSwapBuffers(vd.win);
+      glfwMakeContextCurrent(vd.win);
 
       PRINT_GL_ERRORS
     }
     SECTION(nanogui)
     {
-      glfwSwapInterval(0);
-      glfwSwapBuffers(vd.win);
-      glfwMakeContextCurrent(vd.win);
-
       screen.initialize(vd.win, false);
 
       SECTION(sidebar)
@@ -604,9 +654,10 @@ ENTRY_DECLARATION
         dbLst->setCallback([](int i){                                          // callback for the actual selection
           if(i < dbNames.size()){
             initSimDB(dbNames[i]);
+            refreshDB(&vd);
           }
           screen.performLayout();
-          printf(" selected %d \n",i); 
+          printf(" selected %d \n",i);
         });
         auto spcr4 = new nanogui::Label(keyWin, "");
         auto spcr5 = new nanogui::Label(keyWin, "");
@@ -632,7 +683,8 @@ ENTRY_DECLARATION
         printf("Could not init nanovg.\n");
         return -1;
       }
-      int font = nvgCreateFont(nvg, "sans-bold", "Roboto-Bold.ttf");
+                 nvgCreateFont(nvg, "sans",      "Roboto-Regular.ttf" );
+      int font = nvgCreateFont(nvg, "sans-bold", "Roboto-Bold.ttf"    );
       if(font == -1){
         printf("Could not add font bold.\n");
         return -1;
@@ -659,42 +711,9 @@ ENTRY_DECLARATION
     }
     SECTION(database)
     {
-      if( vd.keyRefreshClock > vd.keyRefresh ){
-        auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
-        dbKeys      = shapesFromKeys(db, move(dbKeys), &vd);
-        dbKeys      = eraseMissingKeys(move(dbKeys), &vd.shapes);
-        
-        sort( ALL(dbIdxs) );                                                // sort the indices so the largest are removed first and the smaller indices don't change their position
-        FROM(dbIdxs.size(),i){ keyWin->removeChild(dbIdxs[i]); }
-        dbIdxs.resize(0);
-        dbIdxs.shrink_to_fit();
-        for(auto key : dbKeys)                                              // add the buttons back and keep track of their indices
-        {
-          auto b = new Button(keyWin, key.str);
-          int  i = keyWin->childIndex(b);
-          if(i > -1){ dbIdxs.push_back(i); }
-          b->setFlags(Button::ToggleButton);
-          b->setChangeCallback( [k=key.str](bool pushed){ buttonCallback(k,pushed); } );
-          b->setPushed(vd.shapes[key.str].active);
-          b->setFixedHeight(25);
-        }
-        screen.performLayout();
-
-        vd.keyRefreshClock -= vd.keyRefresh;
-        vd.verRefreshClock -= vd.verRefresh;
-
-        if(vd.keyRefreshClock > vd.keyRefresh)                                 // if there is already enough time saved up for another update make sure that less that two updates worth of time is kept 
-          vd.keyRefreshClock = vd.keyRefresh + fmod(vd.keyRefreshClock, vd.keyRefresh);
-      }else if( vd.verRefreshClock > vd.verRefresh ){
-        for(auto& kv : vd.shapes){
-          if(kv.second.active){
-            updateKey(db, kv.first, kv.second.version, &vd);
-          }
-        }
-        vd.verRefreshClock -= vd.verRefresh;
-
-        if(vd.verRefreshClock > vd.verRefresh)                                // if there is already enough time saved up for another update make sure that less that two updates worth of time is kept 
-          vd.verRefreshClock = vd.verRefresh + fmod(vd.verRefreshClock, vd.verRefresh);
+      if(vd.keyRefreshClock > vd.keyRefresh)
+      {
+        refreshDB(&vd);
       } // end of updates to shapes 
       PRINT_GL_ERRORS
     }
@@ -802,22 +821,24 @@ ENTRY_DECLARATION
         char str[TITLE_MAX_LEN];
         sprintf(str, "%.1f", avgFps);
 
-        f32 tb = nvgTextBounds(nvg, -300, 0, str, NULL, NULL);
+        f32 tb = nvgTextBounds(nvg, 0, 0, str, NULL, NULL);
         nvgFontSize(nvg, vd.ui.hudSz);
-        nvgFontFace(nvg, "sans-bold");
+        //nvgFontFace(nvg, "sans-bold");
+        nvgFontFace(nvg, "sans");
         nvgTextAlign(nvg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
         nvgFillColor(nvg, nvgRGBA(255, 255, 255, 255));
-        nvgText(nvg, tb, vd.ui.hudSz, str, NULL);
+        nvgText(nvg, 15.f, vd.ui.hudSz, str, NULL);
 
 
         auto rgb = vd.mouseRGB;
         sprintf(str, "%.2f  %.2f  %.2f", rgb[0], rgb[1], rgb[2]);
-        f32 rgbBnds = nvgTextBounds(nvg, tb, 0, str, NULL, NULL);
+        //f32 rgbBnds = nvgTextBounds(nvg, tb, 0, str, NULL, NULL);
         nvgFontSize(nvg, vd.ui.hudSz);
-        nvgFontFace(nvg, "sans-bold");
+        //nvgFontFace(nvg, "sans-bold");
+        nvgFontFace(nvg, "sans");
         nvgTextAlign(nvg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
         nvgFillColor(nvg, nvgRGBA(255, 255, 255, 255));
-        nvgText(nvg, rgbBnds, vd.ui.hudSz, str, NULL);
+        nvgText(nvg, tb + 45.f, vd.ui.hudSz, str, NULL);
 
       nvgEndFrame(nvg);
     }
@@ -837,6 +858,41 @@ ENTRY_DECLARATION
 }
 
 
+//  auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
+//  dbKeys      = shapesFromKeys(db, move(dbKeys), &vd);
+//  dbKeys      = eraseMissingKeys(move(dbKeys), &vd.shapes);
+//  
+//  sort( ALL(dbIdxs) );                                                // sort the indices so the largest are removed first and the smaller indices don't change their position
+//  FROM(dbIdxs.size(),i){ keyWin->removeChild(dbIdxs[i]); }
+//  dbIdxs.resize(0);
+//  dbIdxs.shrink_to_fit();
+//  for(auto key : dbKeys)                                              // add the buttons back and keep track of their indices
+//  {
+//    auto b = new Button(keyWin, key.str);
+//    int  i = keyWin->childIndex(b);
+//    if(i > -1){ dbIdxs.push_back(i); }
+//    b->setFlags(Button::ToggleButton);
+//    b->setChangeCallback( [k=key.str](bool pushed){ buttonCallback(k,pushed); } );
+//    b->setPushed(vd.shapes[key.str].active);
+//    b->setFixedHeight(25);
+//  }
+//  screen.performLayout();
+//
+//  vd.keyRefreshClock -= vd.keyRefresh;
+//  vd.verRefreshClock -= vd.verRefresh;
+//
+//  if(vd.keyRefreshClock > vd.keyRefresh)                                 // if there is already enough time saved up for another update make sure that less that two updates worth of time is kept 
+//    vd.keyRefreshClock = vd.keyRefresh + fmod(vd.keyRefreshClock, vd.keyRefresh);
+//}else if( vd.verRefreshClock > vd.verRefresh ){
+//  for(auto& kv : vd.shapes){
+//    if(kv.second.active){
+//      updateKey(db, kv.first, kv.second.version, &vd);
+//    }
+//  }
+//  vd.verRefreshClock -= vd.verRefresh;
+//
+//  if(vd.verRefreshClock > vd.verRefresh)                                // if there is already enough time saved up for another update make sure that less that two updates worth of time is kept 
+//    vd.verRefreshClock = vd.verRefresh + fmod(vd.verRefreshClock, vd.verRefresh);
 
 //SECTION(main loop from nanogui / common.cpp)
 //{
