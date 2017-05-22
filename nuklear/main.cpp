@@ -107,6 +107,7 @@ using namespace nanogui;
 
 Screen         screen;
 Window*        keyWin = nullptr;
+Window*         dbWin = nullptr;
 BoxLayout*     keyLay = nullptr;
 FormHelper*      keys = nullptr;
 NVGcontext*       nvg = nullptr;
@@ -541,7 +542,19 @@ ENTRY_DECLARATION
         thm->mWindowFillUnfocused = v4f( .2f,  .2f,  .225f,  .3f );
         thm->mWindowFillFocused   = v4f( .3f,  .28f, .275f,  .3f );      
       }
-    
+
+      SECTION(db selector)
+      {
+        dbWin = new Window(&screen, "Keys");
+
+        auto dbPth = new nanogui::TextBox(dbWin, "simdb_");
+        //auto dbSel = new nanogui::detail::FormWidget(dbWin);
+        //dbWin->addGroup("Complex types");
+        //  gui->addVariable("Enumeration", enumval, enabled)
+        //    ->setItems({ "Item 1", "Item 2", "Item 3" });
+        //  gui->addVariable("Color", colval);
+      }
+
       screen.setVisible(true);
       screen.performLayout();
     }
