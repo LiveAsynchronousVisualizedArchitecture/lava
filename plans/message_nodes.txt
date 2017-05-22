@@ -1,0 +1,17 @@
+
+
+messages need to contain:
+|  Either an index into the db OR an address in process memory space
+|  A type
+|  The size - If the size is known, length queries are not needed and allocations can be done in bulk - one allocation to hold all the incoming data from the db
+|  |  How to rectify this with some indices being in process memory already?
+|  |  Loop through inputs and add up all the sizes from db indices
+|  |  Loop through again, changing the indices to pointers to addresses in the bulk memory allocation
+|  |  Copy from the database for all the indices (need to hang on to the indices somehow)
+
+sending messages means:
+|  Incrementing the references for an index / address
+|  Decrementing references must happen by the thread after it is finished with the incoming data
+
+
+
