@@ -70,9 +70,10 @@
 // -todo: test switching between two different databases
 // -todo: change font to normal and not bold for fps and color scanner
 // -todo: make separate database referesh function that can be called on a switch, but also subtracts time from the refresh counter
+// -todo: fix refresh of db to not mangle names
 
+// todo: keep databases in memory after listing them
 // todo: make simdb_listDBs return unprefixed names
-// todo: fix refresh of db to not mangle names
 // todo: fix crash on focus event while db list is open
 // todo: organize nanogui globals into global states
 // todo: integrate font files as .h files so that .exe is contained with no dependencies
