@@ -57,13 +57,14 @@
 // -todo: put vd.now as a variable loop? - isn't broke, don't fix
 // -todo: change to saving indices of buttons and the combo box, so that deleting is done by index instead of in bulk
 // -todo: integrate combo box into key list
+// -todo: make database listing stick
+// -todo: make database listing actually change on selection
+// -todo: put actual db listing into db menu
+// -todo: make combo box callback list the dbs
+// -todo: make the sidebar re-layout on data base selection
 
+// todo: take out simdb_ prefix
 // todo: fix crash on focus event while db list is open
-// todo: make database listing stick
-// todo: make database listing actually change on selection
-// todo: put actual db listing into db menu
-// todo: make combo box callback list the dbs
-// todo: make the sidebar re-layout on data base selection
 // todo: organize nanogui globals into global states
 // todo: add list of databases to select  -  add list of databases currently open?
 // todo: make drop down menu or text field or file dialog for typing in database name
@@ -197,6 +198,10 @@ float        wrapAngleRadians(float angle)
   return fmodf(angle, _2PI);
 }
 
+void                initSimDB(str const& name)
+{
+  new (&db) simdb(name.c_str(), 4096, 1 << 14);             // inititialize the DB with placement new into the data segment
+}
 void                 initGlew()
 {
   //glewExperimental = 1;
@@ -519,7 +524,9 @@ double                   nowd()
 void       genTestGeo(simdb* db)
 {
   using namespace std;
-  
+
+  initSimDB("Viz Default");
+
   // Create serialized IndexedVerts
   size_t leftLen, rightLen, cubeLen;
   vec<u8>  leftData = makeTriangle(leftLen, true);
@@ -541,11 +548,13 @@ ENTRY_DECLARATION
   using namespace std;
   using namespace nanogui;
 
+  genTestGeo(&db);
+
   SECTION(initialization)
   {
     SECTION(static simdb and static VizData)
     {
-      new (&db) simdb("test", 4096, 1<<14);             // inititialize the DB with placement new into the data segment
+      //new (&db) simdb("test", 4096, 1<<14);             // inititialize the DB with placement new into the data segment
 
       vd.ui.w             = 1024; 
       vd.ui.h             =  768;
@@ -585,22 +594,16 @@ ENTRY_DECLARATION
         auto spcr1 = new nanogui::Label(keyWin, "");
         auto spcr2 = new nanogui::Label(keyWin, "");
         auto spcr3 = new nanogui::Label(keyWin, "");
-        dbLst      = new ComboBox(keyWin);
+        dbLst      = new ComboBox(keyWin, {"None"} );
         dbLst->setChangeCallback( dbLstCallback );
         dbLstCallback(true);
-        dbLst->setCallback([](int i) {                                          // callback for the actual selection
+        dbLst->setCallback([](int i){                                          // callback for the actual selection
+          if(i < dbNames.size()){
+            initSimDB(dbNames[i]);
+          }
           screen.performLayout();
           printf(" selected %d \n",i); 
         });
-        //dbLst = new ComboBox(keyWin, { "  simdb_test  ", "  simdb_viz  ", "  simdb_run  " });
-        //dbLst->setChangeCallback([](bool pressed){
-        //  if(pressed){
-        //    dbNames = simdb_listDBs();                                         // all of these are globals
-        //    dbLst->setItems(dbNames);
-        //    screen.performLayout();
-        //  }
-        //  //printf(" pressed: %d \n", pressed); 
-        //});
         auto spcr4 = new nanogui::Label(keyWin, "");
         auto spcr5 = new nanogui::Label(keyWin, "");
         auto spcr6 = new nanogui::Label(keyWin, "");
@@ -632,8 +635,6 @@ ENTRY_DECLARATION
       }
     }
   }
-
-  genTestGeo(&db);
 
   while(!glfwWindowShouldClose(vd.win))
   {
@@ -856,6 +857,15 @@ ENTRY_DECLARATION
 
 
 
+//dbLst = new ComboBox(keyWin, { "  simdb_test  ", "  simdb_viz  ", "  simdb_run  " });
+//dbLst->setChangeCallback([](bool pressed){
+//  if(pressed){
+//    dbNames = simdb_listDBs();                                         // all of these are globals
+//    dbLst->setItems(dbNames);
+//    screen.performLayout();
+//  }
+//  //printf(" pressed: %d \n", pressed); 
+//});
 
 //#define NANOVG_GL3_IMPLEMENTATION
 //#include <nanovg_gl.h>
