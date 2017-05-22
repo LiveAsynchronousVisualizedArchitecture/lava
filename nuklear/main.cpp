@@ -22,8 +22,8 @@
 // -todo: use callback for focus on sidebar to take away mouse button presses so that the camera doesn't move on the side - used window boolean for 'focused' which half works - doesn't prevent camera controls until the window is clicked
 // -todo: get keys working on the side as buttons or labels
 // -todo: erase key ui elements and recreate them on refresh
+// -todo: have toggle button presses turn active on and off
 
-// todo: have toggle button presses turn active on and off
 // todo: add fps counter in the corner - use nanovg alone?
 // todo: add list of databases to select and/or databases currently open
 // todo: make drop down menu or text field or file dialog for typing in database name
@@ -99,9 +99,9 @@
 
 using namespace nanogui;
 
-NAMESPACE_BEGIN(nanogui)
-  extern std::map<GLFWwindow *, Screen *> __nanogui_screens;
-NAMESPACE_END(nanogui)
+//NAMESPACE_BEGIN(nanogui)
+//  extern std::map<GLFWwindow *, Screen *> __nanogui_screens;
+//NAMESPACE_END(nanogui)
 
 Screen         screen;
 Window*        keyWin = nullptr;
@@ -116,9 +116,6 @@ enum test_enum {
 };
 
 using uWindow = std::unique_ptr<nanogui::Window>;
-
-//Screen*     screen = nullptr;
-//uWindow        keyWin = nullptr;
 
 FormHelper*       gui = nullptr;
 Window*           win = nullptr;
@@ -341,6 +338,10 @@ GLFWwindow*          initGLFW(VizData* vd)
   #endif
 
   return win;
+}
+void           buttonCallback(str key, bool pushed)
+{
+  vd.shapes[key].active = pushed;
 }
 void              RenderShape(Shape const& shp, mat4 const& m) // GLuint shaderId)
 {
@@ -595,28 +596,14 @@ ENTRY_DECLARATION
         dbKeys      = eraseMissingKeys(move(dbKeys), &vd.shapes);
 
         keyWin->removeChildren();
-        //keys->clear(10,10);
         for(auto key : dbKeys){
-          //Label* lbl = new Label(keyWin, key.str);
-          
-          //auto tgl = new 
           auto b = new Button(keyWin, key.str);
           b->setFlags(Button::ToggleButton);
-          b->setPushed( vd.shapes[key.str].active  );
-          //button->setCallback(cb);
+          b->setChangeCallback( [k=key.str](bool pushed){ buttonCallback(k,pushed); } );
+          b->setPushed(vd.shapes[key.str].active);
           b->setFixedHeight(25);
-          //if (keyLay->rowCount() > 0)
-            //keyLay->appendRow(mVariableSpacing);
-          //keyLay->appendRow(0);
-          //keyLay->setAnchor(button, AdvancedGridLayout::Anchor(1, keyLay->rowCount() - 1, 3, 1));
-          
-
-          //keyWin ->addButton(key.str, [](){ printf("wat\n\n"); });
         }
         screen.performLayout();
-
-        //keys->addWidget("", new Label(keyWin, "One Key"));
-
 
         vd.keyRefreshClock -= vd.keyRefresh;
         vd.verRefreshClock -= vd.verRefresh;
@@ -645,8 +632,7 @@ ENTRY_DECLARATION
 
       PRINT_GL_ERRORS
     }
-
-    SECTION(openGL frame setup)
+    SECTION(OpenGL frame setup)
     {
       glViewport(0, 0, vd.ui.w, vd.ui.h);
 
@@ -664,7 +650,6 @@ ENTRY_DECLARATION
       glClearColor(0.0625, 0.0625, 0.0625, 0.0625);
       PRINT_GL_ERRORS
     }
-
     SECTION(render the shapes in VizData::shapes)
     {
       const static auto XAXIS = vec3(1.f, 0.f, 0.f);
@@ -705,9 +690,9 @@ ENTRY_DECLARATION
       }
       SECTION(draw shapes)
       {
-        for(auto& kv : vd.shapes){
-          kv.second.active = true;
-        }
+        //for(auto& kv : vd.shapes){
+        //  kv.second.active = true;
+        //}
 
         for(auto& kv : vd.shapes){
           if(kv.second.active)
@@ -717,13 +702,12 @@ ENTRY_DECLARATION
 
       PRINT_GL_ERRORS
     }
-
     SECTION(nanogui)
     {
       if (keyWin->focused()) {
-        vd.camera.mouseDelta = vec2(0, 0);
-        vd.camera.btn2Delta = vec2(0, 0);
-        vd.camera.leftButtonDown = false;
+        vd.camera.mouseDelta      = vec2(0, 0);
+        vd.camera.btn2Delta       = vec2(0, 0);
+        vd.camera.leftButtonDown  = false;
         vd.camera.rightButtonDown = false;
       }
 
@@ -776,6 +760,22 @@ ENTRY_DECLARATION
 
 
 
+
+
+//Label* lbl = new Label(keyWin, key.str);          
+//auto tgl = new 
+//b->setFlags(Button::ToggleButton);
+//button->setCallback(cb);
+//if (keyLay->rowCount() > 0)
+//keyLay->appendRow(mVariableSpacing);
+//keyLay->appendRow(0);
+//keyLay->setAnchor(button, AdvancedGridLayout::Anchor(1, keyLay->rowCount() - 1, 3, 1));
+//keyWin ->addButton(key.str, [](){ printf("wat\n\n"); });
+//
+//keys->addWidget("", new Label(keyWin, "One Key"));
+
+//Screen*     screen = nullptr;
+//uWindow        keyWin = nullptr;
 
 //screen.setBackground(Color(0, 0, 0, 0));
 //
