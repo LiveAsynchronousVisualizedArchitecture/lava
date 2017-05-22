@@ -1,4 +1,32 @@
 
+/*
+  Copyright 2017 Simeon Bassett
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+  http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+*/
+
+/*
+
+  NanoGUI was developed by Wenzel Jakob <wenzel.jakob@epfl.ch>.
+  The widget drawing code is based on the NanoVG demo application
+  by Mikko Mononen.
+
+  All rights reserved. Use of NanoGUI and NanoVG source code is governed by a
+  BSD-style license that can be found in the LICENSE.txt file.
+
+*/
+
+
 // -todo: compile with nanogui
 // -todo: take out nuklear 
 // -todo: make initital nanogui window
@@ -24,15 +52,17 @@
 // -todo: erase key ui elements and recreate them on refresh
 // -todo: have toggle button presses turn active on and off
 // -todo: add fps counter in the corner - use nanovg alone?
+// -todo: make heads up display font size a parameter
+// -todo: add apache and bsd licenses
+// -todo: add color under cursor like previous visualizer - use the gl get frame like the previous visualizer - check if the cursor is over the gl window first as an optimization? - sort of in but not working
+// -todo: put vd.now as a variable loop? - isn't broke, don't fix
 
 // todo: add list of databases to select and/or databases currently open
 // todo: make drop down menu or text field or file dialog for typing in database name
-// todo: add color under cursor like previous visualizer - use the gl get frame like the previous visualizer - check if the cursor is over the gl window first as an optimization? - sort of in but not working
-// todo: write visualizer overview for Readme.md  
-// todo: make camera fitting use the field of view and change the dist to fit all geometry - use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
-// todo: put vd.now as a variable loop?
 // todo: make save button or menu to save serialized files 
 // todo: integrate font files as .h files so that .exe is contained with no dependencies
+// todo: write visualizer overview for Readme.md  
+// todo: make camera fitting use the field of view and change the dist to fit all geometry - use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
 
 // todo: make label switches not only turn keys on and off, but fade their transparency too?
 // todo: move and rename project to LavaViz or any non test name
@@ -499,10 +529,10 @@ ENTRY_DECLARATION
     {
       new (&db) simdb("test", 4096, 1<<14);             // inititialize the DB with placement new into the data segment
 
-      vd.ui.w             =  1024; 
-      vd.ui.h             =   768;
-      //vd.ui.bgclr         =  nk_rgb(16,16,16);         // darker than this may risk not seeing the difference between black and the background
-      vd.ui.ptSz          =  0.25f;
+      vd.ui.w             = 1024; 
+      vd.ui.h             =  768;
+      vd.ui.ptSz          =    0.25f;
+      vd.ui.hudSz         =   20.0f;
 
       vd.now              =  nowd();
       vd.prev             =  vd.now;
@@ -534,7 +564,7 @@ ENTRY_DECLARATION
       {
         keys   = new FormHelper(&screen);
         keyWin = new Window(&screen, "Keys");
-        keyLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 10, 10);
+        keyLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 5, 5);
         keyWin->setLayout(keyLay);
 
         Theme* thm = keyWin->theme();
@@ -543,17 +573,17 @@ ENTRY_DECLARATION
         thm->mWindowFillFocused   = v4f( .3f,  .28f, .275f,  .3f );      
       }
 
-      SECTION(db selector)
-      {
-        dbWin = new Window(&screen, "Keys");
-
-        auto dbPth = new nanogui::TextBox(dbWin, "simdb_");
-        //auto dbSel = new nanogui::detail::FormWidget(dbWin);
-        //dbWin->addGroup("Complex types");
-        //  gui->addVariable("Enumeration", enumval, enabled)
-        //    ->setItems({ "Item 1", "Item 2", "Item 3" });
-        //  gui->addVariable("Color", colval);
-      }
+      //SECTION(db selector)
+      //{
+      //  dbWin = new Window(&screen, "Keys");
+      //
+      //  auto dbPth = new nanogui::TextBox(dbWin, "simdb_");
+      //  //auto dbSel = new nanogui::detail::FormWidget(dbWin);
+      //  //dbWin->addGroup("Complex types");
+      //  //  gui->addVariable("Enumeration", enumval, enabled)
+      //  //    ->setItems({ "Item 1", "Item 2", "Item 3" });
+      //  //  gui->addVariable("Color", colval);
+      //}
 
       screen.setVisible(true);
       screen.performLayout();
@@ -753,25 +783,34 @@ ENTRY_DECLARATION
         avgFps += (1.0 / dt)*0.1;
         int fps = (int)avgFps;
 
-        char fpsStr[TITLE_MAX_LEN];
-        sprintf(fpsStr, "%d", fps);
+        char str[TITLE_MAX_LEN];
+        sprintf(str, "%d", fps);
 
-        f32 tb = nvgTextBounds(nvg, -100, 0, fpsStr, NULL, NULL);
-        nvgFontSize(nvg, 20.0f);
+        f32 tb = nvgTextBounds(nvg, -100, 0, str, NULL, NULL);
+        nvgFontSize(nvg, vd.ui.hudSz);
         nvgFontFace(nvg, "sans-bold");
         nvgTextAlign(nvg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
         nvgFillColor(nvg, nvgRGBA(255, 255, 255, 255));
-        nvgText(nvg, tb, 20.f, fpsStr, NULL);
+        nvgText(nvg, tb, vd.ui.hudSz, str, NULL);
+
+
+        auto rgb = vd.mouseRGB;
+        sprintf(str, "%.2f  %.2f  %.2f", rgb[0], rgb[1], rgb[2]);
+        f32 rgbBnds = nvgTextBounds(nvg, tb, 0, str, NULL, NULL);
+        nvgFontSize(nvg, vd.ui.hudSz);
+        nvgFontFace(nvg, "sans-bold");
+        nvgTextAlign(nvg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+        nvgFillColor(nvg, nvgRGBA(255, 255, 255, 255));
+        nvgText(nvg, rgbBnds, vd.ui.hudSz, str, NULL);
 
       nvgEndFrame(nvg);
     }
 
-
     glfwSwapBuffers(vd.win);
     PRINT_GL_ERRORS
 
-    // todo: mouse position goes here to read back the color under the mouse 
     //glReadPixels( (GLint)(vd.camera.mouseDelta.x), (GLint)(vd.camera.mouseDelta.y), 1, 1, GL_RGB, GL_FLOAT, vd.mouseRGB);
+    glReadPixels( (GLint)(vd.camera.oldMousePos.x), (GLint)(vd.camera.oldMousePos.y), 1, 1, GL_RGB, GL_FLOAT, vd.mouseRGB);
   }
 
   nanogui::shutdown();
@@ -789,6 +828,8 @@ ENTRY_DECLARATION
 
 
 
+//
+//vd.ui.bgclr         =  nk_rgb(16,16,16);         // darker than this may risk not seeing the difference between black and the background
 
 //SECTION(example 2)
 //{

@@ -142,21 +142,18 @@ struct Camera
   }
 };
 
-//using  KeyShapes = map<VerStr, Shape>;
 using  KeyShapes = map<str, Shape>;
 struct VizData
 {
-  GLFWwindow*            win;                      /* Platform */    //int width = 0, height = 0;
+  GLFWwindow*            win;                     // Platform 
   struct nk_context*     ctx;
-  Camera      camera;
-  KeyShapes   shapes;
-  GLuint    shaderId;
+  Camera              camera;
+  KeyShapes           shapes;
+  GLuint            shaderId;
   struct
   {
-    int w, h;
-    //struct nk_rect      rect;                // rect is the rectangle of the sidebar gui
-    //struct nk_color    bgclr;
-    float ptSz;
+    int w, h; 
+    f32 ptSz, hudSz;                              // ptSz is point size  |  hudSz is  heads up display size
   } ui;
   double  keyRefresh, keyRefreshClock, verRefresh, verRefreshClock, prev, now;
   float  mouseRGB[3];
@@ -210,6 +207,14 @@ static VizData  vd;
 #endif
 
 
+
+
+
+
+//using  KeyShapes = map<VerStr, Shape>;
+//
+//struct nk_rect      rect;                // rect is the rectangle of the sidebar gui
+//struct nk_color    bgclr;
 
 //static const char*  vShaderPath  =  "../vertexShader.vert";
 //static const char*  fShaderPath  =  "../fragmentShader.frag";
