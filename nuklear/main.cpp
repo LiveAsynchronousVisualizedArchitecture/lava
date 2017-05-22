@@ -57,7 +57,10 @@
 // -todo: add color under cursor like previous visualizer - use the gl get frame like the previous visualizer - check if the cursor is over the gl window first as an optimization? - sort of in but not working
 // -todo: put vd.now as a variable loop? - isn't broke, don't fix
 
-// todo: add list of databases to select and/or databases currently open
+// todo: change to saving indices of buttons and the combo box, so that deleting is done by index instead of in bulk
+// todo: integrate combo box into key list
+// todo: make combo box callback list the dbs
+// todo: add list of databases to select  -  add list of databases currently open?
 // todo: make drop down menu or text field or file dialog for typing in database name
 // todo: make save button or menu to save serialized files 
 // todo: integrate font files as .h files so that .exe is contained with no dependencies
@@ -131,16 +134,15 @@
 
 using namespace nanogui;
 
-//NAMESPACE_BEGIN(nanogui)
-//  extern std::map<GLFWwindow *, Screen *> __nanogui_screens;
-//NAMESPACE_END(nanogui)
-
 Screen         screen;
 Window*        keyWin = nullptr;
 Window*         dbWin = nullptr;
 BoxLayout*     keyLay = nullptr;
-FormHelper*      keys = nullptr;
+ComboBox*       dbLst = nullptr;
+int          dbLstIdx = -1;
 NVGcontext*       nvg = nullptr;
+
+FormHelper*      keys = nullptr;
 f64 avgFps=60,prevt=0,cpuTime=0, t=0, dt=0;
 
 // start nanogui test stuff
@@ -542,7 +544,7 @@ ENTRY_DECLARATION
       vd.keyRefreshClock  =  vd.keyRefresh;
       vd.camera           =  initCamera();
     }
-    SECTION(glfw window, glew)
+    SECTION(glfw and glew)
     {
       vd.win      = initGLFW( &vd );                        assert(vd.win!=nullptr);
       initGlew();
@@ -562,31 +564,36 @@ ENTRY_DECLARATION
 
       SECTION(sidebar)
       {
-        keys   = new FormHelper(&screen);
-        keyWin = new Window(&screen, "Keys");
+        //keys   = new FormHelper(&screen);
+        keyWin = new Window(&screen, "");
         keyLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 5, 5);
         keyWin->setLayout(keyLay);
 
         Theme* thm = keyWin->theme();
         thm->mTransparent         = v4f( .0f,  .0f,  .0f,    .0f );
         thm->mWindowFillUnfocused = v4f( .2f,  .2f,  .225f,  .3f );
-        thm->mWindowFillFocused   = v4f( .3f,  .28f, .275f,  .3f );      
+        thm->mWindowFillFocused   = v4f( .3f,  .28f, .275f,  .3f );
       }
 
-      //SECTION(db selector)
-      //{
-      //  dbWin = new Window(&screen, "Keys");
-      //
-      //  auto dbPth = new nanogui::TextBox(dbWin, "simdb_");
-      //  //auto dbSel = new nanogui::detail::FormWidget(dbWin);
-      //  //dbWin->addGroup("Complex types");
-      //  //  gui->addVariable("Enumeration", enumval, enabled)
-      //  //    ->setItems({ "Item 1", "Item 2", "Item 3" });
-      //  //  gui->addVariable("Color", colval);
-      //}
+      SECTION(db selector)
+      {
+             dbWin = new Window(&screen, "Keys");
+        auto dbLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 5, 5);
+        dbWin->setLayout(keyLay);
+
+        auto dbPth = new TextBox(dbWin, "simdb_");
+        //auto dbLst = new ComboBox(dbWin, { "simdb_test", "simdb_viz", "simdb_run" } );
+        //auto dbSel = new nanogui::detail::FormWidget(dbWin);
+        //dbWin->addGroup("Complex types");
+        //  gui->addVariable("Enumeration", enumval, enabled)
+        //    ->setItems({ "Item 1", "Item 2", "Item 3" });
+        //  gui->addVariable("Color", colval);
+      }
 
       screen.setVisible(true);
       screen.performLayout();
+
+      dbWin->center();
     }
     SECTION(nanovg)
     {
@@ -629,7 +636,16 @@ ENTRY_DECLARATION
         dbKeys      = shapesFromKeys(db, move(dbKeys), &vd);
         dbKeys      = eraseMissingKeys(move(dbKeys), &vd.shapes);
 
+        if(dbLst){ 
+          dbLst->setPushed(false);
+          dbLst->setVisible(false);
+        }
+
+        keyWin->removeChild(dbLst);
+
         keyWin->removeChildren();
+        dbLst = new ComboBox(keyWin, { "simdb_test", "simdb_viz", "simdb_run" });
+        dbLst->setSide(Popup::Left);
         for(auto key : dbKeys){
           auto b = new Button(keyWin, key.str);
           b->setFlags(Button::ToggleButton);
@@ -739,8 +755,6 @@ ENTRY_DECLARATION
     SECTION(nanogui)
     {
       if(keyWin->focused()){
-        vd.camera.mouseDelta      = vec2(0, 0);
-        vd.camera.btn2Delta       = vec2(0, 0);
         vd.camera.leftButtonDown  = false;
         vd.camera.rightButtonDown = false;
       }
@@ -750,7 +764,6 @@ ENTRY_DECLARATION
       keyWin->setPosition(keyspos);
       keyWin->setSize(v2i(winsz.x(), screen.height()));
 
-      //screen.setWidth(winsz.x());
       screen.drawContents();
       screen.drawWidgets();
 
@@ -776,17 +789,17 @@ ENTRY_DECLARATION
       //  }
       //}
     }
-    SECTION(nanovg)
+    SECTION(nanovg | frames per second and color under cursor) 
     {
       nvgBeginFrame(nvg, vd.ui.w, vd.ui.h, vd.ui.w/(f32)vd.ui.h);
         avgFps *= 0.9;
         avgFps += (1.0 / dt)*0.1;
-        int fps = (int)avgFps;
+        //int fps = (int)avgFps;
 
         char str[TITLE_MAX_LEN];
-        sprintf(str, "%d", fps);
+        sprintf(str, "%.1f", avgFps);
 
-        f32 tb = nvgTextBounds(nvg, -100, 0, str, NULL, NULL);
+        f32 tb = nvgTextBounds(nvg, -300, 0, str, NULL, NULL);
         nvgFontSize(nvg, vd.ui.hudSz);
         nvgFontFace(nvg, "sans-bold");
         nvgTextAlign(nvg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
@@ -809,7 +822,6 @@ ENTRY_DECLARATION
     glfwSwapBuffers(vd.win);
     PRINT_GL_ERRORS
 
-    //glReadPixels( (GLint)(vd.camera.mouseDelta.x), (GLint)(vd.camera.mouseDelta.y), 1, 1, GL_RGB, GL_FLOAT, vd.mouseRGB);
     glReadPixels( (GLint)(vd.camera.oldMousePos.x), (GLint)(vd.camera.oldMousePos.y), 1, 1, GL_RGB, GL_FLOAT, vd.mouseRGB);
   }
 
@@ -826,7 +838,16 @@ ENTRY_DECLARATION
 
 
 
+//NAMESPACE_BEGIN(nanogui)
+//  extern std::map<GLFWwindow *, Screen *> __nanogui_screens;
+//NAMESPACE_END(nanogui)
 
+//vd.camera.mouseDelta      = vec2(0, 0);
+//vd.camera.btn2Delta       = vec2(0, 0);
+
+//screen.setWidth(winsz.x());
+//
+//glReadPixels( (GLint)(vd.camera.mouseDelta.x), (GLint)(vd.camera.mouseDelta.y), 1, 1, GL_RGB, GL_FLOAT, vd.mouseRGB);
 
 //
 //vd.ui.bgclr         =  nk_rgb(16,16,16);         // darker than this may risk not seeing the difference between black and the background

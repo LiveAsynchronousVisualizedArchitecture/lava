@@ -76,5 +76,7 @@ large scale todo:
 |  thread local caching
 |  robin hood hashing
 |  tbl integration
+|  some sort of dynamic resizing
+|  separate atomic operations by key
 
 

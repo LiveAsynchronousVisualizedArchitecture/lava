@@ -1,0 +1,14 @@
+
+color code for errors, warnings and static analyses
+|  red for compiler errors and crashes
+|  yellow for compiler warnings and detected memory leaks through the running node 
+|  green for static analyses
+
+color code for performance in performance visualization mode (node graph)
+|  size nodes differently for performance?
+|  gradient of red to yellow to green to blue
+|  two metrics for performance:
+|  |  time spent relative to the total time spent in the program
+|  |  time spent relative to the amount of data that comes into it
+
+
