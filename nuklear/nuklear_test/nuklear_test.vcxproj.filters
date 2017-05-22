@@ -15,9 +15,6 @@
     <Filter Include="hpp">
       <UniqueIdentifier>{d7a7e0d2-d752-48af-92b2-bd6e9b6db612}</UniqueIdentifier>
     </Filter>
-    <Filter Include="src_libs">
-      <UniqueIdentifier>{20d17ab6-8a23-408f-8af9-ae20a07caa32}</UniqueIdentifier>
-    </Filter>
     <Filter Include="unified">
       <UniqueIdentifier>{e22355bb-80f1-40a9-b263-2c9c730ab978}</UniqueIdentifier>
     </Filter>
@@ -30,8 +27,8 @@
     <Filter Include="Header Files\glfw">
       <UniqueIdentifier>{efd23ca1-c868-4625-9e04-7345592e83fe}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\nuklear">
-      <UniqueIdentifier>{032ce513-c9b3-4c3b-8731-ca3292325515}</UniqueIdentifier>
+    <Filter Include="Source Files\src_libs">
+      <UniqueIdentifier>{20d17ab6-8a23-408f-8af9-ae20a07caa32}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -48,10 +45,10 @@
       <Filter>hpp</Filter>
     </ClInclude>
     <ClInclude Include="..\glfw_3.2.1.h">
-      <Filter>src_libs</Filter>
+      <Filter>Source Files\src_libs</Filter>
     </ClInclude>
     <ClInclude Include="..\glew_2.0.0.h">
-      <Filter>src_libs</Filter>
+      <Filter>Source Files\src_libs</Filter>
     </ClInclude>
     <ClInclude Include="..\IndexedVerts.h">
       <Filter>unified</Filter>
@@ -61,12 +58,6 @@
     </ClInclude>
     <ClInclude Include="..\glfw3.h">
       <Filter>Header Files\glfw</Filter>
-    </ClInclude>
-    <ClInclude Include="..\nuklear.h">
-      <Filter>Header Files\nuklear</Filter>
-    </ClInclude>
-    <ClInclude Include="..\nuklear_glfw_gl3.h">
-      <Filter>Header Files\nuklear</Filter>
     </ClInclude>
     <ClInclude Include="..\nanogui\include\nanogui_resources.h">
       <Filter>Header Files\nanogui</Filter>

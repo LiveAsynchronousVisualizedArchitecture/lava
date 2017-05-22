@@ -23,8 +23,8 @@
 // -todo: get keys working on the side as buttons or labels
 // -todo: erase key ui elements and recreate them on refresh
 // -todo: have toggle button presses turn active on and off
+// -todo: add fps counter in the corner - use nanovg alone?
 
-// todo: add fps counter in the corner - use nanovg alone?
 // todo: add list of databases to select and/or databases currently open
 // todo: make drop down menu or text field or file dialog for typing in database name
 // todo: add color under cursor like previous visualizer - use the gl get frame like the previous visualizer - check if the cursor is over the gl window first as an optimization? - sort of in but not working
@@ -75,6 +75,8 @@
 #include "glfw3.h"
 
 #include <nanogui/nanogui.h>
+//#define NANOVG_GL3_IMPLEMENTATION
+//#include <nanovg_gl.h>
 
 #include "VizData.hpp"
 #include "VizGen.hpp"
@@ -107,6 +109,8 @@ Screen         screen;
 Window*        keyWin = nullptr;
 BoxLayout*     keyLay = nullptr;
 FormHelper*      keys = nullptr;
+NVGcontext*       nvg = nullptr;
+f64 avgFps=60,prevt=0,cpuTime=0, t=0, dt=0;
 
 // start nanogui test stuff
 enum test_enum {
@@ -133,6 +137,8 @@ namespace {
 
 using v2i  =  Eigen::Vector2i;
 using v4f  =  Eigen::Vector4f;
+
+const u32 TITLE_MAX_LEN = 256;
 
 vec3                      pos(mat4 const& m)
 { return m[3];                      }
@@ -486,92 +492,72 @@ ENTRY_DECLARATION
   using namespace std;
   using namespace nanogui;
 
-  SECTION(initialize static simdb and static VizData)
+  SECTION(initialization)
   {
-    new (&db) simdb("test", 4096, 1<<14);             // inititialize the DB with placement new into the data segment
-
-    vd.ui.w             =  1024; 
-    vd.ui.h             =   768;
-    //vd.ui.bgclr         =  nk_rgb(16,16,16);         // darker than this may risk not seeing the difference between black and the background
-    vd.ui.ptSz          =  0.25f;
-
-    vd.now              =  nowd();
-    vd.prev             =  vd.now;
-    vd.verRefresh       =  1.0/144.0;
-    vd.verRefreshClock  =  0.0;
-    vd.keyRefresh       =  2.0;
-    vd.keyRefreshClock  =  vd.keyRefresh;
-    vd.camera           =  initCamera();
-  }
-  SECTION(initialize glfw window, glew)
-  {
-    vd.win      = initGLFW( &vd );                        assert(vd.win!=nullptr);
-    initGlew();
-    vd.shaderId = shadersrc_to_shaderid(vertShader, fragShader);   PRINT_GL_ERRORS
-
-    glfwSetWindowUserPointer(vd.win, &vd);
-
-    PRINT_GL_ERRORS
-  }
-  SECTION(initialize nanogui)
-  {
-    glfwSwapInterval(0);
-    glfwSwapBuffers(vd.win);
-    glfwMakeContextCurrent(vd.win);
-
-    screen.initialize(vd.win, false);
-    //screen.setBackground(Color(0.0625f,0.f));                                       //  16 / 256 for a dark background that still leaves enough of a difference to black 
-
-    SECTION(sidebar)
+    SECTION(static simdb and static VizData)
     {
-      keys   = new FormHelper(&screen);
-      //keyWin = keys->addWindow(v2i(10,10), "Keys");
-      keyWin = new Window(&screen, "Keys");
-      keyLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 10, 10);
-      keyWin->setLayout(keyLay);
-      //keyWin->setTooltip("The Keys in the database");
-      //keys->addGroup("IdxVrt");
-      //keyWin->removeChildren();
-      //((Widget*)keys)->removeChildren();
-      //keys->addWidget("label label", new Label(keyWin, "One Key"));
-      //keys->addButton("Key One", []() { std::cout << "One pressed." << std::endl; });
-      //keys->addButton("Key Two", []() { std::cout << "Two pressed." << std::endl; });
+      new (&db) simdb("test", 4096, 1<<14);             // inititialize the DB with placement new into the data segment
 
-      Theme* thm = keyWin->theme();
-      thm->mTransparent         = v4f( .0f,  .0f,  .0f,    .0f );
-      thm->mWindowFillUnfocused = v4f( .2f,  .2f,  .225f,  .3f );
-      thm->mWindowFillFocused   = v4f( .3f,  .28f, .275f,  .3f );      
+      vd.ui.w             =  1024; 
+      vd.ui.h             =   768;
+      //vd.ui.bgclr         =  nk_rgb(16,16,16);         // darker than this may risk not seeing the difference between black and the background
+      vd.ui.ptSz          =  0.25f;
+
+      vd.now              =  nowd();
+      vd.prev             =  vd.now;
+      vd.verRefresh       =  1.0/144.0;
+      vd.verRefreshClock  =  0.0;
+      vd.keyRefresh       =  2.0;
+      vd.keyRefreshClock  =  vd.keyRefresh;
+      vd.camera           =  initCamera();
     }
+    SECTION(glfw window, glew)
+    {
+      vd.win      = initGLFW( &vd );                        assert(vd.win!=nullptr);
+      initGlew();
+      vd.shaderId = shadersrc_to_shaderid(vertShader, fragShader);   PRINT_GL_ERRORS
 
-    //SECTION(example 2)
-    //{
-    //  //FormHelper *gui = new FormHelper(&screen);  // leak
-    //  gui = new FormHelper(&screen);                // leak
-    //
-    //  //ref<Window> window = gui->addWindow(v2i(10, 10), "Form helper example");
-    //  //auto window = gui->addWindow(v2i(10, 10), "Form helper example");
-    //  win = gui->addWindow(v2i(10, 10), "Form helper example");
-    //
-    //  gui->addGroup("Basic types");
-    //  gui->addVariable("bool", bvar);
-    //  gui->addVariable("string", strval);
-    //
-    //  gui->addGroup("Validating fields");
-    //  gui->addVariable("int", ivar)->setSpinnable(true);
-    //  gui->addVariable("float", fvar);
-    //  gui->addVariable("double", dvar)->setSpinnable(true);
-    //
-    //  gui->addGroup("Complex types");
-    //  gui->addVariable("Enumeration", enumval, enabled)
-    //    ->setItems({ "Item 1", "Item 2", "Item 3" });
-    //  gui->addVariable("Color", colval);
-    //
-    //  gui->addGroup("Other widgets");
-    //  gui->addButton("A button", []() { std::cout << "Button pressed." << std::endl; });
-    //}
+      glfwSetWindowUserPointer(vd.win, &vd);
+
+      PRINT_GL_ERRORS
+    }
+    SECTION(nanogui)
+    {
+      glfwSwapInterval(0);
+      glfwSwapBuffers(vd.win);
+      glfwMakeContextCurrent(vd.win);
+
+      screen.initialize(vd.win, false);
+
+      SECTION(sidebar)
+      {
+        keys   = new FormHelper(&screen);
+        keyWin = new Window(&screen, "Keys");
+        keyLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 10, 10);
+        keyWin->setLayout(keyLay);
+
+        Theme* thm = keyWin->theme();
+        thm->mTransparent         = v4f( .0f,  .0f,  .0f,    .0f );
+        thm->mWindowFillUnfocused = v4f( .2f,  .2f,  .225f,  .3f );
+        thm->mWindowFillFocused   = v4f( .3f,  .28f, .275f,  .3f );      
+      }
     
-    screen.setVisible(true);
-    screen.performLayout();
+      screen.setVisible(true);
+      screen.performLayout();
+    }
+    SECTION(nanovg)
+    {
+      nvg =  nvgCreateGL3(NVG_ANTIALIAS | NVG_STENCIL_STROKES | NVG_DEBUG);
+      if(nvg == NULL){
+        printf("Could not init nanovg.\n");
+        return -1;
+      }
+      int font = nvgCreateFont(nvg, "sans-bold", "Roboto-Bold.ttf");
+      if(font == -1){
+        printf("Could not add font bold.\n");
+        return -1;
+      }
+    }
   }
 
   genTestGeo(&db);
@@ -580,15 +566,20 @@ ENTRY_DECLARATION
   {
     PRINT_GL_ERRORS
 
-    SECTION(add the time passed to refresh clocks)
+    SECTION(time)
     {
       vd.now  = nowd();
       double passed = vd.now - vd.prev;
       vd.prev = vd.now;
       vd.keyRefreshClock += passed;
       vd.verRefreshClock += passed;
+
+      t     = glfwGetTime();
+      dt    = t - prevt;
+      prevt = t;
+
     }
-    SECTION(check updates if enough time stored in refresh clock variables)
+    SECTION(database)
     {
       if( vd.keyRefreshClock > vd.keyRefresh ){
         auto dbKeys = db.getKeyStrs();                              // Get all keys in DB - this will need to be ran in the main loop, but not every frame
@@ -623,7 +614,7 @@ ENTRY_DECLARATION
       } // end of updates to shapes 
       PRINT_GL_ERRORS
     }
-    SECTION(GLFW input)
+    SECTION(input)
     {
       vd.camera.mouseDelta = vec2(0,0);
       vd.camera.btn2Delta  = vec2(0,0);
@@ -632,7 +623,7 @@ ENTRY_DECLARATION
 
       PRINT_GL_ERRORS
     }
-    SECTION(OpenGL frame setup)
+    SECTION(OpenGL setup)
     {
       glViewport(0, 0, vd.ui.w, vd.ui.h);
 
@@ -650,7 +641,7 @@ ENTRY_DECLARATION
       glClearColor(0.0625, 0.0625, 0.0625, 0.0625);
       PRINT_GL_ERRORS
     }
-    SECTION(render the shapes in VizData::shapes)
+    SECTION(render shapes)
     {
       const static auto XAXIS = vec3(1.f, 0.f, 0.f);
       const static auto YAXIS = vec3(0.f, 1.f, 0.f);
@@ -704,7 +695,7 @@ ENTRY_DECLARATION
     }
     SECTION(nanogui)
     {
-      if (keyWin->focused()) {
+      if(keyWin->focused()){
         vd.camera.mouseDelta      = vec2(0, 0);
         vd.camera.btn2Delta       = vec2(0, 0);
         vd.camera.leftButtonDown  = false;
@@ -742,6 +733,26 @@ ENTRY_DECLARATION
       //  }
       //}
     }
+    SECTION(nanovg)
+    {
+      nvgBeginFrame(nvg, vd.ui.w, vd.ui.h, vd.ui.w/(f32)vd.ui.h);
+        avgFps *= 0.9;
+        avgFps += (1.0 / dt)*0.1;
+        int fps = (int)avgFps;
+
+        char fpsStr[TITLE_MAX_LEN];
+        sprintf(fpsStr, "%d", fps);
+
+        f32 tb = nvgTextBounds(nvg, -100, 0, fpsStr, NULL, NULL);
+        nvgFontSize(nvg, 20.0f);
+        nvgFontFace(nvg, "sans-bold");
+        nvgTextAlign(nvg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
+        nvgFillColor(nvg, nvgRGBA(255, 255, 255, 255));
+        nvgText(nvg, tb, 20.f, fpsStr, NULL);
+
+      nvgEndFrame(nvg);
+    }
+
 
     glfwSwapBuffers(vd.win);
     PRINT_GL_ERRORS
@@ -761,6 +772,47 @@ ENTRY_DECLARATION
 
 
 
+
+
+
+
+
+//SECTION(example 2)
+//{
+//  //FormHelper *gui = new FormHelper(&screen);  // leak
+//  gui = new FormHelper(&screen);                // leak
+//
+//  //ref<Window> window = gui->addWindow(v2i(10, 10), "Form helper example");
+//  //auto window = gui->addWindow(v2i(10, 10), "Form helper example");
+//  win = gui->addWindow(v2i(10, 10), "Form helper example");
+//
+//  gui->addGroup("Basic types");
+//  gui->addVariable("bool", bvar);
+//  gui->addVariable("string", strval);
+//
+//  gui->addGroup("Validating fields");
+//  gui->addVariable("int", ivar)->setSpinnable(true);
+//  gui->addVariable("float", fvar);
+//  gui->addVariable("double", dvar)->setSpinnable(true);
+//
+//  gui->addGroup("Complex types");
+//  gui->addVariable("Enumeration", enumval, enabled)
+//    ->setItems({ "Item 1", "Item 2", "Item 3" });
+//  gui->addVariable("Color", colval);
+//
+//  gui->addGroup("Other widgets");
+//  gui->addButton("A button", []() { std::cout << "Button pressed." << std::endl; });
+//}
+
+//screen.setBackground(Color(0.0625f,0.f));                                       //  16 / 256 for a dark background that still leaves enough of a difference to black 
+//keyWin = keys->addWindow(v2i(10,10), "Keys");
+//keyWin->setTooltip("The Keys in the database");
+//keys->addGroup("IdxVrt");
+//keyWin->removeChildren();
+//((Widget*)keys)->removeChildren();
+//keys->addWidget("label label", new Label(keyWin, "One Key"));
+//keys->addButton("Key One", []() { std::cout << "One pressed." << std::endl; });
+//keys->addButton("Key Two", []() { std::cout << "Two pressed." << std::endl; });
 
 //Label* lbl = new Label(keyWin, key.str);          
 //auto tgl = new 

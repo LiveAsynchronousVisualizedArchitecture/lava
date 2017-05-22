@@ -179,7 +179,9 @@
     <ClCompile Include="..\nanogui\src\popup.cpp" />
     <ClCompile Include="..\nanogui\src\popupbutton.cpp" />
     <ClCompile Include="..\nanogui\src\progressbar.cpp" />
-    <ClCompile Include="..\nanogui\src\screen.cpp" />
+    <ClCompile Include="..\nanogui\src\screen.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\nanogui\src\serializer.cpp" />
     <ClCompile Include="..\nanogui\src\slider.cpp" />
     <ClCompile Include="..\nanogui\src\stackedwidget.cpp" />
@@ -204,8 +206,6 @@
     <ClInclude Include="..\nanogui\include\stb_image.h" />
     <ClInclude Include="..\nanogui\include\stb_truetype.h" />
     <ClInclude Include="..\no_rt_util.h" />
-    <ClInclude Include="..\nuklear.h" />
-    <ClInclude Include="..\nuklear_glfw_gl3.h" />
     <ClInclude Include="..\IndexedVerts.h" />
     <ClInclude Include="..\VizData.hpp" />
     <ClInclude Include="..\VizGen.hpp" />
