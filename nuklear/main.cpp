@@ -62,8 +62,9 @@
 // -todo: put actual db listing into db menu
 // -todo: make combo box callback list the dbs
 // -todo: make the sidebar re-layout on data base selection
+// -todo: take out simdb_ prefix from database list
 
-// todo: take out simdb_ prefix
+// todo: is it possible to turn off vertical sync? is it possible to skip the buffer swap if not enough time has passed?
 // todo: fix crash on focus event while db list is open
 // todo: organize nanogui globals into global states
 // todo: add list of databases to select  -  add list of databases currently open?
@@ -399,7 +400,10 @@ void            dbLstCallback(bool pressed)
 {
   if(pressed){
     dbNames = simdb_listDBs();                                         // all of these are globals
-    if(dbLst){ dbLst->setItems(dbNames); }
+    if(dbLst){ 
+      vecstr names = simdbNames_to_name(move(dbNames));
+      dbLst->setItems(names);
+    }
     screen.performLayout();
   }
 }
@@ -787,28 +791,6 @@ ENTRY_DECLARATION
 
       screen.drawContents();
       screen.drawWidgets();
-
-      //SECTION(main loop from nanogui / common.cpp)
-      //{
-      //  int numScreens = 0;
-      //  for(auto kv : __nanogui_screens){
-      //    Screen *screen = kv.second;
-      //    if(!screen->visible()){
-      //      continue;
-      //    }else if(glfwWindowShouldClose(screen->glfwWindow())){
-      //      screen->setVisible(false);
-      //      continue;
-      //    }
-      //
-      //    screen->drawAll();
-      //    numScreens++;
-      //  }
-      //
-      //  if(numScreens == 0){
-      //    //mainloop_active = false;                          /* Give up if there was nothing to draw */
-      //    break;
-      //  }
-      //}
     }
     SECTION(nanovg | frames per second and color under cursor) 
     {
@@ -856,6 +838,27 @@ ENTRY_DECLARATION
 
 
 
+//SECTION(main loop from nanogui / common.cpp)
+//{
+//  int numScreens = 0;
+//  for(auto kv : __nanogui_screens){
+//    Screen *screen = kv.second;
+//    if(!screen->visible()){
+//      continue;
+//    }else if(glfwWindowShouldClose(screen->glfwWindow())){
+//      screen->setVisible(false);
+//      continue;
+//    }
+//
+//    screen->drawAll();
+//    numScreens++;
+//  }
+//
+//  if(numScreens == 0){
+//    //mainloop_active = false;                          /* Give up if there was nothing to draw */
+//    break;
+//  }
+//}
 
 //dbLst = new ComboBox(keyWin, { "  simdb_test  ", "  simdb_viz  ", "  simdb_run  " });
 //dbLst->setChangeCallback([](bool pressed){
