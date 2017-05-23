@@ -28,8 +28,10 @@
 
 // -todo: fix crash on focus event while db list is open - fixed by checking for refCount in the focus?
 // -todo: generate .c arrays of bytes from .ttf files
+// -todo: integrate font files as .c files so that .exe is contained with no dependencies
+// -todo: use serialized file data with nanovg
 
-// todo: integrate font files as .h files so that .exe is contained with no dependencies
+// todo: use serialized fonts with nanogui
 // todo: try out tiny/nano file dialog for saving and loading of serialized data 
 // todo: make save button or menu to save serialized files 
 // todo: make a load button or menu to load serialized files
@@ -618,8 +620,10 @@ ENTRY_DECLARATION
         printf("Could not init nanovg.\n");
         return -1;
       }
-                 nvgCreateFont(vd.ui.nvg, "sans",      "Roboto-Regular.ttf" );
-      int font = nvgCreateFont(vd.ui.nvg, "sans-bold", "Roboto-Bold.ttf"    );
+      
+      //nvgCreateFont(vd.ui.nvg, "sans",      "Roboto-Regular.ttf" );
+      //int font = nvgCreateFont(vd.ui.nvg, "sans-bold", "Roboto-Bold.ttf"    );
+      int font = nvgCreateFontMem(vd.ui.nvg, "sans", Roboto_Regular_ttf, Roboto_Regular_ttf_len, 0);
       if(font == -1){
         printf("Could not add font bold.\n");
         return -1;

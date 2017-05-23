@@ -78,9 +78,17 @@ Theme::Theme(NVGcontext *ctx) {
     //mFontIcons = nvgCreateFontMem(ctx, "icons", entypo_ttf,
     //  entypo_ttf_size, 0);
 
-    mFontNormal = nvgCreateFont(ctx, "sans",      roboto_regular_ttf);      // sbassett - changed to load files instead of using header files from arrays
-    mFontBold   = nvgCreateFont(ctx, "sans-bold", roboto_bold_ttf);
-    mFontIcons  = nvgCreateFont(ctx, "icons",     entypo_ttf);
+    //mFontNormal = nvgCreateFont(ctx, "sans",      roboto_regular_ttf);      // sbassett - changed to load files instead of using header files from arrays
+    //mFontBold   = nvgCreateFont(ctx, "sans-bold", roboto_bold_ttf);
+    //mFontIcons  = nvgCreateFont(ctx, "icons",     entypo_ttf);
+
+    mFontNormal = nvgCreateFontMem(ctx, "sans",      
+      Roboto_Regular_ttf, Roboto_Regular_ttf_len, 0);
+    mFontBold   = nvgCreateFontMem(ctx, "sans-bold",
+      Roboto_Bold_ttf,    Roboto_Bold_ttf_len, 0);
+
+    mFontIcons  = nvgCreateFontMem(ctx, "icons", 
+      entypo_ttf, entypo_ttf_len, 0);
 
     if (mFontNormal == -1 || mFontBold == -1 || mFontIcons == -1)
         throw std::runtime_error("Could not load fonts!");

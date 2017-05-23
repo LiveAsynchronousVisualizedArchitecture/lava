@@ -1,4 +1,8 @@
 
+/*
+  This file contains static data meant to go into the executable
+*/
+
 #ifdef _MSC_VER
   #pragma once
 #endif
@@ -8,6 +12,15 @@
 
 #include "../DataStore/ConcurrentMap/simdb.hpp"
 #include "VizDecl.h"
+
+extern "C" unsigned char Roboto_Regular_ttf[];
+extern "C" unsigned int  Roboto_Regular_ttf_len;
+
+extern "C" unsigned char Roboto_Bold_ttf[];
+extern "C" unsigned int  Roboto_Bold_ttf_len;
+
+extern "C" unsigned char entypo_ttf[];
+extern "C" unsigned int  entypo_ttf_len;
 
 static const char*  vertShader   = 
 "#version 330 core\n"

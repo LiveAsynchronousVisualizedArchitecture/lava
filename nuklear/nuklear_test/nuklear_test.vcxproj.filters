@@ -30,6 +30,9 @@
     <Filter Include="Source Files\src_libs">
       <UniqueIdentifier>{20d17ab6-8a23-408f-8af9-ae20a07caa32}</UniqueIdentifier>
     </Filter>
+    <Filter Include="hpp\SerialFiles">
+      <UniqueIdentifier>{a49c91f6-dec7-4d50-8bbb-801e9a0dffcb}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\no_rt_util.h">
@@ -171,6 +174,15 @@
     </ClCompile>
     <ClCompile Include="..\nanovg.c">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Roboto-Regular.ttf.c">
+      <Filter>hpp\SerialFiles</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Roboto-Bold.ttf.c">
+      <Filter>hpp\SerialFiles</Filter>
+    </ClCompile>
+    <ClCompile Include="..\entypo.ttf.c">
+      <Filter>hpp\SerialFiles</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

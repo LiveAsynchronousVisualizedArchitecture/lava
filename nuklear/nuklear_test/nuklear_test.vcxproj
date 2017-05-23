@@ -156,6 +156,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\entypo.ttf.c" />
     <ClCompile Include="..\glew.c" />
     <ClCompile Include="..\glfw.c" />
     <ClCompile Include="..\main.cpp">
@@ -195,6 +196,11 @@
     <ClCompile Include="..\nanogui\src\window.cpp" />
     <ClCompile Include="..\nanovg.c">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsC</CompileAs>
+    </ClCompile>
+    <ClCompile Include="..\Roboto-Bold.ttf.c" />
+    <ClCompile Include="..\Roboto-Regular.ttf.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+      </ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\unified.cpp" />
   </ItemGroup>
