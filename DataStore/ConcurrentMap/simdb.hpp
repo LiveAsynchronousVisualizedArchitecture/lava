@@ -1272,6 +1272,19 @@ struct  SharedMem
   bool            owner;
   char             path[256];
 
+  void mv(SharedMem&& rval)
+  {
+    fileHndl = rval.fileHndl;
+    hndlPtr = rval.hndlPtr;
+    ptr = rval.ptr;
+    size = rval.size;
+    owner = rval.owner;
+
+    strncpy(path, rval.path, sizeof(path));
+
+    rval.clear();
+  }
+
 public:
   static void        FreeAnon(SharedMem& sm)
   {
@@ -1415,18 +1428,8 @@ public:
 
   SharedMem(){}
   SharedMem(SharedMem&)       = delete;
-  SharedMem(SharedMem&& rval)
-  {
-    fileHndl       =  rval.fileHndl;
-    hndlPtr        =  rval.hndlPtr;
-    ptr            =  rval.ptr;
-    size           =  rval.size;
-    owner          =  rval.owner;
-
-    strncpy(path, rval.path, sizeof(path));
-
-    rval.clear();
-  }
+  SharedMem(SharedMem&& rval){ mv(std::move(rval)); }
+  SharedMem& operator=(SharedMem&& rval){ mv(std::move(rval)); return *this; }
   ~SharedMem()
   {
     if(ptr){
@@ -1503,7 +1506,25 @@ private:
   static bool           IsEmpty(VerIdx vi){return CncrHsh::IsEmpty(vi);}         // special value for CncrHsh
   static bool         IsListEnd(VerIdx vi){return CncrStr::IsListEnd(vi);}       // special value for CncrStr
 
-  
+  void mv(simdb&& rval)
+  {
+    using namespace std;
+    
+    s_flags      = rval.s_flags;
+    s_cnt        = rval.s_cnt;
+    s_blockSize  = rval.s_blockSize;
+    s_blockCount = rval.s_blockCount;
+    memcpy(&s_cs, &rval.s_cs, sizeof(s_cs));
+    memcpy(&s_ch, &rval.s_ch, sizeof(s_ch));
+
+    m_mem       =  move(rval.m_mem);
+    m_error     =  rval.m_error;
+    m_nxtChIdx  =  rval.m_nxtChIdx;
+    m_curChIdx  =  rval.m_curChIdx;
+    m_blkCnt    =  rval.m_blkCnt;
+    m_blkSz     =  rval.m_blkSz;
+    m_isOpen    =  rval.m_isOpen;    
+  }
 
 public:
   simdb(){}
@@ -1553,6 +1574,9 @@ public:
     if(isOwner()){ s_flags->store(1); }
   }
   ~simdb(){ close(); }
+
+  simdb(simdb&& rval){ mv(std::move(rval)); }
+  simdb& operator=(simdb&& rval){ mv(std::move(rval)); return *this; }
 
   i64          len(const void *const key, u32 klen, u32* out_vlen=nullptr, u32* out_version=nullptr) const
   {
@@ -1808,7 +1832,7 @@ public:
       size_t  pfxSz   = sizeof(wPrefix);
       if( strncmp( (char*)info->name.Buffer, (char*)wPrefix, pfxSz)!=0 ){  continue; }
 
-      wstring  wname = wstring( (WCHAR*)info->name.Buffer );
+      wstring  wname = wstring( ((WCHAR*)info->name.Buffer)+6 );
       wstring_convert<codecvt_utf8<wchar_t>> cnvrtr;
       string    name = cnvrtr.to_bytes(wname);
 
@@ -1845,7 +1869,7 @@ public:
       }
 
       if(strncmp(dent->d_name, prefix, pfxSz)==0){
-        ret.push_back(dent->d_name);
+        ret.push_back(dent->d_name + 6);
       }
     }
 

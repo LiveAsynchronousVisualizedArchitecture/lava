@@ -16,7 +16,6 @@
 #include "IndexedVerts.h"
 #include "VizData.hpp"
 
-// todo: put into a util file?
 namespace{
 
 void       print_gl_errors(int line)
@@ -195,16 +194,16 @@ inline vec4         shapes_to_bndsph(VizData const& vd)
   //  }
   //}
 }
-inline vecstr     simdbNames_to_name(vecstr names)
-{
-  using namespace std;
-
-  for(auto& s : names){
-    if(s.size()>6){ s = str(s.c_str()+6); }
-  }
-
-  return move(names);
-}
+//inline vecstr     simdbNames_to_name(vecstr names)
+//{
+//  using namespace std;
+//
+//  for(auto& s : names){
+//    if(s.size()>6){ s = str(s.c_str()+6); }
+//  }
+//
+//  return move(names);
+//}
 #endif
 
 

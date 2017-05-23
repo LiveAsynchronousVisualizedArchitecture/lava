@@ -71,9 +71,10 @@
 // -todo: change font to normal and not bold for fps and color scanner
 // -todo: make separate database referesh function that can be called on a switch, but also subtracts time from the refresh counter
 // -todo: fix refresh of db to not mangle names
+// -todo: build in move constructor for simdb
+// -todo: make simdb_listDBs return unprefixed names
 
-// todo: keep databases in memory after listing them
-// todo: make simdb_listDBs return unprefixed names
+// todo: clean out nanogui example
 // todo: fix crash on focus event while db list is open
 // todo: organize nanogui globals into global states
 // todo: integrate font files as .h files so that .exe is contained with no dependencies
@@ -81,6 +82,7 @@
 // todo: write visualizer overview for Readme.md  
 // todo: make camera fitting use the field of view and change the dist to fit all geometry - use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
 
+// todo: keep databases in memory after listing them?
 // todo: make label switches not only turn keys on and off, but fade their transparency too?
 // todo: move and rename project to LavaViz or any non test name
 // todo: put sensitivity into a separate settings struct
@@ -158,27 +160,6 @@ vecstr        dbNames;
 
 FormHelper*      keys = nullptr;
 f64 avgFps=60,prevt=0,cpuTime=0, t=0, dt=0;
-
-// start nanogui test stuff
-enum test_enum {
-  Item1 = 0,
-  Item2,
-  Item3
-};
-
-using uWindow = std::unique_ptr<nanogui::Window>;
-
-FormHelper*       gui = nullptr;
-Window*           win = nullptr;
-bool          enabled = true;
-bool             bvar = true;
-int              ivar = 12345678;
-double           dvar = 3.1415926;
-float            fvar = (float)dvar;
-std::string    strval = "A string";
-test_enum     enumval = Item2;
-Color          colval(0.5f, 0.5f, 0.7f, 1.f);
-// end nanogui test stuff
 
 namespace {  // functions that are a transform from one datatype to another are in VizTfm.hpp - functions here are more state based
 
@@ -407,9 +388,8 @@ void           buttonCallback(str key, bool pushed)
 void            dbLstCallback(bool pressed)
 {
   if(pressed){
-    dbNames = simdbNames_to_name(simdb_listDBs());                                         // all of these are globals
+    dbNames = simdb_listDBs();                            // all of these are globals
     if(dbLst){ 
-      //vecstr names = dbNames;
       dbLst->setItems(dbNames);
     }
     screen.performLayout();
@@ -712,8 +692,7 @@ ENTRY_DECLARATION
     }
     SECTION(database)
     {
-      if(vd.keyRefreshClock > vd.keyRefresh)
-      {
+      if(vd.keyRefreshClock > vd.keyRefresh){
         refreshDB(&vd);
       } // end of updates to shapes 
       PRINT_GL_ERRORS
@@ -858,6 +837,35 @@ ENTRY_DECLARATION
   return 0;
 }
 
+
+
+
+
+
+
+// start nanogui test stuff
+//enum test_enum {
+//  Item1 = 0,
+//  Item2,
+//  Item3
+//};
+//
+//using uWindow = std::unique_ptr<nanogui::Window>;
+//
+//FormHelper*       gui = nullptr;
+//Window*           win = nullptr;
+//bool          enabled = true;
+//bool             bvar = true;
+//int              ivar = 12345678;
+//double           dvar = 3.1415926;
+//float            fvar = (float)dvar;
+//std::string    strval = "A string";
+//test_enum     enumval = Item2;
+//Color          colval(0.5f, 0.5f, 0.7f, 1.f);
+// end nanogui test stuff
+
+//dbNames = simdbNames_to_name(simdb_listDBs());                                         // all of these are globals
+//vecstr names = dbNames;
 
 //  auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
 //  dbKeys      = shapesFromKeys(db, move(dbKeys), &vd);
