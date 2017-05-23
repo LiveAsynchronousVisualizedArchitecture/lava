@@ -73,8 +73,8 @@
 // -todo: fix refresh of db to not mangle names
 // -todo: build in move constructor for simdb
 // -todo: make simdb_listDBs return unprefixed names
+// -todo: clean out nanogui example
 
-// todo: clean out nanogui example
 // todo: fix crash on focus event while db list is open
 // todo: organize nanogui globals into global states
 // todo: integrate font files as .h files so that .exe is contained with no dependencies
