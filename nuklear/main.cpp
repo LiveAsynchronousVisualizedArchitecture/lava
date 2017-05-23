@@ -74,13 +74,18 @@
 // -todo: build in move constructor for simdb
 // -todo: make simdb_listDBs return unprefixed names
 // -todo: clean out nanogui example
+// -todo: sort keys
+// -todo: organize nanogui globals into global states
+// -todo: move declarations into VizDecl.h
 
+// todo: clean out done todo list and dead lines
 // todo: fix crash on focus event while db list is open
-// todo: organize nanogui globals into global states
 // todo: integrate font files as .h files so that .exe is contained with no dependencies
 // todo: make save button or menu to save serialized files 
+// todo: make a load button or menu to load serialized files
 // todo: write visualizer overview for Readme.md  
 // todo: make camera fitting use the field of view and change the dist to fit all geometry - use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
+// todo: make an initial overlay text that has hotkeys and dissapears when the screen is clicked
 
 // todo: keep databases in memory after listing them?
 // todo: make label switches not only turn keys on and off, but fade their transparency too?
@@ -123,8 +128,6 @@
 
 #include "glfw3.h"
 
-#include <nanogui/nanogui.h>
-
 #include "VizData.hpp"
 #include "VizGen.hpp"
 #include "VizTfm.hpp"
@@ -146,20 +149,6 @@
 #define MAX_VERTEX_BUFFER  512 * 1024
 #define MAX_ELEMENT_BUFFER 128 * 1024
 
-using namespace nanogui;
-
-Screen         screen;
-Window*        keyWin = nullptr;
-Window*         dbWin = nullptr;
-BoxLayout*     keyLay = nullptr;
-ComboBox*       dbLst = nullptr;
-int          dbLstIdx = -1;
-NVGcontext*       nvg = nullptr;
-veci           dbIdxs;
-vecstr        dbNames;
-
-FormHelper*      keys = nullptr;
-f64 avgFps=60,prevt=0,cpuTime=0, t=0, dt=0;
 
 namespace {  // functions that are a transform from one datatype to another are in VizTfm.hpp - functions here are more state based
 
@@ -263,7 +252,7 @@ void              keyCallback(GLFWwindow* window, int key, int scancode, int act
     break;
   }
 
-  screen.keyCallbackEvent(key, scancode, action, mods);
+  vd->ui.screen.keyCallbackEvent(key, scancode, action, mods);
 }
 void           scrollCallback(GLFWwindow* window, double xofst, double yofst)
 {
@@ -279,7 +268,7 @@ void           scrollCallback(GLFWwindow* window, double xofst, double yofst)
   nxtDst        = cam.dist + ofst;
   cam.dist      = nxtDst;
 
-  screen.scrollCallbackEvent(xofst, yofst);
+  vd->ui.screen.scrollCallbackEvent(xofst, yofst);
 }
 void         mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 {
@@ -297,7 +286,7 @@ void         mouseBtnCallback(GLFWwindow* window, int button, int action, int mo
     }
   }
 
-  screen.mouseButtonCallbackEvent(button, action, mods);
+  vd->ui.screen.mouseButtonCallbackEvent(button, action, mods);
 }
 void        cursorPosCallback(GLFWwindow* window, double x, double y)
 {
@@ -327,21 +316,25 @@ void        cursorPosCallback(GLFWwindow* window, double x, double y)
 
   cam.oldMousePos = newMousePosition;
 
-  screen.cursorPosCallbackEvent(x,y);
+  vd->ui.screen.cursorPosCallbackEvent(x,y);
 }
 void             charCallback(GLFWwindow* window, unsigned int codepoint)
 {
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
 
-  screen.charCallbackEvent(codepoint);
+  vd->ui.screen.charCallbackEvent(codepoint);
 }
 void             dropCallback(GLFWwindow* window, int count, const char** filenames)
 {
-  screen.dropCallbackEvent(count, filenames);
+  VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
+
+  vd->ui.screen.dropCallbackEvent(count, filenames);
 }
 void  framebufferSizeCallback(GLFWwindow* window, int w, int h)
 {
-  screen.resizeCallbackEvent(w, h);
+  VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
+
+  vd->ui.screen.resizeCallbackEvent(w, h);
 }
 GLFWwindow*          initGLFW(VizData* vd)
 {
@@ -388,11 +381,11 @@ void           buttonCallback(str key, bool pushed)
 void            dbLstCallback(bool pressed)
 {
   if(pressed){
-    dbNames = simdb_listDBs();                            // all of these are globals
-    if(dbLst){ 
-      dbLst->setItems(dbNames);
+    vd.ui.dbNames = simdb_listDBs();                            // all of these are globals
+    if(vd.ui.dbLst){
+      vd.ui.dbLst->setItems(vd.ui.dbNames);
     }
-    screen.performLayout();
+    vd.ui.screen.performLayout();
   }
 }
 
@@ -516,22 +509,22 @@ void                refreshDB(VizData* vd)
   auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
   dbKeys      = shapesFromKeys(db, move(dbKeys), vd);
   dbKeys      = eraseMissingKeys(move(dbKeys), &vd->shapes);
-
-  sort(ALL(dbIdxs));                                                  // sort the indices so the largest are removed first and the smaller indices don't change their position
-  FROM(dbIdxs.size(), i){ keyWin->removeChild(dbIdxs[i]); }
-  dbIdxs.resize(0);
-  dbIdxs.shrink_to_fit();
+  sort(ALL(dbKeys));
+  sort(ALL(vd->ui.dbIdxs));                                                  // sort the indices so the largest are removed first and the smaller indices don't change their position
+  FROM(vd->ui.dbIdxs.size(), i){ vd->ui.keyWin->removeChild(vd->ui.dbIdxs[i]); }
+  vd->ui.dbIdxs.resize(0);
+  vd->ui.dbIdxs.shrink_to_fit();
   for(auto key : dbKeys)                                              // add the buttons back and keep track of their indices
   {
-    auto b = new Button(keyWin, key.str);
-    int  i = keyWin->childIndex(b);
-    if(i > -1){ dbIdxs.push_back(i); }
+    auto b = new Button(vd->ui.keyWin, key.str);
+    int  i = vd->ui.keyWin->childIndex(b);
+    if(i > -1){ vd->ui.dbIdxs.push_back(i); }
     b->setFlags(Button::ToggleButton);
     b->setChangeCallback([k = key.str](bool pushed){ buttonCallback(k, pushed); });
     b->setPushed(vd->shapes[key.str].active);
     b->setFixedHeight(25);
   }
-  screen.performLayout();
+  vd->ui.screen.performLayout();
 
   vd->keyRefreshClock -= vd->keyRefresh;
   vd->verRefreshClock -= vd->verRefresh;
@@ -576,6 +569,7 @@ void       genTestGeo(simdb* db)
   db2.put("one",    leftData);
   db2.put("two",   rightData);
   db2.put("three",  cubeData);
+  db2.put("super long key name as a test", cubeData);
 
 }
 
@@ -588,10 +582,8 @@ ENTRY_DECLARATION
 
   SECTION(initialization)
   {
-    SECTION(static simdb and static VizData)
+    SECTION(static VizData)
     {
-      //new (&db) simdb("test", 4096, 1<<14);             // inititialize the DB with placement new into the data segment
-
       vd.ui.w             = 1024; 
       vd.ui.h             =  768;
       vd.ui.ptSz          =    0.25f;
@@ -604,6 +596,19 @@ ENTRY_DECLARATION
       vd.keyRefresh       =  2.0;
       vd.keyRefreshClock  =  vd.keyRefresh;
       vd.camera           =  initCamera();
+
+      vd.avgFps   =  60; 
+      vd.prevt    =   0; 
+      vd.cpuTime  =   0; 
+      vd.t        =   0; 
+      vd.dt       =   0;
+
+      vd.ui.keyWin    =  nullptr;
+      vd.ui.dbWin     =  nullptr;
+      vd.ui.keyLay    =  nullptr;
+      vd.ui.dbLst     =  nullptr;
+      vd.ui.dbLstIdx  = -1;
+      vd.ui.nvg       = nullptr;     
     }
     SECTION(glfw and glew)
     {
@@ -620,52 +625,51 @@ ENTRY_DECLARATION
     }
     SECTION(nanogui)
     {
-      screen.initialize(vd.win, false);
+      vd.ui.screen.initialize(vd.win, false);
 
       SECTION(sidebar)
       {
-        keyLay     = new BoxLayout(Orientation::Vertical, Alignment::Fill, 2, 5);
-        keyWin     = new Window(&screen, "");
-        auto spcr1 = new nanogui::Label(keyWin, "");
-        auto spcr2 = new nanogui::Label(keyWin, "");
-        auto spcr3 = new nanogui::Label(keyWin, "");
-        dbLst      = new ComboBox(keyWin, {"None"} );
-        dbLst->setChangeCallback( dbLstCallback );
+        vd.ui.keyLay     = new BoxLayout(Orientation::Vertical, Alignment::Fill, 2, 5);
+        vd.ui.keyWin     = new Window(&vd.ui.screen, "");
+        auto spcr1 = new nanogui::Label(vd.ui.keyWin, "");
+        auto spcr2 = new nanogui::Label(vd.ui.keyWin, "");
+        auto spcr3 = new nanogui::Label(vd.ui.keyWin, "");
+        vd.ui.dbLst      = new ComboBox(vd.ui.keyWin, {"None"} );
+        vd.ui.dbLst->setChangeCallback( dbLstCallback );
         dbLstCallback(true);
-        dbLst->setCallback([](int i){                                          // callback for the actual selection
-          if(i < dbNames.size()){
-            initSimDB(dbNames[i]);
+        vd.ui.dbLst->setCallback([](int i){                                          // callback for the actual selection
+          if(i < vd.ui.dbNames.size()){
+            initSimDB(vd.ui.dbNames[i]);
             refreshDB(&vd);
           }
-          screen.performLayout();
-          printf(" selected %d \n",i);
+          vd.ui.screen.performLayout();
         });
-        auto spcr4 = new nanogui::Label(keyWin, "");
-        auto spcr5 = new nanogui::Label(keyWin, "");
-        auto spcr6 = new nanogui::Label(keyWin, "");
+        auto spcr4 = new nanogui::Label(vd.ui.keyWin, "");
+        auto spcr5 = new nanogui::Label(vd.ui.keyWin, "");
+        auto spcr6 = new nanogui::Label(vd.ui.keyWin, "");
 
-        dbLstIdx = keyWin->childIndex(dbLst);                                  // only done once so not a problem even though it is a linear search
-        keyWin->setLayout(keyLay);
-        dbLst->setSide(Popup::Left);
+        vd.ui.dbLstIdx = vd.ui.keyWin->childIndex(vd.ui.dbLst);                                  // only done once so not a problem even though it is a linear search
+        vd.ui.keyWin->setLayout(vd.ui.keyLay);
+        vd.ui.dbLst->setSide(Popup::Left);
 
-        Theme* thm = keyWin->theme();
+        Theme* thm = vd.ui.keyWin->theme();
         thm->mTransparent         = v4f( .0f,  .0f,  .0f,    .0f );
         thm->mWindowFillUnfocused = v4f( .2f,  .2f,  .225f,  .3f );
         thm->mWindowFillFocused   = v4f( .3f,  .28f, .275f,  .3f );
       }
 
-      screen.setVisible(true);
-      screen.performLayout();
+      vd.ui.screen.setVisible(true);
+      vd.ui.screen.performLayout();
     }
     SECTION(nanovg)
     {
-      nvg =  nvgCreateGL3(NVG_ANTIALIAS | NVG_STENCIL_STROKES | NVG_DEBUG);
-      if(nvg == NULL){
+      vd.ui.nvg =  nvgCreateGL3(NVG_ANTIALIAS | NVG_STENCIL_STROKES | NVG_DEBUG);
+      if(vd.ui.nvg == NULL){
         printf("Could not init nanovg.\n");
         return -1;
       }
-                 nvgCreateFont(nvg, "sans",      "Roboto-Regular.ttf" );
-      int font = nvgCreateFont(nvg, "sans-bold", "Roboto-Bold.ttf"    );
+                 nvgCreateFont(vd.ui.nvg, "sans",      "Roboto-Regular.ttf" );
+      int font = nvgCreateFont(vd.ui.nvg, "sans-bold", "Roboto-Bold.ttf"    );
       if(font == -1){
         printf("Could not add font bold.\n");
         return -1;
@@ -685,14 +689,15 @@ ENTRY_DECLARATION
       vd.keyRefreshClock += passed;
       vd.verRefreshClock += passed;
 
-      t     = glfwGetTime();
-      dt    = t - prevt;
-      prevt = t;
+      vd.t     = glfwGetTime();
+      vd.dt    = vd.t - vd.prevt;
+      vd.prevt = vd.t;
 
     }
     SECTION(database)
     {
       if(vd.keyRefreshClock > vd.keyRefresh){
+        glfwPollEvents();
         refreshDB(&vd);
       } // end of updates to shapes 
       PRINT_GL_ERRORS
@@ -778,49 +783,49 @@ ENTRY_DECLARATION
     }
     SECTION(nanogui)
     {
-      if(keyWin->focused()){
+      if(vd.ui.keyWin->focused()){
         vd.camera.leftButtonDown  = false;
         vd.camera.rightButtonDown = false;
       }
 
-      v2i   winsz = keyWin->size();
-      v2i keyspos = v2i(screen.width() - winsz.x(), 0);
-      keyWin->setPosition(keyspos);
-      keyWin->setSize(v2i(winsz.x(), screen.height()));
+      v2i   winsz = vd.ui.keyWin->size();
+      v2i keyspos = v2i(vd.ui.screen.width() - winsz.x(), 0);
+      vd.ui.keyWin->setPosition(keyspos);
+      vd.ui.keyWin->setSize(v2i(winsz.x(), vd.ui.screen.height()));
 
-      screen.drawContents();
-      screen.drawWidgets();
+      vd.ui.screen.drawContents();
+      vd.ui.screen.drawWidgets();
     }
     SECTION(nanovg | frames per second and color under cursor) 
     {
-      nvgBeginFrame(nvg, vd.ui.w, vd.ui.h, vd.ui.w/(f32)vd.ui.h);
-        avgFps *= 0.9;
-        avgFps += (1.0 / dt)*0.1;
+      nvgBeginFrame(vd.ui.nvg, vd.ui.w, vd.ui.h, vd.ui.w/(f32)vd.ui.h);
+        vd.avgFps *= 0.9;
+        vd.avgFps += (1.0 / vd.dt)*0.1;
         //int fps = (int)avgFps;
 
         char str[TITLE_MAX_LEN];
-        sprintf(str, "%.1f", avgFps);
+        sprintf(str, "%04.01f", vd.avgFps);
 
-        f32 tb = nvgTextBounds(nvg, 0, 0, str, NULL, NULL);
-        nvgFontSize(nvg, vd.ui.hudSz);
+        f32 tb = nvgTextBounds(vd.ui.nvg, 0, 0, str, NULL, NULL);
+        nvgFontSize(vd.ui.nvg, vd.ui.hudSz);
         //nvgFontFace(nvg, "sans-bold");
-        nvgFontFace(nvg, "sans");
-        nvgTextAlign(nvg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
-        nvgFillColor(nvg, nvgRGBA(255, 255, 255, 255));
-        nvgText(nvg, 15.f, vd.ui.hudSz, str, NULL);
+        nvgFontFace(vd.ui.nvg, "sans");
+        nvgTextAlign(vd.ui.nvg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
+        nvgFillColor(vd.ui.nvg, nvgRGBA(255, 255, 255, 255));
+        nvgText(vd.ui.nvg, 15.f, vd.ui.hudSz, str, NULL);
 
 
         auto rgb = vd.mouseRGB;
         sprintf(str, "%.2f  %.2f  %.2f", rgb[0], rgb[1], rgb[2]);
         //f32 rgbBnds = nvgTextBounds(nvg, tb, 0, str, NULL, NULL);
-        nvgFontSize(nvg, vd.ui.hudSz);
+        nvgFontSize(vd.ui.nvg, vd.ui.hudSz);
         //nvgFontFace(nvg, "sans-bold");
-        nvgFontFace(nvg, "sans");
-        nvgTextAlign(nvg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-        nvgFillColor(nvg, nvgRGBA(255, 255, 255, 255));
-        nvgText(nvg, tb + 45.f, vd.ui.hudSz, str, NULL);
+        nvgFontFace(vd.ui.nvg, "sans");
+        nvgTextAlign(vd.ui.nvg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+        nvgFillColor(vd.ui.nvg, nvgRGBA(255, 255, 255, 255));
+        nvgText(vd.ui.nvg, tb + 45.f, vd.ui.hudSz, str, NULL);
 
-      nvgEndFrame(nvg);
+      nvgEndFrame(vd.ui.nvg);
     }
 
     glfwSwapBuffers(vd.win);
@@ -841,7 +846,29 @@ ENTRY_DECLARATION
 
 
 
+//Screen         screen;
+//Window*        keyWin = nullptr;
+//Window*         dbWin = nullptr;
+//BoxLayout*     keyLay = nullptr;
+//ComboBox*       dbLst = nullptr;
+//int          dbLstIdx = -1;
+//NVGcontext*       nvg = nullptr;
+//veci           dbIdxs;
+//vecstr        dbNames;
+//
+//f64 avgFps=60,prevt=0,cpuTime=0, t=0, dt=0;
+//
+//
+//FormHelper*      keys = nullptr;
 
+//new (&db) simdb("test", 4096, 1<<14);             // inititialize the DB with placement new into the data segment
+//
+//vd.ui.screen;
+//vd.ui.dbIdxs;
+//vd.ui.dbNames;
+
+//
+//printf(" selected %d \n",i);
 
 // start nanogui test stuff
 //enum test_enum {

@@ -181,6 +181,7 @@
     <ClCompile Include="..\nanogui\src\progressbar.cpp" />
     <ClCompile Include="..\nanogui\src\screen.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\nanogui\src\serializer.cpp" />
     <ClCompile Include="..\nanogui\src\slider.cpp" />
@@ -208,6 +209,7 @@
     <ClInclude Include="..\no_rt_util.h" />
     <ClInclude Include="..\IndexedVerts.h" />
     <ClInclude Include="..\VizData.hpp" />
+    <ClInclude Include="..\VizDecl.h" />
     <ClInclude Include="..\VizGen.hpp" />
     <ClInclude Include="..\VizTfm.hpp" />
   </ItemGroup>

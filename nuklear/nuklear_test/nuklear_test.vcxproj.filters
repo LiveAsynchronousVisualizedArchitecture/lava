@@ -68,6 +68,9 @@
     <ClInclude Include="..\nanogui\include\stb_truetype.h">
       <Filter>Header Files\nanogui</Filter>
     </ClInclude>
+    <ClInclude Include="..\VizDecl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\unified.cpp">
