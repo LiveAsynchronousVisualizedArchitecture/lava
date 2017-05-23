@@ -1,0 +1,26 @@
+
+dealing with multiple types:
+|  have separate simdb file for the visualizer
+|  have all data be a tbl
+|  shouldn't be able to find any keys in other arbitrary data
+|  have that tbl have a type field that is an unsigned 8 byte number 
+|  IdxVerts would be geometry type
+|  raw table would have type 'Table'
+
+
+
+comparing multiple keys from the same type
+|  IdxVerts can draw over each other in 3D space
+|  Table could be made to interlace arrays and matching keys 
+|  |  While displaying the field values side by side with different colors? 
+
+
+switching between types
+|  have tabs at the top to switch between types 
+|  tabs have a number beside them that shows how many of each type there are?
+|  color key buttons for their different types
+|  will need to check each key to see if is a tbl or not
+|  should tbl have a magic number for the first 16 bits? The first 8 bytes?
+
+
+

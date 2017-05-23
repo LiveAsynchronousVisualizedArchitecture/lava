@@ -30,12 +30,13 @@
 // -todo: generate .c arrays of bytes from .ttf files
 
 // todo: integrate font files as .h files so that .exe is contained with no dependencies
+// todo: try out tiny/nano file dialog for saving and loading of serialized data 
 // todo: make save button or menu to save serialized files 
 // todo: make a load button or menu to load serialized files
 // todo: write visualizer overview for Readme.md  
-// todo: make camera fitting use the field of view and change the dist to fit all geometry - use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
 // todo: make an initial overlay text that has hotkeys and dissapears when the screen is clicked
 
+// todo: make camera fitting use the field of view and change the dist to fit all geometry - use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
 // todo: keep databases in memory after listing them?
 // todo: make label switches not only turn keys on and off, but fade their transparency too?
 // todo: move and rename project to LavaViz or any non test name
