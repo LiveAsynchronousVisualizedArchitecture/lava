@@ -22,6 +22,13 @@ extern "C" unsigned int  Roboto_Bold_ttf_len;
 extern "C" unsigned char entypo_ttf[];
 extern "C" unsigned int  entypo_ttf_len;
 
+static const char* hotkeyGuideH = 
+" 'h' -> 'Home' :  Returns the camera to its default position.";
+static const char* hotkeyGuideF =
+" 'f' -> 'Fit'  :  Fits the view to the currently visible geometry.";
+static const char* hotkeyGuidePage =
+" 'Page Up' and 'Page Down' :  Control the particle and line size.";
+
 static const char*  vertShader   = 
 "#version 330 core\n"
 "\n"

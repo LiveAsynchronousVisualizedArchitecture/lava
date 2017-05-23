@@ -30,14 +30,15 @@
 // -todo: generate .c arrays of bytes from .ttf files
 // -todo: integrate font files as .c files so that .exe is contained with no dependencies
 // -todo: use serialized file data with nanovg
+// -todo: use serialized fonts with nanogui
+// -todo: make an initial overlay text that has hotkeys and dissapears when the screen is clicked
 
-// todo: use serialized fonts with nanogui
+// todo: make title change on different database selection
+// todo: write visualizer overview for Readme.md  
+
 // todo: try out tiny/nano file dialog for saving and loading of serialized data 
 // todo: make save button or menu to save serialized files 
-// todo: make a load button or menu to load serialized files
-// todo: write visualizer overview for Readme.md  
-// todo: make an initial overlay text that has hotkeys and dissapears when the screen is clicked
-
+// todo: make a load button or menu to load serialized files - would need to have a visualizer specific simdb that would keep the files? 
 // todo: make camera fitting use the field of view and change the dist to fit all geometry - use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
 // todo: keep databases in memory after listing them?
 // todo: make label switches not only turn keys on and off, but fade their transparency too?
@@ -225,6 +226,8 @@ void           scrollCallback(GLFWwindow* window, double xofst, double yofst)
 void         mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 {
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
+
+  vd->ui.showGuide = false;
 
   if(button==GLFW_MOUSE_BUTTON_LEFT){
     if(action==GLFW_PRESS) vd->camera.leftButtonDown = true;
@@ -540,6 +543,7 @@ ENTRY_DECLARATION
       vd.ui.h             =  768;
       vd.ui.ptSz          =    0.25f;
       vd.ui.hudSz         =   16.0f;
+      vd.ui.guideSz       =   32.0f;
 
       vd.now              =  nowd();
       vd.prev             =  vd.now;
@@ -555,12 +559,13 @@ ENTRY_DECLARATION
       vd.t        =   0; 
       vd.dt       =   0;
 
-      vd.ui.keyWin    =  nullptr;
-      vd.ui.dbWin     =  nullptr;
-      vd.ui.keyLay    =  nullptr;
-      vd.ui.dbLst     =  nullptr;
-      vd.ui.dbLstIdx  = -1;
-      vd.ui.nvg       = nullptr;     
+      vd.ui.keyWin     =  nullptr;
+      vd.ui.dbWin      =  nullptr;
+      vd.ui.keyLay     =  nullptr;
+      vd.ui.dbLst      =  nullptr;
+      vd.ui.dbLstIdx   =  -1;
+      vd.ui.nvg        =  nullptr;
+      vd.ui.showGuide  =  true;
     }
     SECTION(glfw and glew)
     {
@@ -581,12 +586,12 @@ ENTRY_DECLARATION
 
       SECTION(sidebar)
       {
-        vd.ui.keyLay     = new BoxLayout(Orientation::Vertical, Alignment::Fill, 2, 5);
-        vd.ui.keyWin     = new Window(&vd.ui.screen, "");
-        auto spcr1 = new nanogui::Label(vd.ui.keyWin, "");
-        auto spcr2 = new nanogui::Label(vd.ui.keyWin, "");
-        auto spcr3 = new nanogui::Label(vd.ui.keyWin, "");
-        vd.ui.dbLst      = new ComboBox(vd.ui.keyWin, {"None"} );
+        vd.ui.keyLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 2, 5);
+        vd.ui.keyWin = new Window(&vd.ui.screen,  "");
+        auto spcr1   = new Label(vd.ui.keyWin, "");
+        auto spcr2   = new Label(vd.ui.keyWin, "");
+        auto spcr3   = new Label(vd.ui.keyWin, "");
+        vd.ui.dbLst  = new ComboBox(vd.ui.keyWin, {"None"} );
         vd.ui.dbLst->setChangeCallback( dbLstCallback );
         dbLstCallback(true);
         vd.ui.dbLst->setCallback([](int i){                                          // callback for the actual selection
@@ -596,9 +601,9 @@ ENTRY_DECLARATION
           }
           vd.ui.screen.performLayout();
         });
-        auto spcr4 = new nanogui::Label(vd.ui.keyWin, "");
-        auto spcr5 = new nanogui::Label(vd.ui.keyWin, "");
-        auto spcr6 = new nanogui::Label(vd.ui.keyWin, "");
+        auto spcr4   = new Label(vd.ui.keyWin, "");
+        auto spcr5   = new Label(vd.ui.keyWin, "");
+        auto spcr6   = new Label(vd.ui.keyWin, "");
 
         vd.ui.dbLstIdx = vd.ui.keyWin->childIndex(vd.ui.dbLst);                                  // only done once so not a problem even though it is a linear search
         vd.ui.keyWin->setLayout(vd.ui.keyLay);
@@ -753,32 +758,46 @@ ENTRY_DECLARATION
     SECTION(nanovg | frames per second and color under cursor) 
     {
       nvgBeginFrame(vd.ui.nvg, vd.ui.w, vd.ui.h, vd.ui.w/(f32)vd.ui.h);
-        vd.avgFps *= 0.9;
-        vd.avgFps += (1.0 / vd.dt)*0.1;
-        //int fps = (int)avgFps;
+        f32  tb = 0;
+        char nvgStr[TITLE_MAX_LEN];
 
-        char str[TITLE_MAX_LEN];
-        sprintf(str, "%04.01f", vd.avgFps);
+        SECTION(frames per second)
+        {
+          vd.avgFps *= 0.9;
+          vd.avgFps += (1.0 / vd.dt)*0.1;
 
-        f32 tb = nvgTextBounds(vd.ui.nvg, 0, 0, str, NULL, NULL);
-        nvgFontSize(vd.ui.nvg, vd.ui.hudSz);
-        //nvgFontFace(nvg, "sans-bold");
-        nvgFontFace(vd.ui.nvg, "sans");
-        nvgTextAlign(vd.ui.nvg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
-        nvgFillColor(vd.ui.nvg, nvgRGBA(255, 255, 255, 255));
-        nvgText(vd.ui.nvg, 15.f, vd.ui.hudSz, str, NULL);
+          sprintf(nvgStr, "%04.01f", vd.avgFps);
 
+          tb = nvgTextBounds(vd.ui.nvg, 0, 0, nvgStr, NULL, NULL);
+          nvgFontSize(vd.ui.nvg, vd.ui.hudSz);
+          nvgFontFace(vd.ui.nvg, "sans");
+          nvgTextAlign(vd.ui.nvg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
+          nvgFillColor(vd.ui.nvg, nvgRGBA(255, 255, 255, 255));
+          nvgText(vd.ui.nvg, 15.f, vd.ui.hudSz, nvgStr, NULL);
+        }
+        SECTION(rgb under cursor)
+        {
+          auto rgb = vd.mouseRGB;
+          sprintf(nvgStr, "%.2f  %.2f  %.2f", rgb[0], rgb[1], rgb[2]);
+          nvgFontSize(vd.ui.nvg, vd.ui.hudSz);
+          nvgFontFace(vd.ui.nvg, "sans");
+          nvgTextAlign(vd.ui.nvg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+          nvgFillColor(vd.ui.nvg, nvgRGBA(255, 255, 255, 255));
+          nvgText(vd.ui.nvg, tb + 45.f, vd.ui.hudSz, nvgStr, NULL);
+        }
 
-        auto rgb = vd.mouseRGB;
-        sprintf(str, "%.2f  %.2f  %.2f", rgb[0], rgb[1], rgb[2]);
-        //f32 rgbBnds = nvgTextBounds(nvg, tb, 0, str, NULL, NULL);
-        nvgFontSize(vd.ui.nvg, vd.ui.hudSz);
-        //nvgFontFace(nvg, "sans-bold");
-        nvgFontFace(vd.ui.nvg, "sans");
-        nvgTextAlign(vd.ui.nvg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-        nvgFillColor(vd.ui.nvg, nvgRGBA(255, 255, 255, 255));
-        nvgText(vd.ui.nvg, tb + 45.f, vd.ui.hudSz, str, NULL);
-
+        if(vd.ui.showGuide){
+          SECTION(hotkey guide)
+          {
+            nvgFontSize(vd.ui.nvg, vd.ui.guideSz);
+            nvgFontFace(vd.ui.nvg, "sans");
+            nvgTextAlign(vd.ui.nvg, NVG_ALIGN_LEFT ); // | NVG_ALIGN_MIDDLE);
+            nvgFillColor(vd.ui.nvg, nvgRGBA(255, 255, 255, 255));
+            nvgText(vd.ui.nvg, 100, 100,                   hotkeyGuideH,    NULL);
+            nvgText(vd.ui.nvg, 100, 100 + vd.ui.guideSz*2, hotkeyGuideF,    NULL);
+            nvgText(vd.ui.nvg, 100, 100 + vd.ui.guideSz*4, hotkeyGuidePage, NULL);
+          }
+        }
       nvgEndFrame(vd.ui.nvg);
     }
 
@@ -796,3 +815,24 @@ ENTRY_DECLARATION
   return 0;
 }
 
+
+
+//auto hotLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 2, 5);                   // hotLay is hotkey layout (of course)
+//auto hotWin = new Window(&vd.ui.screen,  "");
+//hotWin->setLayout(hotLay);
+//hotWin->center();
+//auto hotTxt = new TextBox(hotWin, "F is for fun H is for ham");
+//auto hotThm = hotWin->theme();
+//hotThm->mTransparent         = v4f(0,0,0,0);
+//hotThm->mWindowFillFocused   = v4f(0,0,0,0);
+//hotThm->mWindowFillUnfocused = v4f(0,0,0,0);
+//
+//hotWin->center();
+
+//int fps = (int)avgFps;
+//nvgFontFace(nvg, "sans-bold");
+
+//f32 rgbBnds = nvgTextBounds(nvg, tb, 0, nvgStr, NULL, NULL);
+//nvgFontFace(nvg, "sans-bold");
+//
+//nvgText(vd.ui.nvg, 100, 100, hotkeyGuide, NULL);

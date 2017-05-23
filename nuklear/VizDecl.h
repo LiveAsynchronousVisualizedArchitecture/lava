@@ -144,7 +144,7 @@ struct VizData
   struct
   {
     int w, h;
-    f32 ptSz, hudSz;                              // ptSz is point size  |  hudSz is  heads up display size
+    f32 ptSz, hudSz, guideSz;                              // ptSz is point size  |  hudSz is  heads up display size
     Screen         screen;
     Window*        keyWin = nullptr;
     Window*         dbWin = nullptr;
@@ -154,6 +154,7 @@ struct VizData
     NVGcontext*       nvg = nullptr;
     veci           dbIdxs;
     vecstr        dbNames;
+    bool        showGuide;
 
   } ui;
   f64 avgFps, prevt, cpuTime, t, dt;

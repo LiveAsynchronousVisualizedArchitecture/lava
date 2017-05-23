@@ -194,6 +194,9 @@ inline vec4         shapes_to_bndsph(VizData const& vd)
   //  }
   //}
 }
+#endif
+
+
 //inline vecstr     simdbNames_to_name(vecstr names)
 //{
 //  using namespace std;
@@ -204,4 +207,3 @@ inline vec4         shapes_to_bndsph(VizData const& vd)
 //
 //  return move(names);
 //}
-#endif
