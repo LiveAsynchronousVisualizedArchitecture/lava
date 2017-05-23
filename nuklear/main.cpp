@@ -26,7 +26,9 @@
 
 */
 
-// todo: fix crash on focus event while db list is open
+// -todo: fix crash on focus event while db list is open - fixed by checking for refCount in the focus?
+// -todo: generate .c arrays of bytes from .ttf files
+
 // todo: integrate font files as .h files so that .exe is contained with no dependencies
 // todo: make save button or menu to save serialized files 
 // todo: make a load button or menu to load serialized files
