@@ -32,8 +32,22 @@
 // -todo: use serialized file data with nanovg
 // -todo: use serialized fonts with nanogui
 // -todo: make an initial overlay text that has hotkeys and dissapears when the screen is clicked
+// -todo: make title change on different database selection
+// -idea: put version next to key value 
+// -idea: test indexed verts with images
+// -idea: ability to save indexed verts objects to a file
+// -idea: make a text visualizer? - will be taken care of by table 
+//       - display keys and data from db directly - keys then string on one line, click the line and add a tab with the key name in the tab title and a split window between hex and string form?
+//       - display values and strings
+// -idea: make a strings binary format - will this work for an arbitrary packed binary list? - should there be a data structure type and an underlying data type? - should be taken care of by tbl.hpp
+//       - first 8 bytes -> total size in bytes
+//       - next  4 bytes  -> data structure type? - binary list here?
+//       - next  4 bytes  -> underlying data type?
+//       - next  8 bytes  -> number of strings
+//       - for the number of strings -> 8 bytes for the offset of each string from the start of the whole binary 
+//       - next bytes are all string data - does the encoding matter here? should it be utf8 since you know the length of each string?
+// idea: work out a type enum for lava data structures? use the upper 16 bits of the size? this leaves 'only' 65,536 different types and 281 terabytes as the max size - use first 8 bytes for size and next 8 bytes for version? - put magic number in the upper 16 bits and type in a 'type' key 
 
-// todo: make title change on different database selection
 // todo: write visualizer overview for Readme.md  
 
 // todo: try out tiny/nano file dialog for saving and loading of serialized data 
@@ -44,24 +58,9 @@
 // todo: make label switches not only turn keys on and off, but fade their transparency too?
 // todo: move and rename project to LavaViz or any non test name
 // todo: put sensitivity into a separate settings struct
-// idea: make IndexedVerts restore without copying bytes? - this would mean that there would need to be a pointer to the head and each member would be pointers filled in on deserialization? 
-// idea: call getKeys asynchronously - use futures? 
-// idea: put version next to key value 
-// idea: test indexed verts with images
-// idea: ability to save indexed verts objects to a file
+
 // idea: look into drag and drop to load indexed verts objects by dragging from a file
-// idea: make a text visualizer?
-//       - display keys and data from db directly - keys then string on one line, click the line and add a tab with the key name in the tab title and a split window between hex and string form?
-//       - display values and strings
-// idea: make a strings binary format - will this work for an arbitrary packed binary list? - should there be a data structure type and an underlying data type?
-//       - first 8 bytes -> total size in bytes
-//       - next  4 bytes  -> data structure type? - binary list here?
-//       - next  4 bytes  -> underlying data type?
-//       - next  8 bytes  -> number of strings
-//       - for the number of strings -> 8 bytes for the offset of each string from the start of the whole binary 
-//       - next bytes are all string data - does the encoding matter here? should it be utf8 since you know the length of each string?
-// idea: work out a type enum for lava data structures? use the upper 16 bits of the size? this leaves 'only' 65,536 different types and 281 terabytes as the max size - use first 8 bytes for size and next 8 bytes for version?
-// idea: ability to display points of an indexed verts type as numbers - this would give the ability to have numbers floating in space
+// idea: ability to display points of an indexed verts type as numbers - this would give the ability to have numbers floating in space - could be take care of with a specialized tbl
 
 #include <chrono>
 #include <memory>
@@ -133,6 +132,11 @@ void                initSimDB(str const& name)
 {
   db.close();
   new (&db) simdb(name.c_str(), 4096, 1 << 14);             // inititialize the DB with placement new into the data segment
+
+  if(vd.win){
+    str title = "Visualizer - simdb_" + name;
+    glfwSetWindowTitle(vd.win, title.c_str());
+  }
 }
 void                 initGlew()
 {
@@ -306,7 +310,7 @@ GLFWwindow*          initGLFW(VizData* vd)
   glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
   glfwWindowHint(GLFW_SAMPLES, 32);
 
-  GLFWwindow* win = glfwCreateWindow(vd->ui.w, vd->ui.h, "Visualizer - simdb:test", NULL, NULL);    assert(win!=nullptr);
+  GLFWwindow* win = glfwCreateWindow(vd->ui.w, vd->ui.h, "Visualizer", NULL, NULL);    assert(win!=nullptr);
   glfwMakeContextCurrent(win);
   glfwGetWindowSize(win, &vd->ui.w, &vd->ui.h);
 
@@ -596,7 +600,8 @@ ENTRY_DECLARATION
         dbLstCallback(true);
         vd.ui.dbLst->setCallback([](int i){                                          // callback for the actual selection
           if(i < vd.ui.dbNames.size()){
-            initSimDB(vd.ui.dbNames[i]);
+            str name = vd.ui.dbNames[i];
+            initSimDB(name);
             refreshDB(&vd);
           }
           vd.ui.screen.performLayout();
@@ -651,7 +656,6 @@ ENTRY_DECLARATION
       vd.t     = glfwGetTime();
       vd.dt    = vd.t - vd.prevt;
       vd.prevt = vd.t;
-
     }
     SECTION(database)
     {
@@ -676,6 +680,7 @@ ENTRY_DECLARATION
 
       //glEnable(GL_TEXTURE_2D);
       //glEnable(GL_DEPTH);
+
       glEnable(GL_DEPTH_TEST);                                   // glDepthFunc(GL_LESS);
       glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
       PRINT_GL_ERRORS
@@ -792,7 +797,7 @@ ENTRY_DECLARATION
             nvgFontSize(vd.ui.nvg, vd.ui.guideSz);
             nvgFontFace(vd.ui.nvg, "sans");
             nvgTextAlign(vd.ui.nvg, NVG_ALIGN_LEFT ); // | NVG_ALIGN_MIDDLE);
-            nvgFillColor(vd.ui.nvg, nvgRGBA(255, 255, 255, 255));
+            nvgFillColor(vd.ui.nvg, nvgRGBA(255, 255, 255, 235));
             nvgText(vd.ui.nvg, 100, 100,                   hotkeyGuideH,    NULL);
             nvgText(vd.ui.nvg, 100, 100 + vd.ui.guideSz*2, hotkeyGuideF,    NULL);
             nvgText(vd.ui.nvg, 100, 100 + vd.ui.guideSz*4, hotkeyGuidePage, NULL);
@@ -816,6 +821,9 @@ ENTRY_DECLARATION
 }
 
 
+
+//char title[TITLE_MAX_LEN];
+//strncat(title, "Visualizer - simdb_",  );
 
 //auto hotLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 2, 5);                   // hotLay is hotkey layout (of course)
 //auto hotWin = new Window(&vd.ui.screen,  "");
