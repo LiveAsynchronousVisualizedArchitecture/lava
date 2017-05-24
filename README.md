@@ -15,7 +15,7 @@ Many of the fundamental building blocks have been created as single file librari
 Development is made easier through multiple techniques:
 
 #### 0. The Visualizer
- - A separate program that reads from a simdb database and draws IdxVerts in an OpenGL window.  Geometry will update automatically in the visualizer even if changed from another program.  New keys placed in the database by other programs will show up automatically and absent keys will be culled from the visualizer's list. 
+ - A separate program that reads from a simdb database and draws (optionally textured) geometry in an OpenGL window.  Geometry will update automatically in the visualizer even if changed from another program.  New keys placed in the database by other programs will show up automatically and absent keys will be culled from the visualizer's list. 
 
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/nuklear/visualizer.3.png "The visualizer displaying a colored cube and  two triangles")
 
