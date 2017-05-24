@@ -13,6 +13,10 @@ Many of the fundamental building blocks have been created as single file librari
                   It can also store nested tbls, creating a simple way to make trees and compound data structures that are full featured, without having to define new structs or classes. 
 
 Development is made easier through multiple techniques:
+
+0. The Visualizer
+ - A separate program that reads from a simdb database and draws IdxVerts in an OpenGL window.  Geometry will update automatically in the visualizer even if changed from another program.  New keys placed in the database by other programs will show up automatically and absent keys will be culled from the visualizer's list. 
+
 1. A program is composed of message passing nodes and data flow nodes. This enables many desirable features: 
  - A clear picture of the high level structure of a program along with a way to plan the program structure in a precise way.
  - Truely modular pieces that have that clearly defined inputs and output with no side effects.
