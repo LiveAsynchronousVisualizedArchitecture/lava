@@ -1,3 +1,43 @@
+
+
+//inline vecstr     simdbNames_to_name(vecstr names)
+//{
+//  using namespace std;
+//
+//  for(auto& s : names){
+//    if(s.size()>6){ s = str(s.c_str()+6); }
+//  }
+//
+//  return move(names);
+//}
+
+
+//char title[TITLE_MAX_LEN];
+//strncat(title, "Visualizer - simdb_",  );
+
+//auto hotLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 2, 5);                   // hotLay is hotkey layout (of course)
+//auto hotWin = new Window(&vd.ui.screen,  "");
+//hotWin->setLayout(hotLay);
+//hotWin->center();
+//auto hotTxt = new TextBox(hotWin, "F is for fun H is for ham");
+//auto hotThm = hotWin->theme();
+//hotThm->mTransparent         = v4f(0,0,0,0);
+//hotThm->mWindowFillFocused   = v4f(0,0,0,0);
+//hotThm->mWindowFillUnfocused = v4f(0,0,0,0);
+//
+//hotWin->center();
+
+//int fps = (int)avgFps;
+//nvgFontFace(nvg, "sans-bold");
+
+//f32 rgbBnds = nvgTextBounds(nvg, tb, 0, nvgStr, NULL, NULL);
+//nvgFontFace(nvg, "sans-bold");
+//
+//nvgText(vd.ui.nvg, 100, 100, hotkeyGuide, NULL);
+
+
+
+
 //Screen         screen;
 //Window*        keyWin = nullptr;
 //Window*         dbWin = nullptr;

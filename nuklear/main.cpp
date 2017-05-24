@@ -26,28 +26,6 @@
 
 */
 
-// -todo: fix crash on focus event while db list is open - fixed by checking for refCount in the focus?
-// -todo: generate .c arrays of bytes from .ttf files
-// -todo: integrate font files as .c files so that .exe is contained with no dependencies
-// -todo: use serialized file data with nanovg
-// -todo: use serialized fonts with nanogui
-// -todo: make an initial overlay text that has hotkeys and dissapears when the screen is clicked
-// -todo: make title change on different database selection
-// -idea: put version next to key value 
-// -idea: test indexed verts with images
-// -idea: ability to save indexed verts objects to a file
-// -idea: make a text visualizer? - will be taken care of by table 
-//       - display keys and data from db directly - keys then string on one line, click the line and add a tab with the key name in the tab title and a split window between hex and string form?
-//       - display values and strings
-// -idea: make a strings binary format - will this work for an arbitrary packed binary list? - should there be a data structure type and an underlying data type? - should be taken care of by tbl.hpp
-//       - first 8 bytes -> total size in bytes
-//       - next  4 bytes  -> data structure type? - binary list here?
-//       - next  4 bytes  -> underlying data type?
-//       - next  8 bytes  -> number of strings
-//       - for the number of strings -> 8 bytes for the offset of each string from the start of the whole binary 
-//       - next bytes are all string data - does the encoding matter here? should it be utf8 since you know the length of each string?
-// idea: work out a type enum for lava data structures? use the upper 16 bits of the size? this leaves 'only' 65,536 different types and 281 terabytes as the max size - use first 8 bytes for size and next 8 bytes for version? - put magic number in the upper 16 bits and type in a 'type' key 
-
 // todo: write visualizer overview for Readme.md  
 
 // todo: try out tiny/nano file dialog for saving and loading of serialized data 
@@ -820,27 +798,3 @@ ENTRY_DECLARATION
   return 0;
 }
 
-
-
-//char title[TITLE_MAX_LEN];
-//strncat(title, "Visualizer - simdb_",  );
-
-//auto hotLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 2, 5);                   // hotLay is hotkey layout (of course)
-//auto hotWin = new Window(&vd.ui.screen,  "");
-//hotWin->setLayout(hotLay);
-//hotWin->center();
-//auto hotTxt = new TextBox(hotWin, "F is for fun H is for ham");
-//auto hotThm = hotWin->theme();
-//hotThm->mTransparent         = v4f(0,0,0,0);
-//hotThm->mWindowFillFocused   = v4f(0,0,0,0);
-//hotThm->mWindowFillUnfocused = v4f(0,0,0,0);
-//
-//hotWin->center();
-
-//int fps = (int)avgFps;
-//nvgFontFace(nvg, "sans-bold");
-
-//f32 rgbBnds = nvgTextBounds(nvg, tb, 0, nvgStr, NULL, NULL);
-//nvgFontFace(nvg, "sans-bold");
-//
-//nvgText(vd.ui.nvg, 100, 100, hotkeyGuide, NULL);

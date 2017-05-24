@@ -196,14 +196,3 @@ inline vec4         shapes_to_bndsph(VizData const& vd)
 }
 #endif
 
-
-//inline vecstr     simdbNames_to_name(vecstr names)
-//{
-//  using namespace std;
-//
-//  for(auto& s : names){
-//    if(s.size()>6){ s = str(s.c_str()+6); }
-//  }
-//
-//  return move(names);
-//}
