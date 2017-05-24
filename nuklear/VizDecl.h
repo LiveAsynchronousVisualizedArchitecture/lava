@@ -14,6 +14,7 @@
 #include <nanogui/nanogui.h>
 
 #include "../DataStore/ConcurrentMap/simdb.hpp"
+#include "../nanovg_test/tbl_test/tbl.hpp"
 #include "IndexedVerts.h"
 
 using namespace nanogui;

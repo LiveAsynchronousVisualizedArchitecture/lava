@@ -68,7 +68,9 @@
   #pragma comment(lib, "opengl32.lib")
   //#pragma comment(lib, "glew32.lib")
 
-  #define USE_CONSOLE                                 // turning this off will use the windows subsystem in the linker and change the entry point to WinMain() so that no command line/console will appear
+  #if defined(_DEBUG)
+    #define USE_CONSOLE                                 // turning this off will use the windows subsystem in the linker and change the entry point to WinMain() so that no command line/console will appear
+  #endif
   #ifndef USE_CONSOLE
     #pragma comment( linker, "/subsystem:windows" )
     #undef ENTRY_DECLARATION
@@ -78,7 +80,6 @@
 
 #define MAX_VERTEX_BUFFER  512 * 1024
 #define MAX_ELEMENT_BUFFER 128 * 1024
-
 
 namespace {  // functions that are a transform from one datatype to another are in VizTfm.hpp - functions here are more state based
 
@@ -473,6 +474,7 @@ void                refreshDB(VizData* vd)
 
 }
 
+static tbl tst;
 void       genTestGeo(simdb* db)
 {
   using namespace std;
@@ -617,6 +619,10 @@ ENTRY_DECLARATION
         return -1;
       }
     }
+
+    tst("wat")      =    84;
+    tst("skidoosh") =   109;
+    tst("bamf")     = 36789;
   }
 
   while(!glfwWindowShouldClose(vd.win))

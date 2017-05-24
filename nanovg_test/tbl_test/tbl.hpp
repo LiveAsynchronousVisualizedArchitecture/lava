@@ -1,126 +1,4 @@
 
-// -todo: make push and push_back
-// -todo: make pop() and pop_back()
-// -todo: fix realloc to be resize based on element count
-// -todo: operator >> for concatenation with left keys as priority
-// -todo: operator << for concatenation with right keys as priority
-// -todo: make reserve()
-// -todo: keep track of capacity and make capacity() const function
-// -todo: make front() and back()
-// -todo: make key value pair be 4 bytes for hash, 18 + 1 for c_str(), and 8 + 1 for variant + type - should be 32 bytes - with 8 bytes for hash and type -> 36 bytes + 28 more bytes for key str = 64 bytes? - this_is18_char_key | hsh+type -> 8 bytes, 
-// -todo: make tbl_tell that uses printf - can't because it won't detect the types like iostream will
-// -todo: make tbl_assert
-// -todo: make assignment operator
-// -todo: test single kv implicit cast
-// -todo: make template specialization strings to print out types - possible but opted for a switch jump table at run time since it should only be used during debugging and run time type strings will be needed for hsh.type anyway
-// -todo: make tbl_assert a function - can't make it a function because of expression printing and line numbers
-// -todo: make tbl assert have error message
-// -todo: make tbl_assert back into a macro
-// -todo: fill out the rest of the type nums
-// -todo: fill out the rest of the type strings
-// -todo: make as<>() template function
-// -todo: make and test destructor
-// -todo: make move constructor
-// -todo: make hash union
-// -todo: try in release mode - find and fix release mode crash - first try at destructors didn't work
-// -todo: make copy constructor and assignment operator
-// -todo: test and fix destructor crash - reversed boolean of m_mem
-// -todo: make bool implicit cast that evaluates pointer
-// -todo: make vector expand to 8 elements minimum
-// -todo: make 1 bit always indicate signed, 1 bit always indicate table, 1 bit indicate integer, and 2 bits indicate the bit depth as 3,4,5, or 6 - same 5 bits as discreet 21 types if unsigned & not integer is used for empty!
-// -todo: re-test type assertions after structuring enum bits
-// -todo: make variant structure
-// -todo: make enum with number types and table-number types
-// -todo: copy in hash function from simdb
-// -todo: make elems() the number of elements in the map
-// -todo: change reserve to use both size and elems 
-// -todo: start on map
-// -todo: store needed map data on heap - map elements and ????
-// -todo: test operator()
-// -todo: fix hash comparison check
-// -todo: make operator() access the map
-// -todo: check for a full loop around of a hash map search
-// -todo: return a reference to a NONE KV if there was no space and the map search had to loop around to the end
-// -todo: fix reference return to just copy the key when the key is empty and not create a new KV
-// -todo: increase elems and mark type as a default (I32?) instead of EMPTY
-// -todo: add type string for NONE
-// -todo: make kv have implicit casts to the different number types
-// -todo: make another enum type for ERROR?
-// -todo: make has() function or STL equivilent - test has()
-// -todo: make insert() function 
-// -todo: turn operator() into a template - not needed because the reference to kv use the templated operator=
-// -todo: turn insert() into a template
-// -todo: test types to make sure EMPTY and NONE and ERROR are not duplicated
-// -todo: make all elements initialize to zeroed out with EMPTY enum set - just need EMPTY to be default constructor
-// -todo: make operator() return type ERROR if space isn't found 
-// -todo: make a table hold any type, but a map hold only numbers and table-number types
-// -todo: make key length a constant so that key functions that work on C strings can be limited in length
-// -todo: make a double cast template function - template<class FROM, class TO> 
-// -todo: figure out casting from integer to float but not float to integer - just check for float to integer scenario
-// -todo: make switch statement to have flexible number casts (a ui8 can be cast without error to a ui32)
-// -todo: make signed to unsigned debug catch for implicit casts
-// -todo: make constructor with default value
-// -todo: specialize del() function for being owned or not - template specialization of functions seems to work well
-// -todo: make sure an owned tbl from a non-owned tbl copies, but a non-owned from a non-owned does not? - forget this and always copy unless there is a move?
-// -todo: make operator+= 
-// -todo: test operator+ with mismatched sizes
-// -todo: fill out other numeric and binary operators
-// -todo: make numeric operators that take a single right side number
-// -todo: put in assert to check for bounds errors on debug
-// -todo: make bounds checks during debug
-// -todo: specialize offset type somehow?  tbl inside a tbl is given by being an offset/child and owned type. the tbl then gives up a reference/non-owned type that is not a child/offset type  - not neccesary with owned and non-owned tables
-// -todo: make operator[] and operator() call template specialized functions that jump by an offset if they are a child type? - shouldn't be neccesary, because acessing a child tbl can just construct a reference type each time, using the held offset to the tbl children segment (!) - not neccesary with owned and non-owned tables
-// -todo: make reserve rehash and reinsert all elements - works?
-// -todo: factor in wrap aroun
-// -todo: debug expand()  /  reserve with more vector capacity - not vector capacity, but mapcap with 6 instead of 4 causing problems?
-// -todo: test putting more than 8 elements into map - seems broken - debug 5th element insertion - is it reserve or the collision that is the problem? - expand is the problem? it enlarges the capacity AND map_cap?
-// -todo: make error messages for ERROR and NONE
-// -todo: fix comapact_all removing elements - empty index wasn't being set to the current index when moving an element
-// -todo: resolve 'two' conflict with duplicate keys - have to make sure each element has not empty space between its ideal position and its final position
-// -todo: split operator() into a find function that returns the index of the element with the given key
-// -todo: make a compact function that searches backwards to move and element back as far as possible?
-// -todo: debug duplicate entries - possibly because of expand() being run
-// -todo: make comapct function increment empty index instead of setting it to the moved index? - instead, make move element as far back as possible
-// -todo: make a del(const char* key) function that sets the type to empty, then moves back elements until either an empty space or an element aleady in its ideal position is found  
-// -todo: make function to detect holes between a key and its empty position
-// -todo: try using operator() instead of place_kv
-// -todo: with robin-hood hashing, would it be possible to re-insert elements, then deal with them in spans? - no because all movement creates holes
-// -todo: make placement loop reset the end point and always loop to the end index
-// -todo: make function to move an index forward or backward? - not needed with rolling placement reordering
-// -todo: make a function to remove any holes between an element and its ideal position
-// -todo: make function to find spans of non-empty blocks, sort them and move them - not needed
-// -todo: simplify test case and debug duplicates in concatenation - should reserve use a del() function combined with reinsertion? 
-// -todo: revisit concactenation to make sure map elems are copied
-// -todo: try reserve again - without recursion? - if curKV's ideal idx is the same, loop on the next idx. - problem, robin hood hashing would mean swapping if curKV's ideal is larger than the element at i, but if an element hasn't been moved, its distance to ideal could be large, meaning it wouldn't move even though it should 
-//       | solution: don't do robbin hood hasing at first, just make sure all the elements that hash to the same bucket are linearly packed
-//       |   problem: are there scenarios that will trigger infinite recursion? - yes, if only comparing ideal indices
-//       |   problem: moving an element creates a hole - does that mean the elements in front should be moved back if it would make them closer to their ideal index?
-//       |     solution: make a delete function that removes a key and checks elements forward to see if moving them one back would get them closer to their ideal position
-//       |     solution: make a compact function that scans through looking for empty spaces and moves elements backwards if it would be more ideal - make the function start at an index and go until it hits an element already in its ideal position, returning the number of elements moved
-// -todo: robin hood hashing
-// -todo: make put into a template
-// -todo: change place_rh to return reference
-// -todo: change operator() to use put - not neccesary 
-// -todo: change concatenation to use put() - not needed
-// -todo: make a KV constructor that takes a key, hash and a value
-// -todo: debug duplicate "two" entries - rolling placement wasn't using robin hood hasing
-// -todo: make KVRef struct with a *this ptr and an index - make internal and external KV structs, with the external having a this ptr that can modify the table? - not needed
-// -todo: give KV a default constructor and copy constructor so that the c_str key is copied?
-// -todo: put comparison into place_rh
-// -todo: test KV with key string above character length - fails with an assert
-// -todo: make extend() enlarge based on map_capacity() instead of elems
-// -todo: make and test del() function
-// -todo: make capacity be increased when elems is within 75% or 4-6 of the map capacity
-// -todo: make rolling reshuffle and put into delete function - not needed, but robin hood hasing will be needed
-// -todo: integrate robin hood hasing into compact() - short circuiting 
-// -todo: debug del() compact() not filling in holes after first call - only short circuit after prevElemDist is lower than elemDist, not lower of equal
-// -todo: test with 64 byte KV and long key strings - seems to work fine
-// -todo: make rolling reorder into a function
-// -todo: make function to delete KV with NONE type? set NONE to empty? - make delete type function?
-// -todo: make shrink_to_fit()
-// -todo: change find() ideal() distance() and holeOfst to const
-// -todo: update reserve() and constructor to set map capacity
-// -todo: make operator-- be shrink_to_fit() and ++ be expand() ?
 
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
 // | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
@@ -164,7 +42,6 @@
 // todo: make separate 'iota' function for a sequential tbl - maybe tbl_seq<T>()
 // todo: make separate accum(tbl<T> t) function for accumulating a tbl
 
-
 #ifndef __TBL_HEADERGUARD_H__
 #define __TBL_HEADERGUARD_H__
 
@@ -199,59 +76,69 @@
 
 class tbl
 {
-public:                                                                       // forward declarations
-  enum Type;
-  struct KV;
+public:                                                                         // forward declarations
+  enum   Type;
+  struct   KV;
 
-  using T    =  int;
+  using    u8   =   uint8_t;
+  using   u16   =  uint16_t;
+  using   u32   =  uint32_t;
+  using   u64   =  uint64_t;
+  using    i8   =    int8_t;
+  using   i16   =   int16_t;
+  using   i32   =   int32_t;
+  using   i64   =   int64_t;
+  using   f32   =     float;
+  using   f64   =    double;
+  using   T     =       i32;
 
 private:
   template<bool OWNED=true> void typed_del(){ if(m_mem) free(memStart()); };   // explicit template specialization to make an owned tbl free it's memory and a non-owned tbl not free it's memory
   template<> void typed_del<false>(){}; 
 
-  auto      mapcap_ptr()       -> ui64*       { return (ui64*)memStart() + 4;  }
-  auto      mapcap_ptr() const -> ui64 const* { return (ui64*)memStart() + 4;  }
-  void   set_sizeBytes(ui64 bytes) // -> ui64
+  auto      mapcap_ptr()       -> u64*       { return (u64*)memStart() + 4;  }
+  auto      mapcap_ptr() const -> u64 const* { return (u64*)memStart() + 4;  }
+  void   set_sizeBytes(u64 bytes) // -> u64
   {
-    *( (ui64*)memStart() ) = bytes;
+    *( (u64*)memStart() ) = bytes;
   }
-  void        set_size(ui64  size)
+  void        set_size(u64  size)
   {
-    *( ((ui64*)memStart()) + 1 ) = size;
+    *( ((u64*)memStart()) + 1 ) = size;
   }
-  void    set_capacity(ui64   cap)
+  void    set_capacity(u64   cap)
   {
-    *( ((ui64*)memStart()) + 2) = cap;
+    *( ((u64*)memStart()) + 2) = cap;
   }
-  void       set_elems(ui64 elems)
+  void       set_elems(u64 elems)
   {
-    *( ((ui64*)memStart()) + 3) = elems;
+    *( ((u64*)memStart()) + 3) = elems;
   }
-  void      set_mapcap(ui64   cap){ *mapcap_ptr() = cap; }
-  ui64             nxt(ui64 i, ui64 mod) const
+  void      set_mapcap(u64   cap){ *mapcap_ptr() = cap; }
+  u64              nxt(u64 i, u64 mod) const
   {
     return ++i % mod;
   }
-  ui64            prev(ui64 i, ui64 mod) const
+  u64             prev(u64 i, u64 mod) const
   {
     if(mod==0) return 0;
     return i==0?  mod-1  :  i-1;
   }
-  ui64        wrapDist(ui64 ideal, ui64 idx, ui64 mod) const
+  u64         wrapDist(u64 ideal, u64 idx, u64 mod) const
   {
     if(idx>=ideal) return idx - ideal;
     else return idx + (mod-ideal);
   }
-  ui64        wrapDist(KV*  elems, ui64 idx, ui64 mod) const
+  u64         wrapDist(KV*  elems, u64 idx, u64 mod) const
   {
-    ui64 ideal = elems[idx].hsh.hash % mod;
+    u64 ideal = elems[idx].hsh.hash % mod;
     return wrapDist(ideal,idx,mod);
   }
-  KV&         place_rh(KV kv, KV* elems, ui64 st, ui64 dist, ui64 mod, ui64* placement=nullptr)   // place_rh is place with robin hood hashing 
+  KV&         place_rh(KV kv, KV* elems, u64 st, u64 dist, u64 mod, u64* placement=nullptr)   // place_rh is place with robin hood hashing 
   {
-    ui64      i = st;
-    ui64     en = prev(st,mod);
-    ui64  eldst = dist;
+    u64      i = st;
+    u64     en = prev(st,mod);
+    u64  eldst = dist;
     KV*     ret = nullptr;
     while(true)
     {
@@ -275,12 +162,12 @@ private:
     if(ret) return *ret;
     else    return KV::error_kv();
   }
-  ui64         compact(ui64 st, ui64 en, ui64 mapcap)
+  u64          compact(u64 st, u64 en, u64 mapcap)
   {
-    ui64   cnt = 0;                                   // cnt is count which counts the number of loops, making sure the entire map capacity (mapcap) has not bene exceeded
+    u64   cnt = 0;                                   // cnt is count which counts the number of loops, making sure the entire map capacity (mapcap) has not bene exceeded
     KV*     el = elemStart(); 
-    ui64     i = st;
-    ui64 empty;
+    u64     i = st;
+    u64 empty;
     while(i!=en && el[i].hsh.type!=EMPTY){ 
       i = nxt(i,mapcap);
       ++cnt;
@@ -290,16 +177,16 @@ private:
       i = nxt(i,mapcap);
       ++cnt;
     } // find the first non-empty slot after finding an empty slot
-    ui64 prevElemDst = 0;
+    u64 prevElemDst = 0;
     while(i!=en && el[i].hsh.type!=EMPTY){
-      ui64 elemDst = wrapDist(el,i,mapcap);
+      u64 elemDst = wrapDist(el,i,mapcap);
       if(elemDst<prevElemDst) return i;
 
       prevElemDst = elemDst; // short circuiting based on robin hood hashing - as soon as the distance to the ideal position goes down, its ideal position must be further forward than the current empty position. Because no other EMPTY elements have been found, it must not be able to be moved to the current empty position, and this compact() is done
       if( elemDst>0 ){ 
-        ui64 emptyDst = wrapDist(empty,i,mapcap);           // emptyDst is empty distance - the distance to the empty slot - this can probably be optimized to just be an increment
-        ui64    mnDst = mn(elemDst, emptyDst);               // mnDst is the minimum distances
-        ui64    mvIdx = i;
+        u64 emptyDst = wrapDist(empty,i,mapcap);           // emptyDst is empty distance - the distance to the empty slot - this can probably be optimized to just be an increment
+        u64    mnDst = mn(elemDst, emptyDst);               // mnDst is the minimum distances
+        u64    mvIdx = i;
         TO(mnDst,ii) mvIdx=prev(mvIdx,mapcap);
         el[mvIdx] = el[i];
         el[i]       = KV();
@@ -311,20 +198,20 @@ private:
 
     return i;
   }
-  ui64         reorder()
+  u64          reorder()
   {
-    ui64 mod  =  map_capacity(); 
+    u64 mod  =  map_capacity(); 
     KV*   el  =  elemStart();
-    ui64   i  =  0;
-    ui64  en  =  prev(i,mod);
-    ui64  cnt =  0; 
+    u64   i  =  0;
+    u64  en  =  prev(i,mod);
+    u64  cnt =  0; 
     do{
-      ui64 nxti = nxt(i,mod); 
+      u64 nxti = nxt(i,mod); 
       if(el[i].hsh.type != EMPTY){
         KV kv  = el[i];
         el[i]  = KV();
-        ui64 st = kv.hsh.hash % mod;
-        ui64  p = i; 
+        u64 st = kv.hsh.hash % mod;
+        u64  p = i; 
         place_rh(kv,el,st,0,mod,&p);
         if(p!=i) en = i;
       }
@@ -334,9 +221,9 @@ private:
 
     return cnt;
   }
-  void            init(ui64 size)
+  void            init(u64 size)
   {
-    ui64   szBytes  =  tbl::sizeBytes(size);
+    u64   szBytes  =  tbl::sizeBytes(size);
     i8*      memst  =  (i8*)malloc(szBytes);                 // memst is memory start
     m_mem           =  memst + memberBytes();
     set_sizeBytes(szBytes);
@@ -362,7 +249,7 @@ private:
     reserve(l.size(), l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
     //resize(l.size());
 
-    TO(l,i) push(l[i]); 
+    TO(l.size(),i) push(l[i]); 
   }
   void              mv(tbl& r)
   {
@@ -372,15 +259,15 @@ private:
   }
   template<class OP> void op_asn(tbl const& l, OP op)
   {
-    ui64     mx_sz = size();
-    ui64     mn_sz = l.size();
+    u64     mx_sz = size();
+    u64     mn_sz = l.size();
     if(mx_sz<mn_sz){ auto tmp=mx_sz; mx_sz=mn_sz; mn_sz=tmp; }
     TO(mn_sz,i) op( (*this)[i], l[i] );
   }
   template<class OP> tbl  bin_op(tbl const& l, OP op) const
   {     
-    ui64     mx_sz = size();
-    ui64     mn_sz = l.size();
+    u64     mx_sz = size();
+    u64     mn_sz = l.size();
     tbl const* lrg = this;
     if(mx_sz<mn_sz){ auto tmp=mx_sz; mx_sz=mn_sz; mn_sz=tmp; lrg = &l; }        // swap mx_sz, mn_sz, and the pointer to the larger tbl if mismatched
     tbl ret(mx_sz); 
@@ -412,14 +299,14 @@ public:
     BITS_64     =  1<<1 | 1,                // 2^6 is 64 for 64 bit depth
     BITS_MASK   =  BITS_64,
 
-    ERROR       =  ~INTEGER & ~SIGNED & ~BITS_32,
+      ERR       =  ~INTEGER & ~SIGNED & ~BITS_32,
      NONE       =  ~INTEGER & ~SIGNED & ~BITS_16,          // ~TABLE,                              // INTEGER bit turned off, SIGNED bit turned off and TABLE bit turned off, meanin unsigned float table, which is not a viable real type of course
     EMPTY       =  ~INTEGER & ~SIGNED,                                       // a floating point number can't be unsigned, so this scenario is used for an 'empty' state
 
-      UI8       =  INTEGER | BITS_8,   
-     UI16       =  INTEGER | BITS_16,
-     UI32       =  INTEGER | BITS_32,
-     UI64       =  INTEGER | BITS_64,
+       U8       =  INTEGER | BITS_8,   
+      U16       =  INTEGER | BITS_16,
+      U32       =  INTEGER | BITS_32,
+      U64       =  INTEGER | BITS_64,
        I8       =  INTEGER | BITS_8  | SIGNED,
       I16       =  INTEGER | BITS_16 | SIGNED,
       I32       =  INTEGER | BITS_32 | SIGNED,
@@ -427,10 +314,10 @@ public:
       F32       =  BITS_32,
       F64       =  BITS_64,
 
-     tUI8       =  TABLE | INTEGER | BITS_8,   
-    tUI16       =  TABLE | INTEGER | BITS_16,
-    tUI32       =  TABLE | INTEGER | BITS_32,
-    tUI64       =  TABLE | INTEGER | BITS_64,
+      tU8       =  TABLE | INTEGER | BITS_8,   
+     tU16       =  TABLE | INTEGER | BITS_16,
+     tU32       =  TABLE | INTEGER | BITS_32,
+     tU64       =  TABLE | INTEGER | BITS_64,
       tI8       =  TABLE | INTEGER | BITS_8  | SIGNED,
      tI16       =  TABLE | INTEGER | BITS_16 | SIGNED,
      tI32       =  TABLE | INTEGER | BITS_32 | SIGNED,
@@ -439,10 +326,10 @@ public:
      tF64       =  TABLE | BITS_64,
   };
   template<class N> struct typenum { static const Type num = EMPTY; };
-  template<> struct typenum<ui8>   { static const Type num =   UI8; };
-  template<> struct typenum<ui16>  { static const Type num =  UI16; };
-  template<> struct typenum<ui32>  { static const Type num =  UI32; };
-  template<> struct typenum<ui64>  { static const Type num =  UI64; };
+  template<> struct typenum<u8>    { static const Type num =    U8; };
+  template<> struct typenum<u16>   { static const Type num =   U16; };
+  template<> struct typenum<u32>   { static const Type num =   U32; };
+  template<> struct typenum<u64>   { static const Type num =   U64; };
   template<> struct typenum<i8>    { static const Type num =    I8; };
   template<> struct typenum<i16>   { static const Type num =   I16; };
   template<> struct typenum<i32>   { static const Type num =   I32; };
@@ -452,7 +339,7 @@ public:
   //template<> struct typenum<tui8>  { static const ui8 num = tUI8;  }; 
   //template<> struct typenum<tui16> { static const ui8 num = tUI16; }; 
   //template<> struct typenum<tui32> { static const ui8 num = tUI32; }; 
-  //template<> struct typenum<tui64> { static const ui8 num = tUI64; }; 
+  //template<> struct typenum<tu64> { static const ui8 num = tu64; }; 
   //template<> struct typenum<ti8>   { static const ui8 num = tI8;   }; 
   //template<> struct typenum<ti16>  { static const ui8 num = tI16;  }; 
   //template<> struct typenum<ti32>  { static const ui8 num = tI32;  }; 
@@ -462,8 +349,8 @@ public:
 
   union   HshType
   {
-    struct { Type type : 5; ui32 hash: 27; };
-    ui32 as_ui32;
+    struct { Type type : 5; i32 hash: 27; };
+    i32 as_ui32;
 
     HshType() : 
       type(EMPTY),
@@ -473,13 +360,13 @@ public:
   struct       KV
   {
     template<class DEST, class SRC> 
-    static DEST cast_mem(ui64* src){ return (DEST)(*((SRC*)src)); }
+    static DEST cast_mem(u64* src){ return (DEST)(*((SRC*)src)); }
 
     using Key = char[51];  // using Key = char[19]; 
 
     HshType   hsh;
     Key       key;
-    ui64      val;
+    u64      val;
 
     //template<class V> KV(const char* key, ui32 hash, V val)
     //{
@@ -489,7 +376,7 @@ public:
     //}
 
     KV() : hsh(), val(0) { memset(key, 0, sizeof(Key)); }
-    KV(const char* key, ui32 hash) :
+    KV(const char* key, u32 hash) :
       hsh(), val(0)
     {
       strcpy_s(this->key, sizeof(KV::Key), key);
@@ -510,7 +397,7 @@ public:
     template<class N> void operator=(N n)
     {
       hsh.type = typenum<N>::num;
-      val      = *((ui64*)&n);
+      val      = *((u64*)&n);
     }
     template<class N> operator N()
     { 
@@ -597,7 +484,7 @@ public:
       static KV kv;
       //KV kv;
       memset(&kv, 0, sizeof(KV));
-      kv.hsh.type = ERROR;
+      kv.hsh.type = ERR;
 
       return kv;
     }
@@ -610,11 +497,11 @@ public:
     m_mem(nullptr)
   {
   }
-  tbl(ui64 size)                                 // have to run default constructor here?
+  tbl(u64 size)                                 // have to run default constructor here?
   {    
     init(size);
   }
-  tbl(ui64 size, T const& value)
+  tbl(u64 size, T const& value)
   {
     init(size);
     TO(size, i) (*this)[i] = value;
@@ -626,14 +513,14 @@ public:
   tbl(tbl&&      r){ mv(r); }
   tbl& operator=(tbl&&      r){ mv(r); return *this; }
 
-  operator      ui64() const{ return size(); }
-  operator      bool() const{ return m_mem!=nullptr; }
-  T&      operator[](ui64 i)
+  operator      u64() const{ return size(); }
+  //operator      bool() const{ return m_mem!=nullptr; }
+  T&      operator[](u64 i)
   {
     tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
     return ((T*)m_mem)[i];
   }
-  auto    operator[](ui64 i) const -> T const& 
+  auto    operator[](u64 i) const -> T const& 
   {
     tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
     return ((T*)m_mem)[i];
@@ -643,12 +530,12 @@ public:
     if( !( map_capacity()*0.75f > (float)elems() ) )
        if(!expand()) return KV::error_kv();
 
-    ui32  hsh  =  HashStr(key);
+    u32  hsh  =  HashStr(key);
     KV*    el  =  (KV*)elemStart();                                    // el is a pointer to the elements 
-    ui64  mod  =  map_capacity();
-    ui64    i  =  hsh % mod;
-    ui64   en  =  prev(i,mod);
-    ui64 dist  =  0;
+    u64  mod  =  map_capacity();
+    u64    i  =  hsh % mod;
+    u64   en  =  prev(i,mod);
+    u64 dist  =  0;
     for(;;++i,++dist)
     {
       i %= mod;                                                        // get idx within map_capacity
@@ -701,12 +588,12 @@ public:
     if( !(map_capacity()>elems()) )
        if(!expand()) return KV::error_kv();
 
-    ui32  hsh  =  HashStr(key);    
+    u32  hsh  =  HashStr(key);    
     KV*    el  =  (KV*)elemStart();                                    // el is a pointer to the elements 
-    ui64    i  =  hsh;
-    ui64  mod  =  map_capacity();
-    ui64   en  =  prev(i,mod);
-    ui64 dist  =  0;
+    u64    i  =  hsh;
+    u64  mod  =  map_capacity();
+    u64   en  =  prev(i,mod);
+    u64 dist  =  0;
     for(;;++i,++dist)
     {
       i %= mod;                                                        // get idx within map_capacity
@@ -761,11 +648,11 @@ public:
     return kv.hsh.type != EMPTY;
   }
 
-  ui64           size() const
+  u64           size() const
   {
     if(!m_mem) return 0;
 
-    return *( ((ui64*)memStart()) + 1 );
+    return *( ((u64*)memStart()) + 1 );
   }
   T*             data() const
   {
@@ -775,29 +662,29 @@ public:
   {
     return (void*)(m_mem - memberBytes());
   }
-  ui64      sizeBytes() const // -> ui64
+  u64      sizeBytes() const // -> u64
   {
     if(!m_mem) return 0;
 
-    return *( (ui64 const*)memStart() );
+    return *( (u64 const*)memStart() );
   }
-  ui64       capacity() const
+  u64       capacity() const
   {
     if(!m_mem) return 0;
 
-    return *( ((ui64*)memStart()) + 2);
+    return *( ((u64*)memStart()) + 2);
 
     //if(!m_mem) return 0;
     //
     //return (sizeBytes() - memberBytes()) / sizeof(T);  // - size()*sizeof(T)
   }
-  ui64          elems() const
+  u64          elems() const
   {
     if(!m_mem) return 0;
 
-    return *( ((ui64*)memStart()) + 3);
+    return *( ((u64*)memStart()) + 3);
   }
-  ui64   map_capacity() const
+  u64   map_capacity() const
   {
     if(!m_mem) return 0;
     else       return *mapcap_ptr();
@@ -814,16 +701,16 @@ public:
 
     return (KV*)(data() + capacity());
   }
-  void*       reserve(ui64 count, ui64 mapcap)
+  void*       reserve(u64 count, u64 mapcap)
   {
     count   =  mx(count, capacity());
     mapcap  =  mx(mapcap, map_capacity());
     KV*    prevElems  =  elemStart();
-    ui64   prevMemSt  =  (ui64)memStart();
-    ui64    prevOfst  =  prevElems? ((ui64)prevElems)-prevMemSt  :  0;
-    ui64   prevBytes  =  sizeBytes();
-    ui64  prevMapCap  =  map_capacity();
-    ui64    nxtBytes  =  memberBytes() + sizeof(T)*count +  sizeof(KV)*mapcap;
+    u64   prevMemSt  =  (u64)memStart();
+    u64    prevOfst  =  prevElems? ((u64)prevElems)-prevMemSt  :  0;
+    u64   prevBytes  =  sizeBytes();
+    u64  prevMapCap  =  map_capacity();
+    u64    nxtBytes  =  memberBytes() + sizeof(T)*count +  sizeof(KV)*mapcap;
     void*        re;
     bool      fresh  = !m_mem;
     if(fresh) re = malloc(nxtBytes);
@@ -841,7 +728,7 @@ public:
         if(el!=prevEl) TO(prevMapCap,i) el[i] = prevEl[i];
       }
 
-      //ui64  mapcap = mapcap; //map_capacity();
+      //u64  mapcap = mapcap; //map_capacity();
       i64   extcap = mapcap - prevMapCap;
       if(extcap>0) 
         TO(extcap,i) 
@@ -850,8 +737,8 @@ public:
 
       if(prevElems)
       { 
-        ui64 cnt = reorder();
-        printf("\n loop count: %d mapcap: %d  ratio: %.4f \n", cnt, mapcap, cnt/(float)mapcap );
+        u64 cnt = reorder();
+        //printf("\n loop count: %d mapcap: %d  ratio: %.4f \n", cnt, mapcap, cnt/(float)mapcap );
       }
     }
 
@@ -861,27 +748,27 @@ public:
   }
   void*        expand()
   {
-    ui64    sz = size();
-    ui64 nxtSz = sz + sz/2;
+    u64    sz = size();
+    u64 nxtSz = sz + sz/2;
     nxtSz      = nxtSz<8? 8 : nxtSz;
 
-    //ui64    el = elems();
-    //ui64 nxtEl = el + el/2;
+    //u64    el = elems();
+    //u64 nxtEl = el + el/2;
     //nxtEl      = nxtEl<4? 4 : nxtEl;
 
-    ui64    cap = map_capacity();
-    ui64 nxtCap = cap + cap/2;
+    u64    cap = map_capacity();
+    u64 nxtCap = cap + cap/2;
     nxtCap      = nxtCap<4? 4 : nxtCap;
 
     return reserve(nxtSz, nxtCap);
   }
   bool  shrink_to_fit()
   {
-    ui64      sz = size();
-    ui64   vecsz = memberBytes() + sz*sizeof(T);
-    ui64 elemcnt = elems();
-    ui64   mapsz = elemcnt*sizeof(KV);
-    ui64   nxtsz = vecsz + mapsz;
+    u64      sz = size();
+    u64   vecsz = memberBytes() + sz*sizeof(T);
+    u64 elemcnt = elems();
+    u64   mapsz = elemcnt*sizeof(KV);
+    u64   nxtsz = vecsz + mapsz;
     
     KV const* el = elemStart();
     i8* nxtp = (i8*)malloc(nxtsz);
@@ -889,7 +776,7 @@ public:
       i8* p = (i8*)memStart();
       memcpy(nxtp, p, vecsz);
       KV* nxtel = (KV*)(nxtp+vecsz);
-      ui64  cur = 0;
+      u64  cur = 0;
       TO(map_capacity(),i){
         if(el[i].hsh.type!=EMPTY) 
           nxtel[cur++] = el[i];
@@ -909,17 +796,17 @@ public:
     }else 
       return false;
   }
-  i64            find(const char* key, ui32* hash=nullptr) const
+  i64            find(const char* key, u32* hash=nullptr) const
   {
-    ui32   hsh  =  HashStr(key);
-    //ui32   hsh  =  (ui32)(*key); // & HASH_MASK );
+    u32   hsh  =  HashStr(key);
+    //u32   hsh  =  (u32)(*key); // & HASH_MASK );
     if(hash) *hash = hsh;
 
     KV*     el  =  (KV*)elemStart();                                   // el is a pointer to the elements 
-    ui64   cap  =  map_capacity();  
-    ui64     i  =  hsh;
-    ui64  wrap  =  hsh % cap - 1;
-    ui64    en  =  wrap<(cap-1)? wrap : cap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
+    u64   cap  =  map_capacity();  
+    u64     i  =  hsh;
+    u64  wrap  =  hsh % cap - 1;
+    u64    en  =  wrap<(cap-1)? wrap : cap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
     for(;;++i)
     {
       i %= cap;                                                        // get idx within map_capacity
@@ -936,26 +823,26 @@ public:
     
     return -1;
   }
-  ui64          ideal(ui64 i) const
+  u64          ideal(u64 i) const
   {
     auto el = elemStart();
     if(el[i].hsh.type==EMPTY) return i;
      
     return el[i].hsh.hash % map_capacity();
   }
-  ui64       distance(ui64 i) const
+  u64       distance(u64 i) const
   {
-    //ui64 idl = ideal(i);
+    //u64 idl = ideal(i);
     return wrapDist( ideal(i), i, map_capacity() );
   }
-  i64        holeOfst(ui64 i) const
+  i64        holeOfst(u64 i) const
   { // finds the closes hole from an element, but not the furthest hole
     KV const* el = elemStart();
-    ui64     mod = map_capacity();
+    u64     mod = map_capacity();
     
     i64    h = -1;
-    ui64 dst = distance(i);
-    ui64 cnt = 0;
+    u64 dst = distance(i);
+    u64 cnt = 0;
     while(dst >= cnt){ // count can equal distance
       if(el[i].hsh.type==EMPTY) h = i;
       i = prev(i,mod);
@@ -965,28 +852,28 @@ public:
   }
   bool            del(const char* key)
   { 
-    ui64 i = find(key);
+    u64 i = find(key);
     KV* el = elemStart();
     if(el[i].hsh.type==EMPTY) return false;
 
     el[i] = KV();
-    ui64 mapcap = map_capacity();
-    ui64     en = prev(i, mapcap);
+    u64 mapcap = map_capacity();
+    u64     en = prev(i, mapcap);
 
-    ui64 cnt=0;
+    u64 cnt=0;
     //while( (i=compact(i,en,mapcap))!=en ){ ++cnt; } 
     cnt = reorder();
     set_elems( elems()-1 );
 
-    printf("\ncount: %d\n", cnt);
+    //printf("\ncount: %d\n", cnt);
 
     return true;
   }
-  ui64            del(Type t)
+  u64            del(Type t)
   {
-    ui64 mapcap = map_capacity();
+    u64 mapcap = map_capacity();
     KV*      el = elemStart();
-    ui64    cnt = 0;
+    u64    cnt = 0;
     TO(mapcap,i) 
       if(el[i].hsh.type==t){ 
         el[i] = KV();
@@ -998,28 +885,28 @@ public:
   }
 
 private:
-  static const ui32 HASH_MASK = 0x07FFFFFF;
+  static const u32 HASH_MASK = 0x07FFFFFF;
 
-  static ui64  memberBytes()
+  static u64  memberBytes()
   {
-    return sizeof(ui64) * 5;
-    // Memory Layout (5 ui64 variables before m_mem)
+    return sizeof(u64) * 5;
+    // Memory Layout (5 u64 variables before m_mem)
     // sizeBytes     -  total number of bytes of the entire memory span
     // size          -  vector entries
     // capacity      -  number of elements already allocated in the vector
     // elems         -  number of map entries 
     // map_capacity  -  number of elements already allocated for the mapp 
   }
-  static ui64  fnv_64a_buf(void const* const buf, ui64 len)
+  static u64  fnv_64a_buf(void const* const buf, u64 len)
   {
-    // const ui64 FNV_64_PRIME = 0x100000001b3;
-    ui64 hval = 0xcbf29ce484222325;    // FNV1_64_INIT;  // ((Fnv64_t)0xcbf29ce484222325ULL)
-    ui8*   bp = (ui8*)buf;	           /* start of buffer */
-    ui8*   be = bp + len;		           /* beyond end of buffer */
+    // const u64 FNV_64_PRIME = 0x100000001b3;
+    u64 hval = 0xcbf29ce484222325;    // FNV1_64_INIT;  // ((Fnv64_t)0xcbf29ce484222325ULL)
+    u8*   bp = (u8*)buf;	           /* start of buffer */
+    u8*   be = bp + len;		           /* beyond end of buffer */
 
     while(bp < be)                     // FNV-1a hash each octet of the buffer
     {
-      hval ^= (ui64)*bp++;             /* xor the bottom with the current octet */
+      hval ^= (u64)*bp++;             /* xor the bottom with the current octet */
 
       //hval *= FNV_64_PRIME; // does this do the same thing?  /* multiply by the 64 bit FNV magic prime mod 2^64 */
       hval += (hval << 1) + (hval << 4) + (hval << 5) +
@@ -1027,16 +914,16 @@ private:
     }
     return hval;
   }
-  static ui32    HashBytes(const void *const buf, ui32 len)
+  static u32    HashBytes(const void *const buf, u32 len)
   {
-    ui64 hsh = fnv_64a_buf(buf, len);
+    u64 hsh = fnv_64a_buf(buf, len);
 
-    return (ui32)( (hsh>>32) ^ ((ui32)hsh));        // fold the 64 bit hash onto itself
+    return (u32)( (hsh>>32) ^ ((u32)hsh));        // fold the 64 bit hash onto itself
   }
-  static ui32      HashStr(const char* s)
+  static u32      HashStr(const char* s)
   {
-    ui32 len = (ui32)strlen(s);
-    ui32 hsh = HashBytes(s, len);
+    u32 len = (u32)strlen(s);
+    u32 hsh = HashBytes(s, len);
      
     return hsh & HASH_MASK;
   }
@@ -1058,10 +945,10 @@ public:
     case EMPTY: return "Empty";
     case  NONE: return  "None";
     
-    case   UI8: return  "ui8";
-    case  UI16: return "ui16";
-    case  UI32: return "ui32";
-    case  UI64: return "ui64";
+    case    U8: return   "u8";
+    case   U16: return  "u16";
+    case   U32: return  "u32";
+    case   U64: return  "u64";
     case    I8: return   "i8";
     case   I16: return  "i16";
     case   I32: return  "i32";
@@ -1069,10 +956,10 @@ public:
     case   F32: return  "f32";
     case   F64: return  "f64";
 
-    case  tUI8: return  "table  ui8";
-    case tUI16: return  "table ui16";
-    case tUI32: return  "table ui32";
-    case tUI64: return  "table ui64";
+    case   tU8: return  "table   u8";
+    case  tU16: return  "table  u16";
+    case  tU32: return  "table  u32";
+    case  tU64: return  "table  u64";
     case   tI8: return  "table   i8";
     case  tI16: return  "table  i16";
     case  tI32: return  "table  i32";
@@ -1084,7 +971,7 @@ public:
     }
     //return "Empty";
   }
-  static ui64    sizeBytes(ui64 count)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
+  static u64    sizeBytes(u64 count)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
   {
     return memberBytes() + sizeof(T)*count;
   }
@@ -1093,8 +980,8 @@ public:
     auto sz = a.size();
     tbl ret(sz + b.size());
     
-    TO(sz,i) ret[i]    = a[i];
-    TO(b, i) ret[sz+i] = b[i];
+    TO(sz,i){        ret[i]    = a[i]; }
+    TO(b.size(), i){ ret[sz+i] = b[i]; }
 
     KV const* el = b.elemStart();
     TO(b.map_capacity(),i) ret( el[i].key ) = el[i];
@@ -1109,8 +996,8 @@ public:
     auto sz = a.size();
     tbl ret(sz + b.size());
     
-    TO(sz,i) ret[i]    = a[i];
-    TO(b, i) ret[sz+i] = b[i];
+    TO(sz,i){        ret[i]    = a[i]; }
+    TO(b.size(), i){ ret[sz+i] = b[i]; }
 
     KV const* el = a.elemStart();
     TO(a.map_capacity(),i){
@@ -1130,634 +1017,3 @@ public:
 
 #endif
 
-
-
-
-//if(prevBytes<nxtBytes) 
-//  memset(re, 0, nxtBytes);
-  //memset( (i8*)re + prevBytes, 0, nxtBytes-prevBytes );
-//
-  //set_elems(0);
-    //ui64   len = prevMapCap*sizeof(KV);
-    //memmove(el, prevEl, len);
-//
-//TO(map_capacity(),i) new (&el[i]) KV();
-
-//ui64  i  = 0;
-//ui64 en  = prev(i,mapcap);
-//ui64 cnt = 0; 
-//do{
-//  ui64 nxti = nxt(i,mapcap); 
-//  if(el[i].hsh.type != EMPTY){
-//    KV kv  = el[i];
-//    el[i]  = KV();
-//    //ui64 p = place(kv,el,mapcap);
-//    ui64 st = kv.hsh.hash%mapcap;
-//    ui64  p = i; 
-//    place_rh(kv,el,st,0,mapcap,&p);
-//    if(p!=i) en = i;
-//  }
-//  i = nxti;
-//  ++cnt;
-//}while(i!=en);
-
-//for(ui64 mvcnt=1; mvcnt>0;)
-//{
-//  mvcnt=0;
-//  TO(mapcap, i) if(el[i].hsh.type != EMPTY){
-//    KV kv = el[i];
-//    el[i] = KV();
-//    ui64 p = place(kv,el,mapcap);
-//    if(p!=i) ++mvcnt;
-//  }
-//  printf("\n move count: %d \n", mvcnt);
-//}
-
-//TO(mapcap, i) if(el[i].hsh.type != EMPTY){
-//  KV kv = el[i];
-//  el[i] = KV();
-//  place(kv,el,mapcap);
-//}
-
-//TO(prevMapCap, i) if(el[i].hsh.type != EMPTY){
-//  KV kv = el[i];
-//  el[i] = KV();
-//  (*this)(kv.key) = kv;                    
-//}
-
-//TO(prevMapCap, i) if(el[i].hsh.type != EMPTY){
-//  ui64 h = holeOfst(i);
-//  if(h>0) 
-//}
-
-//if(prevElems)
-//{
-//  ui64    mod = mapcap; // - 1;
-//  TO(prevMapCap, i){
-//    KV kv = el[i];
-//    if(kv.hsh.type != EMPTY){
-//      ui64 nxtIdx = kv.hsh.hash % mod;
-//      if(nxtIdx!=i){
-//        //el[i] = KV();
-//        //compact_back( nxt(i,mod), mod);
-//        del(i);
-//        place_kv(kv, el, nxtIdx, mod);
-//      }
-//    }
-//  }
-//   
-//  compact_all( prev(prevMapCap,mapcap), mapcap);                      // start where the loop above left off
-//}
-
-//if(!m_mem) return 0;
-//
-//auto    sz = sizeBytes();
-//auto membr = memberBytes();
-//auto   cap = capacity();
-//auto   szT = sizeof(T);
-//auto  szKV = sizeof(KV);
-//return (sz - membr - cap*szT) / szKV;
-
-//
-//*( ((ui64*)memStart()) + 4) = cap;
-
-//if(el[i].hsh.type==EMPTY) return -1;
-//ui64 idl = ideal(i);
-//while(el[i].hsh.type!=EMPTY && cnt!=dst){
-
-//ui64  dist  =  0;
-// ,++dist
-//
-//}else if(ideal(i)<dist){
-//  return i;
-
-//bool             del(ui64 i)
-//{ 
-//  //ui64 i = find(key);
-//  KV* el = elemStart();
-//  if(el[i].hsh.type==EMPTY) return false;
-//
-//  el[i] = KV();
-//  ui64 mapcap = map_capacity();
-//  ui64     en = prev(i, mapcap);
-//  //compact(i, en, mapcap);
-//
-//  return true;
-//}
-
-//void* el = elemStart();
-//memcpy(nxtp+vecsz, el, mapsz);
-
-//i64            place(KV kv, KV* elems, ui64 mod)
-//{
-//  ui64  i = kv.hsh.hash % mod;
-//  ui64 en = prev(i,mod);
-//  while(elems[i].hsh.type!=EMPTY){
-//    if(i==en) return -1;
-//    i = nxt(i,mod);
-//  }
-//
-//  elems[i] = kv;
-//  return i;
-//}
-
-//KV&     operator()(const char* key, bool make_new=true)              // todo: just needs to return a kv reference since the kv can be set with operator=() ?
-//{
-//  if( !(map_capacity()>elems()) )
-//    if(!expand()) return KV::error_kv();
-//
-//  KV*    el  =  (KV*)elemStart();                                     // el is a pointer to the elements 
-//  ui32 hash  =  0;
-//  i64     i  =  find(key, &hash);
-//  if(i<0) return KV::error_kv();
-//
-//  if(el[i].hsh.type==EMPTY){ 
-//    if(make_new){
-//      strcpy_s(el[i].key, sizeof(KV::Key), key);
-//      el[i].hsh.hash = hash;
-//      el[i].hsh.type = NONE;                                         // this makes this slot no longer empty. When an assignment occurs it will overwrite this type.
-//      set_elems( elems()+1 );
-//    }
-//    return el[i];
-//  }
-//    
-//  if(hash == el[i].hsh.hash){                                        // if the hashes aren't the same, the keys can't be the same
-//    auto cmp = strncmp(el[i].key, key, sizeof(KV::Key)-1);           // check if the keys are the same 
-//    if(cmp==0) return el[i];
-//  }
-//
-//  //ui32   hsh  =  HashStr(key);
-//  ////ui32   hsh  =  (ui32)(*key); // & HASH_MASK );
-//  //
-//  //KV*     el  =  (KV*)elemStart();                                   // el is a pointer to the elements 
-//  //ui64   cap  =  map_capacity();  
-//  //ui64     i  =  hsh;
-//  //ui64  wrap  =  hsh % cap - 1;
-//  //ui64    en  =  wrap<(cap-1)? wrap : cap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
-//  //for(;;++i)
-//  //{
-//  //  i %= cap;                                                        // get idx within map_capacity
-//  //  HshType eh = el[i].hsh;                                          // eh is element hash
-//  //  if(el[i].hsh.type==EMPTY){ 
-//  //    if(make_new){
-//  //      strcpy_s(el[i].key, sizeof(KV::Key), key);
-//  //      el[i].hsh.hash = hsh;
-//  //      el[i].hsh.type = NONE;                                       // this makes this slot no longer empty. When an assignment occurs it will overwrite this type.
-//  //      set_elems( elems()+1 );
-//  //    }
-//  //    return el[i];
-//  //  }else if(hsh == eh.hash){                                        // if the hashes aren't the same, the keys can't be the same
-//  //    auto cmp = strncmp(el[i].key, key, sizeof(KV::Key)-1);         // check if the keys are the same 
-//  //    if(cmp==0) return el[i];
-//  //  }
-//  //
-//  //  if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
-//  //}
-//  
-//  return KV::error_kv();
-//}
-
-//strcpy_s(el[i].key, sizeof(KV::Key), key);
-//el[i].hsh.hash = hsh;
-//el[i] = val;                                                 // this makes this slot no longer empty. When an assignment occurs it will overwrite this type.
-//el[i]       =  kv;
-//strcpy_s(kv.key, sizeof(KV::Key), key);
-//kv.hsh.hash = hsh;
-//
-//KV kv;
-//strcpy_s(kv.key, sizeof(KV::Key), key);
-//kv.hsh.hash = hsh;
-//kv = val;
-//strcpy_s(kv.key, sizeof(KV::Key), key);
-//kv.hsh.hash = hsh;
-//el[i]       =  kv;
-//return el[i] = kv;
-//
-//KV kv;
-//kv = val;
-//strcpy_s(kv.key, sizeof(KV::Key), key);
-//kv.hsh.hash = hsh;
-//ui32   hsh  =  (ui32)(*key); // & HASH_MASK );
-//ui64   cap  =  map_capacity();  
-//ui64  wrap  =  hsh % cap - 1;
-//ui64    en  =  wrap<(cap-1)? wrap : cap-1;                       // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
-
-//
-//ui64 nxtSz = (sz/2)? sz+sz/2 : sz+1;
-
-//void    compact_back(ui64 st, ui64 mod)
-//{
-//  //ui64   cnt = 0;                                   // cnt is count which counts the number of loops, making sure the entire map capacity (mapcap) has not bene exceeded
-//  KV*      el = elemStart(); 
-//  ui64  mvIdx = st;
-//  ui64  elDst = wrapDist(el, st, mod);
-//  if(elDst==0) return;
-//
-//  ui64      i = prev(st, mod);
-//  ui64     en = st; //nxt(st, mapcap);
-//  ui64  mvDst = 0;
-//  while(el[i].hsh.type==EMPTY && mvDst<elDst && i!=en){ 
-//    ++mvDst;
-//    i = prev(i,mod);
-//  }
-//  i = nxt(i,mod);
-//  el[i]  = el[st];
-//  el[st] = KV();
-//  //TO(mvDst,ii) mvIdx=prev(mvIdx,mod);      // todo: do this with a function that doesn't loop
-//}
-//ui64         compact(ui64 st, ui64 en, ui64 mapcap) //ui64 mapcap)
-//{
-//  ui64   cnt = 0;                                   // cnt is count which counts the number of loops, making sure the entire map capacity (mapcap) has not bene exceeded
-//  KV*     el = elemStart(); 
-//  ui64     i = st;
-//  ui64 empty;
-//  while(el[i].hsh.type!=EMPTY && i!=en){ 
-//    i = nxt(i,mapcap);
-//    ++cnt;
-//  } // finds the first empty slot
-//  empty = i;
-//  while(el[i].hsh.type==EMPTY && i!=en){
-//    i = nxt(i,mapcap);
-//    ++cnt;
-//  } // find the first non-empty slot after finding an empty slot
-//  while(el[i].hsh.type!=EMPTY && i!=en){
-//    ui64 elemDst = wrapDist(el,i,mapcap);
-//    if( elemDst>0 ){ 
-//      ui64 emptyDst = wrapDist(empty,i,mapcap);           // emptyDst is empty distance - the distance to the empty slot - this can probably be optimized to just be an increment
-//      ui64    mnDst = mn(elemDst, emptyDst);               // mnDst is the minimum distances
-//      ui64    mvIdx = i;
-//      TO(mnDst,ii) mvIdx=prev(mvIdx,mapcap);
-//      el[mvIdx] = el[i];
-//      el[i]       = KV();
-//      empty       = i;                                     //++empty; // empty = i;  if empty was just the current index or if there are lots of empty elements in between, empty can be incremented by one
-//    }
-//    i = nxt(i,mapcap);
-//    ++cnt;
-//  } // moves elements backwards if they would end up closer to their ideal position
-//
-//  return i;
-//
-//  //ui64  mved = 0;                                 // mved is moved which is the number of elements that have been moved
-//  //ui64    en = st;                                  // en is ending index which is the index that the loops end up on - it is one after the last index looked at
-//  //
-//  // while(el[i].hsh.type!=EMPTY && cnt<mapcap){ 
-//  // while(el[i].hsh.type==EMPTY && cnt<mapcap){
-//  // while(el[i].hsh.type!=EMPTY && cnt<mapcap){
-//}
-//void     compact_all(ui64 st, ui64 mapcap)
-//{
-//  //ui64  wrap  =  st - 1;
-//  //ui64    en  =  wrap<(mapcap-1)? wrap : mapcap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
-//
-//  ui64    en = prev(st,mapcap);
-//  ui64 cmpct = st;
-//  do{
-//    cmpct = compact(cmpct,en,mapcap);
-//  }while( cmpct != en );
-//  
-//}
-
-//i64            place(KV kv, KV* elems, ui64 mod)
-//ui64     i = idx % mod;
-//ui64 elidx = i;
-//do{
-//  //i = i % mod;
-//  if(elems[i].hsh.type==EMPTY){ elems[i]=kv; break; }
-//  elidx = elems[i].hsh.hash % mod;
-//    i64  eldist = wrapDist(elidx,i,mod);
-//    i64    dist = wrapDist(idx,i,mod);
-//    if(dist>eldist)
-//      swap( &(elems[i]), &kv );                     //  robin hood hashing?
-//  i = nxt(i,mod);
-//  //++i;
-//}while(true);
-
-//ui64           mod0(ui64 n, ui64 mod)
-//{
-//  n==mod? (n%mod - 1) : n;
-//}
-    
-//place_kv(kv, elems, elidx, mod);
-//    }
-//
-//}else{
-//  swap( &(elems[i]), &kv );                     //  robin hood hashing?
-//  place_kv(kv, elems, elidx, mod);
-//}
-
-//
-//void        place_kv(KV kv, ui64 kvidx, KV* elems, ui64 i, ui64 mod)
-
-//if(elems[i].hsh.type==EMPTY){ elems[i] = kv; return; }
-//i64  idist = 0;
-
-//swap( &(elems[i]), &kv );
-//if(kv.hsh.type!=EMPTY)
-//place_kv(kv, elems, elidx, mod);
-
-//if(elidx!=i){
-//
-//}
-//if( elems[elidx].hsh.hash%mod == i ){ ++i; continue; }
-
-//do{
-//  ui64 elidx = elems[i].hsh.hash % mod;
-//  if(elidx!=i) break;
-//  ++i;
-//}while(true);
-
-//while(i-kvidx < i-elidx  && elems[i].hsh.type==NONE){
-//  swap( &(elems[i]), &kv );
-//  ++i;
-//  ui64 elidx = elems[i].hsh.hash % mod;
-//}
-
-//if( i-kvidx < i-elidx){
-//}
-
-//if(tmp.hsh.type==NONE){ tmp = el[i]; tmpidx = tmp.hsh.hash%mod; continue; }
-//ui64  elidx = el[i].hsh.hash % mod;
-//if(i-tmpidx < elidx-i) swap( &(el[i]), &tmp );
-//
-// todo: take this out so that hashes aren't wiped
-//KV* el = elemStart();
-//TO(elems, i) el[i] = KV();
-//    
-//set_sizeBytes(nxtBytes);
-
-// todo: need to move the element memory the previous range to the new range
-//(KV*)( ((i8*)re)+prevOfst+prevMapCap*sizeof(KV) ) 
-
-//KV*   curEnd = el + mapcap;
-//KV*  prevEnd = prevElems?  (KV*)( ((i8*)re)+prevSzBytes ) :  el;
-//for(KV* kv=prevEnd; kv!=curEnd; ++kv){                                  // excap is extra capacity
-//  *kv = KV();
-//}
-//for(auto i=prevMapCap; i<elems; ++i){
-//  el[i] = 
-//}
-//TO(elems-prevMapCap,i) 
-
-//ui64 curOfst = (i8*)el - (i8*)re;
-//memcpy(el, (i8*)re + prevOfst, prevMapCap*sizeof(KV) );
-//
-// rehash, make sure that the differences in indexes include a linear search that would wrap around
-//KV      tmp = KV();
-//ui64 tmpidx = 0;
-
-//  KV tmp2 = el[i];
-//  el[i] = tmp;
-//  tmp = tmp2;
-//} 
-//
-//if(el[i].hsh.type != NONE){
-
-//void    operator+=(tbl const& l)
-//{
-//  ui64     mx_sz = size();
-//  ui64     mn_sz = l.size();
-//  if(mx_sz<mn_sz){ auto tmp=mx_sz; mx_sz=mn_sz; mn_sz=tmp; }
-//  TO(mn_sz,i) (*this)[i] += l[i];
-//}
-
-//ui64     mx_sz = size();
-//ui64     mn_sz = l.size();
-//tbl const* lrg = this;
-//if(mx_sz<mn_sz){ auto tmp=mx_sz; mx_sz=mn_sz; mn_sz=tmp; lrg = &l; }        // swap mx_sz, mn_sz, and the pointer to the larger tbl if mismatched
-//tbl ret(mx_sz); 
-//TO(mn_sz, i) ret[i] = (*this)[i] + l[i];
-//TO(mx_sz-mn_sz, i) ret[i+mn_sz] = (*lrg)[i+mn_sz];
-//
-//return ret;
-
-//
-//template<bool OWNED=true> struct typed_del{ static void del(){ if(m_mem) free(memStart()); } }; 
-
-//
-//mx_sz = lsz>mx_sz? lsz : mx_sz;
-
-//ui64   szBytes  =  tbl::sizeBytes(size);
-//i8*      memst  =  (i8*)malloc(szBytes);                 // memst is memory start
-//m_mem           =  memst + memberBytes();
-//set_sizeBytes(szBytes);
-//set_elems(0);
-//set_capacity(size);
-//set_size(size);
-
-//tbl_msg_assert(
-//  hsh.type==typenum<N>::num, 
-//  " - tbl TYPE ERROR -\nInternal type was: ", tbl::type_str((Type)hsh.type), 
-//  "Desired  type was: ",                      tbl::type_str((Type)typenum<N>::num) );
-//
-//return *((N*)&val);
-
-//ui8 typnum = typenum<N>::num;
-//ui8    shr = hsh.type & typnum;    // the shared bits
-//ui8    dif = hsh.type ^ typnum;    // the different bits
-//
-//if(dif & TABLE)   /*error*/ ;                        // don't cast a table, just error if the types are different 
-//if(dif & INTEGER) /*error*/ ;                        // 
-
-//KV(){}
-//
-//static KV KV_NONE; // = KV::none_kv();
-//
-//tbl::KV tbl::KV_NONE = tbl::KV::none_kv();
-
-//if( !(map_capacity()>elems()) )
-//  if(!expand()) return false;
-//
-//HshType ht;                                   // ht is hash type
-//ht.hash  =  HashStr(key);
-//ht.type  =  typenum<decltype(val)>::num;      // todo: need to remove const and reference here?
-//
-//KV  kv;
-//kv       =  val;
-//kv.hsh   =   ht;
-//strcpy_s(kv.key, sizeof(kv.key), key);
-//
-//// get start of elems
-//KV* elems  =  (KV*)elemStart();
-//ui64  cap  =  map_capacity();  
-//ui64    i  =  ht.hash;  
-//for(;;++i)
-//{
-//  i %= cap;                                                         // get idx within map_capacity
-//  HshType eh = elems[i].hsh;                                        // eh is element hash
-//  if(elems[i].hsh.type==EMPTY){ 
-//    elems[i] = kv; 
-//    return true;
-//  }else{                                                            // check if the keys are the same 
-//    if(ht.hash!=eh.hash) continue;                                  // if the hashes aren't the same, the keys can't be the same
-//    
-//    auto cmp = strncmp(elems[i].key, kv.key, sizeof(KV::Key)-1);
-//    if(cmp!=0) continue;
-//    
-//    elems[i] = kv;
-//    return true;
-//  }
-//}
-//
-//return true;
-
-//HshType ht;                                   // ht is hash type
-//ht.hash  =  HashStr(key);
-//ht.type  =  NONE; // typenum<decltype(val)>::num;      // todo: need to remove const and reference here?
-
-//KV  kv;
-////kv       =  val;
-//kv.hsh.hash  =  HashStr(key);
-//strcpy_s(kv.key, sizeof(kv.key), key);
-
-//KV kv;
-//kv.hsh.type = NONE;
-
-//struct      Var
-//{
-//  ui8   type;
-//  ui64  data; 
-//};
-//using var  =  Var;
-
-//m_size(count),
-//ui64  cntBytes  =  count*sizeof(T);
-//ui64   szBytes  =  cntBytes + memberBytes();             // sizeof(ui64)*2;
-
-//namespace wat
-//{
-//  enum Type
-//  {                                                           // 10 number types, 10 table variants + empty = 21 total - at least 5 bits needed
-//    EMPTY = 0,
-//    UI8,   I8,  UI16,  I16,  UI32,  I32,  UI64,  I64,  F32,  F64,
-//    tUI8, tI8, tUI16, tI16, tUI32, tI32, tUI64, tI64, tF32, tF64
-//  };
-//}
-
-//static const char EMPTYs[] = "EMPTY";
-//static const char   F32s[] =   "f32";
-//static const ui64 namestr;
-//char const* const typenum<f32>::namestr = "f32";
-
-//POWEROF2_3  =     0,                    // 2^3 is  8 for  8 bit depth
-//POWEROF2_4  =     1,                    // 2^4 is 16 for 16 bit depth
-//POWEROF2_5  =  1<<1,                    // 2^5 is 32 for 32 bit depth
-//POWEROF2_6  =  1<<1 | 1,                // 2^6 is 64 for 64 bit depth
-//
-//tUI8, tI8, tUI16, tI16, tUI32, tI32, tUI64, tI64, tF32, tF64
-
-//template<> struct typenum<ui8>   { static const ui8 num =   UI8; static const char* namestr =   "ui8"; };
-//
-//template<class N> union type
-//{
-//  struct<
-//};
-
-//case   UI8: return "";
-//case  UI16: return "";
-//case  UI32: return "";
-//case  UI64: return "";
-//case    I8: return "";
-//case   I16: return "";
-//case   I32: return "i32";
-//case   I64: return "";
-//case   F32: return "f32";
-//case   F64: return "";
-//case  tUI8: return "";
-//case tUI16: return "";
-//case tUI32: return "";
-//case tUI64: return "";
-//case   tI8: return "";
-//case  tI16: return "";
-//case  tI32: return "";
-//case  tI64: return "";
-//case  tF32: return "";
-//case  tF64: return "";
-
-//tbl_msg_assert(hsh.type == typenum<N>::num, "Internal type was: ", "", "Desired type was: ", "");
-//tbl_msg_assert(hsh.type == typenum<N>::num, "Internal type was: ");
-
-//#define tbl_msg_assert(exp, msgA, varA, msgB, varB) if((exp)==false){ tbl_PRNT((msgA)) tbl_PRNT((varA)) tbl_PRNT((msgA)) tbl_PRNT((varA)) assert( (exp) ); }  
-//
-//void tbl_msg_assert(bool exp, const char* msgA, const char* varA, const char* msgB, const char* varB)
-//{     
-//  if((exp)==false)
-//  { 
-//    ::std::cerr 
-//    << msgA << varA << ::std::endl 
-//    << msgB << varB << ::std::endl << ::std::endl;
-//
-//    assert( (exp) );
-//  }
-//}
-
-//#define tbl_TELL(var) fprintf(stderr, "\n    ::std::cout<<::std::endl<<::std::setprecision(4)<<#var ## ": "<<::std::endl<<var<<::std::endl;::std::cout.flush();
-//#ifdef _DEBUG
-//#include <cstdio>
-//#define tbl_assert(exp, varA, varB) if( (exp) == false ) { tbl_TELL(varA) tbl_TELL(varB) assert( (exp) ); }
-//#define tbl_assert(exp, varA, varB) if( (exp) == false ) { assert( (exp) && (varA) && (varB) ); assert( (varA)?false:false );  }
-//#define func_assert(exp, FUNC) if( (exp) == false ) { FUNC assert( (exp) );  }
-//
-//#define func_assert(exp, FUNC) ;
-//#endif
-
-//#include <sstream>
-//#include <ostream>
-//#include <string>
-
-//static char const* const namestr() { return   "f32"; }
-//char const* const namestr() const { return "Empty"; }
-
-//static char const* const type_string(Type t);
-//
-//static ui64 memberBytes()
-//{
-//  return sizeof(ui64) * 2;
-//}
-
-//operator ui32()
-//{
-//  return *((ui32*)&val);
-//}
-//operator float()
-//{
-//  return *((float*)&val);
-//}
-
-//kv& operator=(float v)
-//{
-//  val = *((ui64*)&v);
-//
-//  return *this;
-//}
-
-//if(m_mem==nullptr){                            // can just use realloc here
-//  auto szBytes  =  tbl::sizeBytes(1);
-//  i8*    memst  =  (i8*)malloc(szBytes);                 // memst is memory start
-//  m_mem         =  memst + memberBytes();
-//  //m_mem         = (i8*)malloc( szBytes );
-//  set_sizeBytes( szBytes );
-//  set_size(0);
-//  //if(mem) m_mem = mem;
-//  //new (this) tbl(1);
-//  return m_mem;
-//}
-//
-//auto szBytes  =  sizeBytes();
-//auto   extra  =    szBytes/2;
-//extra         =  extra>sizeof(T)? extra : sizeof(T);
-//auto    nxtSz =  szBytes + extra;
-//void*     re  =  realloc(memStart(), nxtSz);
-//if(re){
-//  m_mem = ((i8*)re) + memberBytes();
-//  set_sizeBytes(nxtSz);
-//}
-//
-//return re;
-
-//auto sz = size();
-//tbl ret(sz + l.size());
-//
-//TO(sz,i) ret[i]    = (*this)[i];
-//TO(l, i) ret[sz+i] = l[i];
-//
-//return ret;
