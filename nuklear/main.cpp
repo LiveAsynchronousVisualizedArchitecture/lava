@@ -26,17 +26,19 @@
 
 */
 
-// todo: write visualizer overview for Readme.md  
+// -todo: write visualizer overview for Readme.md  
+// -todo: put sensitivity into a separate settings struct - not broke, don't fix
 
+// todo: make camera fitting use the field of view and change the dist to fit all geometry 
+//       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
+//       |  visualize the fit position and camera frustum in real time to debug
+// todo: move and rename project to LavaViz or any non test name
 // todo: try out tiny/nano file dialog for saving and loading of serialized data 
 // todo: make save button or menu to save serialized files 
 // todo: make a load button or menu to load serialized files - would need to have a visualizer specific simdb that would keep the files? 
-// todo: make camera fitting use the field of view and change the dist to fit all geometry - use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
-// todo: keep databases in memory after listing them?
-// todo: make label switches not only turn keys on and off, but fade their transparency too?
-// todo: move and rename project to LavaViz or any non test name
-// todo: put sensitivity into a separate settings struct
 
+// todo: make label switches not only turn keys on and off, but fade their transparency too?
+// todo: keep databases in memory after listing them?
 // idea: look into drag and drop to load indexed verts objects by dragging from a file
 // idea: ability to display points of an indexed verts type as numbers - this would give the ability to have numbers floating in space - could be take care of with a specialized tbl
 
