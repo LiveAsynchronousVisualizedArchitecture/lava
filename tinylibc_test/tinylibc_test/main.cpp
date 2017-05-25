@@ -10,16 +10,12 @@
 // todo: make header have console and windows CRT #define controls
 // todo: make preprocessor mechanics for subsystem
 
-#include "tinylib_win.h"
+//#include "tinylib_win.h"
+#define WIN_LIBC_IMPL
+#include "win_libc.h"
+
 #include "no_rt_util.h"
 #include <WinUser.h>
-
-//#include <vector>
-//#define EASTL_EABASE_DISABLED
-//#include <EASTL/string.h>
-//
-//template<class T> using vec = std::vector<T>; 
-
 
 template<class T> class tbl
 {
@@ -131,18 +127,17 @@ public:
 static char* strmsg = "hello tiny world";
 void entry(int argc, char** argv)
 {
-  //char* mem = (char*)malloc(17);
-  char* mem = new char[17];
+  char* mem = (char*)malloc(17);
+  //char* mem = new char[17];
 
   memcpy(mem, strmsg, 17);
   memset(mem+4, 0, 17-4);
   //vec<char> mem(17);  
   printf(mem);
 
-  delete mem;
-  //free(mem);
+  //delete mem;
+  free(mem);
 }
-
 
 
 HWND       hwnd;
@@ -170,75 +165,20 @@ LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
   return 0;
 }
 
-//INT_PTR CALLBACK ListBoxExampleProc(HWND hDlg, UINT message, 
-//        WPARAM wParam, LPARAM lParam)
-//{
-//  switch (message)
-//  {
-//  case WM_INITDIALOG:
-//      {
-//          // Add items to list. 
-//          HWND hwndList = GetDlgItem(hDlg, IDC_LISTBOX_EXAMPLE);  
-//          for (int i = 0; i < ARRAYSIZE(Roster); i++) 
-//          { 
-//              int pos = (int)SendMessage(hwndList, LB_ADDSTRING, 0, 
-//                  (LPARAM) Roster[i].achName); 
-//              // Set the array index of the player as item data.
-//              // This enables us to retrieve the item from the array
-//              // even after the items are sorted by the list box.
-//              SendMessage(hwndList, LB_SETITEMDATA, pos, (LPARAM) i); 
-//          } 
-//          // Set input focus to the list box.
-//          SetFocus(hwndList); 
-//          return TRUE;               
-//      } 
-//
-//  case WM_COMMAND:
-//      switch (LOWORD(wParam))
-//      {
-//      case IDOK:
-//      case IDCANCEL:
-//          EndDialog(hDlg, LOWORD(wParam));
-//          return TRUE;
-//
-//      case IDC_LISTBOX_EXAMPLE:
-//          {
-//              switch (HIWORD(wParam)) 
-//              { 
-//              case LBN_SELCHANGE:
-//                  {
-//                      HWND hwndList = GetDlgItem(hDlg, IDC_LISTBOX_EXAMPLE); 
-//
-//                      // Get selected index.
-//                      int lbItem = (int)SendMessage(hwndList, LB_GETCURSEL, 0, 0); 
-//
-//                      // Get item data.
-//                      int i = (int)SendMessage(hwndList, LB_GETITEMDATA, lbItem, 0);
-//
-//                      // Do something with the data from Roster[i]
-//                      TCHAR buff[MAX_PATH];
-//                      StringCbPrintf (buff, ARRAYSIZE(buff),  
-//                          TEXT("Position: %s\nGames played: %d\nGoals: %d"), 
-//                          Roster[i].achPosition, Roster[i].nGamesPlayed, 
-//                          Roster[i].nGoalsScored);
-//
-//                      SetDlgItemText(hDlg, IDC_STATISTICS, buff); 
-//                      return TRUE; 
-//                  } 
-//              }
-//          }
-//          return TRUE;
-//      }
-//  }
-//  return FALSE;
-//}
-
 //void entry(int argc, char** argv)
 int WINAPI WinMain(HINSTANCE     hInstance, 
                    HINSTANCE hPrevInstance,
                    LPSTR         lpCmdLine, 
                    int            nCmdShow)
 {
+
+  auto   n = atol("106724");
+  auto  ni = atoi("859018723");
+  char*  w = "wat skidoosh";
+  //_strupr(w);
+  //_strlwr(w);
+  //auto ok1 = _strcmpi(w, "wat skidoosh");
+  //auto ok2 = _stricmp(w, "wat skidoosh");
 
   SECTION(register window class)
   { //Step 1: Registering the Window Class
@@ -330,6 +270,75 @@ int WINAPI WinMain(HINSTANCE     hInstance,
 
 
 
+
+//INT_PTR CALLBACK ListBoxExampleProc(HWND hDlg, UINT message, 
+//        WPARAM wParam, LPARAM lParam)
+//{
+//  switch (message)
+//  {
+//  case WM_INITDIALOG:
+//      {
+//          // Add items to list. 
+//          HWND hwndList = GetDlgItem(hDlg, IDC_LISTBOX_EXAMPLE);  
+//          for (int i = 0; i < ARRAYSIZE(Roster); i++) 
+//          { 
+//              int pos = (int)SendMessage(hwndList, LB_ADDSTRING, 0, 
+//                  (LPARAM) Roster[i].achName); 
+//              // Set the array index of the player as item data.
+//              // This enables us to retrieve the item from the array
+//              // even after the items are sorted by the list box.
+//              SendMessage(hwndList, LB_SETITEMDATA, pos, (LPARAM) i); 
+//          } 
+//          // Set input focus to the list box.
+//          SetFocus(hwndList); 
+//          return TRUE;               
+//      } 
+//
+//  case WM_COMMAND:
+//      switch (LOWORD(wParam))
+//      {
+//      case IDOK:
+//      case IDCANCEL:
+//          EndDialog(hDlg, LOWORD(wParam));
+//          return TRUE;
+//
+//      case IDC_LISTBOX_EXAMPLE:
+//          {
+//              switch (HIWORD(wParam)) 
+//              { 
+//              case LBN_SELCHANGE:
+//                  {
+//                      HWND hwndList = GetDlgItem(hDlg, IDC_LISTBOX_EXAMPLE); 
+//
+//                      // Get selected index.
+//                      int lbItem = (int)SendMessage(hwndList, LB_GETCURSEL, 0, 0); 
+//
+//                      // Get item data.
+//                      int i = (int)SendMessage(hwndList, LB_GETITEMDATA, lbItem, 0);
+//
+//                      // Do something with the data from Roster[i]
+//                      TCHAR buff[MAX_PATH];
+//                      StringCbPrintf (buff, ARRAYSIZE(buff),  
+//                          TEXT("Position: %s\nGames played: %d\nGoals: %d"), 
+//                          Roster[i].achPosition, Roster[i].nGamesPlayed, 
+//                          Roster[i].nGoalsScored);
+//
+//                      SetDlgItemText(hDlg, IDC_STATISTICS, buff); 
+//                      return TRUE; 
+//                  } 
+//              }
+//          }
+//          return TRUE;
+//      }
+//  }
+//  return FALSE;
+//}
+
+//#include <vector>
+//#define EASTL_EABASE_DISABLED
+//#include <EASTL/string.h>
+//
+//template<class T> using vec = std::vector<T>; 
 
 //extern int WINAPI WinMain (
 //    _In_ HINSTANCE hInstance,

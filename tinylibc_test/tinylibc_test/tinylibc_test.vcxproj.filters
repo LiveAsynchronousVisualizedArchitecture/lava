@@ -9,87 +9,24 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
     </Filter>
-    <Filter Include="Source Files\libctiny">
-      <UniqueIdentifier>{8d08a59e-f4f6-4f8b-aeff-86436a0cde3b}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\libctiny">
-      <UniqueIdentifier>{1cb56856-e375-40b0-b373-d0bad08772f9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\libctiny_excluded">
-      <UniqueIdentifier>{60d8583a-1ec0-4389-ab50-c6a07de87399}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\dlmalloc">
-      <UniqueIdentifier>{19694fea-e762-4da3-aeea-63fffaee28ff}</UniqueIdentifier>
-    </Filter>
     <Filter Include="hpp">
       <UniqueIdentifier>{6e34e42e-2fb3-4bd9-bedf-f9f7b41f72de}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="single header">
+      <UniqueIdentifier>{f6aa1f3b-6f6c-4aef-a351-1915b5e39903}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="CRT0TCON.cpp">
-      <Filter>Source Files\libctiny</Filter>
-    </ClCompile>
-    <ClCompile Include="initterm.cpp">
-      <Filter>Source Files\libctiny</Filter>
-    </ClCompile>
-    <ClCompile Include="ALLOC.cpp">
-      <Filter>Source Files\libctiny_excluded</Filter>
-    </ClCompile>
-    <ClCompile Include="ALLOC2.cpp">
-      <Filter>Source Files\libctiny_excluded</Filter>
-    </ClCompile>
-    <ClCompile Include="ALLOCSUP.cpp">
-      <Filter>Source Files\libctiny_excluded</Filter>
-    </ClCompile>
-    <ClCompile Include="ATOL.cpp">
-      <Filter>Source Files\libctiny_excluded</Filter>
-    </ClCompile>
-    <ClCompile Include="ISCTYPE.cpp">
-      <Filter>Source Files\libctiny_excluded</Filter>
-    </ClCompile>
-    <ClCompile Include="printf.cpp">
-      <Filter>Source Files\libctiny_excluded</Filter>
-    </ClCompile>
-    <ClCompile Include="puts.cpp">
-      <Filter>Source Files\libctiny_excluded</Filter>
-    </ClCompile>
-    <ClCompile Include="sprintf.cpp">
-      <Filter>Source Files\libctiny_excluded</Filter>
-    </ClCompile>
-    <ClCompile Include="stricmp.cpp">
-      <Filter>Source Files\libctiny_excluded</Filter>
-    </ClCompile>
-    <ClCompile Include="struplwr.cpp">
-      <Filter>Source Files\libctiny_excluded</Filter>
-    </ClCompile>
-    <ClCompile Include="malloc.c">
-      <Filter>Source Files\dlmalloc</Filter>
-    </ClCompile>
-    <ClCompile Include="argcargv.cpp">
-      <Filter>Source Files\libctiny_excluded</Filter>
-    </ClCompile>
-    <ClCompile Include="NEWDEL.CPP">
-      <Filter>Source Files\libctiny_excluded</Filter>
-    </ClCompile>
-    <ClCompile Include="CRT0TWIN.cpp">
-      <Filter>Source Files\libctiny</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="no_rt_util.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="initterm.h">
-      <Filter>Header Files\libctiny</Filter>
-    </ClInclude>
-    <ClInclude Include="argcargv.h">
-      <Filter>Header Files\libctiny</Filter>
-    </ClInclude>
-    <ClInclude Include="tinylib_win.h">
-      <Filter>Header Files</Filter>
+    <ClInclude Include="win_libc.h">
+      <Filter>single header</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

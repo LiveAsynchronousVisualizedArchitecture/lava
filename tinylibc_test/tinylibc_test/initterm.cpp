@@ -9,7 +9,6 @@
 #pragma data_seg(".CRT$XCA")
 _PVFV __xc_a[] = { NULL };
 
-
 #pragma data_seg(".CRT$XCZ")
 _PVFV __xc_z[] = { NULL };
 
@@ -70,3 +69,4 @@ void __cdecl _DoExit( void )
                     pf_atexitlist + cur_atexitlist_entries );
     }
 }
+

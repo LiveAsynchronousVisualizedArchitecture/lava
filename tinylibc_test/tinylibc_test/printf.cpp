@@ -2,6 +2,9 @@
 // LIBCTINY - Matt Pietrek 2001
 // MSDN Magazine, January 2001
 //==========================================
+
+#define _NO_CRT_STDIO_INLINE
+
 #include <windows.h>
 #include <stdio.h>
 #include <stdarg.h>

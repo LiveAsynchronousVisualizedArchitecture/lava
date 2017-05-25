@@ -3,6 +3,8 @@
 // MSDN Magazine, January 2001
 //==========================================
 #include <windows.h>
+
+#define _NO_CRT_STDIO_INLINE
 #include <stdio.h>
 
 #define EOF     (-1)
