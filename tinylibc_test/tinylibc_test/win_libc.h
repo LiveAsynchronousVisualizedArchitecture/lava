@@ -2,7 +2,6 @@
 //==========================================
 // LIBCTINY - Matt Pietrek 2001
 // MSDN Magazine, January 2001
-// FILE: CRT0TCON.CPP
 //==========================================
 
 #ifdef _MSC_VER
@@ -19,14 +18,9 @@
 #define NOMINMAX
 #include <windows.h>
 
-
-//#include <windows.h>
-
-//#include "argcargv.h"
 extern char * _ppszArgv[];
 int __cdecl _ConvertCommandLineToArgcArgv(void);
 
-//#include "initterm.h"
 typedef void(__cdecl *_PVFV)(void);
 extern _PVFV __xc_a[], __xc_z[];    /* C++ initializers */
 
@@ -58,26 +52,14 @@ void __cdecl _DoExit(void);
   }
 #endif
 
-
-
 #include <cstdint>
 #include <cstring>
 
-// all linker pragmas
 #pragma comment(linker, "/defaultlib:user32.lib")
 #pragma comment(linker, "/defaultlib:kernel32.lib")
 
-// all data segement declarations
 #define _MAX_CMD_LINE_ARGS  128
 char* _ppszArgv[_MAX_CMD_LINE_ARGS + 1];
-
-// windows specific headers
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
-
-// windows CRT declarations
-//#include "initterm.h"
 
 extern "C" void __cdecl WinMainCRTStartup(void)
 {
@@ -123,10 +105,6 @@ extern "C" void __cdecl WinMainCRTStartup(void)
   _DoExit();
   ExitProcess(mainret);
 }
-
-
-
-
 
 extern "C" int __cdecl printf(const char * format, ...);
 extern "C" int __cdecl printf(const char * format, ...)
@@ -279,11 +257,9 @@ void  __cdecl operator     delete(void*  p)
   HeapFree(GetProcessHeap(), 0, p);
 }
 
-
 extern "C" double   _hypot(double x, double y) { return 0; }
 extern "C" void     _fltused() {}  // symbol needs to be defined for some reason
 //#endif  // end hypot function from musl (needed by std::vector for some reason)
-
 
 void* memcpy(void* dest, const void* src, size_t n)
 {
@@ -483,21 +459,3 @@ extern "C" int    __cdecl      atoi(const char * pstr)
 #endif
 
 
-
-
-
-
-// Force 512 byte section alignment in the PE file
-//#pragma comment(linker, "/OPT:NOWIN98")  //sbassett
-//
-//#pragma comment(linker, "/nodefaultlib:libc.lib")
-//#pragma comment(linker, "/nodefaultlib:libcmt.lib")
-
-//sbassett
-//_heapHndl = HeapCreate(
-//  0,    // _In_ DWORD  flOptions,        // heap is not executable, doesn't generate exceptions and is serialized (thread safe through locks)
-//  0,    // _In_ SIZE_T dwInitialSize,    // 0 is default which is one page 
-//  0 );  // _In_ SIZE_T dwMaximumSize);   // 0 is default which means the heap can grow to available memory
-//
-// sbassett 
-// HeapDestroy(_heapHndl) ?
