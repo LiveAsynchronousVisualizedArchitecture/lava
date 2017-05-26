@@ -2684,15 +2684,19 @@ namespace TinyWindow
 			pfd.cRedBits = 8;
 			pfd.cGreenBits = 8;
 			pfd.cBlueBits = 8;
-			pfd.cDepthBits = 24;
+			pfd.cDepthBits = 32;
+      pfd.cStencilBits = 8;
+      pfd.iLayerType = PFD_MAIN_PLANE;
 
-			int LocalPixelFormat = ChoosePixelFormat(dummyDeviceContextHandle,
-				&pfd);
+      auto pfOk = DescribePixelFormat(dummyDeviceContextHandle, 12, sizeof(PIXELFORMATDESCRIPTOR), &pfd);
 
-			if (LocalPixelFormat)
+			int LocalPixelFormat = ChoosePixelFormat(dummyDeviceContextHandle, &pfd);
+      printWinError
+
+			if(LocalPixelFormat)
 			{
-				SetPixelFormat(dummyDeviceContextHandle, LocalPixelFormat,
-					&pfd);
+				SetPixelFormat(dummyDeviceContextHandle, LocalPixelFormat, &pfd);
+        printWinError
 			}
 
       printWinError
