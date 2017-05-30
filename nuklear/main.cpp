@@ -29,6 +29,7 @@
 // -todo: write visualizer overview for Readme.md  
 // -todo: put sensitivity into a separate settings struct - not broke, don't fix
 
+// todo: visualize normal variables from tbl
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
 //       |  visualize the fit position and camera frustum in real time to debug
@@ -474,6 +475,20 @@ void                refreshDB(VizData* vd)
   }
 }
 
+
+void drawTbl(NVGcontext* nvg, tbl const& t,  f32 x=0.f, f32 y=0.f, f32 sz=50.f)
+{
+  char s[TITLE_MAX_LEN]; f32 xo=0, yo=0;                           // xo is x offset   yo is y offset
+
+  nvgFontSize(nvg, sz);
+  nvgFontFace(nvg, "sans");
+  nvgTextAlign(nvg, NVG_ALIGN_LEFT); // | NVG_ALIGN_MIDDLE);
+  nvgFillColor(nvg, nvgRGBA(255, 255, 170, 255));
+
+  sprintf(s, "sizeBytes: %lu", (unsigned long)t.sizeBytes());
+  nvgText(nvg, x+xo, y+yo, s, NULL);
+}
+
 }
 
 static tbl tst;
@@ -777,6 +792,7 @@ ENTRY_DECLARATION
           nvgText(vd.ui.nvg, tb + 45.f, vd.ui.hudSz, nvgStr, NULL);
         }
 
+        vd.ui.showGuide = false;
         if(vd.ui.showGuide){
           SECTION(hotkey guide)
           {
@@ -789,6 +805,9 @@ ENTRY_DECLARATION
             nvgText(vd.ui.nvg, 100, 100 + vd.ui.guideSz*4, hotkeyGuidePage, NULL);
           }
         }
+
+        drawTbl(vd.ui.nvg, tst, 100,100,25);
+
       nvgEndFrame(vd.ui.nvg);
     }
 

@@ -57,3 +57,5 @@ dependencies:
  tbl ~ tbl 
  tbl + tbl  - add all elemnts in the vectors together and returns a new table
 
+operator[](std::pair) - return a slice from the array?
+
