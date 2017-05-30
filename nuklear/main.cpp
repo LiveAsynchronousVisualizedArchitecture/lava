@@ -476,17 +476,28 @@ void                refreshDB(VizData* vd)
 }
 
 
-void drawTbl(NVGcontext* nvg, tbl const& t,  f32 x=0.f, f32 y=0.f, f32 sz=50.f)
+void drawBnd(NVGcontext* nvg, f32 b[4], f32 margin=5.f)
 {
-  char s[TITLE_MAX_LEN]; f32 xo=0, yo=0;                           // xo is x offset   yo is y offset
+  nvgBeginPath(nvg);
+  nvgRect(nvg, b[0]-margin, b[1]-margin, b[2]-b[0] + margin*2.f, b[3]-b[1] + margin*2.f);
+  nvgStrokeWidth(nvg, 2.f);
+  nvgStrokeColor(nvg, nvgRGBAf(1.f, .7f, 0, .75f));
+  nvgStroke(nvg);
+}
+void drawTbl(NVGcontext* nvg, tbl const& t,  f32 x=0.f, f32 y=0.f, f32 sz=50.f, f32 margin=5.f)
+{
+  char s[TITLE_MAX_LEN]; f32 bnds[4]; f32 xo=0, yo=0;                           // xo is x offset   yo is y offset
 
-  nvgFontSize(nvg, sz);
-  nvgFontFace(nvg, "sans");
+  nvgFontSize(nvg,  sz);
+  nvgFontFace(nvg,  "sans");
   nvgTextAlign(nvg, NVG_ALIGN_LEFT); // | NVG_ALIGN_MIDDLE);
   nvgFillColor(nvg, nvgRGBA(255, 255, 170, 255));
 
   sprintf(s, "sizeBytes: %lu", (unsigned long)t.sizeBytes());
   nvgText(nvg, x+xo, y+yo, s, NULL);
+  nvgTextBounds(nvg, x + xo, y + yo, s, NULL, bnds);
+  drawBnd(nvg, bnds, margin);
+
 }
 
 }
