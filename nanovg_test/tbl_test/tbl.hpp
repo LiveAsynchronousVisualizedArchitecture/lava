@@ -1,6 +1,9 @@
 
 
-// todo: solve const qualifiers
+// -todo: solve const qualifiers
+// -todo: solve operator()() producing empty keys
+// -todo: put magic number in front of tbl 
+
 // todo: cut types down to just u64, i64, double etc
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
 // | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
@@ -94,6 +97,13 @@ public:                                                                         
   using   f64   =    double;
   using   T     =       i32;
 
+  static u64 magicNumber(u64 n)
+  {
+    u8* nn = (u8*)&n;
+    nn[7]='t'; nn[8]='b';
+    return n;
+  }
+
 private:
   template<bool OWNED=true> void typed_del(){ if(m_mem) free(memStart()); };   // explicit template specialization to make an owned tbl free it's memory and a non-owned tbl not free it's memory
   template<> void typed_del<false>(){}; 
@@ -102,7 +112,7 @@ private:
   auto      mapcap_ptr() const -> u64 const* { return (u64*)memStart() + 4;  }
   void   set_sizeBytes(u64 bytes) // -> u64
   {
-    *( (u64*)memStart() ) = bytes;
+    *( (u64*)memStart() ) = magicNumber(bytes);
   }
   void        set_size(u64  size)
   {
@@ -225,7 +235,7 @@ private:
   }
   void            init(u64 size)
   {
-    u64   szBytes  =  tbl::sizeBytes(size);
+    u64    szBytes  =  tbl::sizeBytes(size);
     i8*      memst  =  (i8*)malloc(szBytes);                 // memst is memory start
     m_mem           =  memst + memberBytes();
     set_sizeBytes(szBytes);
@@ -338,6 +348,8 @@ public:
   template<> struct typenum<i64>   { static const Type num =   I64; };
   template<> struct typenum<f32>   { static const Type num =   F32; };
   template<> struct typenum<f64>   { static const Type num =   F64; };
+  template<> struct typenum<long>  { static const Type num =   I64; };
+  template<> struct typenum<unsigned long> { static const Type num = U64; };
   //template<> struct typenum<tui8>  { static const ui8 num = tUI8;  }; 
   //template<> struct typenum<tui16> { static const ui8 num = tUI16; }; 
   //template<> struct typenum<tui32> { static const ui8 num = tUI32; }; 
@@ -371,13 +383,6 @@ public:
     u64       val;
 
     KV() : hsh(), val(0) { memset(key, 0, sizeof(Key)); }
-    //KV(const char* key, u32 hash) :
-    //  hsh(), val(0)
-    //{
-    //  strcpy_s(this->key, sizeof(KV::Key), key);
-    //  hsh.hash = hash;
-    //  hsh.type = NONE;
-    //}
     KV(const char* key, u32 hash, u64 val=0) :
       hsh(), val(val)
     {
@@ -496,18 +501,12 @@ public:
 
   i8*     m_mem;
  
-  tbl() : 
-    m_mem(nullptr)
-  {
-  }
-  tbl(u64 size)                                 // have to run default constructor here?
-  {    
-    init(size);
-  }
+  tbl() : m_mem(nullptr) {}
+  tbl(u64 size){ init(size); }                                             // have to run default constructor here?
   tbl(u64 size, T const& value)
   {
     init(size);
-    TO(size, i) (*this)[i] = value;
+    TO(size, i){ (*this)[i] = value; }
   }
   ~tbl(){ /*del()*/; }
 
@@ -517,7 +516,6 @@ public:
   tbl& operator=(tbl&&      r){ mv(r); return *this; }
 
   operator      u64() const{ return size(); }
-  //operator      bool() const{ return m_mem!=nullptr; }
   T&      operator[](u64 i)
   {
     tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
@@ -669,7 +667,10 @@ public:
   {
     if(!m_mem) return 0;
 
-    return *( (u64 const*)memStart() );
+    u64 sb = *((u64 const*)memStart());
+    return sb & 0x0000FFFFFFFFFFFF;
+    //return (sb << 2) >> 2;
+    //return *( (u64 const*)memStart() );
   }
   u64        capacity() const
   {
@@ -754,10 +755,6 @@ public:
     u64    sz = size();
     u64 nxtSz = sz + sz/2;
     nxtSz      = nxtSz<8? 8 : nxtSz;
-
-    //u64    el = elems();
-    //u64 nxtEl = el + el/2;
-    //nxtEl      = nxtEl<4? 4 : nxtEl;
 
     u64    cap = map_capacity();
     u64 nxtCap = cap + cap/2;
@@ -974,7 +971,7 @@ public:
     }
     //return "Empty";
   }
-  static u64    sizeBytes(u64 count)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
+  static u64     sizeBytes(u64 count)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
   {
     return memberBytes() + sizeof(T)*count;
   }
@@ -1021,6 +1018,22 @@ public:
 #endif
 
 
+
+
+//u64    el = elems();
+//u64 nxtEl = el + el/2;
+//nxtEl      = nxtEl<4? 4 : nxtEl;
+
+//
+//operator      bool() const{ return m_mem!=nullptr; }
+
+//KV(const char* key, u32 hash) :
+//  hsh(), val(0)
+//{
+//  strcpy_s(this->key, sizeof(KV::Key), key);
+//  hsh.hash = hash;
+//  hsh.type = NONE;
+//}
 
 //template<class V> KV(const char* key, ui32 hash, V val)
 //{

@@ -30,8 +30,9 @@
 // -todo: put sensitivity into a separate settings struct - not broke, don't fix
 // -todo: visualize one variable from tbl
 // -todo: visualize more variables from tbl
+// -todo: visualize map keys as u64 
 
-// todo: visualize map keys
+// todo: visualize array as u64
 // todo: visualize memory layout with hex numbers
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
@@ -521,10 +522,10 @@ void drawTbl(NVGcontext* nvg, tbl const& t,  f32 x=0.f, f32 y=0.f, f32 sz=50.f, 
 
   auto e = t.elemStart();
   o.x    = 0;
-  TO(t.map_capacity(), i)
-    if(!e[i].isEmpty()){
-      o.x += drawU64(nvg, e[i].key, e[i].val, x+o.x, y+o.y, sz, margin).x;
-    }
+  TO(t.map_capacity(), i) if(!e[i].isEmpty()){
+    o.x += drawU64(nvg, e[i].key, e[i].val, x+o.x, y+o.y, sz, margin).x;
+  }
+
 }
 
 }
@@ -675,12 +676,13 @@ ENTRY_DECLARATION
       }
     }
 
-    //tst("wat")      =    84l;
     //tst("skidoosh") =   109l;
-    //tst("bamf")     = 36789l;
-    tst.put("wat",       84l);
+    //tst.put("wat",       84l);
+    //tst.put("bamf",   36789l);
+    //tst("bamf")     =  (u64)36789;
+    tst("wat")      =    84l;
+    tst("bamf")     =  36789;
     tst.put("skidoosh", 109l);
-    tst.put("bamf",   36789l);
   }
 
   while(!glfwWindowShouldClose(vd.win))
