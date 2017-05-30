@@ -1,5 +1,7 @@
 
 
+// todo: solve const qualifiers
+// todo: cut types down to just u64, i64, double etc
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
 // | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
 // | does this imply that there should be a separate array type or is specializing string enough? 
@@ -360,24 +362,24 @@ public:
   struct       KV
   {
     template<class DEST, class SRC> 
-    static DEST cast_mem(u64* src){ return (DEST)(*((SRC*)src)); }
+    static DEST cast_mem(u64 const* const src){ return (DEST)(*((SRC*)src)); }
 
     using Key = char[51];  // using Key = char[19]; 
 
     HshType   hsh;
     Key       key;
-    u64      val;
-
-    //template<class V> KV(const char* key, ui32 hash, V val)
-    //{
-    //  *this = val;
-    //  strcpy_s(this->key, sizeof(KV::Key), key);
-    //  hsh.hash = hash;
-    //}
+    u64       val;
 
     KV() : hsh(), val(0) { memset(key, 0, sizeof(Key)); }
-    KV(const char* key, u32 hash) :
-      hsh(), val(0)
+    //KV(const char* key, u32 hash) :
+    //  hsh(), val(0)
+    //{
+    //  strcpy_s(this->key, sizeof(KV::Key), key);
+    //  hsh.hash = hash;
+    //  hsh.type = NONE;
+    //}
+    KV(const char* key, u32 hash, u64 val=0) :
+      hsh(), val(val)
     {
       strcpy_s(this->key, sizeof(KV::Key), key);
       hsh.hash = hash;
@@ -389,7 +391,7 @@ public:
       return hsh.hash==l.hsh.hash && 
              strncmp(l.key,key,sizeof(KV::Key)-1)==0;
     }
-    KV& operator=(KV const& l)
+    KV&  operator=(KV const& l)
     {
       memmove(this, &l, sizeof(KV));
       return *this;
@@ -403,7 +405,7 @@ public:
     { 
       return as<N>();
     }
-    template<class N> N as()
+    template<class N> N as() const
     { 
       if(hsh.type==typenum<N>::num) return *((N*)&val);       // if the types are the same, return it as the cast directly
       
@@ -441,13 +443,13 @@ public:
           tbl::type_str((Type)typenum<N>::num) );
       }
 
-      ui8 destbits = typenum<N>::num & BITS_MASK;
-      ui8  srcbits = hsh.type        & BITS_MASK;
+      u8 destbits = typenum<N>::num & BITS_MASK;
+      u8  srcbits = hsh.type        & BITS_MASK;
       if( destbits > srcbits ){
         switch(hsh.type){
-          case  UI8: return cast_mem<N, ui8>(&val);
-          case UI16: return cast_mem<N,ui16>(&val);
-          case UI32: return cast_mem<N,ui32>(&val);
+          case   U8: return cast_mem<N,  u8>(&val);
+          case  U16: return cast_mem<N, u16>(&val);
+          case  U32: return cast_mem<N, u32>(&val);
           case   I8: return cast_mem<N,  i8>(&val);
           case  I16: return cast_mem<N, i16>(&val);
           case  I32: return cast_mem<N, i32>(&val);
@@ -462,6 +464,7 @@ public:
 
       return N();
     }
+    bool isEmpty() const { return hsh.type == Type::EMPTY; }
 
     static KV     empty_kv()
     {
@@ -589,7 +592,7 @@ public:
        if(!expand()) return KV::error_kv();
 
     u32  hsh  =  HashStr(key);    
-    KV*    el  =  (KV*)elemStart();                                    // el is a pointer to the elements 
+    KV*   el  =  (KV*)elemStart();                                    // el is a pointer to the elements 
     u64    i  =  hsh;
     u64  mod  =  map_capacity();
     u64   en  =  prev(i,mod);
@@ -600,13 +603,13 @@ public:
       HshType eh = el[i].hsh;                                          // eh is element hash
       if(el[i].hsh.type==EMPTY){ 
         set_elems( elems()+1 );
-        return el[i] = KV(key, hsh, val);
+        return el[i] = KV(key, hsh, *((u64*)&val) );
       }else if(hsh==eh.hash  && 
         strncmp(el[i].key,key,sizeof(KV::Key)-1)==0 )
       { // if the hashes aren't the same, the keys can't be the same
-        return el[i] = KV(key, hsh, val);
+        return el[i] = KV(key, hsh, *((u64*)&val) );
       }else if( wrapDist(el,i,mod) < dist ){
-        KV kv(key, hsh, val);
+        KV kv(key, hsh, *((u64*)&val) );
         set_elems( elems()+1 );
         return place_rh(kv, el, i, dist, mod);
       }
@@ -648,7 +651,7 @@ public:
     return kv.hsh.type != EMPTY;
   }
 
-  u64           size() const
+  u64            size() const
   {
     if(!m_mem) return 0;
 
@@ -662,13 +665,13 @@ public:
   {
     return (void*)(m_mem - memberBytes());
   }
-  u64      sizeBytes() const // -> u64
+  u64       sizeBytes() const // -> u64
   {
     if(!m_mem) return 0;
 
     return *( (u64 const*)memStart() );
   }
-  u64       capacity() const
+  u64        capacity() const
   {
     if(!m_mem) return 0;
 
@@ -678,13 +681,13 @@ public:
     //
     //return (sizeBytes() - memberBytes()) / sizeof(T);  // - size()*sizeof(T)
   }
-  u64          elems() const
+  u64           elems() const
   {
     if(!m_mem) return 0;
 
     return *( ((u64*)memStart()) + 3);
   }
-  u64   map_capacity() const
+  u64    map_capacity() const
   {
     if(!m_mem) return 0;
     else       return *mapcap_ptr();
@@ -823,14 +826,14 @@ public:
     
     return -1;
   }
-  u64          ideal(u64 i) const
+  u64           ideal(u64 i) const
   {
     auto el = elemStart();
     if(el[i].hsh.type==EMPTY) return i;
      
     return el[i].hsh.hash % map_capacity();
   }
-  u64       distance(u64 i) const
+  u64        distance(u64 i) const
   {
     //u64 idl = ideal(i);
     return wrapDist( ideal(i), i, map_capacity() );
@@ -869,7 +872,7 @@ public:
 
     return true;
   }
-  u64            del(Type t)
+  u64             del(Type t)
   {
     u64 mapcap = map_capacity();
     KV*      el = elemStart();
@@ -1016,4 +1019,13 @@ public:
 };
 
 #endif
+
+
+
+//template<class V> KV(const char* key, ui32 hash, V val)
+//{
+//  *this = val;
+//  strcpy_s(this->key, sizeof(KV::Key), key);
+//  hsh.hash = hash;
+//}
 

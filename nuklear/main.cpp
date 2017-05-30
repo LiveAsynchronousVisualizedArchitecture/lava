@@ -28,8 +28,11 @@
 
 // -todo: write visualizer overview for Readme.md  
 // -todo: put sensitivity into a separate settings struct - not broke, don't fix
+// -todo: visualize one variable from tbl
+// -todo: visualize more variables from tbl
 
-// todo: visualize normal variables from tbl
+// todo: visualize map keys
+// todo: visualize memory layout with hex numbers
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
 //       |  visualize the fit position and camera frustum in real time to debug
@@ -476,7 +479,7 @@ void                refreshDB(VizData* vd)
 }
 
 
-void drawBnd(NVGcontext* nvg, f32 b[4], f32 margin=5.f)
+void drawBnd(NVGcontext* nvg, f32 b[4], f32 margin)
 {
   nvgBeginPath(nvg);
   nvgRect(nvg, b[0]-margin, b[1]-margin, b[2]-b[0] + margin*2.f, b[3]-b[1] + margin*2.f);
@@ -484,20 +487,44 @@ void drawBnd(NVGcontext* nvg, f32 b[4], f32 margin=5.f)
   nvgStrokeColor(nvg, nvgRGBAf(1.f, .7f, 0, .75f));
   nvgStroke(nvg);
 }
+v2   drawU64(NVGcontext* nvg, const char* label, u64 n, f32 x, f32 y, f32 sz, f32 margin)
+{
+  char s[TITLE_MAX_LEN]; f32 bnds[4];
+
+  sprintf(s, "%s:   %lu", label, (unsigned long)n );
+  f32 m2 = margin * 2;
+  f32 xx = x + m2;
+  f32 yy = y + m2;
+  nvgText(nvg, xx,yy, s, NULL);
+  nvgTextBounds(nvg, xx, yy, s, NULL, bnds);
+  //TO(4,i){ bnds[i] += margin; }
+  drawBnd(nvg, bnds, margin);
+
+  v2 ofst = { bnds[2]-bnds[0] + m2, bnds[3]-bnds[1] + m2 };
+  return ofst;
+}
 void drawTbl(NVGcontext* nvg, tbl const& t,  f32 x=0.f, f32 y=0.f, f32 sz=50.f, f32 margin=5.f)
 {
-  char s[TITLE_MAX_LEN]; f32 bnds[4]; f32 xo=0, yo=0;                           // xo is x offset   yo is y offset
+  char s[TITLE_MAX_LEN]; f32 xo=0, yo=0;                                          // xo is x offset   yo is y offset
 
   nvgFontSize(nvg,  sz);
   nvgFontFace(nvg,  "sans");
   nvgTextAlign(nvg, NVG_ALIGN_LEFT); // | NVG_ALIGN_MIDDLE);
   nvgFillColor(nvg, nvgRGBA(255, 255, 170, 255));
 
-  sprintf(s, "sizeBytes: %lu", (unsigned long)t.sizeBytes());
-  nvgText(nvg, x+xo, y+yo, s, NULL);
-  nvgTextBounds(nvg, x + xo, y + yo, s, NULL, bnds);
-  drawBnd(nvg, bnds, margin);
+  v2 o = {0,0};                                                                   // o is offset
+  o.x += drawU64(nvg, "sizeBytes",    t.sizeBytes(),    x+xo,   y,   sz, margin).x;
+  o.x += drawU64(nvg, "capacity",     t.capacity(),     x+o.x,  y,   sz, margin).x;
+  o.x += drawU64(nvg, "size",         t.size(),         x+o.x,  y,   sz, margin).x;
+  o.x += drawU64(nvg, "map elems",    t.elems(),        x+o.x,  y,   sz, margin).x;
+  o   += drawU64(nvg, "map capacity", t.map_capacity(), x+o.x,  y,   sz, margin);
 
+  auto e = t.elemStart();
+  o.x    = 0;
+  TO(t.map_capacity(), i)
+    if(!e[i].isEmpty()){
+      o.x += drawU64(nvg, e[i].key, e[i].val, x+o.x, y+o.y, sz, margin).x;
+    }
 }
 
 }
@@ -648,9 +675,12 @@ ENTRY_DECLARATION
       }
     }
 
-    tst("wat")      =    84;
-    tst("skidoosh") =   109;
-    tst("bamf")     = 36789;
+    //tst("wat")      =    84l;
+    //tst("skidoosh") =   109l;
+    //tst("bamf")     = 36789l;
+    tst.put("wat",       84l);
+    tst.put("skidoosh", 109l);
+    tst.put("bamf",   36789l);
   }
 
   while(!glfwWindowShouldClose(vd.win))
@@ -817,7 +847,7 @@ ENTRY_DECLARATION
           }
         }
 
-        drawTbl(vd.ui.nvg, tst, 100,100,25);
+        drawTbl(vd.ui.nvg, tst, 25,50,25,10);
 
       nvgEndFrame(vd.ui.nvg);
     }
@@ -836,3 +866,10 @@ ENTRY_DECLARATION
   return 0;
 }
 
+
+
+
+//sprintf(s, "sizeBytes:   %lu", (unsigned long)t.sizeBytes());
+//nvgText(nvg, x+xo, y+yo, s, NULL);
+//nvgTextBounds(nvg, x + xo, y + yo, s, NULL, bnds);
+//drawBnd(nvg, bnds, margin);

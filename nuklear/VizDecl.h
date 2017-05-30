@@ -15,6 +15,7 @@
 
 #include "../DataStore/ConcurrentMap/simdb.hpp"
 #include "../nanovg_test/tbl_test/tbl.hpp"
+//#include "../nanovg_test/nanovg_test/vec.hpp"
 #include "IndexedVerts.h"
 
 using namespace nanogui;
@@ -43,6 +44,9 @@ using  std::map;
 using  glm::perspective;
 using  glm::rotate;
 using  glm::length;
+using  v2 = vec2;
+using  v3 = vec3;
+using  v4 = vec4;
 
 using vec_vs = std::vector<VerStr>;
 using vecstr = std::vector<str>;
