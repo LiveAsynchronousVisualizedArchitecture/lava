@@ -34,16 +34,22 @@
 // -todo: visualize array as u64
 // -todo: draw table under UI
 
+// todo: use toString to find all string bounds ahead of time
+// todo: layout bounds within a specified bounding box
+// todo: make bnd2f in vec.hpp 
 // todo: fix wrong simdb on first switch
-// todo: visualize memory layout with hex numbers
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
 //       |  visualize the fit position and camera frustum in real time to debug
+
+// idea: visualize memory layout with hex numbers
+// idea: use libtcc to interpret a struct declaration for the type of tbl array? 
+// idea: use field key values in the tbl to interpret the tbl array type?
+
 // todo: move and rename project to LavaViz or any non test name
 // todo: try out tiny/nano file dialog for saving and loading of serialized data 
 // todo: make save button or menu to save serialized files 
 // todo: make a load button or menu to load serialized files - would need to have a visualizer specific simdb that would keep the files? 
-
 // todo: make label switches not only turn keys on and off, but fade their transparency too?
 // todo: keep databases in memory after listing them?
 // idea: look into drag and drop to load indexed verts objects by dragging from a file
@@ -96,6 +102,20 @@ using v2i  =  Eigen::Vector2i;
 using v4f  =  Eigen::Vector4f;
 
 const u32 TITLE_MAX_LEN = 256;
+
+template<class T> inline std::string
+toString(T const& x)
+{
+  std::ostringstream convert;
+  convert << x;
+  return convert.str();
+}
+template<class T1, class... T> inline std::string
+toString(const T1& a, const T&... args)
+{
+  return toString(a) + toString(args...);
+}
+
 
 vec3                      pos(mat4 const& m)
 { return m[3];                      }
@@ -487,7 +507,7 @@ void  drawBnd(NVGcontext* nvg, f32 b[4], f32 margin)
   nvgBeginPath(nvg);
   nvgRect(nvg, b[0]-margin, b[1]-margin, b[2]-b[0] + margin*2.f, b[3]-b[1] + margin*2.f);
   nvgStrokeWidth(nvg, 2.f);
-  nvgStrokeColor(nvg, nvgRGBAf(1.f, .7f, 0, .75f));
+  nvgStrokeColor(nvg, nvgRGBAf(1.f, .8f, .2f, .8f));
   nvgStroke(nvg);
 }
 v2    drawU64(NVGcontext* nvg, const char* label, u64 n, f32 x, f32 y, f32 sz, f32 margin)
@@ -506,6 +526,11 @@ v2    drawU64(NVGcontext* nvg, const char* label, u64 n, f32 x, f32 y, f32 sz, f
   v2 ofst = { bnds[2]-bnds[0] + m2, bnds[3]-bnds[1] + m2 };
   return ofst;
 }
+v2    bndStr(NVGcontext* nvg, str const& s)
+{
+  bnd2f bnd;
+  nvgTextBounds(nvg, 0,0, s.c_str(), NULL, bnd.b);
+}
 void  drawTbl(NVGcontext* nvg, tbl const& t,  f32 x=0.f, f32 y=0.f, f32 sz=50.f, f32 margin=5.f)
 {
   char s[TITLE_MAX_LEN]; f32 xo=0, yo=0;                                          // xo is x offset   yo is y offset
@@ -515,8 +540,16 @@ void  drawTbl(NVGcontext* nvg, tbl const& t,  f32 x=0.f, f32 y=0.f, f32 sz=50.f,
   nvgTextAlign(nvg, NVG_ALIGN_LEFT); // | NVG_ALIGN_MIDDLE);
   nvgFillColor(nvg, nvgRGBA(255, 255, 170, 255));
 
+  vecstr fields; fields.reserve(5);
+  fields.push_back( toString("sizeBytes: ",  t.sizeBytes())    );
+  fields.push_back( toString("capacity: ",   t.capacity())     );
+  fields.push_back( toString("size: ",       t.size())         );
+  fields.push_back( toString("map elems",    t.elems())        );
+  fields.push_back( toString("map capacity", t.map_capacity()) );
+
   v2 o = {0,0};                                                                   // o is offset
-  o.x += drawU64(nvg, "sizeBytes",    t.sizeBytes(),    x+xo,   y,   sz, margin).x;
+  //o.x += drawU64(nvg, szbytes.c_str(), t.sizeBytes(), x + xo, y, sz, margin).x;
+  //o.x += drawU64(nvg, "sizeBytes",    t.sizeBytes(),    x+xo,   y,   sz, margin).x;
   o.x += drawU64(nvg, "capacity",     t.capacity(),     x+o.x,  y,   sz, margin).x;
   o.x += drawU64(nvg, "size",         t.size(),         x+o.x,  y,   sz, margin).x;
   o.x += drawU64(nvg, "map elems",    t.elems(),        x+o.x,  y,   sz, margin).x;
@@ -816,7 +849,7 @@ ENTRY_DECLARATION
     SECTION(table)
     {
       nvgBeginFrame(vd.ui.nvg, vd.ui.w, vd.ui.h, vd.ui.w / (f32)vd.ui.h);
-        drawTbl(vd.ui.nvg, tst, 25, 50, 25, 10);
+        drawTbl(vd.ui.nvg, tst, 25, 50, 20, 10);
       nvgEndFrame(vd.ui.nvg);
     }
     SECTION(nanogui)

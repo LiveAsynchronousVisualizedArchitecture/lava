@@ -20,7 +20,7 @@
 
 using namespace nanogui;
 
-enum AtrId : GLuint { POSITION = 0, NORMAL = 1, COLOR = 2, TEXCOORD = 3 };  // this coresponds to the the Vertex struct in IndexedVerts
+enum AtrId : GLuint { POSITION = 0, NORMAL = 1, COLOR = 2, TEXCOORD = 3 };      // this coresponds to the the Vertex struct in IndexedVerts
 
 template<class T, class A = std::allocator<T> > using vec = std::vector<T, A>;  // will need C++ ifdefs eventually
 
@@ -54,7 +54,16 @@ using   vecb = std::vector<bool>;
 using   vecu = std::vector<u32>;
 using   veci = std::vector<i32>;
 
-struct Shape {                     // todo: make rvalue constructor - make all constructors?
+union bnd2f
+{
+  struct { f32 xmn, ymn, xmx, ymx; };
+  f32  b[4];
+
+  f32& operator[](u64 i)       { return b[i]; }
+  f32  operator[](u64 i) const { return b[i]; }
+};
+
+struct  Shape {                     // todo: make rvalue constructor - make all constructors?
 private:
   void del()
   {
@@ -108,7 +117,6 @@ public:
     del();
   }
 };
-
 struct Camera
 {
   float fov, pansense, sensitivity, nearClip, farClip, dist;                     // field of view is fov
@@ -168,8 +176,6 @@ struct VizData
 
   // todo: VizData deconstructor - will need this to clean up shader programs 
 };
-
-
 
 #endif
 
