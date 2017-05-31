@@ -236,7 +236,7 @@ private:
   void            init(u64 size)
   {
     u64    szBytes  =  tbl::sizeBytes(size);
-    i8*      memst  =  (i8*)malloc(szBytes);                 // memst is memory start
+    u8*      memst  =  (u8*)malloc(szBytes);                 // memst is memory start
     m_mem           =  memst + memberBytes();
     set_sizeBytes(szBytes);
     set_elems(0);
@@ -499,7 +499,7 @@ public:
   };
   //struct iterator
 
-  i8*     m_mem;
+  u8*     m_mem;
  
   tbl() : m_mem(nullptr) {}
   tbl(u64 size){ init(size); }                                             // have to run default constructor here?
@@ -620,12 +620,19 @@ public:
 
   bool           push(T const& value)
   {
-    if( !(capacity()>size()) )
+    if(!m_mem){ init(0); }
+
+    auto prevSz = size();
+    if( !(capacity()>prevSz) )
       if(!expand()) return false;
     
-    (*this)[size()] = value;
+    //((T*)(this))[size()] = value;
 
-    set_size(size()+1);
+    T* p = (T*)(m_mem);
+    *(p + prevSz) = value;
+
+    set_size(prevSz+1);
+    //set_size(size()+1);
 
     return true;
   }
@@ -721,14 +728,14 @@ public:
     else      re = realloc(memStart(), nxtBytes);
 
     if(re){
-      m_mem = ((i8*)re) + memberBytes();
+      m_mem = ((u8*)re) + memberBytes();
       set_sizeBytes(nxtBytes);
       set_capacity(count);
       set_mapcap(mapcap);
 
       KV* el = elemStart();
       if(prevElems){
-        KV* prevEl = (KV*)( ((i8*)re) + prevOfst );
+        KV* prevEl = (KV*)( ((u8*)re) + prevOfst );
         if(el!=prevEl) TO(prevMapCap,i) el[i] = prevEl[i];
       }
 
@@ -771,9 +778,9 @@ public:
     u64   nxtsz = vecsz + mapsz;
     
     KV const* el = elemStart();
-    i8* nxtp = (i8*)malloc(nxtsz);
+    u8* nxtp = (u8*)malloc(nxtsz);
     if(nxtp){
-      i8* p = (i8*)memStart();
+      u8* p = (u8*)memStart();
       memcpy(nxtp, p, vecsz);
       KV* nxtel = (KV*)(nxtp+vecsz);
       u64  cur = 0;

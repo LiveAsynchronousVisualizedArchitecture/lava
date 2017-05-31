@@ -31,8 +31,10 @@
 // -todo: visualize one variable from tbl
 // -todo: visualize more variables from tbl
 // -todo: visualize map keys as u64 
+// -todo: visualize array as u64
+// -todo: draw table under UI
 
-// todo: visualize array as u64
+// todo: fix wrong simdb on first switch
 // todo: visualize memory layout with hex numbers
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
@@ -480,7 +482,7 @@ void                refreshDB(VizData* vd)
 }
 
 
-void drawBnd(NVGcontext* nvg, f32 b[4], f32 margin)
+void  drawBnd(NVGcontext* nvg, f32 b[4], f32 margin)
 {
   nvgBeginPath(nvg);
   nvgRect(nvg, b[0]-margin, b[1]-margin, b[2]-b[0] + margin*2.f, b[3]-b[1] + margin*2.f);
@@ -488,7 +490,7 @@ void drawBnd(NVGcontext* nvg, f32 b[4], f32 margin)
   nvgStrokeColor(nvg, nvgRGBAf(1.f, .7f, 0, .75f));
   nvgStroke(nvg);
 }
-v2   drawU64(NVGcontext* nvg, const char* label, u64 n, f32 x, f32 y, f32 sz, f32 margin)
+v2    drawU64(NVGcontext* nvg, const char* label, u64 n, f32 x, f32 y, f32 sz, f32 margin)
 {
   char s[TITLE_MAX_LEN]; f32 bnds[4];
 
@@ -504,7 +506,7 @@ v2   drawU64(NVGcontext* nvg, const char* label, u64 n, f32 x, f32 y, f32 sz, f3
   v2 ofst = { bnds[2]-bnds[0] + m2, bnds[3]-bnds[1] + m2 };
   return ofst;
 }
-void drawTbl(NVGcontext* nvg, tbl const& t,  f32 x=0.f, f32 y=0.f, f32 sz=50.f, f32 margin=5.f)
+void  drawTbl(NVGcontext* nvg, tbl const& t,  f32 x=0.f, f32 y=0.f, f32 sz=50.f, f32 margin=5.f)
 {
   char s[TITLE_MAX_LEN]; f32 xo=0, yo=0;                                          // xo is x offset   yo is y offset
 
@@ -520,11 +522,28 @@ void drawTbl(NVGcontext* nvg, tbl const& t,  f32 x=0.f, f32 y=0.f, f32 sz=50.f, 
   o.x += drawU64(nvg, "map elems",    t.elems(),        x+o.x,  y,   sz, margin).x;
   o   += drawU64(nvg, "map capacity", t.map_capacity(), x+o.x,  y,   sz, margin);
 
+  o.y += margin;
+
   auto e = t.elemStart();
-  o.x    = 0;
-  TO(t.map_capacity(), i) if(!e[i].isEmpty()){
-    o.x += drawU64(nvg, e[i].key, e[i].val, x+o.x, y+o.y, sz, margin).x;
+  o.x         = 0;
+  f32   yofst = 0;
+  auto mapcap = t.map_capacity();
+  TO(mapcap, i) if(!e[i].isEmpty()){
+    v2 ofst = drawU64(nvg, e[i].key, e[i].val, x+o.x, y+o.y, sz, margin);
+    o.x  += ofst.x;
+    yofst = ofst.y;
   }
+  o.y += yofst + margin;
+
+  //o.y += yofst + margin;
+  //o += drawU64(nvg, e[mapcap-1].key, e[mapcap-1].val, x + o.x, y + o.y, sz, margin);
+
+  o.x = 0;
+  TO(t.size(),i){
+    sprintf(s, "%lu", (unsigned long)i); //(unsigned long)t[i] );
+    o.x += drawU64(nvg, s, (u64)t[i], x+o.x, y+o.y, sz, margin).x;
+  }
+
 
 }
 
@@ -680,6 +699,11 @@ ENTRY_DECLARATION
     //tst.put("wat",       84l);
     //tst.put("bamf",   36789l);
     //tst("bamf")     =  (u64)36789;
+    tst.push(82);
+    tst.push(83);
+    tst.push(84);
+    tst.push(85);
+
     tst("wat")      =    84l;
     tst("bamf")     =  36789;
     tst.put("skidoosh", 109l);
@@ -789,6 +813,12 @@ ENTRY_DECLARATION
 
       PRINT_GL_ERRORS
     }
+    SECTION(table)
+    {
+      nvgBeginFrame(vd.ui.nvg, vd.ui.w, vd.ui.h, vd.ui.w / (f32)vd.ui.h);
+        drawTbl(vd.ui.nvg, tst, 25, 50, 25, 10);
+      nvgEndFrame(vd.ui.nvg);
+    }
     SECTION(nanogui)
     {
       if(vd.ui.keyWin->focused()){
@@ -848,8 +878,6 @@ ENTRY_DECLARATION
             nvgText(vd.ui.nvg, 100, 100 + vd.ui.guideSz*4, hotkeyGuidePage, NULL);
           }
         }
-
-        drawTbl(vd.ui.nvg, tst, 25,50,25,10);
 
       nvgEndFrame(vd.ui.nvg);
     }
