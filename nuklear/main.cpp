@@ -33,8 +33,10 @@
 // -todo: visualize map keys as u64 
 // -todo: visualize array as u64
 // -todo: draw table under UI
+// -todo: use toString to find all string bounds ahead of time for fields
+// -todo: find bounds of key-values ahead of time and draw
+// -todo: find bounds of array values ahead of time and draw
 
-// todo: use toString to find all string bounds ahead of time
 // todo: layout bounds within a specified bounding box
 // todo: make bnd2f in vec.hpp 
 // todo: fix wrong simdb on first switch
@@ -501,16 +503,15 @@ void                refreshDB(VizData* vd)
   }
 }
 
-
-void  drawBnd(NVGcontext* nvg, f32 b[4], f32 margin)
+void   drawBnd(NVGcontext* nvg, f32 b[4])
 {
   nvgBeginPath(nvg);
-  nvgRect(nvg, b[0]-margin, b[1]-margin, b[2]-b[0] + margin*2.f, b[3]-b[1] + margin*2.f);
-  nvgStrokeWidth(nvg, 2.f);
-  nvgStrokeColor(nvg, nvgRGBAf(1.f, .8f, .2f, .8f));
+   nvgRect(nvg, b[0], b[1], b[2]-b[0], b[3]-b[1]);
+   nvgStrokeWidth(nvg, 2.f);
+   nvgStrokeColor(nvg, nvgRGBAf(1.f, .8f, .2f, .8f));
   nvgStroke(nvg);
 }
-v2    drawU64(NVGcontext* nvg, const char* label, u64 n, f32 x, f32 y, f32 sz, f32 margin)
+v2     drawU64(NVGcontext* nvg, const char* label, u64 n, f32 x, f32 y, f32 sz, f32 margin)
 {
   char s[TITLE_MAX_LEN]; f32 bnds[4];
 
@@ -521,18 +522,34 @@ v2    drawU64(NVGcontext* nvg, const char* label, u64 n, f32 x, f32 y, f32 sz, f
   nvgText(nvg, xx,yy, s, NULL);
   nvgTextBounds(nvg, xx, yy, s, NULL, bnds);
   //TO(4,i){ bnds[i] += margin; }
-  drawBnd(nvg, bnds, margin);
+  drawBnd(nvg, bnds);
 
   v2 ofst = { bnds[2]-bnds[0] + m2, bnds[3]-bnds[1] + m2 };
   return ofst;
 }
-v2    bndStr(NVGcontext* nvg, str const& s)
+v2     strOfst(NVGcontext* nvg, str const& s)                                      // strOfst is string offset
 {
   bnd2f bnd;
   nvgTextBounds(nvg, 0,0, s.c_str(), NULL, bnd.b);
+  
+  return { bnd.xmx-bnd.xmn, bnd.ymx-bnd.ymn };
 }
-void  drawTbl(NVGcontext* nvg, tbl const& t,  f32 x=0.f, f32 y=0.f, f32 sz=50.f, f32 margin=5.f)
+void  drawStrs(NVGcontext* nvg, vecstr const& strs, vecv2 ofsts, f32 x, f32 y, f32 margin)
 {
+  f32 m2 = margin * 2.f;
+  v2   o = {x,y};                                                                   // o is offset
+  TO(strs.size(),i){
+    bnd2f bnd = { o.x, o.y, o.x+ofsts[i].x+m2, o.y+ofsts[i].y+m2 };                                       //  o.x + margin * 2, o.y + margin * 2 };
+    drawBnd(nvg, bnd.b);
+
+    nvgText(nvg, o.x+margin, o.y+ofsts[i].y+margin, strs[i].c_str(), NULL);
+    o.x += ofsts[i].x + m2;
+  }
+}
+void   drawTbl(NVGcontext* nvg, tbl const& t,  f32 x=0.f, f32 y=0.f, f32 sz=50.f, f32 margin=5.f)
+{
+  using namespace std;
+  
   char s[TITLE_MAX_LEN]; f32 xo=0, yo=0;                                          // xo is x offset   yo is y offset
 
   nvgFontSize(nvg,  sz);
@@ -540,44 +557,53 @@ void  drawTbl(NVGcontext* nvg, tbl const& t,  f32 x=0.f, f32 y=0.f, f32 sz=50.f,
   nvgTextAlign(nvg, NVG_ALIGN_LEFT); // | NVG_ALIGN_MIDDLE);
   nvgFillColor(nvg, nvgRGBA(255, 255, 170, 255));
 
-  vecstr fields; fields.reserve(5);
-  fields.push_back( toString("sizeBytes: ",  t.sizeBytes())    );
-  fields.push_back( toString("capacity: ",   t.capacity())     );
-  fields.push_back( toString("size: ",       t.size())         );
-  fields.push_back( toString("map elems",    t.elems())        );
-  fields.push_back( toString("map capacity", t.map_capacity()) );
+  vecstr labels;  labels.reserve(5);
+  vecv2   ofsts;  ofsts.reserve(5);
 
-  v2 o = {0,0};                                                                   // o is offset
-  //o.x += drawU64(nvg, szbytes.c_str(), t.sizeBytes(), x + xo, y, sz, margin).x;
-  //o.x += drawU64(nvg, "sizeBytes",    t.sizeBytes(),    x+xo,   y,   sz, margin).x;
-  o.x += drawU64(nvg, "capacity",     t.capacity(),     x+o.x,  y,   sz, margin).x;
-  o.x += drawU64(nvg, "size",         t.size(),         x+o.x,  y,   sz, margin).x;
-  o.x += drawU64(nvg, "map elems",    t.elems(),        x+o.x,  y,   sz, margin).x;
-  o   += drawU64(nvg, "map capacity", t.map_capacity(), x+o.x,  y,   sz, margin);
+  f32 mxY = 0.f;
+  SECTION(draw fields)
+  {
+    labels.push_back( toString("sizeBytes:  ",    t.sizeBytes())    );
+    labels.push_back( toString("capacity:  ",     t.capacity())     );
+    labels.push_back( toString("size:  ",         t.size())         );
+    labels.push_back( toString("map elems:  ",    t.elems())        );
+    labels.push_back( toString("map capacity:  ", t.map_capacity()) );
+    TO(labels.size(),i){ ofsts.push_back( strOfst(nvg,labels[i]) ); }
+    TO(ofsts.size(),i){ mxY = max<f32>(mxY, ofsts[i].y); }
 
-  o.y += margin;
-
-  auto e = t.elemStart();
-  o.x         = 0;
-  f32   yofst = 0;
-  auto mapcap = t.map_capacity();
-  TO(mapcap, i) if(!e[i].isEmpty()){
-    v2 ofst = drawU64(nvg, e[i].key, e[i].val, x+o.x, y+o.y, sz, margin);
-    o.x  += ofst.x;
-    yofst = ofst.y;
-  }
-  o.y += yofst + margin;
-
-  //o.y += yofst + margin;
-  //o += drawU64(nvg, e[mapcap-1].key, e[mapcap-1].val, x + o.x, y + o.y, sz, margin);
-
-  o.x = 0;
-  TO(t.size(),i){
-    sprintf(s, "%lu", (unsigned long)i); //(unsigned long)t[i] );
-    o.x += drawU64(nvg, s, (u64)t[i], x+o.x, y+o.y, sz, margin).x;
+    drawStrs(nvg, labels, ofsts, x, y, margin);
   }
 
+  v2 o = { x, y+mxY+margin*3.f };                                                                   // o is offset
+  SECTION(draw key value pairs)
+  {
+    labels.clear();
+    auto e = t.elemStart();
+    TO(t.map_capacity(),i) if(!e[i].isEmpty()){
+      labels.push_back( toString(e[i].key,":  ",e[i].val) );
+    }
+    ofsts.clear();
+    TO(labels.size(),i){ ofsts.push_back(strOfst(nvg, labels[i])); }
+    mxY=0.f;
+    TO(ofsts.size(),i){ mxY = max<f32>(mxY, ofsts[i].y); }
 
+    drawStrs(nvg, labels, ofsts, o.x, o.y, margin);
+  }
+
+  o.x   =  x;
+  o.y  +=  mxY+margin*3.f;
+  SECTION(draw array elements)
+  {
+    labels.clear();
+    TO(t.size(),i){ labels.push_back( toString(i,":  ",t[i]) ); }
+
+    ofsts.clear();
+    TO(labels.size(), i) { ofsts.push_back(strOfst(nvg, labels[i])); }
+    mxY=0.f;
+    TO(ofsts.size(),i){ mxY = max<f32>(mxY, ofsts[i].y); }
+
+    drawStrs(nvg, labels, ofsts, o.x, o.y, margin);
+  }
 }
 
 }
@@ -931,6 +957,58 @@ ENTRY_DECLARATION
 
 
 
+
+
+
+
+
+//bnd = { o.x+margin, o.y+ofsts[i].y+margin, o.x+ofsts[i].x+margin, o.y+margin };                                       //  o.x + margin * 2, o.y + margin * 2 };
+//drawBnd(nvg, bnd.b);
+
+//o.x = 0;
+//TO(t.size(),i){
+//  sprintf(s, "%lu", (unsigned long)i); //(unsigned long)t[i] );
+//  o.x += drawU64(nvg, s, (u64)t[i], x+o.x, y+o.y, sz, margin).x;
+//}
+
+//void   drawBnd(NVGcontext* nvg, f32 b[4], f32 margin)
+//
+//nvgRect(nvg, b[0]-margin, b[1]-margin, b[2]-b[0] + margin*2.f, b[3]-b[1] + margin*2.f);
+
+//v2 o = { 0, mxY+margin*2.f };                                                                   // o is offset
+//o.x += drawU64(nvg, szbytes.c_str(), t.sizeBytes(), x + xo, y, sz, margin).x;
+//o.x += drawU64(nvg, "sizeBytes",    t.sizeBytes(),    x+xo,   y,   sz, margin).x;
+//o.x += drawU64(nvg, "capacity",     t.capacity(),     x+o.x,  y,   sz, margin).x;
+//o.x += drawU64(nvg, "size",         t.size(),         x+o.x,  y,   sz, margin).x;
+//o.x += drawU64(nvg, "map elems",    t.elems(),        x+o.x,  y,   sz, margin).x;
+//o   += drawU64(nvg, "map capacity", t.map_capacity(), x+o.x,  y,   sz, margin);
+//
+//o.y += margin;
+
+//auto e = t.elemStart();
+//o.x = 0;
+//f32   yofst = 0;
+//auto mapcap = t.map_capacity();
+//TO(mapcap, i) if(!e[i].isEmpty()) {
+//  v2 ofst = drawU64(nvg, e[i].key, e[i].val, x + o.x, y + o.y, sz, margin);
+//  o.x    += ofst.x;
+//  yofst   = ofst.y;
+//}
+//o.y += yofst + margin;
+//
+//auto e = t.elemStart();
+//o.x         = 0;
+//f32   yofst = 0;
+//auto mapcap = t.map_capacity();
+//TO(mapcap, i) if(!e[i].isEmpty()){
+//  v2 ofst = drawU64(nvg, e[i].key, e[i].val, x+o.x, y+o.y, sz, margin);
+//  o.x  += ofst.x;
+//  yofst = ofst.y;
+//}
+//o.y += yofst + margin;
+
+//o.y += yofst + margin;
+//o += drawU64(nvg, e[mapcap-1].key, e[mapcap-1].val, x + o.x, y + o.y, sz, margin);
 
 //sprintf(s, "sizeBytes:   %lu", (unsigned long)t.sizeBytes());
 //nvgText(nvg, x+xo, y+yo, s, NULL);

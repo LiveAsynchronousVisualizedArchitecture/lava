@@ -53,6 +53,7 @@ using vecstr = std::vector<str>;
 using   vecb = std::vector<bool>;
 using   vecu = std::vector<u32>;
 using   veci = std::vector<i32>;
+using  vecv2 = std::vector<v2>;
 
 union bnd2f
 {
