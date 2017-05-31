@@ -36,9 +36,9 @@
 // -todo: use toString to find all string bounds ahead of time for fields
 // -todo: find bounds of key-values ahead of time and draw
 // -todo: find bounds of array values ahead of time and draw
+// -todo: make bnd2f in vec.hpp - put in VizDecl
 
 // todo: layout bounds within a specified bounding box
-// todo: make bnd2f in vec.hpp 
 // todo: fix wrong simdb on first switch
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
