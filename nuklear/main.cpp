@@ -37,8 +37,12 @@
 // -todo: find bounds of key-values ahead of time and draw
 // -todo: find bounds of array values ahead of time and draw
 // -todo: make bnd2f in vec.hpp - put in VizDecl
+// -todo: figure out bounding box for window minus sidebar
+// -todo: layout bounds within a specified bounding box
+// -todo: figure out why resolution goes down - device pixel ratio needs to just be 1.f
 
-// todo: layout bounds within a specified bounding box
+// todo: draw histogram from array
+// todo: draw graph of array values
 // todo: fix wrong simdb on first switch
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
@@ -503,15 +507,15 @@ void                refreshDB(VizData* vd)
   }
 }
 
-void   drawBnd(NVGcontext* nvg, f32 b[4])
+void    drawBnd(NVGcontext* nvg, f32 b[4])
 {
   nvgBeginPath(nvg);
    nvgRect(nvg, b[0], b[1], b[2]-b[0], b[3]-b[1]);
-   nvgStrokeWidth(nvg, 2.f);
-   nvgStrokeColor(nvg, nvgRGBAf(1.f, .8f, .2f, .8f));
+   nvgStrokeWidth(nvg, 1.f);
+   nvgStrokeColor(nvg, nvgRGBAf(.8f, .6f, .2f, 1.f));
   nvgStroke(nvg);
 }
-v2     drawU64(NVGcontext* nvg, const char* label, u64 n, f32 x, f32 y, f32 sz, f32 margin)
+v2      drawU64(NVGcontext* nvg, const char* label, u64 n, f32 x, f32 y, f32 sz, f32 margin)
 {
   char s[TITLE_MAX_LEN]; f32 bnds[4];
 
@@ -527,26 +531,36 @@ v2     drawU64(NVGcontext* nvg, const char* label, u64 n, f32 x, f32 y, f32 sz, 
   v2 ofst = { bnds[2]-bnds[0] + m2, bnds[3]-bnds[1] + m2 };
   return ofst;
 }
-v2     strOfst(NVGcontext* nvg, str const& s)                                      // strOfst is string offset
+v2      strOfst(NVGcontext* nvg, str const& s)                                      // strOfst is string offset
 {
   bnd2f bnd;
   nvgTextBounds(nvg, 0,0, s.c_str(), NULL, bnd.b);
   
   return { bnd.xmx-bnd.xmn, bnd.ymx-bnd.ymn };
 }
-void  drawStrs(NVGcontext* nvg, vecstr const& strs, vecv2 ofsts, f32 x, f32 y, f32 margin)
+f32    drawStrs(NVGcontext* nvg, vecstr const& strs, vecv2 ofsts, f32 w, f32 x, f32 y, f32 margin)
 {
+  f32  h = 0.f;
   f32 m2 = margin * 2.f;
-  v2   o = {x,y};                                                                   // o is offset
+  v2   o = {x,y};                                                                         // o is offset
   TO(strs.size(),i){
-    bnd2f bnd = { o.x, o.y, o.x+ofsts[i].x+m2, o.y+ofsts[i].y+m2 };                                       //  o.x + margin * 2, o.y + margin * 2 };
+    if(o.x+ofsts[i].x+m2 > w){
+      o.x  = x;
+      o.y += ofsts[i].y + m2;
+      h   += ofsts[i].y + m2;
+    }else if(i==0){ h += ofsts[i].y + m2; }
+
+    bnd2f bnd = { o.x, o.y, o.x+ofsts[i].x+m2, o.y+ofsts[i].y+m2 };                       //  o.x + margin * 2, o.y + margin * 2 };
     drawBnd(nvg, bnd.b);
 
     nvgText(nvg, o.x+margin, o.y+ofsts[i].y+margin, strs[i].c_str(), NULL);
+
     o.x += ofsts[i].x + m2;
   }
+
+  return h;
 }
-void   drawTbl(NVGcontext* nvg, tbl const& t,  f32 x=0.f, f32 y=0.f, f32 sz=50.f, f32 margin=5.f)
+void    drawTbl(NVGcontext* nvg, tbl const& t, f32 w, f32 h, f32 x=0.f, f32 y=0.f, f32 sz=50.f, f32 margin=5.f)
 {
   using namespace std;
   
@@ -560,7 +574,10 @@ void   drawTbl(NVGcontext* nvg, tbl const& t,  f32 x=0.f, f32 y=0.f, f32 sz=50.f
   vecstr labels;  labels.reserve(5);
   vecv2   ofsts;  ofsts.reserve(5);
 
-  f32 mxY = 0.f;
+  v2      o = { x, y };                                                                       // o is offset
+  f32  xrem = w; 
+  f32   mxY = 0.f;
+  f32    dh = 0.f;                                                                            // dh is draw height
   SECTION(draw fields)
   {
     labels.push_back( toString("sizeBytes:  ",    t.sizeBytes())    );
@@ -571,10 +588,11 @@ void   drawTbl(NVGcontext* nvg, tbl const& t,  f32 x=0.f, f32 y=0.f, f32 sz=50.f
     TO(labels.size(),i){ ofsts.push_back( strOfst(nvg,labels[i]) ); }
     TO(ofsts.size(),i){ mxY = max<f32>(mxY, ofsts[i].y); }
 
-    drawStrs(nvg, labels, ofsts, x, y, margin);
+    dh = drawStrs(nvg, labels, ofsts, w, x, y, margin);
   }
 
-  v2 o = { x, y+mxY+margin*3.f };                                                                   // o is offset
+  o.x  = x;
+  o.y += dh + margin; // mxY+margin*3.f;                                                                      // o is offset
   SECTION(draw key value pairs)
   {
     labels.clear();
@@ -587,11 +605,11 @@ void   drawTbl(NVGcontext* nvg, tbl const& t,  f32 x=0.f, f32 y=0.f, f32 sz=50.f
     mxY=0.f;
     TO(ofsts.size(),i){ mxY = max<f32>(mxY, ofsts[i].y); }
 
-    drawStrs(nvg, labels, ofsts, o.x, o.y, margin);
+    dh = drawStrs(nvg, labels, ofsts, w, o.x, o.y, margin);
   }
 
   o.x   =  x;
-  o.y  +=  mxY+margin*3.f;
+  o.y  +=  dh + margin; // mxY+margin*3.f;
   SECTION(draw array elements)
   {
     labels.clear();
@@ -602,7 +620,7 @@ void   drawTbl(NVGcontext* nvg, tbl const& t,  f32 x=0.f, f32 y=0.f, f32 sz=50.f
     mxY=0.f;
     TO(ofsts.size(),i){ mxY = max<f32>(mxY, ofsts[i].y); }
 
-    drawStrs(nvg, labels, ofsts, o.x, o.y, margin);
+    dh = drawStrs(nvg, labels, ofsts, w, o.x, o.y, margin);
   }
 }
 
@@ -658,7 +676,7 @@ ENTRY_DECLARATION
     SECTION(static VizData)
     {
       vd.ui.w             = 1024; 
-      vd.ui.h             =  768;
+      vd.ui.h             = 1024;
       vd.ui.ptSz          =    0.25f;
       vd.ui.hudSz         =   16.0f;
       vd.ui.guideSz       =   32.0f;
@@ -758,6 +776,7 @@ ENTRY_DECLARATION
     //tst.put("wat",       84l);
     //tst.put("bamf",   36789l);
     //tst("bamf")     =  (u64)36789;
+
     tst.push(82);
     tst.push(83);
     tst.push(84);
@@ -874,8 +893,11 @@ ENTRY_DECLARATION
     }
     SECTION(table)
     {
-      nvgBeginFrame(vd.ui.nvg, vd.ui.w, vd.ui.h, vd.ui.w / (f32)vd.ui.h);
-        drawTbl(vd.ui.nvg, tst, 25, 50, 20, 10);
+      auto w = vd.ui.w - vd.ui.keyWin->width();
+      auto h = vd.ui.h - vd.ui.keyWin->height();
+
+      nvgBeginFrame(vd.ui.nvg, vd.ui.w, vd.ui.h, 1.f); // vd.ui.w / (f32)vd.ui.h);
+        drawTbl(vd.ui.nvg, tst, (f32)w, (f32)h, 25, 50, 20, 10);
       nvgEndFrame(vd.ui.nvg);
     }
     SECTION(nanogui)
@@ -895,7 +917,7 @@ ENTRY_DECLARATION
     }
     SECTION(nanovg | frames per second and color under cursor) 
     {
-      nvgBeginFrame(vd.ui.nvg, vd.ui.w, vd.ui.h, vd.ui.w/(f32)vd.ui.h);
+      nvgBeginFrame(vd.ui.nvg, vd.ui.w, vd.ui.h, 1.f); // vd.ui.w/(f32)vd.ui.h);
         f32  tb = 0;
         char nvgStr[TITLE_MAX_LEN];
 
@@ -937,7 +959,6 @@ ENTRY_DECLARATION
             nvgText(vd.ui.nvg, 100, 100 + vd.ui.guideSz*4, hotkeyGuidePage, NULL);
           }
         }
-
       nvgEndFrame(vd.ui.nvg);
     }
 
