@@ -636,6 +636,17 @@ public:
 
     return true;
   }
+  u64           push(std::initializer_list<T> lst)
+  {
+    u64 cnt = 0;
+    for(auto v : lst){
+      bool ok = this->push(v);
+      if(!ok){ return cnt; }
+      ++cnt;
+    }
+
+    return cnt;
+  }
   bool      push_back(T const& value){ return push(value); }
   void            pop(){ /*delete &(back());*/ set_size(size()-1); }  // todo: needs to run the destructor here
   void       pop_back(){ pop(); }

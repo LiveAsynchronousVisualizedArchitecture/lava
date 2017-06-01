@@ -515,21 +515,25 @@ void    drawBnd(NVGcontext* nvg, f32 b[4])
    nvgStrokeColor(nvg, nvgRGBAf(.8f, .6f, .2f, 1.f));
   nvgStroke(nvg);
 }
-v2      drawU64(NVGcontext* nvg, const char* label, u64 n, f32 x, f32 y, f32 sz, f32 margin)
+//v2      drawU64(NVGcontext* nvg, const char* label, u64 n, f32 x, f32 y, f32 sz, f32 margin)
+//{
+//  char s[TITLE_MAX_LEN]; f32 bnds[4];
+//
+//  sprintf(s, "%s:   %lu", label, (unsigned long)n );
+//  f32 m2 = margin * 2;
+//  f32 xx = x + m2;
+//  f32 yy = y + m2;
+//  nvgText(nvg, xx,yy, s, NULL);
+//  nvgTextBounds(nvg, xx, yy, s, NULL, bnds);
+//  //TO(4,i){ bnds[i] += margin; }
+//  drawBnd(nvg, bnds);
+//
+//  v2 ofst = { bnds[2]-bnds[0] + m2, bnds[3]-bnds[1] + m2 };
+//  return ofst;
+//}
+void   drawHist(NVGcontext* nvg, u64* buf, u64 len, bnd2f b)
 {
-  char s[TITLE_MAX_LEN]; f32 bnds[4];
-
-  sprintf(s, "%s:   %lu", label, (unsigned long)n );
-  f32 m2 = margin * 2;
-  f32 xx = x + m2;
-  f32 yy = y + m2;
-  nvgText(nvg, xx,yy, s, NULL);
-  nvgTextBounds(nvg, xx, yy, s, NULL, bnds);
-  //TO(4,i){ bnds[i] += margin; }
-  drawBnd(nvg, bnds);
-
-  v2 ofst = { bnds[2]-bnds[0] + m2, bnds[3]-bnds[1] + m2 };
-  return ofst;
+  
 }
 v2      strOfst(NVGcontext* nvg, str const& s)                                      // strOfst is string offset
 {
@@ -781,6 +785,7 @@ ENTRY_DECLARATION
     tst.push(83);
     tst.push(84);
     tst.push(85);
+    tst.push({0,1,6,101, 45, 86, 87, 33, 45,45,45,45,45,45 });
 
     tst("wat")      =    84l;
     tst("bamf")     =  36789;
