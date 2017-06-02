@@ -15,8 +15,8 @@
 
 #include "../DataStore/ConcurrentMap/simdb.hpp"
 #include "../nanovg_test/tbl_test/tbl.hpp"
-//#include "../nanovg_test/nanovg_test/vec.hpp"
 #include "IndexedVerts.h"
+//#include "../nanovg_test/nanovg_test/vec.hpp"
 
 using namespace nanogui;
 
@@ -54,6 +54,8 @@ using   vecb = std::vector<bool>;
 using   vecu = std::vector<u32>;
 using   veci = std::vector<i32>;
 using  vecv2 = std::vector<v2>;
+
+using tblu = tbl<u64>;
 
 union bnd2f
 {

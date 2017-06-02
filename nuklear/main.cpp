@@ -40,7 +40,11 @@
 // -todo: figure out bounding box for window minus sidebar
 // -todo: layout bounds within a specified bounding box
 // -todo: figure out why resolution goes down - device pixel ratio needs to just be 1.f
+// -todo: use templated tbl for layout of table cell drawing
+// -todo: sort keys so that they are in alphabetical order
 
+// todo: convert to using tbl instead of vectors for drawing tbl
+// todo: fix drawing of empty key
 // todo: draw histogram from array
 // todo: draw graph of array values
 // todo: fix wrong simdb on first switch
@@ -515,22 +519,6 @@ void    drawBnd(NVGcontext* nvg, f32 b[4])
    nvgStrokeColor(nvg, nvgRGBAf(.8f, .6f, .2f, 1.f));
   nvgStroke(nvg);
 }
-//v2      drawU64(NVGcontext* nvg, const char* label, u64 n, f32 x, f32 y, f32 sz, f32 margin)
-//{
-//  char s[TITLE_MAX_LEN]; f32 bnds[4];
-//
-//  sprintf(s, "%s:   %lu", label, (unsigned long)n );
-//  f32 m2 = margin * 2;
-//  f32 xx = x + m2;
-//  f32 yy = y + m2;
-//  nvgText(nvg, xx,yy, s, NULL);
-//  nvgTextBounds(nvg, xx, yy, s, NULL, bnds);
-//  //TO(4,i){ bnds[i] += margin; }
-//  drawBnd(nvg, bnds);
-//
-//  v2 ofst = { bnds[2]-bnds[0] + m2, bnds[3]-bnds[1] + m2 };
-//  return ofst;
-//}
 void   drawHist(NVGcontext* nvg, u64* buf, u64 len, bnd2f b)
 {
   
@@ -564,11 +552,11 @@ f32    drawStrs(NVGcontext* nvg, vecstr const& strs, vecv2 ofsts, f32 w, f32 x, 
 
   return h;
 }
-void    drawTbl(NVGcontext* nvg, tbl const& t, f32 w, f32 h, f32 x=0.f, f32 y=0.f, f32 sz=50.f, f32 margin=5.f)
+void    drawTbl(NVGcontext* nvg, tblu const& t, f32 w, f32 h, f32 x=0.f, f32 y=0.f, f32 sz=50.f, f32 margin=5.f)
 {
   using namespace std;
   
-  char s[TITLE_MAX_LEN]; f32 xo=0, yo=0;                                          // xo is x offset   yo is y offset
+  char s[TITLE_MAX_LEN]; f32 xo=0, yo=0;                                                    // xo is x offset   yo is y offset
 
   nvgFontSize(nvg,  sz);
   nvgFontFace(nvg,  "sans");
@@ -578,10 +566,10 @@ void    drawTbl(NVGcontext* nvg, tbl const& t, f32 w, f32 h, f32 x=0.f, f32 y=0.
   vecstr labels;  labels.reserve(5);
   vecv2   ofsts;  ofsts.reserve(5);
 
-  v2      o = { x, y };                                                                       // o is offset
+  v2      o = { x, y };                                                                    // o is offset
   f32  xrem = w; 
   f32   mxY = 0.f;
-  f32    dh = 0.f;                                                                            // dh is draw height
+  f32    dh = 0.f;                                                                         // dh is draw height
   SECTION(draw fields)
   {
     labels.push_back( toString("sizeBytes:  ",    t.sizeBytes())    );
@@ -604,6 +592,7 @@ void    drawTbl(NVGcontext* nvg, tbl const& t, f32 w, f32 h, f32 x=0.f, f32 y=0.
     TO(t.map_capacity(),i) if(!e[i].isEmpty()){
       labels.push_back( toString(e[i].key,":  ",e[i].val) );
     }
+    //sort( ALL(labels) );
     ofsts.clear();
     TO(labels.size(),i){ ofsts.push_back(strOfst(nvg, labels[i])); }
     mxY=0.f;
@@ -630,7 +619,7 @@ void    drawTbl(NVGcontext* nvg, tbl const& t, f32 w, f32 h, f32 x=0.f, f32 y=0.
 
 }
 
-static tbl tst;
+static tblu tst;
 void       genTestGeo(simdb* db)
 {
   using namespace std;
@@ -781,15 +770,19 @@ ENTRY_DECLARATION
     //tst.put("bamf",   36789l);
     //tst("bamf")     =  (u64)36789;
 
+    tst("wat")      =     84;
+    tst("bamf")     =  36789;
+    tst("skidoosh") =   6371;
+    tst("wat")      =   464;
+    tst("luv and peace") =   99;
+    tst.put("squidoosh", 109);
+
     tst.push(82);
     tst.push(83);
     tst.push(84);
     tst.push(85);
-    tst.push({0,1,6,101, 45, 86, 87, 33, 45,45,45,45,45,45 });
-
-    tst("wat")      =    84l;
-    tst("bamf")     =  36789;
-    tst.put("skidoosh", 109l);
+    tst.push({0,1,6,101,45});
+    //tst.push({0,1,6,101, 45, 86, 87, 33, 45,45,45,45,45,45 });
   }
 
   while(!glfwWindowShouldClose(vd.win))
@@ -987,6 +980,22 @@ ENTRY_DECLARATION
 
 
 
+//v2      drawU64(NVGcontext* nvg, const char* label, u64 n, f32 x, f32 y, f32 sz, f32 margin)
+//{
+//  char s[TITLE_MAX_LEN]; f32 bnds[4];
+//
+//  sprintf(s, "%s:   %lu", label, (unsigned long)n );
+//  f32 m2 = margin * 2;
+//  f32 xx = x + m2;
+//  f32 yy = y + m2;
+//  nvgText(nvg, xx,yy, s, NULL);
+//  nvgTextBounds(nvg, xx, yy, s, NULL, bnds);
+//  //TO(4,i){ bnds[i] += margin; }
+//  drawBnd(nvg, bnds);
+//
+//  v2 ofst = { bnds[2]-bnds[0] + m2, bnds[3]-bnds[1] + m2 };
+//  return ofst;
+//}
 
 //bnd = { o.x+margin, o.y+ofsts[i].y+margin, o.x+ofsts[i].x+margin, o.y+margin };                                       //  o.x + margin * 2, o.y + margin * 2 };
 //drawBnd(nvg, bnd.b);

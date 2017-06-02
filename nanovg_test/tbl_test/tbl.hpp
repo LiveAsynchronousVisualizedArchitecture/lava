@@ -3,8 +3,13 @@
 // -todo: solve const qualifiers
 // -todo: solve operator()() producing empty keys
 // -todo: put magic number in front of tbl 
+// -todo: template tbl
+// -todo: fix type not being set in tbl::put()
 
-// todo: cut types down to just u64, i64, double etc
+// todo: put in begin() and end() iterators
+// todo: fix elements when size and capacity are not the same
+// todo: fix size when inserting map elements before pushing array values
+// todo: cut types down to just u64, i64, double, string etc
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
 // | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
 // | does this imply that there should be a separate array type or is specializing string enough? 
@@ -79,7 +84,8 @@
   #define tbl_PRNT(msg)
 #endif
 
-class tbl
+
+template<class T> class tbl
 {
 public:                                                                         // forward declarations
   enum   Type;
@@ -95,7 +101,8 @@ public:                                                                         
   using   i64   =   int64_t;
   using   f32   =     float;
   using   f64   =    double;
-  using   T     =       i32;
+
+  //using   T     =       i32;
 
   static u64 magicNumber(u64 n)
   {
@@ -312,8 +319,8 @@ public:
     BITS_MASK   =  BITS_64,
 
       ERR       =  ~INTEGER & ~SIGNED & ~BITS_32,
-     NONE       =  ~INTEGER & ~SIGNED & ~BITS_16,          // ~TABLE,                              // INTEGER bit turned off, SIGNED bit turned off and TABLE bit turned off, meanin unsigned float table, which is not a viable real type of course
-    EMPTY       =  ~INTEGER & ~SIGNED,                                       // a floating point number can't be unsigned, so this scenario is used for an 'empty' state
+     NONE       =  ~INTEGER & ~SIGNED & ~BITS_16,                                    // ~TABLE,                              // INTEGER bit turned off, SIGNED bit turned off and TABLE bit turned off, meanin unsigned float table, which is not a viable real type of course
+    EMPTY       =  ~INTEGER & ~SIGNED,                                               // a floating point number can't be unsigned, so this scenario is used for an 'empty' state
 
        U8       =  INTEGER | BITS_8,   
       U16       =  INTEGER | BITS_16,
@@ -382,12 +389,16 @@ public:
     Key       key;
     u64       val;
 
-    KV() : hsh(), val(0) { memset(key, 0, sizeof(Key)); }
+    KV() : hsh(), val(0) { 
+      memset(key, 0, sizeof(Key));
+      //hsh.type = Type::EMPTY;
+    }
     KV(const char* key, u32 hash, u64 val=0) :
       hsh(), val(val)
     {
       strcpy_s(this->key, sizeof(KV::Key), key);
       hsh.hash = hash;
+      //hsh.type = Type::EMPTY;
       hsh.type = NONE;
     }
 
@@ -469,7 +480,9 @@ public:
 
       return N();
     }
-    bool isEmpty() const { return hsh.type == Type::EMPTY; }
+    bool isEmpty() const {
+      return hsh.type==Type::NONE || hsh.type==Type::EMPTY;
+    }
 
     static KV     empty_kv()
     {
@@ -602,12 +615,11 @@ public:
       if(el[i].hsh.type==EMPTY){ 
         set_elems( elems()+1 );
         return el[i] = KV(key, hsh, *((u64*)&val) );
-      }else if(hsh==eh.hash  && 
-        strncmp(el[i].key,key,sizeof(KV::Key)-1)==0 )
-      { // if the hashes aren't the same, the keys can't be the same
+      }else if(hsh==eh.hash && strncmp(el[i].key,key,sizeof(KV::Key)-1)==0 ){   // if the hashes aren't the same, the keys can't be the same
         return el[i] = KV(key, hsh, *((u64*)&val) );
       }else if( wrapDist(el,i,mod) < dist ){
         KV kv(key, hsh, *((u64*)&val) );
+        kv.hsh.type = typenum<V>::num;
         set_elems( elems()+1 );
         return place_rh(kv, el, i, dist, mod);
       }
@@ -636,10 +648,10 @@ public:
 
     return true;
   }
-  u64           push(std::initializer_list<T> lst)
+  u64            push(std::initializer_list<T> lst)
   {
     u64 cnt = 0;
-    for(auto v : lst){
+    for(auto const& v : lst){
       bool ok = this->push(v);
       if(!ok){ return cnt; }
       ++cnt;
@@ -744,17 +756,17 @@ public:
       set_capacity(count);
       set_mapcap(mapcap);
 
-      KV* el = elemStart();
+      KV* el = elemStart();                                  //  is this copying elements forward in memory? can it overwrite elements that are already there? - right now reserve only ends up expanding memory for both the array and map
       if(prevElems){
         KV* prevEl = (KV*)( ((u8*)re) + prevOfst );
-        if(el!=prevEl) TO(prevMapCap,i) el[i] = prevEl[i];
+        if(el!=prevEl) TO(prevMapCap,i) el[i] = prevEl[i];  
       }
 
       //u64  mapcap = mapcap; //map_capacity();
-      i64   extcap = mapcap - prevMapCap;
+      i64 extcap = mapcap - prevMapCap;
       if(extcap>0) 
         TO(extcap,i) 
-          el[i+prevMapCap] = KV();
+          el[i+prevMapCap] = KV(); // KV::empty_kv(); // KV();
           //new (&el[i+prevMapCap]) KV();
 
       if(prevElems)
@@ -772,11 +784,11 @@ public:
   {
     u64    sz = size();
     u64 nxtSz = sz + sz/2;
-    nxtSz      = nxtSz<8? 8 : nxtSz;
+    nxtSz     = nxtSz<8? 8 : nxtSz;
 
     u64    cap = map_capacity();
     u64 nxtCap = cap + cap/2;
-    nxtCap      = nxtCap<4? 4 : nxtCap;
+    nxtCap     = nxtCap<4? 4 : nxtCap;
 
     return reserve(nxtSz, nxtCap);
   }
