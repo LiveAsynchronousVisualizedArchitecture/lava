@@ -13,8 +13,8 @@
 // -todo: fix size when inserting map elements before pushing array values
 // -todo: put in begin() and end() iterators
 // -todo: fix tbl.put() not making it into the map - put() was close but not the same as operator() - put() now uses operator()
+// -todo: make sure that the first two bytes have TB instead of the most significant little endian bits
 
-// todo: make sure that the first two bytes have TB instead of the most significant little endian bits
 // todo: cut types down to just u64, i64, double, string etc
 // todo: make emplace() and emplace_back() methods
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
@@ -113,8 +113,10 @@ public:                                                                         
 
   static u64 magicNumber(u64 n)
   {
+    n <<= 16;
     u8* nn = (u8*)&n;
-    nn[7]='t'; nn[8]='b';
+    //nn[7]='t'; nn[8]='b';
+    nn[0]='t'; nn[1]='b';
     return n;
   }
 
@@ -703,7 +705,16 @@ public:
     if(!m_mem) return 0;
 
     u64 sb = *((u64 const*)memStart());
-    return sb & 0x0000FFFFFFFFFFFF;
+    auto tmp = &sb;
+    //return sb & 0xFFFFFFFFFFFF0000;
+
+    //u64 sb = *((u64 const*)memStart());
+    //sb &= 0x0000FFFFFFFFFFFF;
+    u8* sbb = (u8*)&sb;
+    sbb[0] = sbb[1] = 0;
+    sb >>= 16;
+    return sb;
+    //
     //return (sb << 2) >> 2;
     //return *( (u64 const*)memStart() );
   }
