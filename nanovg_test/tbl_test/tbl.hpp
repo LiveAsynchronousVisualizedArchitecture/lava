@@ -155,6 +155,8 @@ private:
   }
   KV&         place_rh(KV kv, KV* elems, u64 st, u64 dist, u64 mod, u64* placement=nullptr)   // place_rh is place with robin hood hashing 
   {
+    //assert( strcmp(kv.key,"")!=0 );
+
     u64      i = st;
     u64     en = prev(st,mod);
     u64  eldst = dist;
@@ -217,13 +219,13 @@ private:
 
     return i;
   }
-  u64          reorder()
-  {
-    u64 mod  =  map_capacity(); 
+  u64          reorder()                                         // can this be done by storing chunks (16-64 etc) of KVs in an array, setting the previous slots to empty, sorting the KVs in the array by the slot they will go in, then placing them?   
+  { 
+    u64  mod  =  map_capacity();
     KV*   el  =  elemStart();
-    u64   i  =  0;
-    u64  en  =  prev(i,mod);
-    u64  cnt =  0; 
+    u64    i  =  0;
+    u64   en  =  prev(i,mod);
+    u64  cnt  =  0; 
     do{
       u64 nxti = nxt(i,mod); 
       if(el[i].hsh.type != EMPTY){
@@ -391,15 +393,29 @@ public:
 
     KV() : hsh(), val(0) { 
       memset(key, 0, sizeof(Key));
-      //hsh.type = Type::EMPTY;
+      //hsh.type = Type::NONE;
+      hsh.type = Type::EMPTY;
     }
     KV(const char* key, u32 hash, u64 val=0) :
       hsh(), val(val)
     {
-      strcpy_s(this->key, sizeof(KV::Key), key);
+      //strcpy_s(this->key, sizeof(KV::Key), key);
+      memcpy(this->key, key, sizeof(KV::Key) );
       hsh.hash = hash;
-      //hsh.type = Type::EMPTY;
-      hsh.type = NONE;
+      hsh.type = Type::EMPTY;
+      //hsh.type = NONE;
+    }
+    KV(KV const& l){ cp(l); }
+    KV(KV&& r){ cp(r); }
+
+    KV& cp(KV const& l)
+    {
+      //memmove(this, &l, sizeof(KV));
+      //memcpy(this, &l, sizeof(KV));
+      hsh = l.hsh;
+      val = l.val;
+      memmove(key, l.key, sizeof(Key) );
+      return *this;
     }
 
     bool operator==(KV const& l)
@@ -407,11 +423,9 @@ public:
       return hsh.hash==l.hsh.hash && 
              strncmp(l.key,key,sizeof(KV::Key)-1)==0;
     }
-    KV&  operator=(KV const& l)
-    {
-      memmove(this, &l, sizeof(KV));
-      return *this;
-    }
+    KV&  operator=(KV const& l){ return cp(l); }
+    KV&  operator=(KV&& r){ return cp(r); }
+
     template<class N> void operator=(N n)
     {
       hsh.type = typenum<N>::num;
@@ -491,20 +505,21 @@ public:
       kv.hsh.type = EMPTY;
       return kv;
     }
-    static KV&     none_kv()
+    static KV     none_kv()
     {
-      static KV kv;
+      //static KV kv;
       //KV kv;
-      memset(&kv, 0, sizeof(KV));
+      //memset(&kv, 0, sizeof(KV));
+      KV kv;
       kv.hsh.type = NONE;
 
       return kv;
     }
-    static KV&    error_kv()
+    static KV    error_kv()
     {
-      static KV kv;
-      //KV kv;
-      memset(&kv, 0, sizeof(KV));
+      //static KV kv;
+      //memset(&kv, 0, sizeof(KV));
+      KV kv;
       kv.hsh.type = ERR;
 
       return kv;
@@ -545,7 +560,7 @@ public:
        if(!expand()) return KV::error_kv();
 
     u32  hsh  =  HashStr(key);
-    KV*    el  =  (KV*)elemStart();                                    // el is a pointer to the elements 
+    KV*   el  =  (KV*)elemStart();                                     // el is a pointer to the elements 
     u64  mod  =  map_capacity();
     u64    i  =  hsh % mod;
     u64   en  =  prev(i,mod);
@@ -556,7 +571,9 @@ public:
       HshType eh = el[i].hsh;                                          // eh is element hash
       if(el[i].hsh.type==EMPTY){ 
         set_elems( elems()+1 );
-        return el[i] = KV(key, hsh);
+        //return el[i] = KV(key, hsh);
+        new (&el[i]) KV(key, hsh);
+        return el[i];
       }else if(hsh==eh.hash  && 
         strncmp(el[i].key,key,sizeof(KV::Key)-1)==0 )
       { // if the hashes aren't the same, the keys can't be the same
@@ -739,7 +756,7 @@ public:
   {
     count   =  mx(count, capacity());
     mapcap  =  mx(mapcap, map_capacity());
-    KV*    prevElems  =  elemStart();
+    KV*   prevElems  =  elemStart();
     u64   prevMemSt  =  (u64)memStart();
     u64    prevOfst  =  prevElems? ((u64)prevElems)-prevMemSt  :  0;
     u64   prevBytes  =  sizeBytes();
@@ -756,10 +773,20 @@ public:
       set_capacity(count);
       set_mapcap(mapcap);
 
-      KV* el = elemStart();                                  //  is this copying elements forward in memory? can it overwrite elements that are already there? - right now reserve only ends up expanding memory for both the array and map
+
+      KV*  el = elemStart();                                  //  is this copying elements forward in memory? can it overwrite elements that are already there? - right now reserve only ends up expanding memory for both the array and map
+      u8* elb = (u8*)el;  //(u8*)elemStart();
+      //if(prevElems){
+      //  KV* prevEl = (KV*)( ((u8*)re) + prevOfst );
+      //  if(el!=prevEl)TO(prevMapCap,i){
+      //      KV kv = prevEl[i];
+      //      el[i] = kv;
+      //    }
+      //}
       if(prevElems){
-        KV* prevEl = (KV*)( ((u8*)re) + prevOfst );
-        if(el!=prevEl) TO(prevMapCap,i) el[i] = prevEl[i];  
+        u8* prevEl = (u8*)re + prevOfst;
+        u64  prevB = prevMapCap * sizeof(KV);                    // prevB is previous map bytes
+        FROM(prevB,i) el[i] = prevEl[i];
       }
 
       //u64  mapcap = mapcap; //map_capacity();
@@ -768,6 +795,11 @@ public:
         TO(extcap,i) 
           el[i+prevMapCap] = KV(); // KV::empty_kv(); // KV();
           //new (&el[i+prevMapCap]) KV();
+
+      KV* ell = elemStart();
+      TO(mapcap,i){ 
+        assert(ell[i].hsh.type != 0);
+      }
 
       if(prevElems)
       { 
@@ -784,7 +816,7 @@ public:
   {
     u64    sz = size();
     u64 nxtSz = sz + sz/2;
-    nxtSz     = nxtSz<8? 8 : nxtSz;
+    nxtSz     = nxtSz<4? 4 : nxtSz;
 
     u64    cap = map_capacity();
     u64 nxtCap = cap + cap/2;

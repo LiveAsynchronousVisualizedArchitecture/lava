@@ -511,7 +511,7 @@ void                refreshDB(VizData* vd)
   }
 }
 
-void    drawBnd(NVGcontext* nvg, f32 b[4])
+void       drawBnd(NVGcontext* nvg, f32  b[4])
 {
   nvgBeginPath(nvg);
    nvgRect(nvg, b[0], b[1], b[2]-b[0], b[3]-b[1]);
@@ -519,18 +519,18 @@ void    drawBnd(NVGcontext* nvg, f32 b[4])
    nvgStrokeColor(nvg, nvgRGBAf(.8f, .6f, .2f, 1.f));
   nvgStroke(nvg);
 }
-void   drawHist(NVGcontext* nvg, u64* buf, u64 len, bnd2f b)
+void      drawHist(NVGcontext* nvg, u64* buf, u64 len, bnd2f b)
 {
   
 }
-v2      strOfst(NVGcontext* nvg, str const& s)                                      // strOfst is string offset
+v2         strOfst(NVGcontext* nvg, str    const&    s)                                      // strOfst is string offset
 {
   bnd2f bnd;
   nvgTextBounds(nvg, 0,0, s.c_str(), NULL, bnd.b);
   
   return { bnd.xmx-bnd.xmn, bnd.ymx-bnd.ymn };
 }
-f32    drawStrs(NVGcontext* nvg, vecstr const& strs, vecv2 ofsts, f32 w, f32 x, f32 y, f32 margin)
+f32       drawStrs(NVGcontext* nvg, vecstr const& strs, vecv2 ofsts, f32 w, f32 x, f32 y, f32 margin)
 {
   f32  h = 0.f;
   f32 m2 = margin * 2.f;
@@ -552,7 +552,7 @@ f32    drawStrs(NVGcontext* nvg, vecstr const& strs, vecv2 ofsts, f32 w, f32 x, 
 
   return h;
 }
-void    drawTbl(NVGcontext* nvg, tblu const& t, f32 w, f32 h, f32 x=0.f, f32 y=0.f, f32 sz=50.f, f32 margin=5.f)
+void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f, f32 y=0.f, f32 sz=50.f, f32 margin=5.f)
 {
   using namespace std;
   
@@ -770,18 +770,29 @@ ENTRY_DECLARATION
     //tst.put("bamf",   36789l);
     //tst("bamf")     =  (u64)36789;
 
-    tst("wat")      =     84;
-    tst("bamf")     =  36789;
-    tst("skidoosh") =   6371;
-    tst("wat")      =   464;
-    tst("luv and peace") =   99;
-    tst.put("squidoosh", 109);
+    tst("wat")      =     (u64)84;
+    //tst("bamf")     =  36789;
+    //tst("skidoosh") =   6371;
+    //tst("wat")      =   464;
+    //tst("luv and peace") =   99;
+    //tst.put("squidoosh", 109);
 
-    tst.push(82);
-    tst.push(83);
-    tst.push(84);
-    tst.push(85);
-    tst.push({0,1,6,101,45});
+    tst.expand();
+    //tst.expand();
+    //tst.expand();
+    //tst.expand();
+    //tst.expand();
+
+    //tst.push(82);
+    //tst.push(83);
+    //tst.push(84);
+    //tst.push(85);
+    //tst.push(0);
+    //tst.push(1);
+    //tst.push(6);
+    //tst.push(101);
+    //tst.push(45);
+    //tst.push({0,1,6,101,45});
     //tst.push({0,1,6,101, 45, 86, 87, 33, 45,45,45,45,45,45 });
   }
 
@@ -894,7 +905,7 @@ ENTRY_DECLARATION
       auto w = vd.ui.w - vd.ui.keyWin->width();
       auto h = vd.ui.h - vd.ui.keyWin->height();
 
-      nvgBeginFrame(vd.ui.nvg, vd.ui.w, vd.ui.h, 1.f); // vd.ui.w / (f32)vd.ui.h);
+      nvgBeginFrame(vd.ui.nvg, vd.ui.w, vd.ui.h, 1.f);             // vd.ui.w / (f32)vd.ui.h);
         drawTbl(vd.ui.nvg, tst, (f32)w, (f32)h, 25, 50, 20, 10);
       nvgEndFrame(vd.ui.nvg);
     }
