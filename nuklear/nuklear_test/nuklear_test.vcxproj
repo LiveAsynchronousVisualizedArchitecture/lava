@@ -209,6 +209,7 @@
     <ClCompile Include="..\unified.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\nanovg_test\tbl_test\tbl.hpp" />
     <ClInclude Include="..\glew_2.0.0.h" />
     <ClInclude Include="..\glfw3.h" />
     <ClInclude Include="..\glfw3native.h" />

@@ -55,7 +55,9 @@ using   vecu = std::vector<u32>;
 using   veci = std::vector<i32>;
 using  vecv2 = std::vector<v2>;
 
-using tblu = tbl<u64>;
+using   tblu = tbl<u64>;
+using  tblv2 = tbl<v2>;
+using tblstr = tbl<str>;
 
 union bnd2f
 {

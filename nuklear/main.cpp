@@ -42,9 +42,10 @@
 // -todo: figure out why resolution goes down - device pixel ratio needs to just be 1.f
 // -todo: use templated tbl for layout of table cell drawing
 // -todo: sort keys so that they are in alphabetical order
+// -todo: fix drawing of empty key
+// -todo: use tbl for ofsts
+// -todo: convert to using tbl instead of vectors for drawing labels - needed to make push use the copy constructor instead of the assignment operator ( operator= )
 
-// todo: convert to using tbl instead of vectors for drawing tbl
-// todo: fix drawing of empty key
 // todo: draw histogram from array
 // todo: draw graph of array values
 // todo: fix wrong simdb on first switch
@@ -125,7 +126,6 @@ toString(const T1& a, const T&... args)
 {
   return toString(a) + toString(args...);
 }
-
 
 vec3                      pos(mat4 const& m)
 { return m[3];                      }
@@ -530,7 +530,9 @@ v2         strOfst(NVGcontext* nvg, str    const&    s)                         
   
   return { bnd.xmx-bnd.xmn, bnd.ymx-bnd.ymn };
 }
-f32       drawStrs(NVGcontext* nvg, vecstr const& strs, vecv2 ofsts, f32 w, f32 x, f32 y, f32 margin)
+//f32       drawStrs(NVGcontext* nvg, vecstr const& strs, vecv2 ofsts, f32 w, f32 x, f32 y, f32 margin)
+//f32       drawStrs(NVGcontext* nvg, vecstr const& strs, tblv2 const& ofsts, f32 w, f32 x, f32 y, f32 margin)
+f32       drawStrs(NVGcontext* nvg, tblstr const& strs, tblv2 const& ofsts, f32 w, f32 x, f32 y, f32 margin)
 {
   f32  h = 0.f;
   f32 m2 = margin * 2.f;
@@ -563,8 +565,11 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
   nvgTextAlign(nvg, NVG_ALIGN_LEFT); // | NVG_ALIGN_MIDDLE);
   nvgFillColor(nvg, nvgRGBA(255, 255, 170, 255));
 
-  vecstr labels;  labels.reserve(5);
-  vecv2   ofsts;  ofsts.reserve(5);
+  //vecstr labels;  labels.reserve(5);
+  //vecv2   ofsts;  ofsts.reserve(5);
+  //tbl<v2>   ofsts;  ofsts.reserve(5);
+  tblstr labels;  labels.reserve(5);
+  tblv2   ofsts;  ofsts.reserve(5);
 
   v2      o = { x, y };                                                                    // o is offset
   f32  xrem = w; 
@@ -593,7 +598,8 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
       labels.push_back( toString(e[i].key,":  ",e[i].val) );
     }
     //sort( ALL(labels) );
-    ofsts.clear();
+    //ofsts.clear();
+    new (&ofsts) tblv2;
     TO(labels.size(),i){ ofsts.push_back(strOfst(nvg, labels[i])); }
     mxY=0.f;
     TO(ofsts.size(),i){ mxY = max<f32>(mxY, ofsts[i].y); }
@@ -608,7 +614,8 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
     labels.clear();
     TO(t.size(),i){ labels.push_back( toString(i,":  ",t[i]) ); }
 
-    ofsts.clear();
+    //ofsts.clear();
+    new (&ofsts) tblv2;
     TO(labels.size(), i) { ofsts.push_back(strOfst(nvg, labels[i])); }
     mxY=0.f;
     TO(ofsts.size(),i){ mxY = max<f32>(mxY, ofsts[i].y); }
@@ -770,30 +777,34 @@ ENTRY_DECLARATION
     //tst.put("bamf",   36789l);
     //tst("bamf")     =  (u64)36789;
 
-    tst("wat")      =     (u64)84;
-    //tst("bamf")     =  36789;
-    //tst("skidoosh") =   6371;
-    //tst("wat")      =   464;
-    //tst("luv and peace") =   99;
-    //tst.put("squidoosh", 109);
+    str s = "wat";
+    vecstr ts; ts.reserve(5);
+    ts.push_back(s);
 
-    tst.expand();
+    tst("wat")       =   (u64)84;
+    tst("bamf")      =   (u64)36789;
+    tst("skidoosh")  =   (u64)6371;
+    tst("wat")       =   (u64)464;
+    tst("luv and peace") = (u64)99;
+    tst.put("squidoosh", (u64)109);
+
+    //tst.expand();
     //tst.expand();
     //tst.expand();
     //tst.expand();
     //tst.expand();
 
-    //tst.push(82);
-    //tst.push(83);
-    //tst.push(84);
-    //tst.push(85);
-    //tst.push(0);
-    //tst.push(1);
-    //tst.push(6);
-    //tst.push(101);
-    //tst.push(45);
-    //tst.push({0,1,6,101,45});
-    //tst.push({0,1,6,101, 45, 86, 87, 33, 45,45,45,45,45,45 });
+    tst.push(82);
+    tst.push(83);
+    tst.push(84);
+    tst.push(85);
+    tst.push(0);
+    tst.push(1);
+    tst.push(6);
+    tst.push(101);
+    tst.push(45);
+    tst.push({0,1,6,101,45});
+    tst.push({0,1,6,101, 45, 86, 87, 33, 45,45,45,45,45,45,24 });
   }
 
   while(!glfwWindowShouldClose(vd.win))

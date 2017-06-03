@@ -5,9 +5,15 @@
 // -todo: put magic number in front of tbl 
 // -todo: template tbl
 // -todo: fix type not being set in tbl::put()
+// -todo: solve map elements movement in reserve() - overlapping memory allocations with memmove and memcpy causing problems - assignemnts too - solved by byte by byte copying from the largest address address backwards 
+// -todo: fix elements when size and capacity are not the same
+// -todo: figure out why there are duplicate keys in the tbl - signed / unsigned mismatch between hashes
+// -todo: figure out why map capacities grow when pushing to array - expand didn't discriminate between whether to expand the array or map and enlarged both 
 
+// todo: make emplace() and emplace_back() methods
+// todo: put back destructors on deallocation
+// todo: make sure that the first two bytes have TB instead of the most significant little endian bits
 // todo: put in begin() and end() iterators
-// todo: fix elements when size and capacity are not the same
 // todo: fix size when inserting map elements before pushing array values
 // todo: cut types down to just u64, i64, double, string etc
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
@@ -222,6 +228,8 @@ private:
   u64          reorder()                                         // can this be done by storing chunks (16-64 etc) of KVs in an array, setting the previous slots to empty, sorting the KVs in the array by the slot they will go in, then placing them?   
   { 
     u64  mod  =  map_capacity();
+    if(mod==0){ return 0; }
+
     KV*   el  =  elemStart();
     u64    i  =  0;
     u64   en  =  prev(i,mod);
@@ -372,8 +380,11 @@ public:
 
   union   HshType
   {
-    struct { Type type : 5; i32 hash: 27; };
-    i32 as_ui32;
+    //struct { Type type : 5; i32 hash: 27; };
+    //i32 as_ui32;
+
+    struct { Type type : 5; u32 hash: 27; };
+    u32 as_u32;
 
     HshType() : 
       type(EMPTY),
@@ -557,7 +568,7 @@ public:
   KV&     operator()(const char* key, bool make_new=true)
   {
     if( !( map_capacity()*0.75f > (float)elems() ) )
-       if(!expand()) return KV::error_kv();
+       if(!expand(false, true)) return KV::error_kv();
 
     u32  hsh  =  HashStr(key);
     KV*   el  =  (KV*)elemStart();                                     // el is a pointer to the elements 
@@ -591,8 +602,8 @@ public:
   }
   tbl     operator>>(tbl const& l){ return tbl::concat_l(*this, l); }
   tbl     operator<<(tbl const& l){ return tbl::concat_r(*this, l); }
-  tbl&    operator--(){ shrink_to_fit(); return *this; }    
-  tbl&    operator++(){ expand();        return *this; }
+  tbl&    operator--(){ shrink_to_fit();    return *this; }    
+  tbl&    operator++(){ expand(true,false); return *this; }
   void    operator+=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
   void    operator-=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }
   void    operator*=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a *= b; } ); }
@@ -617,7 +628,7 @@ public:
   template<class V> KV&   put(const char* key, V val)
   {
     if( !(map_capacity()>elems()) )
-       if(!expand()) return KV::error_kv();
+       if(!expand(false, true)){ return KV::error_kv(); }
 
     u32  hsh  =  HashStr(key);    
     KV*   el  =  (KV*)elemStart();                                    // el is a pointer to the elements 
@@ -653,12 +664,13 @@ public:
 
     auto prevSz = size();
     if( !(capacity()>prevSz) )
-      if(!expand()) return false;
+      if(!expand(true, false)){ return false; }
     
     //((T*)(this))[size()] = value;
 
     T* p = (T*)(m_mem);
-    *(p + prevSz) = value;
+    //*(p + prevSz) = value;
+    new (p+prevSz) T(value);
 
     set_size(prevSz+1);
     //set_size(size()+1);
@@ -752,7 +764,7 @@ public:
 
     return (KV*)(data() + capacity());
   }
-  void*       reserve(u64 count, u64 mapcap)
+  void*       reserve(u64 count, u64 mapcap=0)
   {
     count   =  mx(count, capacity());
     mapcap  =  mx(mapcap, map_capacity());
@@ -774,32 +786,18 @@ public:
       set_mapcap(mapcap);
 
 
-      KV*  el = elemStart();                                  //  is this copying elements forward in memory? can it overwrite elements that are already there? - right now reserve only ends up expanding memory for both the array and map
-      u8* elb = (u8*)el;  //(u8*)elemStart();
-      //if(prevElems){
-      //  KV* prevEl = (KV*)( ((u8*)re) + prevOfst );
-      //  if(el!=prevEl)TO(prevMapCap,i){
-      //      KV kv = prevEl[i];
-      //      el[i] = kv;
-      //    }
-      //}
+      KV*  el = elemStart();                                     //  is this copying elements forward in memory? can it overwrite elements that are already there? - right now reserve only ends up expanding memory for both the array and map
+      u8* elb = (u8*)el;  
       if(prevElems){
         u8* prevEl = (u8*)re + prevOfst;
         u64  prevB = prevMapCap * sizeof(KV);                    // prevB is previous map bytes
-        FROM(prevB,i) el[i] = prevEl[i];
+        FROM(prevB,i) elb[i] = prevEl[i];
       }
 
-      //u64  mapcap = mapcap; //map_capacity();
       i64 extcap = mapcap - prevMapCap;
       if(extcap>0) 
         TO(extcap,i) 
-          el[i+prevMapCap] = KV(); // KV::empty_kv(); // KV();
-          //new (&el[i+prevMapCap]) KV();
-
-      KV* ell = elemStart();
-      TO(mapcap,i){ 
-        assert(ell[i].hsh.type != 0);
-      }
+          new (&el[i+prevMapCap]) KV();
 
       if(prevElems)
       { 
@@ -812,15 +810,21 @@ public:
     
     return re;
   }
-  void*        expand()
+  void*        expand(bool ary=true, bool map=true)
   {
-    u64    sz = size();
-    u64 nxtSz = sz + sz/2;
-    nxtSz     = nxtSz<4? 4 : nxtSz;
+    u64 nxtSz = size();
+    if(ary){
+      u64 sz = size();
+      nxtSz  = sz + sz/2;
+      nxtSz  = nxtSz<4? 4 : nxtSz;
+    }
 
-    u64    cap = map_capacity();
-    u64 nxtCap = cap + cap/2;
-    nxtCap     = nxtCap<4? 4 : nxtCap;
+    u64 nxtCap = map_capacity();
+    if(map){
+      u64 cap = map_capacity();
+      nxtCap  = cap + cap/2;
+      nxtCap  = nxtCap<4? 4 : nxtCap;
+    }
 
     return reserve(nxtSz, nxtCap);
   }
@@ -944,6 +948,11 @@ public:
     reorder();
 
     return cnt;
+  }
+  void          clear() // bool ary=true, bool map=true)
+  {
+    destroy();
+    init(0);
   }
 
 private:
@@ -1081,6 +1090,29 @@ public:
 
 
 
+
+
+
+
+
+
+//u64  mapcap = mapcap; //map_capacity();
+//el[i+prevMapCap] = KV();   // KV::empty_kv(); // KV();
+//new (&el[i+prevMapCap]) KV();
+
+//KV* ell = elemStart();
+//TO(mapcap,i){ 
+//  assert(ell[i].hsh.type != 0);
+//}
+
+//(u8*)elemStart();
+//if(prevElems){
+//  KV* prevEl = (KV*)( ((u8*)re) + prevOfst );
+//  if(el!=prevEl)TO(prevMapCap,i){
+//      KV kv = prevEl[i];
+//      el[i] = kv;
+//    }
+//}
 
 //u64    el = elems();
 //u64 nxtEl = el + el/2;
