@@ -46,6 +46,7 @@
 // -todo: use tbl for ofsts
 // -todo: convert to using tbl instead of vectors for drawing labels - needed to make push use the copy constructor instead of the assignment operator ( operator= )
 
+// todo: draw blue line as a separator between tbl sections
 // todo: draw histogram from array
 // todo: draw graph of array values
 // todo: fix wrong simdb on first switch
@@ -596,7 +597,7 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
     TO(t.map_capacity(),i) if(!e[i].isEmpty()){
       labels.push_back( toString(e[i].key,":  ",e[i].val) );
     }
-    //sort( ALL(labels) );
+    sort( ALL(labels) );
     //ofsts.clear();
     new (&ofsts) tblv2;
     TO(labels.size(),i){ ofsts.push_back(strOfst(nvg, labels[i])); }
@@ -771,12 +772,14 @@ ENTRY_DECLARATION
       }
     }
 
-    tst("wat")       =   (u64)84;
-    tst("bamf")      =   (u64)36789;
-    tst("skidoosh")  =   (u64)6371;
-    tst("wat")       =   (u64)464;
-    tst("luv and peace") = (u64)99;
+    //tst("wat")       =   (u64)84;
+    //tst("bamf")      =   (u64)36789;
+    //tst("skidoosh")  =   (u64)6371;
+    //tst("wat")       =   (u64)464;
+    //tst("luv and peace") = (u64)99;
     tst.put("squidoosh", (u64)109);
+    //tst.put("zzz", (u64)(21) );
+    //tst.put("aaa", (u64)(7217) );
 
     //tst.expand();
     //tst.expand();
@@ -784,17 +787,17 @@ ENTRY_DECLARATION
     //tst.expand();
     //tst.expand();
 
-    tst.push(82);
-    tst.push(83);
-    tst.push(84);
-    tst.push(85);
-    tst.push(0);
-    tst.push(1);
-    tst.push(6);
-    tst.push(101);
-    tst.push(45);
-    tst.push({0,1,6,101,45});
-    tst.push({0,1,6,101, 45, 86, 87, 33, 45,45,45,45,45,45,24 });
+    //tst.push(82);
+    //tst.push(83);
+    //tst.push(84);
+    //tst.push(85);
+    //tst.push(0);
+    //tst.push(1);
+    //tst.push(6);
+    //tst.push(101);
+    //tst.push(45);
+    //tst.push({0,1,6,101,45});
+    //tst.push({0,1,6,101, 45, 86, 87, 33, 45,45,45,45,45,45,24 });
   }
 
   while(!glfwWindowShouldClose(vd.win))

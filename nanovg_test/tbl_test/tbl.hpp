@@ -11,8 +11,9 @@
 // -todo: figure out why map capacities grow when pushing to array - expand didn't discriminate between whether to expand the array or map and enlarged both 
 // -todo: put back destructors on deallocation
 // -todo: fix size when inserting map elements before pushing array values
+// -todo: put in begin() and end() iterators
 
-// todo: put in begin() and end() iterators
+// todo: fix tbl.put() not making it into the map
 // todo: cut types down to just u64, i64, double, string etc
 // todo: make sure that the first two bytes have TB instead of the most significant little endian bits
 // todo: make emplace() and emplace_back() methods
@@ -957,6 +958,8 @@ public:
     destroy();
     init(0);
   }
+  T*            begin(){ return (T*)m_mem; }
+  T*              end(){ return ((T*)m_mem) + size(); }
 
 private:
   static const u32 HASH_MASK = 0x07FFFFFF;
