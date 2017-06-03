@@ -12,10 +12,10 @@
 // -todo: put back destructors on deallocation
 // -todo: fix size when inserting map elements before pushing array values
 // -todo: put in begin() and end() iterators
+// -todo: fix tbl.put() not making it into the map - put() was close but not the same as operator() - put() now uses operator()
 
-// todo: fix tbl.put() not making it into the map
-// todo: cut types down to just u64, i64, double, string etc
 // todo: make sure that the first two bytes have TB instead of the most significant little endian bits
+// todo: cut types down to just u64, i64, double, string etc
 // todo: make emplace() and emplace_back() methods
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
 // | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
@@ -440,10 +440,11 @@ public:
     KV&  operator=(KV const& l){ return cp(l); }
     KV&  operator=(KV&& r){ return cp(r); }
 
-    template<class N> void operator=(N n)
+    template<class N> KV& operator=(N n)
     {
       hsh.type = typenum<N>::num;
       val      = *((u64*)&n);
+      return *this;
     }
     template<class N> operator N()
     { 
@@ -512,7 +513,7 @@ public:
       return hsh.type==Type::NONE || hsh.type==Type::EMPTY;
     }
 
-    static KV     empty_kv()
+    static KV    empty_kv()
     {
       KV kv;
       memset(&kv, 0, sizeof(KV));
@@ -557,7 +558,7 @@ public:
   tbl(tbl&&      r){ mv(r); }
   tbl& operator=(tbl&&      r){ mv(r); return *this; }
 
-  operator      u64() const{ return size(); }
+  operator       u64() const{ return size(); }
   T&      operator[](u64 i)
   {
     tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
@@ -630,35 +631,7 @@ public:
 
   template<class V> KV&   put(const char* key, V val)
   {
-    if( !(map_capacity()>elems()) )
-       if(!expand(false, true)){ return KV::error_kv(); }
-
-    u32  hsh  =  HashStr(key);    
-    KV*   el  =  (KV*)elemStart();                                    // el is a pointer to the elements 
-    u64    i  =  hsh;
-    u64  mod  =  map_capacity();
-    u64   en  =  prev(i,mod);
-    u64 dist  =  0;
-    for(;;++i,++dist)
-    {
-      i %= mod;                                                        // get idx within map_capacity
-      HshType eh = el[i].hsh;                                          // eh is element hash
-      if(el[i].hsh.type==EMPTY){ 
-        set_elems( elems()+1 );
-        return el[i] = KV(key, hsh, *((u64*)&val) );
-      }else if(hsh==eh.hash && strncmp(el[i].key,key,sizeof(KV::Key)-1)==0 ){   // if the hashes aren't the same, the keys can't be the same
-        return el[i] = KV(key, hsh, *((u64*)&val) );
-      }else if( wrapDist(el,i,mod) < dist ){
-        KV kv(key, hsh, *((u64*)&val) );
-        kv.hsh.type = typenum<V>::num;
-        set_elems( elems()+1 );
-        return place_rh(kv, el, i, dist, mod);
-      }
-    
-      if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
-    }
-
-    return KV::error_kv();
+    return this->operator()(key) = val;
   }
 
   bool           push(T const& value)
@@ -1101,6 +1074,36 @@ public:
 
 
 
+
+//if( !(map_capacity()>elems()) )
+//   if(!expand(false, true)){ return KV::error_kv(); }
+//
+//u32  hsh  =  HashStr(key);    
+//KV*   el  =  (KV*)elemStart();                                    // el is a pointer to the elements 
+//u64    i  =  hsh;
+//u64  mod  =  map_capacity();
+//u64   en  =  prev(i,mod);
+//u64 dist  =  0;
+//for(;;++i,++dist)
+//{
+//  i %= mod;                                                        // get idx within map_capacity
+//  HshType eh = el[i].hsh;                                          // eh is element hash
+//  if(el[i].hsh.type==EMPTY){ 
+//    set_elems( elems()+1 );
+//    return el[i] = KV(key, hsh, *((u64*)&val) );
+//  }else if(hsh==eh.hash && strncmp(el[i].key,key,sizeof(KV::Key)-1)==0 ){   // if the hashes aren't the same, the keys can't be the same
+//    return el[i] = KV(key, hsh, *((u64*)&val) );
+//  }else if( wrapDist(el,i,mod) < dist ){
+//    KV kv(key, hsh, *((u64*)&val) );
+//    kv.hsh.type = typenum<V>::num;
+//    set_elems( elems()+1 );
+//    return place_rh(kv, el, i, dist, mod);
+//  }
+//
+//  if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+//}
+//
+//return KV::error_kv();
 
 // todo: needs to loop through and run destructors here
 //if(m_mem) free(memStart());
