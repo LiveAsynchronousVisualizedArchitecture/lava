@@ -530,8 +530,6 @@ v2         strOfst(NVGcontext* nvg, str    const&    s)                         
   
   return { bnd.xmx-bnd.xmn, bnd.ymx-bnd.ymn };
 }
-//f32       drawStrs(NVGcontext* nvg, vecstr const& strs, vecv2 ofsts, f32 w, f32 x, f32 y, f32 margin)
-//f32       drawStrs(NVGcontext* nvg, vecstr const& strs, tblv2 const& ofsts, f32 w, f32 x, f32 y, f32 margin)
 f32       drawStrs(NVGcontext* nvg, tblstr const& strs, tblv2 const& ofsts, f32 w, f32 x, f32 y, f32 margin)
 {
   f32  h = 0.f;
@@ -558,7 +556,8 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
 {
   using namespace std;
   
-  char s[TITLE_MAX_LEN]; f32 xo=0, yo=0;                                                    // xo is x offset   yo is y offset
+  //char s[TITLE_MAX_LEN]; 
+  f32 xo=0, yo=0;                                                    // xo is x offset   yo is y offset
 
   nvgFontSize(nvg,  sz);
   nvgFontFace(nvg,  "sans");
@@ -771,15 +770,6 @@ ENTRY_DECLARATION
         return -1;
       }
     }
-
-    //tst("skidoosh") =   109l;
-    //tst.put("wat",       84l);
-    //tst.put("bamf",   36789l);
-    //tst("bamf")     =  (u64)36789;
-
-    str s = "wat";
-    vecstr ts; ts.reserve(5);
-    ts.push_back(s);
 
     tst("wat")       =   (u64)84;
     tst("bamf")      =   (u64)36789;
@@ -1001,6 +991,19 @@ ENTRY_DECLARATION
 
 
 
+
+
+//f32       drawStrs(NVGcontext* nvg, vecstr const& strs, vecv2 ofsts, f32 w, f32 x, f32 y, f32 margin)
+//f32       drawStrs(NVGcontext* nvg, vecstr const& strs, tblv2 const& ofsts, f32 w, f32 x, f32 y, f32 margin)
+
+//tst("skidoosh") =   109l;
+//tst.put("wat",       84l);
+//tst.put("bamf",   36789l);
+//tst("bamf")     =  (u64)36789;
+
+//str s = "wat";
+//vecstr ts; ts.reserve(5);
+//ts.push_back(s);
 
 //v2      drawU64(NVGcontext* nvg, const char* label, u64 n, f32 x, f32 y, f32 sz, f32 margin)
 //{

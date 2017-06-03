@@ -9,13 +9,13 @@
 // -todo: fix elements when size and capacity are not the same
 // -todo: figure out why there are duplicate keys in the tbl - signed / unsigned mismatch between hashes
 // -todo: figure out why map capacities grow when pushing to array - expand didn't discriminate between whether to expand the array or map and enlarged both 
+// -todo: put back destructors on deallocation
+// -todo: fix size when inserting map elements before pushing array values
 
-// todo: make emplace() and emplace_back() methods
-// todo: put back destructors on deallocation
-// todo: make sure that the first two bytes have TB instead of the most significant little endian bits
 // todo: put in begin() and end() iterators
-// todo: fix size when inserting map elements before pushing array values
 // todo: cut types down to just u64, i64, double, string etc
+// todo: make sure that the first two bytes have TB instead of the most significant little endian bits
+// todo: make emplace() and emplace_back() methods
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
 // | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
 // | does this imply that there should be a separate array type or is specializing string enough? 
@@ -262,14 +262,16 @@ private:
     *mapcap_ptr() = 0;
   }
   void         destroy()
-  {
-    // todo: needs to loop through and run destructors here
-    //if(m_mem) free(memStart());
-    //
-    //typed_del<true>::del();
-    //
-    //typed_del<true>();
-    //typed_del<false>();
+  { 
+    if(m_mem){
+      T* a = (T*)m_mem;
+      TO(size(),i){
+        a[i].T::~T(); // run the destructor manually before freeing the memory
+      }
+      free(memStart());
+    }
+
+    // todo: will need to destroy any tables in the map here too
   }
   void              cp(tbl const& l)
   {
@@ -547,7 +549,7 @@ public:
     init(size);
     TO(size, i){ (*this)[i] = value; }
   }
-  ~tbl(){ /*del()*/; }
+  ~tbl(){ destroy(); }
 
   tbl(tbl const& l){ cp(l); }
   tbl& operator=(tbl const& l){ cp(l); return *this; }
@@ -689,7 +691,7 @@ public:
     return cnt;
   }
   bool      push_back(T const& value){ return push(value); }
-  void            pop(){ /*delete &(back());*/ set_size(size()-1); }  // todo: needs to run the destructor here
+  void            pop(){ back()->T::~T(); /*delete &(back());*/ set_size(size()-1); }  // todo: needs to run the destructor here
   void       pop_back(){ pop(); }
   T const&      front() const{ return (*this)[0]; }
   T const&       back() const{ return (*this)[size()-1]; }
@@ -829,7 +831,7 @@ public:
     return reserve(nxtSz, nxtCap);
   }
   bool  shrink_to_fit()
-  {
+  { // todo: does this need to call destroy on the previous allocation?
     u64      sz = size();
     u64   vecsz = memberBytes() + sz*sizeof(T);
     u64 elemcnt = elems();
@@ -848,7 +850,8 @@ public:
           nxtel[cur++] = el[i];
         } 
 
-      free(p);
+      //free(p);
+      destroy();
       m_mem = nxtp+memberBytes();
       set_sizeBytes(nxtsz);
       set_size(sz);
@@ -1095,6 +1098,14 @@ public:
 
 
 
+
+// todo: needs to loop through and run destructors here
+//if(m_mem) free(memStart());
+//
+//typed_del<true>::del();
+//
+//typed_del<true>();
+//typed_del<false>();
 
 //u64  mapcap = mapcap; //map_capacity();
 //el[i+prevMapCap] = KV();   // KV::empty_kv(); // KV();
