@@ -832,6 +832,10 @@ ENTRY_DECLARATION
       }
     }
 
+    str s = "wat";
+    vecstr ts; ts.reserve(5);
+    ts.push_back(s);
+
     tst("wat")       =   (u64)84;
     tst("bamf")      =   (u64)36789;
     tst("skidoosh")  =   (u64)6371;

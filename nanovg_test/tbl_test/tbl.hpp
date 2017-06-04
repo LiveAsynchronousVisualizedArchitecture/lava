@@ -14,9 +14,13 @@
 // -todo: put in begin() and end() iterators
 // -todo: fix tbl.put() not making it into the map - put() was close but not the same as operator() - put() now uses operator()
 // -todo: make sure that the first two bytes have TB instead of the most significant little endian bits
+// -todo: use memcpy in cp() - can't because of copy constructors - need to insert the elements
+// -todo: make cp() copy over map elements 
+// -todo: try just shifting bits to read size bytes
+// -todo: make emplace() and emplace_back() methods
 
 // todo: cut types down to just u64, i64, double, string etc
-// todo: make emplace() and emplace_back() methods
+// todo: work on flattening tbls into with child data section
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
 // | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
 // | does this imply that there should be a separate array type or is specializing string enough? 
@@ -278,12 +282,13 @@ private:
   }
   void              cp(tbl const& l)
   {
-    //tbl_PRNT(" copied ");
-    //del();
-    reserve(l.size(), l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
-    //resize(l.size());
-
+    reserve(l.size(), l.map_capacity() ); // l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
     TO(l.size(),i) push(l[i]); 
+    
+    auto e = l.elemStart();
+    TO(l.map_capacity(),i) if( !e[i].isEmpty() ){
+      put(e[i].key, e[i].val);
+    }
   }
   void              mv(tbl& r)
   {
@@ -636,25 +641,25 @@ public:
     return this->operator()(key) = val;
   }
 
-  bool           push(T const& value)
+  template<class... V> bool emplace(V&&... val)
   {
+    using namespace std;
+    
     if(!m_mem){ init(0); }
 
     auto prevSz = size();
     if( !(capacity()>prevSz) )
       if(!expand(true, false)){ return false; }
-    
-    //((T*)(this))[size()] = value;
 
     T* p = (T*)(m_mem);
-    //*(p + prevSz) = value;
-    new (p+prevSz) T(value);
+    new (p+prevSz) T( forward<V>(val)... );
 
     set_size(prevSz+1);
-    //set_size(size()+1);
 
     return true;
   }
+  template<class... V> bool emplace_back(V&&... val){ return emplace(std::forward<V>(val)...);  }
+  bool           push(T const& val){ return emplace(val); }
   u64            push(std::initializer_list<T> lst)
   {
     u64 cnt = 0;
@@ -667,7 +672,7 @@ public:
     return cnt;
   }
   bool      push_back(T const& value){ return push(value); }
-  void            pop(){ back()->T::~T(); /*delete &(back());*/ set_size(size()-1); }  // todo: needs to run the destructor here
+  void            pop(){ back()->T::~T(); set_size(size()-1); }
   void       pop_back(){ pop(); }
   T const&      front() const{ return (*this)[0]; }
   T const&       back() const{ return (*this)[size()-1]; }
@@ -705,18 +710,8 @@ public:
     if(!m_mem) return 0;
 
     u64 sb = *((u64 const*)memStart());
-    auto tmp = &sb;
-    //return sb & 0xFFFFFFFFFFFF0000;
-
-    //u64 sb = *((u64 const*)memStart());
-    //sb &= 0x0000FFFFFFFFFFFF;
-    u8* sbb = (u8*)&sb;
-    sbb[0] = sbb[1] = 0;
     sb >>= 16;
     return sb;
-    //
-    //return (sb << 2) >> 2;
-    //return *( (u64 const*)memStart() );
   }
   u64        capacity() const
   {
@@ -1084,7 +1079,48 @@ public:
 
 
 
+//if(!m_mem){ init(0); }
+//
+//auto prevSz = size();
+//if( !(capacity()>prevSz) )
+//  if(!expand(true, false)){ return false; }
+//
+////((T*)(this))[size()] = value;
+//
+//T* p = (T*)(m_mem);
+////*(p + prevSz) = value;
+//new (p+prevSz) T(value);
+//
+//set_size(prevSz+1);
+////set_size(size()+1);
+//
+//return true;
 
+//
+// /*delete &(back());*/ todo: needs to run the destructor here
+
+//auto tmp = &sb;
+//u8* sbb = (u8*)&sb;
+//
+//return sb & 0xFFFFFFFFFFFF0000;
+//
+//u64 sb = *((u64 const*)memStart());
+//sb &= 0x0000FFFFFFFFFFFF;
+//
+//sbb[0] = sbb[1] = 0;
+//
+//return (sb << 2) >> 2;
+//return *( (u64 const*)memStart() );
+
+//tbl_PRNT(" copied ");
+//del();
+//resize(l.size());
+//
+// todo: use memcpy instead of copying elements 1 by 1 - can't, need to use copy constructor
+//destroy();
+//u64 szBytes = l.sizeBytes();
+//m_mem = (u8*)malloc( l.sizeBytes() );
+//memcpy(m_mem, l.memStart(), szBytes);
 
 //if( !(map_capacity()>elems()) )
 //   if(!expand(false, true)){ return KV::error_kv(); }
@@ -1163,4 +1199,5 @@ public:
 //  strcpy_s(this->key, sizeof(KV::Key), key);
 //  hsh.hash = hash;
 //}
+
 
