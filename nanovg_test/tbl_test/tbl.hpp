@@ -278,7 +278,7 @@ private:
   }
   void              cp(tbl const& l)
   {
-    tbl_PRNT(" copied ");
+    //tbl_PRNT(" copied ");
     //del();
     reserve(l.size(), l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
     //resize(l.size());

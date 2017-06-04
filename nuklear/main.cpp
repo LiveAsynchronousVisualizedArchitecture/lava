@@ -574,11 +574,11 @@ f32      drawGraph(NVGcontext* nvg, tblu const& t, bnd2f b)
   inc = (b.w()-4) / (f32)t.size();
   hgt = b.h()-4;
 
-  nvgBeginPath(nvg);
-    nvgRect(nvg, b.xmn, b.ymn, b.xmx-b.xmn, b.ymx-b.ymn);
-    nvgStrokeWidth(nvg, 1.f);
-    nvgStrokeColor(nvg, nvgRGBAf(0,.25f,.8f, 1.f));
-  nvgStroke(nvg);
+  //nvgBeginPath(nvg);
+  //  nvgRect(nvg, b.xmn, b.ymn, b.xmx-b.xmn, b.ymx-b.ymn);
+  //  nvgStrokeWidth(nvg, 1.f);
+  //  nvgStrokeColor(nvg, nvgRGBAf(0,.25f,.8f, 1.f));
+  //nvgStroke(nvg);
 
   nvgStrokeWidth(nvg, 1.f);
   nvgStrokeColor(nvg, nvgRGBAf(0,.8f,.25f, 1.f));
@@ -672,7 +672,7 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
 
   o.x  =  x+margin;
   o.y +=  dh + margin*2;
-  dh   =  drawGraph(nvg, t, {o.x, o.y, x+vizW-margin, o.y+200.f});
+  dh   =  drawGraph(nvg, t, {o.x, o.y, x+vizW-margin, o.y+100.f});
 
   o.y  +=  dh + margin*2;
   nvgBeginPath(nvg);
@@ -858,6 +858,15 @@ ENTRY_DECLARATION
     tst.push(45);
     tst.push({0,1,6,101,45});
     tst.push({0,1,6,101, 45, 86, 87, 33, 45,45,45,45,45,45,24 });
+    //tst.push({0,1,2,3,4,5,6,7,8,9});
+    TO(20,i){ tst.push(i); }
+    TO(12,i){   tst.push(i*i); }
+    FROM(12,i){ tst.push(i*i); }
+
+    auto tst2 = tst;
+    sort(ALL(tst2));
+    TO(tst2.size(),i){ tst.push( tst2[i] ); }
+
   }
 
   while(!glfwWindowShouldClose(vd.win))
