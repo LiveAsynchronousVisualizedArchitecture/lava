@@ -45,8 +45,9 @@
 // -todo: fix drawing of empty key
 // -todo: use tbl for ofsts
 // -todo: convert to using tbl instead of vectors for drawing labels - needed to make push use the copy constructor instead of the assignment operator ( operator= )
+// -todo: draw blue line as a separator between tbl sections
+// -todo: draw a line around table visualization
 
-// todo: draw blue line as a separator between tbl sections
 // todo: draw histogram from array
 // todo: draw graph of array values
 // todo: fix wrong simdb on first switch
@@ -563,7 +564,7 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
   nvgFontSize(nvg,  sz);
   nvgFontFace(nvg,  "sans");
   nvgTextAlign(nvg, NVG_ALIGN_LEFT); // | NVG_ALIGN_MIDDLE);
-  nvgFillColor(nvg, nvgRGBA(255, 255, 170, 255));
+  nvgFillColor(nvg, nvgRGBAf(1.f, 1.f, .65f, 1.f));
 
   //vecstr labels;  labels.reserve(5);
   //vecv2   ofsts;  ofsts.reserve(5);
@@ -571,7 +572,7 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
   tblstr labels;  labels.reserve(5);
   tblv2   ofsts;  ofsts.reserve(5);
 
-  v2      o = { x, y };                                                                    // o is offset
+  v2      o = { x+margin, y+margin };                                                                    // o is offset
   f32  xrem = w; 
   f32   mxY = 0.f;
   f32    dh = 0.f;                                                                         // dh is draw height
@@ -585,11 +586,18 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
     TO(labels.size(),i){ ofsts.push_back( strOfst(nvg,labels[i]) ); }
     TO(ofsts.size(),i){ mxY = max<f32>(mxY, ofsts[i].y); }
 
-    dh = drawStrs(nvg, labels, ofsts, w, x, y, margin);
+    dh = drawStrs(nvg, labels, ofsts, w, o.x, o.y, margin);
   }
 
-  o.x  = x;
-  o.y += dh + margin; // mxY+margin*3.f;                                                                      // o is offset
+  o.x  = x+margin;
+  o.y += dh + margin*2; // mxY+margin*3.f;                                                                      // o is offset
+
+  nvgBeginPath(nvg);
+    nvgRect(nvg, x, o.y-margin, w-x-margin*2, 1.f);
+    nvgStrokeWidth(nvg, 1.f);
+    nvgStrokeColor(nvg, nvgRGBAf(0,.25f,.8f, 1.f));
+  nvgStroke(nvg);
+
   SECTION(draw key value pairs)
   {
     labels.clear();
@@ -598,8 +606,8 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
       labels.push_back( toString(e[i].key,":  ",e[i].val) );
     }
     sort( ALL(labels) );
-    //ofsts.clear();
-    new (&ofsts) tblv2;
+    ofsts.clear();
+    //new (&ofsts) tblv2;
     TO(labels.size(),i){ ofsts.push_back(strOfst(nvg, labels[i])); }
     mxY=0.f;
     TO(ofsts.size(),i){ mxY = max<f32>(mxY, ofsts[i].y); }
@@ -607,21 +615,35 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
     dh = drawStrs(nvg, labels, ofsts, w, o.x, o.y, margin);
   }
 
-  o.x   =  x;
-  o.y  +=  dh + margin; // mxY+margin*3.f;
+  o.x   =  x+margin;
+  o.y  +=  dh + margin*2; // mxY+margin*3.f;
+
+  nvgBeginPath(nvg);
+    nvgRect(nvg, o.x-margin, o.y-margin, w-x-margin*2, 1.f);
+    nvgStrokeWidth(nvg, 1.f);
+    nvgStrokeColor(nvg, nvgRGBAf(0,.25f,.8f, 1.f));
+  nvgStroke(nvg);
+
   SECTION(draw array elements)
   {
     labels.clear();
     TO(t.size(),i){ labels.push_back( toString(i,":  ",t[i]) ); }
 
-    //ofsts.clear();
-    new (&ofsts) tblv2;
+    ofsts.clear();
+    //new (&ofsts) tblv2;
     TO(labels.size(), i) { ofsts.push_back(strOfst(nvg, labels[i])); }
     mxY=0.f;
     TO(ofsts.size(),i){ mxY = max<f32>(mxY, ofsts[i].y); }
 
-    dh = drawStrs(nvg, labels, ofsts, w, o.x, o.y, margin);
+    dh = drawStrs(nvg, labels, ofsts, w-margin, o.x, o.y, margin);
   }
+
+  nvgBeginPath(nvg);
+    nvgRect(nvg, x, y, w-x-margin*2, o.y+dh);
+    nvgStrokeWidth(nvg, 1.f);
+    nvgStrokeColor(nvg, nvgRGBAf(0,.25f,.8f, 1.f));
+  nvgStroke(nvg);
+
 }
 
 }
@@ -772,14 +794,14 @@ ENTRY_DECLARATION
       }
     }
 
-    //tst("wat")       =   (u64)84;
-    //tst("bamf")      =   (u64)36789;
-    //tst("skidoosh")  =   (u64)6371;
-    //tst("wat")       =   (u64)464;
-    //tst("luv and peace") = (u64)99;
+    tst("wat")       =   (u64)84;
+    tst("bamf")      =   (u64)36789;
+    tst("skidoosh")  =   (u64)6371;
+    tst("wat")       =   (u64)464;
+    tst("luv and peace") = (u64)99;
     tst.put("squidoosh", (u64)109);
-    //tst.put("zzz", (u64)(21) );
-    //tst.put("aaa", (u64)(7217) );
+    tst.put("zzz", (u64)(21) );
+    tst.put("aaa", (u64)(7217) );
 
     //tst.expand();
     //tst.expand();
@@ -787,17 +809,17 @@ ENTRY_DECLARATION
     //tst.expand();
     //tst.expand();
 
-    //tst.push(82);
-    //tst.push(83);
-    //tst.push(84);
-    //tst.push(85);
-    //tst.push(0);
-    //tst.push(1);
-    //tst.push(6);
-    //tst.push(101);
-    //tst.push(45);
-    //tst.push({0,1,6,101,45});
-    //tst.push({0,1,6,101, 45, 86, 87, 33, 45,45,45,45,45,45,24 });
+    tst.push(82);
+    tst.push(83);
+    tst.push(84);
+    tst.push(85);
+    tst.push(0);
+    tst.push(1);
+    tst.push(6);
+    tst.push(101);
+    tst.push(45);
+    tst.push({0,1,6,101,45});
+    tst.push({0,1,6,101, 45, 86, 87, 33, 45,45,45,45,45,45,24 });
   }
 
   while(!glfwWindowShouldClose(vd.win))
