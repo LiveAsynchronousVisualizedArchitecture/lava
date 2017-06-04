@@ -66,6 +66,9 @@ union bnd2f
 
   f32& operator[](u64 i)       { return b[i]; }
   f32  operator[](u64 i) const { return b[i]; }
+
+  f32 w() const { return xmx - xmn; }
+  f32 h() const { return ymx - ymn; }
 };
 
 struct  Shape {                     // todo: make rvalue constructor - make all constructors?

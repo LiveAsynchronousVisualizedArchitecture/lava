@@ -47,9 +47,9 @@
 // -todo: convert to using tbl instead of vectors for drawing labels - needed to make push use the copy constructor instead of the assignment operator ( operator= )
 // -todo: draw blue line as a separator between tbl sections
 // -todo: draw a line around table visualization
+// -todo: draw graph of array values
 
 // todo: draw histogram from array
-// todo: draw graph of array values
 // todo: fix wrong simdb on first switch
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
@@ -562,11 +562,49 @@ f32       drawStrs(NVGcontext* nvg, tblstr const& strs, tblv2 const& ofsts, f32 
 
   return h;
 }
+f32      drawGraph(NVGcontext* nvg, tblu const& t, bnd2f b)
+{
+  using namespace std;
+
+  f32 mxf, inc, hgt;
+
+  u64 mx = 0;
+  TO(t.size(),i){ mx = max(mx, t[i]);  }
+  mxf = (f32)mx;
+  inc = (b.w()-4) / (f32)t.size();
+  hgt = b.h()-4;
+
+  nvgBeginPath(nvg);
+    nvgRect(nvg, b.xmn, b.ymn, b.xmx-b.xmn, b.ymx-b.ymn);
+    nvgStrokeWidth(nvg, 1.f);
+    nvgStrokeColor(nvg, nvgRGBAf(0,.25f,.8f, 1.f));
+  nvgStroke(nvg);
+
+  nvgStrokeWidth(nvg, 1.f);
+  nvgStrokeColor(nvg, nvgRGBAf(0,.8f,.25f, 1.f));
+  nvgFillColor(nvg, nvgRGBAf(0,.5f,.25f, .5f));
+  TO(t.size(),i)
+  {
+    f32 x = b.xmn + i*inc + 2;
+    f32 y = b.ymx - 2;
+    f32 h = hgt * (t[i]/mxf);
+    nvgBeginPath(nvg);
+      nvgRect(nvg, x, y-h, inc, h);
+    nvgFill(nvg);
+    nvgStroke(nvg);
+  }
+
+  return b.ymx - b.ymn;
+
+  //nvgMoveTo(nvg, x, y);
+  //nvgLineTo(nvg, x, y - h*(t[i]/mxf) );
+}
 void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f, f32 y=0.f, f32 sz=50.f, f32 margin=5.f)
 {
   using namespace std;
   
   f32 xo=0, yo=0;                                                    // xo is x offset   yo is y offset
+  f32 vizW = w - x - margin*2;
 
   nvgFontSize(nvg,  sz);
   nvgFontFace(nvg,  "sans");
@@ -617,9 +655,7 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
 
   o.x   =  x+margin;
   o.y  +=  dh + margin*2; // mxY+margin*3.f;
-
   drawLine(nvg, o.x-margin, o.y-margin, w-x-margin*2);
-
   SECTION(draw array elements)
   {
     labels.clear();
@@ -634,12 +670,18 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
     dh = drawStrs(nvg, labels, ofsts, w-margin, o.x, o.y, margin);
   }
 
+  o.x  =  x+margin;
+  o.y +=  dh + margin*2;
+  dh   =  drawGraph(nvg, t, {o.x, o.y, x+vizW-margin, o.y+200.f});
+
+  o.y  +=  dh + margin*2;
   nvgBeginPath(nvg);
-    nvgRect(nvg, x, y, w-x-margin*2, o.y+dh);
+    nvgRect(nvg, x, y, w-x-margin*2, o.y);
     nvgStrokeWidth(nvg, 1.f);
-    nvgStrokeColor(nvg, nvgRGBAf(0,.25f,.8f, 1.f));
+    nvgStrokeColor(nvg, nvgRGBAf(0,.1f,.6f, 1.f));
   nvgStroke(nvg);
 
+  //nvgRect(nvg, x, y, w-x-margin*2, o.y+dh);
 }
 
 }
