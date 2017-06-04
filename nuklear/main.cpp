@@ -521,6 +521,14 @@ void       drawBnd(NVGcontext* nvg, f32  b[4])
    nvgStrokeColor(nvg, nvgRGBAf(.8f, .6f, .2f, 1.f));
   nvgStroke(nvg);
 }
+void      drawLine(NVGcontext* nvg, f32 x, f32 y, f32 w)
+{
+  nvgBeginPath(nvg);
+    nvgRect(nvg, x, y, w, 1.f);
+    nvgStrokeWidth(nvg, 1.f);
+    nvgStrokeColor(nvg, nvgRGBAf(0,.25f,.8f, 1.f));
+  nvgStroke(nvg);
+}
 void      drawHist(NVGcontext* nvg, u64* buf, u64 len, bnd2f b)
 {
   
@@ -558,7 +566,6 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
 {
   using namespace std;
   
-  //char s[TITLE_MAX_LEN]; 
   f32 xo=0, yo=0;                                                    // xo is x offset   yo is y offset
 
   nvgFontSize(nvg,  sz);
@@ -566,9 +573,6 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
   nvgTextAlign(nvg, NVG_ALIGN_LEFT); // | NVG_ALIGN_MIDDLE);
   nvgFillColor(nvg, nvgRGBAf(1.f, 1.f, .65f, 1.f));
 
-  //vecstr labels;  labels.reserve(5);
-  //vecv2   ofsts;  ofsts.reserve(5);
-  //tbl<v2>   ofsts;  ofsts.reserve(5);
   tblstr labels;  labels.reserve(5);
   tblv2   ofsts;  ofsts.reserve(5);
 
@@ -592,11 +596,7 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
   o.x  = x+margin;
   o.y += dh + margin*2; // mxY+margin*3.f;                                                                      // o is offset
 
-  nvgBeginPath(nvg);
-    nvgRect(nvg, x, o.y-margin, w-x-margin*2, 1.f);
-    nvgStrokeWidth(nvg, 1.f);
-    nvgStrokeColor(nvg, nvgRGBAf(0,.25f,.8f, 1.f));
-  nvgStroke(nvg);
+  drawLine(nvg, x, o.y-margin, w-x-margin*2);
 
   SECTION(draw key value pairs)
   {
@@ -618,11 +618,7 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
   o.x   =  x+margin;
   o.y  +=  dh + margin*2; // mxY+margin*3.f;
 
-  nvgBeginPath(nvg);
-    nvgRect(nvg, o.x-margin, o.y-margin, w-x-margin*2, 1.f);
-    nvgStrokeWidth(nvg, 1.f);
-    nvgStrokeColor(nvg, nvgRGBAf(0,.25f,.8f, 1.f));
-  nvgStroke(nvg);
+  drawLine(nvg, o.x-margin, o.y-margin, w-x-margin*2);
 
   SECTION(draw array elements)
   {
@@ -1017,6 +1013,23 @@ ENTRY_DECLARATION
 
 
 
+//char s[TITLE_MAX_LEN]; 
+//
+//vecstr labels;  labels.reserve(5);
+//vecv2   ofsts;  ofsts.reserve(5);
+//tbl<v2>   ofsts;  ofsts.reserve(5);
+//
+//nvgBeginPath(nvg);
+//  nvgRect(nvg, x, o.y-margin, w-x-margin*2, 1.f);
+//  nvgStrokeWidth(nvg, 1.f);
+//  nvgStrokeColor(nvg, nvgRGBAf(0,.25f,.8f, 1.f));
+//nvgStroke(nvg);
+//
+//nvgBeginPath(nvg);
+//  nvgRect(nvg, o.x-margin, o.y-margin, w-x-margin*2, 1.f);
+//  nvgStrokeWidth(nvg, 1.f);
+//  nvgStrokeColor(nvg, nvgRGBAf(0,.25f,.8f, 1.f));
+//nvgStroke(nvg);
 
 //f32       drawStrs(NVGcontext* nvg, vecstr const& strs, vecv2 ofsts, f32 w, f32 x, f32 y, f32 margin)
 //f32       drawStrs(NVGcontext* nvg, vecstr const& strs, tblv2 const& ofsts, f32 w, f32 x, f32 y, f32 margin)
