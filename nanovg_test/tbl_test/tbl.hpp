@@ -24,7 +24,7 @@
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
 // | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
 // | does this imply that there should be a separate array type or is specializing string enough? 
-// todo: make operator()() take integers so that the map can also be used as an iterable list through sub-tables
+// todo: make operator()() take integers so that the map can also be used as an iterable list through sub-tables - just make operator()() take an integer offset into elemStart(), then make an iteration cursor through the non-empty elements of the map?
 // todo: make operator+=(const char*) create a key in the map
 // todo: make operator-=(const char*) delete a key in the map
 // todo: work on flattening table - put in table data segment
@@ -36,9 +36,9 @@
 // todo: make constructor that takes only an address to the start of a tbl memory span - just has to offset it by memberBytes()
 // todo: make flatten method that has creates a new tbl with no extra capacity and takes all tbl references and makes them into offset/children tbls that are stored in the sub-tbl segment - instead of child type, make a read only type? read only could have template specializations or static asserts that prevent changing the tbl or the KV objects from it
 // todo: make non owned type always read only? - still need owned and non-owned types within tbl
-// todo: make resize()
+// todo: make resize() - should there be a resize()? only affects array?
 // todo: use inline assembly to vectorize basic math operations
-// todo: use the restrict keyword on basic math operations 
+// todo: use the restrict keyword on basic math operations?
 // todo: put an assert that the two tbl pointers are not the same
 
 // todo: try template constructor that returns a tbl<type> with a default value set? - can't have a constructor that reserves elems with this? would need a reserve_elems() function? reserve_elems() not needed since adding a key will allocate map_capacity memory  - will have to try after turning into a template

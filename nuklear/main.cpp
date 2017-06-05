@@ -49,12 +49,14 @@
 // -todo: draw a line around table visualization
 // -todo: draw graph of array values
 
-// todo: draw histogram from array
 // todo: fix wrong simdb on first switch
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
 //       |  visualize the fit position and camera frustum in real time to debug
+// todo: use tbl for IndexedVerts
 
+// todo: draw histogram from array
+// todo: draw variance per pixel when graph of values ends up sub-pixel
 // idea: visualize memory layout with hex numbers
 // idea: use libtcc to interpret a struct declaration for the type of tbl array? 
 // idea: use field key values in the tbl to interpret the tbl array type?
