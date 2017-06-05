@@ -175,6 +175,8 @@ struct VizData
     NVGcontext*       nvg = nullptr;
     veci           dbIdxs;
     vecstr        dbNames;
+    int         dbNameIdx;
+    str            dbName;
     bool        showGuide;
 
   } ui;

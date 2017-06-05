@@ -48,19 +48,15 @@
 // -todo: draw blue line as a separator between tbl sections
 // -todo: draw a line around table visualization
 // -todo: draw graph of array values
+// -todo: make sure selecting same db doesn't close the db
+// -todo: fix wrong simdb on first switch - problem is index not being changed when the dbNames is updated? - also needed to change setSelectionIndex(int) on the nanogui ComboBox
 
-// todo: fix wrong simdb on first switch
 // todo: fix tbl visualization cells going outside the bounds of bounding box - need to wrap sooner, possibly based on more margins
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
 //       |  visualize the fit position and camera frustum in real time to debug
-// todo: use tbl for IndexedVerts after 
+// todo: use tbl for IndexedVerts after adding sub-tables
 
-// todo: draw histogram from array
-// todo: draw variance per pixel when graph of values ends up sub-pixel
-// idea: visualize memory layout with hex numbers
-// idea: use libtcc to interpret a struct declaration for the type of tbl array? 
-// idea: use field key values in the tbl to interpret the tbl array type?
 
 // todo: move and rename project to LavaViz or any non test name
 // todo: try out tiny/nano file dialog for saving and loading of serialized data 
@@ -68,6 +64,13 @@
 // todo: make a load button or menu to load serialized files - would need to have a visualizer specific simdb that would keep the files? 
 // todo: make label switches not only turn keys on and off, but fade their transparency too?
 // todo: keep databases in memory after listing them?
+
+// idea: draw histogram from array
+// idea: draw variance per pixel when graph of values ends up sub-pixel
+// idea: zoom in on array visualization by clicking on a place in the graph or histogram - graph would zoom in on a section in memory - histogram would need to show the indices that are within a certain value range
+// idea: visualize memory layout with hex numbers
+// idea: use libtcc to interpret a struct declaration for the type of tbl array? 
+// idea: use field key values in the tbl to interpret the tbl array type?
 // idea: look into drag and drop to load indexed verts objects by dragging from a file
 // idea: ability to display points of an indexed verts type as numbers - this would give the ability to have numbers floating in space - could be take care of with a specialized tbl
 
@@ -363,9 +366,20 @@ void           buttonCallback(str key, bool pushed)
 void            dbLstCallback(bool pressed)
 {
   if(pressed){
+    str  name;
+    if(vd.ui.dbNameIdx>=0 && vd.ui.dbNameIdx<vd.ui.dbNames.size()){
+      name = vd.ui.dbNames[vd.ui.dbNameIdx];
+    }
+
     vd.ui.dbNames = simdb_listDBs();                            // all of these are globals
+    auto iter = find( ALL(vd.ui.dbNames), name);
+    if(iter != vd.ui.dbNames.end()){
+      vd.ui.dbNameIdx = iter - vd.ui.dbNames.begin();
+    }else{ vd.ui.dbNameIdx = 0; }                                                        // if the name isn't found in the new listing, then just reset to the first in the list of db names
+
     if(vd.ui.dbLst){
       vd.ui.dbLst->setItems(vd.ui.dbNames);
+      vd.ui.dbLst->setSelectedIndex(vd.ui.dbNameIdx);
     }
     vd.ui.screen.performLayout();
   }
@@ -763,6 +777,7 @@ ENTRY_DECLARATION
       vd.ui.dbLstIdx   =  -1;
       vd.ui.nvg        =  nullptr;
       vd.ui.showGuide  =  true;
+      vd.ui.dbNameIdx  =   0;
     }
     SECTION(glfw and glew)
     {
@@ -785,17 +800,19 @@ ENTRY_DECLARATION
       {
         vd.ui.keyLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 2, 5);
         vd.ui.keyWin = new Window(&vd.ui.screen,  "");
-        auto spcr1   = new Label(vd.ui.keyWin, "");
-        auto spcr2   = new Label(vd.ui.keyWin, "");
-        auto spcr3   = new Label(vd.ui.keyWin, "");
+        auto spcr1   = new Label(vd.ui.keyWin,    "");
+        auto spcr2   = new Label(vd.ui.keyWin,    "");
+        auto spcr3   = new Label(vd.ui.keyWin,    "");
         vd.ui.dbLst  = new ComboBox(vd.ui.keyWin, {"None"} );
         vd.ui.dbLst->setChangeCallback( dbLstCallback );
         dbLstCallback(true);
         vd.ui.dbLst->setCallback([](int i){                                          // callback for the actual selection
-          if(i < vd.ui.dbNames.size()){
-            str name = vd.ui.dbNames[i];
-            initSimDB(name);
+          if(i < vd.ui.dbNames.size() && i!=vd.ui.dbNameIdx){
+            vd.ui.dbNameIdx = i;
+            vd.ui.dbName = vd.ui.dbNames[i];
+            initSimDB(vd.ui.dbName);
             refreshDB(&vd);
+            vd.ui.dbLst->setSelectedIndex(i);
           }
           vd.ui.screen.performLayout();
         });
@@ -803,7 +820,7 @@ ENTRY_DECLARATION
         auto spcr5   = new Label(vd.ui.keyWin, "");
         auto spcr6   = new Label(vd.ui.keyWin, "");
 
-        vd.ui.dbLstIdx = vd.ui.keyWin->childIndex(vd.ui.dbLst);                                  // only done once so not a problem even though it is a linear search
+        vd.ui.dbLstIdx = vd.ui.keyWin->childIndex(vd.ui.dbLst);                          // only done once so not a problem even though it is a linear search
         vd.ui.keyWin->setLayout(vd.ui.keyLay);
         vd.ui.dbLst->setSide(Popup::Left);
 
