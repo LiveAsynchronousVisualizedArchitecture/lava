@@ -51,12 +51,11 @@
 // -todo: make sure selecting same db doesn't close the db
 // -todo: fix wrong simdb on first switch - problem is index not being changed when the dbNames is updated? - also needed to change setSelectionIndex(int) on the nanogui ComboBox
 
+// todo: use tbl for IndexedVerts after adding sub-tables
 // todo: fix tbl visualization cells going outside the bounds of bounding box - need to wrap sooner, possibly based on more margins
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
 //       |  visualize the fit position and camera frustum in real time to debug
-// todo: use tbl for IndexedVerts after adding sub-tables
-
 
 // todo: move and rename project to LavaViz or any non test name
 // todo: try out tiny/nano file dialog for saving and loading of serialized data 
@@ -372,7 +371,7 @@ void            dbLstCallback(bool pressed)
     }
 
     vd.ui.dbNames = simdb_listDBs();                            // all of these are globals
-    auto iter = find( ALL(vd.ui.dbNames), name);
+    auto     iter = find( ALL(vd.ui.dbNames), name);
     if(iter != vd.ui.dbNames.end()){
       vd.ui.dbNameIdx = iter - vd.ui.dbNames.begin();
     }else{ vd.ui.dbNameIdx = 0; }                                                        // if the name isn't found in the new listing, then just reset to the first in the list of db names
@@ -579,7 +578,7 @@ f32       drawStrs(NVGcontext* nvg, tblstr const& strs, tblv2 const& ofsts, f32 
 
   return h;
 }
-f32      drawGraph(NVGcontext* nvg, tblu const& t, bnd2f b)
+f32      drawGraph(NVGcontext* nvg, tblu   const&    t, bnd2f b)
 {
   using namespace std;
 
@@ -637,12 +636,12 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
   f32    dh = 0.f;                                                                         // dh is draw height
   SECTION(draw fields)
   {
-    labels.push_back( toString("sizeBytes:  ",    t.sizeBytes())    );
-    labels.push_back( toString("capacity:  ",     t.capacity())     );
-    labels.push_back( toString("size:  ",         t.size())         );
-    labels.push_back( toString("map elems:  ",    t.elems())        );
-    labels.push_back( toString("map capacity:  ", t.map_capacity()) );
-    labels.push_back( toString("child data:  ",   t.childSize())    );
+    labels.push_back( toString("sizeBytes:  ",     t.sizeBytes())      );
+    labels.push_back( toString("capacity:  ",      t.capacity())       );
+    labels.push_back( toString("size:  ",          t.size())           );
+    labels.push_back( toString("map elems:  ",     t.elems())          );
+    labels.push_back( toString("map capacity:  ",  t.map_capacity())   );
+    labels.push_back( toString("child capcity:  ", t.child_capacity()) );
     TO(labels.size(),i){ ofsts.push_back( strOfst(nvg,labels[i]) ); }
     TO(ofsts.size(),i){ mxY = max<f32>(mxY, ofsts[i].y); }
 
@@ -650,7 +649,7 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
   }
 
   o.x  = x+margin;
-  o.y += dh + margin*2; // mxY+margin*3.f;                                                                      // o is offset
+  o.y += dh + margin*2;                                                                   // o is offset
   drawLine(nvg, x, o.y-margin, w-x-margin*2);
   SECTION(draw key value pairs)
   {
@@ -669,7 +668,7 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
   }
 
   o.x   =  x+margin;
-  o.y  +=  dh + margin*2; // mxY+margin*3.f;
+  o.y  +=  dh + margin*2;
   drawLine(nvg, o.x-margin, o.y-margin, w-x-margin*2);
   SECTION(draw array elements)
   {
@@ -855,43 +854,51 @@ ENTRY_DECLARATION
     //ts.push_back(s);
 
     tbl<f64> chld;
-    chld.push_back(.1);
-    chld.push_back(.2);
+    chld.push(.1);
+    chld.push(.2);
+    
+    //tst("wat") =    84;
+    //KV kv      =  tst("child");
+    //kv         =  chld;
+    tst("child") =  chld;
+    tst.flatten();
+    
+    //tst("child")  =  chld;
 
-    tst("wat")       =   84;
-    tst("bamf")      =   (u64)36789;
-    tst("skidoosh")  =   (u64)6371;
-    tst("wat")       =   464;
-    tst("luv and peace") = 99;
-    tst.put("squidoosh", (u64)109);
-    tst.put("zzz", (u64)(21) );
-    tst.put("aaa", (u64)(7217) );
+    //tst("wat")       =   84;
+    //tst("bamf")      =   (u64)36789;
+    //tst("skidoosh")  =   (u64)6371;
+    //tst("wat")       =   464;
+    //tst("luv and peace") = 99;
+    //tst.put("squidoosh", (u64)109);
+    //tst.put("zzz", (u64)(21) );
+    //tst.put("aaa", (u64)(7217) );
 
-    //tst.expand();
-    //tst.expand();
-    //tst.expand();
-    //tst.expand();
-    //tst.expand();
+    ////tst.expand();
+    ////tst.expand();
+    ////tst.expand();
+    ////tst.expand();
+    ////tst.expand();
 
-    tst.push(82);
-    tst.push(83);
-    tst.push(84);
-    tst.push(85);
-    tst.push(0);
-    tst.push(1);
-    tst.push(6);
-    tst.push(101);
-    tst.push(45);
-    tst.push({0,1,6,101,45});
-    tst.push({0,1,6,101, 45, 86, 87, 33, 45,45,45,45,45,45,24 });
-    //tst.push({0,1,2,3,4,5,6,7,8,9});
-    TO(20,i){ tst.push(i); }
-    TO(12,i){   tst.push(i*i); }
-    FROM(12,i){ tst.push(i*i); }
+    //tst.push(82);
+    //tst.push(83);
+    //tst.push(84);
+    //tst.push(85);
+    //tst.push(0);
+    //tst.push(1);
+    //tst.push(6);
+    //tst.push(101);
+    //tst.push(45);
+    //tst.push({0,1,6,101,45});
+    //tst.push({0,1,6,101, 45, 86, 87, 33, 45,45,45,45,45,45,24 });
+    ////tst.push({0,1,2,3,4,5,6,7,8,9});
+    //TO(20,i){ tst.push(i); }
+    //TO(12,i){   tst.push(i*i); }
+    //FROM(12,i){ tst.push(i*i); }
 
-    auto tst2 = tst;
-    sort(ALL(tst2));
-    TO(tst2.size(),i){ tst.push( tst2[i] ); }
+    //auto tst2 = tst;
+    //sort(ALL(tst2));
+    //TO(tst2.size(),i){ tst.push( tst2[i] ); }
 
   }
 
@@ -1005,7 +1012,7 @@ ENTRY_DECLARATION
       auto h = vd.ui.h - vd.ui.keyWin->height();
 
       nvgBeginFrame(vd.ui.nvg, vd.ui.w, vd.ui.h, 1.f);             // vd.ui.w / (f32)vd.ui.h);
-        drawTbl(vd.ui.nvg, tst, (f32)w, (f32)h, 25, 50, 20, 10);
+        drawTbl(vd.ui.nvg, tst("chld"), (f32)w, (f32)h, 25, 50, 20, 10);
       nvgEndFrame(vd.ui.nvg);
     }
     SECTION(nanogui)

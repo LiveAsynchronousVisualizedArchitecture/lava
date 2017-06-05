@@ -268,7 +268,7 @@ void Screen::initialize(GLFWwindow *window, bool shutdownGLFWOnDestruct) {
 
 #if defined(_WIN32) || defined(__linux__)
     if (mPixelRatio != 1 && !mFullscreen)
-        glfwSetWindowSize(window, mSize.x() * mPixelRatio, mSize.y() * mPixelRatio);
+        glfwSetWindowSize(window, (int)(mSize.x()*mPixelRatio), (int)(mSize.y()*mPixelRatio));
 #endif
 
 #if defined(NANOGUI_GLAD)
@@ -350,7 +350,7 @@ void Screen::setSize(const Vector2i &size) {
     Widget::setSize(size);
 
 #if defined(_WIN32) || defined(__linux__)
-    glfwSetWindowSize(mGLFWWindow, size.x() * mPixelRatio, size.y() * mPixelRatio);
+    glfwSetWindowSize(mGLFWWindow, (int)(size.x()*mPixelRatio), (int)(size.y()*mPixelRatio) );
 #else
     glfwSetWindowSize(mGLFWWindow, size.x(), size.y());
 #endif
@@ -408,9 +408,9 @@ void Screen::drawWidgets() {
             Vector2i pos = widget->absolutePosition() +
                            Vector2i(widget->width() / 2, widget->height() + 10);
 
-            nvgTextBounds(mNVGContext, pos.x(), pos.y(),
+            nvgTextBounds(mNVGContext, (float)pos.x(), (float)pos.y(),
                             widget->tooltip().c_str(), nullptr, bounds);
-            int h = (bounds[2] - bounds[0]) / 2;
+            int h = (int)( (bounds[2] - bounds[0]) / 2 );
             if (h > tooltipWidth / 2) {
                 nvgTextAlign(mNVGContext, NVG_ALIGN_CENTER | NVG_ALIGN_TOP);
                 nvgTextBoxBounds(mNVGContext, pos.x(), pos.y(), tooltipWidth,
