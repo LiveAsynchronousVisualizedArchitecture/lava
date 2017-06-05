@@ -21,8 +21,12 @@
 // -todo: put back static KV in error_kv()
 // -todo: make cast types to cast to 64 bit equivilents
 // -todo: cut types down to just u64, i64, double, string etc
+// -todo: add childData() and childDataSize() functions
 
 // todo: work on flattening tbls into with child data section
+//       | still need 'table of intrinsic type' type definitions, even if the map only has 64 bit types 
+//       | start with flattening tables into child section
+//      -| is a child data offset variable needed? - can it be made from capacity, sizeof(T), and map_capacity() ? - try that first
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
 // | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
 // | does this imply that there should be a separate array type or is specializing string enough? 
@@ -39,11 +43,12 @@
 // todo: make constructor that takes only an address to the start of a tbl memory span - just has to offset it by memberBytes()
 // todo: make flatten method that has creates a new tbl with no extra capacity and takes all tbl references and makes them into offset/children tbls that are stored in the sub-tbl segment - instead of child type, make a read only type? read only could have template specializations or static asserts that prevent changing the tbl or the KV objects from it
 // todo: make non owned type always read only? - still need owned and non-owned types within tbl
+
 // todo: make resize() - should there be a resize()? only affects array?
 // todo: use inline assembly to vectorize basic math operations
 // todo: use the restrict keyword on basic math operations?
 // todo: put an assert that the two tbl pointers are not the same
-
+// todo: move size to be the 8 bytes before m_mem
 // todo: try template constructor that returns a tbl<type> with a default value set? - can't have a constructor that reserves elems with this? would need a reserve_elems() function? reserve_elems() not needed since adding a key will allocate map_capacity memory  - will have to try after turning into a template
 // todo: make copy use resize? - should it just be a memcpy?
 // todo: make begin and end iterators to go with C++11 for loops - loop through keys value pairs?
@@ -115,6 +120,17 @@ public:                                                                         
   using   i64   =   int64_t;
   using   f32   =     float;
   using   f64   =    double;
+
+  using   tu8   =  tbl<u8>;
+  using   tu16  =  tbl<u16>;
+  using   tu32  =  tbl<u32>;
+  using   tu64  =  tbl<u64>;
+  using   ti8   =  tbl<i8>;
+  using   ti16  =  tbl<i16>;
+  using   ti32  =  tbl<i32>;
+  using   ti64  =  tbl<i64>;
+  using   tf32  =  tbl<f32>;
+  using   tf64  =  tbl<f64>;
 
   //using   T     =       i32;
 
@@ -285,7 +301,8 @@ private:
   }
   void              cp(tbl const& l)
   {
-    reserve(l.size(), l.map_capacity() ); // l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
+    //reserve(l.size(), l.map_capacity() ); // l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
+    reserve(l.size(), l.elems() ); // l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
     TO(l.size(),i) push(l[i]); 
     
     auto e = l.elemStart();
@@ -332,19 +349,19 @@ private:
 
 public:  
   enum Type
-  {                                                                           // 10 number types, 10 table variants + empty = 21 total - at least 5 bits needed
+  {                                                                                      // 10 number types, 10 table variants + empty = 21 total - at least 5 bits needed
     TABLE      =  1<<4,
     SIGNED     =  1<<3,
     INTEGER    =  1<<2,
-    BITS_8     =     0,                    // 2^3 is  8 for  8 bit depth
-    BITS_16    =     1,                    // 2^4 is 16 for 16 bit depth
-    BITS_32    =  1<<1,                    // 2^5 is 32 for 32 bit depth
-    BITS_64    =  1<<1 | 1,                // 2^6 is 64 for 64 bit depth
+    BITS_8     =     0,                    // 2^3 is  8 for  8 bit depth - 0b00
+    BITS_16    =     1,                    // 2^4 is 16 for 16 bit depth - 0b01
+    BITS_32    =  1<<1,                    // 2^5 is 32 for 32 bit depth - 0b10
+    BITS_64    =  1<<1 | 1,                // 2^6 is 64 for 64 bit depth - 0b11
     BITS_MASK  =  BITS_64,
 
       ERR      =  ~INTEGER & ~SIGNED & ~BITS_32,
-     NONE      =  ~INTEGER & ~SIGNED & ~BITS_16,                                    // ~TABLE,                              // INTEGER bit turned off, SIGNED bit turned off and TABLE bit turned off, meanin unsigned float table, which is not a viable real type of course
-    EMPTY      =  ~INTEGER & ~SIGNED,                                               // a floating point number can't be unsigned, so this scenario is used for an 'empty' state
+     NONE      =  ~INTEGER & ~SIGNED & ~BITS_16,                                         // ~TABLE,                              // INTEGER bit turned off, SIGNED bit turned off and TABLE bit turned off, meanin unsigned float table, which is not a viable real type of course
+    EMPTY      =  ~INTEGER & ~SIGNED,                                                    // a floating point number can't be unsigned, so this scenario is used for an 'empty' state
 
      U64       =  INTEGER | BITS_64,
      I64       =  INTEGER | BITS_64 | SIGNED,
@@ -358,14 +375,13 @@ public:
   template<> struct typenum<u64>   { static const Type num =   U64; };
   template<> struct typenum<i64>   { static const Type num =   I64; };
   template<> struct typenum<f64>   { static const Type num =   F64; };
-  //template<> struct typenum<tU64>  { static const Type num =  tU64; }; 
-  //template<> struct typenum<tI64>  { static const Type num =  tI64; }; 
-  //template<> struct typenum<tF64>  { static const Type num =  tF64; }; 
   template<> struct typenum<long>  { static const Type num =   I64; };
   template<> struct typenum<unsigned long> { static const Type num = U64; };
+  template<> struct typenum<tu64>  { static const Type num =  tU64; }; 
+  template<> struct typenum<ti64>  { static const Type num =  tI64; }; 
+  template<> struct typenum<tf64>  { static const Type num =  tF64; }; 
 
-  // cast types
-  template<class C> struct typecast { using type = C;   };
+  template<class C> struct typecast { using type = C;   };                               // cast types
   template<> struct typecast<i8>    { using type = i64; };
   template<> struct typecast<i16>   { using type = i64; };
   template<> struct typecast<i32>   { using type = i64; };
@@ -373,7 +389,6 @@ public:
   template<> struct typecast<u16>   { using type = u64; };
   template<> struct typecast<u32>   { using type = u64; };
   template<> struct typecast<f32>   { using type = f64; };
-
 
   union   HshType
   {
@@ -538,7 +553,7 @@ public:
   u8*     m_mem;
  
   tbl() : m_mem(nullptr) {}
-  tbl(u64 size){ init(size); }                                             // have to run default constructor here?
+  tbl(u64 size){ init(size); }                                                           // have to run default constructor here?
   tbl(u64 size, T const& value)
   {
     init(size);
@@ -622,7 +637,7 @@ public:
   tbl     operator/ (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
   tbl     operator% (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
 
-  template<class V> KV&   put(const char* key, V val)
+  template<class V> KV& put(const char* key, V val)
   {
     return this->operator()(key) = val;
   }
@@ -686,6 +701,14 @@ public:
   T*             data() const
   {
     return (T*)m_mem;
+  }
+  void*     childData() const
+  {
+    return elemStart() + map_capacity();                                                      // elemStart return a KV* so map_capacity will increment that pointer by the map_capacity * sizeof(KV)
+  }
+  u64       childSize() const
+  {
+    return sizeBytes() - memberBytes() - capacity()*sizeof(T) - map_capacity()*sizeof(KV);
   }
   void*      memStart() const
   {

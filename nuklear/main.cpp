@@ -50,6 +50,7 @@
 // -todo: draw graph of array values
 
 // todo: fix wrong simdb on first switch
+// todo: fix tbl visualization cells going outside the bounds of bounding box - need to wrap sooner, possibly based on more margins
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
 //       |  visualize the fit position and camera frustum in real time to debug
@@ -627,6 +628,7 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
     labels.push_back( toString("size:  ",         t.size())         );
     labels.push_back( toString("map elems:  ",    t.elems())        );
     labels.push_back( toString("map capacity:  ", t.map_capacity()) );
+    labels.push_back( toString("child data:  ",   t.childSize())    );
     TO(labels.size(),i){ ofsts.push_back( strOfst(nvg,labels[i]) ); }
     TO(ofsts.size(),i){ mxY = max<f32>(mxY, ofsts[i].y); }
 
@@ -831,9 +833,13 @@ ENTRY_DECLARATION
       }
     }
 
-    str s = "wat";
-    vecstr ts; ts.reserve(5);
-    ts.push_back(s);
+    //str s = "wat";
+    //vecstr ts; ts.reserve(5);
+    //ts.push_back(s);
+
+    tbl<f64> chld;
+    chld.push_back(.1);
+    chld.push_back(.2);
 
     tst("wat")       =   84;
     tst("bamf")      =   (u64)36789;
@@ -1000,7 +1006,7 @@ ENTRY_DECLARATION
       vd.ui.screen.drawContents();
       vd.ui.screen.drawWidgets();
     }
-    SECTION(nanovg | frames per second and color under cursor) 
+    SECTION(nanovg | tbl visualization, frames per second, color under cursor) 
     {
       nvgBeginFrame(vd.ui.nvg, vd.ui.w, vd.ui.h, 1.f); // vd.ui.w/(f32)vd.ui.h);
         f32  tb = 0;
