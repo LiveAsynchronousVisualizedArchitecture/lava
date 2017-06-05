@@ -53,7 +53,7 @@
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
 //       |  visualize the fit position and camera frustum in real time to debug
-// todo: use tbl for IndexedVerts
+// todo: use tbl for IndexedVerts after 
 
 // todo: draw histogram from array
 // todo: draw variance per pixel when graph of values ends up sub-pixel
@@ -635,19 +635,16 @@ void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f,
 
   o.x  = x+margin;
   o.y += dh + margin*2; // mxY+margin*3.f;                                                                      // o is offset
-
   drawLine(nvg, x, o.y-margin, w-x-margin*2);
-
   SECTION(draw key value pairs)
   {
     labels.clear();
     auto e = t.elemStart();
     TO(t.map_capacity(),i) if(!e[i].isEmpty()){
-      labels.push_back( toString(e[i].key,":  ",e[i].val) );
+      labels.push_back( toString(e[i].key,":  ", e[i].val) );
     }
     sort( ALL(labels) );
     ofsts.clear();
-    //new (&ofsts) tblv2;
     TO(labels.size(),i){ ofsts.push_back(strOfst(nvg, labels[i])); }
     mxY=0.f;
     TO(ofsts.size(),i){ mxY = max<f32>(mxY, ofsts[i].y); }
@@ -838,11 +835,11 @@ ENTRY_DECLARATION
     vecstr ts; ts.reserve(5);
     ts.push_back(s);
 
-    tst("wat")       =   (u64)84;
+    tst("wat")       =   84;
     tst("bamf")      =   (u64)36789;
     tst("skidoosh")  =   (u64)6371;
-    tst("wat")       =   (u64)464;
-    tst("luv and peace") = (u64)99;
+    tst("wat")       =   464;
+    tst("luv and peace") = 99;
     tst.put("squidoosh", (u64)109);
     tst.put("zzz", (u64)(21) );
     tst.put("aaa", (u64)(7217) );
