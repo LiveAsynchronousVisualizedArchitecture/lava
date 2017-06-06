@@ -861,7 +861,9 @@ ENTRY_DECLARATION
     //KV kv      =  tst("child");
     //kv         =  chld;
     tst("child") =  chld;
-    tst.flatten();
+    KV::tf64 chldp = tst("child");
+    //tst = c;
+    //tst.flatten();
     
     //tst("child")  =  chld;
 
@@ -1012,7 +1014,8 @@ ENTRY_DECLARATION
       auto h = vd.ui.h - vd.ui.keyWin->height();
 
       nvgBeginFrame(vd.ui.nvg, vd.ui.w, vd.ui.h, 1.f);             // vd.ui.w / (f32)vd.ui.h);
-        drawTbl(vd.ui.nvg, tst("chld"), (f32)w, (f32)h, 25, 50, 20, 10);
+        //drawTbl(vd.ui.nvg, tst("chld"), (f32)w, (f32)h, 25, 50, 20, 10);
+        drawTbl(vd.ui.nvg, tst, (f32)w, (f32)h, 25, 50, 20, 10);
       nvgEndFrame(vd.ui.nvg);
     }
     SECTION(nanogui)
