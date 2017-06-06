@@ -28,12 +28,17 @@
 // -todo: increment curChild
 // -todo: change KV to be an offset with an offset type
 // -todo: make reserve take a child data parameter
-
-// todo: change tbl types to store m_mem instead of the memStart()
-// todo: work on flattening tbls into with child data section
-//       | start with flattening tables into child section
+// -todo: change tbl types to store m_mem instead of the memStart() - changed to store pointer to table itself to make things easier, not storing just the pointer to the heap
+// -todo: store and retrieve a reference and a pointer to a table
+// -todo: copy tbl out of a KV reference, then copy it out of a KV directly
+// -todo: work on flattening tbls into with child data section
+//      -| start with flattening tables into child section
 //      -| still need 'table of intrinsic type' type definitions, even if the map only has 64 bit types 
 //      -| is a child data offset variable needed? - can it be made from capacity, sizeof(T), and map_capacity() ? - try that first
+// -todo: fix bit flags made from flipped flags
+// -todo: fix type turning to EMPTY when bit combined with CHILD
+
+// todo: retrieve child table from a flattened table
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
 // | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
 // | does this imply that there should be a separate array type or is specializing string enough? 
@@ -128,37 +133,64 @@ public:
   using   i64   =   int64_t;
   using   f32   =     float;
   using   f64   =    double;
+  using  Type   =        u8;
 
-  enum Type
-  {                                                                                      // 10 number types, 10 table variants + empty = 21 total - at least 5 bits needed
-    CHILD      =  1<<5,
-    TABLE      =  1<<4,
-    SIGNED     =  1<<3,
-    INTEGER    =  1<<2,
-    BITS_8     =     0,                    // 2^3 is  8 for  8 bit depth - 0b00
-    BITS_16    =     1,                    // 2^4 is 16 for 16 bit depth - 0b01
-    BITS_32    =  1<<1,                    // 2^5 is 32 for 32 bit depth - 0b10
-    BITS_64    =  1<<1 | 1,                // 2^6 is 64 for 64 bit depth - 0b11
-    BITS_MASK  =  BITS_64,
+  //enum Type
+  //{                                                                                      // 10 number types, 10 table variants + empty = 21 total - at least 5 bits needed
+  //  CHILD      =  1<<5,
+  //  TABLE      =  1<<4,
+  //  SIGNED     =  1<<3,
+  //  INTEGER    =  1<<2,
+  //  BITS_8     =     0,                    // 2^3 is  8 for  8 bit depth - 0b00
+  //  BITS_16    =     1,                    // 2^4 is 16 for 16 bit depth - 0b01
+  //  BITS_32    =  1<<1,                    // 2^5 is 32 for 32 bit depth - 0b10
+  //  BITS_64    =  1<<1 | 1,                // 2^6 is 64 for 64 bit depth - 0b11
+  //  BITS_MASK  =  BITS_64,
+  //  CLEAR      =  BITS_8,
+  //
+  //  ERR        =  ~INTEGER & ~SIGNED & ~BITS_32,
+  //  NONE       =  ~INTEGER & ~SIGNED & ~BITS_16,                                         // ~TABLE,                              // INTEGER bit turned off, SIGNED bit turned off and TABLE bit turned off, meanin unsigned float table, which is not a viable real type of course
+  //  EMPTY      =  ~INTEGER & ~SIGNED,                                                    // a floating point number can't be unsigned, so this scenario is used for an 'empty' state
+  //
+  //  U64        =  INTEGER | BITS_64,
+  //  I64        =  INTEGER | BITS_64 | SIGNED,
+  //  F64        =  BITS_64,
+  //
+  //  tU64       =  TABLE | INTEGER | BITS_64,
+  //  tI64       =  TABLE | INTEGER | BITS_64 | SIGNED,
+  //  tF64       =  TABLE | BITS_64,
+  //
+  //  cU64       =  CHILD | tU64,
+  //  cI64       =  CHILD | tI64,
+  //  cF64       =  CHILD | tF64
+  //};
 
-    ERR        =  ~INTEGER & ~SIGNED & ~BITS_32,
-    NONE       =  ~INTEGER & ~SIGNED & ~BITS_16,                                         // ~TABLE,                              // INTEGER bit turned off, SIGNED bit turned off and TABLE bit turned off, meanin unsigned float table, which is not a viable real type of course
-    EMPTY      =  ~INTEGER & ~SIGNED,                                                    // a floating point number can't be unsigned, so this scenario is used for an 'empty' state
+  static const u8   MASK       =  0x3F;
+  static const u8   CHILD      =  1<<5;
+  static const u8   TABLE      =  1<<4;
+  static const u8   SIGNED     =  1<<3;
+  static const u8   INTEGER    =  1<<2;
+  static const u8   BITS_8     =     0;                    // 2^3 is  8 for  8 bit depth - 0b00
+  static const u8   BITS_16    =     1;                    // 2^4 is 16 for 16 bit depth - 0b01
+  static const u8   BITS_32    =  1<<1;                    // 2^5 is 32 for 32 bit depth - 0b10
+  static const u8   BITS_64    =  1<<1 | 1;                // 2^6 is 64 for 64 bit depth - 0b11
+  static const u8   BITS_MASK  =  BITS_64;
+  static const u8   CLEAR      =  BITS_8;
+  static const u8   ERR        =  ~INTEGER & ~SIGNED & ~BITS_32 & MASK;
+  static const u8   NONE       =  ~INTEGER & ~SIGNED & ~BITS_16 & MASK;                                         // ~TABLE,                              // INTEGER bit turned off, SIGNED bit turned off and TABLE bit turned off, meanin unsigned float table, which is not a viable real type of course
+  static const u8   EMPTY      =  ~INTEGER & ~SIGNED & MASK;     // 0b00111111;                                       // a floating point number can't be unsigned, so this scenario is used for an 'empty' state
+  static const u8   U64        =  INTEGER | BITS_64;
+  static const u8   I64        =  INTEGER | BITS_64 | SIGNED;
+  static const u8   F64        =  BITS_64;
+  static const u8   tU64       =  TABLE | INTEGER | BITS_64;
+  static const u8   tI64       =  TABLE | INTEGER | BITS_64 | SIGNED;
+  static const u8   tF64       =  TABLE | BITS_64;
+  static const u8   cU64       =  CHILD | tU64;
+  static const u8   cI64       =  CHILD | tI64;
+  static const u8   cF64       =  CHILD | tF64;
 
-    U64        =  INTEGER | BITS_64,
-    I64        =  INTEGER | BITS_64 | SIGNED,
-    F64        =  BITS_64,
-
-    tU64       =  TABLE | INTEGER | BITS_64,
-    tI64       =  TABLE | INTEGER | BITS_64 | SIGNED,
-    tF64       =  TABLE | BITS_64,
-
-    cU64       =  CHILD | tU64,
-    cI64       =  CHILD | tI64,
-    cF64       =  CHILD | tF64
-  };
-
-  struct { Type type : 6; u32 hash: 26; };
+  //struct { Type type : 6; u32 hash: 26; };
+  struct { u32 type : 6; u32 hash: 26; };
   u32 as_u32;
 
   HshType() : 
@@ -354,7 +386,7 @@ private:
   void         destroy()
   { 
     if(m_mem){
-      T* a = (T*)m_mem;
+      T*    a = (T*)m_mem;
       auto sz = size();
       TO(sz,i){
         a[i].T::~T(); // run the destructor manually before freeing the memory
@@ -449,8 +481,8 @@ public:
        if(!expand(false, true)) return KV::error_kv();
 
     HshType hh;
-    hh.hash = HashStr(key);
-    u32 hsh = hh.hash;                                                 // make sure that the hash is being squeezed into the same bit depth as the hash in HshType
+    hh.hash   =  HashStr(key);
+    u32 hsh   =  hh.hash;                                                 // make sure that the hash is being squeezed into the same bit depth as the hash in HshType
     //u32  hsh  =  HashStr(key);
     KV*   el  =  (KV*)elemStart();                                     // el is a pointer to the elements 
     u64  mod  =  map_capacity();
@@ -813,32 +845,48 @@ public:
     u64 prevCap = child_capacity();
     u64     cap = 0;
     auto      e = elemStart();
-    TO(map_capacity(),i)
-      if(  (e[i].hsh.type & KV::TABLE) && 
-          !(e[i].hsh.type & KV::CHILD) ){                 // if the table bit is set but the child bit is not set
+    auto mapcap = map_capacity();
+    TO(mapcap,i)
+      if(  (e[i].hsh.type & HshType::TABLE) && 
+          !(e[i].hsh.type & HshType::CHILD) ){                 // if the table bit is set but the child bit is not set
+        
         //auto p  =  (tbl<u8>*)(e[i].val);
         //cap    +=  *p >> 16;
         //cap    +=  p->sizeBytes();
 
-        tbl<u8> t;
-        *((u64*)(&t))  =   e[i].val;
-        cap            +=  t.sizeBytes();
+        //tbl<u8> t;
+        //*((u64*)(&t))  =   e[i].val;
+
+        tu8*  t  =  (tu8*)e[i].val;
+        cap     +=  t->sizeBytes();
     }
     reserve(0,0,cap);
     u8* curChild = (u8*)childData() + prevCap;
-    TO(map_capacity(),i)
-      if(  (e[i].hsh.type & KV::TABLE) && 
-          !(e[i].hsh.type & KV::CHILD) ){                 // if the table bit is set but the child bit is not set
+    TO(mapcap,i)
+      if(  (e[i].hsh.type & HshType::TABLE) && 
+          !(e[i].hsh.type & HshType::CHILD) ){                 // if the table bit is set but the child bit is not set
+        
         //auto       p    =  (u64*)(e[i].val);
         //auto szbytes    =  *p >> 16;
-        tbl<u8> t;
-        *((u64*)(&t))  =  e[i].val;
-        auto szbytes   =  t.sizeBytes();
+
+        //tbl<u8> t;
+        //*((u64*)(&t))  =  e[i].val;
+        //auto szbytes   =  t.sizeBytes();
         //auto       p    =  (tbl<u8>*)(e[i].val);
         //auto szbytes    =  p->sizeBytes();
 
-        memcpy(curChild, t.memStart(), szbytes);
-        e[i].hsh.type   =  (KV::Type)(e[i].hsh.type | KV::CHILD);
+        tu8*       t  =  (tu8*)e[i].val;
+        auto szbytes  =  t->sizeBytes();
+
+        memcpy(curChild, t->memStart(), szbytes);
+        //HshType ht;
+        //int chld = HshType::CLEAR | HshType::CHILD;
+        //ht.type  = chld; // | e[i].hsh.type;
+        //u32 type  =  e[i].hsh.type;
+        //type               |=  HshType::CHILD;
+        //e[i].hsh.type       = ht.type; // (HshType::Type)( HshType::CLEAR | HshType::CHILD | e[i].hsh.type );
+        //e[i].hsh.type   =  (HshType::Type)(e[i].hsh.type | HshType::CHILD);
+        e[i].hsh.type  |=  HshType::CHILD;
         e[i].val        =  (u64)curChild - memst;
         curChild       +=  szbytes;
       }
@@ -988,24 +1036,6 @@ struct       KV
   template<> struct typecast<u32>   { using type = u64; };
   template<> struct typecast<f32>   { using type = f64; };
 
-  //union   HshType
-  //{
-  //  struct { Type type : 6; u32 hash: 26; };
-  //  u32 as_u32;
-  //
-  //  HshType() : 
-  //    type(HshType::EMPTY),
-  //    hash(0)
-  //  {}
-  //};
-  //
-  //template<,class SRC> static tu64 cast_mem(u64 const* const src)
-  //{ 
-  //  tu64 t;
-  //  *((u64*)&t) = *src;
-  //  return t;
-  //}
-
   template<class DEST, class SRC> 
   static DEST cast_mem(u64 const* const src)
   { return (DEST)(*((SRC*)src)); }
@@ -1019,7 +1049,7 @@ struct       KV
   KV() : hsh(), val(0) { 
     memset(key, 0, sizeof(Key));
     //hsh.type = Type::NONE;
-    hsh.type = Type::EMPTY;
+    hsh.type = HshType::EMPTY;
   }
   KV(const char* key, u32 hash, u64 val=0) :
     hsh(), val(val)
@@ -1027,7 +1057,7 @@ struct       KV
     //strcpy_s(this->key, sizeof(KV::Key), key);
     memcpy(this->key, key, sizeof(KV::Key) );
     hsh.hash = hash;
-    hsh.type = Type::EMPTY;
+    hsh.type = HshType::EMPTY;
     //hsh.type = NONE;
   }
   KV(KV const& l){ cp(l); }
@@ -1035,8 +1065,6 @@ struct       KV
 
   KV& cp(KV const& l)
   {
-    //memmove(this, &l, sizeof(KV));
-    //memcpy(this, &l, sizeof(KV));
     hsh = l.hsh;
     val = l.val;
     memmove(key, l.key, sizeof(Key) );
@@ -1149,7 +1177,7 @@ struct       KV
     return N();
   }
   bool isEmpty() const {
-    return hsh.type==Type::NONE || hsh.type==Type::EMPTY;
+    return hsh.type==HshType::NONE || hsh.type==HshType::EMPTY;
   }
 
   static KV&    empty_kv()
@@ -1216,6 +1244,27 @@ struct       KV
 
 
 
+
+//union   HshType
+//{
+//  struct { Type type : 6; u32 hash: 26; };
+//  u32 as_u32;
+//
+//  HshType() : 
+//    type(HshType::EMPTY),
+//    hash(0)
+//  {}
+//};
+
+//template<,class SRC> static tu64 cast_mem(u64 const* const src)
+//{ 
+//  tu64 t;
+//  *((u64*)&t) = *src;
+//  return t;
+//}
+
+//memmove(this, &l, sizeof(KV));
+//memcpy(this, &l, sizeof(KV));
 
 //KV kv;
 //memset(&kv, 0, sizeof(KV));

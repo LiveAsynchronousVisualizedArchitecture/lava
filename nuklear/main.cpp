@@ -861,11 +861,26 @@ ENTRY_DECLARATION
     //KV kv      =  tst("child");
     //kv         =  chld;
     tst("child") =  chld;
-    KV kv        =  tst("child");
+    //KV kv        =  tst("child");
     //tf64& chldp  =  kv.operator tf64 &();
     //tf64& chldp  =  kv;
-    tf64* chldp  =  kv.operator tf64 *();
-    Printf("\n%f %f\n", (*chldp)[0], (*chldp)[1] );
+    //tf64* chldp  =  kv.operator tf64 *();
+    tst.flatten();
+    KV       kv  =  tst("child");
+    tf64  chldc  =  kv;  //  tst("child"); //kv;
+    Printf("\n\n %f %f \n\n", chldc[0], chldc[1] );
+    chldc[0] *= 4.f;
+    chldc[1] *= 4.f;
+
+    tf64* chldp  =  tst("child"); //kv;
+    Printf("\n\n %f %f \n\n", (*chldp)[0], (*chldp)[1] );
+    (*chldp)[0] *= 4.f; 
+    (*chldp)[1] *= 4.f;
+
+    tf64& chldr  =  tst("child"); //kv;
+    Printf("\n\n %f %f \n\n", chldr[0], chldr[1] );
+
+
     //tst = c;
     //tst.flatten();
     
