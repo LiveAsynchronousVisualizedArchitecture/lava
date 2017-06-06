@@ -853,6 +853,8 @@ ENTRY_DECLARATION
     //vecstr ts; ts.reserve(5);
     //ts.push_back(s);
 
+    Printf("\n sizeof(KV): %d \n", sizeof(KV) );
+
     tbl<f64> chld;
     chld.push(.1);
     chld.push(.2);
@@ -865,20 +867,21 @@ ENTRY_DECLARATION
     //tf64& chldp  =  kv.operator tf64 &();
     //tf64& chldp  =  kv;
     //tf64* chldp  =  kv.operator tf64 *();
+
     tst.flatten();
-    KV       kv  =  tst("child");
-    tf64  chldc  =  kv;  //  tst("child"); //kv;
-    Printf("\n\n %f %f \n\n", chldc[0], chldc[1] );
-    chldc[0] *= 4.f;
-    chldc[1] *= 4.f;
+    //KV       kv  =  tst("child");
+    //tf64  chldc  =  tst("child"); //kv;  //  tst("child"); //kv;
+    //Printf("\n\n %f %f \n\n", chldc[0], chldc[1] );
+    //chldc[0] *= 4.f;
+    //chldc[1] *= 4.f;
 
     tf64* chldp  =  tst("child"); //kv;
     Printf("\n\n %f %f \n\n", (*chldp)[0], (*chldp)[1] );
     (*chldp)[0] *= 4.f; 
     (*chldp)[1] *= 4.f;
 
-    tf64& chldr  =  tst("child"); //kv;
-    Printf("\n\n %f %f \n\n", chldr[0], chldr[1] );
+    //tf64& chldr  =  tst("child"); //kv;
+    //Printf("\n\n %f %f \n\n", chldr[0], chldr[1] );
 
 
     //tst = c;
