@@ -590,12 +590,6 @@ f32      drawGraph(NVGcontext* nvg, tblu   const&    t, bnd2f b)
   inc = (b.w()-4) / (f32)t.size();
   hgt = b.h()-4;
 
-  //nvgBeginPath(nvg);
-  //  nvgRect(nvg, b.xmn, b.ymn, b.xmx-b.xmn, b.ymx-b.ymn);
-  //  nvgStrokeWidth(nvg, 1.f);
-  //  nvgStrokeColor(nvg, nvgRGBAf(0,.25f,.8f, 1.f));
-  //nvgStroke(nvg);
-
   nvgStrokeWidth(nvg, 1.f);
   nvgStrokeColor(nvg, nvgRGBAf(0,.8f,.25f, 1.f));
   nvgFillColor(nvg, nvgRGBAf(0,.5f,.25f, .5f));
@@ -611,9 +605,6 @@ f32      drawGraph(NVGcontext* nvg, tblu   const&    t, bnd2f b)
   }
 
   return b.ymx - b.ymn;
-
-  //nvgMoveTo(nvg, x, y);
-  //nvgLineTo(nvg, x, y - h*(t[i]/mxf) );
 }
 void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f, f32 y=0.f, f32 sz=50.f, f32 margin=5.f)
 {
@@ -856,9 +847,12 @@ ENTRY_DECLARATION
     Printf("\n sizeof(KV): %d \n", sizeof(KV) );
     Printf("\n sizeof(tbl::fields): %d \n", sizeof(tbl<u8>::fields) );
 
-    tbl<f64> chld;
-    chld.push(.1);
-    chld.push(.2);
+    tbl<u64> chld;
+    chld.push(4);
+    chld.push(8);
+
+    //chld.push(.1);
+    //chld.push(.2);
     
     //tst("wat") =    84;
     //KV kv      =  tst("child");
@@ -871,15 +865,16 @@ ENTRY_DECLARATION
 
     tst.flatten();
     //KV       kv  =  tst("child");
-    //tf64  chldc  =  tst("child"); //kv;  //  tst("child"); //kv;
-    //Printf("\n\n %f %f \n\n", chldc[0], chldc[1] );
+
+    tu64  chldc  =  tst("child"); //kv;  //  tst("child"); //kv;
+    Printf("\n\n %d %d \n\n", chldc[0], chldc[1] );
     //chldc[0] *= 4.f;
     //chldc[1] *= 4.f;
 
-    tf64* chldp  =  tst("child"); //kv;
-    Printf("\n\n %f %f \n\n", (*chldp)[0], (*chldp)[1] );
-    (*chldp)[0] *= 4.f; 
-    (*chldp)[1] *= 4.f;
+    //tf64* chldp  =  tst("child"); //kv;
+    //Printf("\n\n %f %f \n\n", (*chldp)[0], (*chldp)[1] );
+    //(*chldp)[0] *= 4.f; 
+    //(*chldp)[1] *= 4.f;
 
     //tf64& chldr  =  tst("child"); //kv;
     //Printf("\n\n %f %f \n\n", chldr[0], chldr[1] );
@@ -1122,6 +1117,16 @@ ENTRY_DECLARATION
 
 
 
+
+
+//nvgBeginPath(nvg);
+//  nvgRect(nvg, b.xmn, b.ymn, b.xmx-b.xmn, b.ymx-b.ymn);
+//  nvgStrokeWidth(nvg, 1.f);
+//  nvgStrokeColor(nvg, nvgRGBAf(0,.25f,.8f, 1.f));
+//nvgStroke(nvg);
+//
+//nvgMoveTo(nvg, x, y);
+//nvgLineTo(nvg, x, y - h*(t[i]/mxf) );
 
 //char s[TITLE_MAX_LEN]; 
 //

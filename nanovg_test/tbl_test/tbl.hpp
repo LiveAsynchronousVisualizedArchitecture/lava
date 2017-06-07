@@ -41,12 +41,14 @@
 // -todo: make a KVOfst struct that can hold a KV and an offset for the table
 // -todo: make KVOfst contain just a kv reference instead of full KV
 // -todo: turn fields into a struct
+// -todo: make owned functions
+// -todo: make cp and mv constructors use ownership flag - mv constructor can stay the same because it just copies the m_mem pointer
+// -todo: make a non-owned tbl
+// -todo: make destructor use ownership flag
 
-// todo: move ownership from the fields struct to the m_mem pointer
-// todo: make owned functions
-// todo: make constructor use ownership flag
-// todo: make destructor use ownership flag
-// todo: make a non-owned tbl
+// todo: move ownership from the fields struct to the m_mem pointer? - if the ownership flag is set to false in the contiguous memory, no reference will delete it and the owner of the memory will eventually wipe it out
+// todo: destroy any non-child tables in the map 
+// todo: destroy any child tables in the child data 
 // todo: figure out a way to make tbl work with m_mem while pointing to it directly - make m_mem = 0 and if it is 0, pretend it points to it's own location? - need to make an unowned tbl? where to put the owned bit?
 // todo: retrieve child table from a flattened table
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
@@ -462,16 +464,23 @@ struct       KV
 };
 struct   KVOfst
 {
-  KV&        kv;
-  void*    base;
+  KV&         kv;
+  void*     base;
 
-  template<class T> KVOfst(T&& _kv, void* _base=nullptr) :
-    kv(std::forward<T>(_kv)), 
-    base(_base)
-  {
-  }
-  operator tf64*();
-  operator tf64&();
+  KVOfst(KVOfst&  l) :
+    kv(l.kv), base(l.base)
+  {}
+  KVOfst(KVOfst&& r) :
+    kv(r.kv), base(r.base)
+  {}
+  KVOfst(KV&  _kv, void* _base=nullptr) :
+    kv(_kv), base(_base)
+  {}
+  KVOfst(KV&& _kv, void* _base=nullptr) :
+    kv(std::move(_kv)), base(_base)
+  {}
+  
+  operator tu64();
   template<class N> operator N() { return kv.as<N>(); }
   template<class N> KVOfst& operator=(N const& n){ kv = n; return *this; }
 };
@@ -675,7 +684,7 @@ private:
   }
   void         destroy()
   { 
-    if(m_mem){
+    if( m_mem && owned() ){
       T*    a = (T*)m_mem;
       auto sz = size();
       TO(sz,i){
@@ -684,8 +693,6 @@ private:
       free(memStart());
       m_mem = nullptr;
     }
-
-    // todo: will need to destroy any tables in the map here too
   }
   void              cp(tbl const& l)
   {
@@ -701,7 +708,7 @@ private:
         put(e[i].key, e[i].val);
       }
     }else{
-      m_mem = l
+      m_mem = l.m_mem;
     } 
   }
   void              mv(tbl& r)
@@ -743,7 +750,7 @@ private:
 
 public:  
 
-  u8*     m_mem;
+  u8*     m_mem;                                                                         // the only member variable - everything else is a contiguous block of memory
  
   tbl() : m_mem(nullptr){}
   tbl(u64 size){ init(size); }                                                           // have to run default constructor here?
@@ -773,7 +780,7 @@ public:
   KVOfst  operator()(const char* key, bool make_new=true)
   {
     if( !( map_capacity()*0.75f > (float)elems() ) )
-       if(!expand(false, true)) return { KV::error_kv(), 0 };
+       if(!expand(false, true)) return KV::error_kv();
 
     HshType hh;
     hh.hash   =  HashStr(key);
@@ -804,7 +811,7 @@ public:
           //KV   kv       =  el[i];
           //kv.val       +=  (u64)memStart();
           //kv.hsh.type  &=  ~HshType::CHILD;
-          return KVOfst(el[i], this);
+          return KVOfst(el[i], (void*)(this) );
         }else
           return el[i];   //  = KV(key, hsh);
       }else if(dist > wrapDist(el,i,mod) ){
@@ -845,7 +852,7 @@ public:
   tbl     operator/ (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
   tbl     operator% (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
 
-  template<class V> KV& put(const char* key, V val)
+  template<class V> KVOfst put(const char* key, V val)
   {
     return this->operator()(key) = val;
   }
@@ -1188,6 +1195,7 @@ public:
         auto szbytes  =  t->sizeBytes();
 
         memcpy(curChild, t->memStart(), szbytes);
+        ((fields*)curChild)->owned = 0;
         e[i].hsh.type  |=  HshType::CHILD;
         e[i].val        =  (u64)curChild - memst;
         curChild       +=  szbytes;
@@ -1199,19 +1207,6 @@ public:
 private:
   static const u32 HASH_MASK = 0x07FFFFFF;
 
-  static u64  memberBytes()
-  {
-    return sizeof(fields);
-
-    //return sizeof(u64) * 5;
-    //
-    // Memory Layout (5 u64 variables before m_mem)
-    // sizeBytes     -  total number of bytes of the entire memory span
-    // size          -  vector entries
-    // capacity      -  number of elements already allocated in the vector
-    // elems         -  number of map entries 
-    // map_capacity  -  number of elements already allocated for the mapp 
-  }
   static u64  fnv_64a_buf(void const* const buf, u64 len)
   {
     // const u64 FNV_64_PRIME = 0x100000001b3;
@@ -1253,11 +1248,24 @@ private:
   template<class N> static    N   mn(N a, N b){return a<b?a:b;}
 
 public:
+  static u64    memberBytes()
+  {
+    return sizeof(fields);
+
+    //return sizeof(u64) * 5;
+    //
+    // Memory Layout (5 u64 variables before m_mem)
+    // sizeBytes     -  total number of bytes of the entire memory span
+    // size          -  vector entries
+    // capacity      -  number of elements already allocated in the vector
+    // elems         -  number of map entries 
+    // map_capacity  -  number of elements already allocated for the mapp 
+  }
   static u64     size_bytes(u64 count)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
   {
     return memberBytes() + sizeof(T)*count;  // todo: not correct yet, needs to factor in map and child data
   }
-  static tbl      concat_l(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
+  static tbl       concat_l(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
   {
     auto sz = a.size();
     tbl ret(sz + b.size());
@@ -1273,7 +1281,7 @@ public:
 
     return ret;
   }
-  static tbl      concat_r(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
+  static tbl       concat_r(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
   {
     auto sz = a.size();
     tbl ret(sz + b.size());
@@ -1295,27 +1303,62 @@ public:
 
     return ret;
   }
-  static u64   magicNumber(u64 n)
-  {
-    n <<= 16;
-    u8* nn = (u8*)&n;
-    //nn[7]='t'; nn[8]='b';
-    nn[0]='t'; nn[1]='b';
-    return n;
-  }
+  //static u64   magicNumber(u64 n)
+  //{
+  //  n <<= 16;
+  //  u8* nn = (u8*)&n;
+  //  //nn[7]='t'; nn[8]='b';
+  //  nn[0]='t'; nn[1]='b';
+  //  return n;
+  //}
 };
 
-KVOfst::operator tf64*(){ 
-  tf64*  t = (tf64*)((u64)base+kv.val);
-  //t->m_mem = 
-  return t; }
-KVOfst::operator tf64&(){ return *((tf64*)(u64)base+kv.val);  }
+KVOfst::operator tu64()
+{ 
+  //tf64*  tp = (tf64*)((u64)base+kv.val+tbl<tf64>::memberBytes() ); 
+  
+  tu64 tp;
+  tp.m_mem = (u8*)( (u64)base + kv.val + tbl<tu64>::memberBytes() ); 
+  
+  return tp;
+}
 
 #endif
 
 
 
 
+
+//KVOfst(KV const& _kv, void* _base=nullptr) :
+//  kv(_kv), base(_base)
+//{}
+//
+//KVOfst& operator=(KV const& _kv){ kv = _kv; base=nullptr; }
+//
+//KVOfst(KV&& _kv, void* _base) :
+//  kv(_kv), 
+//  base(_base)
+//{}
+//
+//template<class T> KVOfst(KVOfst&& kvo) : 
+//
+//template<class T> KVOfst(T&& _kv, void* _base) :
+//  kv(std::forward<T>(_kv)), 
+//  base(_base)
+//{
+//}
+//
+//operator tf64*();
+//operator tf64&();
+
+//KVOfst::operator tf64*(){ 
+//  tf64*  t = (tf64*)((u64)base+kv.val);
+//  //t->m_mem = 
+//  return t; }
+//
+//u64 taddr = (tf64*)((u64)base+kv.val); 
+//tf64 ret( *tp );
+//((tf64*)taddr);
 
 //void*      memStart() const
 //{
