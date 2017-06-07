@@ -62,17 +62,19 @@
 // -todo: make sure destructor is being run on objects being held once turned into a template
 // -todo: make shrink_to_fit call destroy on the previous allocation
 // -todo: make reserve(), expand() and shrink_to_fit() not work on non-owned tbls
+// -todo: make constructor that takes only an address to the start of a tbl memory span - just has to offset it by memberBytes() - owned check in the copy constructor + move constructor takes care of this already?
 
-// todo: make shrink_to_fit() take into account childData()
+
+// todo: make KV.val as a child table an offset into the child data segment instead of an offset into the whole table memory
+// todo: make shrink_to_fit() take into account childData() - will need to redo both the base pointer and the tbl offset ?
 // todo: make flatten also shrink_to_fit()
 // todo: destroy any non-child tables in the map 
 // todo: destroy any child tables in the child data 
+// todo: make operator-=(const char*) delete a key in the map - need to use a generic del() function
+// todo: make operator()() take integers so that the map can also be used as an iterable list through sub-tables - just make operator()() take an integer offset into elemStart(), then make an iteration cursor through the non-empty elements of the map? - should this make the hash equal the integer passed or should it look up the element directly?
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
 // | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
 // | does this imply that there should be a separate array type or is specializing string enough? 
-// todo: make operator-=(const char*) delete a key in the map
-// todo: make constructor that takes only an address to the start of a tbl memory span - just has to offset it by memberBytes()
-// todo: make operator()() take integers so that the map can also be used as an iterable list through sub-tables - just make operator()() take an integer offset into elemStart(), then make an iteration cursor through the non-empty elements of the map? - should this make the hash equal the integer passed or should it look up the element directly?
 
 // todo: make resize() - should there be a resize()? only affects array?
 // todo: use inline assembly to vectorize basic math operations
@@ -326,6 +328,8 @@ struct       KV
   template<class N> KV& operator=(tbl<N> const& n)
   {
     hsh.type  =  typenum< tbl<N> >::num;
+    //tbl<N>* tp = &n;
+    //n.childData()
     val       =  (u64)&n;
     return *this;
   }
@@ -805,6 +809,9 @@ public:
       { 
         auto type = el[i].hsh.type;
         if( (type&HshType::TABLE) && (type&HshType::CHILD) ){
+          KVOfst kvo( &el[i], (void*)(memStart()) );
+           
+          auto f = (fields*)(el[i].val + (u64)childData());
           return KVOfst( &el[i], (void*)(memStart()) );
         }else
           return KVOfst( &(el[i]) ); //el[i];   //  = KV(key, hsh);
@@ -844,10 +851,7 @@ public:
   tbl     operator/ (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
   tbl     operator% (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
 
-  template<class V> KVOfst put(const char* key, V val)
-  {
-    return this->operator()(key) = val;
-  }
+  template<class V> KVOfst put(const char* key, V val){ return this->operator()(key) = val; }
 
   template<class... V> bool emplace(V&&... val)
   {
@@ -898,19 +902,9 @@ public:
     return kv.hsh.type != EMPTY;
   }
 
-  u64            size() const
-  {
-    if(!m_mem) return 0;
-    return memStart()->size;  
-  }
-  T*             data() const
-  {
-    return (T*)m_mem;
-  }
-  void*     childData() const
-  {
-    return (void*)(elemStart() + map_capacity());                                                      // elemStart return a KV* so map_capacity will increment that pointer by the map_capacity * sizeof(KV)
-  }
+  u64            size() const { return m_mem? memStart()->size : 0; }
+  T*             data() const {return (T*)m_mem; }
+  void*     childData() const { return (void*)(elemStart() + map_capacity()); }                                                      // elemStart return a KV* so map_capacity will increment that pointer by the map_capacity * sizeof(KV)
   u64  child_capacity() const
   {
     auto szb = 0;
@@ -921,30 +915,9 @@ public:
   bool          owned() const  { return m_mem? memStart()->owned : true; }
   void          owned(bool own){ memStart()->owned = own;  }
   auto       memStart() -> fields* { return m_mem? (fields*)(m_mem - memberBytes())  :  nullptr; }
-  auto       memStart() const -> fields const* 
-  {
-    return (fields*)(m_mem - memberBytes());
-  }
-  u64       sizeBytes() const // -> u64
-  {
-    //if(!m_mem) return 0;
-    //u64 sb = *((u64 const*)memStart());
-    //sb >>= 16;
-    //return sb;
-
-    return m_mem?  memStart()->sizeBytes  :  0;
-  }
-  u64        capacity() const
-  {
-    //if(!m_mem) return 0;
-    //return *( ((u64*)memStart()) + 2);
-
-    //if(!m_mem) return 0;
-    //
-    //return (sizeBytes() - memberBytes()) / sizeof(T);  // - size()*sizeof(T)
-
-    return m_mem?  memStart()->capacity  :  0;
-  }
+  auto       memStart() const -> fields const* { return (fields*)(m_mem - memberBytes()); }
+  u64       sizeBytes() const { return m_mem? memStart()->sizeBytes : 0; }
+  u64        capacity() const { return m_mem? memStart()->capacity  : 0; }
   u64           elems() const
   {
     //if(this==nullptr || !m_mem) return 0;
@@ -1052,30 +1025,50 @@ public:
     u64    vecsz = memberBytes() + sz*sizeof(T);
     u64  elemcnt = elems();
     u64    mapsz = elemcnt*sizeof(KV);
-    u64    nxtsz = vecsz + mapsz;
+    u64  chldCap = child_capacity();
+    u64    nxtsz = vecsz + mapsz + chldCap;
+    auto prvChld = childData();
     KV const* el = elemStart();
     u8*     nxtp = (u8*)malloc(nxtsz);
     if(nxtp){
-      u8* p = (u8*)memStart();
+      u8*     p = (u8*)memStart();
       memcpy(nxtp, p, vecsz);
-      KV* nxtel = (KV*)(nxtp+vecsz);
+      auto ff = (fields*)nxtp;
+      KV* nxtel = (KV*)(nxtp+vecsz);                                       // nxtel is next element
       u64   cur = 0;
-      TO(map_capacity(),i){
-        if(el[i].hsh.type!=EMPTY) 
+      TO(map_capacity(),i)
+        if(el[i].hsh.type!= HshType::EMPTY){
           nxtel[cur++] = el[i];
-        } 
+        }
 
       destroy();
       m_mem = nxtp+memberBytes();
-      set_sizeBytes(nxtsz);
-      set_size(sz);
-      set_capacity(sz);
-      set_elems(elemcnt);
-      *mapcap_ptr() = elemcnt;
+      
+      void* chld = childData();
+      memmove(chld, prvChld, chldCap);
+      auto f   =  memStart();
+      f->t     =  't';
+      f->b     =  'b';
+      f->owned =   1;
+      sizeBytes(nxtsz);
+      size(sz);
+      capacity(sz);
+      elems(elemcnt);
+      mapcap(elemcnt);
+
+      //KV& kv = el[i];
+      //KV* e = elemStart();                                                        // now this is the new tabel, not the old one like the call to elemStart() above
+      //TO(map_capacity(),i){
+      //  auto type = e[i].hsh.type;
+      //  if( (type&HshType::TABLE) && (type&HshType::CHILD) )
+      //    e[i].val = (u64)chld + (e[i].val - (u64)prvChld);
+      //}
 
       return true;
     }else 
       return false;
+
+    //*mapcap_ptr() = elemcnt;
   }
   i64            find(const char* key, u32* hash=nullptr) const
   {
@@ -1173,7 +1166,8 @@ public:
         newcap  +=  t->sizeBytes();
     }
     reserve(0,0, prevCap + newcap);
-    u8* curChild = (u8*)childData() + prevCap;
+    u64   chldst = (u64)childData();
+    u8* curChild = (u8*)chldst + prevCap;
     TO(mapcap,i)
       if(  (e[i].hsh.type & HshType::TABLE) && 
           !(e[i].hsh.type & HshType::CHILD) ){                                 // if the table bit is set but the child bit is not set
@@ -1185,7 +1179,7 @@ public:
         f->owned = 0;
 
         e[i].hsh.type  |=  HshType::CHILD;
-        e[i].val        =  (u64)curChild - (u64)memStart();                    // the memory start will likely have changed due to reallocation
+        e[i].val        =  (u64)curChild - chldst; // (u64)memStart();                    // the memory start will likely have changed due to reallocation
         curChild       +=  szbytes;
       }
 
@@ -1296,9 +1290,22 @@ public:
 KVOfst::operator tu64()
 {   
   if(base){
-    tu64 tp;
-    tp.m_mem = (u8*)( (u64)base + kv->val + tbl<u64>::memberBytes() ); 
-    return tp;
+    tu64 t; 
+    //t.m_mem = (u8*)base;
+    //t.m_mem = (u8*)base;
+    //auto f = t.memStart();
+    auto  f = (tu64::fields*)base;
+    t.m_mem = (u8*)(f+1);
+    u64 a  =  ((u64*)t.m_mem)[0];
+    u64 b  =  ((u64*)t.m_mem)[1];
+    u64 chldst = (u64)f + f->capacity*8 + f->mapcap*sizeof(KV) + sizeof(f);
+    u64     cd = (u64)t.childData();
+    tu64 ret;
+    ret.m_mem = (u8*)( chldst + kv->val + tu64::memberBytes() ); 
+
+    auto ff = ret.memStart();
+
+    return ret;
   }else{
     return *((tu64*)kv->val);
   }
@@ -1309,8 +1316,20 @@ KVOfst::operator tu64()
 
 
 
+//if(!m_mem) return 0;
+//u64 sb = *((u64 const*)memStart());
+//sb >>= 16;
+//return sb;
 
+//if(!m_mem) return 0;
+//return *( ((u64*)memStart()) + 2);
 
+//if(!m_mem) return 0;
+//
+//return (sizeBytes() - memberBytes()) / sizeof(T);  // - size()*sizeof(T)
+
+//
+//{ if(!m_mem) return 0; return memStart()->size; }
 
 //free(p); // from shrink_to_fit
 //reorder();

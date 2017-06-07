@@ -864,6 +864,7 @@ ENTRY_DECLARATION
     //tf64* chldp  =  kv.operator tf64 *();
 
     tst.flatten();
+    //tst.shrink_to_fit();
     //KV       kv  =  tst("child");
 
     tu64  chldc  =  tst("child"); //kv;  //  tst("child"); //kv;
