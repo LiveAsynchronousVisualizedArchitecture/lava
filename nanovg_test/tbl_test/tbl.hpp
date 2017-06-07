@@ -39,8 +39,11 @@
 // -todo: fix type turning to EMPTY when bit combined with CHILD
 // -todo: define KV struct early and fill in methods and functions later
 // -todo: make a KVOfst struct that can hold a KV and an offset for the table
+// -todo: make KVOfst contain just a kv reference instead of full KV
 
-// todo: make KVOfst contain just a kv reference instead of full KV
+// todo: turn fields into a struct
+// todo: make a non-owned tbl
+// todo: figure out a way to make tbl work with m_mem while pointing to it directly - make m_mem = 0 and if it is 0, pretend it points to it's own location? - need to make an unowned tbl? where to put the owned bit?
 // todo: retrieve child table from a flattened table
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
 // | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
@@ -455,7 +458,7 @@ struct       KV
 };
 struct   KVOfst
 {
-  KV         kv;
+  KV&        kv;
   void*    base;
 
   template<class T> KVOfst(T&& _kv, void* _base=nullptr) :
@@ -494,40 +497,64 @@ public:
   using   tf32  =  tbl<f32>;
   using   tf64  =  tbl<f64>;
 
-  //using   T     =       i32;
-
-  static u64 magicNumber(u64 n)
+  struct fields 
   {
-    n <<= 16;
-    u8* nn = (u8*)&n;
-    //nn[7]='t'; nn[8]='b';
-    nn[0]='t'; nn[1]='b';
-    return n;
-  }
+    u64      size : 42;
+    u64     elems : 21;
+    u64     owned :  1;
+
+    u64  capacity : 42;
+    u64    mapcap : 22;
+
+    u64 sizeBytes : 48;
+    u64         b :  8;                             // will hold the character 'b'
+    u64         t :  8;                             // will hold the character 't'
+  };
+
+  //using   T     =       i32;
 
 private:
   template<bool OWNED=true> void typed_del(){ if(m_mem) free(memStart()); };   // explicit template specialization to make an owned tbl free it's memory and a non-owned tbl not free it's memory
   template<> void typed_del<false>(){}; 
 
-  auto      mapcap_ptr()       -> u64*       { return (u64*)memStart() + 4;  }
-  auto      mapcap_ptr() const -> u64 const* { return (u64*)memStart() + 4;  }
-  void   set_sizeBytes(u64 bytes) // -> u64
+  //auto      mapcap_ptr()       -> u64*       { return (u64*)memStart() + 4;  }
+  //auto      mapcap_ptr() const -> u64 const* { return (u64*)memStart() + 4;  }
+  //void   set_sizeBytes(u64 bytes) // -> u64
+  //{
+  //  *( (u64*)memStart() ) = magicNumber(bytes);
+  //}
+  void   sizeBytes(u64 bytes)
   {
-    *( (u64*)memStart() ) = magicNumber(bytes);
+    memStart()->sizeBytes = bytes;
+    //*( (u64*)memStart() ) = magicNumber(bytes);
   }
-  void        set_size(u64  size)
+  //void        set_size(u64  size)
+  //{
+  //  *( ((u64*)memStart()) + 1 ) = size;
+  //}
+  void        size(u64  size)
   {
-    *( ((u64*)memStart()) + 1 ) = size;
+    memStart()->size = size;
   }
-  void    set_capacity(u64   cap)
+  void    capacity(u64   cap)
   {
-    *( ((u64*)memStart()) + 2) = cap;
+    memStart()->capacity = cap;
   }
-  void       set_elems(u64 elems)
+  void       elems(u64 elems)
   {
-    *( ((u64*)memStart()) + 3) = elems;
+    memStart()->elems = elems;
   }
-  void      set_mapcap(u64   cap){ *mapcap_ptr() = cap; }
+  void      mapcap(u64 mapcap){ memStart()->mapcap = mapcap; }
+
+  //void    set_capacity(u64   cap)
+  //{
+  //  *( ((u64*)memStart()) + 2) = cap;
+  //}
+  //void       set_elems(u64 elems)
+  //{
+  //  *( ((u64*)memStart()) + 3) = elems;
+  //}
+  //void      set_mapcap(u64   cap){ *mapcap_ptr() = cap; }
   u64              nxt(u64 i, u64 mod) const
   {
     return ++i % mod;
@@ -640,14 +667,31 @@ private:
   }
   void            init(u64 size)
   {
-    u64    szBytes  =  tbl::sizeBytes(size);
+    u64    szBytes  =  tbl::size_bytes(size);
     u8*      memst  =  (u8*)malloc(szBytes);                 // memst is memory start
     m_mem           =  memst + memberBytes();
-    set_sizeBytes(szBytes);
-    set_elems(0);
-    set_capacity(size);
-    set_size(size);
-    *mapcap_ptr() = 0;
+
+    //m_mem           =  memst + memberBytes();
+    //set_sizeBytes(szBytes);
+    //set_elems(0);
+    //set_capacity(size);
+    //set_size(size);
+    //*mapcap_ptr() = 0;
+
+    //sizeBytes(szBytes);
+    //elems(0);
+    //capacity(size);
+    //this->size(size);
+    //mapcap(0);
+
+    fields*    f = (fields*)memst;
+    f->sizeBytes = szBytes;
+    f->elems     = 0;
+    f->capacity  = size;
+    f->size      = size;
+    f->mapcap    = 0;
+    f->owned     = 1;
+
   }
   void         destroy()
   { 
@@ -760,25 +804,27 @@ public:
       i %= mod;                                                        // get idx within map_capacity
       HshType eh = el[i].hsh;                                          // eh is element hash
       if(el[i].hsh.type == HshType::EMPTY){ 
-        set_elems( elems()+1 );
+        //set_elems( elems()+1 );
+        //memStart()->elems += 1;
+        elems( elems()+1 );
         new (&el[i]) KV(key, hsh);
         el[i].hsh.type = HshType::NONE;
         //return el[i];
-        return KVOfst(el[i], this);
+        return el[i];
       }else if(hsh==eh.hash  &&                                                // if the hashes aren't the same, the keys can't be the same
         strncmp(el[i].key,key,sizeof(KV::Key)-1)==0 )
       { 
         auto type = el[i].hsh.type;
         if( (type&HshType::TABLE) && (type&HshType::CHILD) ){
-          KV   kv       =  el[i];
-          kv.val       +=  (u64)memStart();
-          kv.hsh.type  &=  ~HshType::CHILD;
-          return KVOfst(kv, this);
+          //KV   kv       =  el[i];
+          //kv.val       +=  (u64)memStart();
+          //kv.hsh.type  &=  ~HshType::CHILD;
+          return KVOfst(el[i], this);
         }else
           return el[i];   //  = KV(key, hsh);
       }else if(dist > wrapDist(el,i,mod) ){
         KV kv(key, hsh);
-        set_elems( elems()+1 );
+        elems( elems()+1 );
         return place_rh(kv, el, i, dist, mod);
       }
     
@@ -831,7 +877,8 @@ public:
 
     T* p = (T*)(m_mem);
     new (p+prevSz) T( forward<V>(val)... );
-    set_size(prevSz+1);
+    //set_size(prevSz+1);
+    size(prevSz+1);
 
     return true;
   }
@@ -872,7 +919,8 @@ public:
   {
     if(!m_mem) return 0;
 
-    return *( ((u64*)memStart()) + 1 );
+    return memStart()->size;  // *( ((u64*)memStart()) + 1 );
+    //return *( ((u64*)memStart()) + 1 );
   }
   T*             data() const
   {
@@ -889,38 +937,54 @@ public:
 
     return sizeBytes() - memberBytes() - capacity()*sizeof(T) - map_capacity()*sizeof(KV);
   }
-  void*      memStart() const
+  //void*      memStart() const
+  //{
+  //  return (void*)(m_mem - memberBytes());
+  //}
+  auto      memStart() -> fields* 
   {
-    return (void*)(m_mem - memberBytes());
+    return m_mem? (fields*)(m_mem - memberBytes())  :  nullptr;
+  }
+  auto      memStart() const -> fields const* 
+  {
+    return (fields*)(m_mem - memberBytes());
   }
   u64       sizeBytes() const // -> u64
   {
-    if(!m_mem) return 0;
+    //if(!m_mem) return 0;
+    //u64 sb = *((u64 const*)memStart());
+    //sb >>= 16;
+    //return sb;
 
-    u64 sb = *((u64 const*)memStart());
-    sb >>= 16;
-    return sb;
+    return m_mem?  memStart()->sizeBytes  :  0;
   }
   u64        capacity() const
   {
-    if(!m_mem) return 0;
-
-    return *( ((u64*)memStart()) + 2);
+    //if(!m_mem) return 0;
+    //return *( ((u64*)memStart()) + 2);
 
     //if(!m_mem) return 0;
     //
     //return (sizeBytes() - memberBytes()) / sizeof(T);  // - size()*sizeof(T)
+
+    return m_mem?  memStart()->capacity  :  0;
   }
   u64           elems() const
   {
-    if(this && !m_mem) return 0;
+    //if(this==nullptr || !m_mem) return 0;
+    //return *( ((u64*)memStart()) + 3);
 
-    return *( ((u64*)memStart()) + 3);
+    return m_mem?  memStart()->elems  :  0;
   }
   u64    map_capacity() const
   {
-    if(!m_mem) return 0;
-    else       return *mapcap_ptr();
+    //if(!m_mem) return 0;
+    //else       return *mapcap_ptr();
+
+    //if(!m_mem) return 0;
+    //else       return memStart()->mapcap;
+
+    return m_mem?  memStart()->mapcap  :  0;
   }
   auto      elemStart() -> KV* 
   {
@@ -948,13 +1012,16 @@ public:
     void*        re;
     bool      fresh  = !m_mem;
     if(fresh) re = malloc(nxtBytes);
-    else      re = realloc(memStart(), nxtBytes);
+    else      re = realloc( (void*)memStart(), nxtBytes);
 
     if(re){
       m_mem = ((u8*)re) + memberBytes();
-      set_sizeBytes(nxtBytes);
-      set_capacity(count);
-      set_mapcap(mapcap);
+      sizeBytes(nxtBytes);
+      capacity(count);
+      this->mapcap(mapcap);
+
+      //set_capacity(count);
+      //set_mapcap(mapcap);
 
       KV*  el = elemStart();                                     //  is this copying elements forward in memory? can it overwrite elements that are already there? - right now reserve only ends up expanding memory for both the array and map
       u8* elb = (u8*)el;  
@@ -976,8 +1043,9 @@ public:
       }
     }
 
-    if(re && fresh){ set_size(0); set_elems(0); }
-    
+    //if(re && fresh){ set_size(0); set_elems(0); }
+    if(re && fresh){ size(0); elems(0); }
+
     return re;
   }
   void*        expand(bool ary=true, bool map=true)
@@ -1150,7 +1218,10 @@ private:
 
   static u64  memberBytes()
   {
-    return sizeof(u64) * 5;
+    return sizeof(fields);
+
+    //return sizeof(u64) * 5;
+    //
     // Memory Layout (5 u64 variables before m_mem)
     // sizeBytes     -  total number of bytes of the entire memory span
     // size          -  vector entries
@@ -1197,10 +1268,11 @@ private:
   }
   template<class N> static    N   mx(N a, N b){return a<b?b:a;}
   template<class N> static    N   mn(N a, N b){return a<b?a:b;}
+
 public:
-  static u64     sizeBytes(u64 count)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
+  static u64     size_bytes(u64 count)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
   {
-    return memberBytes() + sizeof(T)*count;
+    return memberBytes() + sizeof(T)*count;  // todo: not correct yet, needs to factor in map and child data
   }
   static tbl      concat_l(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
   {
@@ -1240,12 +1312,21 @@ public:
 
     return ret;
   }
+  static u64   magicNumber(u64 n)
+  {
+    n <<= 16;
+    u8* nn = (u8*)&n;
+    //nn[7]='t'; nn[8]='b';
+    nn[0]='t'; nn[1]='b';
+    return n;
+  }
 };
 
 
 
 KVOfst::operator tf64*(){ 
-  tf64* t = (tf64*)((u64)base+kv.val); 
+  tf64*  t = (tf64*)((u64)base+kv.val);
+  //t->m_mem = 
   return t; }
 KVOfst::operator tf64&(){ return *((tf64*)(u64)base+kv.val);  }
 
