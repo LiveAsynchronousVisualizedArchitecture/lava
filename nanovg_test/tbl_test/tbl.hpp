@@ -40,8 +40,12 @@
 // -todo: define KV struct early and fill in methods and functions later
 // -todo: make a KVOfst struct that can hold a KV and an offset for the table
 // -todo: make KVOfst contain just a kv reference instead of full KV
+// -todo: turn fields into a struct
 
-// todo: turn fields into a struct
+// todo: move ownership from the fields struct to the m_mem pointer
+// todo: make owned functions
+// todo: make constructor use ownership flag
+// todo: make destructor use ownership flag
 // todo: make a non-owned tbl
 // todo: figure out a way to make tbl work with m_mem while pointing to it directly - make m_mem = 0 and if it is 0, pretend it points to it's own location? - need to make an unowned tbl? where to put the owned bit?
 // todo: retrieve child table from a flattened table
@@ -517,21 +521,7 @@ private:
   template<bool OWNED=true> void typed_del(){ if(m_mem) free(memStart()); };   // explicit template specialization to make an owned tbl free it's memory and a non-owned tbl not free it's memory
   template<> void typed_del<false>(){}; 
 
-  //auto      mapcap_ptr()       -> u64*       { return (u64*)memStart() + 4;  }
-  //auto      mapcap_ptr() const -> u64 const* { return (u64*)memStart() + 4;  }
-  //void   set_sizeBytes(u64 bytes) // -> u64
-  //{
-  //  *( (u64*)memStart() ) = magicNumber(bytes);
-  //}
-  void   sizeBytes(u64 bytes)
-  {
-    memStart()->sizeBytes = bytes;
-    //*( (u64*)memStart() ) = magicNumber(bytes);
-  }
-  //void        set_size(u64  size)
-  //{
-  //  *( ((u64*)memStart()) + 1 ) = size;
-  //}
+  void   sizeBytes(u64 bytes){ memStart()->sizeBytes = bytes; }
   void        size(u64  size)
   {
     memStart()->size = size;
@@ -545,16 +535,6 @@ private:
     memStart()->elems = elems;
   }
   void      mapcap(u64 mapcap){ memStart()->mapcap = mapcap; }
-
-  //void    set_capacity(u64   cap)
-  //{
-  //  *( ((u64*)memStart()) + 2) = cap;
-  //}
-  //void       set_elems(u64 elems)
-  //{
-  //  *( ((u64*)memStart()) + 3) = elems;
-  //}
-  //void      set_mapcap(u64   cap){ *mapcap_ptr() = cap; }
   u64              nxt(u64 i, u64 mod) const
   {
     return ++i % mod;
@@ -711,13 +691,18 @@ private:
   {
     //if(&l==nullptr) || l.data()==nullptr)
     //reserve(l.size(), l.map_capacity() ); // l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
-    reserve(l.size(), l.elems() ); // l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
-    TO(l.size(),i) push(l[i]); 
     
-    auto e = l.elemStart();
-    TO(l.map_capacity(),i) if( !e[i].isEmpty() ){
-      put(e[i].key, e[i].val);
-    }
+    if(l.owned()){
+      reserve(l.size(), l.elems() ); // l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
+      TO(l.size(),i) push(l[i]); 
+    
+      auto e = l.elemStart();
+      TO(l.map_capacity(),i) if( !e[i].isEmpty() ){
+        put(e[i].key, e[i].val);
+      }
+    }else{
+      m_mem = l
+    } 
   }
   void              mv(tbl& r)
   {
@@ -770,8 +755,8 @@ public:
   ~tbl(){ destroy(); }
 
   tbl(tbl const& l){ cp(l); }
-  tbl& operator=(tbl const& l){ cp(l); return *this; }
   tbl(tbl&&      r){ mv(r); }
+  tbl& operator=(tbl const& l){ cp(l); return *this; }
   tbl& operator=(tbl&&      r){ mv(r); return *this; }
 
   //operator       u64() const{ return size(); }
@@ -937,10 +922,8 @@ public:
 
     return sizeBytes() - memberBytes() - capacity()*sizeof(T) - map_capacity()*sizeof(KV);
   }
-  //void*      memStart() const
-  //{
-  //  return (void*)(m_mem - memberBytes());
-  //}
+  bool          owned() const  { return memStart()->owned; }
+  void          owned(bool own){ memStart()->owned = own;  }
   auto      memStart() -> fields* 
   {
     return m_mem? (fields*)(m_mem - memberBytes())  :  nullptr;
@@ -1322,14 +1305,22 @@ public:
   }
 };
 
-
-
 KVOfst::operator tf64*(){ 
   tf64*  t = (tf64*)((u64)base+kv.val);
   //t->m_mem = 
   return t; }
 KVOfst::operator tf64&(){ return *((tf64*)(u64)base+kv.val);  }
 
+#endif
+
+
+
+
+
+//void*      memStart() const
+//{
+//  return (void*)(m_mem - memberBytes());
+//}
 
 //struct       KV
 //{
@@ -1552,14 +1543,28 @@ KVOfst::operator tf64&(){ return *((tf64*)(u64)base+kv.val);  }
 //  }
 //};
 
-
-#endif
-
-
-
-
-
-
+//auto      mapcap_ptr()       -> u64*       { return (u64*)memStart() + 4;  }
+//auto      mapcap_ptr() const -> u64 const* { return (u64*)memStart() + 4;  }
+//void   set_sizeBytes(u64 bytes) // -> u64
+//{
+//  *( (u64*)memStart() ) = magicNumber(bytes);
+//}
+//
+//void        set_size(u64  size)
+//{
+//  *( ((u64*)memStart()) + 1 ) = size;
+//}
+//void    set_capacity(u64   cap)
+//{
+//  *( ((u64*)memStart()) + 2) = cap;
+//}
+//void       set_elems(u64 elems)
+//{
+//  *( ((u64*)memStart()) + 3) = elems;
+//}
+//void      set_mapcap(u64   cap){ *mapcap_ptr() = cap; }
+//
+//*( (u64*)memStart() ) = magicNumber(bytes);
 
 //{ return *((tf64*)kv.val + offset);  }
 //
