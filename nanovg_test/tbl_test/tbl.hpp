@@ -50,25 +50,29 @@
 // -todo: change KVOfst to use  a KV pointer instead of reference
 // -todo: figure out why fields does not line up when returned as a KVOfst from operator() - was using this instead of memStart()
 // -todo: retrieve child table from a flattened table
+// -todo: put tbl array type data in capacity variable low bits - just use a 'type' key while first two bytes are magic number 't' and 'b'
+// -todo: make operator+=(const char*) create a key in the map - operator() already does this
+// -todo: work on flattening table - put in table data segment
+//       -| -change map_capacity to be a variable in memory
+//       -| tbl segment would be calculated from other variables - internal tbl would be an offset from m_mem
+// -todo: figure out what happens when doing anything that effects the size of a child tbl - child tbl cannot have it's size changed? need two different internal tbl types, one for references(non owned) and one for children(owned) ?
+//       - changing size or deleting an internal tbl means re-making the memory with another allocation and memcpy
+// -todo: make non owned type always read only? - still need owned and non-owned types within tbl
+// -todo: make flatten method that has creates a new tbl with no extra capacity and takes all tbl references and makes them into offset/children tbls that are stored in the sub-tbl segment - instead of child type, make a read only type? read only could have template specializations or static asserts that prevent changing the tbl or the KV objects from it
+// -todo: make sure destructor is being run on objects being held once turned into a template
+// -todo: make shrink_to_fit call destroy on the previous allocation
+// -todo: make reserve(), expand() and shrink_to_fit() not work on non-owned tbls
 
+// todo: make shrink_to_fit() take into account childData()
+// todo: make flatten also shrink_to_fit()
 // todo: destroy any non-child tables in the map 
 // todo: destroy any child tables in the child data 
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
 // | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
 // | does this imply that there should be a separate array type or is specializing string enough? 
-// todo: put tbl array type data in capacity variable low bits
-// todo: make operator()() take integers so that the map can also be used as an iterable list through sub-tables - just make operator()() take an integer offset into elemStart(), then make an iteration cursor through the non-empty elements of the map?
-// todo: make operator+=(const char*) create a key in the map
 // todo: make operator-=(const char*) delete a key in the map
-// todo: work on flattening table - put in table data segment
-//       | -change map_capacity to be a variable in memory
-//       | tbl segment would be calculated from other variables - internal tbl would be an offset from m_mem
-// todo: figure out what happens when doing anything that effects the size of a child tbl - child tbl cannot have it's size changed? need two different internal tbl types, one for references(non owned) and one for children(owned) ?
-//       - changing size or deleting an internal tbl means re-making the memory with another allocation and memcpy
-// todo: make sure destructor is being run on objects being held once turned into a template
 // todo: make constructor that takes only an address to the start of a tbl memory span - just has to offset it by memberBytes()
-// todo: make flatten method that has creates a new tbl with no extra capacity and takes all tbl references and makes them into offset/children tbls that are stored in the sub-tbl segment - instead of child type, make a read only type? read only could have template specializations or static asserts that prevent changing the tbl or the KV objects from it
-// todo: make non owned type always read only? - still need owned and non-owned types within tbl
+// todo: make operator()() take integers so that the map can also be used as an iterable list through sub-tables - just make operator()() take an integer offset into elemStart(), then make an iteration cursor through the non-empty elements of the map? - should this make the hash equal the integer passed or should it look up the element directly?
 
 // todo: make resize() - should there be a resize()? only affects array?
 // todo: use inline assembly to vectorize basic math operations
@@ -897,9 +901,7 @@ public:
   u64            size() const
   {
     if(!m_mem) return 0;
-
-    return memStart()->size;  // *( ((u64*)memStart()) + 1 );
-    //return *( ((u64*)memStart()) + 1 );
+    return memStart()->size;  
   }
   T*             data() const
   {
@@ -916,12 +918,9 @@ public:
 
     return sizeBytes() - memberBytes() - capacity()*sizeof(T) - map_capacity()*sizeof(KV);
   }
-  bool          owned() const  { return memStart()->owned; }
+  bool          owned() const  { return m_mem? memStart()->owned : true; }
   void          owned(bool own){ memStart()->owned = own;  }
-  auto       memStart() -> fields* 
-  {
-    return m_mem? (fields*)(m_mem - memberBytes())  :  nullptr;
-  }
+  auto       memStart() -> fields* { return m_mem? (fields*)(m_mem - memberBytes())  :  nullptr; }
   auto       memStart() const -> fields const* 
   {
     return (fields*)(m_mem - memberBytes());
@@ -977,6 +976,8 @@ public:
   }
   void*       reserve(u64 count, u64 mapcap=0, u64 childcap=0)
   {
+    if( !owned() ) return m_mem;
+
     count     =  mx(count,          capacity() );
     mapcap    =  mx(mapcap,     map_capacity() );
     childcap  =  mx(childcap, child_capacity() );
@@ -1044,26 +1045,26 @@ public:
     return reserve(nxtSz, nxtCap);
   }
   bool  shrink_to_fit()
-  { // todo: does this need to call destroy on the previous allocation?
-    u64      sz = size();
-    u64   vecsz = memberBytes() + sz*sizeof(T);
-    u64 elemcnt = elems();
-    u64   mapsz = elemcnt*sizeof(KV);
-    u64   nxtsz = vecsz + mapsz;
+  { 
+    if( !owned() ){ return false; }
     
+    u64       sz = size();
+    u64    vecsz = memberBytes() + sz*sizeof(T);
+    u64  elemcnt = elems();
+    u64    mapsz = elemcnt*sizeof(KV);
+    u64    nxtsz = vecsz + mapsz;
     KV const* el = elemStart();
-    u8* nxtp = (u8*)malloc(nxtsz);
+    u8*     nxtp = (u8*)malloc(nxtsz);
     if(nxtp){
       u8* p = (u8*)memStart();
       memcpy(nxtp, p, vecsz);
       KV* nxtel = (KV*)(nxtp+vecsz);
-      u64  cur = 0;
+      u64   cur = 0;
       TO(map_capacity(),i){
         if(el[i].hsh.type!=EMPTY) 
           nxtel[cur++] = el[i];
         } 
 
-      //free(p);
       destroy();
       m_mem = nxtp+memberBytes();
       set_sizeBytes(nxtsz);
@@ -1071,8 +1072,6 @@ public:
       set_capacity(sz);
       set_elems(elemcnt);
       *mapcap_ptr() = elemcnt;
-
-      //reorder();
 
       return true;
     }else 
@@ -1169,7 +1168,7 @@ public:
     auto mapcap = map_capacity();
     TO(mapcap,i)
       if(  (e[i].hsh.type & HshType::TABLE) && 
-          !(e[i].hsh.type & HshType::CHILD) ){                 // if the table bit is set but the child bit is not set
+          !(e[i].hsh.type & HshType::CHILD) ){                                 // if the table bit is set but the child bit is not set
         tu8*  t  =  (tu8*)e[i].val;
         newcap  +=  t->sizeBytes();
     }
@@ -1177,7 +1176,7 @@ public:
     u8* curChild = (u8*)childData() + prevCap;
     TO(mapcap,i)
       if(  (e[i].hsh.type & HshType::TABLE) && 
-          !(e[i].hsh.type & HshType::CHILD) ){                 // if the table bit is set but the child bit is not set
+          !(e[i].hsh.type & HshType::CHILD) ){                                 // if the table bit is set but the child bit is not set
         tu8*       t  =  (tu8*)e[i].val;
         auto szbytes  =  t->sizeBytes();
 
@@ -1309,6 +1308,15 @@ KVOfst::operator tu64()
 
 
 
+
+
+
+
+//free(p); // from shrink_to_fit
+//reorder();
+
+// *( ((u64*)memStart()) + 1 );
+//return *( ((u64*)memStart()) + 1 );
 
 //set_elems( elems()+1 );
 //memStart()->elems += 1;
