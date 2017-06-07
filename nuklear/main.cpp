@@ -868,6 +868,7 @@ ENTRY_DECLARATION
     //KV       kv  =  tst("child");
 
     tu64  chldc  =  tst("child"); //kv;  //  tst("child"); //kv;
+    auto      f  =  chldc.memStart();
     Printf("\n\n %d %d \n\n", chldc[0], chldc[1] );
     //chldc[0] *= 4.f;
     //chldc[1] *= 4.f;

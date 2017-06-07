@@ -64,7 +64,6 @@
 // -todo: make reserve(), expand() and shrink_to_fit() not work on non-owned tbls
 // -todo: make constructor that takes only an address to the start of a tbl memory span - just has to offset it by memberBytes() - owned check in the copy constructor + move constructor takes care of this already?
 
-
 // todo: make KV.val as a child table an offset into the child data segment instead of an offset into the whole table memory
 // todo: make shrink_to_fit() take into account childData() - will need to redo both the base pointer and the tbl offset ?
 // todo: make flatten also shrink_to_fit()
@@ -327,9 +326,9 @@ struct       KV
   }
   template<class N> KV& operator=(tbl<N> const& n)
   {
-    hsh.type  =  typenum< tbl<N> >::num;
     //tbl<N>* tp = &n;
     //n.childData()
+    hsh.type  =  typenum< tbl<N> >::num;
     val       =  (u64)&n;
     return *this;
   }
@@ -527,8 +526,8 @@ public:
 
   struct fields 
   {
-    i8          t :  8;                             // will hold the character 't'
-    i8          b :  8;                             // will hold the character 'b'
+    u64         t :  8;                             // will hold the character 't'
+    u64         b :  8;                             // will hold the character 'b'
     u64 sizeBytes : 48;
 
     u64  capacity : 42;
@@ -715,7 +714,7 @@ private:
       m_mem = l.m_mem;
     } 
   }
-  void              mv(tbl& r)
+  void              mv(tbl&& r)
   {
     //tbl_PRNT("\n moved \n");
     m_mem   = r.m_mem;
@@ -766,10 +765,13 @@ public:
   ~tbl(){ destroy(); }
 
   tbl(tbl const& l){ cp(l); }
-  tbl(tbl&&      r){ mv(r); }
+  //tbl(tbl&&      r) = delete;
+  //tbl(tbl&&      r){ mv(std::move(r)); }
+  tbl(tbl&& r){ mv(std::move(r)); }
   tbl& operator=(tbl const& l){ cp(l); return *this; }
-  tbl& operator=(tbl&&      r){ mv(r); return *this; }
+  tbl& operator=(tbl&&      r){ mv(std::move(r)); return *this; }
 
+  //tbl& operator=(tbl&&      r) = delete;
   //operator       u64() const{ return size(); }
   T&      operator[](u64 i)
   {
@@ -809,9 +811,9 @@ public:
       { 
         auto type = el[i].hsh.type;
         if( (type&HshType::TABLE) && (type&HshType::CHILD) ){
-          KVOfst kvo( &el[i], (void*)(memStart()) );
-           
-          auto f = (fields*)(el[i].val + (u64)childData());
+          //KVOfst kvo( &el[i], (void*)(memStart()) );           
+          //auto f = (fields*)(el[i].val + (u64)childData());
+
           return KVOfst( &el[i], (void*)(memStart()) );
         }else
           return KVOfst( &(el[i]) ); //el[i];   //  = KV(key, hsh);
@@ -971,9 +973,6 @@ public:
       capacity(count);
       this->mapcap(mapcap);
 
-      //set_capacity(count);
-      //set_mapcap(mapcap);
-
       KV*  el = elemStart();                                     //  is this copying elements forward in memory? can it overwrite elements that are already there? - right now reserve only ends up expanding memory for both the array and map
       u8* elb = (u8*)el;  
       if(prevElems){
@@ -995,7 +994,12 @@ public:
     }
 
     //if(re && fresh){ set_size(0); set_elems(0); }
-    if(re && fresh){ size(0); elems(0); }
+    if(re && fresh){
+      auto f = memStart();
+      f->t   = 't';
+      f->b   = 'b';
+      size(0); elems(0);
+    }
 
     return re;
   }
@@ -1291,20 +1295,17 @@ KVOfst::operator tu64()
 {   
   if(base){
     tu64 t; 
-    //t.m_mem = (u8*)base;
-    //t.m_mem = (u8*)base;
-    //auto f = t.memStart();
+
     auto  f = (tu64::fields*)base;
     t.m_mem = (u8*)(f+1);
-    u64 a  =  ((u64*)t.m_mem)[0];
-    u64 b  =  ((u64*)t.m_mem)[1];
+    tu64 ret;
+    auto fff = (tu64::fields*)(kv->val + (u64)t.childData());
+    ret.m_mem = (u8*)(fff+1);
+
+    u64 a  =  ((u64*)ret.m_mem)[0];
+    u64 b  =  ((u64*)ret.m_mem)[1];
     u64 chldst = (u64)f + f->capacity*8 + f->mapcap*sizeof(KV) + sizeof(f);
     u64     cd = (u64)t.childData();
-    tu64 ret;
-    ret.m_mem = (u8*)( chldst + kv->val + tu64::memberBytes() ); 
-
-    auto ff = ret.memStart();
-
     return ret;
   }else{
     return *((tu64*)kv->val);
@@ -1315,6 +1316,22 @@ KVOfst::operator tu64()
 
 
 
+
+
+
+
+
+
+//t.m_mem = (u8*)base;
+//t.m_mem = (u8*)base;
+//auto f = t.memStart();
+//
+//tu64 ret;
+//ret.m_mem = (u8*)( chldst + kv->val + tu64::memberBytes() ); 
+//auto ff = ret.memStart();
+
+//set_capacity(count);
+//set_mapcap(mapcap);
 
 //if(!m_mem) return 0;
 //u64 sb = *((u64 const*)memStart());
