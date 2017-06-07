@@ -45,12 +45,14 @@
 // -todo: make cp and mv constructors use ownership flag - mv constructor can stay the same because it just copies the m_mem pointer
 // -todo: make a non-owned tbl
 // -todo: make destructor use ownership flag
+// -todo: move ownership from the fields struct to the m_mem pointer? - if the ownership flag is set to false in the contiguous memory, no reference will delete it and the owner of the memory will eventually wipe it out
+// -todo: figure out a way to make tbl work with m_mem while pointing to it directly - make m_mem = 0 and if it is 0, pretend it points to it's own location? - need to make an unowned tbl? where to put the owned bit?
+// -todo: change KVOfst to use  a KV pointer instead of reference
+// -todo: figure out why fields does not line up when returned as a KVOfst from operator() - was using this instead of memStart()
+// -todo: retrieve child table from a flattened table
 
-// todo: move ownership from the fields struct to the m_mem pointer? - if the ownership flag is set to false in the contiguous memory, no reference will delete it and the owner of the memory will eventually wipe it out
 // todo: destroy any non-child tables in the map 
 // todo: destroy any child tables in the child data 
-// todo: figure out a way to make tbl work with m_mem while pointing to it directly - make m_mem = 0 and if it is 0, pretend it points to it's own location? - need to make an unowned tbl? where to put the owned bit?
-// todo: retrieve child table from a flattened table
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
 // | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
 // | does this imply that there should be a separate array type or is specializing string enough? 
@@ -464,7 +466,9 @@ struct       KV
 };
 struct   KVOfst
 {
-  KV&         kv;
+  //KV&         kv;
+
+  KV*         kv;
   void*     base;
 
   KVOfst(KVOfst&  l) :
@@ -473,16 +477,19 @@ struct   KVOfst
   KVOfst(KVOfst&& r) :
     kv(r.kv), base(r.base)
   {}
-  KVOfst(KV&  _kv, void* _base=nullptr) :
-    kv(_kv), base(_base)
-  {}
-  KVOfst(KV&& _kv, void* _base=nullptr) :
-    kv(std::move(_kv)), base(_base)
-  {}
+  KVOfst(KV* _kv=nullptr, void* _base=nullptr)
+    //kv(_kv), base(_base)
+  {
+   kv   = _kv;
+   base = _base;
+  }
+  //KVOfst(KV&& _kv, void* _base=nullptr) :
+  //  kv(std::move(_kv)), base(_base)
+  //{}
   
   operator tu64();
-  template<class N> operator N() { return kv.as<N>(); }
-  template<class N> KVOfst& operator=(N const& n){ kv = n; return *this; }
+  template<class N> operator N() { return kv->as<N>(); }
+  template<class N> KVOfst& operator=(N const& n){ *kv = n; return *this; }
 };
 
 template<class T> class tbl
@@ -512,16 +519,16 @@ public:
 
   struct fields 
   {
-    u64      size : 42;
-    u64     elems : 21;
-    u64     owned :  1;
+    i8          t :  8;                             // will hold the character 't'
+    i8          b :  8;                             // will hold the character 'b'
+    u64 sizeBytes : 48;
 
     u64  capacity : 42;
     u64    mapcap : 22;
 
-    u64 sizeBytes : 48;
-    u64         b :  8;                             // will hold the character 'b'
-    u64         t :  8;                             // will hold the character 't'
+    u64     owned :  1;
+    u64     elems : 21;
+    u64      size : 42;
   };
 
   //using   T     =       i32;
@@ -660,20 +667,9 @@ private:
     u8*      memst  =  (u8*)malloc(szBytes);                 // memst is memory start
     m_mem           =  memst + memberBytes();
 
-    //m_mem           =  memst + memberBytes();
-    //set_sizeBytes(szBytes);
-    //set_elems(0);
-    //set_capacity(size);
-    //set_size(size);
-    //*mapcap_ptr() = 0;
-
-    //sizeBytes(szBytes);
-    //elems(0);
-    //capacity(size);
-    //this->size(size);
-    //mapcap(0);
-
     fields*    f = (fields*)memst;
+    f->t         = 't';
+    f->b         = 'b';
     f->sizeBytes = szBytes;
     f->elems     = 0;
     f->capacity  = size;
@@ -713,7 +709,7 @@ private:
   }
   void              mv(tbl& r)
   {
-    tbl_PRNT("\n moved \n");
+    //tbl_PRNT("\n moved \n");
     m_mem   = r.m_mem;
     r.m_mem = nullptr;
   }
@@ -780,7 +776,7 @@ public:
   KVOfst  operator()(const char* key, bool make_new=true)
   {
     if( !( map_capacity()*0.75f > (float)elems() ) )
-       if(!expand(false, true)) return KV::error_kv();
+       if(!expand(false, true)) return &KV::error_kv();
 
     HshType hh;
     hh.hash   =  HashStr(key);
@@ -796,36 +792,28 @@ public:
       i %= mod;                                                        // get idx within map_capacity
       HshType eh = el[i].hsh;                                          // eh is element hash
       if(el[i].hsh.type == HshType::EMPTY){ 
-        //set_elems( elems()+1 );
-        //memStart()->elems += 1;
         elems( elems()+1 );
         new (&el[i]) KV(key, hsh);
         el[i].hsh.type = HshType::NONE;
-        //return el[i];
-        return el[i];
+        return KVOfst( &(el[i]) );
       }else if(hsh==eh.hash  &&                                                // if the hashes aren't the same, the keys can't be the same
         strncmp(el[i].key,key,sizeof(KV::Key)-1)==0 )
       { 
         auto type = el[i].hsh.type;
         if( (type&HshType::TABLE) && (type&HshType::CHILD) ){
-          //KV   kv       =  el[i];
-          //kv.val       +=  (u64)memStart();
-          //kv.hsh.type  &=  ~HshType::CHILD;
-          return KVOfst(el[i], (void*)(this) );
+          return KVOfst( &el[i], (void*)(memStart()) );
         }else
-          return el[i];   //  = KV(key, hsh);
+          return KVOfst( &(el[i]) ); //el[i];   //  = KV(key, hsh);
       }else if(dist > wrapDist(el,i,mod) ){
         KV kv(key, hsh);
         elems( elems()+1 );
-        return place_rh(kv, el, i, dist, mod);
+        return KVOfst( &(place_rh(kv, el, i, dist, mod)) );
       }
     
       if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
     }
 
-    return KV::error_kv(); // , 0};
-
-    //return el[i] = KV(key, hsh);
+    return &KV::error_kv();
   }
   tbl     operator>>(tbl const& l){ return tbl::concat_l(*this, l); }
   tbl     operator<<(tbl const& l){ return tbl::concat_r(*this, l); }
@@ -869,7 +857,6 @@ public:
 
     T* p = (T*)(m_mem);
     new (p+prevSz) T( forward<V>(val)... );
-    //set_size(prevSz+1);
     size(prevSz+1);
 
     return true;
@@ -931,11 +918,11 @@ public:
   }
   bool          owned() const  { return memStart()->owned; }
   void          owned(bool own){ memStart()->owned = own;  }
-  auto      memStart() -> fields* 
+  auto       memStart() -> fields* 
   {
     return m_mem? (fields*)(m_mem - memberBytes())  :  nullptr;
   }
-  auto      memStart() const -> fields const* 
+  auto       memStart() const -> fields const* 
   {
     return (fields*)(m_mem - memberBytes());
   }
@@ -1177,16 +1164,16 @@ public:
   {
     u64   memst = (u64)memStart();
     u64 prevCap = child_capacity();
-    u64     cap = 0;
+    u64  newcap = 0;
     auto      e = elemStart();
     auto mapcap = map_capacity();
     TO(mapcap,i)
       if(  (e[i].hsh.type & HshType::TABLE) && 
           !(e[i].hsh.type & HshType::CHILD) ){                 // if the table bit is set but the child bit is not set
         tu8*  t  =  (tu8*)e[i].val;
-        cap     +=  t->sizeBytes();
+        newcap  +=  t->sizeBytes();
     }
-    reserve(0,0,cap);
+    reserve(0,0, prevCap + newcap);
     u8* curChild = (u8*)childData() + prevCap;
     TO(mapcap,i)
       if(  (e[i].hsh.type & HshType::TABLE) && 
@@ -1195,9 +1182,11 @@ public:
         auto szbytes  =  t->sizeBytes();
 
         memcpy(curChild, t->memStart(), szbytes);
-        ((fields*)curChild)->owned = 0;
+        auto   f = (fields*)curChild;
+        f->owned = 0;
+
         e[i].hsh.type  |=  HshType::CHILD;
-        e[i].val        =  (u64)curChild - memst;
+        e[i].val        =  (u64)curChild - (u64)memStart();                    // the memory start will likely have changed due to reallocation
         curChild       +=  szbytes;
       }
 
@@ -1303,24 +1292,17 @@ public:
 
     return ret;
   }
-  //static u64   magicNumber(u64 n)
-  //{
-  //  n <<= 16;
-  //  u8* nn = (u8*)&n;
-  //  //nn[7]='t'; nn[8]='b';
-  //  nn[0]='t'; nn[1]='b';
-  //  return n;
-  //}
 };
 
 KVOfst::operator tu64()
-{ 
-  //tf64*  tp = (tf64*)((u64)base+kv.val+tbl<tf64>::memberBytes() ); 
-  
-  tu64 tp;
-  tp.m_mem = (u8*)( (u64)base + kv.val + tbl<tu64>::memberBytes() ); 
-  
-  return tp;
+{   
+  if(base){
+    tu64 tp;
+    tp.m_mem = (u8*)( (u64)base + kv->val + tbl<u64>::memberBytes() ); 
+    return tp;
+  }else{
+    return *((tu64*)kv->val);
+  }
 }
 
 #endif
@@ -1328,6 +1310,56 @@ KVOfst::operator tu64()
 
 
 
+//set_elems( elems()+1 );
+//memStart()->elems += 1;
+//
+//return el[i];
+
+//KV   kv       =  el[i];
+//kv.val       +=  (u64)memStart();
+//kv.hsh.type  &=  ~HshType::CHILD;
+//
+//KVOfst kvo;
+//kvo.kv   = el[i];
+//kvo.base = (void*)(this);
+//return kvo;
+//
+//KVOfst kvo( &el[i], (void*)(memStart()) );
+//tu64 t;
+//t.m_mem = (u8*)( (u64)kvo.base + kvo.kv->val + memberBytes() );
+//tu64::fields*  f = t.memStart();
+
+//m_mem           =  memst + memberBytes();
+//set_sizeBytes(szBytes);
+//set_elems(0);
+//set_capacity(size);
+//set_size(size);
+//*mapcap_ptr() = 0;
+
+//sizeBytes(szBytes);
+//elems(0);
+//capacity(size);
+//this->size(size);
+//mapcap(0);
+
+//auto f = (tbl<u64>::fields*)((u64)base+kv->val);
+//
+//auto ff = tp.memStart();
+//
+//tf64*  tp = (tf64*)((u64)base+kv.val+tbl<tf64>::memberBytes() ); 
+//
+//else     tp.m_mem = ((tu64*)kv->val)->m_mem;
+//
+//return tp;
+
+//static u64   magicNumber(u64 n)
+//{
+//  n <<= 16;
+//  u8* nn = (u8*)&n;
+//  //nn[7]='t'; nn[8]='b';
+//  nn[0]='t'; nn[1]='b';
+//  return n;
+//}
 
 //KVOfst(KV const& _kv, void* _base=nullptr) :
 //  kv(_kv), base(_base)
