@@ -68,10 +68,12 @@
 // -todo: make shrink_to_fit() take into account childData() - will need to redo both the base pointer and the tbl offset ?
 // -todo: debug shrink_to_fit() tbl child data return - why is map capacity changed to 4 when reading? - when both reading or writing the table can be expanded - why does expanding break it ? - reserve didn't copy child data at all
 // -todo: template table casting from KVOfst
+// -todo: multiply mapcap by 8 and elems by 10, then compare sizes to get an integer only expansion at 80% full
 
-// todo: split operator()() into a const and non-const version - make them use a get() function underneath
-// todo: multiply mapcap by 80 and elems by 100, then compare sizes to get an integer only expansion at 80% full
 // todo: break out fields from template
+// todo: make KVOfst expand the tbl - would this imply that the size of the array type needs to be kept in the fields?
+// todo: make operator()() use multiple functions so that it can be read from without expansion
+// todo: split operator()() into a const and non-const version - make them use a get() function underneath
 // todo: make flatten also shrink_to_fit()
 // todo: destroy any non-child tables in the map 
 // todo: destroy any child tables in the child data 
@@ -81,6 +83,8 @@
 // | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
 // | does this imply that there should be a separate array type or is specializing string enough? 
 // todo: break out memory allocation from template - keep template as a wrapper for casting a typeless tbl
+// todo: make put() take a KV instead of beiing a template
+
 
 // todo: make resize() - should there be a resize()? only affects array?
 // todo: use inline assembly to vectorize basic math operations
@@ -267,8 +271,10 @@ struct       KV
   template<> struct typenum<tu64>  { static const Type num = HshType::tU64;  }; 
   template<> struct typenum<ti64>  { static const Type num = HshType::tI64;  }; 
   template<> struct typenum<tf64>  { static const Type num = HshType::tF64;  };
-  template<> struct typenum<long>  { static const Type num = HshType::I64;   };
-  template<> struct typenum<unsigned long> { static const Type num = HshType::U64; };
+  template<> struct typenum<long>               { static const Type num = HshType::I64;   };
+  template<> struct typenum<unsigned long>      { static const Type num = HshType::U64;   };
+  template<> struct typenum<tbl<long>>          { static const Type num = HshType::tI64;  };
+  template<> struct typenum<tbl<unsigned long>> { static const Type num = HshType::tU64;  };
 
   template<class C> struct typecast { using type = C;   };                               // cast types
   template<> struct typecast<i8>    { using type = i64; };
@@ -544,9 +550,6 @@ public:
   //using   T     =       i32;
 
 private:
-  template<bool OWNED=true> void typed_del(){ if(m_mem) free(memStart()); };   // explicit template specialization to make an owned tbl free it's memory and a non-owned tbl not free it's memory
-  template<> void typed_del<false>(){}; 
-
   void      sizeBytes(u64 bytes){ memStart()->sizeBytes = bytes; }
   void           size(u64  size)
   {
@@ -791,8 +794,9 @@ public:
   }
   KVOfst  operator()(const char* key, bool make_new=true)
   {
-    if( !( map_capacity()*0.75f > (float)elems() ) )
-       if(!expand(false, true)) return &KV::error_kv();
+    u64 mapcap = map_capacity();
+    if( mapcap==0 || mapcap*8 < elems()*10 )
+      if(!expand(false, true)) return &KV::error_kv();
 
     HshType hh;
     hh.hash   =  HashStr(key);
@@ -905,6 +909,9 @@ public:
     KV const& kv = (*this)(key, false);
     return kv.hsh.type != EMPTY;
   }
+  //KV&            get()
+  //{
+  //}
 
   u64            size() const { return m_mem? memStart()->size : 0; }
   T*             data() const {return (T*)m_mem; }
@@ -1348,6 +1355,13 @@ template<class T> KVOfst::operator tbl<T>()
 
 
 
+//if( !( map_capacity()*0.75f > (float)elems() ) )
+//   if(!expand(false, true)) return &KV::error_kv();
+//
+//if(!m_mem){ return KVOfst(); }
+
+//template<bool OWNED=true> void typed_del(){ if(m_mem) free(memStart()); };   // explicit template specialization to make an owned tbl free it's memory and a non-owned tbl not free it's memory
+//template<> void typed_del<false>(){}; 
 
 //tbl(tbl&&      r) = delete;
 //tbl(tbl&&      r){ mv(std::move(r)); }
