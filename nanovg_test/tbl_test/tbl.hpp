@@ -63,9 +63,10 @@
 // -todo: make shrink_to_fit call destroy on the previous allocation
 // -todo: make reserve(), expand() and shrink_to_fit() not work on non-owned tbls
 // -todo: make constructor that takes only an address to the start of a tbl memory span - just has to offset it by memberBytes() - owned check in the copy constructor + move constructor takes care of this already?
+// -todo: make KV.val as a child table an offset into the child data segment instead of an offset into the whole table memory
 
-// todo: make KV.val as a child table an offset into the child data segment instead of an offset into the whole table memory
 // todo: make shrink_to_fit() take into account childData() - will need to redo both the base pointer and the tbl offset ?
+// todo: template table casting from KVOfst
 // todo: make flatten also shrink_to_fit()
 // todo: destroy any non-child tables in the map 
 // todo: destroy any child tables in the child data 
@@ -688,7 +689,7 @@ private:
   void         destroy()
   { 
     if( m_mem && owned() ){
-      tbl_PRNT("\n destruction \n");
+      //tbl_PRNT("\n destruction \n");
 
       T*    a = (T*)m_mem;
       auto sz = size();
@@ -705,7 +706,7 @@ private:
     //reserve(l.size(), l.map_capacity() ); // l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
     
     if(l.owned()){
-      tbl_PRNT("\n full copy \n");
+      //tbl_PRNT("\n full copy \n");
 
       reserve(l.size(), l.elems(), l.child_capacity() ); // l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
       TO(l.size(),i) push(l[i]); 
@@ -717,13 +718,13 @@ private:
 
       // todo: have to handle child data copying
     }else{
-      tbl_PRNT("\n shallow copy \n");
+      //tbl_PRNT("\n shallow copy \n");
       m_mem = l.m_mem;
     } 
   }
   void              mv(tbl&& r)
   {
-    tbl_PRNT("\n moved \n");
+    //tbl_PRNT("\n moved \n");
     m_mem   = r.m_mem;
     r.m_mem = nullptr;
   }
@@ -818,9 +819,6 @@ public:
       { 
         auto type = el[i].hsh.type;
         if( (type&HshType::TABLE) && (type&HshType::CHILD) ){
-          //KVOfst kvo( &el[i], (void*)(memStart()) );           
-          //auto f = (fields*)(el[i].val + (u64)childData());
-
           return KVOfst( &el[i], (void*)(memStart()) );
         }else
           return KVOfst( &(el[i]) ); //el[i];   //  = KV(key, hsh);
@@ -1300,9 +1298,6 @@ public:
 
 KVOfst::operator tu64()
 {   
-  //u64 chldst = (u64)f + f->capacity*8 + f->mapcap*sizeof(KV) + sizeof(f);
-  //u64     cd = (u64)t.childData();
-
   if(base){
     tu64 t; 
     auto  f = (tu64::fields*)base;
@@ -1330,6 +1325,12 @@ KVOfst::operator tu64()
 
 
 
+
+//u64 chldst = (u64)f + f->capacity*8 + f->mapcap*sizeof(KV) + sizeof(f);
+//u64     cd = (u64)t.childData();
+
+//KVOfst kvo( &el[i], (void*)(memStart()) );           
+//auto f = (fields*)(el[i].val + (u64)childData());
 
 //t.m_mem = (u8*)base;
 //t.m_mem = (u8*)base;
