@@ -688,10 +688,12 @@ private:
   void         destroy()
   { 
     if( m_mem && owned() ){
+      tbl_PRNT("\n destruction \n");
+
       T*    a = (T*)m_mem;
       auto sz = size();
       TO(sz,i){
-        a[i].T::~T(); // run the destructor manually before freeing the memory
+        a[i].T::~T();                                                          // run the destructors manually before freeing the memory
       }
       free(memStart());
       m_mem = nullptr;
@@ -703,20 +705,25 @@ private:
     //reserve(l.size(), l.map_capacity() ); // l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
     
     if(l.owned()){
-      reserve(l.size(), l.elems() ); // l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
+      tbl_PRNT("\n full copy \n");
+
+      reserve(l.size(), l.elems(), l.child_capacity() ); // l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
       TO(l.size(),i) push(l[i]); 
     
       auto e = l.elemStart();
       TO(l.map_capacity(),i) if( !e[i].isEmpty() ){
         put(e[i].key, e[i].val);
       }
+
+      // todo: have to handle child data copying
     }else{
+      tbl_PRNT("\n shallow copy \n");
       m_mem = l.m_mem;
     } 
   }
   void              mv(tbl&& r)
   {
-    //tbl_PRNT("\n moved \n");
+    tbl_PRNT("\n moved \n");
     m_mem   = r.m_mem;
     r.m_mem = nullptr;
   }
@@ -765,14 +772,14 @@ public:
   ~tbl(){ destroy(); }
 
   tbl(tbl const& l){ cp(l); }
-  //tbl(tbl&&      r) = delete;
-  //tbl(tbl&&      r){ mv(std::move(r)); }
   tbl(tbl&& r){ mv(std::move(r)); }
   tbl& operator=(tbl const& l){ cp(l); return *this; }
   tbl& operator=(tbl&&      r){ mv(std::move(r)); return *this; }
-
+  //tbl(tbl&&      r) = delete;
+  //tbl(tbl&&      r){ mv(std::move(r)); }
   //tbl& operator=(tbl&&      r) = delete;
   //operator       u64() const{ return size(); }
+
   T&      operator[](u64 i)
   {
     tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
@@ -1293,19 +1300,21 @@ public:
 
 KVOfst::operator tu64()
 {   
+  //u64 chldst = (u64)f + f->capacity*8 + f->mapcap*sizeof(KV) + sizeof(f);
+  //u64     cd = (u64)t.childData();
+
   if(base){
     tu64 t; 
-
     auto  f = (tu64::fields*)base;
     t.m_mem = (u8*)(f+1);
+    
     tu64 ret;
-    auto fff = (tu64::fields*)(kv->val + (u64)t.childData());
+    auto  fff = (tu64::fields*)(kv->val + (u64)t.childData());
     ret.m_mem = (u8*)(fff+1);
+    u64     a = ((u64*)ret.m_mem)[0];
+    u64     b = ((u64*)ret.m_mem)[1];
+    t.m_mem   = nullptr;
 
-    u64 a  =  ((u64*)ret.m_mem)[0];
-    u64 b  =  ((u64*)ret.m_mem)[1];
-    u64 chldst = (u64)f + f->capacity*8 + f->mapcap*sizeof(KV) + sizeof(f);
-    u64     cd = (u64)t.childData();
     return ret;
   }else{
     return *((tu64*)kv->val);

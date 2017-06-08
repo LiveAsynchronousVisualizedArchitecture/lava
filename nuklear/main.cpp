@@ -858,6 +858,8 @@ ENTRY_DECLARATION
     //KV kv      =  tst("child");
     //kv         =  chld;
     tst("child") =  chld;
+
+    
     //KV kv        =  tst("child");
     //tf64& chldp  =  kv.operator tf64 &();
     //tf64& chldp  =  kv;
@@ -867,8 +869,10 @@ ENTRY_DECLARATION
     //tst.shrink_to_fit();
     //KV       kv  =  tst("child");
 
+    auto      f  =  (tst("child").operator tu64() ).memStart();
+
     tu64  chldc  =  tst("child"); //kv;  //  tst("child"); //kv;
-    auto      f  =  chldc.memStart();
+    //auto      f  =  chldc.memStart();
     Printf("\n\n %d %d \n\n", chldc[0], chldc[1] );
     //chldc[0] *= 4.f;
     //chldc[1] *= 4.f;
