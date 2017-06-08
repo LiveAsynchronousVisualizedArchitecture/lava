@@ -64,9 +64,12 @@
 // -todo: make reserve(), expand() and shrink_to_fit() not work on non-owned tbls
 // -todo: make constructor that takes only an address to the start of a tbl memory span - just has to offset it by memberBytes() - owned check in the copy constructor + move constructor takes care of this already?
 // -todo: make KV.val as a child table an offset into the child data segment instead of an offset into the whole table memory
+// -todo: make private byte move function
+// -todo: make shrink_to_fit() take into account childData() - will need to redo both the base pointer and the tbl offset ?
 
-// todo: make shrink_to_fit() take into account childData() - will need to redo both the base pointer and the tbl offset ?
+// todo: debug shrink_to_fit() tbl child data return
 // todo: template table casting from KVOfst
+// todo: break out fields from template
 // todo: make flatten also shrink_to_fit()
 // todo: destroy any non-child tables in the map 
 // todo: destroy any child tables in the child data 
@@ -75,6 +78,7 @@
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
 // | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
 // | does this imply that there should be a separate array type or is specializing string enough? 
+// todo: break out memory allocation from template - keep template as a wrapper for casting a typeless tbl
 
 // todo: make resize() - should there be a resize()? only affects array?
 // todo: use inline assembly to vectorize basic math operations
@@ -545,40 +549,40 @@ private:
   template<bool OWNED=true> void typed_del(){ if(m_mem) free(memStart()); };   // explicit template specialization to make an owned tbl free it's memory and a non-owned tbl not free it's memory
   template<> void typed_del<false>(){}; 
 
-  void   sizeBytes(u64 bytes){ memStart()->sizeBytes = bytes; }
-  void        size(u64  size)
+  void      sizeBytes(u64 bytes){ memStart()->sizeBytes = bytes; }
+  void           size(u64  size)
   {
     memStart()->size = size;
   }
-  void    capacity(u64   cap)
+  void       capacity(u64   cap)
   {
     memStart()->capacity = cap;
   }
-  void       elems(u64 elems)
+  void          elems(u64 elems)
   {
     memStart()->elems = elems;
   }
-  void      mapcap(u64 mapcap){ memStart()->mapcap = mapcap; }
-  u64              nxt(u64 i, u64 mod) const
+  void         mapcap(u64 mapcap){ memStart()->mapcap = mapcap; }
+  u64             nxt(u64 i, u64 mod) const
   {
     return ++i % mod;
   }
-  u64             prev(u64 i, u64 mod) const
+  u64            prev(u64 i, u64 mod) const
   {
     if(mod==0) return 0;
     return i==0?  mod-1  :  i-1;
   }
-  u64         wrapDist(u64 ideal, u64 idx, u64 mod) const
+  u64        wrapDist(u64 ideal, u64 idx, u64 mod) const
   {
     if(idx>=ideal) return idx - ideal;
     else return idx + (mod-ideal);
   }
-  u64         wrapDist(KV*  elems, u64 idx, u64 mod) const
+  u64        wrapDist(KV*  elems, u64 idx, u64 mod) const
   {
     u64 ideal = elems[idx].hsh.hash % mod;
     return wrapDist(ideal,idx,mod);
   }
-  KV&         place_rh(KV kv, KV* elems, u64 st, u64 dist, u64 mod, u64* placement=nullptr)   // place_rh is place with robin hood hashing 
+  KV&        place_rh(KV kv, KV* elems, u64 st, u64 dist, u64 mod, u64* placement=nullptr)   // place_rh is place with robin hood hashing 
   {
     //assert( strcmp(kv.key,"")!=0 );
 
@@ -608,7 +612,7 @@ private:
     if(ret) return *ret;
     else    return KV::error_kv();
   }
-  u64          compact(u64 st, u64 en, u64 mapcap)
+  u64         compact(u64 st, u64 en, u64 mapcap)
   {
     u64   cnt = 0;                                   // cnt is count which counts the number of loops, making sure the entire map capacity (mapcap) has not bene exceeded
     KV*     el = elemStart(); 
@@ -644,7 +648,7 @@ private:
 
     return i;
   }
-  u64          reorder()                                         // can this be done by storing chunks (16-64 etc) of KVs in an array, setting the previous slots to empty, sorting the KVs in the array by the slot they will go in, then placing them?   
+  u64         reorder()                                         // can this be done by storing chunks (16-64 etc) of KVs in an array, setting the previous slots to empty, sorting the KVs in the array by the slot they will go in, then placing them?   
   { 
     u64  mod  =  map_capacity();
     if(mod==0){ return 0; }
@@ -669,7 +673,7 @@ private:
 
     return cnt;
   }
-  void            init(u64 size)
+  void           init(u64 size)
   {
     u64    szBytes  =  tbl::size_bytes(size);
     u8*      memst  =  (u8*)malloc(szBytes);                 // memst is memory start
@@ -686,7 +690,7 @@ private:
     f->owned     = 1;
 
   }
-  void         destroy()
+  void        destroy()
   { 
     if( m_mem && owned() ){
       //tbl_PRNT("\n destruction \n");
@@ -700,7 +704,7 @@ private:
       m_mem = nullptr;
     }
   }
-  void              cp(tbl const& l)
+  void             cp(tbl const& l)
   {
     //if(&l==nullptr) || l.data()==nullptr)
     //reserve(l.size(), l.map_capacity() ); // l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
@@ -722,7 +726,7 @@ private:
       m_mem = l.m_mem;
     } 
   }
-  void              mv(tbl&& r)
+  void             mv(tbl&& r)
   {
     //tbl_PRNT("\n moved \n");
     m_mem   = r.m_mem;
@@ -776,6 +780,7 @@ public:
   tbl(tbl&& r){ mv(std::move(r)); }
   tbl& operator=(tbl const& l){ cp(l); return *this; }
   tbl& operator=(tbl&&      r){ mv(std::move(r)); return *this; }
+
   //tbl(tbl&&      r) = delete;
   //tbl(tbl&&      r){ mv(std::move(r)); }
   //tbl& operator=(tbl&&      r) = delete;
@@ -799,8 +804,7 @@ public:
     HshType hh;
     hh.hash   =  HashStr(key);
     u32 hsh   =  hh.hash;                                                 // make sure that the hash is being squeezed into the same bit depth as the hash in HshType
-    //u32  hsh  =  HashStr(key);
-    KV*   el  =  (KV*)elemStart();                                     // el is a pointer to the elements 
+    KV*   el  =  (KV*)elemStart();                                        // el is a pointer to the elements 
     u64  mod  =  map_capacity();
     u64    i  =  hsh % mod;
     u64   en  =  prev(i,mod);
@@ -967,7 +971,7 @@ public:
     u64   prevBytes  =  sizeBytes();
     u64  prevMapCap  =  map_capacity();
     u64    nxtBytes  =  memberBytes() + sizeof(T)*count +  sizeof(KV)*mapcap + childcap;
-    void*        re;
+    void*     re;
     bool      fresh  = !m_mem;
     if(fresh) re = malloc(nxtBytes);
     else      re = realloc( (void*)memStart(), nxtBytes);
@@ -1041,29 +1045,43 @@ public:
     u8*     nxtp = (u8*)malloc(nxtsz);
     if(nxtp){
       u8*     p = (u8*)memStart();
-      memcpy(nxtp, p, vecsz);
-      auto ff = (fields*)nxtp;
-      KV* nxtel = (KV*)(nxtp+vecsz);                                       // nxtel is next element
+      memcpy(nxtp, p, vecsz);                                                            // todo: needs to actually use the copy constructor or the assignment operator 
+      auto   ff = (fields*)nxtp;
+      KV* nxtel = (KV*)(nxtp+vecsz);                                                         // nxtel is next element
       u64   cur = 0;
       TO(map_capacity(),i)
         if(el[i].hsh.type!= HshType::EMPTY){
           nxtel[cur++] = el[i];
         }
 
-      destroy();
-      m_mem = nxtp+memberBytes();
-      
-      void* chld = childData();
-      memmove(chld, prvChld, chldCap);
-      auto f   =  memStart();
-      f->t     =  't';
-      f->b     =  'b';
-      f->owned =   1;
+      auto  prvF = (fields*)(prvChld);
+
+      tbl<T> prev;
+      prev.m_mem = m_mem;                                                                 // make a table to hold the previous span of bytes
+      m_mem    = nxtp+memberBytes();                                                      // now this table holds the new span of bytes
+
+      auto f   = memStart();
+      f->t     = 't';
+      f->b     = 'b';
+      f->owned = 1;
       sizeBytes(nxtsz);
       size(sz);
       capacity(sz);
       elems(elemcnt);
       mapcap(elemcnt);
+
+      void* chld = childData();
+      byte_move(chld, prvChld, chldCap);                                                 // shouldn't be neccesary because this is using malloc and not realloc()
+      auto   fff = (fields*)(chld);
+      
+      prev.destroy();
+      prev.m_mem = nullptr;                                                              // makes destructor early exit on destroy
+      
+      //memmove(chld, prvChld, chldCap);
+
+      //auto fff = (fields*)(chld);
+
+      auto cf = (fields*)( childData() );
 
       //KV& kv = el[i];
       //KV* e = elemStart();                                                        // now this is the new tabel, not the old one like the call to elemStart() above
@@ -1159,7 +1177,7 @@ public:
       init(0);
     }
   }
-  T*            begin(){ return (T*)m_mem; }
+  T*            begin(){ return  (T*)m_mem;           }
   T*              end(){ return ((T*)m_mem) + size(); }
   auto        flatten() -> tbl<T>&
   {
@@ -1238,6 +1256,15 @@ private:
   template<class N> static    N   mx(N a, N b){return a<b?b:a;}
   template<class N> static    N   mn(N a, N b){return a<b?a:b;}
 
+  void byte_move(void* dest, void* src, u64 sz)
+  {
+    u8*  d = (u8*)dest;
+    u8*  s = (u8*)src;
+    if(dest==src) return;
+    else if(dest < src) TO(sz,i) d[i] = s[i];
+    else FROM(sz,i) d[i] = s[i];
+  }
+
 public:
   static u64    memberBytes()
   {
@@ -1299,16 +1326,16 @@ public:
 KVOfst::operator tu64()
 {   
   if(base){
-    tu64 t; 
-    auto  f = (tu64::fields*)base;
-    t.m_mem = (u8*)(f+1);
-    
+    tu64   t; 
     tu64 ret;
+
+    auto  f   = (tu64::fields*)base;
+    t.m_mem   = (u8*)(f+1);
     auto  fff = (tu64::fields*)(kv->val + (u64)t.childData());
     ret.m_mem = (u8*)(fff+1);
     u64     a = ((u64*)ret.m_mem)[0];
     u64     b = ((u64*)ret.m_mem)[1];
-    t.m_mem   = nullptr;
+    t.m_mem   = nullptr;                                                                 // prevents the destructor running
 
     return ret;
   }else{
@@ -1325,6 +1352,8 @@ KVOfst::operator tu64()
 
 
 
+//
+//u32  hsh  =  HashStr(key);
 
 //u64 chldst = (u64)f + f->capacity*8 + f->mapcap*sizeof(KV) + sizeof(f);
 //u64     cd = (u64)t.childData();
