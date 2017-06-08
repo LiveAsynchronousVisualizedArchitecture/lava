@@ -67,10 +67,10 @@
 // -todo: make private byte move function
 // -todo: make shrink_to_fit() take into account childData() - will need to redo both the base pointer and the tbl offset ?
 // -todo: debug shrink_to_fit() tbl child data return - why is map capacity changed to 4 when reading? - when both reading or writing the table can be expanded - why does expanding break it ? - reserve didn't copy child data at all
+// -todo: template table casting from KVOfst
 
-// todo: multiply mapcap by 80 and elems by 100, then compare sizes to get an integer only expansion at 80% full
 // todo: split operator()() into a const and non-const version - make them use a get() function underneath
-// todo: template table casting from KVOfst
+// todo: multiply mapcap by 80 and elems by 100, then compare sizes to get an integer only expansion at 80% full
 // todo: break out fields from template
 // todo: make flatten also shrink_to_fit()
 // todo: destroy any non-child tables in the map 
@@ -480,8 +480,6 @@ struct       KV
 };
 struct   KVOfst
 {
-  //KV&         kv;
-
   KV*         kv;
   void*     base;
 
@@ -497,11 +495,9 @@ struct   KVOfst
    kv   = _kv;
    base = _base;
   }
-  //KVOfst(KV&& _kv, void* _base=nullptr) :
-  //  kv(std::move(_kv)), base(_base)
-  //{}
   
-  operator tu64();
+  template<class T> operator tbl<T>();
+
   template<class N> operator N() { return kv->as<N>(); }
   template<class N> KVOfst& operator=(N const& n){ *kv = n; return *this; }
 };
@@ -778,15 +774,10 @@ public:
   }
   ~tbl(){ destroy(); }
 
-  tbl(tbl const& l){ cp(l); }
-  tbl(tbl&& r){ mv(std::move(r)); }
-  tbl& operator=(tbl const& l){ cp(l); return *this; }
+  tbl(tbl const& l){ cp(l);            }
+  tbl(tbl&&      r){ mv(std::move(r)); }
+  tbl& operator=(tbl const& l){ cp(l);            return *this; }
   tbl& operator=(tbl&&      r){ mv(std::move(r)); return *this; }
-
-  //tbl(tbl&&      r) = delete;
-  //tbl(tbl&&      r){ mv(std::move(r)); }
-  //tbl& operator=(tbl&&      r) = delete;
-  //operator       u64() const{ return size(); }
 
   T&      operator[](u64 i)
   {
@@ -841,7 +832,7 @@ public:
   }
   tbl     operator>>(tbl const& l){ return tbl::concat_l(*this, l); }
   tbl     operator<<(tbl const& l){ return tbl::concat_r(*this, l); }
-  tbl&    operator--(){ shrink_to_fit();    return *this; }    
+  tbl&    operator--(){ shrink_to_fit();    return *this; }
   tbl&    operator++(){ expand(true,false); return *this; }
   void    operator+=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
   void    operator-=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }
@@ -1330,15 +1321,15 @@ public:
   }
 };
 
-KVOfst::operator tu64()
+template<class T> KVOfst::operator tbl<T>() 
 {   
   if(base){
-    tu64   t; 
-    tu64 ret;
+    tbl<T>   t;                                                                // type only matters so that c 
+    tbl<T> ret;
 
-    auto  f   = (tu64::fields*)base;
+    auto  f   = (tbl<T>::fields*)base;
     t.m_mem   = (u8*)(f+1);
-    auto  fff = (tu64::fields*)(kv->val + (u64)t.childData());
+    auto  fff = (tbl<T>::fields*)(kv->val + (u64)t.childData());
     ret.m_mem = (u8*)(fff+1);
     u64     a = ((u64*)ret.m_mem)[0];
     u64     b = ((u64*)ret.m_mem)[1];
@@ -1346,7 +1337,7 @@ KVOfst::operator tu64()
 
     return ret;
   }else{
-    return *((tu64*)kv->val);
+    return *((tbl<T>*)kv->val);
   }
 }
 
@@ -1358,6 +1349,18 @@ KVOfst::operator tu64()
 
 
 
+//tbl(tbl&&      r) = delete;
+//tbl(tbl&&      r){ mv(std::move(r)); }
+//tbl& operator=(tbl&&      r) = delete;
+//operator       u64() const{ return size(); }
+
+//KV&         kv;
+//
+//KVOfst(KV&& _kv, void* _base=nullptr) :
+//  kv(std::move(_kv)), base(_base)
+//{}
+//
+//operator tu64();
 
 //
 //u32  hsh  =  HashStr(key);

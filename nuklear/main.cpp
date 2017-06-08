@@ -859,7 +859,6 @@ ENTRY_DECLARATION
     //kv         =  chld;
     tst("child") =  chld;
 
-    
     //KV kv        =  tst("child");
     //tf64& chldp  =  kv.operator tf64 &();
     //tf64& chldp  =  kv;
