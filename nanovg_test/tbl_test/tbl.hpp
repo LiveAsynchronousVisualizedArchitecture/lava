@@ -69,12 +69,16 @@
 // -todo: debug shrink_to_fit() tbl child data return - why is map capacity changed to 4 when reading? - when both reading or writing the table can be expanded - why does expanding break it ? - reserve didn't copy child data at all
 // -todo: template table casting from KVOfst
 // -todo: multiply mapcap by 8 and elems by 10, then compare sizes to get an integer only expansion at 80% full
+// -todo: break out fields from template
+// -todo: make flatten also shrink_to_fit()
 
-// todo: break out fields from template
+// todo: make get return hsh through an optional argument
+// todo: make cast operator for KVOfst return false on error_kv or kv being nullptr
+// todo: make operator() check for existence and ownership before expanding
+// todo: test and check assigning child table to parent table
 // todo: make KVOfst expand the tbl - would this imply that the size of the array type needs to be kept in the fields?
 // todo: make operator()() use multiple functions so that it can be read from without expansion
 // todo: split operator()() into a const and non-const version - make them use a get() function underneath
-// todo: make flatten also shrink_to_fit()
 // todo: destroy any non-child tables in the map 
 // todo: destroy any child tables in the child data 
 // todo: make operator-=(const char*) delete a key in the map - need to use a generic del() function
@@ -84,7 +88,6 @@
 // | does this imply that there should be a separate array type or is specializing string enough? 
 // todo: break out memory allocation from template - keep template as a wrapper for casting a typeless tbl
 // todo: make put() take a KV instead of beiing a template
-
 
 // todo: make resize() - should there be a resize()? only affects array?
 // todo: use inline assembly to vectorize basic math operations
@@ -172,7 +175,7 @@ using   tf64  =  tbl<f64>;
 
 struct  KV;
 
-union   HshType
+union     HshType
 {
 public:
   using    u8   =   uint8_t;
@@ -250,7 +253,7 @@ public:
     hash(0)
   {}
 };
-struct       KV
+struct         KV
 {
   //using    u8   =   uint8_t;
   //using   u16   =  uint16_t;
@@ -484,7 +487,7 @@ struct       KV
     //return "Empty";
   }
 };
-struct   KVOfst
+struct     KVOfst
 {
   KV*         kv;
   void*     base;
@@ -507,10 +510,26 @@ struct   KVOfst
   template<class N> operator N() { return kv->as<N>(); }
   template<class N> KVOfst& operator=(N const& n){ *kv = n; return *this; }
 };
+struct  TblFields 
+{
+  u64         t :  8;                             // will hold the character 't'
+  u64         b :  8;                             // will hold the character 'b'
+  u64 sizeBytes : 48;
+
+  u64  capacity : 42;
+  u64    mapcap : 22;
+
+  u64     owned :  1;
+  u64     elems : 21;
+  u64      size : 42;
+};
+
 
 template<class T> class tbl
 {
-public:                                                                         
+public:                 
+  using fields  =  TblFields;
+
   using    u8   =   uint8_t;
   using   u16   =  uint16_t;
   using   u32   =  uint32_t;
@@ -533,37 +552,14 @@ public:
   using   tf32  =  tbl<f32>;
   using   tf64  =  tbl<f64>;
 
-  struct fields 
-  {
-    u64         t :  8;                             // will hold the character 't'
-    u64         b :  8;                             // will hold the character 'b'
-    u64 sizeBytes : 48;
-
-    u64  capacity : 42;
-    u64    mapcap : 22;
-
-    u64     owned :  1;
-    u64     elems : 21;
-    u64      size : 42;
-  };
-
   //using   T     =       i32;
 
 private:
-  void      sizeBytes(u64 bytes){ memStart()->sizeBytes = bytes; }
-  void           size(u64  size)
-  {
-    memStart()->size = size;
-  }
-  void       capacity(u64   cap)
-  {
-    memStart()->capacity = cap;
-  }
-  void          elems(u64 elems)
-  {
-    memStart()->elems = elems;
-  }
-  void         mapcap(u64 mapcap){ memStart()->mapcap = mapcap; }
+  void      sizeBytes(u64  bytes){ memStart()->sizeBytes =  bytes; }
+  void           size(u64   size){ memStart()->size      =   size; }
+  void       capacity(u64    cap){ memStart()->capacity  =    cap; }
+  void          elems(u64  elems){ memStart()->elems     =  elems; }
+  void         mapcap(u64 mapcap){ memStart()->mapcap    = mapcap; }
   u64             nxt(u64 i, u64 mod) const
   {
     return ++i % mod;
@@ -792,47 +788,95 @@ public:
     tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
     return ((T*)m_mem)[i];
   }
+  //KVOfst  operator()(const char* key, bool make_new=true)
+  //{
+  //  if(!owned()){ 
+  //    if(has(key))
+  //  }
+  //
+  //  u64 mapcap = map_capacity();
+  //  if( mapcap==0 || mapcap*8 < elems()*10 )
+  //    if(!expand(false, true)) return &KV::error_kv();
+  //
+  //  HshType hh;
+  //  hh.hash   =  HashStr(key);
+  //  u32 hsh   =  hh.hash;                                                 // make sure that the hash is being squeezed into the same bit depth as the hash in HshType
+  //  KV*   el  =  (KV*)elemStart();                                        // el is a pointer to the elements 
+  //  u64  mod  =  map_capacity();
+  //  u64    i  =  hsh % mod;
+  //  u64   en  =  prev(i,mod);
+  //  u64 dist  =  0;
+  //  for(;;++i,++dist)
+  //  {
+  //    i %= mod;                                                        // get idx within map_capacity
+  //    HshType eh = el[i].hsh;                                          // eh is element hash
+  //    if(el[i].hsh.type == HshType::EMPTY){ 
+  //      elems( elems()+1 );
+  //      new (&el[i]) KV(key, hsh);
+  //      el[i].hsh.type = HshType::NONE;
+  //      return KVOfst( &(el[i]) );
+  //    }else if(hsh==eh.hash  &&                                                // if the hashes aren't the same, the keys can't be the same
+  //      strncmp(el[i].key,key,sizeof(KV::Key)-1)==0 )
+  //    { 
+  //      auto type = el[i].hsh.type;
+  //      if( (type&HshType::TABLE) && (type&HshType::CHILD) ){
+  //        return KVOfst( &el[i], (void*)(memStart()) );
+  //      }else
+  //        return KVOfst( &(el[i]) ); //el[i];   //  = KV(key, hsh);
+  //    }else if(dist > wrapDist(el,i,mod) ){
+  //      KV kv(key, hsh);
+  //      elems( elems()+1 );
+  //      return KVOfst( &(place_rh(kv, el, i, dist, mod)) );
+  //    }
+  //  
+  //    if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+  //  }
+  //
+  //  return &KV::error_kv();
+  //}
   KVOfst  operator()(const char* key, bool make_new=true)
-  {
-    u64 mapcap = map_capacity();
-    if( mapcap==0 || mapcap*8 < elems()*10 )
-      if(!expand(false, true)) return &KV::error_kv();
+  {      
+    u32 hsh;
+    KV*  kv = m_mem?  get(key, &hsh) : nullptr;
+    if(owned())
+    { 
+      u64 mapcap = map_capacity();
+      if( !kv && (mapcap==0 || mapcap*8 < elems()*10) )
+        if(!expand(false, true)) return KVOfst(); // &KV::error_kv();
 
-    HshType hh;
-    hh.hash   =  HashStr(key);
-    u32 hsh   =  hh.hash;                                                 // make sure that the hash is being squeezed into the same bit depth as the hash in HshType
-    KV*   el  =  (KV*)elemStart();                                        // el is a pointer to the elements 
-    u64  mod  =  map_capacity();
-    u64    i  =  hsh % mod;
-    u64   en  =  prev(i,mod);
-    u64 dist  =  0;
-    for(;;++i,++dist)
-    {
-      i %= mod;                                                        // get idx within map_capacity
-      HshType eh = el[i].hsh;                                          // eh is element hash
-      if(el[i].hsh.type == HshType::EMPTY){ 
-        elems( elems()+1 );
-        new (&el[i]) KV(key, hsh);
-        el[i].hsh.type = HshType::NONE;
-        return KVOfst( &(el[i]) );
-      }else if(hsh==eh.hash  &&                                                // if the hashes aren't the same, the keys can't be the same
-        strncmp(el[i].key,key,sizeof(KV::Key)-1)==0 )
-      { 
-        auto type = el[i].hsh.type;
-        if( (type&HshType::TABLE) && (type&HshType::CHILD) ){
-          return KVOfst( &el[i], (void*)(memStart()) );
-        }else
-          return KVOfst( &(el[i]) ); //el[i];   //  = KV(key, hsh);
-      }else if(dist > wrapDist(el,i,mod) ){
-        KV kv(key, hsh);
-        elems( elems()+1 );
-        return KVOfst( &(place_rh(kv, el, i, dist, mod)) );
-      }
-    
-      if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
-    }
+      kv = get(key, &hsh);                                                                     // if the expansion succeeded there has to be space now, but the keys will be reordered 
 
-    return &KV::error_kv();
+      auto type = kv->hsh.type;
+      if(type==HshType::EMPTY)
+      {
+        elems( elems()+1 );
+        new (kv) KV(key, hsh);
+        kv->hsh.type = HshType::NONE;
+        return KVOfst(kv);
+      }else if( (type&HshType::TABLE) && (type&HshType::CHILD) )
+        return KVOfst(kv, (void*)memStart());
+      else
+        return KVOfst(kv);
+    }else 
+      return KVOfst(kv);                                                    // if the key wasn't found, kv will be a nullptr which is the same as an error KVOfst that will evaluate to false when cast to a boolean      
+
+    //  }
+    //  }else if(hsh==kv->hsh.hash  &&                                                // if the hashes aren't the same, the keys can't be the same
+    //    strncmp(kv->key,key,sizeof(KV::Key)-1)==0 )
+    //  {
+    //    auto type = kv->hsh.type;
+    //    if( (type&HshType::TABLE) && (type&HshType::CHILD) )
+    //      return KVOfst(kv, (void*)memStart());
+    //    else
+    //      return KVOfst(kv);
+    //  }else if(dist > wrapDist(el,i,mod) ){
+    //    KV nxtkv(key, hsh);
+    //    elems( elems()+1 );
+    //    return KVOfst( &(place_rh(nxtkv, el, i, dist, mod)) );
+    //  }
+    //}else return KVOfst(kv)                                                    // if the key wasn't found, kv will be a nullptr which is the same as an error KVOfst that will evaluate to false when cast to a boolean      
+
+    // todo: don't return right away, check if the map should be expanded 
   }
   tbl     operator>>(tbl const& l){ return tbl::concat_l(*this, l); }
   tbl     operator<<(tbl const& l){ return tbl::concat_r(*this, l); }
@@ -909,9 +953,37 @@ public:
     KV const& kv = (*this)(key, false);
     return kv.hsh.type != EMPTY;
   }
-  //KV&            get()
-  //{
-  //}
+  KV*             get(const char* key, u32* out_hash=nullptr)
+  {
+    HshType hh;
+    hh.hash   =  HashStr(key);
+    u32  hsh  =  hh.hash;                                                 // make sure that the hash is being squeezed into the same bit depth as the hash in HshType
+    if(out_hash){ *out_hash = hsh; }
+    KV*   el  =  (KV*)elemStart();                                        // el is a pointer to the elements 
+    u64  mod  =  map_capacity();
+    u64    i  =  hsh % mod;
+    u64   en  =  prev(i,mod);
+    u64 dist  =  0;
+    for(;;++i,++dist)
+    {
+      i %= mod;                                                                // get idx within map_capacity
+      HshType eh = el[i].hsh;                                                  // eh is element hash
+      if( eh.type == HshType::EMPTY || 
+           (hsh == eh.hash &&                                  // if the hashes aren't the same, the keys can't be the same
+           strncmp(el[i].key,key,sizeof(KV::Key)-1)==0) )
+      { 
+        return &el[i];
+      }else if(dist > wrapDist(el,i,mod) ){
+        KV kv(key, hsh);
+        elems( elems()+1 );
+        return &(place_rh(kv, el, i, dist, mod));
+      }
+
+      if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+    }
+
+    return nullptr; // no empty slots and key was not found
+  }
 
   u64            size() const { return m_mem? memStart()->size : 0; }
   T*             data() const {return (T*)m_mem; }
@@ -1194,7 +1266,7 @@ public:
     TO(mapcap,i)
       if(  (e[i].hsh.type & HshType::TABLE) && 
           !(e[i].hsh.type & HshType::CHILD) ){                                 // if the table bit is set but the child bit is not set
-        tu8*  t  =  (tu8*)e[i].val;
+        tbl<T>*  t  =  (tbl<T>*)e[i].val;
         newcap  +=  t->sizeBytes();
     }
     reserve(0,0, prevCap + newcap);
@@ -1203,7 +1275,7 @@ public:
     TO(mapcap,i)
       if(  (e[i].hsh.type & HshType::TABLE) && 
           !(e[i].hsh.type & HshType::CHILD) ){                                 // if the table bit is set but the child bit is not set
-        tu8*       t  =  (tu8*)e[i].val;
+        tbl<T>*       t  =  (tbl<T>*)e[i].val;
         auto szbytes  =  t->sizeBytes();
 
         memcpy(curChild, t->memStart(), szbytes);
@@ -1211,9 +1283,11 @@ public:
         f->owned = 0;
 
         e[i].hsh.type  |=  HshType::CHILD;
-        e[i].val        =  (u64)curChild - chldst; // (u64)memStart();                    // the memory start will likely have changed due to reallocation
+        e[i].val        =  (u64)curChild - chldst;                             // the memory start will likely have changed due to reallocation
         curChild       +=  szbytes;
       }
+
+    shrink_to_fit();                                                           // todo: do it all at once to avoid extra copying and allocations 
 
     return *this;
   }
@@ -1354,6 +1428,13 @@ template<class T> KVOfst::operator tbl<T>()
 
 
 
+//if(kv)
+//{
+//
+//}else return KVOfst();                                                   // if(kv)
+//}else{                                                                     // if(owned())
+//  KV* kv = get(key);
+//}
 
 //if( !( map_capacity()*0.75f > (float)elems() ) )
 //   if(!expand(false, true)) return &KV::error_kv();

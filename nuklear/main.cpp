@@ -865,7 +865,7 @@ ENTRY_DECLARATION
     //tf64* chldp  =  kv.operator tf64 *();
 
     tst.flatten();
-    tst.shrink_to_fit();
+    //tst.shrink_to_fit();
     //KV       kv  =  tst("child");
 
     //auto      f  =  (tst("child").operator tu64() ).memStart();
