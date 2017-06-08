@@ -66,8 +66,10 @@
 // -todo: make KV.val as a child table an offset into the child data segment instead of an offset into the whole table memory
 // -todo: make private byte move function
 // -todo: make shrink_to_fit() take into account childData() - will need to redo both the base pointer and the tbl offset ?
+// -todo: debug shrink_to_fit() tbl child data return - why is map capacity changed to 4 when reading? - when both reading or writing the table can be expanded - why does expanding break it ? - reserve didn't copy child data at all
 
-// todo: debug shrink_to_fit() tbl child data return
+// todo: multiply mapcap by 80 and elems by 100, then compare sizes to get an integer only expansion at 80% full
+// todo: split operator()() into a const and non-const version - make them use a get() function underneath
 // todo: template table casting from KVOfst
 // todo: break out fields from template
 // todo: make flatten also shrink_to_fit()
@@ -962,15 +964,18 @@ public:
   {
     if( !owned() ) return m_mem;
 
+    u64 prvChldCap = child_capacity();
     count     =  mx(count,          capacity() );
     mapcap    =  mx(mapcap,     map_capacity() );
-    childcap  =  mx(childcap, child_capacity() );
-    KV*   prevElems  =  elemStart();
-    u64   prevMemSt  =  (u64)memStart();
-    u64    prevOfst  =  prevElems? ((u64)prevElems)-prevMemSt  :  0;
-    u64   prevBytes  =  sizeBytes();
-    u64  prevMapCap  =  map_capacity();
-    u64    nxtBytes  =  memberBytes() + sizeof(T)*count +  sizeof(KV)*mapcap + childcap;
+    childcap  =  mx(childcap,       prvChldCap );
+    KV*    prevElems  =  elemStart();
+    u64    prevMemSt  =  (u64)memStart();
+    u64     prevOfst  =  prevElems? ((u64)prevElems)-prevMemSt  :  0;
+    u64    prevBytes  =  sizeBytes();
+    u64   prevMapCap  =  map_capacity();
+    void*    prvChld  =  childData();
+    //auto f = (fields*)prvChld;
+    u64     nxtBytes  =  memberBytes() + sizeof(T)*count +  sizeof(KV)*mapcap + childcap;
     void*     re;
     bool      fresh  = !m_mem;
     if(fresh) re = malloc(nxtBytes);
@@ -981,6 +986,14 @@ public:
       sizeBytes(nxtBytes);
       capacity(count);
       this->mapcap(mapcap);
+      if(re && fresh){
+        auto f = memStart();
+        f->t   = 't';
+        f->b   = 'b';
+        size(0); elems(0);
+      }
+      byte_move(childData(), prvChld, prvChldCap);
+      //auto ff = (fields*)childData();
 
       KV*  el = elemStart();                                     //  is this copying elements forward in memory? can it overwrite elements that are already there? - right now reserve only ends up expanding memory for both the array and map
       u8* elb = (u8*)el;  
@@ -1003,12 +1016,6 @@ public:
     }
 
     //if(re && fresh){ set_size(0); set_elems(0); }
-    if(re && fresh){
-      auto f = memStart();
-      f->t   = 't';
-      f->b   = 'b';
-      size(0); elems(0);
-    }
 
     return re;
   }
