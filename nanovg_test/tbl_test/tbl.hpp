@@ -83,8 +83,10 @@
 // -todo: destroy any non-child tables in the map - if they aren't owned, don't they get destroyed anyway?
 // -todo: test destruction of non-child table in a map key - if it isn't owned it would get destroyed on scope exit anyway
 
-// todo: check the type of the table cast and build in asserts just like fundamental number types
+
+// todo: try to take out make_new in operator()
 // todo: make operator()() take integers so that the map can also be used as an iterable list through sub-tables - just make operator()() take an integer offset into elemStart(), then make an iteration cursor through the non-empty elements of the map? - should this make the hash equal the integer passed or should it look up the element directly? - since elemStart() can already loop through all elements, making the integer become the hash should interlace the numbered indices with the string key hash tables - should the integer be hashed? - hashing the integer should give the advantages of a normal hash table
+// todo: check the type of the table cast and build in asserts just like fundamental number types
 // todo: make operator-=(const char*) delete a key in the map - need to use a generic del() function
 // todo: break out memory allocation from template - keep template as a wrapper for casting a typeless tbl
 // todo: make put() take a KV instead of being a template
@@ -686,17 +688,15 @@ private:
     f->owned     = 1;
 
   }
-  void        destroy(bool array_destruct=true)
+  void        destroy()
   { 
     if( m_mem && owned() ){
       //tbl_PRNT("\n destruction \n");
 
-      if(array_destruct){
-        T*    a = (T*)m_mem;
-        auto sz = size();
-        TO(sz,i){
-          a[i].T::~T();                                                                    // run the destructors manually before freeing the memory
-        }
+      T*    a = (T*)m_mem;
+      auto sz = size();
+      TO(sz,i){
+        a[i].T::~T();                                                                    // run the destructors manually before freeing the memory
       }
       
       free(memStart());
@@ -790,7 +790,14 @@ public:
     tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
     return ((T*)m_mem)[i];
   }
-  KVOfst  operator()(const char* key, bool make_new=true)
+  KVOfst  operator()(i32 k)
+  {
+    char key[sizeof(k)+1];
+    memcpy(key, &k, sizeof(k));
+    key[sizeof(k)] = '\0';
+    return operator()(key);
+  }
+  KVOfst  operator()(const char* key)
   {      
     u32 hsh;
     KV*  kv = m_mem?  get(key, &hsh) : nullptr;
@@ -798,9 +805,9 @@ public:
     { 
       u64 mapcap = map_capacity();
       if( !kv && (mapcap==0 || mapcap*8 < elems()*10) )
-        if(!expand(false, true)) return KVOfst(); // &KV::error_kv();
+        if(!expand(false, true)) return KVOfst();
 
-      kv = get(key, &hsh);                                                                     // if the expansion succeeded there has to be space now, but the keys will be reordered 
+      kv = get(key, &hsh);                                                               // if the expansion succeeded there has to be space now, but the keys will be reordered 
 
       auto type = kv->hsh.type;
       if(type==HshType::EMPTY)
@@ -814,23 +821,7 @@ public:
       else
         return KVOfst(kv);
     }else 
-      return KVOfst(kv);                                                    // if the key wasn't found, kv will be a nullptr which is the same as an error KVOfst that will evaluate to false when cast to a boolean      
-
-    //  }
-    //  }else if(hsh==kv->hsh.hash  &&                                                // if the hashes aren't the same, the keys can't be the same
-    //    strncmp(kv->key,key,sizeof(KV::Key)-1)==0 )
-    //  {
-    //    auto type = kv->hsh.type;
-    //    if( (type&HshType::TABLE) && (type&HshType::CHILD) )
-    //      return KVOfst(kv, (void*)memStart());
-    //    else
-    //      return KVOfst(kv);
-    //  }else if(dist > wrapDist(el,i,mod) ){
-    //    KV nxtkv(key, hsh);
-    //    elems( elems()+1 );
-    //    return KVOfst( &(place_rh(nxtkv, el, i, dist, mod)) );
-    //  }
-    //}else return KVOfst(kv)                                                    // if the key wasn't found, kv will be a nullptr which is the same as an error KVOfst that will evaluate to false when cast to a boolean      
+      return KVOfst(kv);                                                                 // if the key wasn't found, kv will be a nullptr which is the same as an error KVOfst that will evaluate to false when cast to a boolean      
 
     // todo: don't return right away, check if the map should be expanded 
   }
@@ -1383,7 +1374,29 @@ template<class T> KVOfst::operator tbl<T>()
 
 
 
+//
+// bool make_new=true) // make_new); // bool make_new=true)
 
+//  }
+//  }else if(hsh==kv->hsh.hash  &&                                                // if the hashes aren't the same, the keys can't be the same
+//    strncmp(kv->key,key,sizeof(KV::Key)-1)==0 )
+//  {
+//    auto type = kv->hsh.type;
+//    if( (type&HshType::TABLE) && (type&HshType::CHILD) )
+//      return KVOfst(kv, (void*)memStart());
+//    else
+//      return KVOfst(kv);
+//  }else if(dist > wrapDist(el,i,mod) ){
+//    KV nxtkv(key, hsh);
+//    elems( elems()+1 );
+//    return KVOfst( &(place_rh(nxtkv, el, i, dist, mod)) );
+//  }
+//}else return KVOfst(kv)                                                    // if the key wasn't found, kv will be a nullptr which is the same as an error KVOfst that will evaluate to false when cast to a boolean      
+
+//bool array_destruct=true)
+//
+//if(array_destruct){
+//}
 
 //u64 mapcap = map_capacity();
 //KV*      e = elemStart();

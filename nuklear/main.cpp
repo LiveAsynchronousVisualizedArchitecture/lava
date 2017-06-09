@@ -873,7 +873,7 @@ ENTRY_DECLARATION
     tbl<f32> nonChld;
     nonChld.push(1.0f);
     nonChld.push(0.5f);
-    tst("non child") = nonChld;
+    tst(0) = nonChld;
 
     tu64  chldc  =  tst("child"); //kv;  //  tst("child"); //kv;
     //auto      f  =  chldc.memStart();
