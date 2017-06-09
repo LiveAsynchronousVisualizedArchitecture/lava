@@ -82,14 +82,14 @@
 // -todo: destroy any child tables in the child data - not neccesary because they are owned memory and not any compound types with real destructors
 // -todo: destroy any non-child tables in the map - if they aren't owned, don't they get destroyed anyway?
 // -todo: test destruction of non-child table in a map key - if it isn't owned it would get destroyed on scope exit anyway
+// -todo: try to take out make_new in operator()
+// -todo: make operator()() take integers so that the map can also be used as an iterable list through sub-tables - just make operator()() take an integer offset into elemStart(), then make an iteration cursor through the non-empty elements of the map? - should this make the hash equal the integer passed or should it look up the element directly? - since elemStart() can already loop through all elements, making the integer become the hash should interlace the numbered indices with the string key hash tables - should the integer be hashed? - hashing the integer should give the advantages of a normal hash table
+// -todo: make map expansion check at the end of operator() as well as the top - wouldn't the re-order where the kv could be? - just want to expand if it owned and being read - just have to use has() if you want to make sure you don't expand the map on read
+// -todo: make operator-=(const char*) delete a key in the map - need to use a generic del() function - del() exists, more operator overloading won't help density much
+// -todo: make put() take a KV instead of being a template - not worth the trouble right now, solution in search of a problem until it can be shown to cause bloat
 
-
-// todo: try to take out make_new in operator()
-// todo: make operator()() take integers so that the map can also be used as an iterable list through sub-tables - just make operator()() take an integer offset into elemStart(), then make an iteration cursor through the non-empty elements of the map? - should this make the hash equal the integer passed or should it look up the element directly? - since elemStart() can already loop through all elements, making the integer become the hash should interlace the numbered indices with the string key hash tables - should the integer be hashed? - hashing the integer should give the advantages of a normal hash table
 // todo: check the type of the table cast and build in asserts just like fundamental number types
-// todo: make operator-=(const char*) delete a key in the map - need to use a generic del() function
 // todo: break out memory allocation from template - keep template as a wrapper for casting a typeless tbl
-// todo: make put() take a KV instead of being a template
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
 // | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
 // | does this imply that there should be a separate array type or is specializing string enough? 
@@ -336,7 +336,7 @@ struct         KV
   }
   KV&  operator=(KV const& l){ return cp(l); }
   KV&  operator=(KV&& r){      return cp(r); }
-  template<class N> KV& operator=(N const& n)
+  template<class N> KV& operator=(N      const& n)
   {
     hsh.type     = typenum< typecast<N>::type >::num;
     auto castVal = (typecast<N>::type)n;
@@ -561,6 +561,14 @@ private:
   void       capacity(u64    cap){ memStart()->capacity  =    cap; }
   void          elems(u64  elems){ memStart()->elems     =  elems; }
   void         mapcap(u64 mapcap){ memStart()->mapcap    = mapcap; }
+  bool     map_expand(bool force=false)
+  {  
+    u64 mapcap = map_capacity();
+    if( force || (mapcap==0 || mapcap*8 < elems()*10) )
+      return expand(false, true);
+
+    return true;
+  }
   u64             nxt(u64     i, u64 mod) const
   {
     return ++i % mod;
@@ -775,9 +783,9 @@ public:
   }
   ~tbl(){ destroy(); }
 
-  tbl(tbl const& l){ cp(l);            }
-  tbl(tbl&&      r){ mv(std::move(r)); }
+  tbl           (tbl const& l){ cp(l);                          }
   tbl& operator=(tbl const& l){ cp(l);            return *this; }
+  tbl           (tbl&&      r){ mv(std::move(r));               }
   tbl& operator=(tbl&&      r){ mv(std::move(r)); return *this; }
 
   T&      operator[](u64 i)
@@ -799,13 +807,12 @@ public:
   }
   KVOfst  operator()(const char* key)
   {      
-    u32 hsh;
-    KV*  kv = m_mem?  get(key, &hsh) : nullptr;
+    KVOfst  ret;                                                                         // this will be set with placement new instead of operator= because operator= is templated and used for assigning to the KV pointed to by KVOfst::KV* -  this is so tbl("some key") = 85  can work correctly
+    u32     hsh;
+    KV*      kv = m_mem?  get(key, &hsh) : nullptr;
     if(owned())
     { 
-      u64 mapcap = map_capacity();
-      if( !kv && (mapcap==0 || mapcap*8 < elems()*10) )
-        if(!expand(false, true)) return KVOfst();
+      if( !map_expand(!kv) ) return KVOfst();                                            // if map_expand returns false, that means that memory expansion was tried but failed
 
       kv = get(key, &hsh);                                                               // if the expansion succeeded there has to be space now, but the keys will be reordered 
 
@@ -815,14 +822,17 @@ public:
         elems( elems()+1 );
         new (kv) KV(key, hsh);
         kv->hsh.type = HshType::NONE;
-        return KVOfst(kv);
+        new (&ret) KVOfst(kv);
       }else if( (type&HshType::TABLE) && (type&HshType::CHILD) )
-        return KVOfst(kv, (void*)memStart());
+        new (&ret) KVOfst(kv, (void*)memStart());
       else
-        return KVOfst(kv);
+        new (&ret) KVOfst(kv);
     }else 
-      return KVOfst(kv);                                                                 // if the key wasn't found, kv will be a nullptr which is the same as an error KVOfst that will evaluate to false when cast to a boolean      
+      new (&ret) KVOfst(kv);                                                             // if the key wasn't found, kv will be a nullptr which is the same as an error KVOfst that will evaluate to false when cast to a boolean      
 
+    //if(owned() && !map_expand() ) return KVOfst();                                       // not forced here, because kv can't be nullptr - short circuting owned() means that this won't run on a non-owned tbl
+
+    return ret;
     // todo: don't return right away, check if the map should be expanded 
   }
   tbl     operator>>(tbl const& l){ return tbl::concat_l(*this, l); }
@@ -851,6 +861,7 @@ public:
   tbl     operator% (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
 
   template<class V> KVOfst put(const char* key, V val){ return this->operator()(key) = val; }
+  //KVOfst put(const char* key, KV kv){ return *(this->operator()(key).kv) = kv; }
 
   template<class... V> bool emplace(V&&... val)
   {
@@ -1373,6 +1384,13 @@ template<class T> KVOfst::operator tbl<T>()
 
 
 
+
+
+
+
+//u64 mapcap = map_capacity();
+//if( !kv && (mapcap==0 || mapcap*8 < elems()*10) )
+//  if(!expand(false, true)) return KVOfst();
 
 //
 // bool make_new=true) // make_new); // bool make_new=true)
