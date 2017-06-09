@@ -1,5 +1,96 @@
 
 
+// -todo: solve const qualifiers
+// -todo: solve operator()() producing empty keys
+// -todo: put magic number in front of tbl 
+// -todo: template tbl
+// -todo: fix type not being set in tbl::put()
+// -todo: solve map elements movement in reserve() - overlapping memory allocations with memmove and memcpy causing problems - assignemnts too - solved by byte by byte copying from the largest address address backwards 
+// -todo: fix elements when size and capacity are not the same
+// -todo: figure out why there are duplicate keys in the tbl - signed / unsigned mismatch between hashes
+// -todo: figure out why map capacities grow when pushing to array - expand didn't discriminate between whether to expand the array or map and enlarged both 
+// -todo: put back destructors on deallocation
+// -todo: fix size when inserting map elements before pushing array values
+// -todo: put in begin() and end() iterators
+// -todo: fix tbl.put() not making it into the map - put() was close but not the same as operator() - put() now uses operator()
+// -todo: make sure that the first two bytes have TB instead of the most significant little endian bits
+// -todo: use memcpy in cp() - can't because of copy constructors - need to insert the elements
+// -todo: make cp() copy over map elements 
+// -todo: try just shifting bits to read size bytes
+// -todo: make emplace() and emplace_back() methods
+// -todo: put back static KV in error_kv()
+// -todo: make cast types to cast to 64 bit equivilents
+// -todo: cut types down to just u64, i64, double, string etc
+// -todo: add childData() and childDataSize() functions
+// -todo: untemplate KV
+// -todo: make types for both table pointers and table offsets - not actual types, just need to be in the type enum
+// -todo: copy child into child data
+// -todo: increment curChild
+// -todo: change KV to be an offset with an offset type
+// -todo: make reserve take a child data parameter
+// -todo: change tbl types to store m_mem instead of the memStart() - changed to store pointer to table itself to make things easier, not storing just the pointer to the heap
+// -todo: store and retrieve a reference and a pointer to a table
+// -todo: copy tbl out of a KV reference, then copy it out of a KV directly
+// -todo: work on flattening tbls into with child data section
+//      -| start with flattening tables into child section
+//      -| still need 'table of intrinsic type' type definitions, even if the map only has 64 bit types 
+//      -| is a child data offset variable needed? - can it be made from capacity, sizeof(T), and map_capacity() ? - try that first
+// -todo: fix bit flags made from flipped flags
+// -todo: fix type turning to EMPTY when bit combined with CHILD
+// -todo: define KV struct early and fill in methods and functions later
+// -todo: make a KVOfst struct that can hold a KV and an offset for the table
+// -todo: make KVOfst contain just a kv reference instead of full KV
+// -todo: turn fields into a struct
+// -todo: make owned functions
+// -todo: make cp and mv constructors use ownership flag - mv constructor can stay the same because it just copies the m_mem pointer
+// -todo: make a non-owned tbl
+// -todo: make destructor use ownership flag
+// -todo: move ownership from the fields struct to the m_mem pointer? - if the ownership flag is set to false in the contiguous memory, no reference will delete it and the owner of the memory will eventually wipe it out
+// -todo: figure out a way to make tbl work with m_mem while pointing to it directly - make m_mem = 0 and if it is 0, pretend it points to it's own location? - need to make an unowned tbl? where to put the owned bit?
+// -todo: change KVOfst to use  a KV pointer instead of reference
+// -todo: figure out why fields does not line up when returned as a KVOfst from operator() - was using this instead of memStart()
+// -todo: retrieve child table from a flattened table
+// -todo: put tbl array type data in capacity variable low bits - just use a 'type' key while first two bytes are magic number 't' and 'b'
+// -todo: make operator+=(const char*) create a key in the map - operator() already does this
+// -todo: work on flattening table - put in table data segment
+//       -| -change map_capacity to be a variable in memory
+//       -| tbl segment would be calculated from other variables - internal tbl would be an offset from m_mem
+// -todo: figure out what happens when doing anything that effects the size of a child tbl - child tbl cannot have it's size changed? need two different internal tbl types, one for references(non owned) and one for children(owned) ?
+//       - changing size or deleting an internal tbl means re-making the memory with another allocation and memcpy
+// -todo: make non owned type always read only? - still need owned and non-owned types within tbl
+// -todo: make flatten method that has creates a new tbl with no extra capacity and takes all tbl references and makes them into offset/children tbls that are stored in the sub-tbl segment - instead of child type, make a read only type? read only could have template specializations or static asserts that prevent changing the tbl or the KV objects from it
+// -todo: make sure destructor is being run on objects being held once turned into a template
+// -todo: make shrink_to_fit call destroy on the previous allocation
+// -todo: make reserve(), expand() and shrink_to_fit() not work on non-owned tbls
+// -todo: make constructor that takes only an address to the start of a tbl memory span - just has to offset it by memberBytes() - owned check in the copy constructor + move constructor takes care of this already?
+// -todo: make KV.val as a child table an offset into the child data segment instead of an offset into the whole table memory
+// -todo: make private byte move function
+// -todo: make shrink_to_fit() take into account childData() - will need to redo both the base pointer and the tbl offset ?
+// -todo: debug shrink_to_fit() tbl child data return - why is map capacity changed to 4 when reading? - when both reading or writing the table can be expanded - why does expanding break it ? - reserve didn't copy child data at all
+// -todo: template table casting from KVOfst
+// -todo: multiply mapcap by 8 and elems by 10, then compare sizes to get an integer only expansion at 80% full
+// -todo: break out fields from template
+// -todo: make flatten also shrink_to_fit()
+// -todo: make get return hsh through an optional argument
+// -todo: make operator() check for existence and ownership before expanding
+// -todo: make KVOfst expand the tbl - would this imply that the size of the array type needs to be kept in the fields? - not neccesary with restructuring 
+// -todo: make cast operator for KVOfst return false on error_kv or kv being nullptr
+// -todo: make operator()() use multiple functions so that it can be read from without expansion
+// -todo: split operator()() into a const and non-const version - make them use a get() function underneath - not neccesary with re-structuring
+// -todo: have to handle child data copying in cp()
+// -todo: test and check assigning child table to parent table
+// -todo: destroy any child tables in the child data - not neccesary because they are owned memory and not any compound types with real destructors
+// -todo: destroy any non-child tables in the map - if they aren't owned, don't they get destroyed anyway?
+// -todo: test destruction of non-child table in a map key - if it isn't owned it would get destroyed on scope exit anyway
+// -todo: try to take out make_new in operator()
+// -todo: make operator()() take integers so that the map can also be used as an iterable list through sub-tables - just make operator()() take an integer offset into elemStart(), then make an iteration cursor through the non-empty elements of the map? - should this make the hash equal the integer passed or should it look up the element directly? - since elemStart() can already loop through all elements, making the integer become the hash should interlace the numbered indices with the string key hash tables - should the integer be hashed? - hashing the integer should give the advantages of a normal hash table
+// -todo: make map expansion check at the end of operator() as well as the top - wouldn't the re-order where the kv could be? - just want to expand if it owned and being read - just have to use has() if you want to make sure you don't expand the map on read
+// -todo: make operator-=(const char*) delete a key in the map - need to use a generic del() function - del() exists, more operator overloading won't help density much
+// -todo: make put() take a KV instead of being a template - not worth the trouble right now, solution in search of a problem until it can be shown to cause bloat
+// -todo: first take out all the old dealings with small bit depths
+// -todo: fix normal numbers being put back into map - types constants and some templates need to  be sorted out again
+
+
 // -todo: make push and push_back
 // -todo: make pop() and pop_back()
 // -todo: fix realloc to be resize based on element count
