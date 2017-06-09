@@ -870,11 +870,16 @@ ENTRY_DECLARATION
 
     //auto      f  =  (tst("child").operator tu64() ).memStart();
 
+    tbl<f32> nonChld;
+    nonChld.push(1.0f);
+    nonChld.push(0.5f);
+    tst("non child") = nonChld;
+
     tu64  chldc  =  tst("child"); //kv;  //  tst("child"); //kv;
     //auto      f  =  chldc.memStart();
     Printf("\n\n %d %d \n\n", chldc[0], chldc[1] );
 
-    tst = chldc;
+    //tst = chldc;
 
     //chldc[0] *= 4.f;
     //chldc[1] *= 4.f;

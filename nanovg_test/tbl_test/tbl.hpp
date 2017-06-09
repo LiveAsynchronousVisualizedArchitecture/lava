@@ -79,9 +79,11 @@
 // -todo: split operator()() into a const and non-const version - make them use a get() function underneath - not neccesary with re-structuring
 // -todo: have to handle child data copying in cp()
 // -todo: test and check assigning child table to parent table
+// -todo: destroy any child tables in the child data - not neccesary because they are owned memory and not any compound types with real destructors
+// -todo: destroy any non-child tables in the map - if they aren't owned, don't they get destroyed anyway?
+// -todo: test destruction of non-child table in a map key - if it isn't owned it would get destroyed on scope exit anyway
 
-// todo: destroy any non-child tables in the map 
-// todo: destroy any child tables in the child data 
+// todo: check the type of the table cast and build in asserts just like fundamental number types
 // todo: make operator()() take integers so that the map can also be used as an iterable list through sub-tables - just make operator()() take an integer offset into elemStart(), then make an iteration cursor through the non-empty elements of the map? - should this make the hash equal the integer passed or should it look up the element directly? - since elemStart() can already loop through all elements, making the integer become the hash should interlace the numbered indices with the string key hash tables - should the integer be hashed? - hashing the integer should give the advantages of a normal hash table
 // todo: make operator-=(const char*) delete a key in the map - need to use a generic del() function
 // todo: break out memory allocation from template - keep template as a wrapper for casting a typeless tbl
@@ -684,16 +686,19 @@ private:
     f->owned     = 1;
 
   }
-  void        destroy()
+  void        destroy(bool array_destruct=true)
   { 
     if( m_mem && owned() ){
       //tbl_PRNT("\n destruction \n");
 
-      T*    a = (T*)m_mem;
-      auto sz = size();
-      TO(sz,i){
-        a[i].T::~T();                                                          // run the destructors manually before freeing the memory
+      if(array_destruct){
+        T*    a = (T*)m_mem;
+        auto sz = size();
+        TO(sz,i){
+          a[i].T::~T();                                                                    // run the destructors manually before freeing the memory
+        }
       }
+      
       free(memStart());
       m_mem = nullptr;
     }
@@ -1377,6 +1382,28 @@ template<class T> KVOfst::operator tbl<T>()
 
 
 
+
+
+
+//u64 mapcap = map_capacity();
+//KV*      e = elemStart();
+//TO(mapcap,i)
+//  if( (e[i].hsh.type&HshType::TABLE) && !(e[i].hsh.type&HshType::CHILD) ){
+//    // this assumes that the array doesn't hold any tbls, which at the moment it can't, because arrays of child tables can only hold numeric types, no compound types, no structs 
+//    ((tbl<T>*)e[i].val)->destroy(false);  // destroy the held table, but don't run the destructors on the array because we don't know the type and they should be intrinsic numerical types anyway
+//  }
+
+//tbl<T> tmp = e[i];
+//
+//if( (e[i].hsh.type&HshType::TABLE) && (e[i].hsh.type&HshType::CHILD) ){
+//  tbl<T> tmp = e[i];      // this will get a reference to the non-owned table
+//  tmp.destroy(false);     // destroy/destruct without actually freeing the memory - this will call the destructors on the children recursivly
+//  // is destructing the child memory even needed since the child tables will contain only intrinsic types and children of intrinsic types ? 
+//  // won't only non-children tables need to be destructed ? 
+//
+//  //tmp.owned(true);      // this will set the owned flag in the child memory - because of this the 
+//}
+//if(free_mem){ free(memStart()); }
 
 // l.elems());    
 // todo: can be done with resize, which could use realloc instead of free and malloc? - this was the copy constructor - cp()
