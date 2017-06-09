@@ -71,23 +71,23 @@
 // -todo: multiply mapcap by 8 and elems by 10, then compare sizes to get an integer only expansion at 80% full
 // -todo: break out fields from template
 // -todo: make flatten also shrink_to_fit()
+// -todo: make get return hsh through an optional argument
+// -todo: make operator() check for existence and ownership before expanding
+// -todo: make KVOfst expand the tbl - would this imply that the size of the array type needs to be kept in the fields? - not neccesary with restructuring 
+// -todo: make cast operator for KVOfst return false on error_kv or kv being nullptr
+// -todo: make operator()() use multiple functions so that it can be read from without expansion
+// -todo: split operator()() into a const and non-const version - make them use a get() function underneath - not neccesary with re-structuring
 
-// todo: make get return hsh through an optional argument
-// todo: make cast operator for KVOfst return false on error_kv or kv being nullptr
-// todo: make operator() check for existence and ownership before expanding
 // todo: test and check assigning child table to parent table
-// todo: make KVOfst expand the tbl - would this imply that the size of the array type needs to be kept in the fields?
-// todo: make operator()() use multiple functions so that it can be read from without expansion
-// todo: split operator()() into a const and non-const version - make them use a get() function underneath
 // todo: destroy any non-child tables in the map 
 // todo: destroy any child tables in the child data 
+// todo: make operator()() take integers so that the map can also be used as an iterable list through sub-tables - just make operator()() take an integer offset into elemStart(), then make an iteration cursor through the non-empty elements of the map? - should this make the hash equal the integer passed or should it look up the element directly? - since elemStart() can already loop through all elements, making the integer become the hash should interlace the numbered indices with the string key hash tables - should the integer be hashed? - hashing the integer should give the advantages of a normal hash table
 // todo: make operator-=(const char*) delete a key in the map - need to use a generic del() function
-// todo: make operator()() take integers so that the map can also be used as an iterable list through sub-tables - just make operator()() take an integer offset into elemStart(), then make an iteration cursor through the non-empty elements of the map? - should this make the hash equal the integer passed or should it look up the element directly?
+// todo: break out memory allocation from template - keep template as a wrapper for casting a typeless tbl
+// todo: make put() take a KV instead of being a template
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
 // | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
 // | does this imply that there should be a separate array type or is specializing string enough? 
-// todo: break out memory allocation from template - keep template as a wrapper for casting a typeless tbl
-// todo: make put() take a KV instead of beiing a template
 
 // todo: make resize() - should there be a resize()? only affects array?
 // todo: use inline assembly to vectorize basic math operations
@@ -147,8 +147,6 @@
   #define tbl_msg_assert(exp, msgA, varA, msgB, varB)
   #define tbl_PRNT(msg)
 #endif
-
-//struct tbl_type{};
 
 using    u8   =   uint8_t;
 using   u16   =  uint16_t;
@@ -342,8 +340,6 @@ struct         KV
   }
   template<class N> KV& operator=(tbl<N> const& n)
   {
-    //tbl<N>* tp = &n;
-    //n.childData()
     hsh.type  =  typenum< tbl<N> >::num;
     val       =  (u64)&n;
     return *this;
@@ -505,6 +501,7 @@ struct     KVOfst
    base = _base;
   }
   
+  operator bool() const { return (bool)(kv); }
   template<class T> operator tbl<T>();
 
   template<class N> operator N() { return kv->as<N>(); }
@@ -523,7 +520,6 @@ struct  TblFields
   u64     elems : 21;
   u64      size : 42;
 };
-
 
 template<class T> class tbl
 {
@@ -788,52 +784,6 @@ public:
     tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
     return ((T*)m_mem)[i];
   }
-  //KVOfst  operator()(const char* key, bool make_new=true)
-  //{
-  //  if(!owned()){ 
-  //    if(has(key))
-  //  }
-  //
-  //  u64 mapcap = map_capacity();
-  //  if( mapcap==0 || mapcap*8 < elems()*10 )
-  //    if(!expand(false, true)) return &KV::error_kv();
-  //
-  //  HshType hh;
-  //  hh.hash   =  HashStr(key);
-  //  u32 hsh   =  hh.hash;                                                 // make sure that the hash is being squeezed into the same bit depth as the hash in HshType
-  //  KV*   el  =  (KV*)elemStart();                                        // el is a pointer to the elements 
-  //  u64  mod  =  map_capacity();
-  //  u64    i  =  hsh % mod;
-  //  u64   en  =  prev(i,mod);
-  //  u64 dist  =  0;
-  //  for(;;++i,++dist)
-  //  {
-  //    i %= mod;                                                        // get idx within map_capacity
-  //    HshType eh = el[i].hsh;                                          // eh is element hash
-  //    if(el[i].hsh.type == HshType::EMPTY){ 
-  //      elems( elems()+1 );
-  //      new (&el[i]) KV(key, hsh);
-  //      el[i].hsh.type = HshType::NONE;
-  //      return KVOfst( &(el[i]) );
-  //    }else if(hsh==eh.hash  &&                                                // if the hashes aren't the same, the keys can't be the same
-  //      strncmp(el[i].key,key,sizeof(KV::Key)-1)==0 )
-  //    { 
-  //      auto type = el[i].hsh.type;
-  //      if( (type&HshType::TABLE) && (type&HshType::CHILD) ){
-  //        return KVOfst( &el[i], (void*)(memStart()) );
-  //      }else
-  //        return KVOfst( &(el[i]) ); //el[i];   //  = KV(key, hsh);
-  //    }else if(dist > wrapDist(el,i,mod) ){
-  //      KV kv(key, hsh);
-  //      elems( elems()+1 );
-  //      return KVOfst( &(place_rh(kv, el, i, dist, mod)) );
-  //    }
-  //  
-  //    if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
-  //  }
-  //
-  //  return &KV::error_kv();
-  //}
   KVOfst  operator()(const char* key, bool make_new=true)
   {      
     u32 hsh;
@@ -1426,7 +1376,55 @@ template<class T> KVOfst::operator tbl<T>()
 
 
 
+//KVOfst  operator()(const char* key, bool make_new=true)
+//{
+//  if(!owned()){ 
+//    if(has(key))
+//  }
+//
+//  u64 mapcap = map_capacity();
+//  if( mapcap==0 || mapcap*8 < elems()*10 )
+//    if(!expand(false, true)) return &KV::error_kv();
+//
+//  HshType hh;
+//  hh.hash   =  HashStr(key);
+//  u32 hsh   =  hh.hash;                                                 // make sure that the hash is being squeezed into the same bit depth as the hash in HshType
+//  KV*   el  =  (KV*)elemStart();                                        // el is a pointer to the elements 
+//  u64  mod  =  map_capacity();
+//  u64    i  =  hsh % mod;
+//  u64   en  =  prev(i,mod);
+//  u64 dist  =  0;
+//  for(;;++i,++dist)
+//  {
+//    i %= mod;                                                        // get idx within map_capacity
+//    HshType eh = el[i].hsh;                                          // eh is element hash
+//    if(el[i].hsh.type == HshType::EMPTY){ 
+//      elems( elems()+1 );
+//      new (&el[i]) KV(key, hsh);
+//      el[i].hsh.type = HshType::NONE;
+//      return KVOfst( &(el[i]) );
+//    }else if(hsh==eh.hash  &&                                                // if the hashes aren't the same, the keys can't be the same
+//      strncmp(el[i].key,key,sizeof(KV::Key)-1)==0 )
+//    { 
+//      auto type = el[i].hsh.type;
+//      if( (type&HshType::TABLE) && (type&HshType::CHILD) ){
+//        return KVOfst( &el[i], (void*)(memStart()) );
+//      }else
+//        return KVOfst( &(el[i]) ); //el[i];   //  = KV(key, hsh);
+//    }else if(dist > wrapDist(el,i,mod) ){
+//      KV kv(key, hsh);
+//      elems( elems()+1 );
+//      return KVOfst( &(place_rh(kv, el, i, dist, mod)) );
+//    }
+//  
+//    if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+//  }
+//
+//  return &KV::error_kv();
+//}
 
+//tbl<N>* tp = &n;
+//n.childData()
 
 //if(kv)
 //{
