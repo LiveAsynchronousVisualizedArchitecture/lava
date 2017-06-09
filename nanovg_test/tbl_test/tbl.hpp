@@ -88,11 +88,17 @@
 // -todo: make operator-=(const char*) delete a key in the map - need to use a generic del() function - del() exists, more operator overloading won't help density much
 // -todo: make put() take a KV instead of being a template - not worth the trouble right now, solution in search of a problem until it can be shown to cause bloat
 
+// todo: first take out all the old dealings with small bit depths
 // todo: check the type of the table cast and build in asserts just like fundamental number types
 // todo: break out memory allocation from template - keep template as a wrapper for casting a typeless tbl
-// todo: make a string type using the 8 bytes in the value and the extra bytes of the key 
-// | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
-// | does this imply that there should be a separate array type or is specializing string enough? 
+// todo: clean up types to no longer be in the global namespace
+// todo: make a string type using the 8 bytes in the value and the extra bytes of the key
+//       | can casts to c_str() using a single 0 byte after the array work? if there is a blank key or no map and a 0 byte at the beggining of childData() then the cast to c_str() could work 
+//       | does any array of strings imply a rabbit hole of keeping track of the type of the array - would any child strings just need to be kept in the map?
+//       | other formats such as one child tbl containing packed strings and another array containing offsets could also be used 
+//       | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
+//       | does this imply that there should be a separate array type or is specializing string enough? 
+// todo: test numeric operations 
 
 // todo: make resize() - should there be a resize()? only affects array?
 // todo: use inline assembly to vectorize basic math operations
