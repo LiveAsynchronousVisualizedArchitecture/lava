@@ -77,8 +77,9 @@
 // -todo: make cast operator for KVOfst return false on error_kv or kv being nullptr
 // -todo: make operator()() use multiple functions so that it can be read from without expansion
 // -todo: split operator()() into a const and non-const version - make them use a get() function underneath - not neccesary with re-structuring
+// -todo: have to handle child data copying in cp()
+// -todo: test and check assigning child table to parent table
 
-// todo: test and check assigning child table to parent table
 // todo: destroy any non-child tables in the map 
 // todo: destroy any child tables in the child data 
 // todo: make operator()() take integers so that the map can also be used as an iterable list through sub-tables - just make operator()() take an integer offset into elemStart(), then make an iteration cursor through the non-empty elements of the map? - should this make the hash equal the integer passed or should it look up the element directly? - since elemStart() can already loop through all elements, making the integer become the hash should interlace the numbered indices with the string key hash tables - should the integer be hashed? - hashing the integer should give the advantages of a normal hash table
@@ -556,11 +557,11 @@ private:
   void       capacity(u64    cap){ memStart()->capacity  =    cap; }
   void          elems(u64  elems){ memStart()->elems     =  elems; }
   void         mapcap(u64 mapcap){ memStart()->mapcap    = mapcap; }
-  u64             nxt(u64 i, u64 mod) const
+  u64             nxt(u64     i, u64 mod) const
   {
     return ++i % mod;
   }
-  u64            prev(u64 i, u64 mod) const
+  u64            prev(u64     i, u64 mod) const
   {
     if(mod==0) return 0;
     return i==0?  mod-1  :  i-1;
@@ -570,12 +571,12 @@ private:
     if(idx>=ideal) return idx - ideal;
     else return idx + (mod-ideal);
   }
-  u64        wrapDist(KV*  elems, u64 idx, u64 mod) const
+  u64        wrapDist(KV* elems, u64 idx, u64 mod) const
   {
     u64 ideal = elems[idx].hsh.hash % mod;
     return wrapDist(ideal,idx,mod);
   }
-  KV&        place_rh(KV kv, KV* elems, u64 st, u64 dist, u64 mod, u64* placement=nullptr)   // place_rh is place with robin hood hashing 
+  KV&        place_rh(KV     kv, KV* elems, u64 st, u64 dist, u64 mod, u64* placement=nullptr)   // place_rh is place with robin hood hashing 
   {
     //assert( strcmp(kv.key,"")!=0 );
 
@@ -605,7 +606,7 @@ private:
     if(ret) return *ret;
     else    return KV::error_kv();
   }
-  u64         compact(u64 st, u64 en, u64 mapcap)
+  u64         compact(u64    st, u64 en, u64 mapcap)
   {
     u64   cnt = 0;                                   // cnt is count which counts the number of loops, making sure the entire map capacity (mapcap) has not bene exceeded
     KV*     el = elemStart(); 
@@ -698,14 +699,14 @@ private:
     }
   }
   void             cp(tbl const& l)
-  {
-    //if(&l==nullptr) || l.data()==nullptr)
-    //reserve(l.size(), l.map_capacity() ); // l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
-    
+  {    
     if(l.owned()){
       //tbl_PRNT("\n full copy \n");
+      tbl<T> prev;
+      prev.m_mem = m_mem;                                                                // make a tbl for the old memory - this will be destructed at the end of this scope, which will free up the old memory. the old memory is not freed up first, since we could be copying from a child of this very same tbl 
 
-      reserve(l.size(), l.elems(), l.child_capacity() ); // l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
+      m_mem = nullptr;
+      reserve(l.size(), l.elems(), l.child_capacity() );                                 // this will size the current table exactly because it starts from a nullptr - it also means however that realloc is not used and malloc is called for a brand new allocation
       TO(l.size(),i) push(l[i]); 
     
       auto e = l.elemStart();
@@ -713,7 +714,7 @@ private:
         put(e[i].key, e[i].val);
       }
 
-      // todo: have to handle child data copying
+      memcpy(childData(), l.childData(), l.child_capacity() );                           // since this is a straight copy of the child memory, the values/offsets in the map's child table can stay the same
     }else{
       //tbl_PRNT("\n shallow copy \n");
       m_mem = l.m_mem;
@@ -1375,6 +1376,13 @@ template<class T> KVOfst::operator tbl<T>()
 #endif
 
 
+
+
+// l.elems());    
+// todo: can be done with resize, which could use realloc instead of free and malloc? - this was the copy constructor - cp()
+
+//if(&l==nullptr) || l.data()==nullptr)
+//reserve(l.size(), l.map_capacity() ); // l.elems());    // todo: can be done with resize, which could use realloc instead of free and malloc?
 
 //KVOfst  operator()(const char* key, bool make_new=true)
 //{

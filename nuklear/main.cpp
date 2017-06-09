@@ -874,6 +874,8 @@ ENTRY_DECLARATION
     //auto      f  =  chldc.memStart();
     Printf("\n\n %d %d \n\n", chldc[0], chldc[1] );
 
+    tst = chldc;
+
     //chldc[0] *= 4.f;
     //chldc[1] *= 4.f;
 
