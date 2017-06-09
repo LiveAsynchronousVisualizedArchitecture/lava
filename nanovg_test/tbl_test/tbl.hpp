@@ -1,17 +1,20 @@
 
 
+// -todo: add pointer casts to all tbl types
+// -todo: make assignment of tbl to map slot only take pointers to a tbl for clarity
+// -todo: check the type of the table cast and build in asserts just like fundamental number types - most asserts still work and apply
 
-// todo: make assignment of tbl to map slot only take pointers to a tbl for clarity
-// todo: check the type of the table cast and build in asserts just like fundamental number types
+// todo: make separate tbl<N>  as<>() function template?  - might have to to make cast to tbl* work 
+// todo: test a smaller integer type being taken out of the tbl
 // todo: break out memory allocation from template - keep template as a wrapper for casting a typeless tbl
-// todo: clean up types to no longer be in the global namespace
+// todo: clean up types to no longer be in the global namespace - leave the tbl types in the global namespace
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key
 //       | can casts to c_str() using a single 0 byte after the array work? if there is a blank key or no map and a 0 byte at the beggining of childData() then the cast to c_str() could work 
 //       | does any array of strings imply a rabbit hole of keeping track of the type of the array - would any child strings just need to be kept in the map?
 //       | other formats such as one child tbl containing packed strings and another array containing offsets could also be used 
 //       | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
 //       | does this imply that there should be a separate array type or is specializing string enough? 
-// todo: test numeric operations 
+// todo: test numeric operations on arrays
 
 // todo: make resize() - should there be a resize()? only affects array?
 // todo: use inline assembly to vectorize basic math operations
@@ -291,7 +294,7 @@ struct         KV
   }
   KV&  operator= (KV const& l){ return cp(l); }
   KV&  operator= (KV&&      r){ return cp(r); }
-  template<class N> KV& operator=(N      const& n)
+  template<class N> KV& operator=(N       const& n)
   {
     hsh.type     = typenum< typecast<N>::type >::num;
     auto castVal = (typecast<N>::type)n;
@@ -299,25 +302,14 @@ struct         KV
     memcpy(&val, &castVal, sizeof(u64));
     return *this;
   }
-  template<class N> KV& operator=(tbl<N> const& n)
+  template<class N> KV& operator=(tbl<N>  const& n) = delete;
+  template<class N> KV& operator=(tbl<N>  const* const n)
   {
     hsh.type  =  typenum< tbl<N> >::num;
-    val       =  (u64)&n;
+    val       =  (u64)n;
     return *this;
   }
 
-  operator tf64*()
-  { 
-    //tf64 t;
-    //*((u64*)&t) = val;
-    //return t;
-    tf64* t = (tf64*)val;
-    return t;
-  }
-  operator tf64&()
-  { 
-    return *((tf64*)val);
-  }
   template<class N> operator N()
   { 
     return as<N>();
@@ -367,6 +359,13 @@ struct         KV
       case   HshType::I64: return cast_mem<N,  i64>(&val);
       case   HshType::F64: return cast_mem<N,  f64>(&val);
 
+      case  HshType::tU8:  return cast_mem<N,  tu8*>(&val);
+      case  HshType::tI8:  return cast_mem<N,  ti8*>(&val);
+      case  HshType::tU16: return cast_mem<N, tu16*>(&val);
+      case  HshType::tI16: return cast_mem<N, ti16*>(&val);
+      case  HshType::tU32: return cast_mem<N, tu32*>(&val);
+      case  HshType::tI32: return cast_mem<N, ti32*>(&val);
+      case  HshType::tF32: return cast_mem<N, tf32*>(&val);
       case  HshType::tU64: return cast_mem<N, tu64*>(&val);
       case  HshType::tI64: return cast_mem<N, ti64*>(&val);
       case  HshType::tF64: return cast_mem<N, tf64*>(&val);
@@ -374,7 +373,7 @@ struct         KV
       //case  HshType::tU64: return (tu64*)val;
       //case  HshType::tI64: return (ti64*)val;
       //case  HshType::tF64: return (tf64*)val;
-
+      //
       //case  HshType::tU64: return cast_ptr<N, tu64>(val);
       //case  HshType::tI64: return cast_ptr<N, ti64>(val);
       //case  HshType::tF64: return cast_ptr<N, tf64>(val);
@@ -1342,3 +1341,19 @@ auto HshType::type_str(Type t) -> char const* const
 #endif
 
 
+
+
+
+
+//operator tf64*()
+//{ 
+//  //tf64 t;
+//  //*((u64*)&t) = val;
+//  //return t;
+//  tf64* t = (tf64*)val;
+//  return t;
+//}
+//operator tf64&()
+//{ 
+//  return *((tf64*)val);
+//}

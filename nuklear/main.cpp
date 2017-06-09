@@ -847,7 +847,7 @@ ENTRY_DECLARATION
     Printf("\n sizeof(KV): %d \n", sizeof(KV) );
     Printf("\n sizeof(tbl::fields): %d \n", sizeof(tbl<u8>::fields) );
 
-    tbl<u64> chld;
+    tu64 chld;
     chld.push(4);
     chld.push(8);
     chld("wat") = 8;
@@ -859,7 +859,7 @@ ENTRY_DECLARATION
     //tst("wat") =    84;
     //KV kv      =  tst("child");
     //kv         =  chld;
-    tst("child") =  chld;
+    tst("child") =  &chld;
 
     //KV kv        =  tst("child");
     //tf64& chldp  =  kv.operator tf64 &();
@@ -875,7 +875,7 @@ ENTRY_DECLARATION
     tbl<f32> nonChld;
     nonChld.push(1.0f);
     nonChld.push(0.5f);
-    tst(0) = nonChld;
+    tst(0) = &nonChld;
 
     tu64  chldc  =  tst("child"); //kv;  //  tst("child"); //kv;
     //auto      f  =  chldc.memStart();
