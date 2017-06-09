@@ -87,8 +87,10 @@
 // -todo: make map expansion check at the end of operator() as well as the top - wouldn't the re-order where the kv could be? - just want to expand if it owned and being read - just have to use has() if you want to make sure you don't expand the map on read
 // -todo: make operator-=(const char*) delete a key in the map - need to use a generic del() function - del() exists, more operator overloading won't help density much
 // -todo: make put() take a KV instead of being a template - not worth the trouble right now, solution in search of a problem until it can be shown to cause bloat
+// -todo: first take out all the old dealings with small bit depths
 
-// todo: first take out all the old dealings with small bit depths
+// todo: make assignment of tbl to map slot only take pointers to a tbl for clarity
+// todo: fix normal numbers being put back into map
 // todo: check the type of the table cast and build in asserts just like fundamental number types
 // todo: break out memory allocation from template - keep template as a wrapper for casting a typeless tbl
 // todo: clean up types to no longer be in the global namespace
@@ -243,17 +245,41 @@ public:
   static const u8   ERR        =  ~INTEGER & ~SIGNED & ~TABLE & ~CHILD & ~BITS_32 & MASK;
   static const u8   NONE       =  ~INTEGER & ~SIGNED & ~TABLE & ~CHILD & ~BITS_16 & MASK;                                         // ~TABLE,                              // INTEGER bit turned off, SIGNED bit turned off and TABLE bit turned off, meanin unsigned float table, which is not a viable real type of course
   static const u8   EMPTY      =  ~INTEGER & ~SIGNED & ~TABLE & ~CHILD & MASK;     // 0b00111111;                                       // a floating point number can't be unsigned, so this scenario is used for an 'empty' state
+  
+
+  static const u8    U8        =  INTEGER |  BITS_8;
+  static const u8    I8        =  INTEGER |  BITS_8 | SIGNED;
+  static const u8   U16        =  INTEGER | BITS_16;
+  static const u8   I16        =  INTEGER | BITS_16 | SIGNED;
+  static const u8   U32        =  INTEGER | BITS_32;
+  static const u8   I32        =  INTEGER | BITS_32 | SIGNED;
+  static const u8   F32        =  BITS_32 | SIGNED;
   static const u8   U64        =  INTEGER | BITS_64;
   static const u8   I64        =  INTEGER | BITS_64 | SIGNED;
   static const u8   F64        =  BITS_64 | SIGNED;
+
+  static const u8    tU8       =  TABLE   | INTEGER |  BITS_8;
+  static const u8    tI8       =  TABLE   | INTEGER |  BITS_8 | SIGNED;
+  static const u8   tU16       =  TABLE   | INTEGER | BITS_16;
+  static const u8   tI16       =  TABLE   | INTEGER | BITS_16 | SIGNED;
+  static const u8   tU32       =  TABLE   | INTEGER | BITS_32;
+  static const u8   tI32       =  TABLE   | INTEGER | BITS_32 | SIGNED;
+  static const u8   tF32       =  TABLE   | F32;
   static const u8   tU64       =  TABLE   | INTEGER | BITS_64;
   static const u8   tI64       =  TABLE   | INTEGER | BITS_64 | SIGNED;
-  static const u8   tF64       =  TABLE   | F64;    // BITS_64;
+  static const u8   tF64       =  TABLE   | F64;
+
+  static const u8    cU8       =  CHILD   |  tU8;
+  static const u8    cI8       =  CHILD   |  tI8;
+  static const u8   cU16       =  CHILD   | tU16;
+  static const u8   cI16       =  CHILD   | tI16;
+  static const u8   cU32       =  CHILD   | tU32;
+  static const u8   cI32       =  CHILD   | tI32;
+  static const u8   cF32       =  CHILD   | tF32;
   static const u8   cU64       =  CHILD   | tU64;
   static const u8   cI64       =  CHILD   | tI64;
   static const u8   cF64       =  CHILD   | tF64;
 
-  //struct { Type type : 6; u32 hash: 26; };
   struct { u32 type : 6; u32 hash: 26; };
   u32 as_u32;
 
@@ -261,6 +287,8 @@ public:
     type(EMPTY),
     hash(0)
   {}
+
+  static auto type_str(Type t) -> char const* const;
 };
 struct         KV
 {
@@ -274,12 +302,24 @@ struct         KV
   //using   i64   =   int64_t;
   //using   f32   =     float;
   //using   f64   =    double;
+  //
+  //template<> struct typenum<tf64>  { static const Type num = HshType::tF8;   };
+  //template<> struct typenum<tf64>  { static const Type num = HshType::tF16;  };
+
   using  Type   =  HshType::Type;
 
   template<class N> struct typenum { static const Type num = HshType::EMPTY; };
   template<> struct typenum<u64>   { static const Type num = HshType::U64;   };
   template<> struct typenum<i64>   { static const Type num = HshType::I64;   };
   template<> struct typenum<f64>   { static const Type num = HshType::F64;   };
+
+  template<> struct typenum<tu8>   { static const Type num = HshType::tU8;   }; 
+  template<> struct typenum<ti8>   { static const Type num = HshType::tI8;   }; 
+  template<> struct typenum<tu16>  { static const Type num = HshType::tU16;  }; 
+  template<> struct typenum<ti16>  { static const Type num = HshType::tI16;  }; 
+  template<> struct typenum<tu32>  { static const Type num = HshType::tU32;  }; 
+  template<> struct typenum<ti32>  { static const Type num = HshType::tI32;  }; 
+  template<> struct typenum<tf32>  { static const Type num = HshType::tF32;  };
   template<> struct typenum<tu64>  { static const Type num = HshType::tU64;  }; 
   template<> struct typenum<ti64>  { static const Type num = HshType::tI64;  }; 
   template<> struct typenum<tf64>  { static const Type num = HshType::tF64;  };
@@ -297,9 +337,9 @@ struct         KV
   template<> struct typecast<u32>   { using type = u64; };
   template<> struct typecast<f32>   { using type = f64; };
 
-  template<class DEST, class SRC> 
-  static DEST cast_mem(u64 const* const src)
-  { return (DEST)(*((SRC*)src)); }
+  template<class DEST, class SRC> static DEST cast_mem(u64 const* const src){ return (DEST)(*((SRC*)src)); }
+  
+  //template<class DEST, class SRC> static DEST cast_ptr(u64 src){ return (DEST*)src; }
 
   using Key = char[43];    // using Key = char[19]; 
 
@@ -340,13 +380,14 @@ struct         KV
     return hsh.hash==l.hsh.hash && 
       strncmp(l.key,key,sizeof(KV::Key)-1)==0;
   }
-  KV&  operator=(KV const& l){ return cp(l); }
-  KV&  operator=(KV&& r){      return cp(r); }
+  KV&  operator= (KV const& l){ return cp(l); }
+  KV&  operator= (KV&&      r){ return cp(r); }
   template<class N> KV& operator=(N      const& n)
   {
     hsh.type     = typenum< typecast<N>::type >::num;
     auto castVal = (typecast<N>::type)n;
-    val          = *((u64*)&castVal);
+    //val          = *((u64*)&castVal);
+    memcpy(&val, &castVal, sizeof(u64));
     return *this;
   }
   template<class N> KV& operator=(tbl<N> const& n)
@@ -376,65 +417,79 @@ struct         KV
   { 
     if(hsh.type==typenum<N>::num) return *((N*)&val);       // if the types are the same, return it as the cast directly
 
-                                                            //ui8   both = hsh.type | typenum<N>::num;              // both bits
+    //ui8   both = hsh.type | typenum<N>::num;              // both bits
+    
     if( (hsh.type & HshType::NONE) || (hsh.type & ERROR) ){
       tbl_msg_assert(
         hsh.type==typenum<N>::num, 
         " - tbl TYPE ERROR -\nInternal type was: ", 
-        tbl::type_str((Type)hsh.type), 
+        HshType::type_str((Type)hsh.type), 
         "Desired  type was: ",
-        tbl::type_str((Type)typenum<N>::num) );        
+        HshType::type_str((Type)typenum<N>::num) );        
     } 
-    if( (hsh.type & SIGNED) && !(typenum<N>::num & SIGNED)  ){
+    if( (hsh.type & HshType::SIGNED) && !(typenum<N>::num & HshType::SIGNED)  ){
       tbl_msg_assert(
         hsh.type==typenum<N>::num, 
         " - tbl TYPE ERROR -\nSigned integers can not be implicitly cast to unsigned integers.\nInternal type was: ", 
-        tbl::type_str((Type)hsh.type), 
+        HshType::type_str((Type)hsh.type), 
         "Desired  type was: ",
-        tbl::type_str((Type)typenum<N>::num) );
+        HshType::type_str((Type)typenum<N>::num) );
     }
-    if( !(hsh.type & INTEGER) && (typenum<N>::num & INTEGER) ){
+    if( !(hsh.type & HshType::INTEGER) && (typenum<N>::num & HshType::INTEGER) ){
       tbl_msg_assert(
         hsh.type==typenum<N>::num, 
         " - tbl TYPE ERROR -\nFloats can not be implicitly cast to integers.\nInternal type was: ", 
-        tbl::type_str((Type)hsh.type), 
+        HshType::type_str((Type)hsh.type), 
         "Desired  type was: ",
-        tbl::type_str((Type)typenum<N>::num) );
+        HshType::type_str((Type)typenum<N>::num) );
     }
-    if( (hsh.type|typenum<N>::num) & TABLE ){
+    if( (hsh.type|typenum<N>::num) & HshType::TABLE ){
       tbl_msg_assert(
         hsh.type==typenum<N>::num, 
         " - tbl TYPE ERROR -\nTables can not be implicitly cast, even to a larger bit depth.\nInternal type was: ", 
-        tbl::type_str((Type)hsh.type), 
+        HshType::type_str((Type)hsh.type), 
         "Desired  type was: ",
-        tbl::type_str((Type)typenum<N>::num) );
+        HshType::type_str((Type)typenum<N>::num) );
     }
 
-    u8 destbits = typenum<N>::num & BITS_MASK;
-    u8  srcbits = hsh.type        & BITS_MASK;
-    if( destbits > srcbits ){
-      switch(hsh.type){
-      case   U8: return cast_mem<N,  u8>(&val);
-      case  U16: return cast_mem<N, u16>(&val);
-      case  U32: return cast_mem<N, u32>(&val);
-      case   I8: return cast_mem<N,  i8>(&val);
-      case  I16: return cast_mem<N, i16>(&val);
-      case  I32: return cast_mem<N, i32>(&val);
-      case  F32: return cast_mem<N, f32>(&val);
+    switch(hsh.type)
+    {
+      case   HshType::U64: return cast_mem<N,  u64>(&val);
+      case   HshType::I64: return cast_mem<N,  i64>(&val);
+      case   HshType::F64: return cast_mem<N,  f64>(&val);
 
-      case  tF64: return cast_mem<N, tf64>(&val);
-      case  tU64: return cast_mem<N, tu64>(&val);
-      case  tI64: return cast_mem<N, ti64>(&val);
+      case  HshType::tU64: return cast_mem<N, tu64*>(&val);
+      case  HshType::tI64: return cast_mem<N, ti64*>(&val);
+      case  HshType::tF64: return cast_mem<N, tf64*>(&val);
 
-      }
+      //case  HshType::tU64: return (tu64*)val;
+      //case  HshType::tI64: return (ti64*)val;
+      //case  HshType::tF64: return (tf64*)val;
+
+      //case  HshType::tU64: return cast_ptr<N, tu64>(val);
+      //case  HshType::tI64: return cast_ptr<N, ti64>(val);
+      //case  HshType::tF64: return cast_ptr<N, tf64>(val);
     }
 
     tbl_msg_assert(
       hsh.type==typenum<N>::num, 
-      " - tbl TYPE ERROR -\nInternal type was: ", tbl::type_str((Type)hsh.type), 
-      "Desired  type was: ",                      tbl::type_str((Type)typenum<N>::num) );
+      " - tbl TYPE ERROR -\nInternal type was: ", HshType::type_str((Type)hsh.type), 
+      "Desired  type was: ",                      HshType::type_str((Type)typenum<N>::num) );
 
     return N();
+
+    //u8 destbits = typenum<N>::num & BITS_MASK;
+    //u8  srcbits = hsh.type        & BITS_MASK;
+    //if( destbits > srcbits ){
+    //}
+
+    //case   U8: return cast_mem<N,  u8>(&val);
+    //case  U16: return cast_mem<N, u16>(&val);
+    //case  U32: return cast_mem<N, u32>(&val);
+    //case   I8: return cast_mem<N,  i8>(&val);
+    //case  I16: return cast_mem<N, i16>(&val);
+    //case  I32: return cast_mem<N, i32>(&val);
+    //case  F32: return cast_mem<N, f32>(&val);
   }
 
   bool isEmpty()           const {
@@ -459,40 +514,6 @@ struct         KV
     kv.hsh.type = HshType::ERR;
     return kv;
   }
-  static auto   type_str(Type t) -> char const* const 
-  {
-    switch(t)
-    {
-    case HshType::ERR:   return "Error";
-    case HshType::EMPTY: return "Empty";
-    case HshType::NONE:  return  "None";
-
-      //case    U8: return   "u8";
-      //case   U16: return  "u16";
-      //case   U32: return  "u32";
-    case   HshType::U64: return  "u64";
-      //case    I8: return   "i8";
-      //case   I16: return  "i16";
-      //case   I32: return  "i32";
-    case   HshType::I64: return  "i16";
-      //case   F32: return  "f32";
-    case   HshType::F64: return  "f64";
-
-      //case   tU8: return  "table   u8";
-      //case  tU16: return  "table  u16";
-      //case  tU32: return  "table  u32";
-    case  HshType::tU64: return  "table  u64";
-      //case   tI8: return  "table   i8";
-      //case  tI16: return  "table  i16";
-      //case  tI32: return  "table  i32";
-    case  HshType::tI64: return  "table  i16";
-      //case  tF32: return  "table  f32";
-    case  HshType::tF64: return  "table  f64";
-
-    default: return "Unknown Type";
-    }
-    //return "Empty";
-  }
 };
 struct     KVOfst
 {
@@ -515,7 +536,8 @@ struct     KVOfst
   operator bool() const { return (bool)(kv); }
   template<class T> operator tbl<T>();
 
-  template<class N> operator N() { return kv->as<N>(); }
+  //template<class N> operator N() { return kv->as<N>(); }
+  template<class N> operator N() { return (N)(*kv); }
   template<class N> KVOfst& operator=(N const& n){ *kv = n; return *this; }
 };
 struct  TblFields 
@@ -925,6 +947,8 @@ public:
     if(out_hash){ *out_hash = hsh; }
     KV*   el  =  (KV*)elemStart();                                        // el is a pointer to the elements 
     u64  mod  =  map_capacity();
+    if(mod==0) return nullptr;
+
     u64    i  =  hsh % mod;
     u64   en  =  prev(i,mod);
     u64 dist  =  0;
@@ -1386,6 +1410,26 @@ template<class T> KVOfst::operator tbl<T>()
   }
 }
 
+auto HshType::type_str(Type t) -> char const* const 
+{
+  switch(t)
+  {
+    case HshType::ERR:   return "Error";
+    case HshType::EMPTY: return "Empty";
+    case HshType::NONE:  return  "None";
+
+    case   HshType::U64: return  "u64";
+    case   HshType::I64: return  "i16";
+    case   HshType::F64: return  "f64";
+    case  HshType::tU64: return  "table  u64";
+    case  HshType::tI64: return  "table  i16";
+    case  HshType::tF64: return  "table  f64";
+
+    default: return "Unknown Type";
+  }
+}
+
+
 #endif
 
 
@@ -1393,6 +1437,25 @@ template<class T> KVOfst::operator tbl<T>()
 
 
 
+//case    U8: return   "u8";
+//case   U16: return  "u16";
+//case   U32: return  "u32";
+//
+//case    I8: return   "i8";
+//case   I16: return  "i16";
+//case   I32: return  "i32";
+//
+//case   F32: return  "f32";
+//
+//case   tU8: return  "table   u8";
+//case  tU16: return  "table  u16";
+//case  tU32: return  "table  u32";
+//
+//case   tI8: return  "table   i8";
+//case  tI16: return  "table  i16";
+//case  tI32: return  "table  i32";
+//case  tF32: return  "table  f32";
+//return "Empty";
 
 //u64 mapcap = map_capacity();
 //if( !kv && (mapcap==0 || mapcap*8 < elems()*10) )

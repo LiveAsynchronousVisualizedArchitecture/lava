@@ -850,6 +850,8 @@ ENTRY_DECLARATION
     tbl<u64> chld;
     chld.push(4);
     chld.push(8);
+    chld("wat") = 8;
+    i64 wat = chld("wat");
 
     //chld.push(.1);
     //chld.push(.2);
