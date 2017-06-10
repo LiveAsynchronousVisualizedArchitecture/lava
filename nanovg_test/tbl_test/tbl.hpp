@@ -6,8 +6,11 @@
 // -todo: make separate tbl<N>  as<>() function template?  - might have to to make cast to tbl* work 
 // -todo: fix child types and table pointer types
 // -todo: fix child table to non-child table pointer assert error and message
+// -todo: test a smaller integer type being taken out of the tbl
+// -todo: test numeric operations on arrays
 
-// todo: test a smaller integer type being taken out of the tbl
+// todo: put in initializer_list as constructor 
+// todo: take out assertion on casting to a smaller error - want a warning if possible
 // todo: break out memory allocation from template - keep template as a wrapper for casting a typeless tbl
 // todo: clean up types to no longer be in the global namespace - leave the tbl types in the global namespace
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key
@@ -16,7 +19,6 @@
 //       | other formats such as one child tbl containing packed strings and another array containing offsets could also be used 
 //       | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
 //       | does this imply that there should be a separate array type or is specializing string enough? 
-// todo: test numeric operations on arrays
 
 // todo: make resize() - should there be a resize()? only affects array?
 // todo: use inline assembly to vectorize basic math operations
@@ -245,18 +247,18 @@ struct         KV
   template<> struct typenum<tbl<unsigned long>*> { static const Type num = HshType::tU64;  };
 
   //template<class N> struct ctypenum { static const Type num = HshType::EMPTY; };
-  template<> struct typenum<tu8>   { static const Type num = HshType::tU8;   }; 
-  template<> struct typenum<ti8>   { static const Type num = HshType::tI8;   }; 
-  template<> struct typenum<tu16>  { static const Type num = HshType::tU16;  }; 
-  template<> struct typenum<ti16>  { static const Type num = HshType::tI16;  }; 
-  template<> struct typenum<tu32>  { static const Type num = HshType::tU32;  }; 
-  template<> struct typenum<ti32>  { static const Type num = HshType::tI32;  }; 
-  template<> struct typenum<tf32>  { static const Type num = HshType::tF32;  };
-  template<> struct typenum<tu64>  { static const Type num = HshType::tU64;  }; 
-  template<> struct typenum<ti64>  { static const Type num = HshType::tI64;  }; 
-  template<> struct typenum<tf64>  { static const Type num = HshType::tF64;  };
-  template<> struct typenum<tbl<long>>          { static const Type num = HshType::tI64;  };
-  template<> struct typenum<tbl<unsigned long>> { static const Type num = HshType::tU64;  };
+  template<> struct typenum<tu8>   { static const Type num = HshType::cU8;   }; 
+  template<> struct typenum<ti8>   { static const Type num = HshType::cI8;   }; 
+  template<> struct typenum<tu16>  { static const Type num = HshType::cU16;  }; 
+  template<> struct typenum<ti16>  { static const Type num = HshType::cI16;  }; 
+  template<> struct typenum<tu32>  { static const Type num = HshType::cU32;  }; 
+  template<> struct typenum<ti32>  { static const Type num = HshType::cI32;  }; 
+  template<> struct typenum<tf32>  { static const Type num = HshType::cF32;  };
+  template<> struct typenum<tu64>  { static const Type num = HshType::cU64;  }; 
+  template<> struct typenum<ti64>  { static const Type num = HshType::cI64;  }; 
+  template<> struct typenum<tf64>  { static const Type num = HshType::cF64;  };
+  template<> struct typenum<tbl<long>>          { static const Type num = HshType::cI64;  };
+  template<> struct typenum<tbl<unsigned long>> { static const Type num = HshType::cU64;  };
 
   template<class C> struct typecast { using type = C;   };                               // cast types
   template<> struct typecast<i8>    { using type = i64; };
@@ -1317,11 +1319,11 @@ public:
 template<class T> KVOfst::operator tbl<T>() 
 {   
   tbl_msg_assert(
-    kv->hsh.type == KV::ctypenum< tbl<T> >::num, 
+    kv->hsh.type == KV::typenum< tbl<T> >::num, 
     " - tbl TYPE ERROR -\nInternal type: ", 
     HshType::type_str((HshType::Type)kv->hsh.type), 
     "Desired type: ",
-    HshType::type_str((HshType::Type)KV::ctypenum< tbl<T> >::num) );        
+    HshType::type_str((HshType::Type)KV::typenum< tbl<T> >::num) );        
 
   if(base){
     tbl<T>   t;                                                                          // type only matters so that c 
@@ -1361,7 +1363,7 @@ auto HshType::type_str(Type t) -> char const* const
     case HshType::NONE:  return  "None";
 
     case   HshType::U64: return  "u64";
-    case   HshType::I64: return  "i16";
+    case   HshType::I64: return  "i64";
     case   HshType::F64: return  "f64";
 
     case   HshType::cU8: return  "child table  u8";

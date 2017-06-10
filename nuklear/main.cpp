@@ -850,7 +850,7 @@ ENTRY_DECLARATION
     tu64 chld;
     chld.push(4);
     chld.push(8);
-    chld("wat") = 8;
+    chld("wat") = (i8)17;
     i64 wat = chld("wat");
 
     //chld.push(.1);
@@ -877,11 +877,19 @@ ENTRY_DECLARATION
     nonChld.push(0.5f);
     tst(0) = &nonChld;
 
-    tu64*  chldc  =  tst("child"); //kv;  //  tst("child"); //kv;
-    Printf("\n\n %d %d \n\n", (*chldc)[0], (*chldc)[1] );
+    //tu64*  chldc  =  tst("child");   // should and does create an error because the table is a child and being cast to a pointer
+    //Printf("\n\n %d %d \n\n", (*chldc)[0], (*chldc)[1] );
 
-    //tu64  chldc  =  tst("child"); //kv;  //  tst("child"); //kv;
-    //Printf("\n\n %d %d \n\n", chldc[0], chldc[1] );
+    tu64  chldc  =  tst("child");
+    Printf("\n\n %d %d \n\n", chldc[0], chldc[1] );
+
+
+    tf32 a; tf32 b;
+    a.push({0.1f, 0.2f, 0.4f, 0.8f, 1.6f});
+    b.push({1.0f, 2.0f, 3.0f, 4.0f, 5.0f});
+
+    auto c = a * b;
+    TO(5,i) Printf("  %f  ", c[i]);
 
     //auto      f  =  chldc.memStart();
     //tst = chldc;
