@@ -845,7 +845,7 @@ ENTRY_DECLARATION
     //ts.push_back(s);
 
     Printf("\n sizeof(KV): %d \n", sizeof(KV) );
-    Printf("\n sizeof(tbl::fields): %d \n", sizeof(tbl<u8>::fields) );
+    Printf("\n sizeof(tbl::fields): %d \n\n", sizeof(tbl<u8>::fields) );
 
     tu64 chld;
     chld.push(4);
