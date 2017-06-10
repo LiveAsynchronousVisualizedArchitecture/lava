@@ -877,10 +877,13 @@ ENTRY_DECLARATION
     nonChld.push(0.5f);
     tst(0) = &nonChld;
 
-    tu64  chldc  =  tst("child"); //kv;  //  tst("child"); //kv;
-    //auto      f  =  chldc.memStart();
-    Printf("\n\n %d %d \n\n", chldc[0], chldc[1] );
+    tu64*  chldc  =  tst("child"); //kv;  //  tst("child"); //kv;
+    Printf("\n\n %d %d \n\n", (*chldc)[0], (*chldc)[1] );
 
+    //tu64  chldc  =  tst("child"); //kv;  //  tst("child"); //kv;
+    //Printf("\n\n %d %d \n\n", chldc[0], chldc[1] );
+
+    //auto      f  =  chldc.memStart();
     //tst = chldc;
 
     //chldc[0] *= 4.f;
