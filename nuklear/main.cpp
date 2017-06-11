@@ -884,9 +884,10 @@ ENTRY_DECLARATION
     Printf("\n\n %d %d \n\n", chldc[0], chldc[1] );
 
 
-    tf32 a; tf32 b;
-    a.push({0.1f, 0.2f, 0.4f, 0.8f, 1.6f});
-    b.push({1.0f, 2.0f, 3.0f, 4.0f, 5.0f});
+    tf32 a = {0.1f, 0.2f, 0.4f, 0.8f, 1.6f}; 
+    tf32 b = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    //a.push({0.1f, 0.2f, 0.4f, 0.8f, 1.6f});
+    //b.push({1.0f, 2.0f, 3.0f, 4.0f, 5.0f});
 
     auto c = a * b;
     TO(5,i) Printf("  %f  ", c[i]);

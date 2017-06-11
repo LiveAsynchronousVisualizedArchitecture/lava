@@ -11,15 +11,16 @@
 
 // todo: put in initializer_list as constructor 
 // todo: take out assertion on casting to a smaller error - want a warning if possible
-// todo: break out memory allocation from template - keep template as a wrapper for casting a typeless tbl
 // todo: clean up types to no longer be in the global namespace - leave the tbl types in the global namespace
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key
-//       | can casts to c_str() using a single 0 byte after the array work? if there is a blank key or no map and a 0 byte at the beggining of childData() then the cast to c_str() could work 
+//       | can casts to c_str() using a single 0 byte after the array work? 
+//       |   if there is a blank key or no map and a 0 byte at the beggining of childData() then the cast to c_str() could work 
 //       | does any array of strings imply a rabbit hole of keeping track of the type of the array - would any child strings just need to be kept in the map?
 //       | other formats such as one child tbl containing packed strings and another array containing offsets could also be used 
 //       | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
 //       | does this imply that there should be a separate array type or is specializing string enough? 
 
+// todo: break out memory allocation from template - keep template as a wrapper for casting a typeless tbl
 // todo: make resize() - should there be a resize()? only affects array?
 // todo: use inline assembly to vectorize basic math operations
 // todo: use the restrict keyword on basic math operations?
@@ -733,6 +734,12 @@ public:
   {
     init(size);
     TO(size, i){ (*this)[i] = value; }
+  }
+  tbl(std::initializer_list<T> lst)
+  {
+    reserve(lst.size(),0,0);
+    //for(auto&& n : lst){ emplace(std::forward<T>(n)); }
+    for(auto&& n : lst){ emplace(n); }
   }
   ~tbl(){ destroy(); }
 
