@@ -850,8 +850,8 @@ ENTRY_DECLARATION
     tu64 chld;
     chld.push(4);
     chld.push(8);
-    chld("wat") = (i8)259;
-    i8 wat = chld("wat");
+    chld("wat") = 259;
+    i64 wat = chld("wat");
 
     Printf("\n %d \n", wat);
 

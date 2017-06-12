@@ -13,6 +13,8 @@
 // -todo: need to change types when flattening - just needed a recompile
 // -todo: clean up types to no longer be in the global namespace - leave the tbl types in the global namespace
 
+// todo: clean out comments
+// todo: transition indexed verts to use tbl
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key
 //       | can casts to c_str() using a single 0 byte after the array work? 
 //       |   if there is a blank key or no map and a 0 byte at the beggining of childData() then the cast to c_str() could work 
@@ -81,17 +83,6 @@
   #define tbl_PRNT(msg)
 #endif
 
-//using    u8   =   uint8_t;
-//using   u16   =  uint16_t;
-//using   u32   =  uint32_t;
-//using   u64   =  uint64_t;
-//using    i8   =    int8_t;
-//using   i16   =   int16_t;
-//using   i32   =   int32_t;
-//using   i64   =   int64_t;
-//using   f32   =     float;
-//using   f64   =    double;
-
 template<class T> class tbl;
 using   tu8   =  tbl<uint8_t>;
 using   tu16  =  tbl<uint16_t>;
@@ -103,8 +94,6 @@ using   ti32  =  tbl<int32_t>;
 using   ti64  =  tbl<int64_t>;
 using   tf32  =  tbl<float>;
 using   tf64  =  tbl<double>;
-
-struct  KV;
 
 union     HshType
 {
@@ -192,15 +181,9 @@ struct         KV
   using   i64   =   int64_t;
   using   f32   =     float;
   using   f64   =    double;
-  //
-  //template<> struct typenum<tf64>  { static const Type num = HshType::tF8;   };
-  //template<> struct typenum<tf64>  { static const Type num = HshType::tF16;  };
 
   using    Type   =  HshType::Type;
   
-  //template<class N> using DES = typenum< typecast<N>::type;
-
-
   template<class N> struct typenum { static const Type num = HshType::EMPTY; };
   template<> struct typenum<u64>   { static const Type num = HshType::U64;   };
   template<> struct typenum<i64>   { static const Type num = HshType::I64;   };
@@ -254,7 +237,6 @@ struct         KV
 
   KV() : hsh(), val(0), base(0) { 
     memset(key, 0, sizeof(Key));
-    //hsh.type = Type::NONE;
     hsh.type = HshType::EMPTY;
   }
   KV(const char* key, u32 hash, u64 _val=0, u64 _base=0) :
@@ -263,9 +245,6 @@ struct         KV
     memcpy(this->key, key, sizeof(KV::Key) );
     hsh.hash = hash;
     hsh.type = HshType::EMPTY;
-
-    //strcpy_s(this->key, sizeof(KV::Key), key);
-    //hsh.type = NONE;
   }
   KV(KV const& l){ cp(l); }
   KV(KV&&      r){ cp(r); }
@@ -279,18 +258,13 @@ struct         KV
     return *this;
   }
 
-  bool operator==(KV const& l)
-  {
-    return hsh.hash==l.hsh.hash && 
-      strncmp(l.key,key,sizeof(KV::Key)-1)==0;
-  }
+  bool operator==(KV const& l){ return hsh.hash==l.hsh.hash && strncmp(l.key,key,sizeof(KV::Key)-1)==0; }
   KV&  operator= (KV const& l){ return cp(l); }
   KV&  operator= (KV&&      r){ return cp(r); }
   template<class N> KV& operator=(N       const& n)
   {
     hsh.type     = typenum< typecast<N>::type >::num;
     auto castVal = (typecast<N>::type)n;
-    //val          = *((u64*)&castVal);
     memcpy(&val, &castVal, sizeof(u64));
     return *this;
   }
@@ -302,15 +276,11 @@ struct         KV
     return *this;
   }
 
-  template<class N> operator N()
-  { 
-    return as<N>();
-  }
+  template<class N> operator N(){ return as<N>(); }
   template<class N> N as() const
   { 
     using DES = typecast<N>::type;                                                       // DES is the desired type 
 
-    
     if(hsh.type==typenum<DES>::num) return *((DES*)&val);                                    // if the types are the same, return it as the cast directly
     
     if( (hsh.type==HshType::NONE) || (hsh.type==HshType::ERR) ){
@@ -362,14 +332,6 @@ struct         KV
       case  HshType::tU64: return cast_mem<N, tu64*>(&val);
       case  HshType::tI64: return cast_mem<N, ti64*>(&val);
       case  HshType::tF64: return cast_mem<N, tf64*>(&val);
-
-      //case  HshType::tU64: return (tu64*)val;
-      //case  HshType::tI64: return (ti64*)val;
-      //case  HshType::tF64: return (tf64*)val;
-      //
-      //case  HshType::tU64: return cast_ptr<N, tu64>(val);
-      //case  HshType::tI64: return cast_ptr<N, ti64>(val);
-      //case  HshType::tF64: return cast_ptr<N, tf64>(val);
     }
 
     tbl_msg_assert(
@@ -378,67 +340,27 @@ struct         KV
       "Desired  type was: ",                      HshType::type_str((Type)typenum<N>::num) );
 
     return N();
-
-    //u8 destbits = typenum<N>::num & BITS_MASK;
-    //u8  srcbits = hsh.type        & BITS_MASK;
-    //if( destbits > srcbits ){
-    //}
-
-    //case   U8: return cast_mem<N,  u8>(&val);
-    //case  U16: return cast_mem<N, u16>(&val);
-    //case  U32: return cast_mem<N, u32>(&val);
-    //case   I8: return cast_mem<N,  i8>(&val);
-    //case  I16: return cast_mem<N, i16>(&val);
-    //case  I32: return cast_mem<N, i32>(&val);
-    //case  F32: return cast_mem<N, f32>(&val);
   }
 
-  bool isEmpty()           const {
-    return hsh.type==HshType::NONE || hsh.type==HshType::EMPTY;
-  }
+  bool isEmpty() const { return hsh.type==HshType::NONE || hsh.type==HshType::EMPTY; }
 
-  static KV&    empty_kv()
-  {
-    static KV kv;
-    kv.hsh.type = HshType::EMPTY;
-    return kv;
-  }
-  static KV&     none_kv()
-  {
-    static KV kv;
-    kv.hsh.type = HshType::NONE;
-    return kv;
-  }
-  static KV&    error_kv()
-  {
-    static KV kv;
-    kv.hsh.type = HshType::ERR;
-    return kv;
-  }
+  static KV& empty_kv(){ static KV kv; kv.hsh.type = HshType::EMPTY; return kv; }
+  static KV&  none_kv(){ static KV kv; kv.hsh.type = HshType::NONE;  return kv; }
+  static KV& error_kv(){ static KV kv; kv.hsh.type = HshType::ERR;   return kv; }
 };
 struct     KVOfst
 {
   KV*         kv;
   void*     base;
 
-  KVOfst(KVOfst&  l) :
-    kv(l.kv), base(l.base)
-  {}
-  KVOfst(KVOfst&& r) :
-    kv(r.kv), base(r.base)
-  {}
-  KVOfst(KV* _kv=nullptr, void* _base=nullptr)
-    //kv(_kv), base(_base)
-  {
-   kv   = _kv;
-   base = _base;
-  }
-  
+  KVOfst(KVOfst&  l) : kv(l.kv), base(l.base) {}
+  KVOfst(KVOfst&& r) : kv(r.kv), base(r.base) {}
+  KVOfst(KV* _kv=nullptr, void* _base=nullptr) : kv(_kv), base(_base) {}
+
   operator bool() const { return (bool)(kv); }
   template<class T> operator tbl<T> ();
   template<class T> operator tbl<T>*();
 
-  //template<class N> operator N() { return kv->as<N>(); }
   template<class N> operator N() { return (N)(*kv); }
   template<class N> KVOfst& operator=(N const& n){ *kv = n; return *this; }
 };
@@ -484,8 +406,6 @@ public:
   using   ti64  =  tbl<i64>;
   using   tf32  =  tbl<f32>;
   using   tf64  =  tbl<f64>;
-
-  //using   T     =       i32;
 
 private:
   void      sizeBytes(u64  bytes){ memStart()->sizeBytes =  bytes; }
@@ -626,7 +546,6 @@ private:
     f->size      = size;
     f->mapcap    = 0;
     f->owned     = 1;
-
   }
   void        destroy()
   { 
@@ -703,7 +622,6 @@ private:
   }
 
 public:  
-
   u8*     m_mem;                                                                         // the only member variable - everything else is a contiguous block of memory
  
   tbl() : m_mem(nullptr){}
@@ -716,7 +634,6 @@ public:
   tbl(std::initializer_list<T> lst)
   {
     reserve(lst.size(),0,0);
-    //for(auto&& n : lst){ emplace(std::forward<T>(n)); }
     for(auto&& n : lst){ emplace(n); }
   }
   ~tbl(){ destroy(); }
@@ -768,10 +685,7 @@ public:
     }else 
       new (&ret) KVOfst(kv);                                                             // if the key wasn't found, kv will be a nullptr which is the same as an error KVOfst that will evaluate to false when cast to a boolean      
 
-    //if(owned() && !map_expand() ) return KVOfst();                                       // not forced here, because kv can't be nullptr - short circuting owned() means that this won't run on a non-owned tbl
-
     return ret;
-    // todo: don't return right away, check if the map should be expanded 
   }
   tbl     operator>>(tbl const& l){ return tbl::concat_l(*this, l); }
   tbl     operator<<(tbl const& l){ return tbl::concat_r(*this, l); }
@@ -799,7 +713,6 @@ public:
   tbl     operator% (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
 
   template<class V> KVOfst put(const char* key, V val){ return this->operator()(key) = val; }
-  //KVOfst put(const char* key, KV kv){ return *(this->operator()(key).kv) = kv; }
 
   template<class... V> bool emplace(V&&... val)
   {
@@ -899,35 +812,10 @@ public:
   auto       memStart() const -> fields const* { return (fields*)(m_mem - memberBytes()); }
   u64       sizeBytes() const { return m_mem? memStart()->sizeBytes : 0; }
   u64        capacity() const { return m_mem? memStart()->capacity  : 0; }
-  u64           elems() const
-  {
-    //if(this==nullptr || !m_mem) return 0;
-    //return *( ((u64*)memStart()) + 3);
-
-    return m_mem?  memStart()->elems  :  0;
-  }
-  u64    map_capacity() const
-  {
-    //if(!m_mem) return 0;
-    //else       return *mapcap_ptr();
-
-    //if(!m_mem) return 0;
-    //else       return memStart()->mapcap;
-
-    return m_mem?  memStart()->mapcap  :  0;
-  }
-  auto      elemStart() -> KV* 
-  {
-    if(!m_mem) return nullptr;
-
-    return (KV*)(data() + capacity());
-  }
-  auto      elemStart() const -> KV const* 
-  {
-    if(!m_mem) return nullptr;
-
-    return (KV*)(data() + capacity());
-  }
+  u64           elems() const { return m_mem?  memStart()->elems    : 0; }
+  u64    map_capacity() const { return m_mem?  memStart()->mapcap   : 0; }
+  auto      elemStart() ->KV* { return m_mem? (KV*)(data() + capacity()) : nullptr; }
+  auto      elemStart() const -> KV const* { return m_mem? (KV*)(data() + capacity()) : nullptr; }
   void*       reserve(u64 count, u64 mapcap=0, u64 childcap=0)
   {
     if( !owned() ) return m_mem;
@@ -942,7 +830,6 @@ public:
     u64    prevBytes  =  sizeBytes();
     u64   prevMapCap  =  map_capacity();
     void*    prvChld  =  childData();
-    //auto f = (fields*)prvChld;
     u64     nxtBytes  =  memberBytes() + sizeof(T)*count +  sizeof(KV)*mapcap + childcap;
     void*     re;
     bool      fresh  = !m_mem;
@@ -961,7 +848,6 @@ public:
         size(0); elems(0);
       }
       byte_move(childData(), prvChld, prvChldCap);
-      //auto ff = (fields*)childData();
 
       KV*  el = elemStart();                                     //  is this copying elements forward in memory? can it overwrite elements that are already there? - right now reserve only ends up expanding memory for both the array and map
       u8* elb = (u8*)el;  
@@ -976,14 +862,8 @@ public:
         TO(extcap,i) 
           new (&el[i+prevMapCap]) KV();
 
-      if(prevElems)
-      { 
-        u64 cnt = reorder();
-        //printf("\n loop count: %d mapcap: %d  ratio: %.4f \n", cnt, mapcap, cnt/(float)mapcap );
-      }
+      if(prevElems){ u64 cnt = reorder(); }
     }
-
-    //if(re && fresh){ set_size(0); set_elems(0); }
 
     return re;
   }
@@ -1052,30 +932,15 @@ public:
       prev.destroy();
       prev.m_mem = nullptr;                                                              // makes destructor early exit on destroy
       
-      //memmove(chld, prvChld, chldCap);
-
-      //auto fff = (fields*)(chld);
-
       auto cf = (fields*)( childData() );
-
-      //KV& kv = el[i];
-      //KV* e = elemStart();                                                        // now this is the new tabel, not the old one like the call to elemStart() above
-      //TO(map_capacity(),i){
-      //  auto type = e[i].hsh.type;
-      //  if( (type&HshType::TABLE) && (type&HshType::CHILD) )
-      //    e[i].val = (u64)chld + (e[i].val - (u64)prvChld);
-      //}
 
       return true;
     }else 
       return false;
-
-    //*mapcap_ptr() = elemcnt;
   }
   i64            find(const char* key, u32* hash=nullptr) const
   {
     u32   hsh  =  HashStr(key);
-    //u32   hsh  =  (u32)(*key); // & HASH_MASK );
     if(hash) *hash = hsh;
 
     KV*     el  =  (KV*)elemStart();                                   // el is a pointer to the elements 
@@ -1106,11 +971,7 @@ public:
      
     return el[i].hsh.hash % map_capacity();
   }
-  u64        distance(u64 i) const
-  {
-    //u64 idl = ideal(i);
-    return wrapDist( ideal(i), i, map_capacity() );
-  }
+  u64        distance(u64 i) const { return wrapDist( ideal(i), i, map_capacity() ); }
   i64        holeOfst(u64 i) const
   { // finds the closes hole from an element, but not the furthest hole
     KV const* el = elemStart();
@@ -1137,21 +998,12 @@ public:
     u64     en = prev(i, mapcap);
 
     u64 cnt=0;
-    //while( (i=compact(i,en,mapcap))!=en ){ ++cnt; } 
     cnt = reorder();
     set_elems( elems()-1 );
 
-    //printf("\ncount: %d\n", cnt);
-
     return true;
   }
-  void          clear() // bool ary=true, bool map=true)
-  {
-    if(m_mem){
-      destroy();
-      init(0);
-    }
-  }
+  void          clear(){ if(m_mem){ destroy(); init(0); } }
   T*            begin(){ return  (T*)m_mem;           }
   T*              end(){ return ((T*)m_mem) + size(); }
   auto        flatten() -> tbl<T>&
@@ -1213,23 +1065,16 @@ private:
   static u32    HashBytes(const void *const buf, u32 len)
   {
     u64 hsh = fnv_64a_buf(buf, len);
-
     return (u32)( (hsh>>32) ^ ((u32)hsh));        // fold the 64 bit hash onto itself
   }
   static u32      HashStr(const char* s)
   {
     u32 len = (u32)strlen(s);
     u32 hsh = HashBytes(s, len);
-     
     return hsh & HASH_MASK;
   }
 
-  template<class S> static void swap(S* a, S* b) 
-  { // here to avoid a depencies
-    S tmp = *a;
-    *a    = *b;
-    *b    = tmp;
-  }
+  template<class S> static void swap(S* a, S* b){ S tmp=*a; *a=*b; *b=tmp; }   // here to avoid a depencies
   template<class N> static    N   mx(N a, N b){return a<b?b:a;}
   template<class N> static    N   mn(N a, N b){return a<b?a:b;}
 
@@ -1243,19 +1088,7 @@ private:
   }
 
 public:
-  static u64    memberBytes()
-  {
-    return sizeof(fields);
-
-    //return sizeof(u64) * 5;
-    //
-    // Memory Layout (5 u64 variables before m_mem)
-    // sizeBytes     -  total number of bytes of the entire memory span
-    // size          -  vector entries
-    // capacity      -  number of elements already allocated in the vector
-    // elems         -  number of map entries 
-    // map_capacity  -  number of elements already allocated for the mapp 
-  }
+  static u64    memberBytes(){ return sizeof(fields); }
   static u64     size_bytes(u64 count)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
   {
     return memberBytes() + sizeof(T)*count;  // todo: not correct yet, needs to factor in map and child data
@@ -1303,13 +1136,6 @@ public:
 
 template<class T> KVOfst::operator tbl<T>() 
 {   
-  //tbl_msg_assert(
-  //  kv->hsh.type == KV::typenum< tbl<T> >::num, 
-  //  " - tbl TYPE ERROR -\nInternal type: ", 
-  //  HshType::type_str((HshType::Type)kv->hsh.type), 
-  //  "Desired type: ",
-  //  HshType::type_str((HshType::Type)KV::typenum< tbl<T> >::num) );        
-
   if(base){
     tbl<T>   t;                                                                          // type only matters so that c 
     tbl<T> ret;
@@ -1383,7 +1209,141 @@ auto HshType::type_str(Type t) -> char const* const
 
 
 
+//tbl_msg_assert(
+//  kv->hsh.type == KV::typenum< tbl<T> >::num, 
+//  " - tbl TYPE ERROR -\nInternal type: ", 
+//  HshType::type_str((HshType::Type)kv->hsh.type), 
+//  "Desired type: ",
+//  HshType::type_str((HshType::Type)KV::typenum< tbl<T> >::num) );        
 
+//return sizeof(u64) * 5;
+//
+// Memory Layout (5 u64 variables before m_mem)
+// sizeBytes     -  total number of bytes of the entire memory span
+// size          -  vector entries
+// capacity      -  number of elements already allocated in the vector
+// elems         -  number of map entries 
+// map_capacity  -  number of elements already allocated for the mapp 
+
+//
+// bool ary=true, bool map=true)
+
+//while( (i=compact(i,en,mapcap))!=en ){ ++cnt; } 
+//
+//printf("\ncount: %d\n", cnt);
+
+//
+//u64 idl = ideal(i);
+
+//
+//u32   hsh  =  (u32)(*key); // & HASH_MASK );
+
+//memmove(chld, prvChld, chldCap);
+//
+//auto fff = (fields*)(chld);
+//
+//KV& kv = el[i];
+//KV* e = elemStart();                                                        // now this is the new tabel, not the old one like the call to elemStart() above
+//TO(map_capacity(),i){
+//  auto type = e[i].hsh.type;
+//  if( (type&HshType::TABLE) && (type&HshType::CHILD) )
+//    e[i].val = (u64)chld + (e[i].val - (u64)prvChld);
+//}
+//
+//*mapcap_ptr() = elemcnt;
+
+//{
+//  if(!m_mem) return nullptr;
+//
+//  return (KV*)(data() + capacity());
+//}
+
+//{
+//  if(!m_mem) return nullptr;
+//
+//  return (KV*)(data() + capacity());
+//}
+
+//printf("\n loop count: %d mapcap: %d  ratio: %.4f \n", cnt, mapcap, cnt/(float)mapcap );
+//
+//auto f = (fields*)prvChld;
+//
+//auto ff = (fields*)childData();
+//
+//if(re && fresh){ set_size(0); set_elems(0); }
+
+//if(!m_mem) return 0;
+//else       return *mapcap_ptr();
+
+//if(!m_mem) return 0;
+//else       return memStart()->mapcap;
+
+//if(this==nullptr || !m_mem) return 0;
+//return *( ((u64*)memStart()) + 3);
+
+//
+//KVOfst put(const char* key, KV kv){ return *(this->operator()(key).kv) = kv; }
+
+//if(owned() && !map_expand() ) return KVOfst();                                       // not forced here, because kv can't be nullptr - short circuting owned() means that this won't run on a non-owned tbl
+// todo: don't return right away, check if the map should be expanded 
+
+//
+//for(auto&& n : lst){ emplace(std::forward<T>(n)); }
+
+//{
+//  kv   = _kv;
+//  base = _base;
+//}
+//
+//template<class N> operator N() { return kv->as<N>(); }
+
+//hsh.type = Type::NONE;
+//
+//strcpy_s(this->key, sizeof(KV::Key), key);
+//hsh.type = NONE;
+//
+//val          = *((u64*)&castVal);
+//
+//case  HshType::tU64: return (tu64*)val;
+//case  HshType::tI64: return (ti64*)val;
+//case  HshType::tF64: return (tf64*)val;
+//
+//case  HshType::tU64: return cast_ptr<N, tu64>(val);
+//case  HshType::tI64: return cast_ptr<N, ti64>(val);
+//case  HshType::tF64: return cast_ptr<N, tf64>(val);
+
+//u8 destbits = typenum<N>::num & BITS_MASK;
+//u8  srcbits = hsh.type        & BITS_MASK;
+//if( destbits > srcbits ){
+//}
+
+//case   U8: return cast_mem<N,  u8>(&val);
+//case  U16: return cast_mem<N, u16>(&val);
+//case  U32: return cast_mem<N, u32>(&val);
+//case   I8: return cast_mem<N,  i8>(&val);
+//case  I16: return cast_mem<N, i16>(&val);
+//case  I32: return cast_mem<N, i32>(&val);
+//case  F32: return cast_mem<N, f32>(&val);
+
+//
+//template<> struct typenum<tf64>  { static const Type num = HshType::tF8;   };
+//template<> struct typenum<tf64>  { static const Type num = HshType::tF16;  };
+//
+//template<class N> using DES = typenum< typecast<N>::type;
+
+//
+//struct  KV;
+
+//using    u8   =   uint8_t;
+//using   u16   =  uint16_t;
+//using   u32   =  uint32_t;
+//using   u64   =  uint64_t;
+//using    i8   =    int8_t;
+//using   i16   =   int16_t;
+//using   i32   =   int32_t;
+//using   i64   =   int64_t;
+//using   f32   =     float;
+//using   f64   =    double;
 
 //enum Type
 //{                                                                                      // 10 number types, 10 table variants + empty = 21 total - at least 5 bits needed
