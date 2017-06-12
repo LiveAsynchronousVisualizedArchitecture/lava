@@ -54,6 +54,12 @@ Pack:
  - Should packs / lists be used always?
 
 
+Security:
+ - 4k used to have 512 inputs and 512 outputs in some format
+ - each input and output could be put in their own isolated page 
+ - this would allow setting security permissions on the pages, such as read only or write only
+ - pages put on low and hi boundaries could be set with retrictive permissions 
+ - this would cause immediate faults on any out of bounds reads or writes
 
 
 Make loading priority for nodes, or load them when it is first known that they will be needed based on data flow and messaging?

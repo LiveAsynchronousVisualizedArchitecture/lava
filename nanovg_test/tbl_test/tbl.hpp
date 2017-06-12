@@ -8,10 +8,11 @@
 // -todo: fix child table to non-child table pointer assert error and message
 // -todo: test a smaller integer type being taken out of the tbl
 // -todo: test numeric operations on arrays
+// -todo: put in initializer_list as constructor 
+// -todo: take out assertion on casting to a smaller bit size - want a warning if possible
+// -todo: need to change types when flattening - just needed a recompile
+// -todo: clean up types to no longer be in the global namespace - leave the tbl types in the global namespace
 
-// todo: put in initializer_list as constructor 
-// todo: take out assertion on casting to a smaller error - want a warning if possible
-// todo: clean up types to no longer be in the global namespace - leave the tbl types in the global namespace
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key
 //       | can casts to c_str() using a single 0 byte after the array work? 
 //       |   if there is a blank key or no map and a 0 byte at the beggining of childData() then the cast to c_str() could work 
@@ -80,28 +81,28 @@
   #define tbl_PRNT(msg)
 #endif
 
-using    u8   =   uint8_t;
-using   u16   =  uint16_t;
-using   u32   =  uint32_t;
-using   u64   =  uint64_t;
-using    i8   =    int8_t;
-using   i16   =   int16_t;
-using   i32   =   int32_t;
-using   i64   =   int64_t;
-using   f32   =     float;
-using   f64   =    double;
+//using    u8   =   uint8_t;
+//using   u16   =  uint16_t;
+//using   u32   =  uint32_t;
+//using   u64   =  uint64_t;
+//using    i8   =    int8_t;
+//using   i16   =   int16_t;
+//using   i32   =   int32_t;
+//using   i64   =   int64_t;
+//using   f32   =     float;
+//using   f64   =    double;
 
 template<class T> class tbl;
-using   tu8   =  tbl<u8>;
-using   tu16  =  tbl<u16>;
-using   tu32  =  tbl<u32>;
-using   tu64  =  tbl<u64>;
-using   ti8   =  tbl<i8>;
-using   ti16  =  tbl<i16>;
-using   ti32  =  tbl<i32>;
-using   ti64  =  tbl<i64>;
-using   tf32  =  tbl<f32>;
-using   tf64  =  tbl<f64>;
+using   tu8   =  tbl<uint8_t>;
+using   tu16  =  tbl<uint16_t>;
+using   tu32  =  tbl<uint32_t>;
+using   tu64  =  tbl<uint64_t>;
+using   ti8   =  tbl<int8_t>;
+using   ti16  =  tbl<int16_t>;
+using   ti32  =  tbl<int32_t>;
+using   ti64  =  tbl<int64_t>;
+using   tf32  =  tbl<float>;
+using   tf64  =  tbl<double>;
 
 struct  KV;
 
@@ -119,36 +120,6 @@ public:
   using   f32   =     float;
   using   f64   =    double;
   using  Type   =        u8;
-
-  //enum Type
-  //{                                                                                      // 10 number types, 10 table variants + empty = 21 total - at least 5 bits needed
-  //  CHILD      =  1<<5,
-  //  TABLE      =  1<<4,
-  //  SIGNED     =  1<<3,
-  //  INTEGER    =  1<<2,
-  //  BITS_8     =     0,                    // 2^3 is  8 for  8 bit depth - 0b00
-  //  BITS_16    =     1,                    // 2^4 is 16 for 16 bit depth - 0b01
-  //  BITS_32    =  1<<1,                    // 2^5 is 32 for 32 bit depth - 0b10
-  //  BITS_64    =  1<<1 | 1,                // 2^6 is 64 for 64 bit depth - 0b11
-  //  BITS_MASK  =  BITS_64,
-  //  CLEAR      =  BITS_8,
-  //
-  //  ERR        =  ~INTEGER & ~SIGNED & ~BITS_32,
-  //  NONE       =  ~INTEGER & ~SIGNED & ~BITS_16,                                         // ~TABLE,                              // INTEGER bit turned off, SIGNED bit turned off and TABLE bit turned off, meanin unsigned float table, which is not a viable real type of course
-  //  EMPTY      =  ~INTEGER & ~SIGNED,                                                    // a floating point number can't be unsigned, so this scenario is used for an 'empty' state
-  //
-  //  U64        =  INTEGER | BITS_64,
-  //  I64        =  INTEGER | BITS_64 | SIGNED,
-  //  F64        =  BITS_64,
-  //
-  //  tU64       =  TABLE | INTEGER | BITS_64,
-  //  tI64       =  TABLE | INTEGER | BITS_64 | SIGNED,
-  //  tF64       =  TABLE | BITS_64,
-  //
-  //  cU64       =  CHILD | tU64,
-  //  cI64       =  CHILD | tI64,
-  //  cF64       =  CHILD | tF64
-  //};
 
   static const u8   MASK       =  0x3F;
   static const u8   CHILD      =  1<<5;
@@ -211,21 +182,24 @@ public:
 };
 struct         KV
 {
-  //using    u8   =   uint8_t;
-  //using   u16   =  uint16_t;
-  //using   u32   =  uint32_t;
-  //using   u64   =  uint64_t;
-  //using    i8   =    int8_t;
-  //using   i16   =   int16_t;
-  //using   i32   =   int32_t;
-  //using   i64   =   int64_t;
-  //using   f32   =     float;
-  //using   f64   =    double;
+  using    u8   =   uint8_t;
+  using   u16   =  uint16_t;
+  using   u32   =  uint32_t;
+  using   u64   =  uint64_t;
+  using    i8   =    int8_t;
+  using   i16   =   int16_t;
+  using   i32   =   int32_t;
+  using   i64   =   int64_t;
+  using   f32   =     float;
+  using   f64   =    double;
   //
   //template<> struct typenum<tf64>  { static const Type num = HshType::tF8;   };
   //template<> struct typenum<tf64>  { static const Type num = HshType::tF16;  };
 
-  using  Type   =  HshType::Type;
+  using    Type   =  HshType::Type;
+  
+  //template<class N> using DES = typenum< typecast<N>::type;
+
 
   template<class N> struct typenum { static const Type num = HshType::EMPTY; };
   template<> struct typenum<u64>   { static const Type num = HshType::U64;   };
@@ -247,7 +221,6 @@ struct         KV
   template<> struct typenum<tbl<long>*>          { static const Type num = HshType::tI64;  };
   template<> struct typenum<tbl<unsigned long>*> { static const Type num = HshType::tU64;  };
 
-  //template<class N> struct ctypenum { static const Type num = HshType::EMPTY; };
   template<> struct typenum<tu8>   { static const Type num = HshType::cU8;   }; 
   template<> struct typenum<ti8>   { static const Type num = HshType::cI8;   }; 
   template<> struct typenum<tu16>  { static const Type num = HshType::cU16;  }; 
@@ -335,39 +308,42 @@ struct         KV
   }
   template<class N> N as() const
   { 
-    if(hsh.type==typenum<N>::num) return *((N*)&val);       // if the types are the same, return it as the cast directly
+    using DES = typecast<N>::type;                                                       // DES is the desired type 
+
     
-    if( (hsh.type & HshType::NONE) || (hsh.type & ERROR) ){
+    if(hsh.type==typenum<DES>::num) return *((DES*)&val);                                    // if the types are the same, return it as the cast directly
+    
+    if( (hsh.type==HshType::NONE) || (hsh.type==HshType::ERR) ){
       tbl_msg_assert(
-        hsh.type==typenum<N>::num, 
+        hsh.type==typenum<DES>::num, 
         " - tbl TYPE ERROR -\nInternal type: ", 
         HshType::type_str((Type)hsh.type), 
         "Desired type: ",
-        HshType::type_str((Type)typenum<N>::num) );        
+        HshType::type_str((Type)typenum< typecast<DES>::type >::num) );        
     } 
-    if( (hsh.type & HshType::SIGNED) && !(typenum<N>::num & HshType::SIGNED)  ){
+    if( (hsh.type & HshType::SIGNED) && !(typenum<DES>::num & HshType::SIGNED)  ){
       tbl_msg_assert(
-        hsh.type==typenum<N>::num, 
+        hsh.type==typenum<DES>::num, 
         " - tbl TYPE ERROR -\nSigned integers can not be implicitly cast to unsigned integers.\nInternal type: ", 
         HshType::type_str((Type)hsh.type), 
         "Desired type: ",
-        HshType::type_str((Type)typenum<N>::num) );
+        HshType::type_str((Type)typenum<DES>::num) );
     }
-    if( !(hsh.type & HshType::INTEGER) && (typenum<N>::num & HshType::INTEGER) ){
+    if( !(hsh.type & HshType::INTEGER) && (typenum<DES>::num & HshType::INTEGER) ){
       tbl_msg_assert(
-        hsh.type==typenum<N>::num, 
+        hsh.type==typenum<DES>::num, 
         " - tbl TYPE ERROR -\nFloats can not be implicitly cast to integers.\nInternal type: ", 
         HshType::type_str((Type)hsh.type), 
         "Desired type: ",
-        HshType::type_str((Type)typenum<N>::num) );
+        HshType::type_str((Type)typenum<DES>::num) );
     }
-    if( (hsh.type|typenum<N>::num) & HshType::TABLE ){
+    if( (hsh.type|typenum<DES>::num) & HshType::TABLE ){
       tbl_msg_assert(
-        hsh.type==typenum<N>::num, 
+        hsh.type==typenum<DES>::num, 
         " - tbl TYPE ERROR -\nTables can not be implicitly cast, even to a larger bit depth.\nInternal type: ", 
         HshType::type_str((Type)hsh.type), 
         "Desired type: ",
-        HshType::type_str((Type)typenum<N>::num) );
+        HshType::type_str((Type)typenum<DES>::num) );
     }
 
     switch(hsh.type)
@@ -468,6 +444,8 @@ struct     KVOfst
 };
 struct  TblFields 
 {
+  using u64 = uint64_t;
+  
   u64         t :  8;                             // will hold the character 't'
   u64         b :  8;                             // will hold the character 'b'
   u64 sizeBytes : 48;
@@ -1325,12 +1303,12 @@ public:
 
 template<class T> KVOfst::operator tbl<T>() 
 {   
-  tbl_msg_assert(
-    kv->hsh.type == KV::typenum< tbl<T> >::num, 
-    " - tbl TYPE ERROR -\nInternal type: ", 
-    HshType::type_str((HshType::Type)kv->hsh.type), 
-    "Desired type: ",
-    HshType::type_str((HshType::Type)KV::typenum< tbl<T> >::num) );        
+  //tbl_msg_assert(
+  //  kv->hsh.type == KV::typenum< tbl<T> >::num, 
+  //  " - tbl TYPE ERROR -\nInternal type: ", 
+  //  HshType::type_str((HshType::Type)kv->hsh.type), 
+  //  "Desired type: ",
+  //  HshType::type_str((HshType::Type)KV::typenum< tbl<T> >::num) );        
 
   if(base){
     tbl<T>   t;                                                                          // type only matters so that c 
@@ -1407,7 +1385,70 @@ auto HshType::type_str(Type t) -> char const* const
 
 
 
+//enum Type
+//{                                                                                      // 10 number types, 10 table variants + empty = 21 total - at least 5 bits needed
+//  CHILD      =  1<<5,
+//  TABLE      =  1<<4,
+//  SIGNED     =  1<<3,
+//  INTEGER    =  1<<2,
+//  BITS_8     =     0,                    // 2^3 is  8 for  8 bit depth - 0b00
+//  BITS_16    =     1,                    // 2^4 is 16 for 16 bit depth - 0b01
+//  BITS_32    =  1<<1,                    // 2^5 is 32 for 32 bit depth - 0b10
+//  BITS_64    =  1<<1 | 1,                // 2^6 is 64 for 64 bit depth - 0b11
+//  BITS_MASK  =  BITS_64,
+//  CLEAR      =  BITS_8,
+//
+//  ERR        =  ~INTEGER & ~SIGNED & ~BITS_32,
+//  NONE       =  ~INTEGER & ~SIGNED & ~BITS_16,                                         // ~TABLE,                              // INTEGER bit turned off, SIGNED bit turned off and TABLE bit turned off, meanin unsigned float table, which is not a viable real type of course
+//  EMPTY      =  ~INTEGER & ~SIGNED,                                                    // a floating point number can't be unsigned, so this scenario is used for an 'empty' state
+//
+//  U64        =  INTEGER | BITS_64,
+//  I64        =  INTEGER | BITS_64 | SIGNED,
+//  F64        =  BITS_64,
+//
+//  tU64       =  TABLE | INTEGER | BITS_64,
+//  tI64       =  TABLE | INTEGER | BITS_64 | SIGNED,
+//  tF64       =  TABLE | BITS_64,
+//
+//  cU64       =  CHILD | tU64,
+//  cI64       =  CHILD | tI64,
+//  cF64       =  CHILD | tF64
+//};
 
+//if(hsh.type==typenum<N>::num) return *((N*)&val);                                    // if the types are the same, return it as the cast directly
+//
+//if( (hsh.type==HshType::NONE) || (hsh.type==HshType::ERR) ){
+//  tbl_msg_assert(
+//    hsh.type==typenum<N>::num, 
+//    " - tbl TYPE ERROR -\nInternal type: ", 
+//    HshType::type_str((Type)hsh.type), 
+//    "Desired type: ",
+//    HshType::type_str((Type)typenum< typecast<N>::type >::num) );        
+//} 
+//if( (hsh.type & HshType::SIGNED) && !(typenum<N>::num & HshType::SIGNED)  ){
+//  tbl_msg_assert(
+//    hsh.type==typenum<N>::num, 
+//    " - tbl TYPE ERROR -\nSigned integers can not be implicitly cast to unsigned integers.\nInternal type: ", 
+//    HshType::type_str((Type)hsh.type), 
+//    "Desired type: ",
+//    HshType::type_str((Type)typenum<N>::num) );
+//}
+//if( !(hsh.type & HshType::INTEGER) && (typenum<N>::num & HshType::INTEGER) ){
+//  tbl_msg_assert(
+//    hsh.type==typenum<N>::num, 
+//    " - tbl TYPE ERROR -\nFloats can not be implicitly cast to integers.\nInternal type: ", 
+//    HshType::type_str((Type)hsh.type), 
+//    "Desired type: ",
+//    HshType::type_str((Type)typenum<N>::num) );
+//}
+//if( (hsh.type|typenum<N>::num) & HshType::TABLE ){
+//  tbl_msg_assert(
+//    hsh.type==typenum<N>::num, 
+//    " - tbl TYPE ERROR -\nTables can not be implicitly cast, even to a larger bit depth.\nInternal type: ", 
+//    HshType::type_str((Type)hsh.type), 
+//    "Desired type: ",
+//    HshType::type_str((Type)typenum<N>::num) );
+//}
 
 //
 //ui8   both = hsh.type | typenum<N>::num;              // both bits
