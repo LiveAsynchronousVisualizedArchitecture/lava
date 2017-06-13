@@ -79,7 +79,6 @@
 #include <fstream>
 #include <sstream>
 #include "GL/glew.h"
-#include "no_rt_util.h"
 
 #define GLM_FORCE_RADIANS
 #define GLM_ENABLE_EXPERIMENTAL
@@ -91,9 +90,12 @@
 
 #include "glfw3.h"
 
+#include "VizDecl.h"
 #include "VizData.hpp"
 #include "VizGen.hpp"
 #include "VizTfm.hpp"
+
+#include "no_rt_util.h"
 
 #define ENTRY_DECLARATION int main(void)
 #ifdef _MSC_VER
@@ -705,7 +707,7 @@ void       genTestGeo(simdb* db)
 
   // Create serialized IndexedVerts
   size_t leftLen, rightLen, cubeLen;
-  vec<u8>  leftData = makeTriangle(leftLen, true);
+  vec<u8>  leftData = makeTriangle(leftLen,   true);
   vec<u8> rightData = makeTriangle(rightLen, false);
   vec<u8>  cubeData = makeCube(cubeLen);
 
@@ -727,6 +729,41 @@ void       genTestGeo(simdb* db)
   db2.put("three",  cubeData);
   db2.put("super long key name as a test", cubeData);
 
+  //iv->verts[0] = {
+  //  {-1.0, -1.0f, 0.0f},      //pos
+  //  {0.0f, 0.0f, -1.0f},      //norm
+  //  {1.0f, 1.0f, 1.0f, 1.0f}, //color
+  //  {0.0f, 0.0f}              //texCoord
+  //};
+  //iv->verts[1] = {
+  //  {-0.17f, -1.0f, 0.0f},      //pos
+  //  {0.0f, 0.0f, -1.0f},      //norm
+  //  {1.0f, 1.0f, 1.0f, 1.0f}, //color
+  //  {0.0f, 0.0f}              //texCoord
+  //};
+  //iv->verts[2] = {
+  //  {-0.58f, 1.0f, 0.0f},       //pos
+  //  {0.0f, 0.0f, -1.0f},        //norm
+  //  {1.0f, 1.0f, 1.0f, 1.0f},   //color
+  //  {0.0f, 0.0f}                //texCoord
+  //};
+
+
+  Tbl lftTri;
+
+  auto typenum = "IdxVerts";
+  lftTri("type") = *((u64*)typenum);
+
+  tf32 p  = { -1.0, -1.0f,  0.0f, -0.17f, -1.0f,  0.0f, -0.58f, 1.0f,  0.0f };
+  tf32 n  = { 0.0f,  0.0f, -1.0f,   0.0f,  0.0f, -1.0f,  0.0f,  0.0f, -1.0f };
+  tf32 c  = { 1.0f,  1.0f,  1.0f,   1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f, 1.0f, 1.0f, 1.0f };
+  tf32 tx = { 0.0f,  0.0f,  0.0f,   0.0f,  0.0f,  0.0f };
+  lftTri("P")  =  &p;
+  lftTri("N")  =  &n;
+  lftTri("C")  =  &c;
+  lftTri("TX") =  &tx;
+
+  db->put("tb left triangle", lftTri.memStart(), lftTri.sizeBytes() );
 }
 
 ENTRY_DECLARATION

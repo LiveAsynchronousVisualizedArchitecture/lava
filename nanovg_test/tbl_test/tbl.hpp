@@ -12,8 +12,14 @@
 // -todo: take out assertion on casting to a smaller bit size - want a warning if possible
 // -todo: need to change types when flattening - just needed a recompile
 // -todo: clean up types to no longer be in the global namespace - leave the tbl types in the global namespace
+// -todo: clean out comments
+// -todo: take out no_rt_util.h dependency 
 
-// todo: clean out comments
+// todo: make simdb convenience function
+// todo: make initializer list syntax possible to create std::pairs of strings and lists of values
+// todo: make sure moving a tmp tbl into a table works - will need to be destructed on flatten AND destructor - need to make moving a tbl in work - owned can still be set - will need a tbl type that isn't a pointer and isn't a child?
+// todo: make boolean argument to flatten() to destruct pointed to tables
+// todo: make flatten() recursive 
 // todo: transition indexed verts to use tbl
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key
 //       | can casts to c_str() using a single 0 byte after the array work? 
@@ -56,7 +62,14 @@
 
 #include <cstdlib>
 #include <cstring>
-#include "../no_rt_util.h"
+//#include "../no_rt_util.h"
+
+#ifndef TO
+  #define TO(to,var) for(uint64_t var=0, lim=(uint64_t)to; var<lim; ++var)
+#endif
+#ifndef FROM
+  #define FROM(from,var) for(std::remove_const<decltype(from)>::type var=from; var-- > 0; )
+#endif
 
 #if defined(_MSC_VER) && defined(_DEBUG)
   #include <iostream>
@@ -83,7 +96,7 @@
   #define tbl_PRNT(msg)
 #endif
 
-template<class T> class tbl;
+template<class T=int8_t> class tbl;
 using   tu8   =  tbl<uint8_t>;
 using   tu16  =  tbl<uint16_t>;
 using   tu32  =  tbl<uint32_t>;
@@ -94,6 +107,8 @@ using   ti32  =  tbl<int32_t>;
 using   ti64  =  tbl<int64_t>;
 using   tf32  =  tbl<float>;
 using   tf64  =  tbl<double>;
+using   Tbl   =  tbl<>;
+//using   tbl   =  tbl<int8_t>;
 
 union     HshType
 {
