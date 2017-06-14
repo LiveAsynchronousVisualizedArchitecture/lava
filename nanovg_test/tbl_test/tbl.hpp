@@ -16,14 +16,16 @@
 // -todo: take out no_rt_util.h dependency 
 // -todo: make a u8* constructor
 // -todo: fix serialization issue - was assigning the start of the memory buffer directly to m_mem, needed to offset it by memStart() which was done by making a u8* constructor
+// -todo: fix assert on unsigned integer casting to u64 - actually working correctly
+// -todo: debug IND tbl not coming through correctly - KVOfst cast to table assumes that the table is the same type as what it is being cast to - need to make offset the address of childData() directly instead of the base of the parent table
+// -todo: make as<>() passthrough in KVOfst - not neccesary? 
+// -todo: make operator->() passthrough to KV - works but still gives warning
 
-// todo: make as<>() passthrough in KVOfst
-// todo: make operator->() passthrough to KV
 // todo: make a const version of operator()
-// todo: should moving a table into a key flatten the tbl and automatically make that tbl a chld?
-// todo: make simdb convenience function to put in a tbl with a string key
-// todo: make initializer list syntax possible to create std::pairs of strings and lists of values
+// todo: should moving a table into a key flatten the tbl and automatically make that tbl a chld? - could work due to realloc - use a dedicated function that does its own realloc? 
 // todo: make sure moving a tmp tbl into a table works - will need to be destructed on flatten AND destructor - need to make moving a tbl in work - owned can still be set - will need a tbl type that isn't a pointer and isn't a child?
+// todo: make initializer list syntax possible to create std::pairs of strings and lists of values
+// todo: make simdb convenience function to put in a tbl with a string key
 // todo: make boolean argument to flatten() to destruct pointed to tables
 // todo: make flatten() recursive 
 // todo: transition indexed verts to use tbl
@@ -307,7 +309,7 @@ struct         KV
     if( (hsh.type==HshType::NONE) || (hsh.type==HshType::ERR) ){
       tbl_msg_assert(
         hsh.type==typenum<DES>::num, 
-        " - tbl TYPE ERROR -\nInternal type: ", 
+        "\n - tbl TYPE ERROR -\nInternal type: ", 
         HshType::type_str((Type)hsh.type), 
         "Desired type: ",
         HshType::type_str((Type)typenum< typecast<DES>::type >::num) );        
@@ -315,7 +317,7 @@ struct         KV
     if( (hsh.type & HshType::SIGNED) && !(typenum<DES>::num & HshType::SIGNED)  ){
       tbl_msg_assert(
         hsh.type==typenum<DES>::num, 
-        " - tbl TYPE ERROR -\nSigned integers can not be implicitly cast to unsigned integers.\nInternal type: ", 
+        "\n - tbl TYPE ERROR -\nSigned integers can not be implicitly cast to unsigned integers.\nInternal type: ", 
         HshType::type_str((Type)hsh.type), 
         "Desired type: ",
         HshType::type_str((Type)typenum<DES>::num) );
@@ -323,7 +325,7 @@ struct         KV
     if( !(hsh.type & HshType::INTEGER) && (typenum<DES>::num & HshType::INTEGER) ){
       tbl_msg_assert(
         hsh.type==typenum<DES>::num, 
-        " - tbl TYPE ERROR -\nFloats can not be implicitly cast to integers.\nInternal type: ", 
+        "\n - tbl TYPE ERROR -\nFloats can not be implicitly cast to integers.\nInternal type: ", 
         HshType::type_str((Type)hsh.type), 
         "Desired type: ",
         HshType::type_str((Type)typenum<DES>::num) );
@@ -331,7 +333,7 @@ struct         KV
     if( (hsh.type|typenum<DES>::num) & HshType::TABLE ){
       tbl_msg_assert(
         hsh.type==typenum<DES>::num, 
-        " - tbl TYPE ERROR -\nTables can not be implicitly cast, even to a larger bit depth.\nInternal type: ", 
+        "\n - tbl TYPE ERROR -\nTables can not be implicitly cast, even to a larger bit depth.\nInternal type: ", 
         HshType::type_str((Type)hsh.type), 
         "Desired type: ",
         HshType::type_str((Type)typenum<DES>::num) );
@@ -379,11 +381,15 @@ struct     KVOfst
   KVOfst(KV* _kv=nullptr, void* _base=nullptr) : kv(_kv), base(_base) {}
 
   operator bool() const { return (bool)(kv); }
+  template<class N> N as() const { return kv->as<N>(); }
+
   template<class T> operator tbl<T> ();
   template<class T> operator tbl<T>*();
 
   template<class N> operator N() { return (N)(*kv); }
   template<class N> KVOfst& operator=(N const& n){ *kv = n; return *this; }
+
+  KV* operator->(){ return kv; }
 };
 struct  TblFields 
 {
@@ -701,7 +707,7 @@ public:
         kv->hsh.type = HshType::NONE;
         new (&ret) KVOfst(kv);
       }else if( (type&HshType::TABLE) && (type&HshType::CHILD) )
-        new (&ret) KVOfst(kv, (void*)memStart());
+        new (&ret) KVOfst(kv, childData()); // (void*)memStart());
       else
         new (&ret) KVOfst(kv);
     }else 
@@ -1162,9 +1168,11 @@ template<class T> KVOfst::operator tbl<T>()
     tbl<T>   t;                                                                          // type only matters so that c 
     tbl<T> ret;
 
-    auto  f   = (tbl<T>::fields*)base;
-    t.m_mem   = (u8*)(f+1);
-    auto  fff = (tbl<T>::fields*)(kv->val + (u64)t.childData());
+    //auto  f   = (tbl<T>::fields*)base;
+    //t.m_mem   = (u8*)(f+1);
+    //auto  fff = (tbl<T>::fields*)(kv->val + (u64)t.childData());
+
+    auto  fff = (tbl<T>::fields*)(kv->val + (u64)base);
     ret.m_mem = (u8*)(fff+1);
     u64     a = ((u64*)ret.m_mem)[0];
     u64     b = ((u64*)ret.m_mem)[1];

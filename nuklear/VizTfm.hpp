@@ -140,8 +140,6 @@ inline Shape          ivbuf_to_shape(void* buf, u64 len)    //IndexedVerts* iv)
 
   return move(shp);
 }
-//template<class T>
-//inline Shape          tbl_to_shape(tbl<T>&& t)
 inline Shape          tbl_to_shape(IvTbl& t)
 {
   using namespace std;
@@ -172,9 +170,12 @@ inline Shape          tbl_to_shape(IvTbl& t)
   //tf32   tx = t("TX");
   tu32  ind = t("IND");
   shp.owner = true;
-  u64 mode  = t("mode");
+  //u32 mode  = t("mode").as<u32>();
+  u32 mode  = (u32)((u64)t("mode"));
   shp.mode  = mode; // t("mode").kv->as<u32>();
   shp.indsz = ind.size();
+
+  auto ff = ind.memStart();
 
   glGenTextures(1, &shp.tx);
   glBindTexture(GL_TEXTURE_2D, shp.tx);
@@ -285,3 +286,8 @@ inline vec4         shapes_to_bndsph(VizData const& vd)
 }
 #endif
 
+
+
+
+//template<class T>
+//inline Shape          tbl_to_shape(tbl<T>&& t)

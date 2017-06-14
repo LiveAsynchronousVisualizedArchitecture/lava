@@ -775,7 +775,7 @@ void       genTestGeo(simdb* db)
   //lftTri("TX")  =  &tx;
 
 
-  IvTbl lftTri = {
+  IvTbl lftTri = {             // array of vert structs
    {{-1.0, -1.0f, 0.0f},       //pos
     {0.0f, 0.0f, -1.0f},       //norm
     {1.0f, 1.0f, 1.0f, 1.0f},  //color
@@ -793,7 +793,7 @@ void       genTestGeo(simdb* db)
   };
   auto typenum    =  "IdxVerts";
   lftTri("type")  =  *((u64*)typenum);
-  lftTri("mode")  =  GL_TRIANGLES;
+  lftTri("mode")  =  (u64)GL_TRIANGLES;
   tu32 ind        =  {0, 1, 2};
   lftTri("IND")   =  &ind; 
   lftTri.flatten();
