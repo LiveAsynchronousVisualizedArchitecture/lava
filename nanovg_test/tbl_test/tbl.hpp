@@ -14,8 +14,14 @@
 // -todo: clean up types to no longer be in the global namespace - leave the tbl types in the global namespace
 // -todo: clean out comments
 // -todo: take out no_rt_util.h dependency 
+// -todo: make a u8* constructor
+// -todo: fix serialization issue - was assigning the start of the memory buffer directly to m_mem, needed to offset it by memStart() which was done by making a u8* constructor
 
-// todo: make simdb convenience function
+// todo: make as<>() passthrough in KVOfst
+// todo: make operator->() passthrough to KV
+// todo: make a const version of operator()
+// todo: should moving a table into a key flatten the tbl and automatically make that tbl a chld?
+// todo: make simdb convenience function to put in a tbl with a string key
 // todo: make initializer list syntax possible to create std::pairs of strings and lists of values
 // todo: make sure moving a tmp tbl into a table works - will need to be destructed on flatten AND destructor - need to make moving a tbl in work - owned can still be set - will need a tbl type that isn't a pointer and isn't a child?
 // todo: make boolean argument to flatten() to destruct pointed to tables
@@ -640,6 +646,7 @@ public:
   u8*     m_mem;                                                                         // the only member variable - everything else is a contiguous block of memory
  
   tbl() : m_mem(nullptr){}
+  tbl(u8* memst) : m_mem(memst+memberBytes()){}
   tbl(u64 size){ init(size); }                                                           // have to run default constructor here?
   tbl(u64 size, T const& value)
   {

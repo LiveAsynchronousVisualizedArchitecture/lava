@@ -16,6 +16,7 @@
 #include "IndexedVerts.h"
 #include "VizData.hpp"
 
+
 namespace{
 
 void       print_gl_errors(int line)
@@ -138,6 +139,94 @@ inline Shape          ivbuf_to_shape(void* buf, u64 len)    //IndexedVerts* iv)
   glBindVertexArray(0);
 
   return move(shp);
+}
+//template<class T>
+//inline Shape          tbl_to_shape(tbl<T>&& t)
+inline Shape          tbl_to_shape(IvTbl& t)
+{
+  using namespace std;
+  static float tmpImg[] = { 0.5f, 0.5f, 0.5f, 0.5f };
+
+  assert( t.m_mem != nullptr );
+  assert( ((i8*)t.memStart())[0] = 't' );
+  assert( ((i8*)t.memStart())[1] = 'b' );
+
+  auto f = t.memStart();
+  u64 typenum;
+  //assert( (typenum=t("type")) == *((u64*)"IdxVerts") );
+
+  Shape shp;   // = {0,0,0,0,0};         // Shape of all 0s
+
+  //if(!buf) return shp;
+  //
+  //auto iv = (IndexedVerts*)IndexedVertsLoad(buf);
+  //if(!iv) return shp;
+
+  //shp.owner = true;
+  //shp.mode  = iv->mode;
+  //shp.indsz = iv->indicesLen;
+
+  //tf32    p = t("P");
+  //tf32    n = t("N");
+  //tf32    c = t("C");
+  //tf32   tx = t("TX");
+  tu32  ind = t("IND");
+  shp.owner = true;
+  u64 mode  = t("mode");
+  shp.mode  = mode; // t("mode").kv->as<u32>();
+  shp.indsz = ind.size();
+
+  glGenTextures(1, &shp.tx);
+  glBindTexture(GL_TEXTURE_2D, shp.tx);
+  //switch(iv->imgChans){
+  //case 1:
+  //  glTexImage2D(GL_TEXTURE_2D, 0, GL_R, iv->imgWidth, iv->imgHeight, 0, GL_R, GL_FLOAT, iv->pixels); 
+  //  break;
+  //case 2:
+  //  glTexImage2D(GL_TEXTURE_2D, 0, GL_RG, iv->imgWidth, iv->imgHeight, 0, GL_RG, GL_FLOAT, iv->pixels); 
+  //  break;
+  //case 3:
+  //  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, iv->imgWidth, iv->imgHeight, 0, GL_RGB, GL_FLOAT, iv->pixels); 
+  //  break;
+  //case 4:
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_FLOAT, tmpImg); 
+  //  break;
+  //default:
+  //  ;
+  //}
+  glBindTexture(GL_TEXTURE_2D, 0);
+
+  //glGenVertexArrays(1, &shp.vertary);
+  //glGenBuffers(1,      &shp.vertbuf);
+  //glGenBuffers(1,      &shp.idxbuf );
+
+  //glBindVertexArray(shp.vertary);
+
+  //glBindBuffer(GL_ARRAY_BUFFER, shp.vertbuf);
+  ////glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex)* iv->vertsLen, iv->verts, GL_STATIC_DRAW);
+  //glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex)* iv->vertsLen, iv->verts, GL_STATIC_DRAW);
+
+  //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shp.idxbuf);
+  //glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t)* iv->indicesLen, iv->indices, GL_STATIC_DRAW);
+
+  //IndexedVertsDestroy(iv);
+
+  //glVertexAttribPointer(POSITION, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);                      
+  //glVertexAttribPointer(NORMAL,   3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) *  3));
+  //glVertexAttribPointer(COLOR,    4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) *  6));
+  //glVertexAttribPointer(TEXCOORD, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 10));
+
+  //glEnableVertexAttribArray(POSITION);
+  //glEnableVertexAttribArray(NORMAL);
+  //glEnableVertexAttribArray(COLOR);
+  //glEnableVertexAttribArray(TEXCOORD);
+
+  //glBindVertexArray(0);
+
+  return move(shp);
+
+
+  //return Shape();
 }
 inline mat4           camera_to_mat4(Camera const& cam, float w, float h)
 {

@@ -71,6 +71,9 @@ union bnd2f
   f32 h() const { return ymx - ymn; }
 };
 
+struct vert { f32 p[3],n[3],c[4],tx[2]; };
+using IvTbl = tbl<vert>;
+
 struct  Shape {                     // todo: make rvalue constructor - make all constructors?
 private:
   void del()
@@ -186,6 +189,9 @@ struct VizData
 
   // todo: VizData deconstructor - will need this to clean up shader programs 
 };
+
+
+
 
 #endif
 

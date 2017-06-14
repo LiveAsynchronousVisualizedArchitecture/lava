@@ -51,6 +51,7 @@
 // -todo: make sure selecting same db doesn't close the db
 // -todo: fix wrong simdb on first switch - problem is index not being changed when the dbNames is updated? - also needed to change setSelectionIndex(int) on the nanogui ComboBox
 
+// todo: make tbl to Shape function in VizTfm.hpp
 // todo: use tbl for IndexedVerts after adding sub-tables
 // todo: fix tbl visualization cells going outside the bounds of bounding box - need to wrap sooner, possibly based on more margins
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
@@ -420,28 +421,35 @@ vec_vs         shapesFromKeys(simdb const& db, vec_vs dbKeys, VizData* vd)  // v
   using namespace std;
 
   for(auto& vs : dbKeys)
-  TO(dbKeys.size(),i)
-  {
-    auto& vs = dbKeys[i];
-    auto cur = vd->shapes.find(vs.str);
-    if(cur!=vd->shapes.end() ){
-      continue;
-    }
+    TO(dbKeys.size(),i)
+    {
+      auto& vs = dbKeys[i];
+      auto cur = vd->shapes.find(vs.str);
+      if(cur!=vd->shapes.end() ){
+        continue;
+      }
 
-    u32     vlen = 0;
-    u32  version = 0;
-    auto     len = db.len(vs.str.data(), (u32)vs.str.length(), &vlen, &version);          // todo: make ui64 as the input length
-    vs.ver = version;
+      u32     vlen = 0;
+      u32  version = 0;
+      auto     len = db.len(vs.str.data(), (u32)vs.str.length(), &vlen, &version);          // todo: make ui64 as the input length
+      vs.ver = version;
 
-    vec<i8> ivbuf(vlen);
-    db.get(vs.str.data(), (u32)vs.str.length(), ivbuf.data(), (u32)ivbuf.size());
+      //vec<i8> ivbuf(vlen);
+      //db.get(vs.str.data(), (u32)vs.str.length(), ivbuf.data(), (u32)ivbuf.size());
+      //Shape  s      = ivbuf_to_shape(ivbuf.data(), len);      PRINT_GL_ERRORS
 
-    Shape  s      = ivbuf_to_shape(ivbuf.data(), len);      PRINT_GL_ERRORS
-    s.shader      = vd->shaderId;
-    s.active      = vd->shapes[vs.str].active;
-    s.version     = version; //vs.v; // version;
-    vd->shapes[vs.str] = move(s);
-  };
+      auto ivbuf = (u8*)malloc(vlen);   // todo: check to make sure this succeeds 
+      db.get(vs.str.data(), (u32)vs.str.length(),  ivbuf, vlen);
+      IvTbl iv(ivbuf);
+      //iv.m_mem   = ivbuf;
+      auto     f = iv.memStart();
+
+      Shape  s   = tbl_to_shape(iv);      PRINT_GL_ERRORS
+      s.shader   = vd->shaderId;
+      s.active   = vd->shapes[vs.str].active;
+      s.version  = version; //vs.v; // version;
+      vd->shapes[vs.str] = move(s);
+    };
 
   return dbKeys;
 }
@@ -716,9 +724,9 @@ void       genTestGeo(simdb* db)
   str rightTriangle = "rightTriangle";
   str          cube = "cube";
 
-  db->put(leftTriangle, leftData);
-  db->put(rightTriangle, rightData);
-  db->put(cube, cubeData);
+  //db->put(leftTriangle, leftData);
+  //db->put(rightTriangle, rightData);
+  //db->put(cube, cubeData);
 
   db1.put("1", leftData);
   db1.put("2", rightData);
@@ -748,20 +756,49 @@ void       genTestGeo(simdb* db)
   //  {0.0f, 0.0f}                //texCoord
   //};
 
+  //u64 type = lftTri("type");
+  //char* tstr = (char*)&type;
 
-  Tbl lftTri;
+  //Tbl lftTri;
+  //auto typenum = "IdxVerts";
+  //lftTri("type") = *((u64*)typenum);
+  //lftTri("mode") = GL_TRIANGLES;
+  //tf32 p   = { -1.0, -1.0f,  0.0f, -0.17f, -1.0f,  0.0f, -0.58f, 1.0f,  0.0f };
+  //tf32 n   = { 0.0f,  0.0f, -1.0f,   0.0f,  0.0f, -1.0f,  0.0f,  0.0f, -1.0f };
+  //tf32 c   = { 1.0f,  1.0f,  1.0f,   1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f, 1.0f, 1.0f, 1.0f };
+  //tf32 tx  = { 0.0f,  0.0f,  0.0f,   0.0f,  0.0f,  0.0f };
+  //tu32 ind = { 0, 1, 2};
+  //
+  //lftTri("P")   =  &p;
+  //lftTri("N")   =  &n;
+  //lftTri("C")   =  &c;
+  //lftTri("TX")  =  &tx;
 
-  auto typenum = "IdxVerts";
-  lftTri("type") = *((u64*)typenum);
 
-  tf32 p  = { -1.0, -1.0f,  0.0f, -0.17f, -1.0f,  0.0f, -0.58f, 1.0f,  0.0f };
-  tf32 n  = { 0.0f,  0.0f, -1.0f,   0.0f,  0.0f, -1.0f,  0.0f,  0.0f, -1.0f };
-  tf32 c  = { 1.0f,  1.0f,  1.0f,   1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f, 1.0f, 1.0f, 1.0f };
-  tf32 tx = { 0.0f,  0.0f,  0.0f,   0.0f,  0.0f,  0.0f };
-  lftTri("P")  =  &p;
-  lftTri("N")  =  &n;
-  lftTri("C")  =  &c;
-  lftTri("TX") =  &tx;
+  IvTbl lftTri = {
+   {{-1.0, -1.0f, 0.0f},       //pos
+    {0.0f, 0.0f, -1.0f},       //norm
+    {1.0f, 1.0f, 1.0f, 1.0f},  //color
+    {0.0f, 0.0f}},             //texCoord
+  
+   {{-0.17f, -1.0f, 0.0f},      //pos
+    {0.0f, 0.0f, -1.0f},        //norm
+    {1.0f, 1.0f, 1.0f, 1.0f},   //color
+    {0.0f, 0.0f}},              //texCoord
+
+   {{-0.58f, 1.0f, 0.0f},       //pos
+    {0.0f, 0.0f, -1.0f},        //norm
+    {1.0f, 1.0f, 1.0f, 1.0f},   //color
+    {0.0f, 0.0f}}               //texCoord
+  };
+  auto typenum    =  "IdxVerts";
+  lftTri("type")  =  *((u64*)typenum);
+  lftTri("mode")  =  GL_TRIANGLES;
+  tu32 ind        =  {0, 1, 2};
+  lftTri("IND")   =  &ind; 
+  lftTri.flatten();
+
+  auto f = lftTri.memStart();
 
   db->put("tb left triangle", lftTri.memStart(), lftTri.sizeBytes() );
 }
