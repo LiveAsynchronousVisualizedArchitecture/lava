@@ -50,6 +50,7 @@
 // -todo: draw graph of array values
 // -todo: make sure selecting same db doesn't close the db
 // -todo: fix wrong simdb on first switch - problem is index not being changed when the dbNames is updated? - also needed to change setSelectionIndex(int) on the nanogui ComboBox
+// -todo: make memcmp assert in tfm
 
 // todo: make tbl to Shape function in VizTfm.hpp
 // todo: use tbl for IndexedVerts after adding sub-tables

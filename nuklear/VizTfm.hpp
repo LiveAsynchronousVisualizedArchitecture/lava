@@ -145,13 +145,12 @@ inline Shape          tbl_to_shape(IvTbl& t)
   using namespace std;
   static float tmpImg[] = { 0.5f, 0.5f, 0.5f, 0.5f };
 
-  assert( t.m_mem != nullptr );
+  assert( t.m_mem != nullptr );   auto f = t.memStart();
   assert( ((i8*)t.memStart())[0] = 't' );
   assert( ((i8*)t.memStart())[1] = 'b' );
 
-  auto f = t.memStart();
-  u64 typenum;
-  //assert( (typenum=t("type")) == *((u64*)"IdxVerts") );
+  u64 typenum = typenum=t("type");
+  assert( memcmp(&typenum, (u64*)"IdxVerts", sizeof(u64))==0 );
 
   Shape shp;   // = {0,0,0,0,0};         // Shape of all 0s
 

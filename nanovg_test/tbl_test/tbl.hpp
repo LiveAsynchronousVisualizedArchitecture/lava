@@ -20,6 +20,7 @@
 // -todo: debug IND tbl not coming through correctly - KVOfst cast to table assumes that the table is the same type as what it is being cast to - need to make offset the address of childData() directly instead of the base of the parent table
 // -todo: make as<>() passthrough in KVOfst - not neccesary? 
 // -todo: make operator->() passthrough to KV - works but still gives warning
+// -todo: make u8* constructor assert that the first two bytes are 't' and 'b'
 
 // todo: make a const version of operator()
 // todo: should moving a table into a key flatten the tbl and automatically make that tbl a chld? - could work due to realloc - use a dedicated function that does its own realloc? 
@@ -652,7 +653,11 @@ public:
   u8*     m_mem;                                                                         // the only member variable - everything else is a contiguous block of memory
  
   tbl() : m_mem(nullptr){}
-  tbl(u8* memst) : m_mem(memst+memberBytes()){}
+  tbl(u8* memst) : m_mem(memst+memberBytes())
+  {
+    assert( ((i8*)memStart())[0]=='t' );
+    assert( ((i8*)memStart())[1]=='b' );
+  }
   tbl(u64 size){ init(size); }                                                           // have to run default constructor here?
   tbl(u64 size, T const& value)
   {
