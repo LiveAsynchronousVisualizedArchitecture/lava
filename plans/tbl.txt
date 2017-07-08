@@ -59,3 +59,9 @@ dependencies:
 
 operator[](std::pair) - return a slice from the array?
 
+
+make a merge function that takes a function and uses it to merge the keys that are the same between two tables
+|  passes the two values in
+|  how to deal with types? take a template lambda and/or use the casts that are already there?
+
+
