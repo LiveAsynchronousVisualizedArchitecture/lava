@@ -575,6 +575,11 @@ private:
     f->mapcap    = 0;
     f->owned     = 1;
   }
+  void           init(std::initializer_list<T> lst)
+  {
+    reserve(lst.size(),0,0);
+    for(auto&& n : lst){ emplace(n); }
+  }
   void        destroy()
   { 
     if( m_mem && owned() ){
@@ -652,7 +657,7 @@ private:
 public:  
   u8*     m_mem;                                                                         // the only member variable - everything else is a contiguous block of memory
  
-  tbl() : m_mem(nullptr){}
+  tbl() : m_mem(nullptr) {}
   tbl(u8* memst) : m_mem(memst+memberBytes())
   {
     assert( ((i8*)memStart())[0]=='t' );
@@ -664,17 +669,14 @@ public:
     init(size);
     TO(size, i){ (*this)[i] = value; }
   }
-  tbl(std::initializer_list<T> lst)
-  {
-    reserve(lst.size(),0,0);
-    for(auto&& n : lst){ emplace(n); }
-  }
+  tbl(std::initializer_list<T> lst){ init(lst); }
   ~tbl(){ destroy(); }
 
   tbl           (tbl const& l){ cp(l);                          }
   tbl& operator=(tbl const& l){ cp(l);            return *this; }
   tbl           (tbl&&      r){ mv(std::move(r));               }
   tbl& operator=(tbl&&      r){ mv(std::move(r)); return *this; }
+  tbl& operator=(std::initializer_list<T> lst){ init(lst); return *this; }
 
   T&      operator[](u64 i)
   {

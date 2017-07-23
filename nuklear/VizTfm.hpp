@@ -167,6 +167,7 @@ inline Shape          tbl_to_shape(IvTbl& t)
   //tf32    n = t("N");
   //tf32    c = t("C");
   //tf32   tx = t("TX");
+
   tu32  ind = t("IND");
   shp.owner = true;
   //u32 mode  = t("mode").as<u32>();
@@ -199,15 +200,23 @@ inline Shape          tbl_to_shape(IvTbl& t)
   //glGenVertexArrays(1, &shp.vertary);
   //glGenBuffers(1,      &shp.vertbuf);
   //glGenBuffers(1,      &shp.idxbuf );
+  glGenVertexArrays(1, &shp.vertary);
+  glGenBuffers(1,      &shp.vertbuf);
+  glGenBuffers(1,      &shp.idxbuf );
 
   //glBindVertexArray(shp.vertary);
+  glBindVertexArray(shp.vertary);
 
   //glBindBuffer(GL_ARRAY_BUFFER, shp.vertbuf);
   ////glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex)* iv->vertsLen, iv->verts, GL_STATIC_DRAW);
   //glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex)* iv->vertsLen, iv->verts, GL_STATIC_DRAW);
+  glBindBuffer(GL_ARRAY_BUFFER, shp.vertbuf);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * t.size(), t.data(), GL_STATIC_DRAW);
 
   //glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shp.idxbuf);
   //glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t)* iv->indicesLen, iv->indices, GL_STATIC_DRAW);
+  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shp.idxbuf);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t)*ind.size(), ind.data(), GL_STATIC_DRAW);
 
   //IndexedVertsDestroy(iv);
 
@@ -215,13 +224,17 @@ inline Shape          tbl_to_shape(IvTbl& t)
   //glVertexAttribPointer(NORMAL,   3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) *  3));
   //glVertexAttribPointer(COLOR,    4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) *  6));
   //glVertexAttribPointer(TEXCOORD, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 10));
+  glVertexAttribPointer(POSITION, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);                      
+  glVertexAttribPointer(NORMAL,   3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) *  3));
+  glVertexAttribPointer(COLOR,    4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) *  6));
+  glVertexAttribPointer(TEXCOORD, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 10));
 
-  //glEnableVertexAttribArray(POSITION);
-  //glEnableVertexAttribArray(NORMAL);
-  //glEnableVertexAttribArray(COLOR);
-  //glEnableVertexAttribArray(TEXCOORD);
+  glEnableVertexAttribArray(POSITION);
+  glEnableVertexAttribArray(NORMAL);
+  glEnableVertexAttribArray(COLOR);
+  glEnableVertexAttribArray(TEXCOORD);
 
-  //glBindVertexArray(0);
+  glBindVertexArray(0);
 
   return move(shp);
 
@@ -255,8 +268,8 @@ inline vec4         shapes_to_bndsph(VizData const& vd)
     if(!kv.second.active) continue;
 
     auto&    key = kv.first;
-    u32    vlen = 0;
-    u32 version = 0;
+    u32     vlen = 0;
+    u32  version = 0;
     auto     len = db.len(key.data(), (u32)key.length(), &vlen, &version);          // todo: make ui64 as the input length
 
     vec<i8> ivbuf(vlen);

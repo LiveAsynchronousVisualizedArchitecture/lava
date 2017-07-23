@@ -51,9 +51,10 @@
 // -todo: make sure selecting same db doesn't close the db
 // -todo: fix wrong simdb on first switch - problem is index not being changed when the dbNames is updated? - also needed to change setSelectionIndex(int) on the nanogui ComboBox
 // -todo: make memcmp assert in tfm
+// -todo: make tbl to Shape function in VizTfm.hpp
+// -todo: use tbl for IndexedVerts after adding sub-tables
 
-// todo: make tbl to Shape function in VizTfm.hpp
-// todo: use tbl for IndexedVerts after adding sub-tables
+// todo: convert makeTriangle and makeCube to return IdxVerts tbls
 // todo: fix tbl visualization cells going outside the bounds of bounding box - need to wrap sooner, possibly based on more margins
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
@@ -716,9 +717,19 @@ void       genTestGeo(simdb* db)
 
   // Create serialized IndexedVerts
   size_t leftLen, rightLen, cubeLen;
-  vec<u8>  leftData = makeTriangle(leftLen,   true);
-  vec<u8> rightData = makeTriangle(rightLen, false);
-  vec<u8>  cubeData = makeCube(cubeLen);
+  //vec<u8>  leftData = makeTriangle(leftLen,   true);
+  //vec<u8> rightData = makeTriangle(rightLen, false);
+  //vec<u8>  cubeData = makeCube(cubeLen);
+  IvTbl  leftData = makeTriangle( leftLen,   true);
+  IvTbl rightData = makeTriangle(rightLen,  false);
+  IvTbl  cubeData =     makeCube( cubeLen);
+
+  vec<u8>  leftBytes( leftData.sizeBytes());
+  vec<u8> rightBytes(rightData.sizeBytes());
+  vec<u8>  cubeBytes( cubeData.sizeBytes());
+  memcpy( leftBytes.data(),   leftData.memStart(),  leftData.sizeBytes());
+  memcpy(rightBytes.data(),  rightData.memStart(), rightData.sizeBytes());
+  memcpy( cubeBytes.data(),   cubeData.memStart(),  cubeData.sizeBytes());
 
   // Store serialized IndexedVerts in the db
   str  leftTriangle = "leftTriangle";
@@ -729,14 +740,14 @@ void       genTestGeo(simdb* db)
   //db->put(rightTriangle, rightData);
   //db->put(cube, cubeData);
 
-  db1.put("1", leftData);
-  db1.put("2", rightData);
-  db1.put("3", cubeData);
+  db1.put("1", leftBytes);
+  db1.put("2", rightBytes);
+  db1.put("3", cubeBytes);
 
-  db2.put("one",    leftData);
-  db2.put("two",   rightData);
-  db2.put("three",  cubeData);
-  db2.put("super long key name as a test", cubeData);
+  db2.put("one",    leftBytes);
+  db2.put("two",   rightBytes);
+  db2.put("three",  cubeBytes);
+  db2.put("super long key name as a test", cubeBytes);
 
   //iv->verts[0] = {
   //  {-1.0, -1.0f, 0.0f},      //pos
