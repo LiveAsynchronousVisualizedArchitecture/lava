@@ -53,8 +53,8 @@
 // -todo: make memcmp assert in tfm
 // -todo: make tbl to Shape function in VizTfm.hpp
 // -todo: use tbl for IndexedVerts after adding sub-tables
+// -todo: convert makeTriangle and makeCube to return IdxVerts tbls
 
-// todo: convert makeTriangle and makeCube to return IdxVerts tbls
 // todo: fix tbl visualization cells going outside the bounds of bounding box - need to wrap sooner, possibly based on more margins
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
@@ -821,6 +821,19 @@ ENTRY_DECLARATION
   using namespace nanogui;
 
   genTestGeo(&db);
+
+  //tbl<u8> pears<std::initializer_list<std::pair<char*,tbl<u8>::KV> >( { std::make_pair("wat",85) } );
+  tbl<u8> pears = { {"wat",85} };
+
+  //KV pear_kv("wat");
+  //pear_kv = (i32)85;
+  //tbl<u8> pears = { pear_kv };
+
+  //tbl<u8> pears = { std::make_pair("wat", (i32)85) };
+
+  //i32 wt = pear_kv; 
+  i32 wt = pears("wat");
+  Printf("\n wat: %d \n", (i32)wt );
 
   SECTION(initialization)
   {

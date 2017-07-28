@@ -21,15 +21,15 @@
 // -todo: make as<>() passthrough in KVOfst - not neccesary? 
 // -todo: make operator->() passthrough to KV - works but still gives warning
 // -todo: make u8* constructor assert that the first two bytes are 't' and 'b'
+// -todo: transition indexed verts to use tbl
+// -todo: make initializer list syntax possible to create pairs of strings and lists of values
 
+// todo: make boolean argument to flatten() to destruct pointed to tables
+// todo: make flatten() recursive 
 // todo: make a const version of operator()
 // todo: should moving a table into a key flatten the tbl and automatically make that tbl a chld? - could work due to realloc - use a dedicated function that does its own realloc? 
 // todo: make sure moving a tmp tbl into a table works - will need to be destructed on flatten AND destructor - need to make moving a tbl in work - owned can still be set - will need a tbl type that isn't a pointer and isn't a child?
-// todo: make initializer list syntax possible to create std::pairs of strings and lists of values
 // todo: make simdb convenience function to put in a tbl with a string key
-// todo: make boolean argument to flatten() to destruct pointed to tables
-// todo: make flatten() recursive 
-// todo: transition indexed verts to use tbl
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key
 //       | can casts to c_str() using a single 0 byte after the array work? 
 //       |   if there is a blank key or no map and a 0 byte at the beggining of childData() then the cast to c_str() could work 
@@ -207,8 +207,17 @@ struct         KV
   using   f64   =    double;
 
   using    Type   =  HshType::Type;
-  
+
+  static const u32 HASH_MASK = 0x07FFFFFF;
+
   template<class N> struct typenum { static const Type num = HshType::EMPTY; };
+  template<> struct typenum<u8>    { static const Type num = HshType::U64;   };
+  template<> struct typenum<i8>    { static const Type num = HshType::I64;   };
+  template<> struct typenum<u16>   { static const Type num = HshType::U64;   };
+  template<> struct typenum<i16>   { static const Type num = HshType::I64;   };
+  template<> struct typenum<u32>   { static const Type num = HshType::U64;   };
+  template<> struct typenum<i32>   { static const Type num = HshType::I64;   };
+  template<> struct typenum<f32>   { static const Type num = HshType::F64;   };
   template<> struct typenum<u64>   { static const Type num = HshType::U64;   };
   template<> struct typenum<i64>   { static const Type num = HshType::I64;   };
   template<> struct typenum<f64>   { static const Type num = HshType::F64;   };
@@ -251,7 +260,7 @@ struct         KV
   template<> struct typecast<f32>   { using type = f64; };
 
   template<class DEST, class SRC> static DEST cast_mem(u64 const* const src){ return (DEST)(*((SRC*)src)); }
-  
+
   using Key = char[43];
 
   HshType   hsh;
@@ -259,19 +268,14 @@ struct         KV
   u64       val;
   u64      base;
 
-  KV() : hsh(), val(0), base(0) { 
-    memset(key, 0, sizeof(Key));
-    hsh.type = HshType::EMPTY;
-  }
-  KV(const char* key, u32 hash, u64 _val=0, u64 _base=0) :
-    hsh(), val(_val), base(_base)
+  template<class N> KV& init(char* k, N v)
   {
-    memcpy(this->key, key, sizeof(KV::Key) );
-    hsh.hash = hash;
-    hsh.type = HshType::EMPTY;
+    new (this) KV(k);
+    hsh.hash  =  HashStr(k);
+    hsh.type  =  typenum< typecast<N>::type >::num;
+    *this     =  v;
+    return *this;
   }
-  KV(KV const& l){ cp(l); }
-  KV(KV&&      r){ cp(r); }
 
   KV& cp(KV const& l)
   {
@@ -282,15 +286,33 @@ struct         KV
     return *this;
   }
 
+  KV() : hsh(), val(0), base(0) { 
+    memset(key, 0, sizeof(Key));
+    hsh.type = HshType::EMPTY;
+  }
+  KV(const char* key)
+  {
+    memcpy(this->key, key, sizeof(KV::Key) );
+    hsh.type = HshType::EMPTY;
+  }
+  KV(KV const& l){ cp(l); }
+  KV(KV&&      r){ cp(r); }
+
+  template<class N> KV(char* key, N val){ init(key, val); }
+
   bool operator==(KV const& l){ return hsh.hash==l.hsh.hash && strncmp(l.key,key,sizeof(KV::Key)-1)==0; }
   KV&  operator= (KV const& l){ return cp(l); }
   KV&  operator= (KV&&      r){ return cp(r); }
-  template<class N> KV& operator=(N       const& n)
+  template<class N> KV& operator=(N           const& n)
   {
     hsh.type     = typenum< typecast<N>::type >::num;
     auto castVal = (typecast<N>::type)n;
     memcpy(&val, &castVal, sizeof(u64));
     return *this;
+  }
+  template<class N> KV& operator=(std::pair<char*,N> p)
+  {
+    return init(p);
   }
   template<class N> KV& operator=(tbl<N>  const& n) = delete;
   template<class N> KV& operator=(tbl<N>  const* const n)
@@ -303,59 +325,50 @@ struct         KV
   template<class N> operator N(){ return as<N>(); }
   template<class N> N as() const
   { 
-    using DES = typecast<N>::type;                                                       // DES is the desired type 
+    using CAST = typecast<N>::type;                                                           // DES is the desired type 
 
-    if(hsh.type==typenum<DES>::num) return *((DES*)&val);                                    // if the types are the same, return it as the cast directly
-    
+    if(hsh.type==typenum<CAST>::num){ 
+      CAST* castptr =  (CAST*)&val;
+      return (N)(*castptr);
+    }
+
     if( (hsh.type==HshType::NONE) || (hsh.type==HshType::ERR) ){
       tbl_msg_assert(
-        hsh.type==typenum<DES>::num, 
+        hsh.type==typenum<CAST>::num, 
         "\n - tbl TYPE ERROR -\nInternal type: ", 
         HshType::type_str((Type)hsh.type), 
         "Desired type: ",
-        HshType::type_str((Type)typenum< typecast<DES>::type >::num) );        
+        HshType::type_str((Type)typenum< typecast<CAST>::type >::num) );        
     } 
-    if( (hsh.type & HshType::SIGNED) && !(typenum<DES>::num & HshType::SIGNED)  ){
+    if( (hsh.type & HshType::SIGNED) && !(typenum<CAST>::num & HshType::SIGNED)  ){
       tbl_msg_assert(
-        hsh.type==typenum<DES>::num, 
+        hsh.type==typenum<CAST>::num, 
         "\n - tbl TYPE ERROR -\nSigned integers can not be implicitly cast to unsigned integers.\nInternal type: ", 
         HshType::type_str((Type)hsh.type), 
         "Desired type: ",
-        HshType::type_str((Type)typenum<DES>::num) );
+        HshType::type_str((Type)typenum<CAST>::num) );
     }
-    if( !(hsh.type & HshType::INTEGER) && (typenum<DES>::num & HshType::INTEGER) ){
+    if( !(hsh.type & HshType::INTEGER) && (typenum<CAST>::num & HshType::INTEGER) ){
       tbl_msg_assert(
-        hsh.type==typenum<DES>::num, 
+        hsh.type==typenum<CAST>::num, 
         "\n - tbl TYPE ERROR -\nFloats can not be implicitly cast to integers.\nInternal type: ", 
         HshType::type_str((Type)hsh.type), 
         "Desired type: ",
-        HshType::type_str((Type)typenum<DES>::num) );
+        HshType::type_str((Type)typenum<CAST>::num) );
     }
-    if( (hsh.type|typenum<DES>::num) & HshType::TABLE ){
+    if( (hsh.type|typenum<CAST>::num) & HshType::TABLE ){
       tbl_msg_assert(
-        hsh.type==typenum<DES>::num, 
+        hsh.type==typenum<CAST>::num, 
         "\n - tbl TYPE ERROR -\nTables can not be implicitly cast, even to a larger bit depth.\nInternal type: ", 
         HshType::type_str((Type)hsh.type), 
         "Desired type: ",
-        HshType::type_str((Type)typenum<DES>::num) );
+        HshType::type_str((Type)typenum<CAST>::num) );
     }
 
-    switch(hsh.type)
-    {
-      case   HshType::U64: return cast_mem<N,  u64>(&val);
+    switch(hsh.type){
+      case   HshType::U64: return cast_mem<N,  u64>(&val); 
       case   HshType::I64: return cast_mem<N,  i64>(&val);
       case   HshType::F64: return cast_mem<N,  f64>(&val);
-
-      case  HshType::tU8:  return cast_mem<N,  tu8*>(&val);
-      case  HshType::tI8:  return cast_mem<N,  ti8*>(&val);
-      case  HshType::tU16: return cast_mem<N, tu16*>(&val);
-      case  HshType::tI16: return cast_mem<N, ti16*>(&val);
-      case  HshType::tU32: return cast_mem<N, tu32*>(&val);
-      case  HshType::tI32: return cast_mem<N, ti32*>(&val);
-      case  HshType::tF32: return cast_mem<N, tf32*>(&val);
-      case  HshType::tU64: return cast_mem<N, tu64*>(&val);
-      case  HshType::tI64: return cast_mem<N, ti64*>(&val);
-      case  HshType::tF64: return cast_mem<N, tf64*>(&val);
     }
 
     tbl_msg_assert(
@@ -368,9 +381,37 @@ struct         KV
 
   bool isEmpty() const { return hsh.type==HshType::NONE || hsh.type==HshType::EMPTY; }
 
-  static KV& empty_kv(){ static KV kv; kv.hsh.type = HshType::EMPTY; return kv; }
-  static KV&  none_kv(){ static KV kv; kv.hsh.type = HshType::NONE;  return kv; }
-  static KV& error_kv(){ static KV kv; kv.hsh.type = HshType::ERR;   return kv; }
+  static KV&    empty_kv(){ static KV kv; kv.hsh.type = HshType::EMPTY; return kv; }
+  static KV&     none_kv(){ static KV kv; kv.hsh.type = HshType::NONE;  return kv; }
+  static KV&    error_kv(){ static KV kv; kv.hsh.type = HshType::ERR;   return kv; }
+  static u64 fnv_64a_buf(void const* const buf, u64 len)
+  {
+    // const u64 FNV_64_PRIME = 0x100000001b3;
+    u64 hval = 0xcbf29ce484222325;    // FNV1_64_INIT;  // ((Fnv64_t)0xcbf29ce484222325ULL)
+    u8*   bp = (u8*)buf;	           /* start of buffer */
+    u8*   be = bp + len;		           /* beyond end of buffer */
+
+    while(bp < be)                     // FNV-1a hash each octet of the buffer
+    {
+      hval ^= (u64)*bp++;             /* xor the bottom with the current octet */
+
+                                      //hval *= FNV_64_PRIME; // does this do the same thing?  /* multiply by the 64 bit FNV magic prime mod 2^64 */
+      hval += (hval << 1) + (hval << 4) + (hval << 5) +
+        (hval << 7) + (hval << 8) + (hval << 40);
+    }
+    return hval;
+  }
+  static u32   HashBytes(const void *const buf, u32 len)
+  {
+    u64 hsh = fnv_64a_buf(buf, len);
+    return (u32)( (hsh>>32) ^ ((u32)hsh));        // fold the 64 bit hash onto itself
+  }
+  static u32     HashStr(const char* s)
+  {
+    u32 len = (u32)strlen(s);
+    u32 hsh = HashBytes(s, len);
+    return hsh & HASH_MASK;
+  }
 };
 struct     KVOfst
 {
@@ -390,7 +431,8 @@ struct     KVOfst
   template<class N> operator N() { return (N)(*kv); }
   template<class N> KVOfst& operator=(N const& n){ *kv = n; return *this; }
 
-  KV* operator->(){ return kv; }
+  KV* operator->(){ return  kv; }
+  KV& operator* (){ return *kv; }
 };
 struct  TblFields 
 {
@@ -575,6 +617,14 @@ private:
     f->mapcap    = 0;
     f->owned     = 1;
   }
+  void         initKV(std::initializer_list<KV> lst)
+  {
+    for(auto&& n : lst){ 
+      KV& kv       = *((*this)(n.key));
+      kv.val      = n.val;
+      kv.hsh.type = n.hsh.type;
+    }
+  }
   void           init(std::initializer_list<T> lst)
   {
     reserve(lst.size(),0,0);
@@ -669,14 +719,16 @@ public:
     init(size);
     TO(size, i){ (*this)[i] = value; }
   }
-  tbl(std::initializer_list<T> lst){ init(lst); }
+  tbl(std::initializer_list<KV> lst){ initKV(lst); }
+  tbl(std::initializer_list<T>  lst){   init(lst); }
   ~tbl(){ destroy(); }
 
   tbl           (tbl const& l){ cp(l);                          }
   tbl& operator=(tbl const& l){ cp(l);            return *this; }
   tbl           (tbl&&      r){ mv(std::move(r));               }
   tbl& operator=(tbl&&      r){ mv(std::move(r)); return *this; }
-  tbl& operator=(std::initializer_list<T> lst){ init(lst); return *this; }
+  tbl& operator=(std::initializer_list<KV> lst){ initKV(lst); return *this; }
+  tbl& operator=(std::initializer_list<T>  lst){   init(lst); return *this; }
 
   T&      operator[](u64 i)
   {
@@ -710,7 +762,9 @@ public:
       if(type==HshType::EMPTY)
       {
         elems( elems()+1 );
-        new (kv) KV(key, hsh);
+        //new (kv) KV(key, hsh);
+        new (kv) KV(key);
+        kv->hsh.hash = hsh;
         kv->hsh.type = HshType::NONE;
         new (&ret) KVOfst(kv);
       }else if( (type&HshType::TABLE) && (type&HshType::CHILD) )
@@ -820,7 +874,9 @@ public:
       { 
         return &el[i];
       }else if(dist > wrapDist(el,i,mod) ){
-        KV kv(key, hsh);
+        //KV kv(key, hsh);
+        KV kv(key);
+        kv.hsh.hash = hsh;
         elems( elems()+1 );
         return &(place_rh(kv, el, i, dist, mod));
       }
@@ -1245,6 +1301,66 @@ auto HshType::type_str(Type t) -> char const* const
 
 
 
+
+//hsh.hash = HashStr(key);
+//new (this) KV(key); HashStr(key));
+
+//template<class N> KV& init(std::pair<char*,N> p)
+//{
+//  new (this) KV(p.first);
+//  hsh.type  =  typenum< tbl<N> >::num;
+//  val       =  (u64)n;
+//  return *this;
+//}
+//
+//template<class N> KV(std::pair<char*,N> p)
+//{
+//  init(p);
+//}
+
+//KV(const char* key, u32 hash, u64 _val=0, u64 _base=0) :
+//  hsh(), val(_val), base(_base)
+//{
+//  memcpy(this->key, key, sizeof(KV::Key) );
+//  hsh.hash = hash;
+//  hsh.type = HshType::EMPTY;
+//}
+
+//case  HshType::tU8:  return cast_mem<N,  tu8*>(&val);
+//case  HshType::tI8:  return cast_mem<N,  ti8*>(&val);
+//case  HshType::tU16: return cast_mem<N, tu16*>(&val);
+//case  HshType::tI16: return cast_mem<N, ti16*>(&val);
+//case  HshType::tU32: return cast_mem<N, tu32*>(&val);
+//case  HshType::tI32: return cast_mem<N, ti32*>(&val);
+//case  HshType::tF32: return cast_mem<N, tf32*>(&val);
+//case  HshType::tU64: return cast_mem<N, tu64*>(&val);
+//case  HshType::tI64: return cast_mem<N, ti64*>(&val);
+//case  HshType::tF64: return cast_mem<N, tf64*>(&val);
+
+//template<class DEST, class SRC> static DEST cast_mem(SRC const* const src){ return (DEST)(*((SRC*)src)); }
+//template<class DEST, class SRC> static DEST cast_mem(SRC const* const src){ return (DEST)(*(src)); }
+//
+//using DES  = typecast<N>::type;                                                           // DES is the desired type 
+//if(hsh.type==typenum<DES>::num) return *((DES*)&val);                                    // if the types are the same, return it as the cast directly
+//return *((DES*)&val);                                      // if the types are the same, return it as the cast directly
+
+//template<class KV> 
+//tbl(std::initializer_list<std::pair<char*,KV> > lst){ initKV(lst); }
+//void         initKV(std::initializer_list<std::pair<char*,KV> > lst)
+//tbl& operator=(std::initializer_list<std::pair<char*,KV> > lst){ initKV(lst); return *this; }
+
+//((*this)(n.key))->val = n.val;
+//kv.hsh.type = n.hsh.type;
+//
+//KV& kv      = ((*this)(n.key)) ;
+//kv          = n.val;
+//kv.hsh.type = n.hsh.type;
+//
+//KV* kv       = get(n.key);
+//
+//KV& kv = (*this)(key, true);
+//kv = n;
+//insert(n.key, n.val);
 
 //tbl_msg_assert(
 //  kv->hsh.type == KV::typenum< tbl<T> >::num, 
