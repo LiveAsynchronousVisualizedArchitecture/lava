@@ -34,7 +34,7 @@ int  main()
   }
   printf("\n\n\n");
 
-  scanf_s("%d");
+  int a; scanf_s("%d", &a);
   return 0;
 }
 

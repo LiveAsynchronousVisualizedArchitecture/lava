@@ -3,19 +3,22 @@
 #include <cstdio>
 
 #include "tbl.hpp"
+#include "../no_rt_util.h"
 
-void prnt_elems(tbl& t)
+void prnt_elems(tbl<int>& t)
 {
-  tbl::KV* kv = t.elemStart();
+  //tbl<int>::KV* kv = t.elemStart();
+  KV* kv = t.elemStart();
   TO(t.map_capacity(), i)
   {
-    if(kv[i].hsh.type==tbl::EMPTY)
+    //if(kv[i].hsh.type==tbl<int>::EMPTY)
+    if(kv[i].hsh.type==HshType::EMPTY)
       printf(" EMPTY ");
     else
-      printf(" %s:%d:%d:%d:%d ", 
+      printf(" %zd:%ld:%d:%lld:%lld ", 
         kv[i].key, 
         (int)(kv[i].val), 
-        kv[i].hsh.type, 
+        (int)kv[i].hsh.type, 
         t.distance(i),
         t.holeOfst(i)
       );
@@ -30,7 +33,9 @@ int  main()
   
   //printf("\n variant size: %d \n\n\n", sizeof(tbl::Var) );
   //printf("\n");
-  printf("KV size: %d \n", sizeof(tbl::KV) );
+
+  //printf("KV size: %d \n", sizeof(tbl<int>::KV) );
+  printf("KV size: %d \n", sizeof(KV) );
   
   printf("\n");
 
@@ -347,8 +352,8 @@ int  main()
 
   SECTION(test default value type deduction constructor)
   {
-    auto t = tbl(10, (int)0.0f);
-    TO(t,i) printf(" %d ", t[i]);
+    auto t = tbl<int>(10, (int)0.0f);
+    TO(t.size(),i) printf(" %d ", t[i]);
   }
 
 

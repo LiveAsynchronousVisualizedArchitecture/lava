@@ -1058,8 +1058,9 @@ public:
   u64           ideal(u64 i) const
   {
     auto el = elemStart();
-    if(el[i].hsh.type==EMPTY) return i;
-     
+    //if(el[i].hsh.type==EMPTY) return i;
+    if(el[i].hsh.type==HshType::EMPTY) return i;
+
     return el[i].hsh.hash % map_capacity();
   }
   u64        distance(u64 i) const { return wrapDist( ideal(i), i, map_capacity() ); }
@@ -1072,7 +1073,8 @@ public:
     u64 dst = distance(i);
     u64 cnt = 0;
     while(dst >= cnt){ // count can equal distance
-      if(el[i].hsh.type==EMPTY) h = i;
+      //if(el[i].hsh.type==EMPTY) h = i;
+      if(el[i].hsh.type==HshType::EMPTY) h = i;
       i = prev(i,mod);
       ++cnt;
     }
