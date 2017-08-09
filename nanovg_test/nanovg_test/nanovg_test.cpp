@@ -57,8 +57,9 @@
 // -todo: put back console 
 // -todo: test console
 // -todo: make dedicated slot vectors 
+// -todo: enable mouse over slot highlighting
 
-// todo: enable mouse over slot detection
+// todo: make slot selection
 // todo: convert general data structures of nodes, slots, and connections to use tbl?
 // todo: print to console with ReadFile.cpp function
 // todo: make two nodes execute in order
@@ -197,9 +198,12 @@ veci               nd_ordr;
 vec_con              cncts;             // cncts is connections - the vector of connection structures
 cnct_tbl          cnct_src;
 
+i32              slotInSel = -1;
+i32             slotOutSel = -1;
 f32                 io_rad;
 vec_slot          slots_in;
 vec_slot         slots_out;
+
 int                 priSel = -1;
 int                 secSel = -1;
 bool                 drgNd = false;
@@ -607,7 +611,7 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
   //   nvgCircle(vg, out.x, out.y, io_rad);
   //  nvgFillColor(vg, nvgRGBAf(.18f, .5f, .18f, 1.f));
   //  nvgFill(vg);
-
+  //
   //  nvgBeginPath(vg);
   //   nvgCircle(vg, in.x, in.y, io_rad);
   //  nvgFillColor(vg, nvgRGBAf(.18f, .4f, .6f, 1.f));
@@ -627,9 +631,6 @@ void        debug_coords(v2 a)
   sprintf(winTitle, "%.2f  %.2f", a.x, a.y);
   glfwSetWindowTitle(win, winTitle);
 }
-
-//const char* text, 
-//v2 P, v2 sz, 
 
 } // end namespace
 
@@ -782,75 +783,113 @@ ENTRY_DECLARATION
 		    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
       }
 
-      bnd drgbnd;
-      SECTION(selection box)
+      SECTION(selection)
       {
-        if(!lftDn){ drgP=pntr; drgbox=false; }
-
-        drgbnd = bnd( min(drgP.x, pntr.x),
-                      min(drgP.y, pntr.y),
-                      max(drgP.x, pntr.x),
-                      max(drgP.y, pntr.y) );
-      }
-      SECTION(select)
-      {
-        if(drgbox){
-          TO(sz,i){
-            sels[i] = isIn(nbnds[i],drgbnd);
-            //sels[ndOrdr] = inNode;
-          }
-        }
-        
-        if(!lftDn){
-          priSel = -1;
-        }
-      }
-      SECTION(node selection)
-      {
-        bool inAny = false;
-        FROM(sz,i)                                                // loop backwards so that the top nodes are dealt with first
+        bnd drgbnd;
+        SECTION(selection box)
         {
-          int  ndOrdr = nd_ordr[i];
-          node&     n = nodes[ndOrdr];
-          bool inNode = isIn(pntr.x,pntr.y, nbnds[ndOrdr]);
-          inAny      |= inNode;
-                     
-          SECTION(secondary selection (for connections) )
-          {
-            if(inNode && rtDn && !prevRtDn)
-            {
-              if(secSel<0) secSel=ndOrdr;
-              else{ // create a connection between secSel and i
-                if( insUnq(&cnct_src,  ndOrdr, secSel) &&
-                    insUnq(&cnct_dest, secSel, ndOrdr) ){
-                  cncts.push_back( {ndOrdr, secSel} );
-                }
+          if(!lftDn){ drgP=pntr; drgbox=false; }
 
-                secSel = -1;
-              }
-              break;
+          drgbnd = bnd( min(drgP.x, pntr.x),
+                        min(drgP.y, pntr.y),
+                        max(drgP.x, pntr.x),
+                        max(drgP.y, pntr.y) );
+        }
+        SECTION(select)
+        {
+          if(drgbox){
+            TO(sz,i){
+              sels[i] = isIn(nbnds[i],drgbnd);
+              //sels[ndOrdr] = inNode;
             }
           }
-          SECTION(primary selection and group selection effects)
-          {
-            if(inNode && clk && (priSel<0||priSel!=ndOrdr) )
-            {
-              MoveToBack( &nd_ordr, i);
-              priSel     = ndOrdr;
-              drgP       = pntr;
-
-              if(!sels[ndOrdr]){
-                TO(sels.size(),i) sels[i]=false;
-                sels[ndOrdr] = true;
-              }
-              break;                                                  // without breaking from the loop, a node could be moved down and hit again
-            }
-          } 
-        }
         
-        if(!inAny){
-          if(lftDn && priSel<0){ drgbox = true; }
-          if(rtDn && !prevRtDn){ secSel = -1; }
+          if(!lftDn){
+            priSel = -1;
+          }
+        }
+        SECTION(node selection)
+        {
+          bool inAny = false;
+          FROM(sz,i)                                                // loop backwards so that the top nodes are dealt with first
+          {
+            int  ndOrdr = nd_ordr[i];
+            node&     n = nodes[ndOrdr];
+            bool inNode = isIn(pntr.x,pntr.y, nbnds[ndOrdr]);
+            inAny      |= inNode;
+                     
+            SECTION(secondary selection (for connections) )
+            {
+              if(inNode && rtDn && !prevRtDn)
+              {
+                if(secSel<0) secSel=ndOrdr;
+                else{ // create a connection between secSel and i
+                  if( insUnq(&cnct_src,  ndOrdr, secSel) &&
+                      insUnq(&cnct_dest, secSel, ndOrdr) ){
+                    cncts.push_back( {ndOrdr, secSel} );
+                  }
+
+                  secSel = -1;
+                }
+                break;
+              }
+            }
+            SECTION(primary selection and group selection effects)
+            {
+              if(inNode && clk && (priSel<0||priSel!=ndOrdr) )
+              {
+                MoveToBack( &nd_ordr, i);
+                priSel     = ndOrdr;
+                drgP       = pntr;
+
+                if(!sels[ndOrdr]){
+                  TO(sels.size(),i) sels[i]=false;
+                  sels[ndOrdr] = true;
+                }
+                break;                                                  // without breaking from the loop, a node could be moved down and hit again
+              }
+            } 
+          }
+        
+          if(!inAny){
+            if(lftDn && priSel<0){ drgbox = true; }
+            if(rtDn && !prevRtDn){ secSel = -1; }
+          }
+        }
+        SECTION(slot selection)
+        {
+          //if(slotInSel < 0)
+          // && slotOutSel < 0)
+          //if(inSlt){ slotOutSel = i; }
+
+          bool inSltAny = false;
+          bool outSltAny = false;
+
+          if(lftDn && !prevLftDn){
+            TO(slots_in.size(),i){ 
+              bool inSlt = len(pntr - slots_in[i].P) < io_rad;
+
+              if(inSlt && slotInSel != i) slotInSel =  i;    // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
+              else                        slotInSel = -1;
+            }
+
+            TO(slots_out.size(),i){ 
+              bool inSlt = len(pntr - slots_out[i].P) < io_rad;
+
+              if(inSlt && slotOutSel != i) slotOutSel =  i;  // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
+              else                         slotOutSel = -1;
+            }
+          }
+
+
+          //if(lftDn && !prevLftDn) 
+          //  TO(slots_out.size(),i){ 
+          //    bool inSlt = len(pntr - slots_out[i].P) < io_rad;
+          //
+          //    if(inSlt && slotOutSel != i) slotOutSel =  i;  // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
+          //    else                         slotOutSel = -1;
+          //  }
+
         }
       }
 
@@ -882,9 +921,9 @@ ENTRY_DECLARATION
         }
       }
 
-		  nvgBeginFrame(vg, ww, wh, pxRatio);
       SECTION(nanovg drawing)
       {
+        nvgBeginFrame(vg, ww, wh, pxRatio);
         SECTION(draw connections)
         {
           TO(cncts.size(),i)
@@ -982,20 +1021,30 @@ ENTRY_DECLARATION
         }
         SECTION(draw slots)
         {
-          nvgFillColor(vg, nvgRGBAf(.18f, .4f, .6f, 1.f));
           TO(slots_in.size(),i){
-            v2 in = slots_in[i].P;
-            nvgBeginPath(vg);
+            v2      in = slots_in[i].P;
+            bool inSlt = len(pntr-in) < io_rad;
+
+            if(i==slotInSel) nvgFillColor(vg, nvgRGBAf(1.f,   1.f,   .5f,  1.f));
+            else if(inSlt)   nvgFillColor(vg, nvgRGBAf( .36f,  .8f, 1.f,   1.f));
+            else             nvgFillColor(vg, nvgRGBAf( .18f,  .4f,  .6f,  1.f));
+            nvgBeginPath(vg);              
               nvgCircle(vg, in.x, in.y, io_rad);
             nvgFill(vg);
           }
-          nvgFillColor(vg, nvgRGBAf(.18f, .5f, .18f, 1.f));
           TO(slots_out.size(),i){
-            v2 out = slots_out[i].P;
+            v2     out = slots_out[i].P;
+            bool inSlt = len(pntr-out) < io_rad;
+
+            if(i==slotOutSel) nvgFillColor(vg, nvgRGBAf(1.f,   1.f,  .5f,  1.f));
+            else if(inSlt)    nvgFillColor(vg, nvgRGBAf( .36f, 1.f,  .36f, 1.f));
+            else              nvgFillColor(vg, nvgRGBAf( .18f,  .5f, .18f, 1.f));
             nvgBeginPath(vg);
               nvgCircle(vg, out.x, out.y, io_rad);
             nvgFill(vg);
           }
+
+
         }
         SECTION(draw selection box)
         {
@@ -1029,8 +1078,8 @@ ENTRY_DECLARATION
 	        nvgFillColor(vg, nvgRGBA(255,255,255,255));
 	        nvgText(vg, tb, 20.f, fpsStr, NULL);
         }
+        nvgEndFrame(vg);
       }
-      nvgEndFrame(vg);
 
       prevRtDn  =  rtDn;
       prevLftDn = lftDn;
@@ -1045,6 +1094,11 @@ ENTRY_DECLARATION
 }
 
 
+
+
+
+//const char* text, 
+//v2 P, v2 sz, 
 
 //
 //nbnds[ndOrdr] = drw_node(vg, 0, n.txt, n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, clr, round);              
