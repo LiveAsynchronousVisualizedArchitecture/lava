@@ -63,6 +63,8 @@
 // -todo: draw connections off of slots
 
 // todo: make slots shift to point at each other 
+// todo: make order of slots dictated by node order
+// todo: make connection class that keeps two connection arrays, each sorted by src or dest
 // todo: convert general data structures of nodes, slots, and connections to use tbl?
 // todo: print to console with ReadFile.cpp function
 // todo: make two nodes execute in order
@@ -128,6 +130,7 @@
 
 const int   TITLE_MAX_LEN = 256;
 const v2    NODE_SZ       = { 256.f, 64.f };
+const v2    NODE_HALF_SZ  = NODE_SZ/2.f;
 const auto  NODE_CLR      = nvgRGBf(.1f,.4f,.5f);
 const float INFf          = std::numeric_limits<float>::infinity();
 const f32   IORAD         = 10.f;
@@ -627,6 +630,50 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
   //nvgCircle(vg, cntrX, y-io_rad, io_rad);
   //nvgStrokeWidth(vg, 1.f);
 }
+v2           node_border(node const& n, v2 dir, f32 slot_rad)
+{
+  v2   hlf = NODE_HALF_SZ;
+  v2 ncntr = n.P + NODE_HALF_SZ;
+  v2  ndir = norm(dir);
+  //v2  pdir = norm(pntr - ncntr) * len(hlfsz);          // * normsz;
+
+  v2 pdir = ndir;
+  v2   ds = sign(pdir);                                  // ds is direction sign
+  if( abs(pdir.x) > hlf.x ){
+    pdir /= abs(pdir.x)/hlf.x;
+  }else{
+    pdir /= abs(pdir.y)/hlf.y;
+  }
+
+  f32        r = hlf.y/2.f;
+  v2  circCntr = (pdir.x<0)? n.P+v2(r,r)  :  n.P+NODE_SZ-r;
+  v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, r);
+  bool     hit = !hasInf(intrsct);
+  if(hit) pdir = intrsct - ncntr;
+
+  v2 dirEnd = ncntr + pdir; // + ndir*hlf;
+  return dirEnd;
+
+  //nvgBeginPath(vg);
+  //nvgMoveTo(vg, ncntr.x,ncntr.y);
+  //nvgLineTo(vg, dirEnd.x, dirEnd.y);
+  //nvgStrokeWidth(vg, 3.f);
+  //nvgStroke(vg);
+  //
+  //nvgBeginPath(vg);
+  //nvgCircle(vg, circCntr.x,circCntr.y, r);
+  //nvgStrokeWidth(vg, 1.f);
+  //nvgStroke(vg);
+  //
+  //nvgBeginPath(vg);
+  //nvgCircle(vg, intrsct.x,intrsct.y, 4.f);
+  //nvgFill(vg);
+  //
+  //v2 brdr = ncntr + pdir + norm(pdir)*8.f;
+  //nvgBeginPath(vg);
+  //nvgCircle(vg, brdr.x,brdr.y, 8.f);
+  //nvgFill(vg);
+}
 
 
 void        debug_coords(v2 a)
@@ -821,22 +868,23 @@ ENTRY_DECLARATION
             bool inNode = isIn(pntr.x,pntr.y, nbnds[ndOrdr]);
             inAny      |= inNode;
                      
-            SECTION(secondary selection (for connections) )
-            {
-              //if(inNode && rtDn && !prevRtDn)
-              //{
-              //  if(secSel<0) secSel=ndOrdr;
-              //  else{ // create a connection between secSel and i
-              //    if( insUnq(&cnct_src,  ndOrdr, secSel) &&
-              //        insUnq(&cnct_dest, secSel, ndOrdr) ){
-              //      cncts.push_back( {ndOrdr, secSel} );
-              //    }
-              //
-              //    secSel = -1;
-              //  }
-              //  break;
-              //}
-            }
+            //SECTION(secondary selection (for connections) )
+            //{
+            //  if(inNode && rtDn && !prevRtDn)
+            //  {
+            //    if(secSel<0) secSel=ndOrdr;
+            //    else{ // create a connection between secSel and i
+            //      if( insUnq(&cnct_src,  ndOrdr, secSel) &&
+            //          insUnq(&cnct_dest, secSel, ndOrdr) ){
+            //        cncts.push_back( {ndOrdr, secSel} );
+            //      }
+            //  
+            //      secSel = -1;
+            //    }
+            //    break;
+            //  }
+            //}
+
             SECTION(primary selection and group selection effects)
             {
               if(inNode && clk && (priSel<0||priSel!=ndOrdr) )
@@ -867,24 +915,14 @@ ENTRY_DECLARATION
           i32  inClk = -1;
           i32 outClk = -1;
           if(lftDn && !prevLftDn){
-            TO(slots_in.size(),  i){ 
-              bool inSlt = len(pntr - slots_in[i].P) < io_rad;
-              if(inSlt) inClk = (i32)i;           
-            }
             TO(slots_out.size(), i){
               bool inSlt = len(pntr - slots_out[i].P) < io_rad;
               if(inSlt) outClk = (i32)i;
             }
-          }
-
-          if(inClk > -1){
-            if(inClk==slotInSel)
-              slotInSel = -1;                                            // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
-            else if(slotOutSel > -1){
-              cncts.push_back( {slotOutSel, inClk} );
-              slotOutSel = slotInSel = -1;
-            }else 
-              slotInSel = inClk;
+            TO(slots_in.size(),  i){ 
+              bool inSlt = len(pntr - slots_in[i].P) < io_rad;
+              if(inSlt) inClk = (i32)i;           
+            }
           }
 
           if(outClk > -1){
@@ -895,6 +933,16 @@ ENTRY_DECLARATION
               slotOutSel = slotInSel = -1;
             }else
               slotOutSel = outClk;
+          }
+
+          if(inClk > -1){
+            if(inClk==slotInSel)
+              slotInSel = -1;                                            // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
+            else if(slotOutSel > -1){
+              cncts.push_back( {slotOutSel, inClk} );
+              slotOutSel = slotInSel = -1;
+            }else 
+              slotInSel = inClk;
           }
 
           //if(inSlt && slotOutSel != i){
@@ -943,22 +991,31 @@ ENTRY_DECLARATION
       }
       SECTION(slot movement)
       {
-        TO(slots_in.size(),i){
-          node& n = nodes[ slots_in[i].nidx ];
-          auto np = n.P;
-          slots_in[i].P = in_cntr(n, io_rad);
-        }
         TO(slots_out.size(),i){
-          node& n = nodes[ slots_out[i].nidx ];
-          auto np = n.P;
-          slots_out[i].P = out_cntr(n, io_rad);
+          node&        n = nodes[ slots_out[i].nidx ];
+          auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){ return c.src==i; } );            // find connect in the naive way for now 
+          if(cnctIter == end(cncts)){
+            slots_out[i].P = out_cntr(n, io_rad);
+          }else{
+            slot&  destSlt = slots_out[cnctIter->dest];
+            v2       destP = nodes[destSlt.nidx].P;
+            //v2       destP = nodes[cnctIter->dest].P;
+            slots_out[i].P = node_border(n,  destP - n.P, io_rad);
+          }          
+        }
+
+        TO(slots_in.size(),i){
+          node&        n = nodes[ slots_in[i].nidx ];
+          auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){ return c.dest==i; } );            // find connect in the naive way for now 
+          if(cnctIter == end(cncts)){
+            slots_in[i].P = in_cntr(n, io_rad);
+          }else{
+            slot&  srcSlt = slots_out[cnctIter->src];
+            v2       srcP = nodes[srcSlt.nidx].P;
+            slots_in[i].P = node_border(n,  n.P - srcP, io_rad);
+          }
         }
       }
-
-      //SECTION(connection creation)
-      //{
-      //  //if()
-      //}
 
       SECTION(nanovg drawing)
       {
@@ -971,17 +1028,6 @@ ENTRY_DECLARATION
             auto& cn = cncts[i];
             v2   out = slots_in[cn.src].P   + hlfsz;
             v2    in = slots_out[cn.dest].P + hlfsz;
-            //v2   out = src;
-            //v2    in = dest;
-            //v2   out = out_cntr(nodes[cn.src], IORAD);
-            //v2    in = in_cntr(nodes[cn.dest], IORAD);
-
-            //const v2 hlfsz = NODE_SZ/2.f;
-            //auto& cn = cncts[i];
-            //v2   src = nodes[cn.src].P + hlfsz;
-            //v2  dest = nodes[cn.dest].P + hlfsz;
-            //v2   out = out_cntr(nodes[cn.src], IORAD);
-            //v2    in = in_cntr(nodes[cn.dest], IORAD);
 
             nvgBeginPath(vg);
              nvgMoveTo(vg,   out.x,out.y);
@@ -991,11 +1037,6 @@ ENTRY_DECLARATION
              nvgStrokeWidth(vg, 3.f);
             nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
    	        nvgStroke(vg);
-
-            //nvgMoveTo(vg,   src.x,src.y);
-            //f32 halfx = lerp(.5f, dest.x, src.x);
-            //f32 halfy = lerp(.5f, dest.y, src.y); 
-            //nvgBezierTo(vg, halfx,src.y, halfx,dest.y, dest.x,dest.y);
           }
         }
         SECTION(draw nodes)
@@ -1007,12 +1048,6 @@ ENTRY_DECLARATION
             node&     n = nodes[ndOrdr];
             bool selctd = ndOrdr==priSel || sels[ndOrdr];
 
-            //auto clr = NODE_CLR;
-            //if(ndOrdr==priSel || sels[ndOrdr]){
-            //  if(priSel>-1) n.P +=  pntr - prevPntr;
-            //  clr = nvgRGBf(.5f,.4f,.1f);
-            //}
-
             auto clr = NODE_CLR;
             if(selctd){
               clr = nvgRGBf(.5f,.4f,.1f);
@@ -1023,13 +1058,9 @@ ENTRY_DECLARATION
 
             SECTION(border test)
             {
-              //if(lftDn){ 
-              //  printf("wat");
-              //}
-
               v2 ncntr = n.P + NODE_SZ/2.f;
               v2 hlfsz = NODE_SZ / 2.f;
-              v2  pdir = norm(pntr - ncntr) * len(hlfsz);         // * normsz;
+              v2  pdir = norm(pntr - ncntr) * len(hlfsz);          // * normsz;
               
               v2 ds = sign(pdir);                                  // ds is direction sign
               if( abs(pdir.x) > hlfsz.x ){
@@ -1145,6 +1176,52 @@ ENTRY_DECLARATION
 
 
 
+
+
+//v2        srcP = slots_out[cnctIter->src].P;
+//
+//node& n = nodes[ slots_in[i].nidx ];
+//auto np = n.P;
+//slots_in[i].P = in_cntr(n, io_rad);
+//auto cnctIter = find_if(ALL(cncts), [&i](cnct const& c){ return c.src==i; } );
+//
+//v2       destP = slots_in[cnctIter->dest].P;
+//
+//auto np = n.P;
+//out_cntr(n, io_rad);
+//v2  slt = node_border(n, n.P-destP, io_rad);
+
+//SECTION(connection creation)
+//{
+//  //if()
+//}
+
+//v2   out = src;
+//v2    in = dest;
+//v2   out = out_cntr(nodes[cn.src], IORAD);
+//v2    in = in_cntr(nodes[cn.dest], IORAD);
+//
+//const v2 hlfsz = NODE_SZ/2.f;
+//auto& cn = cncts[i];
+//v2   src = nodes[cn.src].P + hlfsz;
+//v2  dest = nodes[cn.dest].P + hlfsz;
+//v2   out = out_cntr(nodes[cn.src], IORAD);
+//v2    in = in_cntr(nodes[cn.dest], IORAD);
+
+//nvgMoveTo(vg,   src.x,src.y);
+//f32 halfx = lerp(.5f, dest.x, src.x);
+//f32 halfy = lerp(.5f, dest.y, src.y); 
+//nvgBezierTo(vg, halfx,src.y, halfx,dest.y, dest.x,dest.y);
+
+//auto clr = NODE_CLR;
+//if(ndOrdr==priSel || sels[ndOrdr]){
+//  if(priSel>-1) n.P +=  pntr - prevPntr;
+//  clr = nvgRGBf(.5f,.4f,.1f);
+//}
+
+//if(lftDn){ 
+//  printf("wat");
+//}
 
 //if(slotInSel < 0)
 // && slotOutSel < 0)
