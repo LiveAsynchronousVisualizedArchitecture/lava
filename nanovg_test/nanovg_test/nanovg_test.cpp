@@ -57,6 +57,8 @@
 // -todo: put back console 
 // -todo: test console
 
+// todo: enable mouse over slot detection
+// todo: convert general data structures of nodes, slots, and connections to use tbl?
 // todo: print to console with ReadFile.cpp function
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
@@ -154,6 +156,7 @@ union   bnd
   float h(){return abs(ymx-ymn);}
 };
 struct  node { v2 P; str txt; LavaNode ln; };
+struct  slot { v2 P; u64 nidx; };
 struct  cnct { 
   int src, dest;
   ui8 src_out, dest_in;
@@ -170,6 +173,7 @@ using   vec_nd     =    vec<node>;
 using vec_nbnd     =     vec<bnd>;
 using   vec_v2     =      vec<v2>;
 using  vec_con     =    vec<cnct>;
+using vec_slot     =    vec<slot>;
 using cnct_tbl     =    std::unordered_multimap<int,int>;
 
 GLFWwindow*            win;
@@ -191,6 +195,10 @@ vec<bool>             sels;             // bitfield for selected nodes
 veci               nd_ordr;
 vec_con              cncts;             // cncts is connections - the vector of connection structures
 cnct_tbl          cnct_src;
+
+f32                 io_rad;
+vec_slot          slots_in;
+vec_slot         slots_out;
 int                 priSel = -1;
 int                 secSel = -1;
 bool                 drgNd = false;
@@ -515,7 +523,7 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
   float tw=0, iw=0, x=n.P.x, y=n.P.y, w=NODE_SZ.x, h=NODE_SZ.y;
 	float rad = lerp(rnd, 0.f, h/2.f);           // rad is corner radius
   float cntrX=x+w/2, cntrY=y+h/2, rr=rad;        // rr is rail radius
-  float io_rad=10.f;
+  //float io_rad=10.f;
 
   SECTION(grey border)
   {
@@ -590,26 +598,28 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
 	  nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f,n.txt.c_str(), NULL);
   }
 
-  SECTION(inputs and outputs)
-  {
-    v2 out = out_cntr(n, io_rad);
-    v2  in = in_cntr(n, io_rad);
-    nvgBeginPath(vg);
-     //nvgCircle(vg, cntrX, cntrY+h/2+io_rad, io_rad);
-     nvgCircle(vg, out.x, out.y, io_rad);
-    nvgFillColor(vg, nvgRGBAf(.18f, .5f, .18f, 1.f));
-    nvgFill(vg);
+  //SECTION(inputs and outputs)
+  //{
+  //  v2 out = out_cntr(n, io_rad);
+  //  v2  in = in_cntr(n, io_rad);
+  //  nvgBeginPath(vg);
+  //   nvgCircle(vg, out.x, out.y, io_rad);
+  //  nvgFillColor(vg, nvgRGBAf(.18f, .5f, .18f, 1.f));
+  //  nvgFill(vg);
 
-    nvgBeginPath(vg);
-     //nvgCircle(vg, cntrX, y-io_rad, io_rad);
-     nvgCircle(vg, in.x, in.y, io_rad);
-    //nvgStrokeWidth(vg, 1.f);
-    nvgFillColor(vg, nvgRGBAf(.18f, .4f, .6f, 1.f));
-    nvgFill(vg);
-  }
+  //  nvgBeginPath(vg);
+  //   nvgCircle(vg, in.x, in.y, io_rad);
+  //  nvgFillColor(vg, nvgRGBAf(.18f, .4f, .6f, 1.f));
+  //  nvgFill(vg);
+  //}
 
   return {x,y, x+w, y+h};
+
+  //nvgCircle(vg, cntrX, cntrY+h/2+io_rad, io_rad);
+  //nvgCircle(vg, cntrX, y-io_rad, io_rad);
+  //nvgStrokeWidth(vg, 1.f);
 }
+
 
 void        debug_coords(v2 a)
 {
@@ -631,9 +641,15 @@ ENTRY_DECLARATION
   {
     SECTION(test data init)
     {
+      io_rad = 10.f;
+
       nodes.push_back( { {100.f,100.f},"one"   } );
       nodes.push_back( { {200.f,200.f},"two"   } );
       nodes.push_back( { {300.f,300.f},"three" } );
+
+      slots_in.push_back( {{0.f,0.f}, 0} );
+
+      slots_out.push_back( {{0.f,0.f}, 2} );
 
       for(auto& n : nodes){
         nbnds.push_back( {n.P.x, n.P.y, n.P.x+NODE_SZ.x, n.P.y+NODE_SZ.y} );
@@ -849,6 +865,32 @@ ENTRY_DECLARATION
           if( priSel>-1 && selctd ){           // if a node is primary selected (left mouse down on a node) or the selected flag is set
             n.P +=  pntr - prevPntr;
           }
+        }
+      }
+      SECTION(slot movement)
+      {
+        nvgFillColor(vg, nvgRGBAf(.18f, .4f, .6f, 1.f));
+        TO(slots_in.size(),i){
+          node& n = nodes[ slots_in[i].nidx ];
+          auto np = n.P;
+
+          v2  in = in_cntr(n, io_rad);
+          slots_in[i].P = in;
+          nvgBeginPath(vg);
+            nvgCircle(vg, in.x, in.y, io_rad);
+          nvgFill(vg);
+        }
+
+        TO(slots_out.size(),i){
+          node& n = nodes[ slots_out[i].nidx ];
+          auto np = n.P;
+
+          nvgFillColor(vg, nvgRGBAf(.18f, .5f, .18f, 1.f));
+          v2 out = out_cntr(n, io_rad);
+          slots_out[i].P = out;
+          nvgBeginPath(vg);
+            nvgCircle(vg, out.x, out.y, io_rad);
+          nvgFill(vg);
         }
       }
 
