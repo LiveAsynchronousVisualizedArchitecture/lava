@@ -58,8 +58,11 @@
 // -todo: test console
 // -todo: make dedicated slot vectors 
 // -todo: enable mouse over slot highlighting
+// -todo: make slot selection
+// -todo: use slot selections to make connections
+// -todo: draw connections off of slots
 
-// todo: make slot selection
+// todo: make slots shift to point at each other 
 // todo: convert general data structures of nodes, slots, and connections to use tbl?
 // todo: print to console with ReadFile.cpp function
 // todo: make two nodes execute in order
@@ -663,7 +666,7 @@ ENTRY_DECLARATION
       //drgs.resize(sz, false);
 
       nd_ordr.resize(sz);
-      TO((int)sz,i) nd_ordr[i]=i;
+      TO(sz,i) nd_ordr[i] = (i32)i;
 
       //cncts.push_back( {0,1} );
       //cncts.push_back( {1,2} );
@@ -820,19 +823,19 @@ ENTRY_DECLARATION
                      
             SECTION(secondary selection (for connections) )
             {
-              if(inNode && rtDn && !prevRtDn)
-              {
-                if(secSel<0) secSel=ndOrdr;
-                else{ // create a connection between secSel and i
-                  if( insUnq(&cnct_src,  ndOrdr, secSel) &&
-                      insUnq(&cnct_dest, secSel, ndOrdr) ){
-                    cncts.push_back( {ndOrdr, secSel} );
-                  }
-
-                  secSel = -1;
-                }
-                break;
-              }
+              //if(inNode && rtDn && !prevRtDn)
+              //{
+              //  if(secSel<0) secSel=ndOrdr;
+              //  else{ // create a connection between secSel and i
+              //    if( insUnq(&cnct_src,  ndOrdr, secSel) &&
+              //        insUnq(&cnct_dest, secSel, ndOrdr) ){
+              //      cncts.push_back( {ndOrdr, secSel} );
+              //    }
+              //
+              //    secSel = -1;
+              //  }
+              //  break;
+              //}
             }
             SECTION(primary selection and group selection effects)
             {
@@ -858,38 +861,69 @@ ENTRY_DECLARATION
         }
         SECTION(slot selection)
         {
-          //if(slotInSel < 0)
-          // && slotOutSel < 0)
-          //if(inSlt){ slotOutSel = i; }
+          //bool  inSltAny = false;
+          //bool outSltAny = false;
 
-          bool inSltAny = false;
-          bool outSltAny = false;
-
+          i32  inClk = -1;
+          i32 outClk = -1;
           if(lftDn && !prevLftDn){
-            TO(slots_in.size(),i){ 
+            TO(slots_in.size(),  i){ 
               bool inSlt = len(pntr - slots_in[i].P) < io_rad;
-
-              if(inSlt && slotInSel != i) slotInSel =  i;    // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
-              else                        slotInSel = -1;
+              if(inSlt) inClk = (i32)i;           
             }
-
-            TO(slots_out.size(),i){ 
+            TO(slots_out.size(), i){
               bool inSlt = len(pntr - slots_out[i].P) < io_rad;
-
-              if(inSlt && slotOutSel != i) slotOutSel =  i;  // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
-              else                         slotOutSel = -1;
+              if(inSlt) outClk = (i32)i;
             }
           }
 
+          if(inClk > -1){
+            if(inClk==slotInSel)
+              slotInSel = -1;                                            // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
+            else if(slotOutSel > -1){
+              cncts.push_back( {slotOutSel, inClk} );
+              slotOutSel = slotInSel = -1;
+            }else 
+              slotInSel = inClk;
+          }
 
-          //if(lftDn && !prevLftDn) 
-          //  TO(slots_out.size(),i){ 
+          if(outClk > -1){
+            if(outClk==slotOutSel) 
+              slotOutSel = -1;                                           // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
+            else if(slotInSel > -1){
+              cncts.push_back( {outClk, slotInSel} );
+              slotOutSel = slotInSel = -1;
+            }else
+              slotOutSel = outClk;
+          }
+
+          //if(inSlt && slotOutSel != i){
+          //  if(slotInSel<0){ slotOutSel = (i32)i; }                    // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
+          //  else{ 
+          //    cncts.push_back( {(i32)i, slotInSel} ); 
+          //  }
+          //}else slotOutSel = -1;
+          //
+          //if(lftDn && !prevLftDn){
+          //  TO(slots_in.size(),  i){ 
+          //    bool inSlt = len(pntr - slots_in[i].P) < io_rad;
+          //
+          //    if(inSlt && slotInSel != i) slotInSel =  (i32)i;             // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
+          //    else                        slotInSel = -1;
+          //  }
+          //
+          //  TO(slots_out.size(), i){ 
           //    bool inSlt = len(pntr - slots_out[i].P) < io_rad;
           //
-          //    if(inSlt && slotOutSel != i) slotOutSel =  i;  // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
-          //    else                         slotOutSel = -1;
+          //    if(inSlt && slotOutSel != i){ 
+          //      
+          //      if(slotInSel<0){ slotOutSel = (i32)i; }                    // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
+          //      else{ 
+          //        cncts.push_back( {(i32)i, slotInSel} ); 
+          //      }
+          //    }else slotOutSel = -1;
           //  }
-
+          //}
         }
       }
 
@@ -921,6 +955,11 @@ ENTRY_DECLARATION
         }
       }
 
+      //SECTION(connection creation)
+      //{
+      //  //if()
+      //}
+
       SECTION(nanovg drawing)
       {
         nvgBeginFrame(vg, ww, wh, pxRatio);
@@ -928,18 +967,23 @@ ENTRY_DECLARATION
         {
           TO(cncts.size(),i)
           {
-            const v2 hlfsz = NODE_SZ/2.f;
+            const v2 hlfsz = io_rad/2.f;
             auto& cn = cncts[i];
-            v2   src = nodes[cn.src].P + hlfsz;
-            v2  dest = nodes[cn.dest].P + hlfsz;
-            v2   out = out_cntr(nodes[cn.src], IORAD);
-            v2    in = in_cntr(nodes[cn.dest], IORAD);
+            v2   out = slots_in[cn.src].P   + hlfsz;
+            v2    in = slots_out[cn.dest].P + hlfsz;
+            //v2   out = src;
+            //v2    in = dest;
+            //v2   out = out_cntr(nodes[cn.src], IORAD);
+            //v2    in = in_cntr(nodes[cn.dest], IORAD);
+
+            //const v2 hlfsz = NODE_SZ/2.f;
+            //auto& cn = cncts[i];
+            //v2   src = nodes[cn.src].P + hlfsz;
+            //v2  dest = nodes[cn.dest].P + hlfsz;
+            //v2   out = out_cntr(nodes[cn.src], IORAD);
+            //v2    in = in_cntr(nodes[cn.dest], IORAD);
 
             nvgBeginPath(vg);
-             //nvgMoveTo(vg,   src.x,src.y);
-             //f32 halfx = lerp(.5f, dest.x, src.x);
-             //f32 halfy = lerp(.5f, dest.y, src.y); 
-             //nvgBezierTo(vg, halfx,src.y, halfx,dest.y, dest.x,dest.y);
              nvgMoveTo(vg,   out.x,out.y);
              f32 halfx = lerp(.5f, in.x, out.x);
              f32 halfy = lerp(.5f, in.y, out.y); 
@@ -947,6 +991,11 @@ ENTRY_DECLARATION
              nvgStrokeWidth(vg, 3.f);
             nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
    	        nvgStroke(vg);
+
+            //nvgMoveTo(vg,   src.x,src.y);
+            //f32 halfx = lerp(.5f, dest.x, src.x);
+            //f32 halfy = lerp(.5f, dest.y, src.y); 
+            //nvgBezierTo(vg, halfx,src.y, halfx,dest.y, dest.x,dest.y);
           }
         }
         SECTION(draw nodes)
@@ -1096,6 +1145,18 @@ ENTRY_DECLARATION
 
 
 
+
+//if(slotInSel < 0)
+// && slotOutSel < 0)
+//if(inSlt){ slotOutSel = i; }
+//
+//if(lftDn && !prevLftDn) 
+//  TO(slots_out.size(),i){ 
+//    bool inSlt = len(pntr - slots_out[i].P) < io_rad;
+//
+//    if(inSlt && slotOutSel != i) slotOutSel =  i;  // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
+//    else                         slotOutSel = -1;
+//  }
 
 //const char* text, 
 //v2 P, v2 sz, 

@@ -6,6 +6,7 @@
 #ifndef __VEC_HEADER_GUARD__
 #define __VEC_HEADER_GUARD__
 
+#include <cstdint>
 #include "../no_rt_util.h"
 
 union  vec4
@@ -14,8 +15,10 @@ union  vec4
   struct { float r,g,b,a;  };
   float c[4];
 
-  float&       operator[](int i)       {return c[i];}
-  float const& operator[](int i) const {return c[i];}
+  //float&       operator[](int i)       {return c[i];}
+  //float const& operator[](int i) const {return c[i];}
+  float&       operator[](uint64_t i)       {return c[i];}
+  float const& operator[](uint64_t i) const {return c[i];}
 };
 inline vec4   Vec4(float x=0, float y=0, float z=0)
 {
@@ -111,8 +114,8 @@ union  vec3i
   struct { int v0, v1, v2; };
   int v[3];
 
-  int&       operator[](int i)       {return v[i];}
-  int const& operator[](int i) const {return v[i];}
+  int&       operator[](uint64_t i)       {return v[i];}
+  int const& operator[](uint64_t i) const {return v[i];}
 };
 using  v3i = vec3i;
 
@@ -122,8 +125,8 @@ union  vec3
   struct { float r,g,b;  };
   float c[3];
 
-  float&       operator[](int i)       {return c[i];}
-  float const& operator[](int i) const {return c[i];}
+  float&       operator[](uint64_t i)       {return c[i];}
+  float const& operator[](uint64_t i) const {return c[i];}
 };
 inline vec3   Vec3(float x=0, float y=0, float z=0)
 {
@@ -243,8 +246,8 @@ union  vec2
   struct { float r,g; };
   float c[2];
 
-  float&       operator[](int i)       {return c[i];}
-  float const& operator[](int i) const {return c[i];}
+  float&       operator[](uint64_t i)       {return c[i];}
+  float const& operator[](uint64_t i) const {return c[i];}
   vec2(){} 
   vec2(float x, float y) : r(x), g(y) {} 
   vec2(float a[2]) : x(a[0]), y(a[1]) {}
