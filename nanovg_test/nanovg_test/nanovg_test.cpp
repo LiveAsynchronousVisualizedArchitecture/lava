@@ -56,6 +56,7 @@
 // -todo: fix lag of node and connections to pointers - fixed by changing node positions before drawing, which lets connections go to the correct position
 // -todo: put back console 
 // -todo: test console
+// -todo: make dedicated slot vectors 
 
 // todo: enable mouse over slot detection
 // todo: convert general data structures of nodes, slots, and connections to use tbl?
@@ -869,28 +870,15 @@ ENTRY_DECLARATION
       }
       SECTION(slot movement)
       {
-        nvgFillColor(vg, nvgRGBAf(.18f, .4f, .6f, 1.f));
         TO(slots_in.size(),i){
           node& n = nodes[ slots_in[i].nidx ];
           auto np = n.P;
-
-          v2  in = in_cntr(n, io_rad);
-          slots_in[i].P = in;
-          nvgBeginPath(vg);
-            nvgCircle(vg, in.x, in.y, io_rad);
-          nvgFill(vg);
+          slots_in[i].P = in_cntr(n, io_rad);
         }
-
         TO(slots_out.size(),i){
           node& n = nodes[ slots_out[i].nidx ];
           auto np = n.P;
-
-          nvgFillColor(vg, nvgRGBAf(.18f, .5f, .18f, 1.f));
-          v2 out = out_cntr(n, io_rad);
-          slots_out[i].P = out;
-          nvgBeginPath(vg);
-            nvgCircle(vg, out.x, out.y, io_rad);
-          nvgFill(vg);
+          slots_out[i].P = out_cntr(n, io_rad);
         }
       }
 
@@ -990,6 +978,23 @@ ENTRY_DECLARATION
                nvgCircle(vg, brdr.x,brdr.y, 8.f);
               nvgFill(vg);
             }
+          }
+        }
+        SECTION(draw slots)
+        {
+          nvgFillColor(vg, nvgRGBAf(.18f, .4f, .6f, 1.f));
+          TO(slots_in.size(),i){
+            v2 in = slots_in[i].P;
+            nvgBeginPath(vg);
+              nvgCircle(vg, in.x, in.y, io_rad);
+            nvgFill(vg);
+          }
+          nvgFillColor(vg, nvgRGBAf(.18f, .5f, .18f, 1.f));
+          TO(slots_out.size(),i){
+            v2 out = slots_out[i].P;
+            nvgBeginPath(vg);
+              nvgCircle(vg, out.x, out.y, io_rad);
+            nvgFill(vg);
           }
         }
         SECTION(draw selection box)
