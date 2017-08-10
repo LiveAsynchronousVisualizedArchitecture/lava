@@ -61,8 +61,12 @@
 // -todo: make slot selection
 // -todo: use slot selections to make connections
 // -todo: draw connections off of slots
+// -todo: make slots shift to point at each other 
+// -todo: make slots draw under nodes
 
-// todo: make slots shift to point at each other 
+// todo: take out drawing tests
+// todo: slow down cursor over nodes
+// todo: speed up cursor while dragging
 // todo: make order of slots dictated by node order
 // todo: make connection class that keeps two connection arrays, each sorted by src or dest
 // todo: convert general data structures of nodes, slots, and connections to use tbl?
@@ -133,7 +137,7 @@ const v2    NODE_SZ       = { 256.f, 64.f };
 const v2    NODE_HALF_SZ  = NODE_SZ/2.f;
 const auto  NODE_CLR      = nvgRGBf(.1f,.4f,.5f);
 const float INFf          = std::numeric_limits<float>::infinity();
-const f32   IORAD         = 10.f;
+const f32   IORAD         = 15.f;
 
 //const float INFf          = std::numeric_limits<float>:infinity();
 
@@ -645,7 +649,7 @@ v2           node_border(node const& n, v2 dir, f32 slot_rad)
     pdir /= abs(pdir.y)/hlf.y;
   }
 
-  f32        r = hlf.y/2.f;
+  f32        r = hlf.y;  //hlf.y/2.f;
   v2  circCntr = (pdir.x<0)? n.P+v2(r,r)  :  n.P+NODE_SZ-r;
   v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, r);
   bool     hit = !hasInf(intrsct);
@@ -1039,6 +1043,31 @@ ENTRY_DECLARATION
    	        nvgStroke(vg);
           }
         }
+        SECTION(draw slots)
+        {
+          TO(slots_in.size(),i){
+            v2      in = slots_in[i].P;
+            bool inSlt = len(pntr-in) < io_rad;
+
+            if(i==slotInSel) nvgFillColor(vg, nvgRGBAf(1.f,   1.f,   .5f,  1.f));
+            else if(inSlt)   nvgFillColor(vg, nvgRGBAf( .36f,  .8f, 1.f,   1.f));
+            else             nvgFillColor(vg, nvgRGBAf( .18f,  .4f,  .6f,  1.f));
+            nvgBeginPath(vg);              
+            nvgCircle(vg, in.x, in.y, io_rad);
+            nvgFill(vg);
+          }
+          TO(slots_out.size(),i){
+            v2     out = slots_out[i].P;
+            bool inSlt = len(pntr-out) < io_rad;
+
+            if(i==slotOutSel) nvgFillColor(vg, nvgRGBAf(1.f,   1.f,  .5f,  1.f));
+            else if(inSlt)    nvgFillColor(vg, nvgRGBAf( .36f, 1.f,  .36f, 1.f));
+            else              nvgFillColor(vg, nvgRGBAf( .18f,  .5f, .18f, 1.f));
+            nvgBeginPath(vg);
+            nvgCircle(vg, out.x, out.y, io_rad);
+            nvgFill(vg);
+          }
+        }
         SECTION(draw nodes)
         {
           int sz = (int)nd_ordr.size();
@@ -1098,33 +1127,6 @@ ENTRY_DECLARATION
               nvgFill(vg);
             }
           }
-        }
-        SECTION(draw slots)
-        {
-          TO(slots_in.size(),i){
-            v2      in = slots_in[i].P;
-            bool inSlt = len(pntr-in) < io_rad;
-
-            if(i==slotInSel) nvgFillColor(vg, nvgRGBAf(1.f,   1.f,   .5f,  1.f));
-            else if(inSlt)   nvgFillColor(vg, nvgRGBAf( .36f,  .8f, 1.f,   1.f));
-            else             nvgFillColor(vg, nvgRGBAf( .18f,  .4f,  .6f,  1.f));
-            nvgBeginPath(vg);              
-              nvgCircle(vg, in.x, in.y, io_rad);
-            nvgFill(vg);
-          }
-          TO(slots_out.size(),i){
-            v2     out = slots_out[i].P;
-            bool inSlt = len(pntr-out) < io_rad;
-
-            if(i==slotOutSel) nvgFillColor(vg, nvgRGBAf(1.f,   1.f,  .5f,  1.f));
-            else if(inSlt)    nvgFillColor(vg, nvgRGBAf( .36f, 1.f,  .36f, 1.f));
-            else              nvgFillColor(vg, nvgRGBAf( .18f,  .5f, .18f, 1.f));
-            nvgBeginPath(vg);
-              nvgCircle(vg, out.x, out.y, io_rad);
-            nvgFill(vg);
-          }
-
-
         }
         SECTION(draw selection box)
         {
