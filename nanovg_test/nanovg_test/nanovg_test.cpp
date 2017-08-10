@@ -65,15 +65,25 @@
 // -todo: make slots draw under nodes
 // -todo: take out drawing tests
 // -todo: make a function to find the position of a rounded rect border - node_border
+// -todo: solve disapearing connection and slots when connected nodes are level - 
+//       | y difference is 0 which creates a problem?
+//       | connection source and destination are both 0 - that's fine, the in and out connects are two separate arrays  
+//       | out.x and out.y are both NaN
+//       | problem is the slots, not the connect - difference in y was 0 when nodes are lined up vertically, causing division by 0
+// -todo: get release mode to build - subsystem was WinMain but USE_CONSOLE was defined and entry point was main instead of WinMain
+// -todo: make function to find the normal of a rounded rect - just means wrapping circle collison function - outputting from node_border as optional output
+// -todo: make bezier point at normal of node border
+// -todo: make slots use the rounded rail drawing in the draw_node function
+// -todo: draw normal 
+// -todo: figure why normal doesn't follow node end circle - was using the node center instead of the circle center to create direction
 
-// todo: solve disapearing connection and slots when connected nodes are level - y difference is 0 which creates a problem?
-// todo: make function to find the normal of a rounded rect - just means wrapping circle collison function
-// todo: make bezier point at normal of node border
-// todo: make slots use the rounded rail drawing in the draw_node function
+// todo: highlight connections and slots when a node is selected
+// todo: half highlight when mouse over of node, slot or connection
+// todo: delete connection if it already exists instead of creating a duplicate
 // todo: group ui state variables together - priSel, connecting
 // todo: slow down cursor over nodes
 // todo: speed up cursor while dragging
-// todo: make order of slots dictated by node order
+// todo: make drawing order of slots dictated by node order
 // todo: make connection class that keeps two connection arrays, each sorted by src or dest for fast searching
 // todo: convert general data structures of nodes, slots, and connections to use tbl?
 // todo: print to console with ReadFile.cpp function
@@ -98,6 +108,8 @@
 // todo: separate finding node the pointer is inside from the action to take
 // todo: make selection a vector for multi-selection - if the vector capacity is 3x the size, use reserve to shrink it down to 1.5x the size?
 
+// idea: look into openGL input latency technique
+
 // glew? includes windows.h
 #define  WIN32_LEAN_AND_MEAN
 #define  NOMINMAX
@@ -114,7 +126,10 @@
   #pragma comment(lib, "opengl32.lib")
   //#pragma comment(lib, "glew32.lib")
 
-  #define USE_CONSOLE                                 // turning this off will use the windows subsystem in the linker and change the entry point to WinMain() so that no command line/console will appear
+  #if defined(_DEBUG)
+    #define USE_CONSOLE                                 // turning this off will use the windows subsystem in the linker and change the entry point to WinMain() so that no command line/console will appear
+  #endif
+
   #ifndef USE_CONSOLE
     #pragma comment( linker, "/subsystem:windows" )
     #undef ENTRY_DECLARATION
@@ -215,6 +230,8 @@ i32             slotOutSel = -1;
 f32                 io_rad;
 vec_slot          slots_in;
 vec_slot         slots_out;
+vec_v2      slots_in_nrmls;
+vec_v2     slots_out_nrmls;
 
 int                 priSel = -1;
 int                 secSel = -1;
@@ -299,10 +316,6 @@ bool              hasInf(v2 v)
 }
 v2      lineCircleIntsct(v2 P, v2 dir, v2 crcl, f32 r)
 {
-  //f32       r = NODE_SZ.y/2.f;
-  //v2  dirCirc = abs(pdir) / r;
-  //v2 circCntr = n.P + NODE_SZ - r;
-
   v2       st = (P - crcl) / r;
   f32     mlt = abs(st.x) / dir.x;                 // mlt = multiplier - the multiplier to get dir.x to equal st.x 
   f32       C = (st + dir*mlt).y;
@@ -318,6 +331,10 @@ v2      lineCircleIntsct(v2 P, v2 dir, v2 crcl, f32 r)
   v2  intrsct = v2( sign(dir.x)*x, sign(dir.y)*y)*r + crcl;
 
   return intrsct;
+
+  //f32       r = NODE_SZ.y/2.f;
+  //v2  dirCirc = abs(pdir) / r;
+  //v2 circCntr = n.P + NODE_SZ - r;
 }
 bool              insUnq(cnct_tbl* cnct, int a, int b)   // insUnq is insert unique - this inserts into a multi-set only if the combination of int key and int val does not already exist
 {
@@ -638,49 +655,36 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
   //nvgCircle(vg, cntrX, y-io_rad, io_rad);
   //nvgStrokeWidth(vg, 1.f);
 }
-v2           node_border(node const& n, v2 dir, f32 slot_rad)
+v2           node_border(node const& n, v2 dir, f32 slot_rad, v2* out_nrml=nullptr)
 {
   v2   hlf = NODE_HALF_SZ;
   v2 ncntr = n.P + NODE_HALF_SZ;
   v2  ndir = norm(dir);
-  //v2  pdir = norm(pntr - ncntr) * len(hlfsz);          // * normsz;
 
   v2 pdir = ndir;
   v2   ds = sign(pdir);                                  // ds is direction sign
-  if( abs(pdir.x) > hlf.x ){
-    pdir /= abs(pdir.x)/hlf.x;
+  f32  ax = abs(pdir.x);
+  if( ax > hlf.x ){
+    pdir /= ax/hlf.x;                                    // can this never be 0, since ax is positive, hlf.x is positive, and ax is greater than hlf.x ? 
   }else{
-    pdir /= abs(pdir.y)/hlf.y;
+    f32 ay = abs(pdir.y);
+    pdir /= ay==0.f?  1.f  :  ay/hlf.y;
   }
 
-  f32        r = hlf.y;  //hlf.y/2.f;
+  f32        r = hlf.y;
   v2  circCntr = (pdir.x<0)? n.P+v2(r,r)  :  n.P+NODE_SZ-r;
   v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, r);
   bool     hit = !hasInf(intrsct);
   if(hit) pdir = intrsct - ncntr;
 
-  v2 dirEnd = ncntr + pdir; // + ndir*hlf;
-  return dirEnd;
+  v2 borderPt = ncntr + pdir;
 
-  //nvgBeginPath(vg);
-  //nvgMoveTo(vg, ncntr.x,ncntr.y);
-  //nvgLineTo(vg, dirEnd.x, dirEnd.y);
-  //nvgStrokeWidth(vg, 3.f);
-  //nvgStroke(vg);
-  //
-  //nvgBeginPath(vg);
-  //nvgCircle(vg, circCntr.x,circCntr.y, r);
-  //nvgStrokeWidth(vg, 1.f);
-  //nvgStroke(vg);
-  //
-  //nvgBeginPath(vg);
-  //nvgCircle(vg, intrsct.x,intrsct.y, 4.f);
-  //nvgFill(vg);
-  //
-  //v2 brdr = ncntr + pdir + norm(pdir)*8.f;
-  //nvgBeginPath(vg);
-  //nvgCircle(vg, brdr.x,brdr.y, 8.f);
-  //nvgFill(vg);
+  if(out_nrml){
+    if(hit) *out_nrml = norm(borderPt - circCntr);
+    else    *out_nrml = { 0.f, sign(ndir).y };
+  }
+
+  return borderPt;
 }
 
 
@@ -704,12 +708,14 @@ ENTRY_DECLARATION
       io_rad = 10.f;
 
       nodes.push_back( { {100.f,100.f},"one"   } );
-      nodes.push_back( { {200.f,200.f},"two"   } );
+      nodes.push_back( { {600.f,600.f},"two"   } );
       nodes.push_back( { {300.f,300.f},"three" } );
 
-      slots_in.push_back( {{0.f,0.f}, 0} );
-
       slots_out.push_back( {{0.f,0.f}, 2} );
+      slots_out_nrmls.push_back( {0,0} );
+
+      slots_in.push_back( {{0.f,0.f}, 0} );
+      slots_in_nrmls.push_back( {0,0} );
 
       for(auto& n : nodes){
         nbnds.push_back( {n.P.x, n.P.y, n.P.x+NODE_SZ.x, n.P.y+NODE_SZ.y} );
@@ -717,22 +723,24 @@ ENTRY_DECLARATION
 
       auto sz = nodes.size();
       sels.resize(sz, false);
-      //drgOfsts.resize(sz, {0,0} );
-      //drgs.resize(sz, false);
 
       nd_ordr.resize(sz);
       TO(sz,i) nd_ordr[i] = (i32)i;
-
-      //cncts.push_back( {0,1} );
-      //cncts.push_back( {1,2} );
-
-      //cnct_in.insert( cnct_in.end(), ALL(cncts) );
     
       TO(cncts.size(),i){
         //cnctTbl.insert( { (int)i, cncts[i] } );
       //  lower_bound( ALL(cnct_in), cncts[i], cnct::lessDest);
       //  lower_bound( ALL(cnct_in), cncts[i], cnct::lessDest);
       }
+
+      //drgOfsts.resize(sz, {0,0} );
+      //drgs.resize(sz, false);
+
+      //cncts.push_back( {0,1} );
+      //cncts.push_back( {1,2} );
+
+      //
+      //cnct_in.insert( cnct_in.end(), ALL(cncts) );
     }
     SECTION(init glfw)
     {
@@ -1006,12 +1014,14 @@ ENTRY_DECLARATION
             auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){ return c.src==i; } );            // find connect in the naive way for now 
             if(cnctIter == end(cncts)){
               slots_out[i].P = out_cntr(n, io_rad);
+              slots_out_nrmls[i] = {0, -1.f};
             }else{
               slot&  destSlt = slots_in[cnctIter->dest];
               v2       destP = nodes[destSlt.nidx].P;
-              slots_out[i].P = node_border(n, destP - n.P, io_rad);
+              v2       nrml;
+              slots_out[i].P = node_border(n, destP - n.P, io_rad, &nrml);
+              slots_out_nrmls[i] = nrml;
             }
-            //v2       destP = nodes[cnctIter->dest].P;
           }
 
           TO(slots_in.size(),i){
@@ -1019,10 +1029,13 @@ ENTRY_DECLARATION
             auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){ return c.dest==i; } );            // find connect in the naive way for now 
             if(cnctIter == end(cncts)){
               slots_in[i].P = in_cntr(n, io_rad);
+              slots_out_nrmls[i] = {0, 1.f};
             }else{
               slot&  srcSlt = slots_out[cnctIter->src];
               v2       srcP = nodes[srcSlt.nidx].P;
-              slots_in[i].P = node_border(n, srcP - n.P, io_rad);
+              v2       nrml;
+              slots_in[i].P = node_border(n, srcP - n.P, io_rad, &nrml);
+              slots_in_nrmls[i] = nrml;
             }
           }
         }
@@ -1036,15 +1049,27 @@ ENTRY_DECLARATION
           TO(cncts.size(),i)
           {
             const v2 hlfsz = io_rad/2.f;
-            auto& cn = cncts[i];
-            v2   out = slots_in[cn.src].P   + hlfsz;
-            v2    in = slots_out[cn.dest].P + hlfsz;
+            auto&   cn = cncts[i];
+            v2     out = slots_out[cn.src].P;
+            v2 outNrml = slots_out_nrmls[cn.src];
+            v2      in = slots_in[cn.dest].P;
+            v2  inNrml = slots_in_nrmls[cn.src];
+            f32  halfx = lerp(.5f, in.x, out.x);
+            f32  halfy = lerp(.5f, in.y, out.y);
+            f32   dist = len(out - in);
+            v2  outNxt = out + outNrml*(dist/3);              // divide by 3 because there are 3 sections to the bezier
+            v2   inNxt = in  +  inNrml*(dist/3);
+
+            nvgBeginPath(vg);
+              nvgMoveTo(vg,   out.x,out.y);
+              nvgLineTo(vg,  outNxt.x,outNxt.y);
+              nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+            nvgStroke(vg);
 
             nvgBeginPath(vg);
              nvgMoveTo(vg,   out.x,out.y);
-             f32 halfx = lerp(.5f, in.x, out.x);
-             f32 halfy = lerp(.5f, in.y, out.y); 
-             nvgBezierTo(vg, halfx,out.y, halfx,in.y, in.x,in.y);
+             //nvgBezierTo(vg, halfx,out.y, halfx,in.y, in.x,in.y);
+             nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, in.x,in.y);
              nvgStrokeWidth(vg, 3.f);
             nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
    	        nvgStroke(vg);
@@ -1186,6 +1211,41 @@ ENTRY_DECLARATION
 
 
 
+//
+//v2 dirEnd = ncntr + pdir;
+
+//v2  pdir = norm(pntr - ncntr) * len(hlfsz);          // * normsz;
+//f32        r = hlf.y;  //hlf.y/2.f;
+//v2 dirEnd = ncntr + pdir; // + ndir*hlf;
+
+//if( abs(pdir.x) > hlf.x ){
+//  pdir /= abs(pdir.x)/hlf.x;
+//}else{
+//  pdir /= abs(pdir.y)/hlf.y;
+//}
+
+//nvgBeginPath(vg);
+//nvgMoveTo(vg, ncntr.x,ncntr.y);
+//nvgLineTo(vg, dirEnd.x, dirEnd.y);
+//nvgStrokeWidth(vg, 3.f);
+//nvgStroke(vg);
+//
+//nvgBeginPath(vg);
+//nvgCircle(vg, circCntr.x,circCntr.y, r);
+//nvgStrokeWidth(vg, 1.f);
+//nvgStroke(vg);
+//
+//nvgBeginPath(vg);
+//nvgCircle(vg, intrsct.x,intrsct.y, 4.f);
+//nvgFill(vg);
+//
+//v2 brdr = ncntr + pdir + norm(pdir)*8.f;
+//nvgBeginPath(vg);
+//nvgCircle(vg, brdr.x,brdr.y, 8.f);
+//nvgFill(vg);
+
+//
+//v2       destP = nodes[cnctIter->dest].P;
 
 //v2        srcP = slots_out[cnctIter->src].P;
 //
