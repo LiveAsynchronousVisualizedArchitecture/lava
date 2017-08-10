@@ -997,11 +997,11 @@ ENTRY_DECLARATION
           if(cnctIter == end(cncts)){
             slots_out[i].P = out_cntr(n, io_rad);
           }else{
-            slot&  destSlt = slots_out[cnctIter->dest];
+            slot&  destSlt = slots_in[cnctIter->dest];
             v2       destP = nodes[destSlt.nidx].P;
-            //v2       destP = nodes[cnctIter->dest].P;
-            slots_out[i].P = node_border(n,  destP - n.P, io_rad);
-          }          
+            slots_out[i].P = node_border(n, destP - n.P, io_rad);
+          }
+          //v2       destP = nodes[cnctIter->dest].P;
         }
 
         TO(slots_in.size(),i){
@@ -1012,7 +1012,7 @@ ENTRY_DECLARATION
           }else{
             slot&  srcSlt = slots_out[cnctIter->src];
             v2       srcP = nodes[srcSlt.nidx].P;
-            slots_in[i].P = node_border(n,  n.P - srcP, io_rad);
+            slots_in[i].P = node_border(n, srcP - n.P, io_rad);
           }
         }
       }
