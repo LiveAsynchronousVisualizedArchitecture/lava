@@ -76,39 +76,41 @@
 // -todo: make slots use the rounded rail drawing in the draw_node function
 // -todo: draw normal 
 // -todo: figure why normal doesn't follow node end circle - was using the node center instead of the circle center to create direction
+// -todo: make input and output circles roll towards their connection
 
-// todo: highlight connections and slots when a node is selected
-// todo: half highlight when mouse over of node, slot or connection
+// todo: make slot drawn with border rail technique
 // todo: delete connection if it already exists instead of creating a duplicate
 // todo: group ui state variables together - priSel, connecting
-// todo: slow down cursor over nodes
-// todo: speed up cursor while dragging
+// todo: draw arrows (triangles) to show direction with connections
+// todo: make one node snap to another node
+// todo: make two snapped nodes group together and be dragged together
+// todo: make a menu bar
+// todo: add file to menu bar
+// todo: add save to menu bar
 // todo: make drawing order of slots dictated by node order
 // todo: make connection class that keeps two connection arrays, each sorted by src or dest for fast searching
-// todo: convert general data structures of nodes, slots, and connections to use tbl?
+// todo: make global state 
+// todo: separate finding node the pointer is inside from the action to take
 // todo: print to console with ReadFile.cpp function
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
 // todo: make a node to split text into lines and scatter the result
 // todo: add data to node for inputs
 // todo: add data to connection for input and output indices
-// todo: draw arrows (triangles) to show direction with connections
-// todo: make input and output circles roll towards their connection
-// todo: make a menu bar
-// todo: add file to menu bar
-// todo: add save to menu bar
-// todo: make one node snap to another node
-// todo: make two snapped nodes group together and be dragged together
-// todo: make snapped/grouped nodes separate with right mouse button
-// todo: make global state 
-// todo: make nodes different shapes? - make data input into vertical columns?
-// todo: make connections have different shapes? draw three thin lines for a scatter connection?
-// todo: make selected indication a border effect and not a color change
-// todo: draw inputs
-// todo: separate finding node the pointer is inside from the action to take
-// todo: make selection a vector for multi-selection - if the vector capacity is 3x the size, use reserve to shrink it down to 1.5x the size?
 
+// idea: slow down cursor over nodes
+// idea: speed up cursor while dragging
+// idea: highlight connections and slots when a node is selected
+// idea: half highlight when mouse over of node, slot or connection
+// idea: make snapped/grouped nodes separate with right mouse button
+// idea: make mouse slow down over slots more than it slows down over nodes
+// idea: make click and drag for connections
+// idea: make selected indication a border effect and not a color change
+// idea: make selection a vector for multi-selection - if the vector capacity is 3x the size, use reserve to shrink it down to 1.5x the size?
+// idea: make connections have different shapes? draw three thin lines for a scatter connection?
+// idea: make nodes different shapes? - make data input into vertical columns?
 // idea: look into openGL input latency technique
+// idea: convert general data structures of nodes, slots, and connections to use tbl?
 
 // glew? includes windows.h
 #define  WIN32_LEAN_AND_MEAN
@@ -507,7 +509,8 @@ void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int
         printf("%s    %s    %s", nds[0].name, nds[0].in_types[0], nds[0].out_types[0] );
         while(nds && nds->name)
           node_add( (nds++)->name );
-      }else{ printf("zero", lib); }
+      }else{ printf("zero"); }
+      //}else{ printf("zero", lib); }
 
 
     #endif
@@ -516,7 +519,7 @@ void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int
   {
     //sprintf(sngl, "sizeof LavaData %d", sizeof(LavaData) );
     //glfwSetWindowTitle(win, sngl);    
-    printf("sizeof LavaData %d \n", sizeof(LavaData) );
+    printf("sizeof LavaData %lld \n", sizeof(LavaData) );
   }break;
   default:
     ;
@@ -545,7 +548,7 @@ v2              out_cntr(node const& n, f32 r)
 }
 bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
                             int preicon,
-                          node const& n, 
+                          node const& n,
                            NVGcolor col,
                         float       rnd)     // rnd is corner rounding
 {
@@ -577,32 +580,13 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
 	  bg = nvgLinearGradient(vg, x,y,x,y+h, topClr, botClr);
 	  nvgBeginPath(vg);
 	    nvgRoundedRect(vg, x+border,y+border, w-(border*2),h-(border*2), rad); //-1);
+      col.a = 0.1f;
 	    if(!isBlack(col)){
 		    nvgFillColor(vg, col);
 		    nvgFill(vg);
 	    }
 	  nvgFillPaint(vg, bg);
 	  nvgFill(vg);
-  }
-
-  SECTION(rounded rails)
-  {
-  //  float cntrX=x+border+rad, cntrY=y+border+h/2, rr=rad;        // rr is rail radius
-  //  
-  //  float bthk = rthk+2;
-  //  nvgBeginPath(vg);
-  //   nvgMoveTo(vg, x-bthk/2, cntrY);
-  //   nvgArc(vg, cntrX, cntrY, rr, PIf*1.f, PIf*1.5f, NVG_CW);
-  //   nvgStrokeWidth(vg, bthk);
-  //  nvgStrokeColor(vg, nvgRGBAf(0, 0, 0, 1.f) );
-	 // nvgStroke(vg);
-  //
-  //  nvgBeginPath(vg);
-  //   nvgMoveTo(vg, x-rthk/2, cntrY);
-  //   nvgArc(vg, cntrX, cntrY, rr, PIf*1.f, PIf*1.5f, NVG_CW);
-  //   nvgStrokeWidth(vg, rthk);
-  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
-	 // nvgStroke(vg);
   }
 
   SECTION(text)
@@ -634,6 +618,28 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
 	  nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f,n.txt.c_str(), NULL);
   }
 
+  return {x,y, x+w, y+h};
+
+  //SECTION(rounded rails)
+  //{
+  ////  float cntrX=x+border+rad, cntrY=y+border+h/2, rr=rad;        // rr is rail radius
+  ////  
+  ////  float bthk = rthk+2;
+  ////  nvgBeginPath(vg);
+  ////   nvgMoveTo(vg, x-bthk/2, cntrY);
+  ////   nvgArc(vg, cntrX, cntrY, rr, PIf*1.f, PIf*1.5f, NVG_CW);
+  ////   nvgStrokeWidth(vg, bthk);
+  ////  nvgStrokeColor(vg, nvgRGBAf(0, 0, 0, 1.f) );
+  //// nvgStroke(vg);
+  ////
+  ////  nvgBeginPath(vg);
+  ////   nvgMoveTo(vg, x-rthk/2, cntrY);
+  ////   nvgArc(vg, cntrX, cntrY, rr, PIf*1.f, PIf*1.5f, NVG_CW);
+  ////   nvgStrokeWidth(vg, rthk);
+  ////  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+  //// nvgStroke(vg);
+  //}
+
   //SECTION(inputs and outputs)
   //{
   //  v2 out = out_cntr(n, io_rad);
@@ -649,16 +655,15 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
   //  nvgFill(vg);
   //}
 
-  return {x,y, x+w, y+h};
-
   //nvgCircle(vg, cntrX, cntrY+h/2+io_rad, io_rad);
   //nvgCircle(vg, cntrX, y-io_rad, io_rad);
   //nvgStrokeWidth(vg, 1.f);
 }
-v2           node_border(node const& n, v2 dir, f32 slot_rad, v2* out_nrml=nullptr)
+//v2           node_border(node const& n, v2 dir, f32 slot_rad, v2* out_nrml=nullptr)
+v2           node_border(v2 nP, v2 dir, f32 slot_rad, v2* out_nrml=nullptr)
 {
   v2   hlf = NODE_HALF_SZ;
-  v2 ncntr = n.P + NODE_HALF_SZ;
+  v2 ncntr = nP + NODE_HALF_SZ;
   v2  ndir = norm(dir);
 
   v2 pdir = ndir;
@@ -672,7 +677,7 @@ v2           node_border(node const& n, v2 dir, f32 slot_rad, v2* out_nrml=nullp
   }
 
   f32        r = hlf.y;
-  v2  circCntr = (pdir.x<0)? n.P+v2(r,r)  :  n.P+NODE_SZ-r;
+  v2  circCntr = (pdir.x<0)? nP+v2(r,r)  :  nP+NODE_SZ-r;
   v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, r);
   bool     hit = !hasInf(intrsct);
   if(hit) pdir = intrsct - ncntr;
@@ -685,6 +690,99 @@ v2           node_border(node const& n, v2 dir, f32 slot_rad, v2* out_nrml=nullp
   }
 
   return borderPt;
+}
+void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw_rail is draw_rail
+{
+  using namespace std;
+  
+  const int border = 2;
+  const f32   rthk = 8.f;    // rthk is rail thickness
+
+  f32 rnd = 1.f;
+  f32 tw=0, iw=0, x=nP.x, y=nP.y, w=NODE_SZ.x, h=NODE_SZ.y;
+  //f32 rad = lerp(rnd, 0.f, h/2.f);                               // rad is corner radius
+  //f32 cntrX = x+border+rad, cntrY = y+border+h/2, 
+  //f32 rr=rad;        // rr is rail radius
+  v2  hlf = NODE_HALF_SZ;
+  f32 rad = hlf.y; 
+  f32  rr = NODE_SZ.y/2;          // rr is rail radius
+
+  //v2  hlf = NODE_HALF_SZ;
+  //v2 ndir = norm(nP - P);
+  //v2 pdir = ndir;
+  //v2   ds = sign(pdir);                                  // ds is direction sign
+  //f32  ax = abs(pdir.x);
+  //if( ax > hlf.x ){
+  //  pdir /= ax/hlf.x;                                    // can this never be 0, since ax is positive, hlf.x is positive, and ax is greater than hlf.x ? 
+  //}else{
+  //  f32 ay = abs(pdir.y);
+  //  pdir /= ay==0.f?  1.f  :  ay/hlf.y;
+  //}
+  //f32       r = hlf.y;
+  //v2 circCntr = (pdir.x<0)? nP+v2(r,r)  :  nP+NODE_SZ-r;
+  
+  v2 ndCntr = {nP.x + hlf.x, nP.y + hlf.y};
+
+  bool leftSide = P.x < ndCntr.x;
+  v2 circCntr;
+  circCntr.y = nP.y + hlf.y;
+  circCntr.x = leftSide? nP.x+rad  :  nP.x+NODE_SZ.x-rad;
+
+  // black border
+  //f32 bthk = rthk+2;                        // bthk is black thickness 
+  //nvgBeginPath(vg);
+  //  nvgMoveTo(vg, x-bthk/2, P.y);
+  //  nvgArc(vg, P.x, P.y, rr, PIf*1.f, PIf*1.5f, NVG_CW);
+  //  nvgStrokeWidth(vg, bthk);
+  //nvgStrokeColor(vg, nvgRGBAf(0, 0, 0, 1.f) );
+  //nvgStroke(vg);
+
+  // inner color
+  //nvgBeginPath(vg);
+  //  nvgMoveTo(vg, x-rthk/2, P.y);
+  //  nvgArc(vg, P.x, P.y, rr, PIf*1.f, PIf*1.5f, NVG_CW);
+  //  nvgStrokeWidth(vg, rthk);
+  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+  //nvgStroke(vg);
+
+  v2 brdr = node_border(nP, P - ndCntr, io_rad);      // brdr is border
+
+  nvgBeginPath(vg);
+    nvgCircle(vg, brdr.x, brdr.y, 5.f);
+    nvgStrokeWidth(vg, rthk);
+    nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+  nvgStroke(vg);
+
+  nvgBeginPath(vg);
+    nvgCircle(vg, circCntr.x, circCntr.y, 5.f);
+    nvgStrokeWidth(vg, rthk);
+    nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+  nvgStroke(vg);
+
+  f32 arcSt = PIf/2.0f;
+  f32 arcEn = PIf*1.5f;
+  NVGwinding windDirection = leftSide? NVG_CW  :  NVG_CCW;
+  nvgBeginPath(vg);
+    nvgMoveTo(vg, brdr.x, brdr.y);
+    nvgArc(vg, circCntr.x, circCntr.y, rr, arcSt, arcEn, windDirection);    // PIf*1.f, PIf*1.5f, NVG_CW);
+    nvgStrokeWidth(vg, rthk);
+    nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+  nvgStroke(vg);
+
+  //f32 arcEn = leftSide? PIf*1.5f  :  -PIf*0.5f;
+  //if(leftSide==false){ swap(arcSt, arcEn); }
+
+  //nvgBeginPath(vg);
+  //  nvgCircle(vg, nP.x, nP.y, 5.f);
+  //  nvgStrokeWidth(vg, rthk);
+  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+  //nvgStroke(vg);
+  //
+  //nvgBeginPath(vg);
+  //  nvgCircle(vg, P.x, P.y, 5.f);
+  //  nvgStrokeWidth(vg, rthk);
+  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+  //nvgStroke(vg);
 }
 
 
@@ -1019,7 +1117,7 @@ ENTRY_DECLARATION
               slot&  destSlt = slots_in[cnctIter->dest];
               v2       destP = nodes[destSlt.nidx].P;
               v2       nrml;
-              slots_out[i].P = node_border(n, destP - n.P, io_rad, &nrml);
+              slots_out[i].P = node_border(n.P, destP - n.P, io_rad, &nrml);
               slots_out_nrmls[i] = nrml;
             }
           }
@@ -1034,7 +1132,7 @@ ENTRY_DECLARATION
               slot&  srcSlt = slots_out[cnctIter->src];
               v2       srcP = nodes[srcSlt.nidx].P;
               v2       nrml;
-              slots_in[i].P = node_border(n, srcP - n.P, io_rad, &nrml);
+              slots_in[i].P = node_border(n.P, srcP - n.P, io_rad, &nrml);
               slots_in_nrmls[i] = nrml;
             }
           }
@@ -1060,33 +1158,38 @@ ENTRY_DECLARATION
             v2  outNxt = out + outNrml*(dist/3);              // divide by 3 because there are 3 sections to the bezier
             v2   inNxt = in  +  inNrml*(dist/3);
 
-            nvgBeginPath(vg);
-              nvgMoveTo(vg,   out.x,out.y);
-              nvgLineTo(vg,  outNxt.x,outNxt.y);
-              nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
-            nvgStroke(vg);
+            // draw normal
+            //nvgBeginPath(vg);
+            //  nvgMoveTo(vg,   out.x,out.y);
+            //  nvgLineTo(vg,  outNxt.x,outNxt.y);
+            //  nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+            //nvgStroke(vg);
 
             nvgBeginPath(vg);
              nvgMoveTo(vg,   out.x,out.y);
-             //nvgBezierTo(vg, halfx,out.y, halfx,in.y, in.x,in.y);
              nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, in.x,in.y);
              nvgStrokeWidth(vg, 3.f);
-            nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+             nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
    	        nvgStroke(vg);
+            
+            //nvgBezierTo(vg, halfx,out.y, halfx,in.y, in.x,in.y);
           }
         }
         SECTION(draw slots)
         {
           TO(slots_in.size(),i){
-            v2      in = slots_in[i].P;
+            slot&  slt = slots_in[i];
+            v2      in = slt.P;
             bool inSlt = len(pntr-in) < io_rad;
 
             if(i==slotInSel) nvgFillColor(vg, nvgRGBAf(1.f,   1.f,   .5f,  1.f));
             else if(inSlt)   nvgFillColor(vg, nvgRGBAf( .36f,  .8f, 1.f,   1.f));
             else             nvgFillColor(vg, nvgRGBAf( .18f,  .4f,  .6f,  1.f));
             nvgBeginPath(vg);              
-            nvgCircle(vg, in.x, in.y, io_rad);
+             nvgCircle(vg, in.x, in.y, io_rad);
             nvgFill(vg);
+
+            drw_rail(vg, slt.P, nodes[slt.nidx].P);
           }
           TO(slots_out.size(),i){
             v2     out = slots_out[i].P;
@@ -1096,7 +1199,7 @@ ENTRY_DECLARATION
             else if(inSlt)    nvgFillColor(vg, nvgRGBAf( .36f, 1.f,  .36f, 1.f));
             else              nvgFillColor(vg, nvgRGBAf( .18f,  .5f, .18f, 1.f));
             nvgBeginPath(vg);
-            nvgCircle(vg, out.x, out.y, io_rad);
+              nvgCircle(vg, out.x, out.y, io_rad);
             nvgFill(vg);
           }
         }
