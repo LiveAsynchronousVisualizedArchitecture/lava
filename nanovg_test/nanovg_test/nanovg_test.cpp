@@ -82,6 +82,7 @@
 // -todo: fix rail getting longer than the rail radius - lftDist needed to be clamped with min() to the rail radius
 // -todo: make slot drawn with border rail technique
 
+// todo: fix arc on right when not in circle
 // todo: make right side of slot rail
 // todo: delete connection if it already exists instead of creating a duplicate
 // todo: group ui state variables together - priSel, connecting
@@ -713,13 +714,93 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
 
   f32 rnd = 1.f;
   f32 tw=0, iw=0, x=nP.x, y=nP.y, w=NODE_SZ.x, h=NODE_SZ.y;
-  //f32 rad = lerp(rnd, 0.f, h/2.f);                               // rad is corner radius
-  //f32 cntrX = x+border+rad, cntrY = y+border+h/2, 
-  //f32 rr=rad;        // rr is rail radius
   v2   hlf = NODE_HALF_SZ;
   f32  rad = hlf.y; 
   f32   rr = NODE_SZ.y/2;          // rr is rail radius
-  f32 rlen = NODE_SZ.x/2;        // rlen is rail length
+  f32 rlen = NODE_SZ.x/2;          // rlen is rail length
+  
+  v2 ndCntr = {nP.x + hlf.x, nP.y + hlf.y};
+
+  bool leftSide = P.x < ndCntr.x;
+  v2    lftCirc = { nP.x+rad, ndCntr.y };
+  v2    rgtCirc = { nP.x+NODE_SZ.x-rad, ndCntr.y };
+
+  bool inLeftCircle = P.x < (nP.x + rad);
+  bool  inRgtCircle = P.x > (nP.x+NODE_SZ.x - rad);
+  bool        onTop = P.y < ndCntr.y;
+  enum Place { BOTTOM=0, LEFT, TOP, RIGHT };
+  Place place = BOTTOM;
+  if(inLeftCircle)     place = LEFT;
+  else if(inRgtCircle) place = RIGHT;
+  else if(onTop)       place = TOP;
+
+  v2 dir;
+  if(inLeftCircle) dir = norm(P-lftCirc);
+  else             dir = norm(P-ndCntr);
+
+  f32 railRad, lftDist, lftArc, lftOpp, lftArcSt=hPi, rgtDist, rgtArc, rgtOpp, rgtArcSt=hPi; 
+  railRad = rlen/2;
+
+  if(inLeftCircle) lftArcSt = PIf - asin(dir.y);
+  lftDist = inLeftCircle? 0 : max(0.f, min(railRad, P.x-(nP.x+rad)) );
+  lftArc  = min(hPi*3 - lftArcSt, (railRad-lftDist) / rad );          // maximum arc amount is half a circle, which is PI radians
+  lftOpp  = railRad - lftArc*rad - lftDist;                           // lftOpp is left opposite side segment length
+
+  if(inRgtCircle) rgtArcSt = asin(dir.y);
+  rgtDist = inRgtCircle? 0 : max(0.f, min(railRad, (nP.x+NODE_SZ.x-rad)-P.x) );
+  rgtArc  = max(-hPi - rgtArcSt, (railRad-rgtDist) / rad );           // maximum arc amount is half a circle, which is PI radians
+  rgtOpp  = railRad - rgtArc*rad - rgtDist;                           // rgtOpp is right opposite side segment length
+
+  SECTION(drawing second attempt)
+  {
+    nvgStrokeWidth(vg, rthk);
+    nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+    //nvgBeginPath(vg);  // left side
+    //  nvgMoveTo(vg, P.x, P.y);
+    //  //switch(place){      
+    //  if(onTop && !inLeftCircle)
+    //  { 
+    //    if(lftDist>0){ nvgLineTo(vg, P.x - lftDist, P.y); }
+    //    if(lftArc>0)   nvgArc(vg, lftCirc.x, lftCirc.y, rad, hPi*3, hPi*3 - lftArc, NVG_CCW);
+    //    if(lftOpp>0)   nvgLineTo(vg, nP.x+rad+lftOpp, nP.y+NODE_SZ.y);
+    //  }
+    //  else{
+    //    if(lftDist>0){ nvgLineTo(vg, P.x - lftDist, P.y); }
+    //    if(inLeftCircle){
+    //      if(lftArc>0) nvgArc(vg, lftCirc.x, lftCirc.y, rad, lftArcSt, lftArcSt + lftArc, NVG_CW);
+    //    }else{
+    //      if(lftArc>0) nvgArc(vg, lftCirc.x, lftCirc.y, rad, hPi, hPi + lftArc, NVG_CW);
+    //    }
+    //    if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
+    //  }
+    //  //}
+    //nvgStroke(vg);
+
+    nvgBeginPath(vg);  // left side
+    nvgMoveTo(vg, P.x, P.y);
+    //switch(place){      
+    if(onTop && !inRgtCircle)
+    { 
+      if(rgtDist>0){ nvgLineTo(vg, P.x + rgtDist, P.y); }
+      if(rgtArc>0)   nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, hPi*3, hPi*3 - rgtArc, NVG_CW);
+      if(rgtOpp>0)   nvgLineTo(vg, nP.x+rad+rgtOpp, nP.y+NODE_SZ.y);
+    }
+    else{
+      if(rgtDist>0){ nvgLineTo(vg, P.x + rgtDist, P.y); }
+      if(inRgtCircle){
+        if(rgtArc>0) nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, rgtArcSt, rgtArcSt + rgtArc, NVG_CCW);
+      }else{
+        if(rgtArc>0) nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, hPi, hPi + rgtArc, NVG_CCW);
+      }
+      if(rgtOpp>0) nvgLineTo(vg, nP.x+NODE_SZ.x-rad-rgtOpp, nP.y);
+    }
+    //}
+    nvgStroke(vg);
+  }
+
+  //f32 rad = lerp(rnd, 0.f, h/2.f);                               // rad is corner radius
+  //f32 cntrX = x+border+rad, cntrY = y+border+h/2, 
+  //f32 rr=rad;        // rr is rail radius
 
   //v2  hlf = NODE_HALF_SZ;
   //v2 ndir = norm(nP - P);
@@ -734,53 +815,27 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
   //}
   //f32       r = hlf.y;
   //v2 circCntr = (pdir.x<0)? nP+v2(r,r)  :  nP+NODE_SZ-r;
-  
-  v2 ndCntr = {nP.x + hlf.x, nP.y + hlf.y};
-
-  bool leftSide = P.x < ndCntr.x;
-  v2    lftCirc = { nP.x+rad, ndCntr.y };
-  v2    rgtCirc = { nP.x+NODE_SZ.x-rad, ndCntr.y };
 
   //v2 lftCirc;
   //lftCirc.y = nP.y + hlf.y;
   //lftCirc.x = leftSide? nP.x+rad  :  nP.x+NODE_SZ.x-rad;
   //lftCirc.y = nP.y + hlf.y;
 
-  bool inLeftCircle = P.x < (nP.x + rad);
-  bool inRightCirlce = false;
-  bool        onTop = P.y < ndCntr.y;
-  enum Place { BOTTOM=0, LEFT, TOP, RIGHT };
-  Place place = BOTTOM;
-  if(inLeftCircle)       place = LEFT;
-  else if(inRightCirlce) place = RIGHT;
-  else if(onTop)         place = TOP;
+  //f32      leftLine = P.x - rlen/2;
+  //f32 leftLineLimit = max(nP.x + rad, leftLine);
+  //f32     leftExtra = abs(leftLineLimit - leftLine);
+  ////f32       leftArc = inLeftCircle? (rlen/2)/rad  :  min(PIf*1.5f, leftExtra/rad);
+  //f32       leftArc = min(PIf*1.5f, leftExtra/rad);
+  //f32         arcSt = inLeftCircle? hPi + hPi-asin(dir.y) :  hPi;
+  //f32         arcEn = min(arcSt+leftArc, PIf*1.5f);
+  //f32       arcDist = (arcEn - arcSt) * rad;
+  //f32      leftWrap = max(0.f, leftExtra -  arcDist);
 
-  v2 dir;
-  if(inLeftCircle) dir = norm(P-lftCirc);
-  else             dir = norm(P-ndCntr);
-
-  f32      leftLine = P.x - rlen/2;
-  f32 leftLineLimit = max(nP.x + rad, leftLine);
-  f32     leftExtra = abs(leftLineLimit - leftLine);
-  //f32       leftArc = inLeftCircle? (rlen/2)/rad  :  min(PIf*1.5f, leftExtra/rad);
-  f32       leftArc = min(PIf*1.5f, leftExtra/rad);
-  f32         arcSt = inLeftCircle? hPi + hPi-asin(dir.y) :  hPi;
-  f32         arcEn = min(arcSt+leftArc, PIf*1.5f);
-  f32       arcDist = (arcEn - arcSt) * rad;
-  f32      leftWrap = max(0.f, leftExtra -  arcDist);
-
-  f32 railRad, lftDist, lftArc, lftOpp, st = hPi; 
-  if(inLeftCircle) st = PIf - asin(dir.y);
-  
-  railRad = rlen/2;
-  lftDist = inLeftCircle? 0 : max(0.f, min(railRad, P.x - (nP.x+rad)) );
-  lftArc  = min(hPi*3 - st, (railRad-lftDist) / rad );                //inLeftCircle?  :  min(PIf, (railRad-lftDist) / rad);     // maximum arc amount is half a circle, which is PI radians
-  lftOpp  = railRad - lftArc*rad - lftDist;                           // lftOpp is left opposite side segment length
   //st      = PIf - asin(dir.y);
   //f32   lftSeg = P.x - lftDist;
-
+  //
   //f32 leftLineLen = P.x - rlen/2 - leftLimit;  // nP.x + 2*rad rlen/2 - 
-
+  //
   // black border
   //f32 bthk = rthk+2;                        // bthk is black thickness 
   //nvgBeginPath(vg);
@@ -789,7 +844,7 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
   //  nvgStrokeWidth(vg, bthk);
   //nvgStrokeColor(vg, nvgRGBAf(0, 0, 0, 1.f) );
   //nvgStroke(vg);
-
+  //
   // inner color
   //nvgBeginPath(vg);
   //  nvgMoveTo(vg, x-rthk/2, P.y);
@@ -797,61 +852,29 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
   //  nvgStrokeWidth(vg, rthk);
   //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
   //nvgStroke(vg);
-
+  //
   //v2 brdr = node_border(nP, P - ndCntr, io_rad);      // brdr is border
-
+  //
   //nvgBeginPath(vg);
   //  nvgCircle(vg, P.x, P.y, 5.f);
   //  nvgStrokeWidth(vg, rthk);
   //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
   //nvgStroke(vg);
-
+  //
   //nvgBeginPath(vg);
   //  nvgCircle(vg, circCntr.x, circCntr.y, 5.f);
   //  nvgStrokeWidth(vg, rthk);
   //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
   //nvgStroke(vg);
-
+  //
   //f32 angle = inLeftCircle? asin(dir.y) :  PIf/2;
   //f32 arcSt = PIf/2.0f;
   //f32 arcEn = PIf*1.5f;
-  NVGwinding windDirection = leftSide? NVG_CW  :  NVG_CCW;
+  //NVGwinding windDirection = leftSide? NVG_CW  :  NVG_CCW;
   //if(onTop){
   //  swap(arcSt, arcEn);
   //  windDirection = NVG_CCW;
   //}
-
-  SECTION(drawing second attempt)
-  {
-    nvgBeginPath(vg);
-
-    nvgMoveTo(vg, P.x, P.y);
-    //switch(place){
-      
-      //if(lftArc>0){
-        if(onTop && !inLeftCircle)
-        { 
-          if(lftDist>0){ nvgLineTo(vg, P.x - lftDist, P.y); }
-          if(lftArc>0)   nvgArc(vg, lftCirc.x, lftCirc.y, rad, hPi*3, hPi*3 - lftArc, NVG_CCW);
-          if(lftOpp>0)   nvgLineTo(vg, nP.x+rad+lftOpp, nP.y+NODE_SZ.y);
-        }
-        else{
-          if(lftDist>0){ nvgLineTo(vg, P.x - lftDist, P.y); }
-          if(inLeftCircle){
-            if(lftArc>0) nvgArc(vg, lftCirc.x, lftCirc.y, rad, st, st + lftArc, NVG_CW);
-          }else{
-            if(lftArc>0) nvgArc(vg, lftCirc.x, lftCirc.y, rad, hPi, hPi + lftArc, NVG_CW);
-          }
-          if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
-          //if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
-        }
-      //}
-    //}
-
-    nvgStrokeWidth(vg, rthk);
-    nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
-    nvgStroke(vg);
-  }
 
   //SECTION(drawing first attempt)
   //{
