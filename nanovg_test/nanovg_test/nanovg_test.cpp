@@ -695,17 +695,19 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
 {
   using namespace std;
   
+  const f32    hPi = PIf/2;      // hPi is half pi 
   const int border = 2;
-  const f32   rthk = 8.f;    // rthk is rail thickness
+  const f32   rthk = 8.f;        // rthk is rail thickness
 
   f32 rnd = 1.f;
   f32 tw=0, iw=0, x=nP.x, y=nP.y, w=NODE_SZ.x, h=NODE_SZ.y;
   //f32 rad = lerp(rnd, 0.f, h/2.f);                               // rad is corner radius
   //f32 cntrX = x+border+rad, cntrY = y+border+h/2, 
   //f32 rr=rad;        // rr is rail radius
-  v2  hlf = NODE_HALF_SZ;
-  f32 rad = hlf.y; 
-  f32  rr = NODE_SZ.y/2;          // rr is rail radius
+  v2   hlf = NODE_HALF_SZ;
+  f32  rad = hlf.y; 
+  f32   rr = NODE_SZ.y/2;          // rr is rail radius
+  f32 rlen = NODE_SZ.x;        // rlen is rail length
 
   //v2  hlf = NODE_HALF_SZ;
   //v2 ndir = norm(nP - P);
@@ -728,6 +730,25 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
   circCntr.y = nP.y + hlf.y;
   circCntr.x = leftSide? nP.x+rad  :  nP.x+NODE_SZ.x-rad;
 
+  bool inLeftCircle = P.x < (nP.x + rad);
+  bool        onTop = P.y < ndCntr.y;
+
+  v2 dir;
+  if(inLeftCircle) dir = norm(P-circCntr);
+  else             dir = norm(P-ndCntr);
+
+  f32      leftLine = P.x - rlen/2;
+  f32 leftLineLimit = max(nP.x + rad, leftLine);
+  f32     leftExtra = abs(leftLineLimit - leftLine);
+  //f32       leftArc = inLeftCircle? (rlen/2)/rad  :  min(PIf*1.5f, leftExtra/rad);
+  f32       leftArc = min(PIf*1.5f, leftExtra/rad);
+  f32         arcSt = inLeftCircle? hPi + hPi-asin(dir.y) :  hPi;
+  f32         arcEn = min(arcSt+leftArc, PIf*1.5f);
+  f32       arcDist = (arcEn - arcSt) * rad;
+  f32      leftWrap = max(0.f, leftExtra -  arcDist);
+
+  //f32 leftLineLen = P.x - rlen/2 - leftLimit;  // nP.x + 2*rad rlen/2 - 
+
   // black border
   //f32 bthk = rthk+2;                        // bthk is black thickness 
   //nvgBeginPath(vg);
@@ -745,10 +766,10 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
   //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
   //nvgStroke(vg);
 
-  v2 brdr = node_border(nP, P - ndCntr, io_rad);      // brdr is border
+  //v2 brdr = node_border(nP, P - ndCntr, io_rad);      // brdr is border
 
   nvgBeginPath(vg);
-    nvgCircle(vg, brdr.x, brdr.y, 5.f);
+    nvgCircle(vg, P.x, P.y, 5.f);
     nvgStrokeWidth(vg, rthk);
     nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
   nvgStroke(vg);
@@ -759,12 +780,39 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
     nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
   nvgStroke(vg);
 
-  f32 arcSt = PIf/2.0f;
-  f32 arcEn = PIf*1.5f;
+  //f32 angle = inLeftCircle? asin(dir.y) :  PIf/2;
+  //f32 arcSt = PIf/2.0f;
+  //f32 arcEn = PIf*1.5f;
   NVGwinding windDirection = leftSide? NVG_CW  :  NVG_CCW;
+  //if(onTop){
+  //  swap(arcSt, arcEn);
+  //  windDirection = NVG_CCW;
+  //}
   nvgBeginPath(vg);
-    nvgMoveTo(vg, brdr.x, brdr.y);
-    nvgArc(vg, circCntr.x, circCntr.y, rr, arcSt, arcEn, windDirection);    // PIf*1.f, PIf*1.5f, NVG_CW);
+    //if(inLeftCircle){
+    //  nvgMoveTo(vg, P.x, P.y);
+    //  if(leftArc>0){
+    //    nvgArc(vg, circCntr.x, circCntr.y, rad, arcSt, arcEn, windDirection);    // PIf*1.f, PIf*1.5f, NVG_CW);
+    //    if(leftWrap>0)
+    //      nvgLineTo(vg, nP.x+rad+leftWrap, nP.y);
+    //  }
+    //}else{
+    if(leftSide){
+      nvgMoveTo(vg, P.x, P.y);
+      if(!inLeftCircle){ nvgLineTo(vg, leftLineLimit, P.y); }
+      if(leftArc>0){
+        nvgArc(vg, circCntr.x, circCntr.y, rad, arcSt, arcEn, windDirection);    // PIf*1.f, PIf*1.5f, NVG_CW);
+        if(leftWrap>0)
+          nvgLineTo(vg, nP.x+rad+leftWrap, nP.y);
+      }
+    }
+    //}else if(leftSide && onTop){
+    //  
+    //}
+
+    //nvgMoveTo(vg, leftLineLimit, P.y);
+    //nvgLineTo(vg, P.x, P.y);
+    //nvgArc(vg, circCntr.x, circCntr.y, rr, arcSt, arcEn, windDirection);    // PIf*1.f, PIf*1.5f, NVG_CW);
     nvgStrokeWidth(vg, rthk);
     nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
   nvgStroke(vg);
