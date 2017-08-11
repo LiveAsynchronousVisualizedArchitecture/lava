@@ -77,8 +77,12 @@
 // -todo: draw normal 
 // -todo: figure why normal doesn't follow node end circle - was using the node center instead of the circle center to create direction
 // -todo: make input and output circles roll towards their connection
+// -todo: fix blinking slot and connection when connection is purely vertical  -  circle intersection only deals with horizontal intersections and wasn't prepared for dir.x == 0 
+// -todo: debug rail changing at halfway point - circle centrer changes at halfway point and arc is draw on the opposite side - need the centes for both circles
+// -todo: fix rail getting longer than the rail radius - lftDist needed to be clamped with min() to the rail radius
+// -todo: make slot drawn with border rail technique
 
-// todo: make slot drawn with border rail technique
+// todo: make right side of slot rail
 // todo: delete connection if it already exists instead of creating a duplicate
 // todo: group ui state variables together - priSel, connecting
 // todo: draw arrows (triangles) to show direction with connections
@@ -156,6 +160,7 @@ const v2    NODE_SZ       = { 256.f, 64.f };
 const v2    NODE_HALF_SZ  = NODE_SZ/2.f;
 const auto  NODE_CLR      = nvgRGBf(.1f,.4f,.5f);
 const float INFf          = std::numeric_limits<float>::infinity();
+const float SIG_NANf      = std::numeric_limits<float>::signaling_NaN();
 const f32   IORAD         = 15.f;
 
 //const float INFf          = std::numeric_limits<float>:infinity();
@@ -316,8 +321,15 @@ bool              hasInf(v2 v)
   TO(2,i) if(v[i]==INFf || v[i]==-INFf) return true;
   return false;
 }
-v2      lineCircleIntsct(v2 P, v2 dir, v2 crcl, f32 r)
+bool              hasNaN(v2 v)
 {
+  TO(2,i) if(v[i]==SIG_NANf || v[i]==-SIG_NANf) return true;
+  return false;
+}
+v2      lineCircleIntsct(v2 P, v2 dir, v2 crcl, f32 r)  // only works for circles to the sides
+{
+  if(dir.x==0) return {INFf, INFf};
+
   v2       st = (P - crcl) / r;
   f32     mlt = abs(st.x) / dir.x;                 // mlt = multiplier - the multiplier to get dir.x to equal st.x 
   f32       C = (st + dir*mlt).y;
@@ -679,7 +691,7 @@ v2           node_border(v2 nP, v2 dir, f32 slot_rad, v2* out_nrml=nullptr)
   f32        r = hlf.y;
   v2  circCntr = (pdir.x<0)? nP+v2(r,r)  :  nP+NODE_SZ-r;
   v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, r);
-  bool     hit = !hasInf(intrsct);
+  bool     hit = !hasInf(intrsct) && !hasNaN(intrsct);
   if(hit) pdir = intrsct - ncntr;
 
   v2 borderPt = ncntr + pdir;
@@ -707,7 +719,7 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
   v2   hlf = NODE_HALF_SZ;
   f32  rad = hlf.y; 
   f32   rr = NODE_SZ.y/2;          // rr is rail radius
-  f32 rlen = NODE_SZ.x;        // rlen is rail length
+  f32 rlen = NODE_SZ.x/2;        // rlen is rail length
 
   //v2  hlf = NODE_HALF_SZ;
   //v2 ndir = norm(nP - P);
@@ -726,21 +738,25 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
   v2 ndCntr = {nP.x + hlf.x, nP.y + hlf.y};
 
   bool leftSide = P.x < ndCntr.x;
-  v2 circCntr;
-  circCntr.y = nP.y + hlf.y;
-  circCntr.x = leftSide? nP.x+rad  :  nP.x+NODE_SZ.x-rad;
+  v2    lftCirc = { nP.x+rad, ndCntr.y };
+  v2    rgtCirc = { nP.x+NODE_SZ.x-rad, ndCntr.y };
+
+  //v2 lftCirc;
+  //lftCirc.y = nP.y + hlf.y;
+  //lftCirc.x = leftSide? nP.x+rad  :  nP.x+NODE_SZ.x-rad;
+  //lftCirc.y = nP.y + hlf.y;
 
   bool inLeftCircle = P.x < (nP.x + rad);
   bool inRightCirlce = false;
   bool        onTop = P.y < ndCntr.y;
   enum Place { BOTTOM=0, LEFT, TOP, RIGHT };
   Place place = BOTTOM;
-  if(inLeftCircle) place = LEFT;
+  if(inLeftCircle)       place = LEFT;
   else if(inRightCirlce) place = RIGHT;
-  else if(onTop) place = TOP;
+  else if(onTop)         place = TOP;
 
   v2 dir;
-  if(inLeftCircle) dir = norm(P-circCntr);
+  if(inLeftCircle) dir = norm(P-lftCirc);
   else             dir = norm(P-ndCntr);
 
   f32      leftLine = P.x - rlen/2;
@@ -757,9 +773,9 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
   if(inLeftCircle) st = PIf - asin(dir.y);
   
   railRad = rlen/2;
-  lftDist = inLeftCircle? 0 : max(0.f, P.x - (nP.x+rad) );
+  lftDist = inLeftCircle? 0 : max(0.f, min(railRad, P.x - (nP.x+rad)) );
   lftArc  = min(hPi*3 - st, (railRad-lftDist) / rad );                //inLeftCircle?  :  min(PIf, (railRad-lftDist) / rad);     // maximum arc amount is half a circle, which is PI radians
-  lftOpp  = railRad - lftArc*rad - lftDist;                          // lftOpp is left opposite side segment length
+  lftOpp  = railRad - lftArc*rad - lftDist;                           // lftOpp is left opposite side segment length
   //st      = PIf - asin(dir.y);
   //f32   lftSeg = P.x - lftDist;
 
@@ -812,22 +828,24 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
     nvgMoveTo(vg, P.x, P.y);
     //switch(place){
       
-      if(lftArc>0){
+      //if(lftArc>0){
         if(onTop && !inLeftCircle)
         { 
           if(lftDist>0){ nvgLineTo(vg, P.x - lftDist, P.y); }
-          nvgArc(vg, circCntr.x, circCntr.y, rad, hPi*3, hPi*3 - lftArc, NVG_CCW);
-          if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y+NODE_SZ.y);
+          if(lftArc>0)   nvgArc(vg, lftCirc.x, lftCirc.y, rad, hPi*3, hPi*3 - lftArc, NVG_CCW);
+          if(lftOpp>0)   nvgLineTo(vg, nP.x+rad+lftOpp, nP.y+NODE_SZ.y);
         }
         else{
           if(lftDist>0){ nvgLineTo(vg, P.x - lftDist, P.y); }
           if(inLeftCircle){
-            nvgArc(vg, circCntr.x, circCntr.y, rad, st, st + lftArc, NVG_CW);
-            if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
-          }else             nvgArc(vg, circCntr.x, circCntr.y, rad, hPi, hPi + lftArc, NVG_CW);
+            if(lftArc>0) nvgArc(vg, lftCirc.x, lftCirc.y, rad, st, st + lftArc, NVG_CW);
+          }else{
+            if(lftArc>0) nvgArc(vg, lftCirc.x, lftCirc.y, rad, hPi, hPi + lftArc, NVG_CW);
+          }
+          if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
           //if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
         }
-      }
+      //}
     //}
 
     nvgStrokeWidth(vg, rthk);
