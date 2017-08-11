@@ -747,6 +747,16 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
   f32       arcDist = (arcEn - arcSt) * rad;
   f32      leftWrap = max(0.f, leftExtra -  arcDist);
 
+  f32 railRad, lftDist, lftArc, lftOpp, st = hPi; 
+  if(inLeftCircle) st = PIf - asin(dir.y);
+  
+  railRad = rlen/2;
+  lftDist = inLeftCircle? 0 : max(0.f, P.x - (nP.x+rad) );
+  lftArc  = min(hPi*3 - st, (railRad-lftDist) / rad );                //inLeftCircle?  :  min(PIf, (railRad-lftDist) / rad);     // maximum arc amount is half a circle, which is PI radians
+  lftOpp  = railRad - lftArc*rad - lftDist;                          // lftOpp is left opposite side segment length
+  //st      = PIf - asin(dir.y);
+  //f32   lftSeg = P.x - lftDist;
+
   //f32 leftLineLen = P.x - rlen/2 - leftLimit;  // nP.x + 2*rad rlen/2 - 
 
   // black border
@@ -768,17 +778,17 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
 
   //v2 brdr = node_border(nP, P - ndCntr, io_rad);      // brdr is border
 
-  nvgBeginPath(vg);
-    nvgCircle(vg, P.x, P.y, 5.f);
-    nvgStrokeWidth(vg, rthk);
-    nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
-  nvgStroke(vg);
+  //nvgBeginPath(vg);
+  //  nvgCircle(vg, P.x, P.y, 5.f);
+  //  nvgStrokeWidth(vg, rthk);
+  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+  //nvgStroke(vg);
 
-  nvgBeginPath(vg);
-    nvgCircle(vg, circCntr.x, circCntr.y, 5.f);
-    nvgStrokeWidth(vg, rthk);
-    nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
-  nvgStroke(vg);
+  //nvgBeginPath(vg);
+  //  nvgCircle(vg, circCntr.x, circCntr.y, 5.f);
+  //  nvgStrokeWidth(vg, rthk);
+  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+  //nvgStroke(vg);
 
   //f32 angle = inLeftCircle? asin(dir.y) :  PIf/2;
   //f32 arcSt = PIf/2.0f;
@@ -788,35 +798,73 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
   //  swap(arcSt, arcEn);
   //  windDirection = NVG_CCW;
   //}
-  nvgBeginPath(vg);
-    //if(inLeftCircle){
-    //  nvgMoveTo(vg, P.x, P.y);
-    //  if(leftArc>0){
-    //    nvgArc(vg, circCntr.x, circCntr.y, rad, arcSt, arcEn, windDirection);    // PIf*1.f, PIf*1.5f, NVG_CW);
-    //    if(leftWrap>0)
-    //      nvgLineTo(vg, nP.x+rad+leftWrap, nP.y);
-    //  }
-    //}else{
-    if(leftSide){
-      nvgMoveTo(vg, P.x, P.y);
-      if(!inLeftCircle){ nvgLineTo(vg, leftLineLimit, P.y); }
-      if(leftArc>0){
-        nvgArc(vg, circCntr.x, circCntr.y, rad, arcSt, arcEn, windDirection);    // PIf*1.f, PIf*1.5f, NVG_CW);
-        if(leftWrap>0)
-          nvgLineTo(vg, nP.x+rad+leftWrap, nP.y);
-      }
-    }
-    //}else if(leftSide && onTop){
-    //  
-    //}
 
-    //nvgMoveTo(vg, leftLineLimit, P.y);
-    //nvgLineTo(vg, P.x, P.y);
-    //nvgArc(vg, circCntr.x, circCntr.y, rr, arcSt, arcEn, windDirection);    // PIf*1.f, PIf*1.5f, NVG_CW);
+  SECTION(drawing second attempt)
+  {
+    nvgBeginPath(vg);
+
+    nvgMoveTo(vg, P.x, P.y);
+    if(lftDist>0){ nvgLineTo(vg, P.x - lftDist, P.y); }
+    
+    if(lftArc>0){
+      if(onTop && !inLeftCircle){ 
+        nvgArc(vg, circCntr.x, circCntr.y, rad, hPi*3, lftArc, NVG_CCW);
+      }else{
+        if(inLeftCircle){
+          nvgArc(vg, circCntr.x, circCntr.y, rad, st, st + lftArc, NVG_CW);
+        }else             nvgArc(vg, circCntr.x, circCntr.y, rad, hPi, hPi + lftArc, NVG_CW);
+        //if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
+      }
+
+    }
+
     nvgStrokeWidth(vg, rthk);
     nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
-  nvgStroke(vg);
+    nvgStroke(vg);
+  }
 
+  //SECTION(drawing first attempt)
+  //{
+  //  nvgBeginPath(vg);
+  //    //if(inLeftCircle){
+  //    //  nvgMoveTo(vg, P.x, P.y);
+  //    //  if(leftArc>0){
+  //    //    nvgArc(vg, circCntr.x, circCntr.y, rad, arcSt, arcEn, windDirection);    // PIf*1.f, PIf*1.5f, NVG_CW);
+  //    //    if(leftWrap>0)
+  //    //      nvgLineTo(vg, nP.x+rad+leftWrap, nP.y);
+  //    //  }
+  //    //}else{
+  //    //if(leftSide){
+  //
+  //    //if(onTop && !inLeftCircle){
+  //    //  nvgMoveTo(vg, P.x, P.y);
+  //    //  nvgLineTo(vg, leftLineLimit, P.y);
+  //    //  nvgArc(vg, circCntr.x, circCntr.y, rad, arcEn, arcSt, NVG_CCW);      // PIf*1.f, PIf*1.5f, NVG_CW);
+  //    //  if(leftWrap>0)
+  //    //    nvgLineTo(vg, nP.x+rad+leftWrap, nP.y+NODE_SZ.y);
+  //    //}else{
+  //      nvgMoveTo(vg, P.x, P.y);
+  //      if(!inLeftCircle){ nvgLineTo(vg, leftLineLimit, P.y); }
+  //      if(leftArc>0){
+  //        if(onTop) nvgArc(vg, circCntr.x, circCntr.y, rad, arcEn, arcSt, NVG_CCW);
+  //        else      nvgArc(vg, circCntr.x, circCntr.y, rad, arcSt, arcEn, windDirection);
+  //        if(leftWrap>0)
+  //          nvgLineTo(vg, nP.x+rad+leftWrap, nP.y);
+  //      }
+  //    //}
+  //    //}
+  //    //}else if(leftSide && onTop){
+  //    //  
+  //    //}
+  //
+  //    //nvgMoveTo(vg, leftLineLimit, P.y);
+  //    //nvgLineTo(vg, P.x, P.y);
+  //    //nvgArc(vg, circCntr.x, circCntr.y, rr, arcSt, arcEn, windDirection);    // PIf*1.f, PIf*1.5f, NVG_CW);
+  //    nvgStrokeWidth(vg, rthk);
+  //    nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+  //  nvgStroke(vg);
+  //}
+  //
   //f32 arcEn = leftSide? PIf*1.5f  :  -PIf*0.5f;
   //if(leftSide==false){ swap(arcSt, arcEn); }
 
