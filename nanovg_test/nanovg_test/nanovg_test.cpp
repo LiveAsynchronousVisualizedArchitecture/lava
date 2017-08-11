@@ -731,7 +731,13 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
   circCntr.x = leftSide? nP.x+rad  :  nP.x+NODE_SZ.x-rad;
 
   bool inLeftCircle = P.x < (nP.x + rad);
+  bool inRightCirlce = false;
   bool        onTop = P.y < ndCntr.y;
+  enum Place { BOTTOM=0, LEFT, TOP, RIGHT };
+  Place place = BOTTOM;
+  if(inLeftCircle) place = LEFT;
+  else if(inRightCirlce) place = RIGHT;
+  else if(onTop) place = TOP;
 
   v2 dir;
   if(inLeftCircle) dir = norm(P-circCntr);
@@ -804,19 +810,25 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
     nvgBeginPath(vg);
 
     nvgMoveTo(vg, P.x, P.y);
-    if(lftDist>0){ nvgLineTo(vg, P.x - lftDist, P.y); }
-    
-    if(lftArc>0){
-      if(onTop && !inLeftCircle){ 
-        nvgArc(vg, circCntr.x, circCntr.y, rad, hPi*3, lftArc, NVG_CCW);
-      }else{
-        if(inLeftCircle){
-          nvgArc(vg, circCntr.x, circCntr.y, rad, st, st + lftArc, NVG_CW);
-        }else             nvgArc(vg, circCntr.x, circCntr.y, rad, hPi, hPi + lftArc, NVG_CW);
-        //if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
+    //switch(place){
+      
+      if(lftArc>0){
+        if(onTop && !inLeftCircle)
+        { 
+          if(lftDist>0){ nvgLineTo(vg, P.x - lftDist, P.y); }
+          nvgArc(vg, circCntr.x, circCntr.y, rad, hPi*3, hPi*3 - lftArc, NVG_CCW);
+          if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y+NODE_SZ.y);
+        }
+        else{
+          if(lftDist>0){ nvgLineTo(vg, P.x - lftDist, P.y); }
+          if(inLeftCircle){
+            nvgArc(vg, circCntr.x, circCntr.y, rad, st, st + lftArc, NVG_CW);
+            if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
+          }else             nvgArc(vg, circCntr.x, circCntr.y, rad, hPi, hPi + lftArc, NVG_CW);
+          //if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
+        }
       }
-
-    }
+    //}
 
     nvgStrokeWidth(vg, rthk);
     nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
