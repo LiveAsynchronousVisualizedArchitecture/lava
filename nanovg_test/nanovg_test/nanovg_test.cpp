@@ -765,10 +765,79 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
 
   //if(inLeftCircle)     arcSt = PIf - asin(dir.y);
   //else if(inRgtCircle) arcSt = asin(dir.y);
-  bnd nb(nP.x, nP.y, nP.x+NODE_SZ.x, nP.y+NODE_SZ.y);
-  f32 lDst = abs(railRad-(nb.xmn+rad));
-  f32 rDst = abs(railRad-(nb.xmx-rad));
 
+  bnd nb(nP.x, nP.y, nP.x+NODE_SZ.x, nP.y+NODE_SZ.y);
+  
+  // relative distances
+  f32 lDst = max(0.f, railRad - (P.x-(nb.xmn+rad)) );
+  f32 rDst = max(0.f, railRad - ((nb.xmx-rad)-P.x) );
+  f32 lArc = (railRad-lDst) / rad;
+  f32 rArc = (railRad-rDst) / rad;
+  f32 lOpp = railRad - lDst - lArc*rad;
+  f32 rOpp = railRad - rDst - rArc*rad;
+
+  // absolute positions
+  v2  lPt    = { P.x - lDst, P.y };
+  v2  rPt    = { P.x + rDst, P.y };
+  f32 lArcSt = hPi + lArc;
+  f32 lArcEn = hPi; 
+  f32 rArcSt = hPi - rArc;
+  f32 rArcEn = hPi - rArc;
+  v2  lOppPt = { nb.xmn + rad + lOpp , nb.ymn };
+  v2  rOppPt = { nb.xmx - rad - rOpp , nb.ymn };
+
+  SECTION(drawing second attempt)
+  {
+    nvgStrokeWidth(vg, rthk);
+    nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+  
+    nvgBeginPath(vg);
+      nvgMoveTo(vg, lOppPt.x, lOppPt.y);
+      if(lArc>0) nvgArc(vg, lftCirc.x, lftCirc.y, rad, lArcSt, lArcEn, NVG_CCW);
+      if(lDst>0) nvgLineTo(vg, lPt.x, lPt.y);
+
+      //if(onTop && !inLeftCircle)
+      //{ 
+      //  if(lftDist>0){ nvgLineTo(vg, P.x - lftDist, P.y); }
+      //  if(lftArc>0)   nvgArc(vg, lftCirc.x, lftCirc.y, rad, hPi*3, hPi*3 - lftArc, NVG_CCW);
+      //  if(lftOpp>0)   nvgLineTo(vg, nP.x+rad+lftOpp, nP.y+NODE_SZ.y);
+      //}
+      //else{
+      //  if(lftDist>0){ nvgLineTo(vg, P.x - lftDist, P.y); }
+      //  if(inLeftCircle){
+      //    if(lftArc>0) nvgArc(vg, lftCirc.x, lftCirc.y, rad, arcSt, arcSt + lftArc, NVG_CW);
+      //    if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
+      //  }else if(inRgtCircle){
+      //    if(lftArc>0) nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, arcSt, arcSt + lftArc, NVG_CW);
+      //    if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
+      //  }else{
+      //    if(lftArc>0) nvgArc(vg, lftCirc.x, lftCirc.y, rad, hPi, hPi + lftArc, NVG_CW);
+      //    if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
+      //  }
+      //}
+    nvgStroke(vg);
+  
+    //nvgBeginPath(vg);  // left side
+    //nvgMoveTo(vg, P.x, P.y);
+    ////switch(place){      
+    //if(onTop && !inRgtCircle)
+    //{ 
+    //  if(rgtDist>0){ nvgLineTo(vg, P.x + rgtDist, P.y); }
+    //  if(rgtArc>0)   nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, -hPi, -hPi + rgtArc, NVG_CW);
+    //  if(rgtOpp>0)   nvgLineTo(vg, nP.x+rad+rgtOpp, nP.y+NODE_SZ.y);
+    //}
+    //else{
+    //  if(rgtDist>0){ nvgLineTo(vg, P.x + rgtDist, P.y); }
+    //  if(inRgtCircle){
+    //    if(rgtArc>0) nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, arcSt, arcSt - rgtArc, NVG_CCW);
+    //  }else{
+    //    if(rgtArc>0) nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, hPi, hPi - rgtArc, NVG_CCW);
+    //  }
+    //  if(rgtOpp>0) nvgLineTo(vg, nP.x+NODE_SZ.x-rad-rgtOpp, nP.y);
+    //}
+    ////}
+    //nvgStroke(vg);
+  }
 
   //SECTION(drawing second attempt)
   //{
