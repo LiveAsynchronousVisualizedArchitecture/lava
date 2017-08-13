@@ -1508,7 +1508,7 @@ static void glnvg__renderDelete(void* uptr)
 #if defined NANOVG_GL2
 NVGcontext* nvgCreateGL2(int flags)
 #elif defined NANOVG_GL3
-NVGcontext* nvgCreateGL3(int flags)
+inline NVGcontext* nvgCreateGL3(int flags)
 #elif defined NANOVG_GLES2
 NVGcontext* nvgCreateGLES2(int flags)
 #elif defined NANOVG_GLES3
@@ -1553,7 +1553,7 @@ error:
 #if defined NANOVG_GL2
 void nvgDeleteGL2(NVGcontext* ctx)
 #elif defined NANOVG_GL3
-void nvgDeleteGL3(NVGcontext* ctx)
+inline void nvgDeleteGL3(NVGcontext* ctx)
 #elif defined NANOVG_GLES2
 void nvgDeleteGLES2(NVGcontext* ctx)
 #elif defined NANOVG_GLES3

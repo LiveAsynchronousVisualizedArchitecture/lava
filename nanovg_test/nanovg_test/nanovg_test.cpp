@@ -83,20 +83,24 @@
 // -todo: make slot drawn with border rail technique
 // -todo: fix arc on right when not in circle
 // -todo: correct right arc when on 
+// -todo: make right and left draw when they are in their opposite circles
+// -todo: make right side of slot rail
+// -todo: delete connection if it already exists instead of creating a duplicate
+// -todo: change slot colors and add border
+// -todo: fix slots moving off border in release mode - hasNaN check might have always been returning true
+// -todo: make Fissure struct to hold global state
+// -todo: get nanogui compiling 
+// -todo: get nanogui working
 
-// todo: make right and left draw when they are in their opposite circles
+// todo: unify serial files
+// todo: make a menu bar
+// todo: add file to menu bar
+// todo: add save to menu bar
 // todo: fix slot jumping when on border of circle
-// todo: make right side of slot rail
-// todo: delete connection if it already exists instead of creating a duplicate
 // todo: group ui state variables together - priSel, connecting
 // todo: draw arrows (triangles) to show direction with connections
 // todo: make one node snap to another node
 // todo: make two snapped nodes group together and be dragged together
-// todo: make a menu bar
-// todo: add file to menu bar
-// todo: add save to menu bar
-// todo: make drawing order of slots dictated by node order
-// todo: make connection class that keeps two connection arrays, each sorted by src or dest for fast searching
 // todo: make global state 
 // todo: separate finding node the pointer is inside from the action to take
 // todo: print to console with ReadFile.cpp function
@@ -106,6 +110,7 @@
 // todo: add data to node for inputs
 // todo: add data to connection for input and output indices
 
+// idea: make connection a set
 // idea: slow down cursor over nodes
 // idea: speed up cursor while dragging
 // idea: highlight connections and slots when a node is selected
@@ -119,6 +124,8 @@
 // idea: make nodes different shapes? - make data input into vertical columns?
 // idea: look into openGL input latency technique
 // idea: convert general data structures of nodes, slots, and connections to use tbl?
+// idea: make drawing order of slots dictated by node order
+// idea: make connection class that keeps two connection arrays, each sorted by src or dest for fast searching
 
 // glew? includes windows.h
 #define  WIN32_LEAN_AND_MEAN
@@ -128,7 +135,7 @@
 #include "nanovg.h"
 
 #define NANOVG_GL3_IMPLEMENTATION   // Use GL2 implementation.
-#include "nanovg_gl.h"
+//#include "nanovg_gl.h"  // nanogui includes this already
 
 #define ENTRY_DECLARATION int main(void)
 #ifdef _MSC_VER
@@ -158,65 +165,11 @@
 #include "../no_rt_util.h"
 #include "../Transform.h"
 #include "../LavaNode.h"
-
-const int   TITLE_MAX_LEN = 256;
-const v2    NODE_SZ       = { 256.f, 64.f };
-const v2    NODE_HALF_SZ  = NODE_SZ/2.f;
-const auto  NODE_CLR      = nvgRGBf(.1f,.4f,.5f);
-const float INFf          = std::numeric_limits<float>::infinity();
-const float SIG_NANf      = std::numeric_limits<float>::signaling_NaN();
-const f32   IORAD         = 15.f;
+#include "FissureDecl.h"
 
 //const float INFf          = std::numeric_limits<float>:infinity();
 
-template<class T> using vec = std::vector<T>;
-using str = std::string;
-
-union   bnd 
-{
-  struct { float xmn, ymn, xmx, ymx; };  // todo: make into a union?
-  struct { v2 mn; v2 mx; };
-  struct { v4 mnmx; };
-  float c[4];
-
-  bnd() : xmn(INFf), ymn(INFf), xmx(-INFf), ymx(-INFf) {}
-  bnd(float Xmn, float Ymn, float Xmx, float Ymx) :
-    xmn(Xmn), ymn(Ymn), xmx(Xmx), ymx(Ymx)
-  {}
-
-  float&       operator[](int i)       {return c[i];}
-  float const& operator[](int i) const {return c[i];}
-  bnd& operator()(float Xmn, float Ymn, float Xmx, float Ymx)
-  {
-    xmn=Xmn; ymn=Ymn; xmx=Xmx; ymx=Ymx; return *this;
-  }
-  operator v4&(){ return mnmx; }
-
-  float w(){return abs(xmx-xmn);}
-  float h(){return abs(ymx-ymn);}
-};
-struct  node { v2 P; str txt; LavaNode ln; };
-struct  slot { v2 P; u64 nidx; };
-struct  cnct { 
-  int src, dest;
-  ui8 src_out, dest_in;
-  bool operator<(cnct const& r){ return src < r.src; }
-
-  static bool lessDest(cnct const& l, cnct const& r){
-    return l.dest < r.dest;
-  }
-};
-
-
-using     veci     =     vec<int>;
-using   vec_nd     =    vec<node>;
-using vec_nbnd     =     vec<bnd>;
-using   vec_v2     =      vec<v2>;
-using  vec_con     =    vec<cnct>;
-using vec_slot     =    vec<slot>;
-using cnct_tbl     =    std::unordered_multimap<int,int>;
-
-GLFWwindow*            win;
+//GLFWwindow*            win;
 char              winTitle[TITLE_MAX_LEN];
 int                premult = 0;
 bnd                   nbnd;
@@ -251,6 +204,8 @@ v2                    drgP;
 v2                 drgofst;
 bool                drgbox = false;
 cnct_tbl         cnct_dest;
+
+static FisData fd;
 
 namespace{
 
@@ -575,7 +530,7 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
 	char icon[8];
   float tw=0, iw=0, x=n.P.x, y=n.P.y, w=NODE_SZ.x, h=NODE_SZ.y;
 	float rad = lerp(rnd, 0.f, h/2.f);           // rad is corner radius
-  float cntrX=x+w/2, cntrY=y+h/2, rr=rad;        // rr is rail radius
+  float cntrX=x+w/2, cntrY=y+h/2, rr=rad;      // rr is rail radius
   //float io_rad=10.f;
 
   SECTION(grey border)
@@ -595,8 +550,8 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
     auto botClr = nvgRGBA(0,0,0,isBlack(col)?16:grad);
 	  bg = nvgLinearGradient(vg, x,y,x,y+h, topClr, botClr);
 	  nvgBeginPath(vg);
-	    nvgRoundedRect(vg, x+border,y+border, w-(border*2),h-(border*2), rad); //-1);
-      col.a = 0.1f;
+	    nvgRoundedRect(vg, x+border,y+border, w-(border*2),h-(border*2), rad);
+      col.a = 0.75f;
 	    if(!isBlack(col)){
 		    nvgFillColor(vg, col);
 		    nvgFill(vg);
@@ -635,47 +590,7 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
   }
 
   return {x,y, x+w, y+h};
-
-  //SECTION(rounded rails)
-  //{
-  ////  float cntrX=x+border+rad, cntrY=y+border+h/2, rr=rad;        // rr is rail radius
-  ////  
-  ////  float bthk = rthk+2;
-  ////  nvgBeginPath(vg);
-  ////   nvgMoveTo(vg, x-bthk/2, cntrY);
-  ////   nvgArc(vg, cntrX, cntrY, rr, PIf*1.f, PIf*1.5f, NVG_CW);
-  ////   nvgStrokeWidth(vg, bthk);
-  ////  nvgStrokeColor(vg, nvgRGBAf(0, 0, 0, 1.f) );
-  //// nvgStroke(vg);
-  ////
-  ////  nvgBeginPath(vg);
-  ////   nvgMoveTo(vg, x-rthk/2, cntrY);
-  ////   nvgArc(vg, cntrX, cntrY, rr, PIf*1.f, PIf*1.5f, NVG_CW);
-  ////   nvgStrokeWidth(vg, rthk);
-  ////  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
-  //// nvgStroke(vg);
-  //}
-
-  //SECTION(inputs and outputs)
-  //{
-  //  v2 out = out_cntr(n, io_rad);
-  //  v2  in = in_cntr(n, io_rad);
-  //  nvgBeginPath(vg);
-  //   nvgCircle(vg, out.x, out.y, io_rad);
-  //  nvgFillColor(vg, nvgRGBAf(.18f, .5f, .18f, 1.f));
-  //  nvgFill(vg);
-  //
-  //  nvgBeginPath(vg);
-  //   nvgCircle(vg, in.x, in.y, io_rad);
-  //  nvgFillColor(vg, nvgRGBAf(.18f, .4f, .6f, 1.f));
-  //  nvgFill(vg);
-  //}
-
-  //nvgCircle(vg, cntrX, cntrY+h/2+io_rad, io_rad);
-  //nvgCircle(vg, cntrX, y-io_rad, io_rad);
-  //nvgStrokeWidth(vg, 1.f);
 }
-//v2           node_border(node const& n, v2 dir, f32 slot_rad, v2* out_nrml=nullptr)
 v2           node_border(v2 nP, v2 dir, f32 slot_rad, v2* out_nrml=nullptr)
 {
   v2   hlf = NODE_HALF_SZ;
@@ -695,7 +610,7 @@ v2           node_border(v2 nP, v2 dir, f32 slot_rad, v2* out_nrml=nullptr)
   f32        r = hlf.y;
   v2  circCntr = (pdir.x<0)? nP+v2(r,r)  :  nP+NODE_SZ-r;
   v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, r);
-  bool     hit = !hasInf(intrsct) && !hasNaN(intrsct);
+  bool     hit = !hasInf(intrsct); //  && !hasNaN(intrsct);
   if(hit) pdir = intrsct - ncntr;
 
   v2 borderPt = ncntr + pdir;
@@ -718,6 +633,7 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
   f32 rnd = 1.f;
   f32 tw=0, iw=0, x=nP.x, y=nP.y, w=NODE_SZ.x, h=NODE_SZ.y;
   v2   hlf = NODE_HALF_SZ;
+  f32 vMid = nP.y +  NODE_SZ.y/2;
   f32  rad = hlf.y; 
   f32   rr = NODE_SZ.y/2;          // rr is rail radius
   f32 rlen = NODE_SZ.x/2;          // rlen is rail length
@@ -769,75 +685,81 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
   bnd nb(nP.x, nP.y, nP.x+NODE_SZ.x, nP.y+NODE_SZ.y);
   
   // relative distances
-  f32 lDst = max(0.f, railRad - (P.x-(nb.xmn+rad)) );
-  f32 rDst = max(0.f, railRad - ((nb.xmx-rad)-P.x) );
+  f32 lDst = max(0.f, min(railRad, (P.x-(nb.xmn+rad))) );
+  f32 rDst = max(0.f, min(railRad, ((nb.xmx-rad)-P.x)) );
   f32 lArc = (railRad-lDst) / rad;
   f32 rArc = (railRad-rDst) / rad;
   f32 lOpp = railRad - lDst - lArc*rad;
   f32 rOpp = railRad - rDst - rArc*rad;
 
+  if(inLeftCircle){
+    f32 ang = P.y>vMid?  acos(P.x)  :  PIf+acos(P.x);
+    lArc = min(hPi*3.f - ang, railRad);
+    rArc = min(ang - hPi, railRad);
+  }
+
   // absolute positions
+  //v2  lArcPt =  node_border(nP, dir, io_rad);
+
   v2  lPt    = { P.x - lDst, P.y };
   v2  rPt    = { P.x + rDst, P.y };
   f32 lArcSt = hPi + lArc;
   f32 lArcEn = hPi; 
-  f32 rArcSt = hPi - rArc;
+  f32 rArcSt = hPi;
   f32 rArcEn = hPi - rArc;
   v2  lOppPt = { nb.xmn + rad + lOpp , nb.ymn };
   v2  rOppPt = { nb.xmx - rad - rOpp , nb.ymn };
+  v2  lArcPt = { acos(lArcSt), asin(lArcSt) };
+  v2  rArcPt = { acos(rArcSt), asin(rArcSt) };
 
-  SECTION(drawing second attempt)
+  if(inLeftCircle){
+    
+  }
+
+  SECTION(drawing fourth attempt)
   {
+    // maybe the rounded rectangle should be broken down into one number that represents a position on the border
+    // then taking the number backwards and forwards would at least give the start and end points 
+
+
+    v2 orthDir = { dir.y, -dir.x };
+    v2 lBrdr = node_border(nP, orthDir, io_rad);
+
     nvgStrokeWidth(vg, rthk);
     nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
-  
-    nvgBeginPath(vg);
-      nvgMoveTo(vg, lOppPt.x, lOppPt.y);
-      if(lArc>0) nvgArc(vg, lftCirc.x, lftCirc.y, rad, lArcSt, lArcEn, NVG_CCW);
-      if(lDst>0) nvgLineTo(vg, lPt.x, lPt.y);
 
-      //if(onTop && !inLeftCircle)
-      //{ 
-      //  if(lftDist>0){ nvgLineTo(vg, P.x - lftDist, P.y); }
-      //  if(lftArc>0)   nvgArc(vg, lftCirc.x, lftCirc.y, rad, hPi*3, hPi*3 - lftArc, NVG_CCW);
-      //  if(lftOpp>0)   nvgLineTo(vg, nP.x+rad+lftOpp, nP.y+NODE_SZ.y);
-      //}
-      //else{
-      //  if(lftDist>0){ nvgLineTo(vg, P.x - lftDist, P.y); }
-      //  if(inLeftCircle){
-      //    if(lftArc>0) nvgArc(vg, lftCirc.x, lftCirc.y, rad, arcSt, arcSt + lftArc, NVG_CW);
-      //    if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
-      //  }else if(inRgtCircle){
-      //    if(lftArc>0) nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, arcSt, arcSt + lftArc, NVG_CW);
-      //    if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
-      //  }else{
-      //    if(lftArc>0) nvgArc(vg, lftCirc.x, lftCirc.y, rad, hPi, hPi + lftArc, NVG_CW);
-      //    if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
-      //  }
-      //}
+    nvgBeginPath(vg);
+      nvgMoveTo(vg, P.x, P.y);
+      nvgLineTo(vg, lBrdr.x, lBrdr.y);
+      //nvgRoundedRect(vg, nP.x, nP.y, NODE_SZ.x, NODE_SZ.y, NODE_SZ.y/2 );
+      //nvgRect(vg, nP.x, nP.y, NODE_SZ.x, NODE_SZ.y); 
     nvgStroke(vg);
-  
-    //nvgBeginPath(vg);  // left side
-    //nvgMoveTo(vg, P.x, P.y);
-    ////switch(place){      
-    //if(onTop && !inRgtCircle)
-    //{ 
-    //  if(rgtDist>0){ nvgLineTo(vg, P.x + rgtDist, P.y); }
-    //  if(rgtArc>0)   nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, -hPi, -hPi + rgtArc, NVG_CW);
-    //  if(rgtOpp>0)   nvgLineTo(vg, nP.x+rad+rgtOpp, nP.y+NODE_SZ.y);
-    //}
-    //else{
-    //  if(rgtDist>0){ nvgLineTo(vg, P.x + rgtDist, P.y); }
-    //  if(inRgtCircle){
-    //    if(rgtArc>0) nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, arcSt, arcSt - rgtArc, NVG_CCW);
-    //  }else{
-    //    if(rgtArc>0) nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, hPi, hPi - rgtArc, NVG_CCW);
-    //  }
-    //  if(rgtOpp>0) nvgLineTo(vg, nP.x+NODE_SZ.x-rad-rgtOpp, nP.y);
-    //}
-    ////}
-    //nvgStroke(vg);
   }
+
+  //SECTION(drawing third attempt)
+  //{
+  //  nvgStrokeWidth(vg, rthk);
+  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+  //
+  //  nvgBeginPath(vg);
+  //    if(lOpp>0){
+  //      nvgMoveTo(vg, lOppPt.x, lOppPt.y);
+  //    }else if(lArc>0){
+  //      nvgMoveTo(vg, lArcPt.x, lArcPt.y);
+  //      nvgArc(vg, lftCirc.x, lftCirc.y, rad, lArcSt, lArcEn, NVG_CCW);
+  //    }else{
+  //      nvgMoveTo(vg, lPt.x, lPt.y);
+  //    }
+  //    if(rDst>0) nvgLineTo(vg, rPt.x, rPt.y);
+  //
+  //    if(rArc>0){
+  //      nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, rArcSt, rArcEn, NVG_CCW);
+  //    }
+  //    if(rOpp>0) nvgLineTo(vg, rOppPt.x, rOppPt.y);
+  //
+  //    //if(lArc>0) nvgArc(vg, lftCirc.x, lftCirc.y, rad, lArcSt, lArcEn, NVG_CCW);
+  //  nvgStroke(vg);  
+  //}
 
   //SECTION(drawing second attempt)
   //{
@@ -1031,7 +953,7 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
 void        debug_coords(v2 a)
 {
   sprintf(winTitle, "%.2f  %.2f", a.x, a.y);
-  glfwSetWindowTitle(win, winTitle);
+  glfwSetWindowTitle(fd.win, winTitle);
 }
 
 } // end namespace
@@ -1099,15 +1021,15 @@ ENTRY_DECLARATION
       glfwWindowHint(GLFW_SAMPLES, 16);
 
       //GLFWwindow* win = glfwCreateWindow(vd->ui.w, vd->ui.h, "Demo", NULL, NULL);    assert(win!=nullptr);
-      win = glfwCreateWindow(1024, 1024, "Demo", NULL, NULL);    //assert(win!=nullptr);
-      glfwMakeContextCurrent(win);
+      fd.win = glfwCreateWindow(1024, 1024, "Demo", NULL, NULL);    //assert(win!=nullptr);
+      glfwMakeContextCurrent(fd.win);
       //glfwSetWindowPos(win, 384, 1800);
 
       //glfwGetWindowSize(win, &vd->ui.w, &vd->ui.h);
-      glfwSetKeyCallback(win, keyCallback);
+      glfwSetKeyCallback(fd.win, keyCallback);
       //glfwSetScrollCallback(win, scrollCallback);
       //glfwSetCursorPosCallback(win, cursorPosCallback);
-      glfwSetMouseButtonCallback(win, mouseBtnCallback);
+      glfwSetMouseButtonCallback(fd.win, mouseBtnCallback);
 
       #ifdef _WIN32
         //GLFWimage images[2];
@@ -1125,6 +1047,24 @@ ENTRY_DECLARATION
         fprintf(stderr, "Failed to setup GLEW\n");
         exit(1);
       }
+    }
+    SECTION(nanogui)
+    {
+      fd.ui.screen.initialize(fd.win, false);
+
+      fd.ui.keyLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 2, 5);
+      fd.ui.keyWin = new Window(&fd.ui.screen,  "");
+      auto spcr1   = new Label(fd.ui.keyWin,    "spacer data");
+
+      fd.ui.keyWin->setLayout(fd.ui.keyLay);
+
+      Theme* thm = fd.ui.keyWin->theme();
+      thm->mTransparent         = e4f( .0f,  .0f,  .0f,    .0f );
+      thm->mWindowFillUnfocused = e4f( .2f,  .2f,  .225f,  .3f );
+      thm->mWindowFillFocused   = e4f( .3f,  .28f, .275f,  .3f );
+
+      fd.ui.screen.setVisible(true);
+      fd.ui.screen.performLayout();
     }
     SECTION(init nanovg and font)
     {
@@ -1149,7 +1089,7 @@ ENTRY_DECLARATION
     float pxRatio;
 		int ww, wh, fbWidth, fbHeight;
 
-    while(!glfwWindowShouldClose(win))
+    while(!glfwWindowShouldClose(fd.win))
     {
       bool lftClk = (lftDn && !prevLftDn);
       bool  rtClk = (rtDn  && !prevRtDn);
@@ -1164,7 +1104,7 @@ ENTRY_DECLARATION
       }
       SECTION(input)
       {
-  	    glfwGetCursorPos(win, &cx, &cy);
+  	    glfwGetCursorPos(fd.win, &cx, &cy);
         //px=(float)cx; py=(float)cy;
         //prevX=px; prevY=py; 
         prevPntr = pntr;
@@ -1173,8 +1113,8 @@ ENTRY_DECLARATION
         //sprintf(winTitle, "%.4f  %.4f", px, py);
         //glfwSetWindowTitle(win, winTitle);
 
-		    glfwGetWindowSize(win, &ww, &wh);
-		    glfwGetFramebufferSize(win, &fbWidth, &fbHeight);
+		    glfwGetWindowSize(fd.win, &ww, &wh);
+		    glfwGetFramebufferSize(fd.win, &fbWidth, &fbHeight);
 
         // Calculate pixel ration for hi-dpi devices.
         pxRatio = (float)fbWidth / (float)ww;
@@ -1188,7 +1128,6 @@ ENTRY_DECLARATION
 			    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
 		    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
       }
-
       SECTION(selection)
       {
         bnd drgbnd;
@@ -1263,11 +1202,8 @@ ENTRY_DECLARATION
             if(rtDn && !prevRtDn){ secSel = -1; }
           }
         }
-        SECTION(slot selection)
+        SECTION(slot selection and connection creation)
         {
-          //bool  inSltAny = false;
-          //bool outSltAny = false;
-
           i32  inClk = -1;
           i32 outClk = -1;
           if(lftDn && !prevLftDn){
@@ -1284,20 +1220,40 @@ ENTRY_DECLARATION
           if(outClk > -1){
             if(outClk==slotOutSel) 
               slotOutSel = -1;                                           // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
-            else if(slotInSel > -1){
-              cncts.push_back( {outClk, slotInSel} );
+            else if(slotInSel > -1)
+            {
+              cnct c = {outClk, slotInSel};
+              auto curCnct = find(ALL(cncts), c);
+              if(curCnct == end(cncts)) 
+                cncts.push_back( {outClk, slotInSel} );
+              else
+                cncts.erase(curCnct);                                   // have to find another way to index connections if they are going to be referenced, since any deletion will invalidate their positions
+
               slotOutSel = slotInSel = -1;
-            }else
+            }
+            else
               slotOutSel = outClk;
           }
 
           if(inClk > -1){
             if(inClk==slotInSel)
               slotInSel = -1;                                            // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
-            else if(slotOutSel > -1){
-              cncts.push_back( {slotOutSel, inClk} );
+            else if(slotOutSel > -1)
+            {
+              cnct c = {slotOutSel, inClk};
+              auto curCnct = find(ALL(cncts), c);
+              if(curCnct == end(cncts)) 
+                cncts.push_back(c);
+              else
+                cncts.erase(curCnct);                                   // have to find another way to index connections if they are going to be referenced, since any deletion will invalidate their positions
+
               slotOutSel = slotInSel = -1;
-            }else 
+
+              //else if(slotOutSel > -1){
+              //  cncts.push_back( {slotOutSel, inClk} );
+              //  slotOutSel = slotInSel = -1;
+            }            
+            else 
               slotInSel = inClk;
           }
 
@@ -1330,7 +1286,6 @@ ENTRY_DECLARATION
           //}
         }
       }
-
       SECTION(movement)
       {
         SECTION(node movement)
@@ -1380,170 +1335,181 @@ ENTRY_DECLARATION
           }
         }
       }
-
-      SECTION(nanovg drawing)
+      SECTION(drawing)
       {
-        nvgBeginFrame(vg, ww, wh, pxRatio);
-        SECTION(draw connections)
+        SECTION(nanogui)
         {
-          TO(cncts.size(),i)
-          {
-            const v2 hlfsz = io_rad/2.f;
-            auto&   cn = cncts[i];
-            v2     out = slots_out[cn.src].P;
-            v2 outNrml = slots_out_nrmls[cn.src];
-            v2      in = slots_in[cn.dest].P;
-            v2  inNrml = slots_in_nrmls[cn.src];
-            f32  halfx = lerp(.5f, in.x, out.x);
-            f32  halfy = lerp(.5f, in.y, out.y);
-            f32   dist = len(out - in);
-            v2  outNxt = out + outNrml*(dist/3);              // divide by 3 because there are 3 sections to the bezier
-            v2   inNxt = in  +  inNrml*(dist/3);
-
-            // draw normal
-            //nvgBeginPath(vg);
-            //  nvgMoveTo(vg,   out.x,out.y);
-            //  nvgLineTo(vg,  outNxt.x,outNxt.y);
-            //  nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
-            //nvgStroke(vg);
-
-            nvgBeginPath(vg);
-             nvgMoveTo(vg,   out.x,out.y);
-             nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, in.x,in.y);
-             nvgStrokeWidth(vg, 3.f);
-             nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
-   	        nvgStroke(vg);
-            
-            //nvgBezierTo(vg, halfx,out.y, halfx,in.y, in.x,in.y);
-          }
+          fd.ui.screen.drawContents();
+          fd.ui.screen.drawWidgets();
         }
-        SECTION(draw slots)
+        SECTION(nanovg drawing)
         {
-          TO(slots_in.size(),i){
-            slot&  slt = slots_in[i];
-            v2      in = slt.P;
-            bool inSlt = len(pntr-in) < io_rad;
-
-            if(i==slotInSel) nvgFillColor(vg, nvgRGBAf(1.f,   1.f,   .5f,  1.f));
-            else if(inSlt)   nvgFillColor(vg, nvgRGBAf( .36f,  .8f, 1.f,   1.f));
-            else             nvgFillColor(vg, nvgRGBAf( .18f,  .4f,  .6f,  1.f));
-            nvgBeginPath(vg);              
-             nvgCircle(vg, in.x, in.y, io_rad);
-            nvgFill(vg);
-
-            drw_rail(vg, slt.P, nodes[slt.nidx].P);
-          }
-          TO(slots_out.size(),i){
-            v2     out = slots_out[i].P;
-            bool inSlt = len(pntr-out) < io_rad;
-
-            if(i==slotOutSel) nvgFillColor(vg, nvgRGBAf(1.f,   1.f,  .5f,  1.f));
-            else if(inSlt)    nvgFillColor(vg, nvgRGBAf( .36f, 1.f,  .36f, 1.f));
-            else              nvgFillColor(vg, nvgRGBAf( .18f,  .5f, .18f, 1.f));
-            nvgBeginPath(vg);
-              nvgCircle(vg, out.x, out.y, io_rad);
-            nvgFill(vg);
-          }
-        }
-        SECTION(draw nodes)
-        {
-          int sz = (int)nd_ordr.size();
-          TO(sz,i)
+          nvgBeginFrame(vg, ww, wh, pxRatio);
+          SECTION(draw connections)
           {
-            int  ndOrdr = nd_ordr[i];
-            node&     n = nodes[ndOrdr];
-            bool selctd = ndOrdr==priSel || sels[ndOrdr];
-
-            auto clr = NODE_CLR;
-            if(selctd){
-              clr = nvgRGBf(.5f,.4f,.1f);
-            }
-
-            float round = secSel==ndOrdr? 0 : 1.f;
-            nbnds[ndOrdr] = drw_node(vg, 0, n, clr, round);              
-
-            SECTION(border test)
+            TO(cncts.size(),i)
             {
-            //  v2 ncntr = n.P + NODE_SZ/2.f;
-            //  v2 hlfsz = NODE_SZ / 2.f;
-            //  v2  pdir = norm(pntr - ncntr) * len(hlfsz);          // * normsz;
-            //  
-            //  v2 ds = sign(pdir);                                  // ds is direction sign
-            //  if( abs(pdir.x) > hlfsz.x ){
-            //    pdir /= abs(pdir.x)/hlfsz.x;
-            //  }else{
-            //    pdir /= abs(pdir.y)/hlfsz.y;
-            //  }
-            //  
-            //  f32        r = NODE_SZ.y/2.f;
-            //  v2  circCntr = (pdir.x<0)? n.P+v2(r,r)  :  n.P+NODE_SZ-r;
-            //  v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, r);
-            //  bool     hit = !hasInf(intrsct);
-            //  if(hit) pdir = intrsct - ncntr;
-            //  else continue;
+              const v2 hlfsz = io_rad/2.f;
+              auto&   cn = cncts[i];
+              v2     out = slots_out[cn.src].P;
+              v2 outNrml = slots_out_nrmls[cn.src];
+              v2      in = slots_in[cn.dest].P;
+              v2  inNrml = slots_in_nrmls[cn.src];
+              f32  halfx = lerp(.5f, in.x, out.x);
+              f32  halfy = lerp(.5f, in.y, out.y);
+              f32   dist = len(out - in);
+              v2  outNxt = out + outNrml*(dist/3);              // divide by 3 because there are 3 sections to the bezier
+              v2   inNxt = in  +  inNrml*(dist/3);
 
-            //  v2 dirEnd = ncntr + pdir*1.f;
-            //  nvgBeginPath(vg);
-            //   nvgMoveTo(vg, ncntr.x,ncntr.y);
-            //   nvgLineTo(vg, dirEnd.x, dirEnd.y);
-            //  nvgStrokeWidth(vg, 3.f);
-            //  nvgStroke(vg);
+              // draw normal
+              //nvgBeginPath(vg);
+              //  nvgMoveTo(vg,   out.x,out.y);
+              //  nvgLineTo(vg,  outNxt.x,outNxt.y);
+              //  nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+              //nvgStroke(vg);
 
-            //  nvgBeginPath(vg);
-            //   nvgCircle(vg, circCntr.x,circCntr.y, r);
-            //  nvgStrokeWidth(vg, 1.f);
-            //  nvgStroke(vg);
-
-            //  nvgBeginPath(vg);
-            //   nvgCircle(vg, intrsct.x,intrsct.y, 4.f);
-            //  nvgFill(vg);
-            //  
-            //  v2 brdr = ncntr + pdir + norm(pdir)*8.f;
-            //  nvgBeginPath(vg);
-            //   nvgCircle(vg, brdr.x,brdr.y, 8.f);
-            //  nvgFill(vg);
+              nvgBeginPath(vg);
+               nvgMoveTo(vg,   out.x,out.y);
+               nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, in.x,in.y);
+               nvgStrokeWidth(vg, 3.f);
+               nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+   	          nvgStroke(vg);
+            
+              //nvgBezierTo(vg, halfx,out.y, halfx,in.y, in.x,in.y);
             }
           }
-        }
-        SECTION(draw selection box)
-        {
-          if(lftDn && priSel<0)
+          SECTION(draw slots)
           {
-            nvgBeginPath(vg);
-              float x,y,w,h;
-              x = min(drgP.x, pntr.x); 
-              y = min(drgP.y, pntr.y); 
-              w = abs(drgP.x - pntr.x);
-              h = abs(drgP.y - pntr.y);
-              nvgRect(vg, x,y, w,h);
-            nvgStrokeWidth(vg, 2.f);
-            nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, .75f));
-   	        nvgStroke(vg);
-          }
-        }
-        SECTION(draw fps - frames per second counter)
-        {
-          avgFps *= 0.9;
-          avgFps += (1.0/dt)*0.1;
-          int fps = (int)avgFps;
+            nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
+            nvgStrokeWidth(vg, 3.f);
+            TO(slots_in.size(),i){
+              slot&  slt = slots_in[i];
+              v2      in = slt.P;
+              bool inSlt = len(pntr-in) < io_rad;
 
-          char fpsStr[TITLE_MAX_LEN];
-          sprintf(fpsStr, "%d", fps);
+              if(i==slotInSel) nvgFillColor(vg, nvgRGBAf(1.f,   1.f,   .5f,  1.f));
+              else if(inSlt)   nvgFillColor(vg, nvgRGBAf( .36f,  .9f, 1.f,   1.f));
+              else             nvgFillColor(vg, nvgRGBAf( .18f,  .6f,  .75f,  1.f));
+              nvgBeginPath(vg);
+               nvgCircle(vg, in.x, in.y, io_rad);
+              nvgFill(vg);
+              nvgStroke(vg);
            
-          f32 tb = nvgTextBounds(vg, -100,0, fpsStr, NULL, NULL);
-          nvgFontSize(vg, 20.0f);
-	        nvgFontFace(vg, "sans-bold");
-	        nvgTextAlign(vg,  NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
-	        nvgFillColor(vg, nvgRGBA(255,255,255,255));
-	        nvgText(vg, tb, 20.f, fpsStr, NULL);
+              //drw_rail(vg, slt.P, nodes[slt.nidx].P);
+            }
+            TO(slots_out.size(),i){
+              v2     out = slots_out[i].P;
+              bool inSlt = len(pntr-out) < io_rad;
+
+              if(i==slotOutSel) nvgFillColor(vg, nvgRGBAf(1.f,   1.f,  .5f,  1.f));
+              else if(inSlt)    nvgFillColor(vg, nvgRGBAf( .36f, 1.f,  .36f, 1.f));
+              else              nvgFillColor(vg, nvgRGBAf( .18f,  .75f, .18f, 1.f));
+              nvgBeginPath(vg);
+                nvgCircle(vg, out.x, out.y, io_rad);
+              nvgFill(vg);
+              nvgStroke(vg);
+            }
+          }
+          SECTION(draw nodes)
+          {
+            int sz = (int)nd_ordr.size();
+            TO(sz,i)
+            {
+              int  ndOrdr = nd_ordr[i];
+              node&     n = nodes[ndOrdr];
+              bool selctd = ndOrdr==priSel || sels[ndOrdr];
+
+              auto clr = NODE_CLR;
+              if(selctd){
+                clr = nvgRGBf(.5f,.4f,.1f);
+              }
+
+              float round = secSel==ndOrdr? 0 : 1.f;
+              nbnds[ndOrdr] = drw_node(vg, 0, n, clr, round);              
+
+              SECTION(border test)
+              {
+              //  v2 ncntr = n.P + NODE_SZ/2.f;
+              //  v2 hlfsz = NODE_SZ / 2.f;
+              //  v2  pdir = norm(pntr - ncntr) * len(hlfsz);          // * normsz;
+              //  
+              //  v2 ds = sign(pdir);                                  // ds is direction sign
+              //  if( abs(pdir.x) > hlfsz.x ){
+              //    pdir /= abs(pdir.x)/hlfsz.x;
+              //  }else{
+              //    pdir /= abs(pdir.y)/hlfsz.y;
+              //  }
+              //  
+              //  f32        r = NODE_SZ.y/2.f;
+              //  v2  circCntr = (pdir.x<0)? n.P+v2(r,r)  :  n.P+NODE_SZ-r;
+              //  v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, r);
+              //  bool     hit = !hasInf(intrsct);
+              //  if(hit) pdir = intrsct - ncntr;
+              //  else continue;
+
+              //  v2 dirEnd = ncntr + pdir*1.f;
+              //  nvgBeginPath(vg);
+              //   nvgMoveTo(vg, ncntr.x,ncntr.y);
+              //   nvgLineTo(vg, dirEnd.x, dirEnd.y);
+              //  nvgStrokeWidth(vg, 3.f);
+              //  nvgStroke(vg);
+
+              //  nvgBeginPath(vg);
+              //   nvgCircle(vg, circCntr.x,circCntr.y, r);
+              //  nvgStrokeWidth(vg, 1.f);
+              //  nvgStroke(vg);
+
+              //  nvgBeginPath(vg);
+              //   nvgCircle(vg, intrsct.x,intrsct.y, 4.f);
+              //  nvgFill(vg);
+              //  
+              //  v2 brdr = ncntr + pdir + norm(pdir)*8.f;
+              //  nvgBeginPath(vg);
+              //   nvgCircle(vg, brdr.x,brdr.y, 8.f);
+              //  nvgFill(vg);
+              }
+            }
+          }
+          SECTION(draw selection box)
+          {
+            if(lftDn && priSel<0)
+            {
+              nvgBeginPath(vg);
+                float x,y,w,h;
+                x = min(drgP.x, pntr.x); 
+                y = min(drgP.y, pntr.y); 
+                w = abs(drgP.x - pntr.x);
+                h = abs(drgP.y - pntr.y);
+                nvgRect(vg, x,y, w,h);
+              nvgStrokeWidth(vg, 2.f);
+              nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, .75f));
+   	          nvgStroke(vg);
+            }
+          }
+          SECTION(draw fps - frames per second counter)
+          {
+            avgFps *= 0.9;
+            avgFps += (1.0/dt)*0.1;
+            int fps = (int)avgFps;
+
+            char fpsStr[TITLE_MAX_LEN];
+            sprintf(fpsStr, "%d", fps);
+           
+            f32 tb = nvgTextBounds(vg, -50,0, fpsStr, NULL, NULL);
+            nvgFontSize(vg, 15.0f);
+	          nvgFontFace(vg, "sans-bold");
+	          nvgTextAlign(vg,  NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
+	          nvgFillColor(vg, nvgRGBA(255,255,255,255));
+	          nvgText(vg, tb, 20.f, fpsStr, NULL);
+          }
+          nvgEndFrame(vg);
         }
-        nvgEndFrame(vg);
       }
 
       prevRtDn  =  rtDn;
       prevLftDn = lftDn;
 
-      glfwSwapBuffers(win);
+      glfwSwapBuffers(fd.win);
       glfwPollEvents();
     }
   }
@@ -1555,6 +1521,50 @@ ENTRY_DECLARATION
 
 
 
+
+
+
+//SECTION(rounded rails)
+//{
+////  float cntrX=x+border+rad, cntrY=y+border+h/2, rr=rad;        // rr is rail radius
+////  
+////  float bthk = rthk+2;
+////  nvgBeginPath(vg);
+////   nvgMoveTo(vg, x-bthk/2, cntrY);
+////   nvgArc(vg, cntrX, cntrY, rr, PIf*1.f, PIf*1.5f, NVG_CW);
+////   nvgStrokeWidth(vg, bthk);
+////  nvgStrokeColor(vg, nvgRGBAf(0, 0, 0, 1.f) );
+//// nvgStroke(vg);
+////
+////  nvgBeginPath(vg);
+////   nvgMoveTo(vg, x-rthk/2, cntrY);
+////   nvgArc(vg, cntrX, cntrY, rr, PIf*1.f, PIf*1.5f, NVG_CW);
+////   nvgStrokeWidth(vg, rthk);
+////  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+//// nvgStroke(vg);
+//}
+
+//SECTION(inputs and outputs)
+//{
+//  v2 out = out_cntr(n, io_rad);
+//  v2  in = in_cntr(n, io_rad);
+//  nvgBeginPath(vg);
+//   nvgCircle(vg, out.x, out.y, io_rad);
+//  nvgFillColor(vg, nvgRGBAf(.18f, .5f, .18f, 1.f));
+//  nvgFill(vg);
+//
+//  nvgBeginPath(vg);
+//   nvgCircle(vg, in.x, in.y, io_rad);
+//  nvgFillColor(vg, nvgRGBAf(.18f, .4f, .6f, 1.f));
+//  nvgFill(vg);
+//}
+
+//nvgCircle(vg, cntrX, cntrY+h/2+io_rad, io_rad);
+//nvgCircle(vg, cntrX, y-io_rad, io_rad);
+//nvgStrokeWidth(vg, 1.f);
+
+//
+//v2           node_border(node const& n, v2 dir, f32 slot_rad, v2* out_nrml=nullptr)
 
 //
 //v2 dirEnd = ncntr + pdir;

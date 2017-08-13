@@ -90,6 +90,9 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>H:\projects\LAVA\lava\nanovg_test\nanovg_test\nanogui\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <MinimalRebuild>false</MinimalRebuild>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -126,6 +129,7 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <FloatingPointModel>Fast</FloatingPointModel>
+      <AdditionalIncludeDirectories>H:\projects\LAVA\lava\nanovg_test\nanovg_test\nanogui\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -135,6 +139,15 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\nuklear\entypo.ttf.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\nuklear\NotoEmoji-Regular.ttf.c">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="..\..\nuklear\Roboto-Bold.ttf.c" />
+    <ClCompile Include="..\..\nuklear\Roboto-Light.ttf.c" />
+    <ClCompile Include="..\..\nuklear\Roboto-Regular.ttf.c" />
     <ClCompile Include="..\nanovg-master\src\nanovg.c">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsC</CompileAs>
     </ClCompile>
@@ -147,7 +160,43 @@
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsC</CompileAs>
     </ClCompile>
     <ClCompile Include="Jzon.cpp" />
-    <ClCompile Include="nanovg_test.cpp" />
+    <ClCompile Include="nanogui\src\button.cpp" />
+    <ClCompile Include="nanogui\src\checkbox.cpp" />
+    <ClCompile Include="nanogui\src\colorpicker.cpp" />
+    <ClCompile Include="nanogui\src\colorwheel.cpp" />
+    <ClCompile Include="nanogui\src\combobox.cpp" />
+    <ClCompile Include="nanogui\src\common.cpp" />
+    <ClCompile Include="nanogui\src\glcanvas.cpp" />
+    <ClCompile Include="nanogui\src\glutil.cpp" />
+    <ClCompile Include="nanogui\src\graph.cpp" />
+    <ClCompile Include="nanogui\src\imagepanel.cpp" />
+    <ClCompile Include="nanogui\src\imageview.cpp" />
+    <ClCompile Include="nanogui\src\label.cpp" />
+    <ClCompile Include="nanogui\src\layout.cpp" />
+    <ClCompile Include="nanogui\src\messagedialog.cpp" />
+    <ClCompile Include="nanogui\src\popup.cpp" />
+    <ClCompile Include="nanogui\src\popupbutton.cpp" />
+    <ClCompile Include="nanogui\src\progressbar.cpp" />
+    <ClCompile Include="nanogui\src\screen.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\serializer.cpp" />
+    <ClCompile Include="nanogui\src\slider.cpp" />
+    <ClCompile Include="nanogui\src\stackedwidget.cpp" />
+    <ClCompile Include="nanogui\src\tabheader.cpp" />
+    <ClCompile Include="nanogui\src\tabwidget.cpp" />
+    <ClCompile Include="nanogui\src\textbox.cpp" />
+    <ClCompile Include="nanogui\src\theme.cpp" />
+    <ClCompile Include="nanogui\src\vscrollpanel.cpp" />
+    <ClCompile Include="nanogui\src\widget.cpp" />
+    <ClCompile Include="nanogui\src\window.cpp" />
+    <ClCompile Include="nanovg_test.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="serial_files.c" />
+    <ClCompile Include="unified.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\LavaNode.h" />
@@ -159,6 +208,7 @@
     <ClInclude Include="..\nanovg-master\src\stb_image.h" />
     <ClInclude Include="..\nanovg-master\src\stb_truetype.h" />
     <ClInclude Include="..\Transform.h" />
+    <ClInclude Include="FissureDecl.h" />
     <ClInclude Include="glew_2.0.0.h" />
     <ClInclude Include="glfw_3.2.1.h" />
     <ClInclude Include="picojson.h" />

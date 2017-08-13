@@ -24,11 +24,23 @@
     <Filter Include="Source Files\libs\nanovg">
       <UniqueIdentifier>{f5c0f4e2-e42f-4d4d-b7ec-ccb440b72fd5}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\libs">
+      <UniqueIdentifier>{c4607905-505b-4a58-90e9-43b23e88cd93}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Header Files\nanovg">
+      <UniqueIdentifier>{94c495f8-72c2-4c6e-96fe-8b4260fa02c5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\nanogui">
+      <UniqueIdentifier>{26939ba1-0e01-43f4-a07d-70a2fc3bc8d8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SerialFiles">
+      <UniqueIdentifier>{3bd227fd-c562-4aed-97f2-35d306d42ac5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\unified">
+      <UniqueIdentifier>{a55d09eb-6712-4ff5-b8dc-83653b78ee4e}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="nanovg_test.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="glew.c">
       <Filter>Source Files\libh</Filter>
     </ClCompile>
@@ -41,26 +53,116 @@
     <ClCompile Include="Jzon.cpp">
       <Filter>Source Files\libs</Filter>
     </ClCompile>
+    <ClCompile Include="nanogui\src\button.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\checkbox.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\colorpicker.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\colorwheel.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\combobox.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\common.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\glcanvas.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\glutil.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\graph.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\imagepanel.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\imageview.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\label.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\layout.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\messagedialog.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\popup.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\popupbutton.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\progressbar.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\serializer.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\slider.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\stackedwidget.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\tabheader.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\tabwidget.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\textbox.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\theme.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\vscrollpanel.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\widget.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\window.cpp">
+      <Filter>Source Files\nanogui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\nuklear\Roboto-Bold.ttf.c">
+      <Filter>SerialFiles</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\nuklear\Roboto-Light.ttf.c">
+      <Filter>SerialFiles</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\nuklear\Roboto-Regular.ttf.c">
+      <Filter>SerialFiles</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\nuklear\entypo.ttf.c">
+      <Filter>SerialFiles</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\nuklear\NotoEmoji-Regular.ttf.c">
+      <Filter>SerialFiles</Filter>
+    </ClCompile>
+    <ClCompile Include="nanovg_test.cpp">
+      <Filter>Source Files\unified</Filter>
+    </ClCompile>
+    <ClCompile Include="unified.cpp">
+      <Filter>Source Files\unified</Filter>
+    </ClCompile>
+    <ClCompile Include="nanogui\src\screen.cpp">
+      <Filter>Source Files\unified</Filter>
+    </ClCompile>
+    <ClCompile Include="serial_files.c">
+      <Filter>SerialFiles</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\nanovg-master\src\fontstash.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\nanovg-master\src\nanovg.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\nanovg-master\src\nanovg_gl.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\nanovg-master\src\nanovg_gl_utils.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\nanovg-master\src\stb_image.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\nanovg-master\src\stb_truetype.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="glfw_3.2.1.h">
       <Filter>libh</Filter>
     </ClInclude>
@@ -81,6 +183,27 @@
     </ClInclude>
     <ClInclude Include="..\LavaNode.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="FissureDecl.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nanovg-master\src\stb_truetype.h">
+      <Filter>libh</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nanovg-master\src\stb_image.h">
+      <Filter>libh</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nanovg-master\src\nanovg.h">
+      <Filter>Header Files\nanovg</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nanovg-master\src\nanovg_gl.h">
+      <Filter>Header Files\nanovg</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nanovg-master\src\nanovg_gl_utils.h">
+      <Filter>Header Files\nanovg</Filter>
+    </ClInclude>
+    <ClInclude Include="..\nanovg-master\src\fontstash.h">
+      <Filter>Header Files\nanovg</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>
