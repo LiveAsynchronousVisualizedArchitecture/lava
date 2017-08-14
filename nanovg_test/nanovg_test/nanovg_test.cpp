@@ -110,9 +110,8 @@
 // -todo: put in error handling to loadFile()
 // -todo: create node with button
 // -todo: remove .ttf file dependencies so that only the internal byte arrays are used - needed to use load mem font function on the graph nanavg context
+// -todo: fix slot jumping when on border of circle - looks like the circle hit is used slightly too far into the node - intersection wasn't being ignored while inside the non-rounded corners
 
-// todo: fix slot jumping when on border of circle
-// todo: don't select a slot if it is under an existing node
 // todo: draw arrow inside slots to show they are input or output
 // todo: group ui state variables together - priSel, connecting
 // todo: make one node snap to another node
@@ -126,6 +125,8 @@
 // todo: add data to node for inputs
 // todo: add data to connection for input and output indices
 
+// todo: don't select a slot if it is under an existing node
+// idea: switch over to using json.hpp
 // idea: make load file take the state in
 // idea: make an io file
 // idea: make a recently opened menu
@@ -624,7 +625,6 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
                            NVGcolor col,
                         float       rnd)     // rnd is corner rounding
 {
-  const int   border = 2;
   const float   rthk = 8.f;    // rw is rail thickness
 
 	NVGpaint bg;
@@ -637,7 +637,8 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
   SECTION(grey border)
   {
 	  nvgBeginPath(vg);
-     nvgRoundedRect(vg, x,y,w,h, rad+border); //-.5f);
+     nvgRoundedRect(vg, x,y,w,h, rad);
+     //nvgRoundedRect(vg, x,y,w,h, rad+BORDER); //-.5f);
 	   //nvgRoundedRect(vg, x+0.5f,y+0.5f, w-1,h-1, cornerRad-.5f);
     nvgFillColor(vg, nvgRGBA(0,0,0,128));
 	  nvgFill(vg);
@@ -651,7 +652,7 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
     auto botClr = nvgRGBA(0,0,0,isBlack(col)?16:grad);
 	  bg = nvgLinearGradient(vg, x,y,x,y+h, topClr, botClr);
 	  nvgBeginPath(vg);
-	    nvgRoundedRect(vg, x+border,y+border, w-(border*2),h-(border*2), rad);
+	    nvgRoundedRect(vg, x+BORDER,y+BORDER, w-(BORDER*2),h-(BORDER*2), rad-BORDER);
       col.a = 0.8f;
 	    if(!isBlack(col)){
 		    nvgFillColor(vg, col);
@@ -690,11 +691,32 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
 	  nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f,n.txt.c_str(), NULL);
   }
 
+  nvgStrokeColor(vg, nvgRGBAf(1,1,1,1) );
+  nvgStrokeWidth(vg, 1.f);
+  nvgBeginPath(vg);
+   nvgMoveTo(vg, n.P.x+rad,n.P.y);
+   nvgLineTo(vg, n.P.x+rad,n.P.y + NODE_SZ.y);
+  nvgStroke(vg);
+
+  nvgBeginPath(vg);
+    nvgMoveTo(vg, n.P.x+NODE_SZ.x-rad, n.P.y);
+    nvgLineTo(vg, n.P.x+NODE_SZ.x-rad, n.P.y + NODE_SZ.y);
+  nvgStroke(vg);
+
+  nvgBeginPath(vg);
+    nvgCircle(vg, n.P.x+rad, n.P.y+rad, rad);
+  nvgStroke(vg);
+
+  nvgBeginPath(vg);
+    nvgCircle(vg, n.P.x+NODE_SZ.x-rad, n.P.y+NODE_SZ.y-rad, rad);
+  nvgStroke(vg);
+
   return {x,y, x+w, y+h};
 }
 v2           node_border(v2 nP, v2 dir, f32 slot_rad, v2* out_nrml=nullptr)
 {
   v2   hlf = NODE_HALF_SZ;
+  f32  rad = hlf.y;
   v2 ncntr = nP + NODE_HALF_SZ;
   v2  ndir = norm(dir);
 
@@ -708,13 +730,17 @@ v2           node_border(v2 nP, v2 dir, f32 slot_rad, v2* out_nrml=nullptr)
     pdir /= ay==0.f?  1.f  :  ay/hlf.y;
   }
 
-  f32        r = hlf.y;
-  v2  circCntr = (pdir.x<0)? nP+v2(r,r)  :  nP+NODE_SZ-r;
-  v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, r);
-  bool     hit = !hasInf(intrsct); //  && !hasNaN(intrsct);
-  if(hit) pdir = intrsct - ncntr;
+  //f32        r = hlf.y;
+  v2  circCntr = (pdir.x<0)? nP+v2(rad,rad)  :  nP+NODE_SZ-v2(rad,rad);
+  v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, rad);
+  bool     hit = !hasInf(intrsct)  &&  (intrsct.x < nP.x+rad || intrsct.x > nP.x+NODE_SZ.x-rad);   //  && !hasNaN(intrsct);
+  if(hit){ pdir = intrsct - ncntr; }
 
   v2 borderPt = ncntr + pdir;
+  //if(hit && borderPt.x > (nP.x+rad) && borderPt.x < (nP.x-rad) ){
+  //  if(ds.y > .5f) borderPt.y = nP.y + NODE_SZ.y;
+  //  else           borderPt.y = nP.y;
+  //}
 
   if(out_nrml){
     if(hit) *out_nrml = norm(borderPt - circCntr);

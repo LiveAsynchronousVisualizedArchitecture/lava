@@ -19,6 +19,8 @@ const auto  NODE_CLR      = nvgRGBf(.1f,.4f,.5f);
 const float INFf          = std::numeric_limits<float>::infinity();
 const float SIG_NANf      = std::numeric_limits<float>::signaling_NaN();
 const f32   IORAD         = 15.f;
+const int   BORDER        = 2;
+
 
 extern "C" unsigned char Roboto_Regular_ttf[];
 extern "C" unsigned int  Roboto_Regular_ttf_len;
