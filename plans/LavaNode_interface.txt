@@ -1,5 +1,10 @@
 
 
+Should every output be optional in some way? 
+- Should every packet have the possibility of being an error packet that 
+  | shows there is an error
+  | has an error number
+  | has an optional string with an error message 
 
 Questions:
  - What data needs to be embedded in the .dll ?

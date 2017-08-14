@@ -103,11 +103,17 @@
 // -todo: debug nanogui in release mode - any optimizations destroy the gui layout of nanogui
 // -todo: draw gui over node graph
 // -todo: save json file with button
+// -todo: debug font not loading error when running binary directly - a problem only with the debug build? - still relies on .ttf files for some reason, debug needed them in the .exe directory
+// -todo: add filter to open dialog and load json file with button
+// -todo: make strToGraph actually change the graph - load button wasn't calling loadFile
+// -todo: debug nodes dissapearing - Jzon.hpp can't read it's own files if the file is formatted in a readable way 
+// -todo: put in error handling to loadFile()
+// -todo: create node with button
 
-// todo: debug font not loading error when running binary directly
-// todo: create node with button
-// todo: load json file with button
+// todo: don't select a slot if it is under an existing node
+// todo: remove .ttf file dependencies so that only the internal byte arrays are used
 // todo: fix slot jumping when on border of circle
+// todo: draw arrow inside slots to show they are input or output
 // todo: group ui state variables together - priSel, connecting
 // todo: make one node snap to another node
 // todo: make two snapped nodes group together and be dragged together
@@ -120,6 +126,7 @@
 // todo: add data to node for inputs
 // todo: add data to connection for input and output indices
 
+// idea: make load file take the state in
 // idea: make an io file
 // idea: make a recently opened menu
 // idea: drag json file into window to open file
@@ -352,6 +359,7 @@ void            node_add(str txt)
   nbnds.emplace_back();
   nd_ordr.push_back( (int)(nodes.size()-1) );
 }
+
 str           graphToStr()
 {
   using namespace std;
@@ -396,14 +404,14 @@ str           graphToStr()
   graph.add("nodes", nds);
   graph.add("connections", jcncts);
 
-  Jzon::Format format;
-  format.newline    = true;
-  format.indentSize = 1;
-  format.spacing    = true;
-  format.useTabs    = false;
+  //Jzon::Format format;
+  //format.newline    = true;
+  //format.indentSize = 1;
+  //format.spacing    = true;
+  //format.useTabs    = false;
 
   Jzon::Writer w;
-  w.setFormat(format);
+  //w.setFormat(format);  // breaks reading for some reason
   str s;
   w.writeString(graph, s);
 
@@ -462,8 +470,24 @@ bool            saveFile(str path)
 
   return true;
 }
+bool            loadFile(str path)
+{
+  FILE* f = fopen(path.c_str(), "r");
+  if(!f) return false;
+  fseek(f, 0, SEEK_END);
+  str s;
+  s.resize( ftell(f) );
+  fseek(f, 0, SEEK_SET);
 
-str _s; // very temp variable 
+  size_t redRet = fread( (void*)s.data(), 1, s.size(), f);
+  if(redRet != s.size()) return false; 
+
+  if(fclose(f) == EOF) return false;
+
+  strToGraph(s);
+
+  return true;
+}
 
 void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
 {
@@ -477,21 +501,21 @@ void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int
   switch(key){
   case 'J':
   {
-    _s = graphToStr();
-    glfwSetWindowTitle(win, _s.c_str() );
-    FILE* f = fopen("nanovg_test.lava", "w");
-    fwrite(_s.c_str(), 1, _s.size(), f);
-    fclose(f);
+    //_s = graphToStr();
+    //glfwSetWindowTitle(win, _s.c_str() );
+    //FILE* f = fopen("nanovg_test.lava", "w");
+    //fwrite(_s.c_str(), 1, _s.size(), f);
+    //fclose(f);
   }break;
   case 'K':
   {
-    FILE* f = fopen("nanovg_test.lava", "r");
-    fseek(f, 0, SEEK_END);
-    _s.resize( ftell(f) );
-    fseek(f, 0, SEEK_SET);
-    fread( (void*)_s.data(), 1, _s.size(), f);
-    fclose(f);
-    strToGraph(_s);
+    //FILE* f = fopen("nanovg_test.lava", "r");
+    //fseek(f, 0, SEEK_END);
+    //_s.resize( ftell(f) );
+    //fseek(f, 0, SEEK_SET);
+    //fread( (void*)_s.data(), 1, _s.size(), f);
+    //fclose(f);
+    //strToGraph(_s);
   }break;
   case 'L':
   {
@@ -628,7 +652,7 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
 	  bg = nvgLinearGradient(vg, x,y,x,y+h, topClr, botClr);
 	  nvgBeginPath(vg);
 	    nvgRoundedRect(vg, x+border,y+border, w-(border*2),h-(border*2), rad);
-      col.a = 0.9f;
+      col.a = 0.8f;
 	    if(!isBlack(col)){
 		    nvgFillColor(vg, col);
 		    nvgFill(vg);
@@ -1132,22 +1156,31 @@ ENTRY_DECLARATION
       auto msgBtn    = new Button(fd.ui.keyWin,    "Message Node");
 
       loadBtn->setCallback([](){ 
-        nfdchar_t *outPath = NULL;
-        nfdresult_t result = NFD_OpenDialog( NULL, NULL, &outPath );
+        nfdchar_t *inPath = NULL;
+        nfdresult_t result = NFD_OpenDialog("lava", NULL, &inPath );
 
-        printf("\n\nfile dialog: %d %s \n\n", result, outPath);
+        //printf("\n\nfile dialog: %d %s \n\n", result, inPath);
+
+        if(inPath){
+          bool ok = loadFile(inPath);
+          if(ok) printf("\nFile loaded from %s\n", inPath);
+          else   printf("\nLoad did not read successfully from %s\n", inPath);
+        }
       });
       saveBtn->setCallback([](){
         nfdchar_t *outPath = NULL;
         nfdresult_t result = NFD_SaveDialog("lava", NULL, &outPath );
 
-        printf("\n\nfile dialog: %d %s \n\n", result, outPath);
+        //printf("\n\nfile dialog: %d %s \n\n", result, outPath);
 
         if(outPath){
           bool ok = saveFile(outPath);
           if(ok) printf("\nFile Written to %s\n", outPath);
-          else   printf("\nSave did not complete successfully\n", outPath);
+          else   printf("\nSave did not write successfully to %s\n", outPath);
         }
+      });
+      flowBtn->setCallback([](){
+        node_add("new node");
       });
 
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
@@ -1403,32 +1436,38 @@ ENTRY_DECLARATION
         SECTION(slot movement)
         {
           TO(slots_out.size(),i){
-            node&        n = nodes[ slots_out[i].nidx ];
-            auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){ return c.src==i; } );            // find connect in the naive way for now 
-            if(cnctIter == end(cncts)){
-              slots_out[i].P = out_cntr(n, io_rad);
-              slots_out_nrmls[i] = {0, -1.f};
-            }else{
-              slot&  destSlt = slots_in[cnctIter->dest];
-              v2       destP = nodes[destSlt.nidx].P;
-              v2       nrml;
-              slots_out[i].P = node_border(n.P, destP - n.P, io_rad, &nrml);
-              slots_out_nrmls[i] = nrml;
+            auto nidx = slots_out[i].nidx;
+            if(nidx < nodes.size()){
+              node&        n = nodes[nidx];
+              auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){ return c.src==i; } );            // find connect in the naive way for now 
+              if(cnctIter == end(cncts)){
+                slots_out[i].P = out_cntr(n, io_rad);
+                slots_out_nrmls[i] = {0, -1.f};
+              }else{
+                slot&  destSlt = slots_in[cnctIter->dest];
+                v2       destP = nodes[destSlt.nidx].P;
+                v2       nrml;
+                slots_out[i].P = node_border(n.P, destP - n.P, io_rad, &nrml);
+                slots_out_nrmls[i] = nrml;
+              }
             }
           }
 
           TO(slots_in.size(),i){
-            node&        n = nodes[ slots_in[i].nidx ];
-            auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){ return c.dest==i; } );            // find connect in the naive way for now 
-            if(cnctIter == end(cncts)){
-              slots_in[i].P = in_cntr(n, io_rad);
-              slots_out_nrmls[i] = {0, 1.f};
-            }else{
-              slot&  srcSlt = slots_out[cnctIter->src];
-              v2       srcP = nodes[srcSlt.nidx].P;
-              v2       nrml;
-              slots_in[i].P = node_border(n.P, srcP - n.P, io_rad, &nrml);
-              slots_in_nrmls[i] = nrml;
+            auto nidx = slots_in[i].nidx;
+            if(nidx < nodes.size()){
+              node&        n = nodes[nidx];
+              auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){ return c.dest==i; } );            // find connect in the naive way for now 
+              if(cnctIter == end(cncts)){
+                slots_in[i].P = in_cntr(n, io_rad);
+                slots_out_nrmls[i] = {0, 1.f};
+              }else{
+                slot&  srcSlt = slots_out[cnctIter->src];
+                v2       srcP = nodes[srcSlt.nidx].P;
+                v2       nrml;
+                slots_in[i].P = node_border(n.P, srcP - n.P, io_rad, &nrml);
+                slots_in_nrmls[i] = nrml;
+              }
             }
           }
         }
@@ -1619,553 +1658,4 @@ ENTRY_DECLARATION
 
 
 
-
-
-//void              keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
-//{
-//  //using namespace glm;
-//
-//  if(key==GLFW_KEY_ESCAPE && action==GLFW_PRESS)
-//    glfwSetWindowShouldClose(window, GL_TRUE);
-//
-//  FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
-//}
-
-//TO(cncts.size(),i){
-//cnctTbl.insert( { (int)i, cncts[i] } );
-//  lower_bound( ALL(cnct_in), cncts[i], cnct::lessDest);
-//  lower_bound( ALL(cnct_in), cncts[i], cnct::lessDest);
-//}
-
-//drgOfsts.resize(sz, {0,0} );
-//drgs.resize(sz, false);
-
-//cncts.push_back( {0,1} );
-//cncts.push_back( {1,2} );
-
-//
-//cnct_in.insert( cnct_in.end(), ALL(cncts) );
-
-//glfwWindowHint(GLFW_DOUBLEBUFFER, GL_FALSE);
-//GLFWwindow* win = glfwCreateWindow(vd->ui.w, vd->ui.h, "Demo", NULL, NULL);    assert(win!=nullptr);
-//glfwSetWindowPos(win, 384, 1800);
-//
-//glfwGetWindowSize(win, &vd->ui.w, &vd->ui.h);
-//
-//glfwSetScrollCallback(win, scrollCallback);
-//glfwSetCursorPosCallback(win, cursorPosCallback);
-
-//auto loadLbl   = new Label(fd.ui.keyWin,    "Load");
-//auto saveLbl   = new Label(fd.ui.keyWin,    "Save");
-//saveBtn->setHeight(300);
-
-//SECTION(rounded rails)
-//{
-////  float cntrX=x+border+rad, cntrY=y+border+h/2, rr=rad;        // rr is rail radius
-////  
-////  float bthk = rthk+2;
-////  nvgBeginPath(vg);
-////   nvgMoveTo(vg, x-bthk/2, cntrY);
-////   nvgArc(vg, cntrX, cntrY, rr, PIf*1.f, PIf*1.5f, NVG_CW);
-////   nvgStrokeWidth(vg, bthk);
-////  nvgStrokeColor(vg, nvgRGBAf(0, 0, 0, 1.f) );
-//// nvgStroke(vg);
-////
-////  nvgBeginPath(vg);
-////   nvgMoveTo(vg, x-rthk/2, cntrY);
-////   nvgArc(vg, cntrX, cntrY, rr, PIf*1.f, PIf*1.5f, NVG_CW);
-////   nvgStrokeWidth(vg, rthk);
-////  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
-//// nvgStroke(vg);
-//}
-
-//SECTION(inputs and outputs)
-//{
-//  v2 out = out_cntr(n, io_rad);
-//  v2  in = in_cntr(n, io_rad);
-//  nvgBeginPath(vg);
-//   nvgCircle(vg, out.x, out.y, io_rad);
-//  nvgFillColor(vg, nvgRGBAf(.18f, .5f, .18f, 1.f));
-//  nvgFill(vg);
-//
-//  nvgBeginPath(vg);
-//   nvgCircle(vg, in.x, in.y, io_rad);
-//  nvgFillColor(vg, nvgRGBAf(.18f, .4f, .6f, 1.f));
-//  nvgFill(vg);
-//}
-
-//nvgCircle(vg, cntrX, cntrY+h/2+io_rad, io_rad);
-//nvgCircle(vg, cntrX, y-io_rad, io_rad);
-//nvgStrokeWidth(vg, 1.f);
-
-//
-//v2           node_border(node const& n, v2 dir, f32 slot_rad, v2* out_nrml=nullptr)
-
-//
-//v2 dirEnd = ncntr + pdir;
-
-//v2  pdir = norm(pntr - ncntr) * len(hlfsz);          // * normsz;
-//f32        r = hlf.y;  //hlf.y/2.f;
-//v2 dirEnd = ncntr + pdir; // + ndir*hlf;
-
-//if( abs(pdir.x) > hlf.x ){
-//  pdir /= abs(pdir.x)/hlf.x;
-//}else{
-//  pdir /= abs(pdir.y)/hlf.y;
-//}
-
-//nvgBeginPath(vg);
-//nvgMoveTo(vg, ncntr.x,ncntr.y);
-//nvgLineTo(vg, dirEnd.x, dirEnd.y);
-//nvgStrokeWidth(vg, 3.f);
-//nvgStroke(vg);
-//
-//nvgBeginPath(vg);
-//nvgCircle(vg, circCntr.x,circCntr.y, r);
-//nvgStrokeWidth(vg, 1.f);
-//nvgStroke(vg);
-//
-//nvgBeginPath(vg);
-//nvgCircle(vg, intrsct.x,intrsct.y, 4.f);
-//nvgFill(vg);
-//
-//v2 brdr = ncntr + pdir + norm(pdir)*8.f;
-//nvgBeginPath(vg);
-//nvgCircle(vg, brdr.x,brdr.y, 8.f);
-//nvgFill(vg);
-
-//
-//v2       destP = nodes[cnctIter->dest].P;
-
-//v2        srcP = slots_out[cnctIter->src].P;
-//
-//node& n = nodes[ slots_in[i].nidx ];
-//auto np = n.P;
-//slots_in[i].P = in_cntr(n, io_rad);
-//auto cnctIter = find_if(ALL(cncts), [&i](cnct const& c){ return c.src==i; } );
-//
-//v2       destP = slots_in[cnctIter->dest].P;
-//
-//auto np = n.P;
-//out_cntr(n, io_rad);
-//v2  slt = node_border(n, n.P-destP, io_rad);
-
-//SECTION(connection creation)
-//{
-//  //if()
-//}
-
-//v2   out = src;
-//v2    in = dest;
-//v2   out = out_cntr(nodes[cn.src], IORAD);
-//v2    in = in_cntr(nodes[cn.dest], IORAD);
-//
-//const v2 hlfsz = NODE_SZ/2.f;
-//auto& cn = cncts[i];
-//v2   src = nodes[cn.src].P + hlfsz;
-//v2  dest = nodes[cn.dest].P + hlfsz;
-//v2   out = out_cntr(nodes[cn.src], IORAD);
-//v2    in = in_cntr(nodes[cn.dest], IORAD);
-
-//nvgMoveTo(vg,   src.x,src.y);
-//f32 halfx = lerp(.5f, dest.x, src.x);
-//f32 halfy = lerp(.5f, dest.y, src.y); 
-//nvgBezierTo(vg, halfx,src.y, halfx,dest.y, dest.x,dest.y);
-
-//auto clr = NODE_CLR;
-//if(ndOrdr==priSel || sels[ndOrdr]){
-//  if(priSel>-1) n.P +=  pntr - prevPntr;
-//  clr = nvgRGBf(.5f,.4f,.1f);
-//}
-
-//if(lftDn){ 
-//  printf("wat");
-//}
-
-//if(slotInSel < 0)
-// && slotOutSel < 0)
-//if(inSlt){ slotOutSel = i; }
-//
-//if(lftDn && !prevLftDn) 
-//  TO(slots_out.size(),i){ 
-//    bool inSlt = len(pntr - slots_out[i].P) < io_rad;
-//
-//    if(inSlt && slotOutSel != i) slotOutSel =  i;  // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
-//    else                         slotOutSel = -1;
-//  }
-
-//const char* text, 
-//v2 P, v2 sz, 
-
-//
-//nbnds[ndOrdr] = drw_node(vg, 0, n.txt, n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, clr, round);              
-
-//auto cs = (float)cncts.size();
-//debug_coords(cs);
-
-//bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
-//                            int preicon, 
-//                        str const& text,
-//                       float x, float y, 
-//                       float w, float h, 
-//                           NVGcolor col,
-//                        float       rnd)   // rnd is corner rounding
-
-//auto getTfms = (GetTransforms_t)GetProcAddress(lib, TEXT("GetTransforms") );
-//Transform* tfms = getTfms();
-//sprintf(sngl, "%s    %s    %s", tfms[0].in_type, tfms[0].out_type, tfms[0].name );
-//sprintf(sngl, "0x%016x", (ui64)tfms);
-
-//vec<bool>             drgs;
-//vec<v2>           drgOfsts;
-
-//#include "json.hpp"
-//#include "picojson.h"
-
-//f32 fps = (float)(t-prevt);
-//f32 fps = (float)( 1/dt );
-//double fps = 1.0/dt;
-//glfwSetWindowTitle(win, fpsStr);
-
-//SECTION(move primary selection to top)
-//{
-//}
-
-//picojson::value  j;
-//picojson::value::object n;
-//n["txt"].set( nodes[0].txt );
-//picojson::value::serialize(n);
-////j.set<picojson::object>(move(n));
-//j.set(n);
-
-//
-//#include "../nanovg-master/example/demo.h"
-
-//int                    drg = -1;
-//cnct_tbl           cnctTbl;
-//bnd                 drgbnd;   // this is calculated data, not fundamental data
-//float                prevX;
-//float                prevY;
-
-// (int)(sz-1);                               // make the dragged node the last node and the drag index the last index 
-//drgofst = pntr - nbnds[i].mn;
-
-//v2  dirCirc = abs(pdir) / r;
-//v2       st = (ncntr - circCntr) / r;
-//f32     mlt = abs(st.x) / abs(pdir.x);                                // mlt = multiplier - the multiplier to get st.x to 0
-//f32       C = (st + pdir*mlt).y;
-//if(C > r) continue;
-//f32       m = pdir.y / pdir.x;
-//f32       a = SQR(m) + 1;
-//f32       b = 2.f * m * C;
-//f32       c = SQR(C) - 1.f;
-//f32      q2 = SQR(b) - 4.f*a*c;
-//if(q2 < 0) continue;
-//f32       x = (-b + sqrt(q2)) / 2.f*a;
-//f32       y =  sign(pdir.y) * sin(acos(x));
-//v2  intrsct = v2(x,y)*r + circCntr;
-
-//nvgBeginPath(vg);
-// nvgMoveTo(vg, intrsct.x, 0);
-// nvgLineTo(vg, intrsct.x, 1024.f);
-//nvgStrokeWidth(vg, 1.f);
-//nvgStroke(vg);
-
-//v2 scrnMid = v2(ww,wh)/2.f;
-//v2 stmid = st + scrnMid;
-//v2 dirmid = (v2(x,y) + scrnMid) * r; 
-//nvgBeginPath(vg);
-// nvgMoveTo(vg, stmid.x, stmid.y);
-// nvgLineTo(vg, dirmid.x, dirmid.y);
-//nvgStrokeWidth(vg, 2.f);
-//nvgStroke(vg);
-
-//
-//if(i==0) debug_coords(intrsct);
-
-//using cnct_tbl     =    std::unordered_multimap<int, cnct>;
-//using cnct_tbl     =    std::unordered_multimap<int, int>;
-
-//if(inNode && !lftDn){
-//drgOfsts[i] = {0,0};
-//
-//if(drg==i){ n.P = pntr - drgofst; }
-    //int last = (int)cncts.size()-1;
-//cnctTbl.insert( {ndOrdr, cncts.back()} );
-//cnctTbl.insert( {ndOrdr, cncts.back()} );
-//auto rnge = cnct_src.equal_range(ndOrdr);
-//if(rnge.first!=rnge.second){
-//  auto bkt = find(rnge.first, rnge.second, secSel);
-//  if(bkt!=rnge.second) 
-//    cnct_src.insert( {ndOrdr, secSel} ); 
-//}
-//find(rnge, secSel);
-//              
-//cnct_dest.insert( {secSel, ndOrdr} );
-
-//v2  ofst = (sels[i] && drg>-1)?  (pntr-drgP) : Vec2(0,0);
-//
-//v2 d = dest+ofst, s = src+ofst;
-//nvgMoveTo(vg,   s.x,s.y);
-//f32 halfx = lerp(.5f, d.x, s.x);
-//f32 halfy = lerp(.5f, d.y, s.y); 
-//nvgBezierTo(vg, halfx,s.y, halfx,d.y, d.x,d.y);
-
-//  drw_node(vg, 0, n.txt.c_str(), n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, clr, 1.f);
-//}else{
-//  nbnds[ndOrdr] = drw_node(vg, 0, n.txt.c_str(), n.P.x,n.P.y, NODE_SZ.x,NODE_SZ.y, NODE_CLR, 1.f);              
-//}
-
-//
-//float px=0, py=0;
-
-//nvgBeginPath(vg);
-// nvgCircle(vg, ncntr.x,ncntr.y, 10.f);
-//nvgFill(vg);
-//
-//v2 normsz = NODE_SZ / max(NODE_SZ.x, NODE_SZ.y);
-//pdir      = clamp_hi(pdir, normsz);
-//
-//pdir = clamp_hi(abs(pdir), NODE_SZ) * dirSign;
-//
-//if( abs(pdir.x * normsz.x) > abs(pdir.y * normsz.y) ){
-//  pdir = pdir / abs(pdir.x) * NODE_SZ.x;
-//}else{
-//  pdir = pdir / abs(pdir.y) * NODE_SZ.y;
-//}
-//
-//if( abs(pdir.x * normsz.x) > abs(pdir.y * normsz.y) ){
-//  pdir = pdir / abs(pdir.x) * NODE_SZ.x;
-//}else{
-//  pdir = pdir / abs(pdir.y) * NODE_SZ.y;
-//}
-//
-//pdir *= NODE_SZ;
-
-//v2 ncntr = (NODE_SZ/Vec2(2.f,2.f)) + n.P;
-//f32 side = dot( pdir, norm(Vec2(1.f,1.f)) );
-//if(pdir.x>0) pdir /= pdir.x;
-//else         pdir /= abs(pdir.y);
-//if(pdir.y>0) pdir /= pdir.y;
-//else         pdir /= abs(pdir.x);                
-//ncntr.x += NODE_SZ.x / 2.f;
-
-//v2    nP = sels[ndOrdr]?(n.P+(pntr-drgP))  :  n.P;
-//v2 nP = drg>-1?(n.P+(pntr-drgP))  :  n.P;
-//if(drg>-1) n.P = n.P + (pntr-drgP);
-
-//px=(float)cx; 
-//py=(float)cy;
-//px=cx*ww; py=cy*wh;
-
-//#include "glm/vec2.hpp"
-//using v2 = glm::vec2;
-
-//nvgMoveTo(vg,  drgP.x,drgP.y);
-//nvgLineTo(vg, pntr.x, pntr.y);
-//nvgBezierTo(vg, dest.x/2,dest.y, dest.x/2,dest.y, dest.x,dest.y);
-
-//sprintf(winTitle, "%.2f  %.2f", pntr.x, pntr.y);  //nodes[0].P.x, nodes[0].P.y );
-//glfwSetWindowTitle(win, winTitle);
-
-//
-//TO(nodes.size(),i)
-
-//auto tmp = nd_ordr[i];
-//for(int j=i; j<sz-1; ++j) nd_ordr[j] = nd_ordr[j+1];
-//nd_ordr[sz-1] = tmp;
-
-//
-//nbnd = drw_node(vg, 0, "BUTTON TIME", ndx,ndy, NODE_SZ.x,NODE_SZ.y, nclr, linNorm(px, 0,(float)ww) );
-
-//SECTION(select and drag)
-//{
-//  bool inNode = isIn(px,py,nbnds[i]);
-//  if(inNode){
-//    if(!lftDn){ drgOfsts[i]={0,0}; }
-//    else if(!drgs[i]){ drgOfsts[i] = pntr - nbnds[i].mn; }
-//  }
-//  drgs[i] = (drgs[i] || inNode) && lftDn;
-//}
-
-//auto   nclr = nvgRGBf(.1f,.4f,.5f);
-//bool inNode = isIn(px,py,nbnd);
-//if(inNode){
-//  nclr = nvgRGBf(.5f, .4f, .1f);
-//  if(!lftDn){ ndOfstX = ndOfstY = 0; }
-//  else if(!drg){ 
-//    ndOfstX = px - nbnd.xmn;
-//    ndOfstY = py - nbnd.ymn;
-//  }
-//}
-//drg = (drg || inNode) && lftDn;
-//
-//if(drg){
-//  ndx = px-ndOfstX;
-//  ndy = py-ndOfstY;
-//}
-
-//if(!lftDn && drg<0) drgP = pntr;
-//v2   ndP = n.P;
-// drgOfsts[i];
-
-//else if( !(drg==i) ){ drgP }
-//else if( !(drg==i) ){ drgOfsts[i] = pntr - nbnds[i].mn; }
-//if( drg>-1 && drg)
-//
-//auto tmp = nodes.back();
-//auto  sz = nodes.size();
-//nodes[sz-1] = nodes[i];
-//for(int j=i; j<sz-1; ++j) nodes[j] = nodes[j+1];
-//nodes[sz-2];
-//
-//swap( nodes.back(), nodes[i] );
-
-//drgOfsts[i].x = px - nbnds[i].xmn;
-//drgOfsts[i].y = py - nbnds[i].ymn;
-
-//void cursorPosCallback(GLFWwindow* window, double xposition, double yposition)
-//{
-//  const static float _2PI = 2.f* PIf;
-//
-//  glfwGetWindowUserPointer(window);
-//  vec2 newMousePosition = vec2((float)xposition, (float)yposition);
-//
-//  if(vd->camera.leftButtonDown){
-//    vd->camera.mouseDelta = (newMousePosition - vd->camera.oldMousePos);
-//  }else{ vd->camera.mouseDelta = vec2(0,0); }
-//    
-//  if(vd->camera.rightButtonDown){
-//    vd->camera.btn2Delta = (newMousePosition - vd->camera.oldMousePos);
-//  }else{ vd->camera.btn2Delta  = vec2(0,0); }
-//
-//  vd->camera.oldMousePos = newMousePosition;
-//}
-
-//
-// 32.f); // max(0.f, 48.f-dt*16.f ) );
-
-//SECTION(rounded rails)
-//{
-//  nvgBeginPath(vg);
-	//  nvgRoundedRect(vg, x+border,y+border, w-(border*2),h-(border*2), rad); //-1);
-	//  nvgRoundedRect(vg, x+rthk,y+rthk, w-(rthk*2),h-(rthk*2),         rad); //-1);
-//   nvgPathWinding(vg, NVG_HOLE);
-//  nvgFillColor(vg, nvgRGBAf(1.f, .8f, 0, .75f));
-	// nvgFill(vg);
-//}
-
-//SECTION(rounded rails)
-//{
-//  float cntrX=x+border+rad, cntrY=y+border+h/2, rr=rad;        // rr is rail radius
-//  
-//  nvgBeginPath(vg);
-//   nvgMoveTo(vg, cntrX, cntrY);
-//   nvgArc(vg, cntrX, cntrY, rr, PIf*1, PIf*1.5, NVG_CW);
-//   nvgClosePath(vg);
-//
-//   nvgMoveTo(vg, cntrX, cntrY);
-//   nvgArc(vg, cntrX+2, cntrY+2, rr-rthk+2, PIf*1, PIf*1.5, NVG_CW);
-//   nvgPathWinding(vg, NVG_HOLE);
-//  nvgFillColor(vg, nvgRGBAf(1.f, .7f, 0, .5f));
-	// nvgFill(vg);
-//}
-
-//nvgLineTo(vg, cntrX, y+border+rthk);
-//nvgClosePath(vg);
-//
-//nvgMoveTo(vg, cntrX, cntrY);
-//nvgArc(vg, cntrX+2, cntrY+2, rr-rthk+2, PIf*1, PIf*1.5, NVG_CW);
-//nvgPathWinding(vg, NVG_HOLE);
-
-//nvgLineTo(vg, cntrX, y+border+rthk);
-//nvgClosePath(vg);
-//
-//nvgMoveTo(vg, cntrX, cntrY);
-//nvgArc(vg, cntrX+2, cntrY+2, rr-rthk+2, PIf*1, PIf*1.5, NVG_CW);
-//nvgPathWinding(vg, NVG_HOLE);
-
-// nvgFillColor(vg, nvgRGBAf(1.f, .7f, 0, .5f));
-//nvgFill(vg);
-
-//nvgBeginPath(vg);
-// nvgMoveTo(vg, 50,50);
-// nvgLineTo(vg, 400,50);
-// nvgArc(vg, 256,256, 128.f, 0,NVG_PI/4.f, NVG_CW);
-// nvgCircle(vg, 300,300,32.f);
-// nvgPathWinding(vg, NVG_HOLE);
-//nvgClosePath(vg);
-//nvgFillColor(vg, nvgRGBA(0,0,0,255));
-//nvgFill(vg);
-
-//nvgBezierTo(vg, 100,200, 250,200, 350,350);
-//nvgLineTo(vg, 200,700);
-//nvgArc(vg, 384,384, 128.f, -NVG_PI/4.f,NVG_PI/4.f, NVG_CW);
-//
-//nvgLineCap(vg, NVG_BUTT);
-//nvgLineJoin(vg, NVG_BEVEL);
-
-//nvgStrokeWidth(vg, 2.f);
-//nvgStrokeColor(vg, nvgRGBA(0,0,0,255));
-//nvgStroke(vg);
-//
-//struct NVGcolor bclr; bclr.r=.1f; bclr.g=.4f; bclr.b=.5f; bclr.a=1.f;
-
-//
-//double prevt = 0; // cpuTime = 0;
-
-//win = initGLFW();                        // assert(vd.win!=nullptr);
-//
-//DemoData     data;
-//GPUtimer    gpuTimer;
-//PerfGraph fps, cpuGraph, gpuGraph;
-
-//initGraph(&fps, GRAPH_RENDER_FPS, "Frame Time");
-//initGraph(&cpuGraph, GRAPH_RENDER_MS, "CPU Time");
-//initGraph(&gpuGraph, GRAPH_RENDER_MS, "GPU Time");
-
-//GLFWwindow*  initGLFW()
-//{
-//  //glfwSetErrorCallback(errorCallback);
-//  if( !glfwInit() ){
-//    fprintf(stdout, "[GFLW] failed to init!\n");
-//    exit(1);
-//  }
-//
-//  glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-//  glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
-//  glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
-//  glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
-//  glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
-//  glfwWindowHint(GLFW_SAMPLES, 32);
-//
-//  //GLFWwindow* win = glfwCreateWindow(vd->ui.w, vd->ui.h, "Demo", NULL, NULL);    assert(win!=nullptr);
-//  GLFWwindow* win = glfwCreateWindow(1024, 1024, "Demo", NULL, NULL);    //assert(win!=nullptr);
-//  glfwMakeContextCurrent(win);
-//
-//  //glfwGetWindowSize(win, &vd->ui.w, &vd->ui.h);
-//  //glfwSetKeyCallback(win, keyCallback);
-//  //glfwSetScrollCallback(win, scrollCallback);
-//  //glfwSetCursorPosCallback(win, cursorPosCallback);
-//  //glfwSetMouseButtonCallback(win, mouseBtnCallback);
-//
-//  #ifdef _WIN32
-//    //GLFWimage images[2];
-//    //images[0] = LoadIcon("lava.jpg");
-//    //images[1] = LoadIcon("lava.jpg");
-//    //glfwSetWindowIcon(win, 2, images);
-//  #endif
-//
-//  glfwSwapInterval(0);
-//
-//  return win;
-//}
-//void         initGlew()
-//{
-//  //glewExperimental = 1;
-//  if(glewInit() != GLEW_OK) {
-//    fprintf(stderr, "Failed to setup GLEW\n");
-//    exit(1);
-//  }
-//}
 

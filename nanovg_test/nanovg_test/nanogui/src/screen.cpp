@@ -419,7 +419,7 @@ void Screen::drawWidgets() {
                 h = (int)( (bounds[2] - bounds[0]) / 2 );
             }
             nvgGlobalAlpha(mNVGContext,
-                           std::min(1.0, 2 * (elapsed - 0.5f)) * 0.8);
+                           (float)std::min<float>(1.0f, 2.f * ((float)elapsed - 0.5f)) * 0.8f);   // sbassett 8.14.2017
 
             nvgBeginPath(mNVGContext);
             nvgFillColor(mNVGContext, Color(0, 255));
