@@ -33,9 +33,6 @@
     <Filter Include="Source Files\nanogui">
       <UniqueIdentifier>{26939ba1-0e01-43f4-a07d-70a2fc3bc8d8}</UniqueIdentifier>
     </Filter>
-    <Filter Include="SerialFiles">
-      <UniqueIdentifier>{3bd227fd-c562-4aed-97f2-35d306d42ac5}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\unified">
       <UniqueIdentifier>{a55d09eb-6712-4ff5-b8dc-83653b78ee4e}</UniqueIdentifier>
     </Filter>
@@ -134,21 +131,6 @@
     <ClCompile Include="nanogui\src\window.cpp">
       <Filter>Source Files\nanogui</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\nuklear\Roboto-Bold.ttf.c">
-      <Filter>SerialFiles</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\nuklear\Roboto-Light.ttf.c">
-      <Filter>SerialFiles</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\nuklear\Roboto-Regular.ttf.c">
-      <Filter>SerialFiles</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\nuklear\entypo.ttf.c">
-      <Filter>SerialFiles</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\nuklear\NotoEmoji-Regular.ttf.c">
-      <Filter>SerialFiles</Filter>
-    </ClCompile>
     <ClCompile Include="nanovg_test.cpp">
       <Filter>Source Files\unified</Filter>
     </ClCompile>
@@ -159,7 +141,13 @@
       <Filter>Source Files\unified</Filter>
     </ClCompile>
     <ClCompile Include="serial_files.c">
-      <Filter>SerialFiles</Filter>
+      <Filter>Source Files\unified</Filter>
+    </ClCompile>
+    <ClCompile Include="nfd_win.cpp">
+      <Filter>Source Files\unified</Filter>
+    </ClCompile>
+    <ClCompile Include="nfd_common.c">
+      <Filter>Source Files\unified</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

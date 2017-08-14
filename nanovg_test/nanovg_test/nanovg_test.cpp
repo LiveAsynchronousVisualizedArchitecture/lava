@@ -91,14 +91,20 @@
 // -todo: make Fissure struct to hold global state
 // -todo: get nanogui compiling 
 // -todo: get nanogui working
+// -todo: unify serial files
+// -todo: reposition fps
+// -todo: make a menu bar
+// -todo: add file to menu bar
+// -todo: add save to menu bar
+// -todo: compile in tiny file dialog
+// -todo: open file dialog on button push 
+// -todo: make release mode compile
+// -todo: debug release mode RTTI crash - rtti information not compiled in
 
-// todo: unify serial files
-// todo: make a menu bar
-// todo: add file to menu bar
-// todo: add save to menu bar
+// todo: debug nanogui in release mode
+// todo: put gui over node graph
 // todo: fix slot jumping when on border of circle
 // todo: group ui state variables together - priSel, connecting
-// todo: draw arrows (triangles) to show direction with connections
 // todo: make one node snap to another node
 // todo: make two snapped nodes group together and be dragged together
 // todo: make global state 
@@ -110,6 +116,7 @@
 // todo: add data to node for inputs
 // todo: add data to connection for input and output indices
 
+// idea: draw arrows (triangles) to show direction with connections
 // idea: make connection a set
 // idea: slow down cursor over nodes
 // idea: speed up cursor while dragging
@@ -160,6 +167,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <algorithm>
+#include "nfd.h"
 #include "jzon.h"
 #include "vec.hpp"
 #include "../no_rt_util.h"
@@ -495,6 +503,8 @@ void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int
   default:
     ;
   }
+
+  fd.ui.screen.keyCallbackEvent(key, scancode, action, modbits);
 }
 void    mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 {
@@ -507,6 +517,53 @@ void    mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
     if(action==GLFW_PRESS) rtDn = true;
     else if(action==GLFW_RELEASE) rtDn = false;
   }
+
+  fd.ui.screen.mouseButtonCallbackEvent(button, action, mods);
+}
+void            errorCallback(int e, const char *d) {
+  printf("Error %d: %s\n", e, d);
+  fflush(stdout);
+}
+//void              keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+//{
+//  //using namespace glm;
+//
+//  if(key==GLFW_KEY_ESCAPE && action==GLFW_PRESS)
+//    glfwSetWindowShouldClose(window, GL_TRUE);
+//
+//  FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
+//}
+void           scrollCallback(GLFWwindow* window, double xofst, double yofst)
+{
+  using namespace std;
+  fd.ui.screen.scrollCallbackEvent(xofst, yofst);
+}
+void        cursorPosCallback(GLFWwindow* window, double x, double y)
+{
+  //using namespace glm;
+  const static float _2PI = 2.f* PIf; //  pi<float>();
+
+  //FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
+
+  fd.ui.screen.cursorPosCallbackEvent(x,y);
+}
+void             charCallback(GLFWwindow* window, unsigned int codepoint)
+{
+  FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
+
+  fd->ui.screen.charCallbackEvent(codepoint);
+}
+void             dropCallback(GLFWwindow* window, int count, const char** filenames)
+{
+  FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
+
+  fd->ui.screen.dropCallbackEvent(count, filenames);
+}
+void  framebufferSizeCallback(GLFWwindow* window, int w, int h)
+{
+  FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
+
+  fd->ui.screen.resizeCallbackEvent(w, h);
 }
 
 v2               in_cntr(node const& n, f32 r)
@@ -551,7 +608,7 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
 	  bg = nvgLinearGradient(vg, x,y,x,y+h, topClr, botClr);
 	  nvgBeginPath(vg);
 	    nvgRoundedRect(vg, x+border,y+border, w-(border*2),h-(border*2), rad);
-      col.a = 0.75f;
+      col.a = 0.9f;
 	    if(!isBlack(col)){
 		    nvgFillColor(vg, col);
 		    nvgFill(vg);
@@ -1004,6 +1061,10 @@ ENTRY_DECLARATION
       //
       //cnct_in.insert( cnct_in.end(), ALL(cncts) );
     }
+    SECTION(FisData)
+    {
+      
+    }
     SECTION(init glfw)
     {
       //glfwSetErrorCallback(errorCallback);
@@ -1026,10 +1087,19 @@ ENTRY_DECLARATION
       //glfwSetWindowPos(win, 384, 1800);
 
       //glfwGetWindowSize(win, &vd->ui.w, &vd->ui.h);
-      glfwSetKeyCallback(fd.win, keyCallback);
+      glfwSetKeyCallback(fd.win,                keyCallback);
       //glfwSetScrollCallback(win, scrollCallback);
       //glfwSetCursorPosCallback(win, cursorPosCallback);
-      glfwSetMouseButtonCallback(fd.win, mouseBtnCallback);
+      glfwSetMouseButtonCallback(fd.win,   mouseBtnCallback);
+      glfwSetCharCallback(fd.win,              charCallback);         // in glfw charCallback is for typing letters and is different than the keyCallback for keys like backspace 
+      glfwSetKeyCallback(fd.win,                keyCallback);
+      glfwSetScrollCallback(fd.win,          scrollCallback);
+      glfwSetCursorPosCallback(fd.win,    cursorPosCallback);
+      glfwSetMouseButtonCallback(fd.win,   mouseBtnCallback);
+      glfwSetDropCallback(fd.win,              dropCallback);
+      glfwSetFramebufferSizeCallback(fd.win, framebufferSizeCallback);
+
+      glfwSetWindowUserPointer(fd.win, &fd.ui.screen);
 
       #ifdef _WIN32
         //GLFWimage images[2];
@@ -1038,7 +1108,7 @@ ENTRY_DECLARATION
         //glfwSetWindowIcon(win, 2, images);
       #endif
 
-      glfwSwapInterval(1);
+      glfwSwapInterval(0);
     }
     SECTION(init glew)
     {
@@ -1052,19 +1122,42 @@ ENTRY_DECLARATION
     {
       fd.ui.screen.initialize(fd.win, false);
 
-      fd.ui.keyLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 2, 5);
-      fd.ui.keyWin = new Window(&fd.ui.screen,  "");
-      auto spcr1   = new Label(fd.ui.keyWin,    "spacer data");
+      fd.ui.keyLay   = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
+      fd.ui.keyWin   = new Window(&fd.ui.screen,  "");
+      auto spcr1     = new Label(fd.ui.keyWin,    "");
+      auto spcr2     = new Label(fd.ui.keyWin,    "");
+      auto spcr3     = new Label(fd.ui.keyWin,    "");
+      auto loadBtn   = new Button(fd.ui.keyWin,    "Load");
+      auto saveBtn   = new Button(fd.ui.keyWin,    "Save");
+
+      loadBtn->setCallback([](){ 
+        nfdchar_t *outPath = NULL;
+        nfdresult_t result = NFD_OpenDialog( NULL, NULL, &outPath );
+
+        printf("\n\nfile dialog: %d %s \n\n", result, outPath);
+      });
+      saveBtn->setCallback([](){
+        nfdchar_t *outPath = NULL;
+        nfdresult_t result = NFD_OpenDialog( NULL, NULL, &outPath );
+
+        printf("\n\nfile dialog: %d %s \n\n", result, outPath);
+      });
+
+      //auto loadLbl   = new Label(fd.ui.keyWin,    "Load");
+      //auto saveLbl   = new Label(fd.ui.keyWin,    "Save");
 
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
 
       Theme* thm = fd.ui.keyWin->theme();
+      thm->mButtonFontSize      = 20;
       thm->mTransparent         = e4f( .0f,  .0f,  .0f,    .0f );
       thm->mWindowFillUnfocused = e4f( .2f,  .2f,  .225f,  .3f );
       thm->mWindowFillFocused   = e4f( .3f,  .28f, .275f,  .3f );
 
       fd.ui.screen.setVisible(true);
       fd.ui.screen.performLayout();
+
+      //saveBtn->setHeight(300);
     }
     SECTION(init nanovg and font)
     {
@@ -1087,7 +1180,8 @@ ENTRY_DECLARATION
     v2 pntr = {0,0};
     double cx, cy, t, dt, avgFps=60, prevt=0, cpuTime=0;
     float pxRatio;
-		int ww, wh, fbWidth, fbHeight;
+		//int ww, wh,
+    int fbWidth, fbHeight;
 
     while(!glfwWindowShouldClose(fd.win))
     {
@@ -1104,20 +1198,23 @@ ENTRY_DECLARATION
       }
       SECTION(input)
       {
+        glfwPollEvents();                                             // PollEvents must be done after zeroing out the deltas
   	    glfwGetCursorPos(fd.win, &cx, &cy);
+
         //px=(float)cx; py=(float)cy;
         //prevX=px; prevY=py; 
+
         prevPntr = pntr;
         pntr=Vec2((float)cx, (float)cy);
 
         //sprintf(winTitle, "%.4f  %.4f", px, py);
         //glfwSetWindowTitle(win, winTitle);
 
-		    glfwGetWindowSize(fd.win, &ww, &wh);
+		    glfwGetWindowSize(fd.win, &fd.ui.w, &fd.ui.h);
 		    glfwGetFramebufferSize(fd.win, &fbWidth, &fbHeight);
 
         // Calculate pixel ration for hi-dpi devices.
-        pxRatio = (float)fbWidth / (float)ww;
+        pxRatio = (float)fbWidth / (float)fd.ui.w;
       }
       SECTION(gl frame setup)
       {
@@ -1344,7 +1441,7 @@ ENTRY_DECLARATION
         }
         SECTION(nanovg drawing)
         {
-          nvgBeginFrame(vg, ww, wh, pxRatio);
+          nvgBeginFrame(vg, fd.ui.w, fd.ui.h, pxRatio);
           SECTION(draw connections)
           {
             TO(cncts.size(),i)
@@ -1495,12 +1592,12 @@ ENTRY_DECLARATION
             char fpsStr[TITLE_MAX_LEN];
             sprintf(fpsStr, "%d", fps);
            
-            f32 tb = nvgTextBounds(vg, -50,0, fpsStr, NULL, NULL);
+            f32 tb = nvgTextBounds(vg, 10,0, fpsStr, NULL, NULL);
             nvgFontSize(vg, 15.0f);
 	          nvgFontFace(vg, "sans-bold");
 	          nvgTextAlign(vg,  NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
 	          nvgFillColor(vg, nvgRGBA(255,255,255,255));
-	          nvgText(vg, tb, 20.f, fpsStr, NULL);
+	          nvgText(vg, tb-40, 10, fpsStr, NULL);
           }
           nvgEndFrame(vg);
         }
@@ -1514,6 +1611,7 @@ ENTRY_DECLARATION
     }
   }
 
+  nanogui::shutdown();
   glfwTerminate();
   return 0;
 }

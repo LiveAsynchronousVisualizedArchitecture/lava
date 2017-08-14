@@ -76,24 +76,24 @@ using vec_slot     =    vec<slot>;
 
 struct FisData
 {
-  GLFWwindow*            win;                     // Platform 
+  GLFWwindow*            win = nullptr;                     // Platform 
 
   struct
   {
-    int w, h;
-    f32 ptSz, hudSz, guideSz;                              // ptSz is point size  |  hudSz is  heads up display size
+    int w=0, h=0;
+    //f32 ptSz, hudSz, guideSz;                              // ptSz is point size  |  hudSz is  heads up display size
     Screen         screen;
     Window*        keyWin = nullptr;
     Window*         dbWin = nullptr;
     BoxLayout*     keyLay = nullptr;
-    ComboBox*       dbLst = nullptr;
-    int          dbLstIdx = -1;
-    NVGcontext*       nvg = nullptr;
-    veci           dbIdxs;
-    vecstr        dbNames;
-    int         dbNameIdx;
-    str            dbName;
-    bool        showGuide;
+    //ComboBox*       dbLst = nullptr;
+    //int          dbLstIdx = -1;
+    //NVGcontext*       nvg = nullptr;
+    //veci           dbIdxs;
+    //vecstr        dbNames;
+    //int         dbNameIdx;
+    //str            dbName;
+    //bool        showGuide;
 
   } ui;
 };
