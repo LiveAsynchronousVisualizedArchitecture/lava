@@ -691,25 +691,28 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
 	  nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f,n.txt.c_str(), NULL);
   }
 
-  nvgStrokeColor(vg, nvgRGBAf(1,1,1,1) );
-  nvgStrokeWidth(vg, 1.f);
-  nvgBeginPath(vg);
-   nvgMoveTo(vg, n.P.x+rad,n.P.y);
-   nvgLineTo(vg, n.P.x+rad,n.P.y + NODE_SZ.y);
-  nvgStroke(vg);
-
-  nvgBeginPath(vg);
-    nvgMoveTo(vg, n.P.x+NODE_SZ.x-rad, n.P.y);
-    nvgLineTo(vg, n.P.x+NODE_SZ.x-rad, n.P.y + NODE_SZ.y);
-  nvgStroke(vg);
-
-  nvgBeginPath(vg);
-    nvgCircle(vg, n.P.x+rad, n.P.y+rad, rad);
-  nvgStroke(vg);
-
-  nvgBeginPath(vg);
-    nvgCircle(vg, n.P.x+NODE_SZ.x-rad, n.P.y+NODE_SZ.y-rad, rad);
-  nvgStroke(vg);
+  SECTION(debug circle sides)
+  {
+    //nvgStrokeColor(vg, nvgRGBAf(1,1,1,1) );
+    //nvgStrokeWidth(vg, 1.f);
+    //nvgBeginPath(vg);
+    // nvgMoveTo(vg, n.P.x+rad,n.P.y);
+    // nvgLineTo(vg, n.P.x+rad,n.P.y + NODE_SZ.y);
+    //nvgStroke(vg);
+    //
+    //nvgBeginPath(vg);
+    //  nvgMoveTo(vg, n.P.x+NODE_SZ.x-rad, n.P.y);
+    //  nvgLineTo(vg, n.P.x+NODE_SZ.x-rad, n.P.y + NODE_SZ.y);
+    //nvgStroke(vg);
+    //
+    //nvgBeginPath(vg);
+    //  nvgCircle(vg, n.P.x+rad, n.P.y+rad, rad);
+    //nvgStroke(vg);
+    //
+    //nvgBeginPath(vg);
+    //  nvgCircle(vg, n.P.x+NODE_SZ.x-rad, n.P.y+NODE_SZ.y-rad, rad);
+    //nvgStroke(vg);
+  }
 
   return {x,y, x+w, y+h};
 }
@@ -1546,13 +1549,39 @@ ENTRY_DECLARATION
               v2      in = slt.P;
               bool inSlt = len(pntr-in) < io_rad;
 
-              if(i==slotInSel) nvgFillColor(vg, nvgRGBAf(1.f,   1.f,   .5f,  1.f));
-              else if(inSlt)   nvgFillColor(vg, nvgRGBAf( .36f,  .9f, 1.f,   1.f));
-              else             nvgFillColor(vg, nvgRGBAf( .18f,  .6f,  .75f,  1.f));
+              NVGcolor fillClr;
+              if(i==slotInSel) fillClr = nvgRGBAf(1.f,   1.f,   .5f,  1.f);
+              else if(inSlt)   fillClr = nvgRGBAf( .36f,  .9f, 1.f,   1.f);
+              else             fillClr = nvgRGBAf( .18f,  .6f,  .75f, 1.f);
+              nvgFillColor(vg, fillClr);
+
               nvgBeginPath(vg);
-              nvgCircle(vg, in.x, in.y, io_rad);
+               nvgCircle(vg, in.x, in.y, io_rad);
               nvgFill(vg);
               nvgStroke(vg);
+
+              //auto inrClr = fillClr;
+              //inrClr.a = inrClr.r = inrClr.g = inrClr.b = 1.f;
+              //nvgFillColor(vg, inrClr);
+              //nvgBeginPath(vg);
+              //  nvgCircle(vg, in.x, in.y, io_rad);
+              //  nvgRadialGradient(vg, in.x, in.y, 0, io_rad/2, inrClr, fillClr);
+              //nvgFill(vg);
+
+              //nvgTransformRotate()
+              f32  triRad = io_rad - 2.f;
+              auto inrClr = fillClr;
+              inrClr.r += 0.2f;
+              inrClr.g += 0.2f;
+              inrClr.b += 0.2f;
+              //inrClr.a = inrClr.r = inrClr.g = inrClr.b = 1.f;
+              nvgFillColor(vg, inrClr);
+              nvgBeginPath(vg);
+                nvgMoveTo(vg, in.x-0.707*triRad, in.y-0.707*triRad);
+                nvgLineTo(vg, in.x+0.707*triRad, in.y-0.707*triRad);
+                nvgLineTo(vg, in.x, in.y+triRad);
+                nvgClosePath(vg);
+              nvgFill(vg);
 
               //drw_rail(vg, slt.P, nodes[slt.nidx].P);
             }
@@ -1560,13 +1589,34 @@ ENTRY_DECLARATION
               v2     out = slots_out[i].P;
               bool inSlt = len(pntr-out) < io_rad;
 
-              if(i==slotOutSel) nvgFillColor(vg, nvgRGBAf(1.f,   1.f,  .5f,  1.f));
-              else if(inSlt)    nvgFillColor(vg, nvgRGBAf( .36f, 1.f,  .36f, 1.f));
-              else              nvgFillColor(vg, nvgRGBAf( .18f,  .75f, .18f, 1.f));
+              NVGcolor fillClr;
+              if(i==slotInSel) fillClr = nvgRGBAf(1.f,   1.f,   .5f,   1.f);
+              else if(inSlt)   fillClr = nvgRGBAf( .36f, 1.f,   .36f,  1.f);
+              else             fillClr = nvgRGBAf( .18f,  .75f, .18f,  1.f);
+              nvgFillColor(vg, fillClr);
+
+              //if(i==slotOutSel) nvgFillColor(vg, nvgRGBAf(1.f,   1.f,  .5f,  1.f));
+              //else if(inSlt)    nvgFillColor(vg, nvgRGBAf( .36f, 1.f,  .36f, 1.f));
+              //else              nvgFillColor(vg, nvgRGBAf( .18f,  .75f, .18f, 1.f));
+              
               nvgBeginPath(vg);
-              nvgCircle(vg, out.x, out.y, io_rad);
+               nvgCircle(vg, out.x, out.y, io_rad);
               nvgFill(vg);
               nvgStroke(vg);
+
+              f32  triRad = io_rad - 2.f;
+              auto inrClr = fillClr;
+              inrClr.r += 0.2f;
+              inrClr.g += 0.2f;
+              inrClr.b += 0.2f;
+              //inrClr.a = inrClr.r = inrClr.g = inrClr.b = 1.f;
+              nvgFillColor(vg, inrClr);
+              nvgBeginPath(vg);
+                nvgMoveTo(vg, out.x-0.707*triRad, out.y-0.707*triRad);
+                nvgLineTo(vg, out.x+0.707*triRad, out.y-0.707*triRad);
+                nvgLineTo(vg, out.x, out.y+triRad);
+                nvgClosePath(vg);
+              nvgFill(vg);
             }
           }
           SECTION(draw nodes)
