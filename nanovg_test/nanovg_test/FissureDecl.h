@@ -81,21 +81,27 @@ struct FisData
   struct
   {
     int w=0, h=0;
-    //f32 ptSz, hudSz, guideSz;                              // ptSz is point size  |  hudSz is  heads up display size
     Screen         screen;
     Window*        keyWin = nullptr;
     Window*         dbWin = nullptr;
     BoxLayout*     keyLay = nullptr;
-    //ComboBox*       dbLst = nullptr;
-    //int          dbLstIdx = -1;
-    //NVGcontext*       nvg = nullptr;
-    //veci           dbIdxs;
-    //vecstr        dbNames;
-    //int         dbNameIdx;
-    //str            dbName;
-    //bool        showGuide;
-
   } ui;
 };
 
 #endif
+
+
+
+
+
+//f32 ptSz, hudSz, guideSz;                              // ptSz is point size  |  hudSz is  heads up display size
+//
+//ComboBox*       dbLst = nullptr;
+//int          dbLstIdx = -1;
+//NVGcontext*       nvg = nullptr;
+//veci           dbIdxs;
+//vecstr        dbNames;
+//int         dbNameIdx;
+//str            dbName;
+//bool        showGuide;
+

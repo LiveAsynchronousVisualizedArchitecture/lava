@@ -100,9 +100,13 @@
 // -todo: open file dialog on button push 
 // -todo: make release mode compile
 // -todo: debug release mode RTTI crash - rtti information not compiled in
+// -todo: debug nanogui in release mode - any optimizations destroy the gui layout of nanogui
+// -todo: draw gui over node graph
+// -todo: save json file with button
 
-// todo: debug nanogui in release mode
-// todo: put gui over node graph
+// todo: debug font not loading error when running binary directly
+// todo: create node with button
+// todo: load json file with button
 // todo: fix slot jumping when on border of circle
 // todo: group ui state variables together - priSel, connecting
 // todo: make one node snap to another node
@@ -116,6 +120,9 @@
 // todo: add data to node for inputs
 // todo: add data to connection for input and output indices
 
+// idea: make an io file
+// idea: make a recently opened menu
+// idea: drag json file into window to open file
 // idea: draw arrows (triangles) to show direction with connections
 // idea: make connection a set
 // idea: slow down cursor over nodes
@@ -389,7 +396,14 @@ str           graphToStr()
   graph.add("nodes", nds);
   graph.add("connections", jcncts);
 
+  Jzon::Format format;
+  format.newline    = true;
+  format.indentSize = 1;
+  format.spacing    = true;
+  format.useTabs    = false;
+
   Jzon::Writer w;
+  w.setFormat(format);
   str s;
   w.writeString(graph, s);
 
@@ -432,6 +446,21 @@ void          strToGraph(str const& s)
   TO(cnt,i) nd_ordr[i] = ordr.get(i).toInt();
 
   //TO(cnt,i) nd_ordr[i] = (int)i;
+}
+bool            saveFile(str path)
+{
+  str fileStr = graphToStr();
+  
+  FILE* f = fopen(path.c_str(), "w");
+  if(!f) return false;
+
+  size_t writeSz = fwrite(fileStr.c_str(), 1, fileStr.size(), f);
+  if(writeSz != fileStr.size()) return false;
+
+  int closeRet = fclose(f);
+  if(closeRet == EOF) return false;
+
+  return true;
 }
 
 str _s; // very temp variable 
@@ -524,15 +553,6 @@ void            errorCallback(int e, const char *d) {
   printf("Error %d: %s\n", e, d);
   fflush(stdout);
 }
-//void              keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
-//{
-//  //using namespace glm;
-//
-//  if(key==GLFW_KEY_ESCAPE && action==GLFW_PRESS)
-//    glfwSetWindowShouldClose(window, GL_TRUE);
-//
-//  FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
-//}
 void           scrollCallback(GLFWwindow* window, double xofst, double yofst)
 {
   using namespace std;
@@ -1026,14 +1046,14 @@ ENTRY_DECLARATION
     {
       io_rad = 10.f;
 
-      nodes.push_back( { {100.f,100.f},"one"   } );
-      nodes.push_back( { {600.f,600.f},"two"   } );
-      nodes.push_back( { {300.f,300.f},"three" } );
+      nodes.push_back( { {300.f,300.f},"one"   } );
+      nodes.push_back( { {300.f,500.f},"two"   } );
+      //nodes.push_back( { {300.f,300.f},"three" } );
 
-      slots_out.push_back( {{0.f,0.f}, 2} );
+      slots_out.push_back( {{0.f,0.f}, 0} );
       slots_out_nrmls.push_back( {0,0} );
 
-      slots_in.push_back( {{0.f,0.f}, 0} );
+      slots_in.push_back( {{0.f,0.f}, 1} );
       slots_in_nrmls.push_back( {0,0} );
 
       for(auto& n : nodes){
@@ -1045,21 +1065,6 @@ ENTRY_DECLARATION
 
       nd_ordr.resize(sz);
       TO(sz,i) nd_ordr[i] = (i32)i;
-    
-      TO(cncts.size(),i){
-        //cnctTbl.insert( { (int)i, cncts[i] } );
-      //  lower_bound( ALL(cnct_in), cncts[i], cnct::lessDest);
-      //  lower_bound( ALL(cnct_in), cncts[i], cnct::lessDest);
-      }
-
-      //drgOfsts.resize(sz, {0,0} );
-      //drgs.resize(sz, false);
-
-      //cncts.push_back( {0,1} );
-      //cncts.push_back( {1,2} );
-
-      //
-      //cnct_in.insert( cnct_in.end(), ALL(cncts) );
     }
     SECTION(FisData)
     {
@@ -1078,20 +1083,14 @@ ENTRY_DECLARATION
       glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
       glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
       glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
-      //glfwWindowHint(GLFW_DOUBLEBUFFER, GL_FALSE);
       glfwWindowHint(GLFW_SAMPLES, 16);
 
-      //GLFWwindow* win = glfwCreateWindow(vd->ui.w, vd->ui.h, "Demo", NULL, NULL);    assert(win!=nullptr);
-      fd.win = glfwCreateWindow(1024, 1024, "Demo", NULL, NULL);    //assert(win!=nullptr);
+      fd.win = glfwCreateWindow(1024, 768, "Demo", NULL, NULL);        // assert(win!=nullptr);
       glfwMakeContextCurrent(fd.win);
-      //glfwSetWindowPos(win, 384, 1800);
 
-      //glfwGetWindowSize(win, &vd->ui.w, &vd->ui.h);
       glfwSetKeyCallback(fd.win,                keyCallback);
-      //glfwSetScrollCallback(win, scrollCallback);
-      //glfwSetCursorPosCallback(win, cursorPosCallback);
       glfwSetMouseButtonCallback(fd.win,   mouseBtnCallback);
-      glfwSetCharCallback(fd.win,              charCallback);         // in glfw charCallback is for typing letters and is different than the keyCallback for keys like backspace 
+      glfwSetCharCallback(fd.win,              charCallback);          // in glfw charCallback is for typing letters and is different than the keyCallback for keys like backspace 
       glfwSetKeyCallback(fd.win,                keyCallback);
       glfwSetScrollCallback(fd.win,          scrollCallback);
       glfwSetCursorPosCallback(fd.win,    cursorPosCallback);
@@ -1129,6 +1128,8 @@ ENTRY_DECLARATION
       auto spcr3     = new Label(fd.ui.keyWin,    "");
       auto loadBtn   = new Button(fd.ui.keyWin,    "Load");
       auto saveBtn   = new Button(fd.ui.keyWin,    "Save");
+      auto flowBtn   = new Button(fd.ui.keyWin,    "Flow Node");
+      auto msgBtn    = new Button(fd.ui.keyWin,    "Message Node");
 
       loadBtn->setCallback([](){ 
         nfdchar_t *outPath = NULL;
@@ -1138,13 +1139,16 @@ ENTRY_DECLARATION
       });
       saveBtn->setCallback([](){
         nfdchar_t *outPath = NULL;
-        nfdresult_t result = NFD_OpenDialog( NULL, NULL, &outPath );
+        nfdresult_t result = NFD_SaveDialog("lava", NULL, &outPath );
 
         printf("\n\nfile dialog: %d %s \n\n", result, outPath);
-      });
 
-      //auto loadLbl   = new Label(fd.ui.keyWin,    "Load");
-      //auto saveLbl   = new Label(fd.ui.keyWin,    "Save");
+        if(outPath){
+          bool ok = saveFile(outPath);
+          if(ok) printf("\nFile Written to %s\n", outPath);
+          else   printf("\nSave did not complete successfully\n", outPath);
+        }
+      });
 
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
 
@@ -1156,8 +1160,6 @@ ENTRY_DECLARATION
 
       fd.ui.screen.setVisible(true);
       fd.ui.screen.performLayout();
-
-      //saveBtn->setHeight(300);
     }
     SECTION(init nanovg and font)
     {
@@ -1213,8 +1215,7 @@ ENTRY_DECLARATION
 		    glfwGetWindowSize(fd.win, &fd.ui.w, &fd.ui.h);
 		    glfwGetFramebufferSize(fd.win, &fbWidth, &fbHeight);
 
-        // Calculate pixel ration for hi-dpi devices.
-        pxRatio = (float)fbWidth / (float)fd.ui.w;
+        pxRatio = (float)fbWidth / (float)fd.ui.w;          // Calculate pixel ration for hi-dpi devices.
       }
       SECTION(gl frame setup)
       {
@@ -1434,11 +1435,6 @@ ENTRY_DECLARATION
       }
       SECTION(drawing)
       {
-        SECTION(nanogui)
-        {
-          fd.ui.screen.drawContents();
-          fd.ui.screen.drawWidgets();
-        }
         SECTION(nanovg drawing)
         {
           nvgBeginFrame(vg, fd.ui.w, fd.ui.h, pxRatio);
@@ -1466,12 +1462,12 @@ ENTRY_DECLARATION
               //nvgStroke(vg);
 
               nvgBeginPath(vg);
-               nvgMoveTo(vg,   out.x,out.y);
-               nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, in.x,in.y);
-               nvgStrokeWidth(vg, 3.f);
-               nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
-   	          nvgStroke(vg);
-            
+              nvgMoveTo(vg,   out.x,out.y);
+              nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, in.x,in.y);
+              nvgStrokeWidth(vg, 3.f);
+              nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+              nvgStroke(vg);
+
               //nvgBezierTo(vg, halfx,out.y, halfx,in.y, in.x,in.y);
             }
           }
@@ -1488,10 +1484,10 @@ ENTRY_DECLARATION
               else if(inSlt)   nvgFillColor(vg, nvgRGBAf( .36f,  .9f, 1.f,   1.f));
               else             nvgFillColor(vg, nvgRGBAf( .18f,  .6f,  .75f,  1.f));
               nvgBeginPath(vg);
-               nvgCircle(vg, in.x, in.y, io_rad);
+              nvgCircle(vg, in.x, in.y, io_rad);
               nvgFill(vg);
               nvgStroke(vg);
-           
+
               //drw_rail(vg, slt.P, nodes[slt.nidx].P);
             }
             TO(slots_out.size(),i){
@@ -1502,7 +1498,7 @@ ENTRY_DECLARATION
               else if(inSlt)    nvgFillColor(vg, nvgRGBAf( .36f, 1.f,  .36f, 1.f));
               else              nvgFillColor(vg, nvgRGBAf( .18f,  .75f, .18f, 1.f));
               nvgBeginPath(vg);
-                nvgCircle(vg, out.x, out.y, io_rad);
+              nvgCircle(vg, out.x, out.y, io_rad);
               nvgFill(vg);
               nvgStroke(vg);
             }
@@ -1526,44 +1522,44 @@ ENTRY_DECLARATION
 
               SECTION(border test)
               {
-              //  v2 ncntr = n.P + NODE_SZ/2.f;
-              //  v2 hlfsz = NODE_SZ / 2.f;
-              //  v2  pdir = norm(pntr - ncntr) * len(hlfsz);          // * normsz;
-              //  
-              //  v2 ds = sign(pdir);                                  // ds is direction sign
-              //  if( abs(pdir.x) > hlfsz.x ){
-              //    pdir /= abs(pdir.x)/hlfsz.x;
-              //  }else{
-              //    pdir /= abs(pdir.y)/hlfsz.y;
-              //  }
-              //  
-              //  f32        r = NODE_SZ.y/2.f;
-              //  v2  circCntr = (pdir.x<0)? n.P+v2(r,r)  :  n.P+NODE_SZ-r;
-              //  v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, r);
-              //  bool     hit = !hasInf(intrsct);
-              //  if(hit) pdir = intrsct - ncntr;
-              //  else continue;
+                //  v2 ncntr = n.P + NODE_SZ/2.f;
+                //  v2 hlfsz = NODE_SZ / 2.f;
+                //  v2  pdir = norm(pntr - ncntr) * len(hlfsz);          // * normsz;
+                //  
+                //  v2 ds = sign(pdir);                                  // ds is direction sign
+                //  if( abs(pdir.x) > hlfsz.x ){
+                //    pdir /= abs(pdir.x)/hlfsz.x;
+                //  }else{
+                //    pdir /= abs(pdir.y)/hlfsz.y;
+                //  }
+                //  
+                //  f32        r = NODE_SZ.y/2.f;
+                //  v2  circCntr = (pdir.x<0)? n.P+v2(r,r)  :  n.P+NODE_SZ-r;
+                //  v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, r);
+                //  bool     hit = !hasInf(intrsct);
+                //  if(hit) pdir = intrsct - ncntr;
+                //  else continue;
 
-              //  v2 dirEnd = ncntr + pdir*1.f;
-              //  nvgBeginPath(vg);
-              //   nvgMoveTo(vg, ncntr.x,ncntr.y);
-              //   nvgLineTo(vg, dirEnd.x, dirEnd.y);
-              //  nvgStrokeWidth(vg, 3.f);
-              //  nvgStroke(vg);
+                //  v2 dirEnd = ncntr + pdir*1.f;
+                //  nvgBeginPath(vg);
+                //   nvgMoveTo(vg, ncntr.x,ncntr.y);
+                //   nvgLineTo(vg, dirEnd.x, dirEnd.y);
+                //  nvgStrokeWidth(vg, 3.f);
+                //  nvgStroke(vg);
 
-              //  nvgBeginPath(vg);
-              //   nvgCircle(vg, circCntr.x,circCntr.y, r);
-              //  nvgStrokeWidth(vg, 1.f);
-              //  nvgStroke(vg);
+                //  nvgBeginPath(vg);
+                //   nvgCircle(vg, circCntr.x,circCntr.y, r);
+                //  nvgStrokeWidth(vg, 1.f);
+                //  nvgStroke(vg);
 
-              //  nvgBeginPath(vg);
-              //   nvgCircle(vg, intrsct.x,intrsct.y, 4.f);
-              //  nvgFill(vg);
-              //  
-              //  v2 brdr = ncntr + pdir + norm(pdir)*8.f;
-              //  nvgBeginPath(vg);
-              //   nvgCircle(vg, brdr.x,brdr.y, 8.f);
-              //  nvgFill(vg);
+                //  nvgBeginPath(vg);
+                //   nvgCircle(vg, intrsct.x,intrsct.y, 4.f);
+                //  nvgFill(vg);
+                //  
+                //  v2 brdr = ncntr + pdir + norm(pdir)*8.f;
+                //  nvgBeginPath(vg);
+                //   nvgCircle(vg, brdr.x,brdr.y, 8.f);
+                //  nvgFill(vg);
               }
             }
           }
@@ -1572,15 +1568,15 @@ ENTRY_DECLARATION
             if(lftDn && priSel<0)
             {
               nvgBeginPath(vg);
-                float x,y,w,h;
-                x = min(drgP.x, pntr.x); 
-                y = min(drgP.y, pntr.y); 
-                w = abs(drgP.x - pntr.x);
-                h = abs(drgP.y - pntr.y);
-                nvgRect(vg, x,y, w,h);
+              float x,y,w,h;
+              x = min(drgP.x, pntr.x); 
+              y = min(drgP.y, pntr.y); 
+              w = abs(drgP.x - pntr.x);
+              h = abs(drgP.y - pntr.y);
+              nvgRect(vg, x,y, w,h);
               nvgStrokeWidth(vg, 2.f);
               nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, .75f));
-   	          nvgStroke(vg);
+              nvgStroke(vg);
             }
           }
           SECTION(draw fps - frames per second counter)
@@ -1591,15 +1587,20 @@ ENTRY_DECLARATION
 
             char fpsStr[TITLE_MAX_LEN];
             sprintf(fpsStr, "%d", fps);
-           
+
             f32 tb = nvgTextBounds(vg, 10,0, fpsStr, NULL, NULL);
             nvgFontSize(vg, 15.0f);
-	          nvgFontFace(vg, "sans-bold");
-	          nvgTextAlign(vg,  NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
-	          nvgFillColor(vg, nvgRGBA(255,255,255,255));
-	          nvgText(vg, tb-40, 10, fpsStr, NULL);
+            nvgFontFace(vg, "sans-bold");
+            nvgTextAlign(vg,  NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
+            nvgFillColor(vg, nvgRGBA(255,255,255,255));
+            nvgText(vg, tb-40, 10, fpsStr, NULL);
           }
           nvgEndFrame(vg);
+        }
+        SECTION(nanogui)
+        {
+          fd.ui.screen.drawContents();
+          fd.ui.screen.drawWidgets();
         }
       }
 
@@ -1620,7 +1621,43 @@ ENTRY_DECLARATION
 
 
 
+//void              keyCallback(GLFWwindow* window, int key, int scancode, int action, int mods)
+//{
+//  //using namespace glm;
+//
+//  if(key==GLFW_KEY_ESCAPE && action==GLFW_PRESS)
+//    glfwSetWindowShouldClose(window, GL_TRUE);
+//
+//  FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
+//}
 
+//TO(cncts.size(),i){
+//cnctTbl.insert( { (int)i, cncts[i] } );
+//  lower_bound( ALL(cnct_in), cncts[i], cnct::lessDest);
+//  lower_bound( ALL(cnct_in), cncts[i], cnct::lessDest);
+//}
+
+//drgOfsts.resize(sz, {0,0} );
+//drgs.resize(sz, false);
+
+//cncts.push_back( {0,1} );
+//cncts.push_back( {1,2} );
+
+//
+//cnct_in.insert( cnct_in.end(), ALL(cncts) );
+
+//glfwWindowHint(GLFW_DOUBLEBUFFER, GL_FALSE);
+//GLFWwindow* win = glfwCreateWindow(vd->ui.w, vd->ui.h, "Demo", NULL, NULL);    assert(win!=nullptr);
+//glfwSetWindowPos(win, 384, 1800);
+//
+//glfwGetWindowSize(win, &vd->ui.w, &vd->ui.h);
+//
+//glfwSetScrollCallback(win, scrollCallback);
+//glfwSetCursorPosCallback(win, cursorPosCallback);
+
+//auto loadLbl   = new Label(fd.ui.keyWin,    "Load");
+//auto saveLbl   = new Label(fd.ui.keyWin,    "Save");
+//saveBtn->setHeight(300);
 
 //SECTION(rounded rails)
 //{
