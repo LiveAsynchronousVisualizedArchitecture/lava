@@ -5,6 +5,7 @@ Should every output be optional in some way?
   | shows there is an error
   | has an error number
   | has an optional string with an error message 
+  | would error packets still need their frame number, their source node and their destination node? 
 
 Questions:
  - What data needs to be embedded in the .dll ?

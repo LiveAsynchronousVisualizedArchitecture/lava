@@ -109,10 +109,10 @@
 // -todo: debug nodes dissapearing - Jzon.hpp can't read it's own files if the file is formatted in a readable way 
 // -todo: put in error handling to loadFile()
 // -todo: create node with button
+// -todo: remove .ttf file dependencies so that only the internal byte arrays are used - needed to use load mem font function on the graph nanavg context
 
-// todo: don't select a slot if it is under an existing node
-// todo: remove .ttf file dependencies so that only the internal byte arrays are used
 // todo: fix slot jumping when on border of circle
+// todo: don't select a slot if it is under an existing node
 // todo: draw arrow inside slots to show they are input or output
 // todo: group ui state variables together - priSel, connecting
 // todo: make one node snap to another node
@@ -1201,7 +1201,8 @@ ENTRY_DECLARATION
         printf("Could not init nanovg.\n");
 		    return -1;
 	    }
-      int font = nvgCreateFont(vg, "sans-bold", "Roboto-Bold.ttf");
+      int font = nvgCreateFontMem(vg, "sans-bold", Roboto_Bold_ttf, Roboto_Bold_ttf_len, 0);
+      //int font = nvgCreateFont(vg, "sans-bold", "Roboto-Bold.ttf");
       if(font == -1) {
 		    printf("Could not add font bold.\n");
 		    return -1;

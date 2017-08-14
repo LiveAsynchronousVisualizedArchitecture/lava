@@ -20,6 +20,15 @@ const float INFf          = std::numeric_limits<float>::infinity();
 const float SIG_NANf      = std::numeric_limits<float>::signaling_NaN();
 const f32   IORAD         = 15.f;
 
+extern "C" unsigned char Roboto_Regular_ttf[];
+extern "C" unsigned int  Roboto_Regular_ttf_len;
+
+extern "C" unsigned char Roboto_Bold_ttf[];
+extern "C" unsigned int  Roboto_Bold_ttf_len;
+
+extern "C" unsigned char entypo_ttf[];
+extern "C" unsigned int  entypo_ttf_len;
+
 template<class T> using vec = std::vector<T>;
 using str = std::string;
 
@@ -31,7 +40,7 @@ using   vecstr     =    std::vector<str>;
 using   vec_v2     =    vec<v2>;
 using cnct_tbl     =    std::unordered_multimap<int,int>;
 
-struct  node { v2 P; str txt; LavaNode ln; };
+struct    node { v2 P; str txt; LavaNode ln; };
 using   vec_nd     =    vec<node>;
 
 union      bnd 
@@ -59,7 +68,7 @@ union      bnd
 };
 using vec_nbnd     =    vec<bnd>;
 
-struct  cnct { 
+struct    cnct { 
   int src, dest;
   ui8 src_out, dest_in;
   bool operator<(cnct const& r){ return src < r.src; }
@@ -76,7 +85,7 @@ using vec_slot     =    vec<slot>;
 
 struct FisData
 {
-  GLFWwindow*            win = nullptr;                     // Platform 
+  GLFWwindow*         win = nullptr;                     // Platform 
 
   struct
   {
