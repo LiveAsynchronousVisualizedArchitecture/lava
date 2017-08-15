@@ -1627,7 +1627,7 @@ ENTRY_DECLARATION
               v2     out = slots_out[cn.src].P;
               v2 outNrml = slots_out_nrmls[cn.src];
               v2      in = slots_in[cn.dest].P;
-              v2  inNrml = slots_in_nrmls[cn.src];
+              v2  inNrml = slots_in_nrmls[cn.dest];
               f32  halfx = lerp(.5f, in.x, out.x);
               f32  halfy = lerp(.5f, in.y, out.y);
               f32   dist = len(out - in);
