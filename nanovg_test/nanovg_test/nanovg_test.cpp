@@ -115,10 +115,14 @@
 // -todo: rotate slot triangle according to normal - atan2(y,x) and some organization
 // -todo: make a message node button 
 // -todo: draw message node as a circle
+// -todo: make angle to normal function
+// -todo: use node_border for both connected and unconnected slot states
 
-// todo: look into quantized gradients of nanovg
+// todo: debug bezier normals
+// todo: draw message node slots as sliding angles
+// todo: make bnd also work for message passing nodes
+// todo: put node type into written file
 // todo: fix deselection of slots
-// todo: draw message node slots as angles
 // todo: make one node snap to another node
 // todo: use scroll wheel and nanovg scale transforms to zoom in and out
 // todo: group ui state variables together - priSel, connecting
@@ -132,7 +136,8 @@
 // todo: add data to node for inputs
 // todo: add data to connection for input and output indices
 
-// todo: don't select a slot if it is under an existing node
+// idea: look into quantized gradients of nanovg
+// idea: don't select a slot if it is under an existing node
 // idea: switch over to using json.hpp
 // idea: make load file take the state in
 // idea: make an io file
@@ -362,6 +367,10 @@ bool              insUnq(cnct_tbl* cnct, int a, int b)   // insUnq is insert uni
 f32        normalToAngle(v2 N)
 {
   return atan2(N.y, N.x);
+}
+v2        angleToNormal(f32 angle)
+{
+  return { cos(angle), sin(angle) };
 }
 
 str           graphToStr()
@@ -648,6 +657,7 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
   //float io_rad=10.f;
 
   nvgResetTransform(vg);
+  nvgGlobalAlpha(vg, 1.f);
   switch(n.type)
   {
   case node::FLOW: {
@@ -681,27 +691,27 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
     nvgStrokeColor(vg, nvgRGBAf(.04f, .04f, .04f, 1.f));
     nvgStrokeWidth(vg, 3.f);
 
-
     nvgBeginPath(vg);
-      nvgCircle(vg, x+w/2,y+h/2, msgRad);
-      //nvgRoundedRect(vg, x,y,w,h, rad);
-    nvgFillColor(vg, nvgRGBAf(.15f, .15f, .15f, .95f));
+    nvgCircle(vg, cntrX, cntrY, msgRad);
+    auto radial = nvgRadialGradient(vg,
+      cntrX, cntrY, msgRad*.5f, msgRad,
+      nvgRGBAf( .15f, .15f,  .15f,   .95f ),
+      nvgRGBAf( .2f, .2f,    .2f,   1.f)  ); 
+    nvgFillPaint(vg, radial);
     nvgFill(vg);
 
     nvgBeginPath(vg);
       nvgCircle(vg, x+w/2,y+h/2, msgRad);
-      auto paint = nvgLinearGradient(vg, 
-                                   //x-msgRad*.1f, y-msgRad*.1f, x+msgRad*.1f, y+msgRad*.1f, 
-                                   x, y-msgRad, x, y+msgRad, //+msgRad*.25f, 
-                                   nvgRGBAf( .3f,   .3f,   .3f,   .5f), 
-                                   nvgRGBAf( .15f,  .15f,  .15f,  .2f) );
-      nvgFillPaint(vg, paint);
+      auto lin = nvgLinearGradient(vg, 
+                                   cntrX, cntrY-msgRad, x, y+msgRad,
+                                   nvgRGBAf( .3f,   .3f,   .3f,  0.5f), 
+                                   nvgRGBAf( .15f,  .15f,  .15f,  .45f) );
+      nvgFillPaint(vg, lin);
     nvgFill(vg);
 
     nvgBeginPath(vg);
       nvgCircle(vg, x + w/2, y + h/2, msgRad);
     nvgStroke(vg);
-
   } break;
   }
 
@@ -759,47 +769,76 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
 
   return {x,y, x+w, y+h};
 
+  //nvgBeginPath(vg);
+  //  nvgCircle(vg, x+w/2,y+h/2, msgRad);
+  //  //nvgRoundedRect(vg, x,y,w,h, rad);
+  //nvgFillColor(vg, nvgRGBAf(.15f, .15f, .15f, .95f));
+  //nvgFill(vg);
+  //
+  //x-msgRad*.1f, y-msgRad*.1f, x+msgRad*.1f, y+msgRad*.1f, 
+
   //nvgRoundedRect(vg, x,y,w,h, rad+BORDER); //-.5f);
   //nvgRoundedRect(vg, x+0.5f,y+0.5f, w-1,h-1, cornerRad-.5f);
   //
   //nvgStrokeColor(vg, nvgRGBA(0,0,0,128));
   //nvgStroke(vg);
 }
-v2           node_border(v2 nP, v2 dir, f32 slot_rad, v2* out_nrml=nullptr)
+//v2           node_border(node const& n, v2 dir, f32 slot_rad, v2* out_nrml=nullptr)
+v2           node_border(node const& n, v2 dir, v2* out_nrml=nullptr)
 {
-  v2   hlf = NODE_HALF_SZ;
-  f32  rad = hlf.y;
-  v2 ncntr = nP + NODE_HALF_SZ;
-  v2  ndir = norm(dir);
+  v2       nP = n.P;
+  v2 borderPt = {0,0};
+  v2     ndir = norm(dir);
+  v2    ncntr = nP + NODE_HALF_SZ;
 
-  v2 pdir = ndir;
-  v2   ds = sign(pdir);                                  // ds is direction sign
-  f32  ax = abs(pdir.x);
-  if( ax > hlf.x ){
-    pdir /= ax/hlf.x;                                    // can this never be 0, since ax is positive, hlf.x is positive, and ax is greater than hlf.x ? 
-  }else{
-    f32 ay = abs(pdir.y);
-    pdir /= ay==0.f?  1.f  :  ay/hlf.y;
+  switch(n.type)
+  {
+  case node::FLOW: {
+    v2   hlf = NODE_HALF_SZ;
+    f32  rad = hlf.y;
+
+    v2 pdir = ndir;
+    v2   ds = sign(pdir);                                  // ds is direction sign
+    f32  ax = abs(pdir.x);
+    if( ax > hlf.x ){
+      pdir /= ax/hlf.x;                                    // can this never be 0, since ax is positive, hlf.x is positive, and ax is greater than hlf.x ? 
+    }else{
+      f32 ay = abs(pdir.y);
+      pdir /= ay==0.f?  1.f  :  ay/hlf.y;
+    }
+
+    v2  circCntr = (pdir.x<0)? nP+v2(rad,rad)  :  nP+NODE_SZ-v2(rad,rad);
+    v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, rad);
+    bool     hit = !hasInf(intrsct)  &&  (intrsct.x < nP.x+rad || intrsct.x > nP.x+NODE_SZ.x-rad); 
+    if(hit){ pdir = intrsct - ncntr; }
+
+    borderPt = ncntr + pdir;
+
+    if(out_nrml){
+      if(hit) *out_nrml = norm(borderPt - circCntr);
+      //if(hit) *out_nrml = norm(circCntr - borderPt);
+      else    *out_nrml = { 0.f, sign(ndir).y };
+    }
+  } break;
+  case node::MSG: 
+  default: 
+  {
+    f32  rad = NODE_SZ.x/2;
+    borderPt = ncntr + ndir*rad; 
+    if(out_nrml){ *out_nrml = ndir; }
+  } break;
   }
 
-  //f32        r = hlf.y;
-  v2  circCntr = (pdir.x<0)? nP+v2(rad,rad)  :  nP+NODE_SZ-v2(rad,rad);
-  v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, rad);
-  bool     hit = !hasInf(intrsct)  &&  (intrsct.x < nP.x+rad || intrsct.x > nP.x+NODE_SZ.x-rad);   //  && !hasNaN(intrsct);
-  if(hit){ pdir = intrsct - ncntr; }
+  return borderPt;
 
-  v2 borderPt = ncntr + pdir;
+  //  && !hasNaN(intrsct);
+  //
+  //f32        r = hlf.y;
+  //
   //if(hit && borderPt.x > (nP.x+rad) && borderPt.x < (nP.x-rad) ){
   //  if(ds.y > .5f) borderPt.y = nP.y + NODE_SZ.y;
   //  else           borderPt.y = nP.y;
   //}
-
-  if(out_nrml){
-    if(hit) *out_nrml = norm(borderPt - circCntr);
-    else    *out_nrml = { 0.f, sign(ndir).y };
-  }
-
-  return borderPt;
 }
 void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw_rail is draw_rail
 {
@@ -895,25 +934,25 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
     
   }
 
-  SECTION(drawing fourth attempt)
-  {
-    // maybe the rounded rectangle should be broken down into one number that represents a position on the border
-    // then taking the number backwards and forwards would at least give the start and end points 
-
-
-    v2 orthDir = { dir.y, -dir.x };
-    v2 lBrdr = node_border(nP, orthDir, io_rad);
-
-    nvgStrokeWidth(vg, rthk);
-    nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
-
-    nvgBeginPath(vg);
-      nvgMoveTo(vg, P.x, P.y);
-      nvgLineTo(vg, lBrdr.x, lBrdr.y);
-      //nvgRoundedRect(vg, nP.x, nP.y, NODE_SZ.x, NODE_SZ.y, NODE_SZ.y/2 );
-      //nvgRect(vg, nP.x, nP.y, NODE_SZ.x, NODE_SZ.y); 
-    nvgStroke(vg);
-  }
+  //SECTION(drawing fourth attempt)
+  //{
+  //  // maybe the rounded rectangle should be broken down into one number that represents a position on the border
+  //  // then taking the number backwards and forwards would at least give the start and end points 
+  //
+  //
+  //  v2 orthDir = { dir.y, -dir.x };
+  //  v2 lBrdr = node_border(nP, orthDir, io_rad);
+  //
+  //  nvgStrokeWidth(vg, rthk);
+  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+  //
+  //  nvgBeginPath(vg);
+  //    nvgMoveTo(vg, P.x, P.y);
+  //    nvgLineTo(vg, lBrdr.x, lBrdr.y);
+  //    //nvgRoundedRect(vg, nP.x, nP.y, NODE_SZ.x, NODE_SZ.y, NODE_SZ.y/2 );
+  //    //nvgRect(vg, nP.x, nP.y, NODE_SZ.x, NODE_SZ.y); 
+  //  nvgStroke(vg);
+  //}
 
   //SECTION(drawing third attempt)
   //{
@@ -1147,14 +1186,17 @@ ENTRY_DECLARATION
     {
       io_rad = IORAD;
 
-      nodes.push_back( { {300.f,300.f}, "one", node::FLOW } );
-      nodes.push_back( { {300.f,500.f}, "two", node::FLOW } );
-      //nodes.push_back( { {300.f,300.f},"three" } );
+      nodes.push_back( { {300.f,300.f}, "one",   node::FLOW } );
+      nodes.push_back( { {300.f,500.f}, "two",   node::FLOW } );
+      nodes.push_back( { {300.f,300.f}, "three", node::MSG  } );
 
-      slots_out.push_back( {{0.f,0.f}, 0} );
+      slots_out.push_back( {{0.f,0.f}, 0, {0,1.f} } );
       slots_out_nrmls.push_back( {0,0} );
 
-      slots_in.push_back( {{0.f,0.f}, 1} );
+      slots_in.push_back( {{0.f,0.f}, 1, {0,1.f} } );
+      slots_in_nrmls.push_back( {0,0} );
+
+      slots_in.push_back( {{0.f,0.f}, 2, {0,1.f} } );
       slots_in_nrmls.push_back( {0,0} );
 
       for(auto& n : nodes){
@@ -1519,19 +1561,29 @@ ENTRY_DECLARATION
           TO(slots_out.size(),i){
             auto nidx = slots_out[i].nidx;
             if(nidx < nodes.size()){
+              v2        nrml;
               node&        n = nodes[nidx];
               auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){ return c.src==i; } );            // find connect in the naive way for now 
               if(cnctIter == end(cncts)){
-                slots_out[i].P = out_cntr(n, io_rad);
-                slots_out[i].N = {0, 1.f};
-                slots_out_nrmls[i] = {0, 1.f};
-              }else{
-                slot&  destSlt = slots_in[cnctIter->dest];
-                v2       destP = nodes[destSlt.nidx].P;
-                v2       nrml;
-                slots_out[i].P = node_border(n.P, destP - n.P, io_rad, &nrml);
-                slots_out[i].N = nrml;
+                slots_out[i].P     = node_border(n, v2(0,1.f), &nrml);
+                slots_out[i].N     = nrml;
                 slots_out_nrmls[i] = nrml;
+                //slots_out[i].P     = out_cntr(n, io_rad);
+                //slots_out[i].N     = {0, 1.f};
+                //slots_out_nrmls[i] = {0, 1.f};
+              }else{
+                //if(n.type==node::FLOW){
+                  slot&  destSlt = slots_in[cnctIter->dest];
+                  v2       destP = nodes[destSlt.nidx].P;
+                  //slots_out[i].P = node_border(n.P, destP - n.P, io_rad, &nrml);
+                  slots_out[i].P     = node_border(n, destP - n.P, &nrml);
+                  slots_out[i].N     = nrml;
+                  slots_out_nrmls[i] = nrml;
+                //}else{
+                //  f32 rad = NODE_SZ.x/2;                // todo: will need to be changed to use a per node size
+                //  slots_out[i].P = node_border(n.P, destP - n.P, io_rad, &nrml);
+                //  slots_out[i].N = nrml;
+                //}
               }
             }
           }
@@ -1539,17 +1591,21 @@ ENTRY_DECLARATION
           TO(slots_in.size(),i){
             auto nidx = slots_in[i].nidx;
             if(nidx < nodes.size()){
+              v2        nrml;
               node&        n = nodes[nidx];
               auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){ return c.dest==i; } );            // find connect in the naive way for now 
               if(cnctIter == end(cncts)){
-                slots_in[i].P  = in_cntr(n, io_rad);
-                slots_in[i].N = {0,1.f};
-                slots_in_nrmls[i] = {0, 1.f};
+                slots_in[i].P = node_border(n, v2(0,-1.f), &nrml);
+                slots_in[i].N = nrml;
+                slots_in_nrmls[i] = nrml;
+                //slots_in[i].P  = in_cntr(n, io_rad);
+                //slots_in[i].N = {0,1.f};
+                //slots_in_nrmls[i] = {0, 1.f};
               }else{
                 slot&  srcSlt = slots_out[cnctIter->src];
                 v2       srcP = nodes[srcSlt.nidx].P;
-                v2       nrml;
-                slots_in[i].P  = node_border(n.P, srcP - n.P, io_rad, &nrml);
+                //slots_in[i].P  = node_border(n.P, srcP - n.P, io_rad, &nrml);
+                slots_in[i].P = node_border(n, srcP - n.P, &nrml);
                 slots_in[i].N = nrml;
                 slots_in_nrmls[i] = nrml;
               }
@@ -1586,10 +1642,16 @@ ENTRY_DECLARATION
               //nvgStroke(vg);
 
               nvgBeginPath(vg);
-              nvgMoveTo(vg,   out.x,out.y);
-              nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, in.x,in.y);
-              nvgStrokeWidth(vg, 3.f);
-              nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+                nvgMoveTo(vg,   out.x,out.y);
+                nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, in.x,in.y);
+                nvgStrokeWidth(vg, 3.f);
+                nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+              nvgStroke(vg);
+
+              v2 nrmlEnd = in + inNrml*100.f;
+              nvgBeginPath(vg);
+                nvgMoveTo(vg,   in.x,in.y);
+                nvgLineTo(vg,  nrmlEnd.x, nrmlEnd.y);
               nvgStroke(vg);
 
               //nvgBezierTo(vg, halfx,out.y, halfx,in.y, in.x,in.y);
@@ -1665,7 +1727,7 @@ ENTRY_DECLARATION
               nvgBeginPath(vg);
                 nvgResetTransform(vg);
                 nvgTranslate(vg, in.x, in.y);             // translate comes before rotate here because nanovg 'premultiplies' transformations instead of multiplying them in for some reason. this reverses the order of transformations and can be seen in the source for nanovg
-                nvgRotate(vg, normalToAngle(N)-PIf/2.f );
+                nvgRotate(vg, normalToAngle(N)+PIf/2.f );
 
                 nvgMoveTo(vg, -0.707f*triRad, -0.707f*triRad);
                 nvgLineTo(vg,  0.707f*triRad, -0.707f*triRad);
