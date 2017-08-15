@@ -12,14 +12,14 @@
 
 using namespace nanogui;
 
-const int   TITLE_MAX_LEN = 256;
-const v2    NODE_SZ       = { 256.f, 64.f };
-const v2    NODE_HALF_SZ  = NODE_SZ/2.f;
-const auto  NODE_CLR      = nvgRGBf(.1f,.4f,.5f);
-const float INFf          = std::numeric_limits<float>::infinity();
-const float SIG_NANf      = std::numeric_limits<float>::signaling_NaN();
-const f32   IORAD         = 15.f;
-const int   BORDER        = 2;
+const int     TITLE_MAX_LEN = 256;
+const v2      NODE_SZ       = { 256.f, 64.f };
+const v2      NODE_HALF_SZ  = NODE_SZ/2.f;
+const auto    NODE_CLR      = nvgRGBf(.1f,.4f,.5f);
+const float   INFf          = std::numeric_limits<float>::infinity();
+const float   SIG_NANf      = std::numeric_limits<float>::signaling_NaN();
+const f32     IORAD         = 15.f;
+const int     BORDER        = 2;
 
 
 extern "C" unsigned char Roboto_Regular_ttf[];
@@ -42,7 +42,14 @@ using   vecstr     =    std::vector<str>;
 using   vec_v2     =    vec<v2>;
 using cnct_tbl     =    std::unordered_multimap<int,int>;
 
-struct    node { v2 P; str txt; LavaNode ln; };
+struct    node
+{
+  enum Type { MSG=0, FLOW=1 };
+  v2        P; 
+  str     txt; 
+  Type   type;
+  LavaNode ln;
+};
 using   vec_nd     =    vec<node>;
 
 union      bnd 
@@ -82,7 +89,7 @@ struct    cnct {
 };
 using  vec_con     =    vec<cnct>;
 
-struct  slot { v2 P; u64 nidx; };
+struct    slot { v2 P; u64 nidx; v2 N; };
 using vec_slot     =    vec<slot>;
 
 struct FisData

@@ -111,10 +111,17 @@
 // -todo: create node with button
 // -todo: remove .ttf file dependencies so that only the internal byte arrays are used - needed to use load mem font function on the graph nanavg context
 // -todo: fix slot jumping when on border of circle - looks like the circle hit is used slightly too far into the node - intersection wasn't being ignored while inside the non-rounded corners
+// -todo: draw arrow inside slots 
+// -todo: rotate slot triangle according to normal - atan2(y,x) and some organization
+// -todo: make a message node button 
+// -todo: draw message node as a circle
 
-// todo: draw arrow inside slots to show they are input or output
-// todo: group ui state variables together - priSel, connecting
+// todo: look into quantized gradients of nanovg
+// todo: fix deselection of slots
+// todo: draw message node slots as angles
 // todo: make one node snap to another node
+// todo: use scroll wheel and nanovg scale transforms to zoom in and out
+// todo: group ui state variables together - priSel, connecting
 // todo: make two snapped nodes group together and be dragged together
 // todo: make global state 
 // todo: separate finding node the pointer is inside from the action to take
@@ -352,13 +359,9 @@ bool              insUnq(cnct_tbl* cnct, int a, int b)   // insUnq is insert uni
   //  return true;
   //} 
 }
-void            node_add(str txt)
+f32        normalToAngle(v2 N)
 {
-  v2 P = v2(512,512);
-  nodes.push_back( {P,txt} );
-  sels.push_back(false);
-  nbnds.emplace_back();
-  nd_ordr.push_back( (int)(nodes.size()-1) );
+  return atan2(N.y, N.x);
 }
 
 str           graphToStr()
@@ -488,6 +491,16 @@ bool            loadFile(str path)
   strToGraph(s);
 
   return true;
+}
+
+void            node_add(str txt, node::Type type=node::FLOW)
+{
+  v2 P = v2(512,512);
+  nodes.push_back( {P,txt} );
+  nodes.back().type = type;
+  sels.push_back(false);
+  nbnds.emplace_back();
+  nd_ordr.push_back( (int)(nodes.size()-1) );
 }
 
 void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
@@ -623,7 +636,7 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
                             int preicon,
                           node const& n,
                            NVGcolor col,
-                        float       rnd)     // rnd is corner rounding
+                         float      rnd)     // rnd is corner rounding
 {
   const float   rthk = 8.f;    // rw is rail thickness
 
@@ -634,32 +647,62 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
   float cntrX=x+w/2, cntrY=y+h/2, rr=rad;      // rr is rail radius
   //float io_rad=10.f;
 
-  SECTION(grey border)
+  nvgResetTransform(vg);
+  switch(n.type)
   {
-	  nvgBeginPath(vg);
-     nvgRoundedRect(vg, x,y,w,h, rad);
-     //nvgRoundedRect(vg, x,y,w,h, rad+BORDER); //-.5f);
-	   //nvgRoundedRect(vg, x+0.5f,y+0.5f, w-1,h-1, cornerRad-.5f);
-    nvgFillColor(vg, nvgRGBA(0,0,0,128));
-	  nvgFill(vg);
-    //nvgStrokeColor(vg, nvgRGBA(0,0,0,128));
-	  //nvgStroke(vg);
-  }
-  SECTION(shaded color inside)
-  {
-    int    grad = (int)lerp(rnd, 0, 48);
-    auto topClr = nvgRGBA(255,255,255,isBlack(col)?16:grad);
-    auto botClr = nvgRGBA(0,0,0,isBlack(col)?16:grad);
-	  bg = nvgLinearGradient(vg, x,y,x,y+h, topClr, botClr);
-	  nvgBeginPath(vg);
-	    nvgRoundedRect(vg, x+BORDER,y+BORDER, w-(BORDER*2),h-(BORDER*2), rad-BORDER);
-      col.a = 0.8f;
-	    if(!isBlack(col)){
-		    nvgFillColor(vg, col);
-		    nvgFill(vg);
-	    }
-	  nvgFillPaint(vg, bg);
-	  nvgFill(vg);
+  case node::FLOW: {
+    SECTION(grey border)
+    {
+	    nvgBeginPath(vg);
+       nvgRoundedRect(vg, x,y,w,h, rad);
+      nvgFillColor(vg, nvgRGBA(0,0,0,128));
+	    nvgFill(vg);
+    }
+    SECTION(shaded color inside)
+    {
+      int    grad = (int)lerp(rnd, 0, 48);
+      auto topClr = nvgRGBA(255,255,255,isBlack(col)?16:grad);
+      auto botClr = nvgRGBA(0,0,0,isBlack(col)?16:grad);
+	    bg = nvgLinearGradient(vg, x,y,x,y+h, topClr, botClr);
+	    nvgBeginPath(vg);
+	      nvgRoundedRect(vg, x+BORDER,y+BORDER, w-(BORDER*2),h-(BORDER*2), rad-BORDER);
+        col.a = 0.8f;
+	      if(!isBlack(col)){
+		      nvgFillColor(vg, col);
+		      nvgFill(vg);
+	      }
+	    nvgFillPaint(vg, bg);
+	    nvgFill(vg);
+    }
+  } break;
+  case node::MSG: {
+    f32 msgRad = NODE_SZ.x / 2;
+
+    nvgStrokeColor(vg, nvgRGBAf(.04f, .04f, .04f, 1.f));
+    nvgStrokeWidth(vg, 3.f);
+
+
+    nvgBeginPath(vg);
+      nvgCircle(vg, x+w/2,y+h/2, msgRad);
+      //nvgRoundedRect(vg, x,y,w,h, rad);
+    nvgFillColor(vg, nvgRGBAf(.15f, .15f, .15f, .95f));
+    nvgFill(vg);
+
+    nvgBeginPath(vg);
+      nvgCircle(vg, x+w/2,y+h/2, msgRad);
+      auto paint = nvgLinearGradient(vg, 
+                                   //x-msgRad*.1f, y-msgRad*.1f, x+msgRad*.1f, y+msgRad*.1f, 
+                                   x, y-msgRad, x, y+msgRad, //+msgRad*.25f, 
+                                   nvgRGBAf( .3f,   .3f,   .3f,   .5f), 
+                                   nvgRGBAf( .15f,  .15f,  .15f,  .2f) );
+      nvgFillPaint(vg, paint);
+    nvgFill(vg);
+
+    nvgBeginPath(vg);
+      nvgCircle(vg, x + w/2, y + h/2, msgRad);
+    nvgStroke(vg);
+
+  } break;
   }
 
   SECTION(text)
@@ -715,6 +758,12 @@ bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
   }
 
   return {x,y, x+w, y+h};
+
+  //nvgRoundedRect(vg, x,y,w,h, rad+BORDER); //-.5f);
+  //nvgRoundedRect(vg, x+0.5f,y+0.5f, w-1,h-1, cornerRad-.5f);
+  //
+  //nvgStrokeColor(vg, nvgRGBA(0,0,0,128));
+  //nvgStroke(vg);
 }
 v2           node_border(v2 nP, v2 dir, f32 slot_rad, v2* out_nrml=nullptr)
 {
@@ -1079,7 +1128,6 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
   //nvgStroke(vg);
 }
 
-
 void        debug_coords(v2 a)
 {
   sprintf(winTitle, "%.2f  %.2f", a.x, a.y);
@@ -1097,10 +1145,10 @@ ENTRY_DECLARATION
   {
     SECTION(test data init)
     {
-      io_rad = 10.f;
+      io_rad = IORAD;
 
-      nodes.push_back( { {300.f,300.f},"one"   } );
-      nodes.push_back( { {300.f,500.f},"two"   } );
+      nodes.push_back( { {300.f,300.f}, "one", node::FLOW } );
+      nodes.push_back( { {300.f,500.f}, "two", node::FLOW } );
       //nodes.push_back( { {300.f,300.f},"three" } );
 
       slots_out.push_back( {{0.f,0.f}, 0} );
@@ -1211,6 +1259,9 @@ ENTRY_DECLARATION
       flowBtn->setCallback([](){
         node_add("new node");
       });
+      msgBtn->setCallback([](){
+        node_add("message node", node::MSG);
+      });
 
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
 
@@ -1286,7 +1337,7 @@ ENTRY_DECLARATION
 		    if(premult)
 			    glClearColor(0,0,0,0);
 		    else
-			    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+			    glClearColor(.075f, .075f, .075f, 1.0f);
 		    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
       }
       SECTION(selection)
@@ -1472,12 +1523,14 @@ ENTRY_DECLARATION
               auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){ return c.src==i; } );            // find connect in the naive way for now 
               if(cnctIter == end(cncts)){
                 slots_out[i].P = out_cntr(n, io_rad);
-                slots_out_nrmls[i] = {0, -1.f};
+                slots_out[i].N = {0, 1.f};
+                slots_out_nrmls[i] = {0, 1.f};
               }else{
                 slot&  destSlt = slots_in[cnctIter->dest];
                 v2       destP = nodes[destSlt.nidx].P;
                 v2       nrml;
                 slots_out[i].P = node_border(n.P, destP - n.P, io_rad, &nrml);
+                slots_out[i].N = nrml;
                 slots_out_nrmls[i] = nrml;
               }
             }
@@ -1489,13 +1542,15 @@ ENTRY_DECLARATION
               node&        n = nodes[nidx];
               auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){ return c.dest==i; } );            // find connect in the naive way for now 
               if(cnctIter == end(cncts)){
-                slots_in[i].P = in_cntr(n, io_rad);
-                slots_out_nrmls[i] = {0, 1.f};
+                slots_in[i].P  = in_cntr(n, io_rad);
+                slots_in[i].N = {0,1.f};
+                slots_in_nrmls[i] = {0, 1.f};
               }else{
                 slot&  srcSlt = slots_out[cnctIter->src];
                 v2       srcP = nodes[srcSlt.nidx].P;
                 v2       nrml;
-                slots_in[i].P = node_border(n.P, srcP - n.P, io_rad, &nrml);
+                slots_in[i].P  = node_border(n.P, srcP - n.P, io_rad, &nrml);
+                slots_in[i].N = nrml;
                 slots_in_nrmls[i] = nrml;
               }
             }
@@ -1544,9 +1599,48 @@ ENTRY_DECLARATION
           {
             nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
             nvgStrokeWidth(vg, 3.f);
+            TO(slots_out.size(),i){
+              slot&  slt = slots_out[i];
+              v2     out = slt.P;
+              v2       N = slt.N;
+              bool inSlt = len(pntr-out) < io_rad;
+
+              NVGcolor fillClr;
+              if(i==slotInSel) fillClr = nvgRGBAf(1.f,   1.f,   .5f,   1.f);
+              else if(inSlt)   fillClr = nvgRGBAf( .36f, 1.f,   .36f,  1.f);
+              else             fillClr = nvgRGBAf( .18f,  .75f, .18f,  1.f);
+              nvgFillColor(vg, fillClr);
+
+              nvgBeginPath(vg);
+              nvgCircle(vg, out.x, out.y, io_rad);
+              nvgFill(vg);
+              nvgStroke(vg);
+
+              // slot triangle drawing
+              f32  triRad = io_rad - 2.f;
+              auto inrClr = fillClr;
+              inrClr.r += 0.2f;
+              inrClr.g += 0.2f;
+              inrClr.b += 0.2f;
+              nvgFillColor(vg, inrClr);
+
+              nvgBeginPath(vg);
+              nvgResetTransform(vg);
+              nvgTranslate(vg, out.x, out.y);             // translate comes before rotate here because nanovg 'premultiplies' transformations instead of multiplying them in for some reason. this reverses the order of transformations and can be seen in the source for nanovg
+              nvgRotate(vg, normalToAngle(N)-PIf/2.f );
+
+              nvgMoveTo(vg, -0.707f*triRad, -0.707f*triRad);
+              nvgLineTo(vg,  0.707f*triRad, -0.707f*triRad);
+              nvgLineTo(vg,  0, triRad);
+
+              nvgClosePath(vg);
+              nvgFill(vg);
+              nvgResetTransform(vg);
+            }
             TO(slots_in.size(),i){
               slot&  slt = slots_in[i];
               v2      in = slt.P;
+              v2       N = slt.N;
               bool inSlt = len(pntr-in) < io_rad;
 
               NVGcolor fillClr;
@@ -1560,63 +1654,28 @@ ENTRY_DECLARATION
               nvgFill(vg);
               nvgStroke(vg);
 
-              //auto inrClr = fillClr;
-              //inrClr.a = inrClr.r = inrClr.g = inrClr.b = 1.f;
-              //nvgFillColor(vg, inrClr);
-              //nvgBeginPath(vg);
-              //  nvgCircle(vg, in.x, in.y, io_rad);
-              //  nvgRadialGradient(vg, in.x, in.y, 0, io_rad/2, inrClr, fillClr);
-              //nvgFill(vg);
-
-              //nvgTransformRotate()
+              // slot triangle drawing
               f32  triRad = io_rad - 2.f;
               auto inrClr = fillClr;
               inrClr.r += 0.2f;
               inrClr.g += 0.2f;
               inrClr.b += 0.2f;
-              //inrClr.a = inrClr.r = inrClr.g = inrClr.b = 1.f;
               nvgFillColor(vg, inrClr);
+
               nvgBeginPath(vg);
-                nvgMoveTo(vg, in.x-0.707*triRad, in.y-0.707*triRad);
-                nvgLineTo(vg, in.x+0.707*triRad, in.y-0.707*triRad);
-                nvgLineTo(vg, in.x, in.y+triRad);
+                nvgResetTransform(vg);
+                nvgTranslate(vg, in.x, in.y);             // translate comes before rotate here because nanovg 'premultiplies' transformations instead of multiplying them in for some reason. this reverses the order of transformations and can be seen in the source for nanovg
+                nvgRotate(vg, normalToAngle(N)-PIf/2.f );
+
+                nvgMoveTo(vg, -0.707f*triRad, -0.707f*triRad);
+                nvgLineTo(vg,  0.707f*triRad, -0.707f*triRad);
+                nvgLineTo(vg,  0, triRad);
+
                 nvgClosePath(vg);
               nvgFill(vg);
+              nvgResetTransform(vg);
 
               //drw_rail(vg, slt.P, nodes[slt.nidx].P);
-            }
-            TO(slots_out.size(),i){
-              v2     out = slots_out[i].P;
-              bool inSlt = len(pntr-out) < io_rad;
-
-              NVGcolor fillClr;
-              if(i==slotInSel) fillClr = nvgRGBAf(1.f,   1.f,   .5f,   1.f);
-              else if(inSlt)   fillClr = nvgRGBAf( .36f, 1.f,   .36f,  1.f);
-              else             fillClr = nvgRGBAf( .18f,  .75f, .18f,  1.f);
-              nvgFillColor(vg, fillClr);
-
-              //if(i==slotOutSel) nvgFillColor(vg, nvgRGBAf(1.f,   1.f,  .5f,  1.f));
-              //else if(inSlt)    nvgFillColor(vg, nvgRGBAf( .36f, 1.f,  .36f, 1.f));
-              //else              nvgFillColor(vg, nvgRGBAf( .18f,  .75f, .18f, 1.f));
-              
-              nvgBeginPath(vg);
-               nvgCircle(vg, out.x, out.y, io_rad);
-              nvgFill(vg);
-              nvgStroke(vg);
-
-              f32  triRad = io_rad - 2.f;
-              auto inrClr = fillClr;
-              inrClr.r += 0.2f;
-              inrClr.g += 0.2f;
-              inrClr.b += 0.2f;
-              //inrClr.a = inrClr.r = inrClr.g = inrClr.b = 1.f;
-              nvgFillColor(vg, inrClr);
-              nvgBeginPath(vg);
-                nvgMoveTo(vg, out.x-0.707*triRad, out.y-0.707*triRad);
-                nvgLineTo(vg, out.x+0.707*triRad, out.y-0.707*triRad);
-                nvgLineTo(vg, out.x, out.y+triRad);
-                nvgClosePath(vg);
-              nvgFill(vg);
             }
           }
           SECTION(draw nodes)
@@ -1736,3 +1795,41 @@ ENTRY_DECLARATION
 
 
 
+
+
+
+//f32  triRad = io_rad - 2.f;
+//auto inrClr = fillClr;
+//inrClr.r += 0.2f;
+//inrClr.g += 0.2f;
+//inrClr.b += 0.2f;
+//nvgFillColor(vg, inrClr);
+//nvgBeginPath(vg);
+//  nvgMoveTo(vg, in.x-0.707f*triRad, in.y-0.707f*triRad);
+//  nvgLineTo(vg, in.x+0.707f*triRad, in.y-0.707f*triRad);
+//  nvgLineTo(vg, in.x, in.y+triRad);
+//  nvgClosePath(vg);
+//nvgFill(vg);
+
+//auto inrClr = fillClr;
+//inrClr.a = inrClr.r = inrClr.g = inrClr.b = 1.f;
+//nvgFillColor(vg, inrClr);
+//nvgBeginPath(vg);
+//  nvgCircle(vg, in.x, in.y, io_rad);
+//  nvgRadialGradient(vg, in.x, in.y, 0, io_rad/2, inrClr, fillClr);
+//nvgFill(vg);
+//
+//nvgTransformRotate()
+//
+//inrClr.a = inrClr.r = inrClr.g = inrClr.b = 1.f;
+
+//if(i==slotOutSel) nvgFillColor(vg, nvgRGBAf(1.f,   1.f,  .5f,  1.f));
+//else if(inSlt)    nvgFillColor(vg, nvgRGBAf( .36f, 1.f,  .36f, 1.f));
+//else              nvgFillColor(vg, nvgRGBAf( .18f,  .75f, .18f, 1.f));
+//
+//inrClr.a = inrClr.r = inrClr.g = inrClr.b = 1.f;
+
+//nvgMoveTo(vg, out.x-0.707*triRad, out.y-0.707*triRad);
+//nvgLineTo(vg, out.x+0.707*triRad, out.y-0.707*triRad);
+//nvgLineTo(vg, out.x, out.y+triRad);
+//nvgClosePath(vg);
