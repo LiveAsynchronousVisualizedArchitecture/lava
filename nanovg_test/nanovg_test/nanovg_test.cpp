@@ -117,9 +117,10 @@
 // -todo: draw message node as a circle
 // -todo: make angle to normal function
 // -todo: use node_border for both connected and unconnected slot states
+// -todo: debug bezier normals - another bug from copying lines but not replacing cnct.dest / src
 
-// todo: debug bezier normals
 // todo: draw message node slots as sliding angles
+// todo: make slots average between their sources and directions
 // todo: make bnd also work for message passing nodes
 // todo: put node type into written file
 // todo: fix deselection of slots
@@ -1568,24 +1569,43 @@ ENTRY_DECLARATION
                 slots_out[i].P     = node_border(n, v2(0,1.f), &nrml);
                 slots_out[i].N     = nrml;
                 slots_out_nrmls[i] = nrml;
-                //slots_out[i].P     = out_cntr(n, io_rad);
-                //slots_out[i].N     = {0, 1.f};
-                //slots_out_nrmls[i] = {0, 1.f};
               }else{
-                //if(n.type==node::FLOW){
+                //slots_out[i].P     = {0,0};
+                v2       destP     = {0,0};
+                //slots_out[i].N     = {0,0};
+                //slots_out_nrmls[i] = {0,0};
+                int   cnt = 0; 
+                for(;cnctIter != end(cncts); ++cnt, ++cnctIter){
                   slot&  destSlt = slots_in[cnctIter->dest];
-                  v2       destP = nodes[destSlt.nidx].P;
-                  //slots_out[i].P = node_border(n.P, destP - n.P, io_rad, &nrml);
-                  slots_out[i].P     = node_border(n, destP - n.P, &nrml);
-                  slots_out[i].N     = nrml;
-                  slots_out_nrmls[i] = nrml;
-                //}else{
-                //  f32 rad = NODE_SZ.x/2;                // todo: will need to be changed to use a per node size
-                //  slots_out[i].P = node_border(n.P, destP - n.P, io_rad, &nrml);
-                //  slots_out[i].N = nrml;
-                //}
+                  destP              += nodes[destSlt.nidx].P;
+                  //slots_out[i].N     += nrml;
+                  //slots_out_nrmls[i] += nrml;
+                }
+                destP              /= (f32)cnt;
+                slots_out[i].P      = node_border(n, destP - n.P, &nrml);
+                slots_out[i].N      = nrml;
+                slots_out_nrmls[i]  = nrml;
+
+                //slots_out[i].P     /= (f32)cnt;
+                //slots_out[i].N     /= (f32)cnt;
+                //slots_out_nrmls[i] /= (f32)cnt;
               }
             }
+
+            //v2       destP = nodes[destSlt.nidx].P;
+            //
+            //slots_out[i].P     = out_cntr(n, io_rad);
+            //slots_out[i].N     = {0, 1.f};
+            //slots_out_nrmls[i] = {0, 1.f};
+            //
+            //if(n.type==node::FLOW){
+            //slots_out[i].P = node_border(n.P, destP - n.P, io_rad, &nrml);
+            //
+            //}else{
+            //  f32 rad = NODE_SZ.x/2;                // todo: will need to be changed to use a per node size
+            //  slots_out[i].P = node_border(n.P, destP - n.P, io_rad, &nrml);
+            //  slots_out[i].N = nrml;
+            //}
           }
 
           TO(slots_in.size(),i){
@@ -1648,12 +1668,12 @@ ENTRY_DECLARATION
                 nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
               nvgStroke(vg);
 
-              v2 nrmlEnd = in + inNrml*100.f;
-              nvgBeginPath(vg);
-                nvgMoveTo(vg,   in.x,in.y);
-                nvgLineTo(vg,  nrmlEnd.x, nrmlEnd.y);
-              nvgStroke(vg);
-
+              //v2 nrmlEnd = in + inNrml*100.f;
+              //nvgBeginPath(vg);
+              //  nvgMoveTo(vg,   in.x,in.y);
+              //  nvgLineTo(vg,  nrmlEnd.x, nrmlEnd.y);
+              //nvgStroke(vg);
+              //
               //nvgBezierTo(vg, halfx,out.y, halfx,in.y, in.x,in.y);
             }
           }
