@@ -120,13 +120,16 @@
 // -todo: debug bezier normals - another bug from copying lines but not replacing cnct.dest / src
 // -todo: make inputs look at outputs slots instead of their connecting node
 // -todo: draw slots above nodes
+// -todo: make slots average between their sources and directions
+// -todo: make slot drawing into a function
 
+// todo: make a way to access the slot connected to a node instead of just the nodes connected to a slot
 // todo: draw slots at the same time as nodes so that they have the same draw order
-// todo: draw message node slots as sliding angles
-// todo: make slots average between their sources and directions
+// todo: refine slots to be closer together and more linear in their connection
 // todo: make bnd also work for message passing nodes
 // todo: put node type into written file
 // todo: fix deselection of slots
+// todo: draw message node slots as sliding angles
 // todo: make one node snap to another node
 // todo: use scroll wheel and nanovg scale transforms to zoom in and out
 // todo: group ui state variables together - priSel, connecting
@@ -645,7 +648,7 @@ v2              out_cntr(node const& n, f32 r)
 {
   return v2(n.P.x + NODE_SZ.x/2, n.P.y + NODE_SZ.y + r);
 }
-bnd             drw_node(NVGcontext* vg,      // drw_node is draw node
+bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
                             int preicon,
                           node const& n,
                            NVGcolor col,
@@ -1169,6 +1172,56 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
   //  nvgStrokeWidth(vg, rthk);
   //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
   //nvgStroke(vg);
+}
+
+void           slot_draw(NVGcontext* vg, u64 idx, bool isOut=true, bool highlight=false)
+{
+  nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
+  nvgStrokeWidth(vg, 3.f);
+
+  slot&  slt = isOut? slots_out[idx]  :  slots_in[idx];
+  v2     out = slt.P;
+  v2       N = slt.N;
+  //bool inSlt = len(pntr-out) < io_rad;
+
+  NVGcolor fillClr;
+  if(isOut){
+    if(idx==slotInSel) fillClr = nvgRGBAf(1.f,   1.f,   .5f,   1.f);
+    else if(highlight) fillClr = nvgRGBAf( .36f, 1.f,   .36f,  1.f);
+    else               fillClr = nvgRGBAf( .18f,  .75f, .18f,  1.f);
+    nvgFillColor(vg, fillClr);
+  }else{
+    if(idx==slotInSel) fillClr = nvgRGBAf(1.f,   1.f,   .5f,  1.f);
+    else if(highlight) fillClr = nvgRGBAf( .36f,  .9f, 1.f,   1.f);
+    else               fillClr = nvgRGBAf( .18f,  .6f,  .75f, 1.f);
+    nvgFillColor(vg, fillClr);
+  }
+
+  nvgBeginPath(vg);
+    nvgCircle(vg, out.x, out.y, io_rad);
+  nvgFill(vg);
+  nvgStroke(vg);
+
+  // slot triangle drawing
+  f32  triRad = io_rad - 2.f;
+  auto inrClr = fillClr;
+  inrClr.r += 0.2f;
+  inrClr.g += 0.2f;
+  inrClr.b += 0.2f;
+  nvgFillColor(vg, inrClr);
+
+  nvgBeginPath(vg);
+  nvgResetTransform(vg);
+  nvgTranslate(vg, out.x, out.y);             // translate comes before rotate here because nanovg 'premultiplies' transformations instead of multiplying them in for some reason. this reverses the order of transformations and can be seen in the source for nanovg
+  nvgRotate(vg, normalToAngle(N) + (isOut? -PIf : PIf)/2.f );
+
+  nvgMoveTo(vg, -0.707f*triRad, -0.707f*triRad);
+  nvgLineTo(vg,  0.707f*triRad, -0.707f*triRad);
+  nvgLineTo(vg,  0, triRad);
+
+  nvgClosePath(vg);
+  nvgFill(vg);
+  nvgResetTransform(vg);
 }
 
 void        debug_coords(v2 a)
@@ -1697,7 +1750,7 @@ ENTRY_DECLARATION
               }
 
               float round = secSel==ndOrdr? 0 : 1.f;
-              nbnds[ndOrdr] = drw_node(vg, 0, n, clr, round);              
+              nbnds[ndOrdr] = node_draw(vg, 0, n, clr, round);              
 
               SECTION(border test)
               {
@@ -1745,84 +1798,90 @@ ENTRY_DECLARATION
           SECTION(draw slots)
           {
             nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
-            nvgStrokeWidth(vg, 3.f);
+            nvgStrokeWidth(vg, BORDER);
             TO(slots_out.size(),i){
-              slot&  slt = slots_out[i];
-              v2     out = slt.P;
-              v2       N = slt.N;
-              bool inSlt = len(pntr-out) < io_rad;
+              bool inSlot = len(pntr-slots_out[i].P) < io_rad;
+              slot_draw(vg, i, true, inSlot);
 
-              NVGcolor fillClr;
-              if(i==slotInSel) fillClr = nvgRGBAf(1.f,   1.f,   .5f,   1.f);
-              else if(inSlt)   fillClr = nvgRGBAf( .36f, 1.f,   .36f,  1.f);
-              else             fillClr = nvgRGBAf( .18f,  .75f, .18f,  1.f);
-              nvgFillColor(vg, fillClr);
-
-              nvgBeginPath(vg);
-              nvgCircle(vg, out.x, out.y, io_rad);
-              nvgFill(vg);
-              nvgStroke(vg);
-
-              // slot triangle drawing
-              f32  triRad = io_rad - 2.f;
-              auto inrClr = fillClr;
-              inrClr.r += 0.2f;
-              inrClr.g += 0.2f;
-              inrClr.b += 0.2f;
-              nvgFillColor(vg, inrClr);
-
-              nvgBeginPath(vg);
-              nvgResetTransform(vg);
-              nvgTranslate(vg, out.x, out.y);             // translate comes before rotate here because nanovg 'premultiplies' transformations instead of multiplying them in for some reason. this reverses the order of transformations and can be seen in the source for nanovg
-              nvgRotate(vg, normalToAngle(N)-PIf/2.f );
-
-              nvgMoveTo(vg, -0.707f*triRad, -0.707f*triRad);
-              nvgLineTo(vg,  0.707f*triRad, -0.707f*triRad);
-              nvgLineTo(vg,  0, triRad);
-
-              nvgClosePath(vg);
-              nvgFill(vg);
-              nvgResetTransform(vg);
+              //slot&  slt = slots_out[i];
+              //v2     out = slt.P;
+              //v2       N = slt.N;
+              //bool inSlt = len(pntr-out) < io_rad;
+              //
+              //NVGcolor fillClr;
+              //if(i==slotInSel) fillClr = nvgRGBAf(1.f,   1.f,   .5f,   1.f);
+              //else if(inSlt)   fillClr = nvgRGBAf( .36f, 1.f,   .36f,  1.f);
+              //else             fillClr = nvgRGBAf( .18f,  .75f, .18f,  1.f);
+              //nvgFillColor(vg, fillClr);
+              //
+              //nvgBeginPath(vg);
+              //nvgCircle(vg, out.x, out.y, io_rad);
+              //nvgFill(vg);
+              //nvgStroke(vg);
+              //
+              //// slot triangle drawing
+              //f32  triRad = io_rad - 2.f;
+              //auto inrClr = fillClr;
+              //inrClr.r += 0.2f;
+              //inrClr.g += 0.2f;
+              //inrClr.b += 0.2f;
+              //nvgFillColor(vg, inrClr);
+              //
+              //nvgBeginPath(vg);
+              //nvgResetTransform(vg);
+              //nvgTranslate(vg, out.x, out.y);             // translate comes before rotate here because nanovg 'premultiplies' transformations instead of multiplying them in for some reason. this reverses the order of transformations and can be seen in the source for nanovg
+              //nvgRotate(vg, normalToAngle(N) -PIf/2.f );
+              //
+              //nvgMoveTo(vg, -0.707f*triRad, -0.707f*triRad);
+              //nvgLineTo(vg,  0.707f*triRad, -0.707f*triRad);
+              //nvgLineTo(vg,  0, triRad);
+              //
+              //nvgClosePath(vg);
+              //nvgFill(vg);
+              //nvgResetTransform(vg);
             }
             TO(slots_in.size(),i){
-              slot&  slt = slots_in[i];
-              v2      in = slt.P;
-              v2       N = slt.N;
-              bool inSlt = len(pntr-in) < io_rad;
+              bool inSlot = len(pntr-slots_in[i].P) < io_rad;
+              slot_draw(vg, i, false, inSlot);
 
-              NVGcolor fillClr;
-              if(i==slotInSel) fillClr = nvgRGBAf(1.f,   1.f,   .5f,  1.f);
-              else if(inSlt)   fillClr = nvgRGBAf( .36f,  .9f, 1.f,   1.f);
-              else             fillClr = nvgRGBAf( .18f,  .6f,  .75f, 1.f);
-              nvgFillColor(vg, fillClr);
-
-              nvgBeginPath(vg);
-              nvgCircle(vg, in.x, in.y, io_rad);
-              nvgFill(vg);
-              nvgStroke(vg);
-
-              // slot triangle drawing
-              f32  triRad = io_rad - 2.f;
-              auto inrClr = fillClr;
-              inrClr.r += 0.2f;
-              inrClr.g += 0.2f;
-              inrClr.b += 0.2f;
-              nvgFillColor(vg, inrClr);
-
-              nvgBeginPath(vg);
-              nvgResetTransform(vg);
-              nvgTranslate(vg, in.x, in.y);             // translate comes before rotate here because nanovg 'premultiplies' transformations instead of multiplying them in for some reason. this reverses the order of transformations and can be seen in the source for nanovg
-              nvgRotate(vg, normalToAngle(N)+PIf/2.f );
-
-              nvgMoveTo(vg, -0.707f*triRad, -0.707f*triRad);
-              nvgLineTo(vg,  0.707f*triRad, -0.707f*triRad);
-              nvgLineTo(vg,  0, triRad);
-
-              nvgClosePath(vg);
-              nvgFill(vg);
-              nvgResetTransform(vg);
-
-              //drw_rail(vg, slt.P, nodes[slt.nidx].P);
+              //slot&  slt = slots_in[i];
+              //v2      in = slt.P;
+              //v2       N = slt.N;
+              //bool inSlt = len(pntr-in) < io_rad;
+              //
+              //NVGcolor fillClr;
+              //if(i==slotInSel) fillClr = nvgRGBAf(1.f,   1.f,   .5f,  1.f);
+              //else if(inSlt)   fillClr = nvgRGBAf( .36f,  .9f, 1.f,   1.f);
+              //else             fillClr = nvgRGBAf( .18f,  .6f,  .75f, 1.f);
+              //nvgFillColor(vg, fillClr);
+              //
+              //nvgBeginPath(vg);
+              //nvgCircle(vg, in.x, in.y, io_rad);
+              //nvgFill(vg);
+              //nvgStroke(vg);
+              //
+              //// slot triangle drawing
+              //f32  triRad = io_rad - 2.f;
+              //auto inrClr = fillClr;
+              //inrClr.r += 0.2f;
+              //inrClr.g += 0.2f;
+              //inrClr.b += 0.2f;
+              //nvgFillColor(vg, inrClr);
+              //
+              //nvgBeginPath(vg);
+              //nvgResetTransform(vg);
+              //nvgTranslate(vg, in.x, in.y);             // translate comes before rotate here because nanovg 'premultiplies' transformations instead of multiplying them in for some reason. this reverses the order of transformations and can be seen in the source for nanovg
+              //nvgRotate(vg, normalToAngle(N)+PIf/2.f );
+              //
+              //nvgMoveTo(vg, -0.707f*triRad, -0.707f*triRad);
+              //nvgLineTo(vg,  0.707f*triRad, -0.707f*triRad);
+              //nvgLineTo(vg,  0, triRad);
+              //
+              //nvgClosePath(vg);
+              //nvgFill(vg);
+              //nvgResetTransform(vg);
+              //
+              ////drw_rail(vg, slt.P, nodes[slt.nidx].P);
             }
           }
           SECTION(draw selection box)
