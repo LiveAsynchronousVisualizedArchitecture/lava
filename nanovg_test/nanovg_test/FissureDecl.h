@@ -15,11 +15,11 @@ using namespace nanogui;
 const int     TITLE_MAX_LEN = 256;
 const v2      NODE_SZ       = { 256.f, 64.f };
 const v2      NODE_HALF_SZ  = NODE_SZ/2.f;
-const auto    NODE_CLR      = nvgRGBf(.1f,.4f,.5f);
+const auto    NODE_CLR      = nvgRGBf(.15f,.3f,.4f);
 const float   INFf          = std::numeric_limits<float>::infinity();
 const float   SIG_NANf      = std::numeric_limits<float>::signaling_NaN();
 const f32     IORAD         = 15.f;
-const int     BORDER        = 2;
+const float   BORDER        = 3.5f;
 
 
 extern "C" unsigned char Roboto_Regular_ttf[];
