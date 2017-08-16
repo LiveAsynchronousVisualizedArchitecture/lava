@@ -21,7 +21,6 @@ const float   SIG_NANf      = std::numeric_limits<float>::signaling_NaN();
 const f32     IORAD         = 15.f;
 const float   BORDER        = 3.5f;
 
-
 extern "C" unsigned char Roboto_Regular_ttf[];
 extern "C" unsigned int  Roboto_Regular_ttf_len;
 
@@ -37,20 +36,10 @@ using str = std::string;
 using e2i  =  Eigen::Vector2i;
 using e4f  =  Eigen::Vector4f;
 
-using     veci     =    vec<int>;
+using     veci     =    vec<i32>;
 using   vecstr     =    std::vector<str>;
 using   vec_v2     =    vec<v2>;
 using cnct_tbl     =    std::unordered_multimap<int,int>;
-
-struct    node
-{
-  enum Type { MSG=0, FLOW=1 };
-  v2        P; 
-  str     txt; 
-  Type   type;
-  LavaNode ln;
-};
-using   vec_nd     =    vec<node>;
 
 union      bnd 
 {
@@ -77,6 +66,21 @@ union      bnd
 };
 using vec_nbnd     =    vec<bnd>;
 
+struct    node
+{
+  enum Type { MSG=0, FLOW=1 };
+
+  v2        P = {0,0};
+  //bnd       B;
+  str     txt; 
+  Type   type = FLOW;
+  //LavaNode ln;
+
+  node(){}
+  node(str _txt, Type _type=FLOW, v2 _P=v2(0,0) ) : txt(_txt), P(_P), type(_type) {}
+};
+using   vec_nd     =    vec<node>;
+
 struct    cnct { 
   int src, dest;
   ui8 src_out, dest_in;
@@ -89,12 +93,72 @@ struct    cnct {
 };
 using  vec_con     =    vec<cnct>;
 
-struct    slot { v2 P; u64 nidx; v2 N; };
+struct    slot { 
+  v2 P; u64 nidx; v2 N; bool in=false;
+
+  slot(u64 nIdx, bool In=false) : nidx(nIdx), in(In), P(0,0), N(0,1) {}
+};
 using vec_slot     =    vec<slot>;
+
+
+class  GraphDB
+{
+public:
+  using NodeSlotMap = std::multimap<i32, i32>;   // The key is the index into the node array, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used.
+
+private:
+  vec_nd               nodes;
+  vec_nbnd              bnds;
+  veci                  ordr;
+  vec<bool>         selected;             // bitfield for selected nodes
+  vec_slot             slots;
+  NodeSlotMap     node_slots;
+
+public:
+  GraphDB(){}
+
+  i32      addNode(node n)
+  {
+    nodes.push_back(n);
+    i32 nodeIdx = (i32)(nodes.size()-1);
+    ordr.push_back( nodeIdx );
+    bnds.emplace_back();
+    selected.push_back(false);
+
+    return nodeIdx;
+  }
+  i32      addSlot(slot s)
+  {
+    slots.push_back(s);
+    i32 slotIdx = (i32)(slots.size() - 1);
+
+    auto iter = node_slots.insert({s.nidx, slotIdx});
+    
+    return slotIdx;
+  }
+  auto   nodeSlots(u64 nIdx) -> decltype(node_slots.find(nIdx))
+  {
+    auto iter = node_slots.find(nIdx);
+    return iter;
+  }
+  auto         end() -> decltype(node_slots.end()) { return node_slots.end(); } 
+  auto orderedNode(u64 order) -> node& { return nodes[ordr[order]]; }
+  auto        node(u64 nIdx) -> node& { return nodes[nIdx]; }
+  auto        slot(u64 sIdx) -> slot& { return slots[sIdx]; }
+  auto    getNodes() -> vec_nd&   { return nodes; }
+  auto    getSlots() -> vec_slot& { return slots; }
+  auto         bnd(u64 idx) -> bnd& { return bnds[idx]; }
+  bool        sel(u64 idx){ return selected[idx]; }
+  void        sel(u64 idx, bool s){ selected[idx] = s; }
+  i32       order(u64 idx){ return ordr[idx]; }
+  void      order(u64 idx, i32 o){ ordr[idx] = o; }
+  u64         nsz(){ return nodes.size(); }
+};
 
 struct FisData
 {
   GLFWwindow*         win = nullptr;                     // Platform 
+  GraphDB            grph;
 
   struct
   {
@@ -111,6 +175,20 @@ struct FisData
 
 
 
+
+
+//using NodeIdex    = i32;
+//
+//vec_slot          slots_in;
+//vec_slot         slots_out;
+//
+//void  getSlots(i32 nIdx)
+
+//nbnds.emplace_back( { n.P.x, n.P.y, n.P.x + , n.P.y  } );
+//
+//v2 P = v2(512,512);
+//nodes.push_back( {P,txt} );
+//nodes.back().type = type;
 
 //f32 ptSz, hudSz, guideSz;                              // ptSz is point size  |  hudSz is  heads up display size
 //

@@ -122,10 +122,18 @@
 // -todo: draw slots above nodes
 // -todo: make slots average between their sources and directions
 // -todo: make slot drawing into a function
+// -todo: make GraphDB that connects nodes and slots
+// -todo: use GraphDB::addNode in parallel with node_add()
+// -todo: draw from GraphDB
+// -todo: make order changing part of GraphDB
+// -todo: convert node movement to use GraphDB
 
-// todo: make a way to access the slot connected to a node instead of just the nodes connected to a slot
 // todo: draw slots at the same time as nodes so that they have the same draw order
-// todo: refine slots to be closer together and more linear in their connection
+// todo: make 'delete' and 'backspace' delete selected nodes
+// todo: make 'delete' and 'backspace' delete selected connections
+// todo: put in a max length of bezier connection drawing tangents based on the size of a node
+// todo: make a way to access the slot connected to a node instead of just the nodes connected to a slot
+// todo: refine slots to be closer together and more linear in their connection - maybe give them some leeway in how much they can rotate
 // todo: make bnd also work for message passing nodes
 // todo: put node type into written file
 // todo: fix deselection of slots
@@ -143,6 +151,7 @@
 // todo: add data to node for inputs
 // todo: add data to connection for input and output indices
 
+// idea: take out redudant node position + bnd information 
 // idea: look into quantized gradients of nanovg
 // idea: don't select a slot if it is under an existing node
 // idea: switch over to using json.hpp
@@ -511,8 +520,12 @@ bool            loadFile(str path)
 
 void            node_add(str txt, node::Type type=node::FLOW)
 {
-  v2 P = v2(512,512);
-  nodes.push_back( {P,txt} );
+  //v2 P = v2(512,512);
+  node n(txt, type);
+  n.P = v2(512,512);
+  nodes.push_back(n);
+
+  //nodes.push_back( {P,txt} );
   nodes.back().type = type;
   sels.push_back(false);
   nbnds.emplace_back();
@@ -1243,18 +1256,36 @@ ENTRY_DECLARATION
     {
       io_rad = IORAD;
 
-      nodes.push_back( { {300.f,300.f}, "one",   node::FLOW } );
-      nodes.push_back( { {300.f,500.f}, "two",   node::FLOW } );
-      nodes.push_back( { {300.f,300.f}, "three", node::MSG  } );
+      // nodes
+      fd.grph.addNode( node("one",   node::FLOW, {300.f,300.f}) );
+      fd.grph.addNode( node("two",   node::FLOW, {300.f,500.f}) );
+      //fd.grph.addNode( node("three", node::FLOW, {300.f,300.f}) );
 
-      slots_out.push_back( {{0.f,0.f}, 0, {0,1.f} } );
-      slots_out_nrmls.push_back( {0,0} );
+      //fd.grph.addNode( { {300.f,300.f}, "one",   node::FLOW } );
+      //fd.grph.addNode( { {300.f,500.f}, "two",   node::FLOW } );
+      //fd.grph.addNode( { {300.f,300.f}, "three", node::MSG  } );
 
-      slots_in.push_back( {{0.f,0.f}, 1, {0,1.f} } );
-      slots_in_nrmls.push_back( {0,0} );
+      nodes.push_back( node("one",   node::FLOW, {300.f,300.f}) );
+      nodes.push_back( node("two",   node::FLOW, {300.f,500.f}) );
+      //nodes.push_back( node("three", node::FLOW, {300.f,300.f}) );
 
-      slots_in.push_back( {{0.f,0.f}, 2, {0,1.f} } );
-      slots_in_nrmls.push_back( {0,0} );
+      //nodes.push_back( { {300.f,300.f}, "one",   node::FLOW } );
+      //nodes.push_back( { {300.f,500.f}, "two",   node::FLOW } );
+      //nodes.push_back( { {300.f,300.f}, "three", node::MSG  } );
+
+      // slots
+      fd.grph.addSlot( slot(0, false) );
+      fd.grph.addSlot( slot(1,  true) );
+      fd.grph.addSlot( slot(2,  true) );
+
+      //slots_out.push_back( {{0.f,0.f}, 0, {0,1.f} } );
+      //slots_out_nrmls.push_back( {0,0} );
+
+      //slots_in.push_back( {{0.f,0.f}, 1, {0,1.f} } );
+      //slots_in_nrmls.push_back( {0,0} );
+
+      //slots_in.push_back( {{0.f,0.f}, 2, {0,1.f} } );
+      //slots_in_nrmls.push_back( {0,0} );
 
       for(auto& n : nodes){
         nbnds.push_back( {n.P.x, n.P.y, n.P.x+NODE_SZ.x, n.P.y+NODE_SZ.y} );
@@ -1355,8 +1386,11 @@ ENTRY_DECLARATION
           else   printf("\nSave did not write successfully to %s\n", outPath);
         }
       });
-      flowBtn->setCallback([](){
+
+      GraphDB* grphPtr = &fd.grph;
+      flowBtn->setCallback([grphPtr](){
         node_add("new node");
+        grphPtr->addNode( node("new node", node::FLOW) );
       });
       msgBtn->setCallback([](){
         node_add("message node", node::MSG);
@@ -1392,10 +1426,10 @@ ENTRY_DECLARATION
   glfwSetTime(0);
   SECTION(main loop)
   {
-    v2 pntr = {0,0};
+    GraphDB& grph = fd.grph;
+    v2       pntr = {0,0};
     double cx, cy, t, dt, avgFps=60, prevt=0, cpuTime=0;
     float pxRatio;
-		//int ww, wh,
     int fbWidth, fbHeight;
 
     while(!glfwWindowShouldClose(fd.win))
@@ -1455,7 +1489,9 @@ ENTRY_DECLARATION
         {
           if(drgbox){
             TO(sz,i){
-              sels[i] = isIn(nbnds[i],drgbnd);
+              bool selected = isIn(grph.bnd(i), drgbnd);
+              grph.sel(i, selected);
+              //sels[i] = isIn(nbnds[i],drgbnd);
               //sels[ndOrdr] = inNode;
             }
           }
@@ -1469,11 +1505,16 @@ ENTRY_DECLARATION
           bool inAny = false;
           FROM(sz,i)                                                // loop backwards so that the top nodes are dealt with first
           {
-            int  ndOrdr = nd_ordr[i];
-            node&     n = nodes[ndOrdr];
-            bool inNode = isIn(pntr.x,pntr.y, nbnds[ndOrdr]);
+            int  ndOrdr = grph.order(i);
+            node&     n = grph.node(i);
+            bool inNode = isIn(pntr.x,pntr.y, grph.bnd(ndOrdr) );
             inAny      |= inNode;
                      
+            //int  ndOrdr = nd_ordr[i];
+            //node&     n = grph.orderedNode(i);
+            //node&     n = nodes[ndOrdr];
+            //bool inNode = isIn(pntr.x,pntr.y, nbnds[ndOrdr]);
+
             //SECTION(secondary selection (for connections) )
             //{
             //  if(inNode && rtDn && !prevRtDn)
@@ -1499,9 +1540,14 @@ ENTRY_DECLARATION
                 priSel     = ndOrdr;
                 drgP       = pntr;
 
-                if(!sels[ndOrdr]){
-                  TO(sels.size(),i) sels[i]=false;
-                  sels[ndOrdr] = true;
+                //if(!sels[ndOrdr]){
+                //  TO(sels.size(),i) sels[i]=false;
+                //  sels[ndOrdr] = true;
+                //}
+
+                if(!grph.sel(ndOrdr)){
+                  TO(sels.size(),i) grph.sel(i,false);
+                  grph.sel(ndOrdr,true);
                 }
                 break;                                                  // without breaking from the loop, a node could be moved down and hit again
               }
@@ -1518,14 +1564,16 @@ ENTRY_DECLARATION
           i32  inClk = -1;
           i32 outClk = -1;
           if(lftDn && !prevLftDn){
-            TO(slots_out.size(), i){
-              bool inSlt = len(pntr - slots_out[i].P) < io_rad;
+            //TO(slots_out.size(), i){
+            TO(grph.getSlots().size(), i){
+              //bool inSlt = len(pntr - slots_out[i].P) < io_rad;
+              bool inSlt = len(pntr - grph.slot(i).P) < io_rad;
               if(inSlt) outClk = (i32)i;
             }
-            TO(slots_in.size(),  i){ 
-              bool inSlt = len(pntr - slots_in[i].P) < io_rad;
-              if(inSlt) inClk = (i32)i;           
-            }
+            //TO(slots_in.size(),  i){ 
+            //  bool inSlt = len(pntr - slots_in[i].P) < io_rad;
+            //  if(inSlt) inClk = (i32)i;           
+            //}
           }
 
           if(outClk > -1){
@@ -1559,54 +1607,29 @@ ENTRY_DECLARATION
                 cncts.erase(curCnct);                                   // have to find another way to index connections if they are going to be referenced, since any deletion will invalidate their positions
 
               slotOutSel = slotInSel = -1;
-
-              //else if(slotOutSel > -1){
-              //  cncts.push_back( {slotOutSel, inClk} );
-              //  slotOutSel = slotInSel = -1;
             }            
             else 
               slotInSel = inClk;
           }
-
-          //if(inSlt && slotOutSel != i){
-          //  if(slotInSel<0){ slotOutSel = (i32)i; }                    // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
-          //  else{ 
-          //    cncts.push_back( {(i32)i, slotInSel} ); 
-          //  }
-          //}else slotOutSel = -1;
-          //
-          //if(lftDn && !prevLftDn){
-          //  TO(slots_in.size(),  i){ 
-          //    bool inSlt = len(pntr - slots_in[i].P) < io_rad;
-          //
-          //    if(inSlt && slotInSel != i) slotInSel =  (i32)i;             // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
-          //    else                        slotInSel = -1;
-          //  }
-          //
-          //  TO(slots_out.size(), i){ 
-          //    bool inSlt = len(pntr - slots_out[i].P) < io_rad;
-          //
-          //    if(inSlt && slotOutSel != i){ 
-          //      
-          //      if(slotInSel<0){ slotOutSel = (i32)i; }                    // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
-          //      else{ 
-          //        cncts.push_back( {(i32)i, slotInSel} ); 
-          //      }
-          //    }else slotOutSel = -1;
-          //  }
-          //}
         }
       }
       SECTION(movement)
       {
         SECTION(node movement)
         {
-          int sz = (int)nd_ordr.size();
-          TO(sz,i)
+          //int sz = (int)nd_ordr.size();
+          //auto sz = fd.grph.getNodes().size();
+          //auto sz = grph.nsz();
+          //
+          //int  ndOrdr = nd_ordr[i];
+          //node&     n = nodes[ndOrdr];
+          //bool selctd = ndOrdr==priSel || sels[ndOrdr];
+
+          TO(grph.nsz(),i)
           {
-            int  ndOrdr = nd_ordr[i];
-            node&     n = nodes[ndOrdr];
-            bool selctd = ndOrdr==priSel || sels[ndOrdr];
+            int  ndOrdr = grph.order(i);
+            node&     n = grph.node(ndOrdr);
+            bool selctd = ndOrdr==priSel || grph.sel(ndOrdr);
 
             if( priSel>-1 && selctd ){           // if a node is primary selected (left mouse down on a node) or the selected flag is set
               n.P +=  pntr - prevPntr;
@@ -1737,62 +1760,22 @@ ENTRY_DECLARATION
           }
           SECTION(draw nodes)
           {
-            int sz = (int)nd_ordr.size();
+            //int sz = (int)nd_ordr.size();
+            auto sz = fd.grph.getNodes().size();
             TO(sz,i)
             {
-              int  ndOrdr = nd_ordr[i];
-              node&     n = nodes[ndOrdr];
-              bool selctd = ndOrdr==priSel || sels[ndOrdr];
+              int  ndOrdr = fd.grph.order(i); // nd_ordr[i];
+              auto      n = fd.grph.node(ndOrdr);
+              //node&     n = nodes[ndOrdr];
+              //bool selctd = ndOrdr==priSel || sels[ndOrdr];
+              bool selctd = ndOrdr==priSel || fd.grph.sel(ndOrdr);
 
               auto clr = NODE_CLR;
-              if(selctd){
-                clr = nvgRGBf(.5f,.4f,.1f);
-              }
+              if(selctd){ clr = nvgRGBf(.5f,.4f,.1f); }
 
               float round = secSel==ndOrdr? 0 : 1.f;
-              nbnds[ndOrdr] = node_draw(vg, 0, n, clr, round);              
-
-              SECTION(border test)
-              {
-                //  v2 ncntr = n.P + NODE_SZ/2.f;
-                //  v2 hlfsz = NODE_SZ / 2.f;
-                //  v2  pdir = norm(pntr - ncntr) * len(hlfsz);          // * normsz;
-                //  
-                //  v2 ds = sign(pdir);                                  // ds is direction sign
-                //  if( abs(pdir.x) > hlfsz.x ){
-                //    pdir /= abs(pdir.x)/hlfsz.x;
-                //  }else{
-                //    pdir /= abs(pdir.y)/hlfsz.y;
-                //  }
-                //  
-                //  f32        r = NODE_SZ.y/2.f;
-                //  v2  circCntr = (pdir.x<0)? n.P+v2(r,r)  :  n.P+NODE_SZ-r;
-                //  v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, r);
-                //  bool     hit = !hasInf(intrsct);
-                //  if(hit) pdir = intrsct - ncntr;
-                //  else continue;
-
-                //  v2 dirEnd = ncntr + pdir*1.f;
-                //  nvgBeginPath(vg);
-                //   nvgMoveTo(vg, ncntr.x,ncntr.y);
-                //   nvgLineTo(vg, dirEnd.x, dirEnd.y);
-                //  nvgStrokeWidth(vg, 3.f);
-                //  nvgStroke(vg);
-
-                //  nvgBeginPath(vg);
-                //   nvgCircle(vg, circCntr.x,circCntr.y, r);
-                //  nvgStrokeWidth(vg, 1.f);
-                //  nvgStroke(vg);
-
-                //  nvgBeginPath(vg);
-                //   nvgCircle(vg, intrsct.x,intrsct.y, 4.f);
-                //  nvgFill(vg);
-                //  
-                //  v2 brdr = ncntr + pdir + norm(pdir)*8.f;
-                //  nvgBeginPath(vg);
-                //   nvgCircle(vg, brdr.x,brdr.y, 8.f);
-                //  nvgFill(vg);
-              }
+              fd.grph.bnd(ndOrdr) = node_draw(vg, 0, n, clr, round);
+              //nbnds[ndOrdr] = node_draw(vg, 0, n, clr, round);
             }
           }
           SECTION(draw slots)
@@ -1943,6 +1926,82 @@ ENTRY_DECLARATION
 
 
 
+//if(inSlt && slotOutSel != i){
+//  if(slotInSel<0){ slotOutSel = (i32)i; }                    // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
+//  else{ 
+//    cncts.push_back( {(i32)i, slotInSel} ); 
+//  }
+//}else slotOutSel = -1;
+//
+//if(lftDn && !prevLftDn){
+//  TO(slots_in.size(),  i){ 
+//    bool inSlt = len(pntr - slots_in[i].P) < io_rad;
+//
+//    if(inSlt && slotInSel != i) slotInSel =  (i32)i;             // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
+//    else                        slotInSel = -1;
+//  }
+//
+//  TO(slots_out.size(), i){ 
+//    bool inSlt = len(pntr - slots_out[i].P) < io_rad;
+//
+//    if(inSlt && slotOutSel != i){ 
+//      
+//      if(slotInSel<0){ slotOutSel = (i32)i; }                    // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
+//      else{ 
+//        cncts.push_back( {(i32)i, slotInSel} ); 
+//      }
+//    }else slotOutSel = -1;
+//  }
+//}
+
+//else if(slotOutSel > -1){
+//  cncts.push_back( {slotOutSel, inClk} );
+//  slotOutSel = slotInSel = -1;
+
+//
+//int ww, wh,
+
+//SECTION(border test)
+//{
+//  //  v2 ncntr = n.P + NODE_SZ/2.f;
+//  //  v2 hlfsz = NODE_SZ / 2.f;
+//  //  v2  pdir = norm(pntr - ncntr) * len(hlfsz);          // * normsz;
+//  //  
+//  //  v2 ds = sign(pdir);                                  // ds is direction sign
+//  //  if( abs(pdir.x) > hlfsz.x ){
+//  //    pdir /= abs(pdir.x)/hlfsz.x;
+//  //  }else{
+//  //    pdir /= abs(pdir.y)/hlfsz.y;
+//  //  }
+//  //  
+//  //  f32        r = NODE_SZ.y/2.f;
+//  //  v2  circCntr = (pdir.x<0)? n.P+v2(r,r)  :  n.P+NODE_SZ-r;
+//  //  v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, r);
+//  //  bool     hit = !hasInf(intrsct);
+//  //  if(hit) pdir = intrsct - ncntr;
+//  //  else continue;
+//
+//  //  v2 dirEnd = ncntr + pdir*1.f;
+//  //  nvgBeginPath(vg);
+//  //   nvgMoveTo(vg, ncntr.x,ncntr.y);
+//  //   nvgLineTo(vg, dirEnd.x, dirEnd.y);
+//  //  nvgStrokeWidth(vg, 3.f);
+//  //  nvgStroke(vg);
+//
+//  //  nvgBeginPath(vg);
+//  //   nvgCircle(vg, circCntr.x,circCntr.y, r);
+//  //  nvgStrokeWidth(vg, 1.f);
+//  //  nvgStroke(vg);
+//
+//  //  nvgBeginPath(vg);
+//  //   nvgCircle(vg, intrsct.x,intrsct.y, 4.f);
+//  //  nvgFill(vg);
+//  //  
+//  //  v2 brdr = ncntr + pdir + norm(pdir)*8.f;
+//  //  nvgBeginPath(vg);
+//  //   nvgCircle(vg, brdr.x,brdr.y, 8.f);
+//  //  nvgFill(vg);
+//}
 
 //f32  triRad = io_rad - 2.f;
 //auto inrClr = fillClr;
