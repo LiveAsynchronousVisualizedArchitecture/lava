@@ -106,7 +106,9 @@ using vec_slot     =    vec<slot>;
 class  GraphDB
 {
 public:
-  using NodeSlotMap = std::multimap<u64, u64>;   // The key is the index into the node array, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used.
+  using NodeSlotMap = std::multimap<u64, u64>;          // The key is the index into the node array, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used.
+  using CnctMap     = std::multimap<u32, u32>;
+  using SrcMap      = std::multimap<u32, u32>;
 
 private:
   vec_nd               nodes;
@@ -115,35 +117,48 @@ private:
   vec<bool>         selected;             // bitfield for selected nodes
   vec_slot             slots;
   NodeSlotMap     node_slots;
+  CnctMap          out_cncts;
+  SrcMap            in_cncts;
 
 public:
   GraphDB(){}
 
-  i32       addNode(node n)
+  u64       addNode(node n)
   {
     nodes.push_back(n);
-    i32 nodeIdx = (i32)(nodes.size()-1);
-    ordr.push_back( nodeIdx );
+    u64 nodeIdx = (u64)(nodes.size()-1);
+    ordr.push_back( (i32)nodeIdx );
     bnds.emplace_back();
     selected.push_back(false);
 
     return nodeIdx;
   }
-  i32       addSlot(slot s)
+  u64       addSlot(slot s)
   {
     slots.push_back(s);
-    i32 slotIdx = (i32)(slots.size() - 1);
+    u64 slotIdx = (u64)(slots.size() - 1);
 
     auto iter = node_slots.insert({s.nidx, slotIdx});
     
     return slotIdx;
+  }
+  void      addCnct(u32 src, u32 dest)
+  {
+    auto srcIter = in_cncts.find(dest);
+    if(srcIter != in_cncts.end()){
+      in_cncts.erase(dest);
+    }
+
+    out_cncts.insert({src, dest});
+    in_cncts.insert({dest, src});
   }
   auto    nodeSlots(u64 nIdx) -> decltype(node_slots.find(nIdx))
   {
     auto iter = node_slots.find(nIdx);
     return iter;
   }
-  auto          end() -> decltype(node_slots.end()) { return node_slots.end(); } 
+  auto      slotEnd() -> decltype(node_slots.end()) { return node_slots.end(); } 
+  auto      cnctEnd() -> decltype(out_cncts.end())  { return out_cncts.end(); }
   auto  orderedNode(u64 order) -> node& { return nodes[ordr[order]]; }
   void   moveToBack(u64 nIdx)
   {
@@ -159,10 +174,24 @@ public:
     //auto&  o = order;
     //move_backward(a.front()+i+1ul, a.back(), a.back()-1);
   }
-  auto         node(u64 nIdx) -> node& { return nodes[nIdx]; }
-  auto         slot(u64 sIdx) -> slot& { return slots[sIdx]; }
+  auto         node(u64 nIdx)  -> node& { return nodes[nIdx]; }
+  auto         slot(u64 sIdx)  -> slot& { return slots[sIdx]; }
   auto     getNodes() -> vec_nd&   { return nodes; }
   auto     getSlots() -> vec_slot& { return slots; }
+  auto      srcSlot(u32 destSlotIdx) -> struct slot* 
+  {
+    auto ci = in_cncts.find(destSlotIdx);
+    if(ci != in_cncts.end()){
+      struct slot& s = slot(ci->second);
+      return &s;
+    }else 
+      return nullptr;
+  }
+  auto    destSlots(u32 srcSlotIdx) -> decltype(out_cncts.end())
+  {
+    return out_cncts.find(srcSlotIdx);
+  }
+  auto        cncts() -> decltype(out_cncts.begin()) { return out_cncts.begin(); }
   auto          bnd(u64 idx) -> bnd& { return bnds[idx]; }
   auto       bounds() -> vec_bnd& { return bnds; }
   bool          sel(u64 idx){ return selected[idx]; }
@@ -173,7 +202,8 @@ public:
   u64           nsz(){ return nodes.size(); }
   u64           ssz(){ return slots.size(); }
   u64         selsz(){ return selected.size(); }
-  
+  u64        cnctsz(){ return out_cncts.size(); }
+
 };
 
 struct FisData

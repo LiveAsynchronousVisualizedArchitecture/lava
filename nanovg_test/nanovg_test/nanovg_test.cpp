@@ -140,25 +140,33 @@
 // -todo: put move to back in GraphDB
 // -todo: take out global order
 // -todo: make node selection use graphdb
+// -todo: make global state 
+// -todo: debug drawing order of first node's out slot - wasn't using the node order index for the lookup or key comparison
+// -todo: debug message nodes not showing up - just needed to change the event handler to add the node to the graph
+// -todo: build in connections to graphdb 
+// -todo: put in a max length of bezier connection drawing tangents based on the size of a node - min with NODE_SZ.x/2
+// -todo: make a way to access the slot connected to a node instead of just the nodes connected to a slot - done with grph
+// -todo: convert connections to use graphdb
 
-// todo: debug drawing order of first node's out slot
-// todo: debug message nodes not showing up 
-// todo: build in connections to graphdb 
-// todo: convert connections to use graphdb
+// todo: make in/dest slot move too
+// todo: take out global connection vector
+// todo: make addCnct delete a connection if the input is already connected
+// todo: make slot movement use graphdb
+// todo: solve assert(win==NULL) on window resize
+// todo: make graphToStr use graphdb
+// todo: make strToGraph use graphdb
 // todo: make 'delete' and 'backspace' delete selected nodes
 // todo: make 'delete' and 'backspace' delete selected connections
-// todo: put in a max length of bezier connection drawing tangents based on the size of a node
-// todo: make a way to access the slot connected to a node instead of just the nodes connected to a slot
 // todo: refine slots to be closer together and more linear in their connection - maybe give them some leeway in how much they can rotate
 // todo: make bnd also work for message passing nodes
 // todo: put node type into written file
 // todo: fix deselection of slots
+// idea: make drawing of one src to multiple connections draw first to the average of all the slots, then draw to all the dest slots
 // todo: draw message node slots as sliding angles
 // todo: make one node snap to another node
 // todo: use scroll wheel and nanovg scale transforms to zoom in and out
 // todo: group ui state variables together - priSel, connecting
 // todo: make two snapped nodes group together and be dragged together
-// todo: make global state 
 // todo: separate finding node the pointer is inside from the action to take
 // todo: print to console with ReadFile.cpp function
 // todo: make two nodes execute in order
@@ -205,9 +213,11 @@
 
 #define ENTRY_DECLARATION int main(void)
 #ifdef _MSC_VER
+  // not needed due to having glfw and glew compiled into single files
   //#pragma comment(lib, "glfw3dll.lib")
-  #pragma comment(lib, "opengl32.lib")
   //#pragma comment(lib, "glew32.lib")
+
+  #pragma comment(lib, "opengl32.lib")
 
   #if defined(_DEBUG)
     #define USE_CONSOLE                                 // turning this off will use the windows subsystem in the linker and change the entry point to WinMain() so that no command line/console will appear
@@ -253,8 +263,8 @@ float              ndOfstY;
 float                  ndx = 512.f;
 float                  ndy = 512.f;
 vec_nd               nodes;
-vec_con              cncts;             // cncts is connections - the vector of connection structures
-cnct_tbl          cnct_src;
+//vec_con              cncts;             // cncts is connections - the vector of connection structures
+//cnct_tbl          cnct_src;
 
 i32              slotInSel = -1;
 i32             slotOutSel = -1;
@@ -405,135 +415,136 @@ v2        angleToNormal(f32 angle)
   return { cos(angle), sin(angle) };
 }
 
-str           graphToStr()
-{
-  using namespace std;
-  
-  Jzon::Node nds = Jzon::object();
-  SECTION(nodes)
-  {
-    auto sz = nodes.size();
-
-    Jzon::Node nd_txt = Jzon::array();
-    TO(sz,i) nd_txt.add(nodes[i].txt);
-
-    Jzon::Node   nd_x = Jzon::array();
-    TO(sz,i) nd_x.add(nodes[i].P.x);
-
-    Jzon::Node   nd_y = Jzon::array();
-    TO(sz,i) nd_y.add(nodes[i].P.y);
-
-    //Jzon::Node ordr = Jzon::array();
-    //TO(sz,i) ordr.add(nd_ordr[i]);
-
-    nds.add("x",      nd_x);
-    nds.add("y",      nd_y);
-    nds.add("txt",  nd_txt);
-    //nds.add("order",  ordr);
-  }
-  Jzon::Node jcncts = Jzon::object();
-  SECTION(connections)
-  {
-    auto sz = cncts.size();
-    Jzon::Node src  = Jzon::array();
-    Jzon::Node dest = Jzon::array();
-
-    TO(sz,i) src.add(cncts[i].src);
-    TO(sz,i) dest.add(cncts[i].dest);
-
-    jcncts.add("src",   src);
-    jcncts.add("dest", dest);
-  }
-  
-  Jzon::Node graph = Jzon::object();
-  graph.add("nodes", nds);
-  graph.add("connections", jcncts);
-
-  //Jzon::Format format;
-  //format.newline    = true;
-  //format.indentSize = 1;
-  //format.spacing    = true;
-  //format.useTabs    = false;
-
-  Jzon::Writer w;
-  //w.setFormat(format);  // breaks reading for some reason
-  str s;
-  w.writeString(graph, s);
-
-  return s;
-}
-void          strToGraph(str const& s)
-{
-  cnct_src.clear();
-  cnct_dest.clear();
-
-  Jzon::Parser prs;
-  auto graph = prs.parseString(s);
-
-  auto nd_x   = graph.get("nodes").get("x");
-  auto nd_y   = graph.get("nodes").get("y");
-  auto nd_txt = graph.get("nodes").get("txt");
-  auto ordr   = graph.get("nodes").get("order");
-  auto src    = graph.get("connections").get("src");
-  auto dest   = graph.get("connections").get("dest");
-    
-  auto cnt = nd_x.getCount();
-  nodes.resize(cnt);  
-  TO(cnt,i) nodes[i].P.x = nd_x.get(i).toFloat();
-  TO(cnt,i) nodes[i].P.y = nd_y.get(i).toFloat();
-  TO(cnt,i) nodes[i].txt = nd_txt.get(i).toString();
-
-  auto cnct_cnt = src.getCount();
-  cncts.resize(cnct_cnt);
-  TO(cnct_cnt,i) cncts[i].src  = src.get(i).toInt();
-  TO(cnct_cnt,i) cncts[i].dest = dest.get(i).toInt();
-
-  for(auto c : cncts){
-    cnct_src.insert( {c.src, c.dest} );
-    cnct_dest.insert( {c.dest, c.src} );
-  }
-
-  //sels.resize(cnt);
-  //nbnds.resize(cnt);
-
-  //nd_ordr.resize(cnt);
-  //TO(cnt,i) nd_ordr[i] = ordr.get(i).toInt();
-
-  //TO(cnt,i) nd_ordr[i] = (int)i;
-}
-bool            saveFile(str path)
-{
-  str fileStr = graphToStr();
-  
-  FILE* f = fopen(path.c_str(), "w");
-  if(!f) return false;
-
-  size_t writeSz = fwrite(fileStr.c_str(), 1, fileStr.size(), f);
-  if(writeSz != fileStr.size()) return false;
-
-  int closeRet = fclose(f);
-  if(closeRet == EOF) return false;
-
-  return true;
-}
-bool            loadFile(str path)
-{
-  FILE* f = fopen(path.c_str(), "r");
-  if(!f) return false;
-  fseek(f, 0, SEEK_END);
-  str s;
-  s.resize( ftell(f) );
-  fseek(f, 0, SEEK_SET);
-
-  size_t redRet = fread( (void*)s.data(), 1, s.size(), f);
-  if(redRet != s.size()) return false; 
-
-  if(fclose(f) == EOF) return false;
-
-  strToGraph(s);
-
-  return true;
-}
+//inline str           graphToStr()
+//{
+//  using namespace std;
+//  
+//  Jzon::Node nds = Jzon::object();
+//  SECTION(nodes)
+//  {
+//    auto sz = nodes.size();
+//
+//    Jzon::Node nd_txt = Jzon::array();
+//    TO(sz,i) nd_txt.add(nodes[i].txt);
+//
+//    Jzon::Node   nd_x = Jzon::array();
+//    TO(sz,i) nd_x.add(nodes[i].P.x);
+//
+//    Jzon::Node   nd_y = Jzon::array();
+//    TO(sz,i) nd_y.add(nodes[i].P.y);
+//
+//    //Jzon::Node ordr = Jzon::array();
+//    //TO(sz,i) ordr.add(nd_ordr[i]);
+//
+//    nds.add("x",      nd_x);
+//    nds.add("y",      nd_y);
+//    nds.add("txt",  nd_txt);
+//    //nds.add("order",  ordr);
+//  }
+//  Jzon::Node jcncts = Jzon::object();
+//  SECTION(connections)
+//  {
+//    auto sz = cncts.size();
+//
+//    Jzon::Node src  = Jzon::array();
+//    Jzon::Node dest = Jzon::array();
+//
+//    TO(sz,i) src.add(cncts[i].src);
+//    TO(sz,i) dest.add(cncts[i].dest);
+//
+//    jcncts.add("src",   src);
+//    jcncts.add("dest", dest);
+//  }
+//  
+//  Jzon::Node graph = Jzon::object();
+//  graph.add("nodes", nds);
+//  graph.add("connections", jcncts);
+//
+//  //Jzon::Format format;
+//  //format.newline    = true;
+//  //format.indentSize = 1;
+//  //format.spacing    = true;
+//  //format.useTabs    = false;
+//
+//  Jzon::Writer w;
+//  //w.setFormat(format);  // breaks reading for some reason
+//  str s;
+//  w.writeString(graph, s);
+//
+//  return s;
+//}
+//void          strToGraph(str const& s)
+//{
+//  cnct_src.clear();
+//  cnct_dest.clear();
+//
+//  Jzon::Parser prs;
+//  auto graph = prs.parseString(s);
+//
+//  auto nd_x   = graph.get("nodes").get("x");
+//  auto nd_y   = graph.get("nodes").get("y");
+//  auto nd_txt = graph.get("nodes").get("txt");
+//  auto ordr   = graph.get("nodes").get("order");
+//  auto src    = graph.get("connections").get("src");
+//  auto dest   = graph.get("connections").get("dest");
+//    
+//  auto cnt = nd_x.getCount();
+//  nodes.resize(cnt);  
+//  TO(cnt,i) nodes[i].P.x = nd_x.get(i).toFloat();
+//  TO(cnt,i) nodes[i].P.y = nd_y.get(i).toFloat();
+//  TO(cnt,i) nodes[i].txt = nd_txt.get(i).toString();
+//
+//  auto cnct_cnt = src.getCount();
+//  cncts.resize(cnct_cnt);
+//  TO(cnct_cnt,i) cncts[i].src  = src.get(i).toInt();
+//  TO(cnct_cnt,i) cncts[i].dest = dest.get(i).toInt();
+//
+//  for(auto c : cncts){
+//    cnct_src.insert( {c.src, c.dest} );
+//    cnct_dest.insert( {c.dest, c.src} );
+//  }
+//
+//  //sels.resize(cnt);
+//  //nbnds.resize(cnt);
+//
+//  //nd_ordr.resize(cnt);
+//  //TO(cnt,i) nd_ordr[i] = ordr.get(i).toInt();
+//
+//  //TO(cnt,i) nd_ordr[i] = (int)i;
+//}
+//bool            saveFile(str path)
+//{
+//  str fileStr = graphToStr();
+//  
+//  FILE* f = fopen(path.c_str(), "w");
+//  if(!f) return false;
+//
+//  size_t writeSz = fwrite(fileStr.c_str(), 1, fileStr.size(), f);
+//  if(writeSz != fileStr.size()) return false;
+//
+//  int closeRet = fclose(f);
+//  if(closeRet == EOF) return false;
+//
+//  return true;
+//}
+//bool            loadFile(str path)
+//{
+//  FILE* f = fopen(path.c_str(), "r");
+//  if(!f) return false;
+//  fseek(f, 0, SEEK_END);
+//  str s;
+//  s.resize( ftell(f) );
+//  fseek(f, 0, SEEK_SET);
+//
+//  size_t redRet = fread( (void*)s.data(), 1, s.size(), f);
+//  if(redRet != s.size()) return false; 
+//
+//  if(fclose(f) == EOF) return false;
+//
+//  strToGraph(s);
+//
+//  return true;
+//}
 
 void            node_add(str txt, node::Type type=node::FLOW)
 {
@@ -1297,7 +1308,9 @@ ENTRY_DECLARATION
       // slots
       fd.grph.addSlot( slot(0, false) );
       fd.grph.addSlot( slot(1,  true) );
-      fd.grph.addSlot( slot(2,  true) );
+      //fd.grph.addSlot( slot(2,  true) );
+
+      fd.grph.addCnct(0, 1);
 
       //slots_out.push_back( {{0.f,0.f}, 0, {0,1.f} } );
       //slots_out_nrmls.push_back( {0,0} );
@@ -1392,9 +1405,9 @@ ENTRY_DECLARATION
         //printf("\n\nfile dialog: %d %s \n\n", result, inPath);
 
         if(inPath){
-          bool ok = loadFile(inPath);
-          if(ok) printf("\nFile loaded from %s\n", inPath);
-          else   printf("\nLoad did not read successfully from %s\n", inPath);
+          //bool ok = loadFile(inPath);
+          //if(ok) printf("\nFile loaded from %s\n", inPath);
+          //else   printf("\nLoad did not read successfully from %s\n", inPath);
         }
       });
       saveBtn->setCallback([](){
@@ -1403,20 +1416,21 @@ ENTRY_DECLARATION
 
         //printf("\n\nfile dialog: %d %s \n\n", result, outPath);
 
-        if(outPath){
-          bool ok = saveFile(outPath);
-          if(ok) printf("\nFile Written to %s\n", outPath);
-          else   printf("\nSave did not write successfully to %s\n", outPath);
-        }
+        //if(outPath){
+        //  bool ok = saveFile(outPath);
+        //  if(ok) printf("\nFile Written to %s\n", outPath);
+        //  else   printf("\nSave did not write successfully to %s\n", outPath);
+        //}
       });
 
       GraphDB* grphPtr = &fd.grph;
       flowBtn->setCallback([grphPtr](){
-        node_add("new node");
+        //node_add("new node");
         grphPtr->addNode( node("new node", node::FLOW) );
       });
-      msgBtn->setCallback([](){
-        node_add("message node", node::MSG);
+      msgBtn->setCallback([grphPtr](){
+        //node_add("message node", node::MSG);
+        grphPtr->addNode( node("message node", node::MSG) );
       });
 
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
@@ -1604,16 +1618,22 @@ ENTRY_DECLARATION
             //}
           }
 
-          if(outClk > -1){
+          if(outClk > -1)
+          {
             if(outClk==slotOutSel) 
               slotOutSel = -1;                                           // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
             else if(slotInSel > -1)
             {
               cnct c = {outClk, slotInSel};
-              auto curCnct = find(ALL(cncts), c);
-              if(curCnct==end(cncts)) 
-                cncts.push_back( {outClk, slotInSel} );
-              else cncts.erase(curCnct);                                 // have to find another way to index connections if they are going to be referenced, since any deletion will invalidate their positions
+              //auto curCnct = find(ALL(cncts), c);
+              //if(curCnct==end(cncts)) 
+
+              //auto curCnct = find(ALL(grph.cncts), c);              
+              //if(curCnct==end(cncts)) 
+              //  cncts.push_back( {outClk, slotInSel} );
+              //else cncts.erase(curCnct);                                 // have to find another way to index connections if they are going to be referenced, since any deletion will invalidate their positions
+
+              grph.addCnct(slotInSel, outClk);
 
               slotOutSel = slotInSel = -1;
             }
@@ -1626,12 +1646,14 @@ ENTRY_DECLARATION
               slotInSel = -1;                                            // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
             else if(slotOutSel > -1)
             {
-              cnct c = {slotOutSel, inClk};
-              auto curCnct = find(ALL(cncts), c);
-              if(curCnct == end(cncts)) 
-                cncts.push_back(c);
-              else
-                cncts.erase(curCnct);                                   // have to find another way to index connections if they are going to be referenced, since any deletion will invalidate their positions
+              //cnct c = {slotOutSel, inClk};
+              //auto curCnct = find(ALL(cncts), c);
+              //if(curCnct == end(cncts)) 
+              //  cncts.push_back(c);
+              //else
+              //  cncts.erase(curCnct);                                   // have to find another way to index connections if they are going to be referenced, since any deletion will invalidate their positions
+
+              grph.addCnct(inClk, slotInSel);
 
               slotOutSel = slotInSel = -1;
             }            
@@ -1672,21 +1694,39 @@ ENTRY_DECLARATION
             if(nidx < grph.nsz()){
               v2        nrml;
               node const&  n = grph.node(nidx);
-              auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){return c.src==i;});       // find connect in the naive way for now 
-              if(cnctIter==end(cncts)){
+              auto        ci = grph.destSlots(i);
+
+              if(ci == grph.cnctEnd()){
                 s.P = node_border(n, v2(0,s.in? -1.f : 1.f), &nrml);
                 s.N = nrml;
               }else{
                 v2  destP = {0,0};
-                int   cnt = 0; 
-                for(;cnctIter != end(cncts); ++cnt, ++cnctIter){
-                  auto destNdIdx = grph.slot(cnctIter->dest).nidx;
-                  destP         += grph.node(destNdIdx).P;
+                int   cnt = 0;
+                for(; ci != grph.cnctEnd() && ci->first==i; ++cnt, ++ci){
+                  //auto destNdIdx = grph.slot(ci->dest).nidx;
+                  auto destNdIdx  = grph.slot(ci->second).nidx;
+                  destP          += grph.node(destNdIdx).P;
                 }
                 destP              /= (f32)cnt;
                 s.P = node_border(n, destP - n.P, &nrml);
                 s.N = nrml;
               }
+
+              //auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){return c.src==i;});       // find connect in the naive way for now 
+              //if(cnctIter==end(cncts)){
+              //  s.P = node_border(n, v2(0,s.in? -1.f : 1.f), &nrml);
+              //  s.N = nrml;
+              //}else{
+              //  v2  destP = {0,0};
+              //  int   cnt = 0; 
+              //  for(;cnctIter != end(cncts); ++cnt, ++cnctIter){
+              //    auto destNdIdx = grph.slot(cnctIter->dest).nidx;
+              //    destP         += grph.node(destNdIdx).P;
+              //  }
+              //  destP              /= (f32)cnt;
+              //  s.P = node_border(n, destP - n.P, &nrml);
+              //  s.N = nrml;
+              //}
             }
           }
         }
@@ -1698,47 +1738,76 @@ ENTRY_DECLARATION
           nvgBeginFrame(vg, fd.ui.w, fd.ui.h, pxRatio);
           SECTION(draw connections)
           {
-            TO(cncts.size(),i)
+            auto ci = grph.cncts();                                 // ci is connection iterator 
+            for(; ci!=grph.cnctEnd(); ++ci)
             {
               const v2 hlfsz = io_rad/2.f;
-              auto&   cn = cncts[i];
-              v2     out = slots_out[cn.src].P;
-              v2 outNrml = slots_out_nrmls[cn.src];
-              v2      in = slots_in[cn.dest].P;
-              v2  inNrml = slots_in_nrmls[cn.dest];
-              f32  halfx = lerp(.5f, in.x, out.x);
-              f32  halfy = lerp(.5f, in.y, out.y);
-              f32   dist = len(out - in);
-              v2  outNxt = out + outNrml*(dist/3);              // divide by 3 because there are 3 sections to the bezier
-              v2   inNxt = in  +  inNrml*(dist/3);
+              slot const&  src = grph.slot(ci->first);
+              slot const& dest = grph.slot(ci->second);
 
-              // draw normal
-              //nvgBeginPath(vg);
-              //  nvgMoveTo(vg,   out.x,out.y);
-              //  nvgLineTo(vg,  outNxt.x,outNxt.y);
-              //  nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
-              //nvgStroke(vg);
+              f32  halfx = lerp(.5f, dest.P.x, src.P.x);
+              f32  halfy = lerp(.5f, dest.P.y, src.P.y);
+              f32   dist = len(src.P - dest.P);
+              v2  outNxt = src.P  + src.N * min(NODE_SZ.x/2, (dist/3));         // divide by 3 because there are 3 sections to the bezier
+              v2   inNxt = dest.P + dest.N * min(NODE_SZ.x/2, (dist/3));        // todo: make these limited by a fraction of the node's size
 
               nvgBeginPath(vg);
-                nvgMoveTo(vg,   out.x,out.y);
-                nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, in.x,in.y);
+                nvgMoveTo(vg,   src.P.x,src.P.y);
+                nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, dest.P.x,dest.P.y);
                 nvgStrokeWidth(vg, 3.f);
                 nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
               nvgStroke(vg);
-
-              //v2 nrmlEnd = in + inNrml*100.f;
-              //nvgBeginPath(vg);
-              //  nvgMoveTo(vg,   in.x,in.y);
-              //  nvgLineTo(vg,  nrmlEnd.x, nrmlEnd.y);
-              //nvgStroke(vg);
-              //
-              //nvgBezierTo(vg, halfx,out.y, halfx,in.y, in.x,in.y);
             }
+
+            //auto&   cn = cncts[i];
+            //v2     out = slots_out[cn.src].P;
+            //
+            //v2 outNrml = slots_out_nrmls[cn.src];
+            //v2      in = slots_in[cn.dest].P;
+            //v2  inNrml = slots_in_nrmls[cn.dest];
+
+            //TO(cncts.size(),i)
+            //{
+            //  const v2 hlfsz = io_rad/2.f;
+            //  auto&   cn = cncts[i];
+            //  v2     out = slots_out[cn.src].P;
+            //  v2 outNrml = slots_out_nrmls[cn.src];
+            //  v2      in = slots_in[cn.dest].P;
+            //  v2  inNrml = slots_in_nrmls[cn.dest];
+            //  f32  halfx = lerp(.5f, in.x, out.x);
+            //  f32  halfy = lerp(.5f, in.y, out.y);
+            //  f32   dist = len(out - in);
+            //  v2  outNxt = out + outNrml*(dist/3);              // divide by 3 because there are 3 sections to the bezier
+            //  v2   inNxt = in  +  inNrml*(dist/3);
+            //
+            //  // draw normal
+            //  //nvgBeginPath(vg);
+            //  //  nvgMoveTo(vg,   out.x,out.y);
+            //  //  nvgLineTo(vg,  outNxt.x,outNxt.y);
+            //  //  nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+            //  //nvgStroke(vg);
+            //
+            //  nvgBeginPath(vg);
+            //    nvgMoveTo(vg,   out.x,out.y);
+            //    nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, in.x,in.y);
+            //    nvgStrokeWidth(vg, 3.f);
+            //    nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+            //  nvgStroke(vg);
+            //
+            //  //v2 nrmlEnd = in + inNrml*100.f;
+            //  //nvgBeginPath(vg);
+            //  //  nvgMoveTo(vg,   in.x,in.y);
+            //  //  nvgLineTo(vg,  nrmlEnd.x, nrmlEnd.y);
+            //  //nvgStroke(vg);
+            //  //
+            //  //nvgBezierTo(vg, halfx,out.y, halfx,in.y, in.x,in.y);
+            //}
           }
           SECTION(draw nodes)
           {
             //int sz = (int)nd_ordr.size();
-            auto sz = fd.grph.getNodes().size();
+            //auto sz = fd.grph.getNodes().size();
+            auto sz = fd.grph.nsz();
             TO(sz,i)
             {
               int  ndOrdr = fd.grph.order(i);      // nd_ordr[i];
@@ -1758,8 +1827,8 @@ ENTRY_DECLARATION
               {
                 nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
                 nvgStrokeWidth(vg, BORDER);
-                auto sIter = grph.nodeSlots(i);            // sIter is slot iterator
-                for(;sIter!=grph.end() && sIter->first==i; ++sIter){
+                auto sIter = grph.nodeSlots(ndOrdr);            // sIter is slot iterator
+                for(;sIter!=grph.slotEnd() && sIter->first==ndOrdr; ++sIter){
                   auto sIdx = sIter->second;               // sIdx is slot index
                   slot const& s = grph.slot(sIdx);
                   bool   inSlot = len(pntr - s.P) < io_rad;
@@ -1832,6 +1901,7 @@ ENTRY_DECLARATION
   glfwTerminate();
   return 0;
 }
+
 
 
 
