@@ -147,11 +147,12 @@
 // -todo: put in a max length of bezier connection drawing tangents based on the size of a node - min with NODE_SZ.x/2
 // -todo: make a way to access the slot connected to a node instead of just the nodes connected to a slot - done with grph
 // -todo: convert connections to use graphdb
+// -todo: make in/dest slot move too
+// -todo: take out global connection vector
+// -todo: make addCnct delete a connection if the input is already connected
+// -todo: make slot movement use graphdb
 
-// todo: make in/dest slot move too
-// todo: take out global connection vector
-// todo: make addCnct delete a connection if the input is already connected
-// todo: make slot movement use graphdb
+// todo: make out/src slot point directly at the the in/dest slot
 // todo: solve assert(win==NULL) on window resize
 // todo: make graphToStr use graphdb
 // todo: make strToGraph use graphdb
@@ -280,7 +281,7 @@ bool                 drgNd = false;
 v2                    drgP;
 v2                 drgofst;
 bool                drgbox = false;
-cnct_tbl         cnct_dest;
+//cnct_tbl         cnct_dest;
 
 static FisData fd;
 
@@ -1694,22 +1695,32 @@ ENTRY_DECLARATION
             if(nidx < grph.nsz()){
               v2        nrml;
               node const&  n = grph.node(nidx);
-              auto        ci = grph.destSlots(i);
-
-              if(ci == grph.cnctEnd()){
-                s.P = node_border(n, v2(0,s.in? -1.f : 1.f), &nrml);
-                s.N = nrml;
-              }else{
-                v2  destP = {0,0};
-                int   cnt = 0;
-                for(; ci != grph.cnctEnd() && ci->first==i; ++cnt, ++ci){
-                  //auto destNdIdx = grph.slot(ci->dest).nidx;
-                  auto destNdIdx  = grph.slot(ci->second).nidx;
-                  destP          += grph.node(destNdIdx).P;
+              
+              if(s.in){
+                slot* src = grph.srcSlot(i);
+                if(src){
+                  auto srcNdP = grph.node(src->nidx).P;
+                  s.P = node_border(n, srcNdP - n.P, &nrml);
+                  //s->P = node_border(n,  - n.P, &nrml);
+                  s.N = nrml;
                 }
-                destP              /= (f32)cnt;
-                s.P = node_border(n, destP - n.P, &nrml);
-                s.N = nrml;
+              }else{
+                auto ci = grph.destSlots(i);
+                if(ci == grph.cnctEnd()){
+                  s.P = node_border(n, v2(0,s.in? -1.f : 1.f), &nrml);
+                  s.N = nrml;
+                }else{
+                  v2  destP = {0,0};
+                  int   cnt = 0;
+                  for(; ci != grph.cnctEnd() && ci->first==i; ++cnt, ++ci){
+                    //auto destNdIdx = grph.slot(ci->dest).nidx;
+                    auto destNdIdx  = grph.slot(ci->second).nidx;
+                    destP          += grph.node(destNdIdx).P;
+                  }
+                  destP              /= (f32)cnt;
+                  s.P = node_border(n, destP - n.P, &nrml);
+                  s.N = nrml;
+                }
               }
 
               //auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){return c.src==i;});       // find connect in the naive way for now 
