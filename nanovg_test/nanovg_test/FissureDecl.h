@@ -94,7 +94,9 @@ struct    cnct {
 using  vec_con     =    vec<cnct>;
 
 struct    slot { 
-  v2 P; u64 nidx; v2 N; bool in=false;
+  enum State { NORMAL=0, HIGHLIGHTED, SELECTED };
+
+  v2 P; u64 nidx; v2 N; bool in=false; State state=NORMAL;
 
   slot(u64 nIdx, bool In=false) : nidx(nIdx), in(In), P(0,0), N(0,1) {}
 };
@@ -104,7 +106,7 @@ using vec_slot     =    vec<slot>;
 class  GraphDB
 {
 public:
-  using NodeSlotMap = std::multimap<i32, i32>;   // The key is the index into the node array, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used.
+  using NodeSlotMap = std::multimap<u64, u64>;   // The key is the index into the node array, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used.
 
 private:
   vec_nd               nodes;
@@ -148,11 +150,12 @@ public:
   auto    getNodes() -> vec_nd&   { return nodes; }
   auto    getSlots() -> vec_slot& { return slots; }
   auto         bnd(u64 idx) -> bnd& { return bnds[idx]; }
-  bool        sel(u64 idx){ return selected[idx]; }
-  void        sel(u64 idx, bool s){ selected[idx] = s; }
-  i32       order(u64 idx){ return ordr[idx]; }
-  void      order(u64 idx, i32 o){ ordr[idx] = o; }
-  u64         nsz(){ return nodes.size(); }
+  bool         sel(u64 idx){ return selected[idx]; }
+  void         sel(u64 idx, bool s){ selected[idx] = s; }
+  i32        order(u64 idx){ return ordr[idx]; }
+  void       order(u64 idx, i32 o){ ordr[idx] = o; }
+  u64          nsz(){ return nodes.size(); }
+  u64          ssz(){ return slots.size(); }
 };
 
 struct FisData

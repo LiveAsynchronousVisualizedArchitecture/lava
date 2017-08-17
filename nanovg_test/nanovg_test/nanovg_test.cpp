@@ -127,8 +127,14 @@
 // -todo: draw from GraphDB
 // -todo: make order changing part of GraphDB
 // -todo: convert node movement to use GraphDB
+// -todo: make three states built in to slot
+// -todo: convert slot drawing to use GraphDB structure
+// -todo: convert slot movement to use GraphDB structure
 
+// todo: make slots draw the right way when not connected
 // todo: draw slots at the same time as nodes so that they have the same draw order
+// todo: build in connections to graphdb 
+// todo: convert connections to use graphdb
 // todo: make 'delete' and 'backspace' delete selected nodes
 // todo: make 'delete' and 'backspace' delete selected connections
 // todo: put in a max length of bezier connection drawing tangents based on the size of a node
@@ -803,7 +809,7 @@ bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
   //nvgStrokeColor(vg, nvgRGBA(0,0,0,128));
   //nvgStroke(vg);
 }
-//v2           node_border(node const& n, v2 dir, f32 slot_rad, v2* out_nrml=nullptr)
+
 v2           node_border(node const& n, v2 dir, v2* out_nrml=nullptr)
 {
   v2       nP = n.P;
@@ -1186,29 +1192,31 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
   //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
   //nvgStroke(vg);
 }
-
-void           slot_draw(NVGcontext* vg, u64 idx, bool isOut=true, bool highlight=false)
+void           slot_draw(NVGcontext* vg, slot const& s, bool highlight=false, bool selected=false)
 {
   nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
   nvgStrokeWidth(vg, 3.f);
 
-  slot&  slt = isOut? slots_out[idx]  :  slots_in[idx];
-  v2     out = slt.P;
-  v2       N = slt.N;
-  //bool inSlt = len(pntr-out) < io_rad;
+  v2     out = s.P;
+  v2       N = s.N;
 
   NVGcolor fillClr;
-  if(isOut){
-    if(idx==slotInSel) fillClr = nvgRGBAf(1.f,   1.f,   .5f,   1.f);
-    else if(highlight) fillClr = nvgRGBAf( .36f, 1.f,   .36f,  1.f);
-    else               fillClr = nvgRGBAf( .18f,  .75f, .18f,  1.f);
-    nvgFillColor(vg, fillClr);
+  if(s.in){
+    switch(s.state){
+    case slot::SELECTED:    fillClr = nvgRGBAf(1.f,   1.f,   .5f,  1.f); break;
+    case slot::HIGHLIGHTED: fillClr = nvgRGBAf( .36f,  .9f, 1.f,   1.f); break;
+    case slot::NORMAL:
+    default:                fillClr = nvgRGBAf( .18f,  .6f,  .75f, 1.f); break;
+    }
   }else{
-    if(idx==slotInSel) fillClr = nvgRGBAf(1.f,   1.f,   .5f,  1.f);
-    else if(highlight) fillClr = nvgRGBAf( .36f,  .9f, 1.f,   1.f);
-    else               fillClr = nvgRGBAf( .18f,  .6f,  .75f, 1.f);
-    nvgFillColor(vg, fillClr);
+    switch(s.state){
+    case slot::SELECTED:    fillClr = nvgRGBAf(1.f,   1.f,   .5f,   1.f); break;
+    case slot::HIGHLIGHTED: fillClr = nvgRGBAf( .36f, 1.f,   .36f,  1.f); break;
+    case slot::NORMAL:      
+    default:                fillClr = nvgRGBAf( .18f,  .75f, .18f,  1.f); break;
+    }
   }
+  nvgFillColor(vg, fillClr);
 
   nvgBeginPath(vg);
     nvgCircle(vg, out.x, out.y, io_rad);
@@ -1226,7 +1234,7 @@ void           slot_draw(NVGcontext* vg, u64 idx, bool isOut=true, bool highligh
   nvgBeginPath(vg);
   nvgResetTransform(vg);
   nvgTranslate(vg, out.x, out.y);             // translate comes before rotate here because nanovg 'premultiplies' transformations instead of multiplying them in for some reason. this reverses the order of transformations and can be seen in the source for nanovg
-  nvgRotate(vg, normalToAngle(N) + (isOut? -PIf : PIf)/2.f );
+  nvgRotate(vg, normalToAngle(N) + (s.in? PIf/2.f : -PIf) );
 
   nvgMoveTo(vg, -0.707f*triRad, -0.707f*triRad);
   nvgLineTo(vg,  0.707f*triRad, -0.707f*triRad);
@@ -1638,6 +1646,32 @@ ENTRY_DECLARATION
         }
         SECTION(slot movement)
         {
+          TO(grph.ssz(),i)
+          {
+            slot& s      = grph.slot(i);
+            auto    nidx = s.nidx;
+            if(nidx < grph.nsz()){
+              v2        nrml;
+              node const&  n = grph.node(nidx);
+              auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){return c.src==i;});       // find connect in the naive way for now 
+              if(cnctIter == end(cncts)){
+                s.P = node_border(n, v2(0,1.f), &nrml);
+                s.N = nrml;
+              }else{
+                v2  destP = {0,0};
+                int   cnt = 0; 
+                for(;cnctIter != end(cncts); ++cnt, ++cnctIter){
+                  //slot&  destSlt =  grph.slot(cnctIter->dest)
+                  auto destNdIdx = grph.slot(cnctIter->dest).nidx;
+                  destP         += grph.node(destNdIdx).P;
+                }
+                destP              /= (f32)cnt;
+                s.P = node_border(n, destP - n.P, &nrml);
+                s.N = nrml;
+              }
+            }
+          }
+
           TO(slots_out.size(),i){
             auto nidx = slots_out[i].nidx;
             if(nidx < nodes.size()){
@@ -1782,6 +1816,12 @@ ENTRY_DECLARATION
           {
             nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
             nvgStrokeWidth(vg, BORDER);
+            TO(grph.ssz(),i){
+              slot const& s = grph.slot(i);
+              bool inSlot = len(pntr - s.P) < io_rad;
+              slot_draw(vg, s, inSlot);
+            }
+
             TO(slots_out.size(),i){
               bool inSlot = len(pntr-slots_out[i].P) < io_rad;
               slot_draw(vg, i, true, inSlot);
@@ -1924,7 +1964,21 @@ ENTRY_DECLARATION
 
 
 
+//
+//v2           node_border(node const& n, v2 dir, f32 slot_rad, v2* out_nrml=nullptr)
 
+//void           slot_draw(NVGcontext* vg, u64 idx, bool isOut=true, bool highlight=false)
+//
+//slot&  slt = isOut? slots_out[idx]  :  slots_in[idx];
+//bool inSlt = len(pntr-out) < io_rad;
+//
+//if(idx==slotInSel) fillClr = nvgRGBAf(1.f,   1.f,   .5f,  1.f);
+//else if(highlight) fillClr = nvgRGBAf( .36f,  .9f, 1.f,   1.f);
+//else               fillClr = nvgRGBAf( .18f,  .6f,  .75f, 1.f);
+//
+//if(idx==slotInSel) fillClr = nvgRGBAf(1.f,   1.f,   .5f,   1.f);
+//else if(highlight) fillClr = nvgRGBAf( .36f, 1.f,   .36f,  1.f);
+//else               fillClr = nvgRGBAf( .18f,  .75f, .18f,  1.f);
 
 //if(inSlt && slotOutSel != i){
 //  if(slotInSel<0){ slotOutSel = (i32)i; }                    // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
