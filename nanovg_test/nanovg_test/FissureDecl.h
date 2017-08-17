@@ -64,7 +64,7 @@ union      bnd
   float w(){return abs(xmx-xmn);}
   float h(){return abs(ymx-ymn);}
 };
-using vec_nbnd     =    vec<bnd>;
+using  vec_bnd     =    vec<bnd>;
 
 struct    node
 {
@@ -110,7 +110,7 @@ public:
 
 private:
   vec_nd               nodes;
-  vec_nbnd              bnds;
+  vec_bnd               bnds;
   veci                  ordr;
   vec<bool>         selected;             // bitfield for selected nodes
   vec_slot             slots;
@@ -119,7 +119,7 @@ private:
 public:
   GraphDB(){}
 
-  i32      addNode(node n)
+  i32       addNode(node n)
   {
     nodes.push_back(n);
     i32 nodeIdx = (i32)(nodes.size()-1);
@@ -129,7 +129,7 @@ public:
 
     return nodeIdx;
   }
-  i32      addSlot(slot s)
+  i32       addSlot(slot s)
   {
     slots.push_back(s);
     i32 slotIdx = (i32)(slots.size() - 1);
@@ -138,24 +138,42 @@ public:
     
     return slotIdx;
   }
-  auto   nodeSlots(u64 nIdx) -> decltype(node_slots.find(nIdx))
+  auto    nodeSlots(u64 nIdx) -> decltype(node_slots.find(nIdx))
   {
     auto iter = node_slots.find(nIdx);
     return iter;
   }
-  auto         end() -> decltype(node_slots.end()) { return node_slots.end(); } 
-  auto orderedNode(u64 order) -> node& { return nodes[ordr[order]]; }
-  auto        node(u64 nIdx) -> node& { return nodes[nIdx]; }
-  auto        slot(u64 sIdx) -> slot& { return slots[sIdx]; }
-  auto    getNodes() -> vec_nd&   { return nodes; }
-  auto    getSlots() -> vec_slot& { return slots; }
-  auto         bnd(u64 idx) -> bnd& { return bnds[idx]; }
-  bool         sel(u64 idx){ return selected[idx]; }
-  void         sel(u64 idx, bool s){ selected[idx] = s; }
-  i32        order(u64 idx){ return ordr[idx]; }
-  void       order(u64 idx, i32 o){ ordr[idx] = o; }
-  u64          nsz(){ return nodes.size(); }
-  u64          ssz(){ return slots.size(); }
+  auto          end() -> decltype(node_slots.end()) { return node_slots.end(); } 
+  auto  orderedNode(u64 order) -> node& { return nodes[ordr[order]]; }
+  void   moveToBack(u64 nIdx)
+  {
+    using namespace std;
+
+    auto  sz = ordr.size();
+    auto tmp = move(ordr[nIdx]);
+    for(auto j=nIdx; j<sz-1; ++j)
+      ordr[j] = move( ordr[j+1] );
+
+    ordr[sz-1] = tmp;
+
+    //auto&  o = order;
+    //move_backward(a.front()+i+1ul, a.back(), a.back()-1);
+  }
+  auto         node(u64 nIdx) -> node& { return nodes[nIdx]; }
+  auto         slot(u64 sIdx) -> slot& { return slots[sIdx]; }
+  auto     getNodes() -> vec_nd&   { return nodes; }
+  auto     getSlots() -> vec_slot& { return slots; }
+  auto          bnd(u64 idx) -> bnd& { return bnds[idx]; }
+  auto       bounds() -> vec_bnd& { return bnds; }
+  bool          sel(u64 idx){ return selected[idx]; }
+  void          sel(u64 idx, bool s){ selected[idx] = s; }
+  auto         sels() -> vec<bool>& { return selected; }
+  i32         order(u64 idx){ return ordr[idx]; }
+  void        order(u64 idx, i32 o){ ordr[idx] = o; }
+  u64           nsz(){ return nodes.size(); }
+  u64           ssz(){ return slots.size(); }
+  u64         selsz(){ return selected.size(); }
+  
 };
 
 struct FisData

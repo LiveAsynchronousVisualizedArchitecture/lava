@@ -77,8 +77,11 @@ using  ui64  =  uint64_t;
 //#define            TO(to, var) for(std::remove_const<decltype( (ui64)to )>::type var = 0; var < to; ++var)
 #define         RANGE(st, to, var)  for(std::remove_const<decltype(to)>::type var = st; var < to; ++var)
 
+//#ifndef FROM
+//  #define       FROM(from, var) for(std::remove_const<decltype(from)>::type var = from-1; var >= decltype(from)(0); --var )
+//#endif
 #ifndef FROM
-  #define       FROM(from, var) for(std::remove_const<decltype(from)>::type var = from-1; var >= decltype(from)(0); --var )
+  #define       FROM(from, var) for(int64_t var = ((i64)from)-1; var >= int64_t(0); --var)
 #endif
 
 #define       SECTION(_msvc_only_collapses_macros_with_arguments, ...)

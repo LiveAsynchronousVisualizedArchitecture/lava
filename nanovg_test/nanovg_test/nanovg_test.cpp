@@ -132,7 +132,17 @@
 // -todo: convert slot movement to use GraphDB structure
 // -todo: make slots draw the right way when not connected
 // -todo: draw slots at the same time as nodes so that they have the same draw order
+// -todo: take out global selections
+// -todo: take out global bounds
+// -todo: figure out slot being drawn in the corner - slot added to node that didn't exist yet + std::multimap iterator doesn't go to end after it exhausts the looked up key, so the key must be checked as well as end()
+// -todo: debug crash on node order - order array size is 0 and subtracting 1 from an unsigned in is wrapping i around to the max value of a u64? - yes, FROM macro redone with int64_t so that it is signed
+// -todo: debug crash on message node creation - doesn't happen with FROM macro
+// -todo: put move to back in GraphDB
+// -todo: take out global order
+// -todo: make node selection use graphdb
 
+// todo: debug drawing order of first node's out slot
+// todo: debug message nodes not showing up 
 // todo: build in connections to graphdb 
 // todo: convert connections to use graphdb
 // todo: make 'delete' and 'backspace' delete selected nodes
@@ -224,9 +234,12 @@
 #include "../LavaNode.h"
 #include "FissureDecl.h"
 
-//const float INFf          = std::numeric_limits<float>:infinity();
 
 //GLFWwindow*            win;
+//vec_bnd              nbnds;
+//vec<bool>             sels;             // bitfield for selected nodes
+//veci               nd_ordr;
+
 char              winTitle[TITLE_MAX_LEN];
 int                premult = 0;
 bnd                   nbnd;
@@ -240,9 +253,6 @@ float              ndOfstY;
 float                  ndx = 512.f;
 float                  ndy = 512.f;
 vec_nd               nodes;
-vec_nbnd             nbnds;
-vec<bool>             sels;             // bitfield for selected nodes
-veci               nd_ordr;
 vec_con              cncts;             // cncts is connections - the vector of connection structures
 cnct_tbl          cnct_src;
 
@@ -413,13 +423,13 @@ str           graphToStr()
     Jzon::Node   nd_y = Jzon::array();
     TO(sz,i) nd_y.add(nodes[i].P.y);
 
-    Jzon::Node ordr = Jzon::array();
-    TO(sz,i) ordr.add(nd_ordr[i]);
+    //Jzon::Node ordr = Jzon::array();
+    //TO(sz,i) ordr.add(nd_ordr[i]);
 
     nds.add("x",      nd_x);
     nds.add("y",      nd_y);
     nds.add("txt",  nd_txt);
-    nds.add("order",  ordr);
+    //nds.add("order",  ordr);
   }
   Jzon::Node jcncts = Jzon::object();
   SECTION(connections)
@@ -483,10 +493,11 @@ void          strToGraph(str const& s)
     cnct_dest.insert( {c.dest, c.src} );
   }
 
-  sels.resize(cnt);
-  nbnds.resize(cnt);
-  nd_ordr.resize(cnt);
-  TO(cnt,i) nd_ordr[i] = ordr.get(i).toInt();
+  //sels.resize(cnt);
+  //nbnds.resize(cnt);
+
+  //nd_ordr.resize(cnt);
+  //TO(cnt,i) nd_ordr[i] = ordr.get(i).toInt();
 
   //TO(cnt,i) nd_ordr[i] = (int)i;
 }
@@ -533,9 +544,11 @@ void            node_add(str txt, node::Type type=node::FLOW)
 
   //nodes.push_back( {P,txt} );
   nodes.back().type = type;
-  sels.push_back(false);
-  nbnds.emplace_back();
-  nd_ordr.push_back( (int)(nodes.size()-1) );
+
+  //sels.push_back(false);
+  //nbnds.emplace_back();
+
+  //nd_ordr.push_back( (int)(nodes.size()-1) );
 }
 
 void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
@@ -1273,8 +1286,8 @@ ENTRY_DECLARATION
       //fd.grph.addNode( { {300.f,500.f}, "two",   node::FLOW } );
       //fd.grph.addNode( { {300.f,300.f}, "three", node::MSG  } );
 
-      nodes.push_back( node("one",   node::FLOW, {300.f,300.f}) );
-      nodes.push_back( node("two",   node::FLOW, {300.f,500.f}) );
+      //nodes.push_back( node("one",   node::FLOW, {300.f,300.f}) );
+      //nodes.push_back( node("two",   node::FLOW, {300.f,500.f}) );
       //nodes.push_back( node("three", node::FLOW, {300.f,300.f}) );
 
       //nodes.push_back( { {300.f,300.f}, "one",   node::FLOW } );
@@ -1296,14 +1309,16 @@ ENTRY_DECLARATION
       //slots_in_nrmls.push_back( {0,0} );
 
       for(auto& n : nodes){
-        nbnds.push_back( {n.P.x, n.P.y, n.P.x+NODE_SZ.x, n.P.y+NODE_SZ.y} );
+        //nbnds.push_back( {n.P.x, n.P.y, n.P.x+NODE_SZ.x, n.P.y+NODE_SZ.y} );
       }
 
-      auto sz = nodes.size();
-      sels.resize(sz, false);
+      //auto sz = nodes.size();
+      //sels.resize(sz, false);
 
-      nd_ordr.resize(sz);
-      TO(sz,i) nd_ordr[i] = (i32)i;
+      auto sz = fd.grph.nsz();
+
+      //nd_ordr.resize(sz);
+      //TO(sz,i) nd_ordr[i] = (i32)i;
     }
     SECTION(FisData)
     {
@@ -1445,7 +1460,8 @@ ENTRY_DECLARATION
       bool lftClk = (lftDn && !prevLftDn);
       bool  rtClk = (rtDn  && !prevRtDn);
       bool    clk = lftClk || rtClk;
-      int      sz = (int)nd_ordr.size();
+      //int      sz = (int)nd_ordr.size();
+      auto     sz =  grph.nsz(); // (int)nd_ordr.size();
 
       SECTION(time)
       {
@@ -1544,7 +1560,8 @@ ENTRY_DECLARATION
             {
               if(inNode && clk && (priSel<0||priSel!=ndOrdr) )
               {
-                MoveToBack( &nd_ordr, i);
+                //MoveToBack( &nd_ordr, i);
+                grph.moveToBack(i);
                 priSel     = ndOrdr;
                 drgP       = pntr;
 
@@ -1554,7 +1571,8 @@ ENTRY_DECLARATION
                 //}
 
                 if(!grph.sel(ndOrdr)){
-                  TO(sels.size(),i) grph.sel(i,false);
+                  //TO(sels.size(),i) grph.sel(i,false);
+                  TO(grph.selsz(),i) grph.sel(i,false);
                   grph.sel(ndOrdr,true);
                 }
                 break;                                                  // without breaking from the loop, a node could be moved down and hit again
@@ -1572,12 +1590,14 @@ ENTRY_DECLARATION
           i32  inClk = -1;
           i32 outClk = -1;
           if(lftDn && !prevLftDn){
-            //TO(slots_out.size(), i){
             TO(grph.getSlots().size(), i){
               //bool inSlt = len(pntr - slots_out[i].P) < io_rad;
               bool inSlt = len(pntr - grph.slot(i).P) < io_rad;
               if(inSlt) outClk = (i32)i;
             }
+            
+            //TO(slots_out.size(), i){
+            //
             //TO(slots_in.size(),  i){ 
             //  bool inSlt = len(pntr - slots_in[i].P) < io_rad;
             //  if(inSlt) inClk = (i32)i;           
@@ -1591,10 +1611,9 @@ ENTRY_DECLARATION
             {
               cnct c = {outClk, slotInSel};
               auto curCnct = find(ALL(cncts), c);
-              if(curCnct == end(cncts)) 
+              if(curCnct==end(cncts)) 
                 cncts.push_back( {outClk, slotInSel} );
-              else
-                cncts.erase(curCnct);                                   // have to find another way to index connections if they are going to be referenced, since any deletion will invalidate their positions
+              else cncts.erase(curCnct);                                 // have to find another way to index connections if they are going to be referenced, since any deletion will invalidate their positions
 
               slotOutSel = slotInSel = -1;
             }
@@ -1722,7 +1741,7 @@ ENTRY_DECLARATION
             auto sz = fd.grph.getNodes().size();
             TO(sz,i)
             {
-              int  ndOrdr = fd.grph.order(i); // nd_ordr[i];
+              int  ndOrdr = fd.grph.order(i);      // nd_ordr[i];
               auto      n = fd.grph.node(ndOrdr);
               //node&     n = nodes[ndOrdr];
               //bool selctd = ndOrdr==priSel || sels[ndOrdr];
@@ -1740,7 +1759,7 @@ ENTRY_DECLARATION
                 nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
                 nvgStrokeWidth(vg, BORDER);
                 auto sIter = grph.nodeSlots(i);            // sIter is slot iterator
-                for(;sIter != grph.end(); ++sIter){
+                for(;sIter!=grph.end() && sIter->first==i; ++sIter){
                   auto sIdx = sIter->second;               // sIdx is slot index
                   slot const& s = grph.slot(sIdx);
                   bool   inSlot = len(pntr - s.P) < io_rad;
@@ -1765,14 +1784,14 @@ ENTRY_DECLARATION
             if(lftDn && priSel<0)
             {
               nvgBeginPath(vg);
-              float x,y,w,h;
-              x = min(drgP.x, pntr.x); 
-              y = min(drgP.y, pntr.y); 
-              w = abs(drgP.x - pntr.x);
-              h = abs(drgP.y - pntr.y);
-              nvgRect(vg, x,y, w,h);
-              nvgStrokeWidth(vg, 2.f);
-              nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, .75f));
+                float x,y,w,h;
+                x = min(drgP.x, pntr.x); 
+                y = min(drgP.y, pntr.y); 
+                w = abs(drgP.x - pntr.x);
+                h = abs(drgP.y - pntr.y);
+                nvgRect(vg, x,y, w,h);
+                nvgStrokeWidth(vg, 1.f);
+                nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, .75f));
               nvgStroke(vg);
             }
           }
