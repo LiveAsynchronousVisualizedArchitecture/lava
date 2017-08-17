@@ -130,9 +130,9 @@
 // -todo: make three states built in to slot
 // -todo: convert slot drawing to use GraphDB structure
 // -todo: convert slot movement to use GraphDB structure
+// -todo: make slots draw the right way when not connected
+// -todo: draw slots at the same time as nodes so that they have the same draw order
 
-// todo: make slots draw the right way when not connected
-// todo: draw slots at the same time as nodes so that they have the same draw order
 // todo: build in connections to graphdb 
 // todo: convert connections to use graphdb
 // todo: make 'delete' and 'backspace' delete selected nodes
@@ -1232,15 +1232,15 @@ void           slot_draw(NVGcontext* vg, slot const& s, bool highlight=false, bo
   nvgFillColor(vg, inrClr);
 
   nvgBeginPath(vg);
-  nvgResetTransform(vg);
-  nvgTranslate(vg, out.x, out.y);             // translate comes before rotate here because nanovg 'premultiplies' transformations instead of multiplying them in for some reason. this reverses the order of transformations and can be seen in the source for nanovg
-  nvgRotate(vg, normalToAngle(N) + (s.in? PIf/2.f : -PIf) );
+    nvgResetTransform(vg);
+    nvgTranslate(vg, out.x, out.y);             // translate comes before rotate here because nanovg 'premultiplies' transformations instead of multiplying them in for some reason. this reverses the order of transformations and can be seen in the source for nanovg
+    nvgRotate(vg, normalToAngle(N) + (s.in? PIf/2.f : -PIf/2) );
 
-  nvgMoveTo(vg, -0.707f*triRad, -0.707f*triRad);
-  nvgLineTo(vg,  0.707f*triRad, -0.707f*triRad);
-  nvgLineTo(vg,  0, triRad);
+    nvgMoveTo(vg, -0.707f*triRad, -0.707f*triRad);
+    nvgLineTo(vg,  0.707f*triRad, -0.707f*triRad);
+    nvgLineTo(vg,  0, triRad);
 
-  nvgClosePath(vg);
+    nvgClosePath(vg);
   nvgFill(vg);
   nvgResetTransform(vg);
 }
@@ -1654,14 +1654,13 @@ ENTRY_DECLARATION
               v2        nrml;
               node const&  n = grph.node(nidx);
               auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){return c.src==i;});       // find connect in the naive way for now 
-              if(cnctIter == end(cncts)){
-                s.P = node_border(n, v2(0,1.f), &nrml);
+              if(cnctIter==end(cncts)){
+                s.P = node_border(n, v2(0,s.in? -1.f : 1.f), &nrml);
                 s.N = nrml;
               }else{
                 v2  destP = {0,0};
                 int   cnt = 0; 
                 for(;cnctIter != end(cncts); ++cnt, ++cnctIter){
-                  //slot&  destSlt =  grph.slot(cnctIter->dest)
                   auto destNdIdx = grph.slot(cnctIter->dest).nidx;
                   destP         += grph.node(destNdIdx).P;
                 }
@@ -1670,81 +1669,6 @@ ENTRY_DECLARATION
                 s.N = nrml;
               }
             }
-          }
-
-          TO(slots_out.size(),i){
-            auto nidx = slots_out[i].nidx;
-            if(nidx < nodes.size()){
-              v2        nrml;
-              node&        n = nodes[nidx];
-              auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){ return c.src==i; } );            // find connect in the naive way for now 
-              if(cnctIter == end(cncts)){
-                slots_out[i].P     = node_border(n, v2(0,1.f), &nrml);
-                slots_out[i].N     = nrml;
-                slots_out_nrmls[i] = nrml;
-              }else{
-                //slots_out[i].P     = {0,0};
-                v2       destP     = {0,0};
-                //slots_out[i].N     = {0,0};
-                //slots_out_nrmls[i] = {0,0};
-                int   cnt = 0; 
-                for(;cnctIter != end(cncts); ++cnt, ++cnctIter){
-                  slot&  destSlt = slots_in[cnctIter->dest];
-                  destP              += nodes[destSlt.nidx].P;
-                  //slots_out[i].N     += nrml;
-                  //slots_out_nrmls[i] += nrml;
-                }
-                destP              /= (f32)cnt;
-                slots_out[i].P      = node_border(n, destP - n.P, &nrml);
-                slots_out[i].N      = nrml;
-                slots_out_nrmls[i]  = nrml;
-
-                //slots_out[i].P     /= (f32)cnt;
-                //slots_out[i].N     /= (f32)cnt;
-                //slots_out_nrmls[i] /= (f32)cnt;
-              }
-            }
-
-            //v2       destP = nodes[destSlt.nidx].P;
-            //
-            //slots_out[i].P     = out_cntr(n, io_rad);
-            //slots_out[i].N     = {0, 1.f};
-            //slots_out_nrmls[i] = {0, 1.f};
-            //
-            //if(n.type==node::FLOW){
-            //slots_out[i].P = node_border(n.P, destP - n.P, io_rad, &nrml);
-            //
-            //}else{
-            //  f32 rad = NODE_SZ.x/2;                // todo: will need to be changed to use a per node size
-            //  slots_out[i].P = node_border(n.P, destP - n.P, io_rad, &nrml);
-            //  slots_out[i].N = nrml;
-            //}
-          }
-
-          TO(slots_in.size(),i){
-            auto nidx = slots_in[i].nidx;
-            if(nidx < nodes.size()){
-              v2        nrml;
-              node&        n = nodes[nidx];
-              auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){ return c.dest==i; } );            // find connect in the naive way for now 
-              if(cnctIter == end(cncts)){
-                slots_in[i].P = node_border(n, v2(0,-1.f), &nrml);
-                slots_in[i].N = nrml;
-                slots_in_nrmls[i] = nrml;
-              }else{
-                slot&  srcSlt = slots_out[cnctIter->src];
-                v2       srcP = srcSlt.P;
-                //v2       srcP = nodes[srcSlt.nidx].P;
-                slots_in[i].P = node_border(n, srcP - n.P, &nrml);
-                slots_in[i].N = nrml;
-                slots_in_nrmls[i] = nrml;
-              }
-            }
-            //slots_in[i].P  = node_border(n.P, srcP - n.P, io_rad, &nrml);
-            //
-            //slots_in[i].P  = in_cntr(n, io_rad);
-            //slots_in[i].N = {0,1.f};
-            //slots_in_nrmls[i] = {0, 1.f};
           }
         }
       }
@@ -1810,103 +1734,32 @@ ENTRY_DECLARATION
               float round = secSel==ndOrdr? 0 : 1.f;
               fd.grph.bnd(ndOrdr) = node_draw(vg, 0, n, clr, round);
               //nbnds[ndOrdr] = node_draw(vg, 0, n, clr, round);
+
+              SECTION(draw node slots)
+              {
+                nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
+                nvgStrokeWidth(vg, BORDER);
+                auto sIter = grph.nodeSlots(i);            // sIter is slot iterator
+                for(;sIter != grph.end(); ++sIter){
+                  auto sIdx = sIter->second;               // sIdx is slot index
+                  slot const& s = grph.slot(sIdx);
+                  bool   inSlot = len(pntr - s.P) < io_rad;
+                  slot_draw(vg, s, inSlot);
+                }
+              }
+
             }
           }
-          SECTION(draw slots)
-          {
-            nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
-            nvgStrokeWidth(vg, BORDER);
-            TO(grph.ssz(),i){
-              slot const& s = grph.slot(i);
-              bool inSlot = len(pntr - s.P) < io_rad;
-              slot_draw(vg, s, inSlot);
-            }
-
-            TO(slots_out.size(),i){
-              bool inSlot = len(pntr-slots_out[i].P) < io_rad;
-              slot_draw(vg, i, true, inSlot);
-
-              //slot&  slt = slots_out[i];
-              //v2     out = slt.P;
-              //v2       N = slt.N;
-              //bool inSlt = len(pntr-out) < io_rad;
-              //
-              //NVGcolor fillClr;
-              //if(i==slotInSel) fillClr = nvgRGBAf(1.f,   1.f,   .5f,   1.f);
-              //else if(inSlt)   fillClr = nvgRGBAf( .36f, 1.f,   .36f,  1.f);
-              //else             fillClr = nvgRGBAf( .18f,  .75f, .18f,  1.f);
-              //nvgFillColor(vg, fillClr);
-              //
-              //nvgBeginPath(vg);
-              //nvgCircle(vg, out.x, out.y, io_rad);
-              //nvgFill(vg);
-              //nvgStroke(vg);
-              //
-              //// slot triangle drawing
-              //f32  triRad = io_rad - 2.f;
-              //auto inrClr = fillClr;
-              //inrClr.r += 0.2f;
-              //inrClr.g += 0.2f;
-              //inrClr.b += 0.2f;
-              //nvgFillColor(vg, inrClr);
-              //
-              //nvgBeginPath(vg);
-              //nvgResetTransform(vg);
-              //nvgTranslate(vg, out.x, out.y);             // translate comes before rotate here because nanovg 'premultiplies' transformations instead of multiplying them in for some reason. this reverses the order of transformations and can be seen in the source for nanovg
-              //nvgRotate(vg, normalToAngle(N) -PIf/2.f );
-              //
-              //nvgMoveTo(vg, -0.707f*triRad, -0.707f*triRad);
-              //nvgLineTo(vg,  0.707f*triRad, -0.707f*triRad);
-              //nvgLineTo(vg,  0, triRad);
-              //
-              //nvgClosePath(vg);
-              //nvgFill(vg);
-              //nvgResetTransform(vg);
-            }
-            TO(slots_in.size(),i){
-              bool inSlot = len(pntr-slots_in[i].P) < io_rad;
-              slot_draw(vg, i, false, inSlot);
-
-              //slot&  slt = slots_in[i];
-              //v2      in = slt.P;
-              //v2       N = slt.N;
-              //bool inSlt = len(pntr-in) < io_rad;
-              //
-              //NVGcolor fillClr;
-              //if(i==slotInSel) fillClr = nvgRGBAf(1.f,   1.f,   .5f,  1.f);
-              //else if(inSlt)   fillClr = nvgRGBAf( .36f,  .9f, 1.f,   1.f);
-              //else             fillClr = nvgRGBAf( .18f,  .6f,  .75f, 1.f);
-              //nvgFillColor(vg, fillClr);
-              //
-              //nvgBeginPath(vg);
-              //nvgCircle(vg, in.x, in.y, io_rad);
-              //nvgFill(vg);
-              //nvgStroke(vg);
-              //
-              //// slot triangle drawing
-              //f32  triRad = io_rad - 2.f;
-              //auto inrClr = fillClr;
-              //inrClr.r += 0.2f;
-              //inrClr.g += 0.2f;
-              //inrClr.b += 0.2f;
-              //nvgFillColor(vg, inrClr);
-              //
-              //nvgBeginPath(vg);
-              //nvgResetTransform(vg);
-              //nvgTranslate(vg, in.x, in.y);             // translate comes before rotate here because nanovg 'premultiplies' transformations instead of multiplying them in for some reason. this reverses the order of transformations and can be seen in the source for nanovg
-              //nvgRotate(vg, normalToAngle(N)+PIf/2.f );
-              //
-              //nvgMoveTo(vg, -0.707f*triRad, -0.707f*triRad);
-              //nvgLineTo(vg,  0.707f*triRad, -0.707f*triRad);
-              //nvgLineTo(vg,  0, triRad);
-              //
-              //nvgClosePath(vg);
-              //nvgFill(vg);
-              //nvgResetTransform(vg);
-              //
-              ////drw_rail(vg, slt.P, nodes[slt.nidx].P);
-            }
-          }
+          //SECTION(draw slots)
+          //{
+            //nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
+            //nvgStrokeWidth(vg, BORDER);
+            //TO(grph.ssz(),i){
+            //  slot const& s = grph.slot(i);
+            //  bool inSlot = len(pntr - s.P) < io_rad;
+            //  slot_draw(vg, s, inSlot);
+            //}
+          //}
           SECTION(draw selection box)
           {
             if(lftDn && priSel<0)
@@ -1963,6 +1816,170 @@ ENTRY_DECLARATION
 
 
 
+
+
+
+//TO(slots_out.size(),i){
+//  bool inSlot = len(pntr-slots_out[i].P) < io_rad;
+//  slot_draw(vg, i, true, inSlot);
+//
+//  //slot&  slt = slots_out[i];
+//  //v2     out = slt.P;
+//  //v2       N = slt.N;
+//  //bool inSlt = len(pntr-out) < io_rad;
+//  //
+//  //NVGcolor fillClr;
+//  //if(i==slotInSel) fillClr = nvgRGBAf(1.f,   1.f,   .5f,   1.f);
+//  //else if(inSlt)   fillClr = nvgRGBAf( .36f, 1.f,   .36f,  1.f);
+//  //else             fillClr = nvgRGBAf( .18f,  .75f, .18f,  1.f);
+//  //nvgFillColor(vg, fillClr);
+//  //
+//  //nvgBeginPath(vg);
+//  //nvgCircle(vg, out.x, out.y, io_rad);
+//  //nvgFill(vg);
+//  //nvgStroke(vg);
+//  //
+//  //// slot triangle drawing
+//  //f32  triRad = io_rad - 2.f;
+//  //auto inrClr = fillClr;
+//  //inrClr.r += 0.2f;
+//  //inrClr.g += 0.2f;
+//  //inrClr.b += 0.2f;
+//  //nvgFillColor(vg, inrClr);
+//  //
+//  //nvgBeginPath(vg);
+//  //nvgResetTransform(vg);
+//  //nvgTranslate(vg, out.x, out.y);             // translate comes before rotate here because nanovg 'premultiplies' transformations instead of multiplying them in for some reason. this reverses the order of transformations and can be seen in the source for nanovg
+//  //nvgRotate(vg, normalToAngle(N) -PIf/2.f );
+//  //
+//  //nvgMoveTo(vg, -0.707f*triRad, -0.707f*triRad);
+//  //nvgLineTo(vg,  0.707f*triRad, -0.707f*triRad);
+//  //nvgLineTo(vg,  0, triRad);
+//  //
+//  //nvgClosePath(vg);
+//  //nvgFill(vg);
+//  //nvgResetTransform(vg);
+//}
+//TO(slots_in.size(),i){
+//  bool inSlot = len(pntr-slots_in[i].P) < io_rad;
+//  slot_draw(vg, i, false, inSlot);
+//
+//  //slot&  slt = slots_in[i];
+//  //v2      in = slt.P;
+//  //v2       N = slt.N;
+//  //bool inSlt = len(pntr-in) < io_rad;
+//  //
+//  //NVGcolor fillClr;
+//  //if(i==slotInSel) fillClr = nvgRGBAf(1.f,   1.f,   .5f,  1.f);
+//  //else if(inSlt)   fillClr = nvgRGBAf( .36f,  .9f, 1.f,   1.f);
+//  //else             fillClr = nvgRGBAf( .18f,  .6f,  .75f, 1.f);
+//  //nvgFillColor(vg, fillClr);
+//  //
+//  //nvgBeginPath(vg);
+//  //nvgCircle(vg, in.x, in.y, io_rad);
+//  //nvgFill(vg);
+//  //nvgStroke(vg);
+//  //
+//  //// slot triangle drawing
+//  //f32  triRad = io_rad - 2.f;
+//  //auto inrClr = fillClr;
+//  //inrClr.r += 0.2f;
+//  //inrClr.g += 0.2f;
+//  //inrClr.b += 0.2f;
+//  //nvgFillColor(vg, inrClr);
+//  //
+//  //nvgBeginPath(vg);
+//  //nvgResetTransform(vg);
+//  //nvgTranslate(vg, in.x, in.y);             // translate comes before rotate here because nanovg 'premultiplies' transformations instead of multiplying them in for some reason. this reverses the order of transformations and can be seen in the source for nanovg
+//  //nvgRotate(vg, normalToAngle(N)+PIf/2.f );
+//  //
+//  //nvgMoveTo(vg, -0.707f*triRad, -0.707f*triRad);
+//  //nvgLineTo(vg,  0.707f*triRad, -0.707f*triRad);
+//  //nvgLineTo(vg,  0, triRad);
+//  //
+//  //nvgClosePath(vg);
+//  //nvgFill(vg);
+//  //nvgResetTransform(vg);
+//  //
+//  ////drw_rail(vg, slt.P, nodes[slt.nidx].P);
+//}
+
+//
+//slot&  destSlt =  grph.slot(cnctIter->dest)
+
+//TO(slots_out.size(),i){
+//  auto nidx = slots_out[i].nidx;
+//  if(nidx < nodes.size()){
+//    v2        nrml;
+//    node&        n = nodes[nidx];
+//    auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){ return c.src==i; } );            // find connect in the naive way for now 
+//    if(cnctIter == end(cncts)){
+//      slots_out[i].P     = node_border(n, v2(0,1.f), &nrml);
+//      slots_out[i].N     = nrml;
+//      slots_out_nrmls[i] = nrml;
+//    }else{
+//      //slots_out[i].P     = {0,0};
+//      v2       destP     = {0,0};
+//      //slots_out[i].N     = {0,0};
+//      //slots_out_nrmls[i] = {0,0};
+//      int   cnt = 0; 
+//      for(;cnctIter != end(cncts); ++cnt, ++cnctIter){
+//        slot&  destSlt = slots_in[cnctIter->dest];
+//        destP              += nodes[destSlt.nidx].P;
+//        //slots_out[i].N     += nrml;
+//        //slots_out_nrmls[i] += nrml;
+//      }
+//      destP              /= (f32)cnt;
+//      slots_out[i].P      = node_border(n, destP - n.P, &nrml);
+//      slots_out[i].N      = nrml;
+//      slots_out_nrmls[i]  = nrml;
+//
+//      //slots_out[i].P     /= (f32)cnt;
+//      //slots_out[i].N     /= (f32)cnt;
+//      //slots_out_nrmls[i] /= (f32)cnt;
+//    }
+//  }
+//
+//  //v2       destP = nodes[destSlt.nidx].P;
+//  //
+//  //slots_out[i].P     = out_cntr(n, io_rad);
+//  //slots_out[i].N     = {0, 1.f};
+//  //slots_out_nrmls[i] = {0, 1.f};
+//  //
+//  //if(n.type==node::FLOW){
+//  //slots_out[i].P = node_border(n.P, destP - n.P, io_rad, &nrml);
+//  //
+//  //}else{
+//  //  f32 rad = NODE_SZ.x/2;                // todo: will need to be changed to use a per node size
+//  //  slots_out[i].P = node_border(n.P, destP - n.P, io_rad, &nrml);
+//  //  slots_out[i].N = nrml;
+//  //}
+//}
+//TO(slots_in.size(),i){
+//  auto nidx = slots_in[i].nidx;
+//  if(nidx < nodes.size()){
+//    v2        nrml;
+//    node&        n = nodes[nidx];
+//    auto  cnctIter = find_if(ALL(cncts), [&i](cnct const& c){ return c.dest==i; } );            // find connect in the naive way for now 
+//    if(cnctIter == end(cncts)){
+//      slots_in[i].P = node_border(n, v2(0,-1.f), &nrml);
+//      slots_in[i].N = nrml;
+//      slots_in_nrmls[i] = nrml;
+//    }else{
+//      slot&  srcSlt = slots_out[cnctIter->src];
+//      v2       srcP = srcSlt.P;
+//      //v2       srcP = nodes[srcSlt.nidx].P;
+//      slots_in[i].P = node_border(n, srcP - n.P, &nrml);
+//      slots_in[i].N = nrml;
+//      slots_in_nrmls[i] = nrml;
+//    }
+//  }
+//  //slots_in[i].P  = node_border(n.P, srcP - n.P, io_rad, &nrml);
+//  //
+//  //slots_in[i].P  = in_cntr(n, io_rad);
+//  //slots_in[i].N = {0,1.f};
+//  //slots_in_nrmls[i] = {0, 1.f};
+//}
 
 //
 //v2           node_border(node const& n, v2 dir, f32 slot_rad, v2* out_nrml=nullptr)
