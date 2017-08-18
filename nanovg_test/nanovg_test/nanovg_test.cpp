@@ -3,20 +3,20 @@
 // -todo: make a deselect all function that clears globals and calls fd.grph.clearSels()
 // -todo: fix deselection of slots
 // -todo: organized graphdb functions according to which part they operate on
+// -todo: change graphdb private variables to use m_
+// -todo: try renaming types with upper case first letter
+// -todo: fix slots not staying selected - slots clicked need to turn off clearSelection - clearSelection turned off on left click up when inside a slot
+// -todo: solve assert(win==NULL) on window resize - was using void* attached to glfw instead of static state
 
-// todo: change graphdb private variables to use m_
 // todo: make a GraphDB function that toggles a selection on or off
-// todo: try renaming types with upper case first letter
 // todo: make selection of one dest and one src slot trigger connection create or delete
 // todo: make connection delete and create trigger when 1 or more in/dest slots are selected and 1 out/src slot is connected
-// todo: fix slots not staying selected
 // idea: make drawing of one src to multiple connections draw first to the average of all the slots, then draw to all the dest slots
-// todo: solve assert(win==NULL) on window resize
+// todo: make bnd also work for message passing nodes
 // todo: make graphToStr use graphdb
 // todo: make strToGraph use graphdb
 // todo: make 'delete' and 'backspace' delete selected nodes
 // todo: make 'delete' and 'backspace' delete selected connections
-// todo: make bnd also work for message passing nodes
 // todo: put node type into written file
 // todo: draw message node slots as sliding angles
 // todo: make one node snap to another node
@@ -102,7 +102,6 @@
 #include "../LavaNode.h"
 #include "FissureDecl.h"
 
-
 //GLFWwindow*            win;
 //vec_bnd              nbnds;
 //vec<bool>             sels;             // bitfield for selected nodes
@@ -110,7 +109,7 @@
 
 char              winTitle[TITLE_MAX_LEN];
 int                premult = 0;
-bnd                   nbnd;
+Bnd                   nbnd;
 v2                prevPntr;
 bool                  rtDn = false;    // right mouse button down
 bool                 lftDn = false;    // left mouse button down
@@ -120,25 +119,17 @@ float              ndOfstX;
 float              ndOfstY;
 float                  ndx = 512.f;
 float                  ndy = 512.f;
-//vec_nd               nodes;
-//vec_con              cncts;             // cncts is connections - the vector of connection structures
-//cnct_tbl          cnct_src;
 
 i32              slotInSel = -1;
 i32             slotOutSel = -1;
-f32                 io_rad;
-//vec_slot          slots_in;
-//vec_slot         slots_out;
-//vec_v2      slots_in_nrmls;
-//vec_v2     slots_out_nrmls;
-
 int                 priSel = -1;
 int                 secSel = -1;
+f32                 io_rad;
+
 bool                 drgNd = false;
 v2                    drgP;
 v2                 drgofst;
 bool                drgbox = false;
-//cnct_tbl         cnct_dest;
 
 static FisData fd;
 
@@ -174,11 +165,11 @@ float              remap(float n, float lo, float hi, float toLo, float toHi)
   float p = linNorm(n, lo, hi);
   return lerp(p, toLo, toHi);
 }
-bool                isIn(float x, float y, bnd const& b)
+bool                isIn(float x, float y, Bnd const& b)
 {
   return x>b.xmn && x<b.xmx && y>b.ymn && y<b.ymx;
 }
-bool                isIn(bnd const& a, bnd const& b)
+bool                isIn(Bnd const& a, Bnd const& b)
 {
   return b.xmn<a.xmn && b.xmx>a.xmx && b.ymn<a.ymn && b.ymx>a.ymx;
 }
@@ -405,10 +396,10 @@ v2        angleToNormal(f32 angle)
 //}
 
 // state manipulation
-void            node_add(str txt, node::Type type=node::FLOW)
+void            node_add(str txt, Node::Type type=Node::FLOW)
 {
   //v2 P = v2(512,512);
-  node n(txt, type);
+  Node n(txt, type);
   n.P = v2(512,512);
   //nodes.push_back(n);
 
@@ -545,22 +536,23 @@ void             dropCallback(GLFWwindow* window, int count, const char** filena
 }
 void  framebufferSizeCallback(GLFWwindow* window, int w, int h)
 {
-  FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
+  //FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
+  //fd->ui.screen.resizeCallbackEvent(w, h);
 
-  fd->ui.screen.resizeCallbackEvent(w, h);
+  fd.ui.screen.resizeCallbackEvent(w, h);
 }
 
-v2               in_cntr(node const& n, f32 r)
+v2               in_cntr(Node const& n, f32 r)
 {
   return v2(n.P.x + NODE_SZ.x/2, n.P.y-r);
 }
-v2              out_cntr(node const& n, f32 r)
+v2              out_cntr(Node const& n, f32 r)
 {
   return v2(n.P.x + NODE_SZ.x/2, n.P.y + NODE_SZ.y + r);
 }
-bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
+Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
                             int preicon,
-                          node const& n,
+                          Node const& n,
                            NVGcolor col,
                          float      rnd)     // rnd is corner rounding
 {
@@ -577,7 +569,7 @@ bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
   nvgGlobalAlpha(vg, 1.f);
   switch(n.type)
   {
-  case node::FLOW: {
+  case Node::FLOW: {
     SECTION(grey border)
     {
 	    nvgBeginPath(vg);
@@ -602,7 +594,7 @@ bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
 	    nvgFill(vg);
     }
   } break;
-  case node::MSG: {
+  case Node::MSG: {
     f32 msgRad = NODE_SZ.x / 2;
 
     nvgStrokeColor(vg, nvgRGBAf(.04f, .04f, .04f, 1.f));
@@ -701,7 +693,7 @@ bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
   //nvgStroke(vg);
 }
 
-v2           node_border(node const& n, v2 dir, v2* out_nrml=nullptr)
+v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 {
   v2       nP = n.P;
   v2 borderPt = {0,0};
@@ -710,7 +702,7 @@ v2           node_border(node const& n, v2 dir, v2* out_nrml=nullptr)
 
   switch(n.type)
   {
-  case node::FLOW: {
+  case Node::FLOW: {
     v2   hlf = NODE_HALF_SZ;
     f32  rad = hlf.y;
 
@@ -737,7 +729,7 @@ v2           node_border(node const& n, v2 dir, v2* out_nrml=nullptr)
       else    *out_nrml = { 0.f, sign(ndir).y };
     }
   } break;
-  case node::MSG: 
+  case Node::MSG: 
   default: 
   {
     f32  rad = NODE_SZ.x/2;
@@ -817,7 +809,7 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
   //if(inLeftCircle)     arcSt = PIf - asin(dir.y);
   //else if(inRgtCircle) arcSt = asin(dir.y);
 
-  bnd nb(nP.x, nP.y, nP.x+NODE_SZ.x, nP.y+NODE_SZ.y);
+  Bnd nb(nP.x, nP.y, nP.x+NODE_SZ.x, nP.y+NODE_SZ.y);
   
   // relative distances
   f32 lDst = max(0.f, min(railRad, (P.x-(nb.xmn+rad))) );
@@ -1083,7 +1075,7 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
   //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
   //nvgStroke(vg);
 }
-void           slot_draw(NVGcontext* vg, slot const& s, slot::State drawState) //bool highlight=false, bool selected=false)
+void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState) //bool highlight=false, bool selected=false)
 {
   nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
   nvgStrokeWidth(vg, 3.f);
@@ -1095,17 +1087,17 @@ void           slot_draw(NVGcontext* vg, slot const& s, slot::State drawState) /
   if(s.in){
     //switch(s.state){
     switch(drawState){
-    case slot::SELECTED:    fillClr = nvgRGBAf(1.f,   1.f,   .5f,  1.f); break;
-    case slot::HIGHLIGHTED: fillClr = nvgRGBAf( .36f,  .9f, 1.f,   1.f); break;
-    case slot::NORMAL:
+    case Slot::SELECTED:    fillClr = nvgRGBAf(1.f,   1.f,   .5f,  1.f); break;
+    case Slot::HIGHLIGHTED: fillClr = nvgRGBAf( .36f,  .9f, 1.f,   1.f); break;
+    case Slot::NORMAL:
     default:                fillClr = nvgRGBAf( .18f,  .6f,  .75f, 1.f); break;
     }
   }else{
     //switch(s.state){
     switch(drawState){
-    case slot::SELECTED:    fillClr = nvgRGBAf(1.f,   1.f,   .5f,   1.f); break;
-    case slot::HIGHLIGHTED: fillClr = nvgRGBAf( .36f, 1.f,   .36f,  1.f); break;
-    case slot::NORMAL:      
+    case Slot::SELECTED:    fillClr = nvgRGBAf(1.f,   1.f,   .5f,   1.f); break;
+    case Slot::HIGHLIGHTED: fillClr = nvgRGBAf( .36f, 1.f,   .36f,  1.f); break;
+    case Slot::NORMAL:      
     default:                fillClr = nvgRGBAf( .18f,  .75f, .18f,  1.f); break;
     }
   }
@@ -1158,8 +1150,8 @@ ENTRY_DECLARATION
       io_rad = IORAD;
 
       // nodes
-      fd.grph.addNode( node("one",   node::FLOW, {300.f,300.f}) );
-      fd.grph.addNode( node("two",   node::FLOW, {300.f,500.f}) );
+      fd.grph.addNode( Node("one",   Node::FLOW, {300.f,300.f}) );
+      fd.grph.addNode( Node("two",   Node::FLOW, {300.f,500.f}) );
       //fd.grph.addNode( node("three", node::FLOW, {300.f,300.f}) );
 
       //fd.grph.addNode( { {300.f,300.f}, "one",   node::FLOW } );
@@ -1175,8 +1167,8 @@ ENTRY_DECLARATION
       //nodes.push_back( { {300.f,300.f}, "three", node::MSG  } );
 
       // slots
-      fd.grph.addSlot( slot(0, false) );
-      fd.grph.addSlot( slot(1,  true) );
+      fd.grph.addSlot( Slot(0, false) );
+      fd.grph.addSlot( Slot(1,  true) );
       //fd.grph.addSlot( slot(2,  true) );
 
       fd.grph.addCnct(0, 1);
@@ -1243,7 +1235,7 @@ ENTRY_DECLARATION
         //glfwSetWindowIcon(win, 2, images);
       #endif
 
-      glfwSwapInterval(0);
+      glfwSwapInterval(1);
     }
     SECTION(init glew)
     {
@@ -1295,11 +1287,11 @@ ENTRY_DECLARATION
       GraphDB* grphPtr = &fd.grph;
       flowBtn->setCallback([grphPtr](){
         //node_add("new node");
-        grphPtr->addNode( node("new node", node::FLOW) );
+        grphPtr->addNode( Node("new node", Node::FLOW) );
       });
       msgBtn->setCallback([grphPtr](){
         //node_add("message node", node::MSG);
-        grphPtr->addNode( node("message node", node::MSG) );
+        grphPtr->addNode( Node("message node", Node::MSG) );
       });
 
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
@@ -1381,13 +1373,15 @@ ENTRY_DECLARATION
       }
       SECTION(selection)
       {
+        bool lftClkDn =  lftDn && !prevLftDn;    // lftClkDn is left click down
+        bool lftClkUp = !lftDn &&  prevLftDn;    // lftClkDn is left click up
         bool clearSelections = true;
-        bnd  drgbnd;
+        Bnd  drgbnd;
         SECTION(selection box)
         {
           if(!lftDn){ drgP=pntr; drgbox=false; }
 
-          drgbnd = bnd( min(drgP.x, pntr.x),
+          drgbnd = Bnd( min(drgP.x, pntr.x),
                         min(drgP.y, pntr.y),
                         max(drgP.x, pntr.x),
                         max(drgP.y, pntr.y) );
@@ -1412,7 +1406,7 @@ ENTRY_DECLARATION
           FROM(sz,i)                                                // loop backwards so that the top nodes are dealt with first
           {
             int  ndOrdr = grph.order(i);
-            node&     n = grph.node(i);
+            Node&     n = grph.node(i);
             bool inNode = isIn(pntr.x,pntr.y, grph.bnd(ndOrdr) );
             inAny      |= inNode;
                      
@@ -1445,17 +1439,35 @@ ENTRY_DECLARATION
         {
           i32  inClk = -1;
           i32 outClk = -1;
-          if(lftDn && !prevLftDn){
-            TO(grph.getSlots().size(), i){
-              slot&    s = grph.slot(i);
+          TO(grph.getSlots().size(), i){
+            if(lftClkDn)  //lftDn && !prevLftDn)
+            {
+              Slot&    s = grph.slot(i);
               bool inSlt = len(pntr - s.P) < io_rad;
               if(inSlt){
-                outClk      = (i32)i;
-                s.state     = slot::SELECTED;
+                outClk          = (i32)i;
+                s.state         = Slot::SELECTED;
+                clearSelections = false;
               }
             }
-            clearSelections = false;
+            else if(lftClkUp){
+              Slot&    s = grph.slot(i);
+              bool inSlt = len(pntr - s.P) < io_rad;
+              if(inSlt) clearSelections = false;
+            }
           }
+
+          //if(lftDn && !prevLftDn){
+          //  TO(grph.getSlots().size(), i){
+          //    Slot&    s = grph.slot(i);
+          //    bool inSlt = len(pntr - s.P) < io_rad;
+          //    if(inSlt){
+          //      outClk          = (i32)i;
+          //      s.state         = Slot::SELECTED;
+          //      clearSelections = false;
+          //    }
+          //  }
+          //}
 
           if(outClk > -1){
             if(outClk==slotOutSel) 
@@ -1468,6 +1480,7 @@ ENTRY_DECLARATION
               slotOutSel = outClk;
               clearSelections = false;
             }
+            clearSelections = false;
           }
 
           if(inClk > -1){
@@ -1481,6 +1494,7 @@ ENTRY_DECLARATION
               slotInSel  = inClk;
               clearSelections = false;
             }
+            clearSelections = false;
           }
         }
         
@@ -1503,7 +1517,7 @@ ENTRY_DECLARATION
           TO(grph.nsz(),i)
           {
             int  ndOrdr = grph.order(i);
-            node&     n = grph.node(ndOrdr);
+            Node&     n = grph.node(ndOrdr);
             bool selctd = ndOrdr==priSel || grph.sel(ndOrdr);
 
             if( priSel>-1 && selctd ){           // if a node is primary selected (left mouse down on a node) or the selected flag is set
@@ -1515,15 +1529,15 @@ ENTRY_DECLARATION
         {
           TO(grph.ssz(),i)
           {
-            slot& s      = grph.slot(i);
+            Slot& s      = grph.slot(i);
             auto    nidx = s.nidx;
             if(nidx < grph.nsz()){
               v2        nrml;
-              node const&  n = grph.node(nidx);
+              Node const&  n = grph.node(nidx);
               v2 nP = n.P + NODE_SZ/2;
               
               if(s.in){                                              // dest / in / blue slots
-                slot* src = grph.srcSlot(i);
+                Slot* src = grph.srcSlot(i);
                 if(src){
                   auto srcNdP = grph.node(src->nidx).P + NODE_SZ/2;
                   s.P = node_border(n, srcNdP - nP, &nrml);
@@ -1590,8 +1604,8 @@ ENTRY_DECLARATION
             for(; ci!=grph.cnctEnd(); ++ci)
             {
               const v2 hlfsz = io_rad/2.f;
-              slot const&  src = grph.slot(ci->first);
-              slot const& dest = grph.slot(ci->second);
+              Slot const&  src = grph.slot(ci->first);
+              Slot const& dest = grph.slot(ci->second);
 
               f32  halfx = lerp(.5f, dest.P.x, src.P.x);
               f32  halfy = lerp(.5f, dest.P.y, src.P.y);
@@ -1674,12 +1688,12 @@ ENTRY_DECLARATION
                 for(; sIter!=grph.slotEnd() && sIter->first==ndOrdr; ++sIter)
                 {
                   auto     sIdx = sIter->second;                    // sIdx is slot index
-                  slot const& s = grph.slot(sIdx);
+                  Slot const& s = grph.slot(sIdx);
                   bool   inSlot = len(pntr - s.P) < io_rad;
 
-                  slot::State drawState = slot::NORMAL;
-                  if(s.state==slot::SELECTED) drawState = slot::SELECTED;
-                  else if(inSlot)             drawState = slot::HIGHLIGHTED;
+                  Slot::State drawState = Slot::NORMAL;
+                  if(s.state==Slot::SELECTED) drawState = Slot::SELECTED;
+                  else if(inSlot)             drawState = Slot::HIGHLIGHTED;
                   slot_draw(vg, s, drawState);
                 }
               }
@@ -1745,6 +1759,18 @@ ENTRY_DECLARATION
 
 
 
+
+
+//vec_nd               nodes;
+//vec_con              cncts;             // cncts is connections - the vector of connection structures
+//cnct_tbl          cnct_src;
+//
+//vec_slot          slots_in;
+//vec_slot         slots_out;
+//vec_v2      slots_in_nrmls;
+//vec_v2     slots_out_nrmls;
+//
+//cnct_tbl         cnct_dest;
 
 //sels[i] = isIn(nbnds[i],drgbnd);
 //sels[ndOrdr] = inNode;

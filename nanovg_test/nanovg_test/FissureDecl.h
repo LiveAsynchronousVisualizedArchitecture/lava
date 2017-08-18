@@ -15,7 +15,7 @@ using namespace nanogui;
 const int     TITLE_MAX_LEN = 256;
 const v2      NODE_SZ       = { 256.f, 64.f };
 const v2      NODE_HALF_SZ  = NODE_SZ/2.f;
-const auto    NODE_CLR      = nvgRGBf(.15f,.3f,.4f);
+const auto    NODE_CLR      = nvgRGBf(.2f, .3f, .375f);
 const float   INFf          = std::numeric_limits<float>::infinity();
 const float   SIG_NANf      = std::numeric_limits<float>::signaling_NaN();
 const f32     IORAD         = 15.f;
@@ -41,21 +41,21 @@ using   vecstr     =    std::vector<str>;
 using   vec_v2     =    vec<v2>;
 using cnct_tbl     =    std::unordered_multimap<int,int>;
 
-union      bnd 
+union      Bnd 
 {
   struct { float xmn, ymn, xmx, ymx; };  // todo: make into a union?
   struct { v2 mn; v2 mx; };
   struct { v4 mnmx; };
   float c[4];
 
-  bnd() : xmn(INFf), ymn(INFf), xmx(-INFf), ymx(-INFf) {}
-  bnd(float Xmn, float Ymn, float Xmx, float Ymx) :
+  Bnd() : xmn(INFf), ymn(INFf), xmx(-INFf), ymx(-INFf) {}
+  Bnd(float Xmn, float Ymn, float Xmx, float Ymx) :
     xmn(Xmn), ymn(Ymn), xmx(Xmx), ymx(Ymx)
   {}
 
   float&       operator[](int i)       {return c[i];}
   float const& operator[](int i) const {return c[i];}
-  bnd& operator()(float Xmn, float Ymn, float Xmx, float Ymx)
+  Bnd& operator()(float Xmn, float Ymn, float Xmx, float Ymx)
   {
     xmn=Xmn; ymn=Ymn; xmx=Xmx; ymx=Ymx; return *this;
   }
@@ -64,9 +64,9 @@ union      bnd
   float w(){return abs(xmx-xmn);}
   float h(){return abs(ymx-ymn);}
 };
-using  vec_bnd     =    vec<bnd>;
+using  vec_bnd     =    vec<Bnd>;
 
-struct    node
+struct    Node
 {
   enum Type { MSG=0, FLOW=1 };
 
@@ -76,10 +76,10 @@ struct    node
   Type   type = FLOW;
   //LavaNode ln;
 
-  node(){}
-  node(str _txt, Type _type=FLOW, v2 _P=v2(0,0) ) : txt(_txt), P(_P), type(_type) {}
+  Node(){}
+  Node(str _txt, Type _type=FLOW, v2 _P=v2(0,0) ) : txt(_txt), P(_P), type(_type) {}
 };
-using   vec_nd     =    vec<node>;
+using   vec_nd     =    vec<Node>;
 
 struct    cnct { 
   int src, dest;
@@ -93,15 +93,14 @@ struct    cnct {
 };
 using  vec_con     =    vec<cnct>;
 
-struct    slot { 
+struct    Slot { 
   enum State { NORMAL=0, HIGHLIGHTED, SELECTED };
 
   v2 P; u64 nidx; v2 N; bool in=false; State state=NORMAL;
 
-  slot(u64 nIdx, bool In=false) : nidx(nIdx), in(In), P(0,0), N(0,1) {}
+  Slot(u64 nIdx, bool In=false) : nidx(nIdx), in(In), P(0,0), N(0,1) {}
 };
-using vec_slot     =    vec<slot>;
-
+using vec_slot     =    vec<Slot>;
 
 class  GraphDB
 {
@@ -114,27 +113,27 @@ private:
   vec_nd             m_nodes;
   vec_bnd             m_bnds;
   veci                m_ordr;
-  vec<bool>         selected;             // bitfield for selected nodes
-  vec_slot             slots;
-  NodeSlotMap     node_slots;
-  CnctMap          out_cncts;
-  SrcMap            in_cncts;
+  vec<bool>       m_selected;             // bitfield for selected nodes
+  vec_slot           m_slots;
+  NodeSlotMap    m_nodeSlots;
+  CnctMap         m_outCncts;
+  SrcMap           m_inCncts;
 
 public:
   GraphDB(){}
 
-  u64       addNode(node n)
+  u64       addNode(Node n)
   {
     m_nodes.push_back(n);
     u64 nodeIdx = (u64)(m_nodes.size()-1);
     m_ordr.push_back( (i32)nodeIdx );
     m_bnds.emplace_back();
-    selected.push_back(false);
+    m_selected.push_back(false);
 
     return nodeIdx;
   }
-  auto         node(u64 nIdx)  -> struct node& { return m_nodes[nIdx]; }
-  auto  orderedNode(u64 order) -> struct node& { return m_nodes[m_ordr[order]]; }
+  auto         node(u64 nIdx)  -> struct Node& { return m_nodes[nIdx]; }
+  auto  orderedNode(u64 order) -> struct Node& { return m_nodes[m_ordr[order]]; }
   void   moveToBack(u64 nIdx)
   {
     using namespace std;
@@ -149,64 +148,64 @@ public:
   auto     getNodes() -> vec_nd&   { return m_nodes; }
   u64           nsz(){ return m_nodes.size(); }
 
-  u64       addSlot(slot s)
+  u64       addSlot(Slot s)
   {
-    slots.push_back(s);
-    u64 slotIdx = (u64)(slots.size() - 1);
+    m_slots.push_back(s);
+    u64 slotIdx = (u64)(m_slots.size() - 1);
 
-    auto iter = node_slots.insert({s.nidx, slotIdx});
+    auto iter = m_nodeSlots.insert({s.nidx, slotIdx});
     
     return slotIdx;
   }
-  auto         slot(u64 sIdx)  -> slot& { return slots[sIdx]; }
-  auto    nodeSlots(u64 nIdx) -> decltype(node_slots.find(nIdx))
+  auto         slot(u64 sIdx)  -> Slot& { return m_slots[sIdx]; }
+  auto    nodeSlots(u64 nIdx) -> decltype(m_nodeSlots.find(nIdx))
   {
-    auto iter = node_slots.find(nIdx);
+    auto iter = m_nodeSlots.find(nIdx);
     return iter;
   }
-  auto     getSlots() -> vec_slot& { return slots; }
-  auto      srcSlot(u32 destSlotIdx) -> struct slot* 
+  auto     getSlots() -> vec_slot& { return m_slots; }
+  auto      srcSlot(u32 destSlotIdx) -> struct Slot* 
   {
-    auto ci = in_cncts.find(destSlotIdx);
-    if(ci != in_cncts.end()){
-      struct slot& s = slot(ci->second);
+    auto ci = m_inCncts.find(destSlotIdx);
+    if(ci != m_inCncts.end()){
+      struct Slot& s = slot(ci->second);
       return &s;
     }else 
       return nullptr;
   }
-  auto    destSlots(u32 srcSlotIdx) -> decltype(out_cncts.end())
+  auto    destSlots(u32 srcSlotIdx) -> decltype(m_outCncts.end())
   {
-    return out_cncts.find(srcSlotIdx);
+    return m_outCncts.find(srcSlotIdx);
   }
-  auto      slotEnd() -> decltype(node_slots.end()) { return node_slots.end(); }
-  u64           ssz(){ return slots.size(); }
+  auto      slotEnd() -> decltype(m_nodeSlots.end()) { return m_nodeSlots.end(); }
+  u64           ssz(){ return m_slots.size(); }
 
   void      addCnct(u32 src, u32 dest)
   {
-    auto srcIter = in_cncts.find(dest);
-    if(srcIter != in_cncts.end()){
-      in_cncts.erase(dest);
+    auto srcIter = m_inCncts.find(dest);
+    if(srcIter != m_inCncts.end()){
+      m_inCncts.erase(dest);
     }
 
-    out_cncts.insert({src, dest});
-    in_cncts.insert({dest, src});
+    m_outCncts.insert({src, dest});
+    m_inCncts.insert({dest, src});
   }
-  auto      cnctEnd() -> decltype(out_cncts.end())  { return out_cncts.end(); }
-  auto        cncts() -> decltype(out_cncts.begin()) { return out_cncts.begin(); }
-  u64        cnctsz(){ return out_cncts.size(); }
+  auto      cnctEnd() -> decltype(m_outCncts.end())  { return m_outCncts.end(); }
+  auto        cncts() -> decltype(m_outCncts.begin()) { return m_outCncts.begin(); }
+  u64        cnctsz(){ return m_outCncts.size(); }
 
-  auto          bnd(u64 idx) -> bnd& { return m_bnds[idx]; }
+  auto          bnd(u64 idx) -> Bnd& { return m_bnds[idx]; }
   auto       bounds() -> vec_bnd& { return m_bnds; }
 
-  bool          sel(u64 idx){ return selected[idx]; }
-  void          sel(u64 idx, bool s){ selected[idx] = s; }
-  auto         sels() -> vec<bool>& { return selected; }
+  bool          sel(u64 idx){ return m_selected[idx]; }
+  void          sel(u64 idx, bool s){ m_selected[idx] = s; }
+  auto         sels() -> vec<bool>& { return m_selected; }
   void    clearSels()
   {
-    for(auto& sel : selected) sel = false;
-    for(auto& slt : slots) slt.state = slot::NORMAL;
+    for(auto& sel : m_selected) sel = false;
+    for(auto& slt : m_slots) slt.state = Slot::NORMAL;
   }
-  u64         selsz(){ return selected.size(); }
+  u64         selsz(){ return m_selected.size(); }
 
   i32         order(u64 idx){ return m_ordr[idx]; }
   void        order(u64 idx, i32 o){ m_ordr[idx] = o; }
