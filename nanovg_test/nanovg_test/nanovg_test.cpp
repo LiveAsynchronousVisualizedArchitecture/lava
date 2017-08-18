@@ -151,14 +151,18 @@
 // -todo: take out global connection vector
 // -todo: make addCnct delete a connection if the input is already connected
 // -todo: make slot movement use graphdb
+// -todo: make out/src slide to the in/dest slot instead of dest node center
+// -todo: make out/src slot point directly at the the in/dest slot
+// -todo: refine slots to be closer together and more linear in their connection - maybe give them some leeway in how much they can rotate - done with the the src slot looking at the dest slot for both position and direction
+// -todo: make node_bounds direction be the direction of src slot? - initially fragile
+// -todo: make slots use the middle of nodes instead of their upper left corner
 
-// todo: make out/src slot point directly at the the in/dest slot
+// todo: fix selection of slots
 // todo: solve assert(win==NULL) on window resize
 // todo: make graphToStr use graphdb
 // todo: make strToGraph use graphdb
 // todo: make 'delete' and 'backspace' delete selected nodes
 // todo: make 'delete' and 'backspace' delete selected connections
-// todo: refine slots to be closer together and more linear in their connection - maybe give them some leeway in how much they can rotate
 // todo: make bnd also work for message passing nodes
 // todo: put node type into written file
 // todo: fix deselection of slots
@@ -263,17 +267,17 @@ float              ndOfstX;
 float              ndOfstY;
 float                  ndx = 512.f;
 float                  ndy = 512.f;
-vec_nd               nodes;
+//vec_nd               nodes;
 //vec_con              cncts;             // cncts is connections - the vector of connection structures
 //cnct_tbl          cnct_src;
 
 i32              slotInSel = -1;
 i32             slotOutSel = -1;
 f32                 io_rad;
-vec_slot          slots_in;
-vec_slot         slots_out;
-vec_v2      slots_in_nrmls;
-vec_v2     slots_out_nrmls;
+//vec_slot          slots_in;
+//vec_slot         slots_out;
+//vec_v2      slots_in_nrmls;
+//vec_v2     slots_out_nrmls;
 
 int                 priSel = -1;
 int                 secSel = -1;
@@ -552,10 +556,10 @@ void            node_add(str txt, node::Type type=node::FLOW)
   //v2 P = v2(512,512);
   node n(txt, type);
   n.P = v2(512,512);
-  nodes.push_back(n);
+  //nodes.push_back(n);
 
   //nodes.push_back( {P,txt} );
-  nodes.back().type = type;
+  //nodes.back().type = type;
 
   //sels.push_back(false);
   //nbnds.emplace_back();
@@ -1322,9 +1326,9 @@ ENTRY_DECLARATION
       //slots_in.push_back( {{0.f,0.f}, 2, {0,1.f} } );
       //slots_in_nrmls.push_back( {0,0} );
 
-      for(auto& n : nodes){
+      //for(auto& n : nodes){
         //nbnds.push_back( {n.P.x, n.P.y, n.P.x+NODE_SZ.x, n.P.y+NODE_SZ.y} );
-      }
+      //}
 
       //auto sz = nodes.size();
       //sels.resize(sz, false);
@@ -1626,6 +1630,7 @@ ENTRY_DECLARATION
             else if(slotInSel > -1)
             {
               cnct c = {outClk, slotInSel};
+
               //auto curCnct = find(ALL(cncts), c);
               //if(curCnct==end(cncts)) 
 
@@ -1695,12 +1700,13 @@ ENTRY_DECLARATION
             if(nidx < grph.nsz()){
               v2        nrml;
               node const&  n = grph.node(nidx);
+              v2 nP = n.P + NODE_SZ/2;
               
-              if(s.in){
+              if(s.in){                                              // dest / in / blue slots
                 slot* src = grph.srcSlot(i);
                 if(src){
-                  auto srcNdP = grph.node(src->nidx).P;
-                  s.P = node_border(n, srcNdP - n.P, &nrml);
+                  auto srcNdP = grph.node(src->nidx).P + NODE_SZ/2;
+                  s.P = node_border(n, srcNdP - nP, &nrml);
                   //s->P = node_border(n,  - n.P, &nrml);
                   s.N = nrml;
                 }
@@ -1710,16 +1716,27 @@ ENTRY_DECLARATION
                   s.P = node_border(n, v2(0,s.in? -1.f : 1.f), &nrml);
                   s.N = nrml;
                 }else{
-                  v2  destP = {0,0};
+                  v2  destP={0,0}, destN={0,0};
                   int   cnt = 0;
                   for(; ci != grph.cnctEnd() && ci->first==i; ++cnt, ++ci){
                     //auto destNdIdx = grph.slot(ci->dest).nidx;
-                    auto destNdIdx  = grph.slot(ci->second).nidx;
-                    destP          += grph.node(destNdIdx).P;
+                    
+                    //auto destNdIdx  = grph.slot(ci->second).nidx;
+                    //destP          += grph.node(destNdIdx).P;
+
+                    v2 curP = grph.slot(ci->second).P;
+                    destP += curP; // grph.node(destNdIdx).P;
+                    //destN += norm(curP - s.P);
+                    //v2  P  = hasNaN(s.P)? n.P  :  s.P;
+                    destN += norm(curP - nP);
                   }
-                  destP              /= (f32)cnt;
-                  s.P = node_border(n, destP - n.P, &nrml);
-                  s.N = nrml;
+                  destP /= (f32)cnt;
+                  destN /= (f32)cnt;
+                  s.N = norm(destN);
+                  s.P = node_border(n, s.N);
+                  //s.P = node_border(n, destP - n.P);
+                  //s.P = node_border(n, destP - n.P, &nrml);
+                  //s.N = nrml;
                 }
               }
 
@@ -1818,13 +1835,17 @@ ENTRY_DECLARATION
           {
             //int sz = (int)nd_ordr.size();
             //auto sz = fd.grph.getNodes().size();
+            //
+            //node&     n = nodes[ndOrdr];
+            //bool selctd = ndOrdr==priSel || sels[ndOrdr];
+            //
+            //nbnds[ndOrdr] = node_draw(vg, 0, n, clr, round);
+
             auto sz = fd.grph.nsz();
             TO(sz,i)
             {
               int  ndOrdr = fd.grph.order(i);      // nd_ordr[i];
               auto      n = fd.grph.node(ndOrdr);
-              //node&     n = nodes[ndOrdr];
-              //bool selctd = ndOrdr==priSel || sels[ndOrdr];
               bool selctd = ndOrdr==priSel || fd.grph.sel(ndOrdr);
 
               auto clr = NODE_CLR;
@@ -1832,7 +1853,6 @@ ENTRY_DECLARATION
 
               float round = secSel==ndOrdr? 0 : 1.f;
               fd.grph.bnd(ndOrdr) = node_draw(vg, 0, n, clr, round);
-              //nbnds[ndOrdr] = node_draw(vg, 0, n, clr, round);
 
               SECTION(draw node slots)
               {
