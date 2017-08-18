@@ -1,168 +1,16 @@
 
-// -todo: make click and drag node position relative to click position
-// -todo: bring in vecf from lighting in a bottle
-// -todo: try bezier
-// -todo: make vector of bnds, nodes, etc.
-// -todo: make ability to select node out of multiple nodes
-// -todo: make node struct 
-// -todo: make click and drag work with multple nodes
-// -todo: make dragged node swap with top node
-// -todo: make dragged node insert at top and keep sorted order
-// -todo: make connections data
-// -todo: take out windows min and max
-// -todo: draw connections
-// -todo: make click and drag draw a box
-// -todo: separate node drag and selection from nanovg drawing
-// -todo: lerp connection bezier instad of divide by 2
-// -todo: make drag not pick up nodes
-// -todo: make selection drag box highlight fully inside nodes
-// -todo: make selection by drag box
-// -todo: use std::move_back in MoveToBack()? 
-// -todo: make click drag short circuit on the top (back) node - need to loop in reverse? - yes, just FROM instead of TO
-// -todo: make node referenceable connections structure - have two connection vectors, one for in and one for out? - need to be able to get all in and/or out connections for a node - need two heaps?
-// -todo: make connections structure use sorted vectors of indices and and lower_bound + upper_bound - can just use one simple  multi-map?
-// -todo: make all selected nodes drag - need a starting position for the pntr - that is what drgP is?
-// -todo: take out px, py - just use vector v2
-// -todo: make vector from center to a square border
-// -todo: make line from center of node obey node ratio when clamped to 
-// -todo: turn circle collision into stand alone function
-// -todo: make direction vector from center clamp to rounded corners
-// -todo: make circle on outer border of node
-// -todo: fix bounds being swapped - ndOrdr instead of i is correct?
-// -todo: make circle collision keep signs and work on both sides - actually needed to switch the center point of the circle
-// -todo: make dragging selected nodes work after the first time 
-// -todo: make secondary selection with right mouse button
-// -todo: fix negative x border - needed to keep the sign of the dir.x vector
-// -todo: fix selections hitting the wrong nodes - just need ndOrdr in bounds array index?
-// -todo: make connections between nodes
-// -todo: fix secSel again - was comparing secSel to i instead of ndOrdr
-// -todo: check to see if there is already a connection
-// -todo: change drg variable to primary selection
-// -todo: put back click select of node - primary selection needed to be set to ndOrdr on click
-// -todo: change node drawing function to str
-// -todo: make fps counter
-// -todo: make left click on non-selected clear selection
-// -todo: make nodes and connections save to json string
-// -todo: make nodes load from json string
-// -todo: save json to file
-// -todo: load json to file
-// -todo: load .dll and name node 
-// -todo: figure out why new nodes don't load from json - nd_ordr was not being set
-// -todo: save node order in json
-// -todo: design node format
-// -todo: draw single input and output
-// -todo: make function to get position of middle of input or out
-// -todo: draw connections from an input to an output
-// -todo: fix lag of node and connections to pointers - fixed by changing node positions before drawing, which lets connections go to the correct position
-// -todo: put back console 
-// -todo: test console
-// -todo: make dedicated slot vectors 
-// -todo: enable mouse over slot highlighting
-// -todo: make slot selection
-// -todo: use slot selections to make connections
-// -todo: draw connections off of slots
-// -todo: make slots shift to point at each other 
-// -todo: make slots draw under nodes
-// -todo: take out drawing tests
-// -todo: make a function to find the position of a rounded rect border - node_border
-// -todo: solve disapearing connection and slots when connected nodes are level - 
-//       | y difference is 0 which creates a problem?
-//       | connection source and destination are both 0 - that's fine, the in and out connects are two separate arrays  
-//       | out.x and out.y are both NaN
-//       | problem is the slots, not the connect - difference in y was 0 when nodes are lined up vertically, causing division by 0
-// -todo: get release mode to build - subsystem was WinMain but USE_CONSOLE was defined and entry point was main instead of WinMain
-// -todo: make function to find the normal of a rounded rect - just means wrapping circle collison function - outputting from node_border as optional output
-// -todo: make bezier point at normal of node border
-// -todo: make slots use the rounded rail drawing in the draw_node function
-// -todo: draw normal 
-// -todo: figure why normal doesn't follow node end circle - was using the node center instead of the circle center to create direction
-// -todo: make input and output circles roll towards their connection
-// -todo: fix blinking slot and connection when connection is purely vertical  -  circle intersection only deals with horizontal intersections and wasn't prepared for dir.x == 0 
-// -todo: debug rail changing at halfway point - circle centrer changes at halfway point and arc is draw on the opposite side - need the centes for both circles
-// -todo: fix rail getting longer than the rail radius - lftDist needed to be clamped with min() to the rail radius
-// -todo: make slot drawn with border rail technique
-// -todo: fix arc on right when not in circle
-// -todo: correct right arc when on 
-// -todo: make right and left draw when they are in their opposite circles
-// -todo: make right side of slot rail
-// -todo: delete connection if it already exists instead of creating a duplicate
-// -todo: change slot colors and add border
-// -todo: fix slots moving off border in release mode - hasNaN check might have always been returning true
-// -todo: make Fissure struct to hold global state
-// -todo: get nanogui compiling 
-// -todo: get nanogui working
-// -todo: unify serial files
-// -todo: reposition fps
-// -todo: make a menu bar
-// -todo: add file to menu bar
-// -todo: add save to menu bar
-// -todo: compile in tiny file dialog
-// -todo: open file dialog on button push 
-// -todo: make release mode compile
-// -todo: debug release mode RTTI crash - rtti information not compiled in
-// -todo: debug nanogui in release mode - any optimizations destroy the gui layout of nanogui
-// -todo: draw gui over node graph
-// -todo: save json file with button
-// -todo: debug font not loading error when running binary directly - a problem only with the debug build? - still relies on .ttf files for some reason, debug needed them in the .exe directory
-// -todo: add filter to open dialog and load json file with button
-// -todo: make strToGraph actually change the graph - load button wasn't calling loadFile
-// -todo: debug nodes dissapearing - Jzon.hpp can't read it's own files if the file is formatted in a readable way 
-// -todo: put in error handling to loadFile()
-// -todo: create node with button
-// -todo: remove .ttf file dependencies so that only the internal byte arrays are used - needed to use load mem font function on the graph nanavg context
-// -todo: fix slot jumping when on border of circle - looks like the circle hit is used slightly too far into the node - intersection wasn't being ignored while inside the non-rounded corners
-// -todo: draw arrow inside slots 
-// -todo: rotate slot triangle according to normal - atan2(y,x) and some organization
-// -todo: make a message node button 
-// -todo: draw message node as a circle
-// -todo: make angle to normal function
-// -todo: use node_border for both connected and unconnected slot states
-// -todo: debug bezier normals - another bug from copying lines but not replacing cnct.dest / src
-// -todo: make inputs look at outputs slots instead of their connecting node
-// -todo: draw slots above nodes
-// -todo: make slots average between their sources and directions
-// -todo: make slot drawing into a function
-// -todo: make GraphDB that connects nodes and slots
-// -todo: use GraphDB::addNode in parallel with node_add()
-// -todo: draw from GraphDB
-// -todo: make order changing part of GraphDB
-// -todo: convert node movement to use GraphDB
-// -todo: make three states built in to slot
-// -todo: convert slot drawing to use GraphDB structure
-// -todo: convert slot movement to use GraphDB structure
-// -todo: make slots draw the right way when not connected
-// -todo: draw slots at the same time as nodes so that they have the same draw order
-// -todo: take out global selections
-// -todo: take out global bounds
-// -todo: figure out slot being drawn in the corner - slot added to node that didn't exist yet + std::multimap iterator doesn't go to end after it exhausts the looked up key, so the key must be checked as well as end()
-// -todo: debug crash on node order - order array size is 0 and subtracting 1 from an unsigned in is wrapping i around to the max value of a u64? - yes, FROM macro redone with int64_t so that it is signed
-// -todo: debug crash on message node creation - doesn't happen with FROM macro
-// -todo: put move to back in GraphDB
-// -todo: take out global order
-// -todo: make node selection use graphdb
-// -todo: make global state 
-// -todo: debug drawing order of first node's out slot - wasn't using the node order index for the lookup or key comparison
-// -todo: debug message nodes not showing up - just needed to change the event handler to add the node to the graph
-// -todo: build in connections to graphdb 
-// -todo: put in a max length of bezier connection drawing tangents based on the size of a node - min with NODE_SZ.x/2
-// -todo: make a way to access the slot connected to a node instead of just the nodes connected to a slot - done with grph
-// -todo: convert connections to use graphdb
-// -todo: make in/dest slot move too
-// -todo: take out global connection vector
-// -todo: make addCnct delete a connection if the input is already connected
-// -todo: make slot movement use graphdb
-// -todo: make out/src slide to the in/dest slot instead of dest node center
-// -todo: make out/src slot point directly at the the in/dest slot
-// -todo: refine slots to be closer together and more linear in their connection - maybe give them some leeway in how much they can rotate - done with the the src slot looking at the dest slot for both position and direction
-// -todo: make node_bounds direction be the direction of src slot? - initially fragile
-// -todo: make slots use the middle of nodes instead of their upper left corner
-// -todo: make slots highlight on mouse over
 // -todo: fix selection of slots
 // -todo: make a deselect all function that clears globals and calls fd.grph.clearSels()
-// -todo: fix deselectin of slots
+// -todo: fix deselection of slots
+// -todo: organized graphdb functions according to which part they operate on
 
+// todo: change graphdb private variables to use m_
+// todo: make a GraphDB function that toggles a selection on or off
+// todo: try renaming types with upper case first letter
 // todo: make selection of one dest and one src slot trigger connection create or delete
 // todo: make connection delete and create trigger when 1 or more in/dest slots are selected and 1 out/src slot is connected
+// todo: fix slots not staying selected
+// idea: make drawing of one src to multiple connections draw first to the average of all the slots, then draw to all the dest slots
 // todo: solve assert(win==NULL) on window resize
 // todo: make graphToStr use graphdb
 // todo: make strToGraph use graphdb
@@ -170,7 +18,6 @@
 // todo: make 'delete' and 'backspace' delete selected connections
 // todo: make bnd also work for message passing nodes
 // todo: put node type into written file
-// idea: make drawing of one src to multiple connections draw first to the average of all the slots, then draw to all the dest slots
 // todo: draw message node slots as sliding angles
 // todo: make one node snap to another node
 // todo: use scroll wheel and nanovg scale transforms to zoom in and out
@@ -184,6 +31,7 @@
 // todo: add data to node for inputs
 // todo: add data to connection for input and output indices
 
+// idea: make a single file include all nanoui into one compilation unit
 // idea: make msg loop that would deal with selections, clicks and drags? 
 // idea: take out redudant node position + bnd information 
 // idea: look into quantized gradients of nanovg

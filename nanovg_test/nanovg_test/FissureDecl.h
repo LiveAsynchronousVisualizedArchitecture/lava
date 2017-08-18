@@ -111,9 +111,9 @@ public:
   using SrcMap      = std::multimap<u32, u32>;
 
 private:
-  vec_nd               nodes;
-  vec_bnd               bnds;
-  veci                  ordr;
+  vec_nd             m_nodes;
+  vec_bnd             m_bnds;
+  veci                m_ordr;
   vec<bool>         selected;             // bitfield for selected nodes
   vec_slot             slots;
   NodeSlotMap     node_slots;
@@ -125,14 +125,30 @@ public:
 
   u64       addNode(node n)
   {
-    nodes.push_back(n);
-    u64 nodeIdx = (u64)(nodes.size()-1);
-    ordr.push_back( (i32)nodeIdx );
-    bnds.emplace_back();
+    m_nodes.push_back(n);
+    u64 nodeIdx = (u64)(m_nodes.size()-1);
+    m_ordr.push_back( (i32)nodeIdx );
+    m_bnds.emplace_back();
     selected.push_back(false);
 
     return nodeIdx;
   }
+  auto         node(u64 nIdx)  -> struct node& { return m_nodes[nIdx]; }
+  auto  orderedNode(u64 order) -> struct node& { return m_nodes[m_ordr[order]]; }
+  void   moveToBack(u64 nIdx)
+  {
+    using namespace std;
+
+    auto  sz = m_ordr.size();
+    auto tmp = move(m_ordr[nIdx]);
+    for(auto j=nIdx; j<sz-1; ++j)
+      m_ordr[j] = move( m_ordr[j+1] );
+
+    m_ordr[sz-1] = tmp;
+  }
+  auto     getNodes() -> vec_nd&   { return m_nodes; }
+  u64           nsz(){ return m_nodes.size(); }
+
   u64       addSlot(slot s)
   {
     slots.push_back(s);
@@ -142,41 +158,12 @@ public:
     
     return slotIdx;
   }
-  void      addCnct(u32 src, u32 dest)
-  {
-    auto srcIter = in_cncts.find(dest);
-    if(srcIter != in_cncts.end()){
-      in_cncts.erase(dest);
-    }
-
-    out_cncts.insert({src, dest});
-    in_cncts.insert({dest, src});
-  }
+  auto         slot(u64 sIdx)  -> slot& { return slots[sIdx]; }
   auto    nodeSlots(u64 nIdx) -> decltype(node_slots.find(nIdx))
   {
     auto iter = node_slots.find(nIdx);
     return iter;
   }
-  auto      slotEnd() -> decltype(node_slots.end()) { return node_slots.end(); } 
-  auto      cnctEnd() -> decltype(out_cncts.end())  { return out_cncts.end(); }
-  auto  orderedNode(u64 order) -> node& { return nodes[ordr[order]]; }
-  void   moveToBack(u64 nIdx)
-  {
-    using namespace std;
-
-    auto  sz = ordr.size();
-    auto tmp = move(ordr[nIdx]);
-    for(auto j=nIdx; j<sz-1; ++j)
-      ordr[j] = move( ordr[j+1] );
-
-    ordr[sz-1] = tmp;
-
-    //auto&  o = order;
-    //move_backward(a.front()+i+1ul, a.back(), a.back()-1);
-  }
-  auto         node(u64 nIdx)  -> node& { return nodes[nIdx]; }
-  auto         slot(u64 sIdx)  -> slot& { return slots[sIdx]; }
-  auto     getNodes() -> vec_nd&   { return nodes; }
   auto     getSlots() -> vec_slot& { return slots; }
   auto      srcSlot(u32 destSlotIdx) -> struct slot* 
   {
@@ -191,24 +178,38 @@ public:
   {
     return out_cncts.find(srcSlotIdx);
   }
+  auto      slotEnd() -> decltype(node_slots.end()) { return node_slots.end(); }
+  u64           ssz(){ return slots.size(); }
+
+  void      addCnct(u32 src, u32 dest)
+  {
+    auto srcIter = in_cncts.find(dest);
+    if(srcIter != in_cncts.end()){
+      in_cncts.erase(dest);
+    }
+
+    out_cncts.insert({src, dest});
+    in_cncts.insert({dest, src});
+  }
+  auto      cnctEnd() -> decltype(out_cncts.end())  { return out_cncts.end(); }
   auto        cncts() -> decltype(out_cncts.begin()) { return out_cncts.begin(); }
-  auto          bnd(u64 idx) -> bnd& { return bnds[idx]; }
-  auto       bounds() -> vec_bnd& { return bnds; }
+  u64        cnctsz(){ return out_cncts.size(); }
+
+  auto          bnd(u64 idx) -> bnd& { return m_bnds[idx]; }
+  auto       bounds() -> vec_bnd& { return m_bnds; }
+
   bool          sel(u64 idx){ return selected[idx]; }
   void          sel(u64 idx, bool s){ selected[idx] = s; }
   auto         sels() -> vec<bool>& { return selected; }
-  i32         order(u64 idx){ return ordr[idx]; }
-  void        order(u64 idx, i32 o){ ordr[idx] = o; }
-  u64           nsz(){ return nodes.size(); }
-  u64           ssz(){ return slots.size(); }
-  u64         selsz(){ return selected.size(); }
-  u64        cnctsz(){ return out_cncts.size(); }
   void    clearSels()
   {
     for(auto& sel : selected) sel = false;
     for(auto& slt : slots) slt.state = slot::NORMAL;
   }
+  u64         selsz(){ return selected.size(); }
 
+  i32         order(u64 idx){ return m_ordr[idx]; }
+  void        order(u64 idx, i32 o){ m_ordr[idx] = o; }
 };
 
 struct FisData
@@ -232,6 +233,9 @@ struct FisData
 
 
 
+
+//auto&  o = order;
+//move_backward(a.front()+i+1ul, a.back(), a.back()-1);
 
 //using NodeIdex    = i32;
 //
