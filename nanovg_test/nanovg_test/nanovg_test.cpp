@@ -156,8 +156,13 @@
 // -todo: refine slots to be closer together and more linear in their connection - maybe give them some leeway in how much they can rotate - done with the the src slot looking at the dest slot for both position and direction
 // -todo: make node_bounds direction be the direction of src slot? - initially fragile
 // -todo: make slots use the middle of nodes instead of their upper left corner
+// -todo: make slots highlight on mouse over
+// -todo: fix selection of slots
+// -todo: make a deselect all function that clears globals and calls fd.grph.clearSels()
+// -todo: fix deselectin of slots
 
-// todo: fix selection of slots
+// todo: make selection of one dest and one src slot trigger connection create or delete
+// todo: make connection delete and create trigger when 1 or more in/dest slots are selected and 1 out/src slot is connected
 // todo: solve assert(win==NULL) on window resize
 // todo: make graphToStr use graphdb
 // todo: make strToGraph use graphdb
@@ -165,7 +170,6 @@
 // todo: make 'delete' and 'backspace' delete selected connections
 // todo: make bnd also work for message passing nodes
 // todo: put node type into written file
-// todo: fix deselection of slots
 // idea: make drawing of one src to multiple connections draw first to the average of all the slots, then draw to all the dest slots
 // todo: draw message node slots as sliding angles
 // todo: make one node snap to another node
@@ -180,6 +184,7 @@
 // todo: add data to node for inputs
 // todo: add data to connection for input and output indices
 
+// idea: make msg loop that would deal with selections, clicks and drags? 
 // idea: take out redudant node position + bnd information 
 // idea: look into quantized gradients of nanovg
 // idea: don't select a slot if it is under an existing node
@@ -551,6 +556,7 @@ v2        angleToNormal(f32 angle)
 //  return true;
 //}
 
+// state manipulation
 void            node_add(str txt, node::Type type=node::FLOW)
 {
   //v2 P = v2(512,512);
@@ -565,6 +571,14 @@ void            node_add(str txt, node::Type type=node::FLOW)
   //nbnds.emplace_back();
 
   //nd_ordr.push_back( (int)(nodes.size()-1) );
+}
+void    clear_selections(GraphDB* inout_grph)
+{
+  inout_grph->clearSels();
+  slotInSel   =  -1;
+  slotOutSel  =  -1;
+  priSel      =  -1;
+  secSel      =  -1;
 }
 
 void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
@@ -1221,7 +1235,7 @@ void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw
   //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
   //nvgStroke(vg);
 }
-void           slot_draw(NVGcontext* vg, slot const& s, bool highlight=false, bool selected=false)
+void           slot_draw(NVGcontext* vg, slot const& s, slot::State drawState) //bool highlight=false, bool selected=false)
 {
   nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
   nvgStrokeWidth(vg, 3.f);
@@ -1231,14 +1245,16 @@ void           slot_draw(NVGcontext* vg, slot const& s, bool highlight=false, bo
 
   NVGcolor fillClr;
   if(s.in){
-    switch(s.state){
+    //switch(s.state){
+    switch(drawState){
     case slot::SELECTED:    fillClr = nvgRGBAf(1.f,   1.f,   .5f,  1.f); break;
     case slot::HIGHLIGHTED: fillClr = nvgRGBAf( .36f,  .9f, 1.f,   1.f); break;
     case slot::NORMAL:
     default:                fillClr = nvgRGBAf( .18f,  .6f,  .75f, 1.f); break;
     }
   }else{
-    switch(s.state){
+    //switch(s.state){
+    switch(drawState){
     case slot::SELECTED:    fillClr = nvgRGBAf(1.f,   1.f,   .5f,   1.f); break;
     case slot::HIGHLIGHTED: fillClr = nvgRGBAf( .36f, 1.f,   .36f,  1.f); break;
     case slot::NORMAL:      
@@ -1479,8 +1495,7 @@ ENTRY_DECLARATION
       bool lftClk = (lftDn && !prevLftDn);
       bool  rtClk = (rtDn  && !prevRtDn);
       bool    clk = lftClk || rtClk;
-      //int      sz = (int)nd_ordr.size();
-      auto     sz =  grph.nsz(); // (int)nd_ordr.size();
+      auto     sz =  grph.nsz();
 
       SECTION(time)
       {
@@ -1518,7 +1533,8 @@ ENTRY_DECLARATION
       }
       SECTION(selection)
       {
-        bnd drgbnd;
+        bool clearSelections = true;
+        bnd  drgbnd;
         SECTION(selection box)
         {
           if(!lftDn){ drgP=pntr; drgbox=false; }
@@ -1533,10 +1549,9 @@ ENTRY_DECLARATION
           if(drgbox){
             TO(sz,i){
               bool selected = isIn(grph.bnd(i), drgbnd);
-              grph.sel(i, selected);
-              //sels[i] = isIn(nbnds[i],drgbnd);
-              //sels[ndOrdr] = inNode;
+              grph.sel(i, selected);               
             }
+            clearSelections = false;
           }
         
           if(!lftDn){
@@ -1553,46 +1568,18 @@ ENTRY_DECLARATION
             bool inNode = isIn(pntr.x,pntr.y, grph.bnd(ndOrdr) );
             inAny      |= inNode;
                      
-            //int  ndOrdr = nd_ordr[i];
-            //node&     n = grph.orderedNode(i);
-            //node&     n = nodes[ndOrdr];
-            //bool inNode = isIn(pntr.x,pntr.y, nbnds[ndOrdr]);
-
-            //SECTION(secondary selection (for connections) )
-            //{
-            //  if(inNode && rtDn && !prevRtDn)
-            //  {
-            //    if(secSel<0) secSel=ndOrdr;
-            //    else{ // create a connection between secSel and i
-            //      if( insUnq(&cnct_src,  ndOrdr, secSel) &&
-            //          insUnq(&cnct_dest, secSel, ndOrdr) ){
-            //        cncts.push_back( {ndOrdr, secSel} );
-            //      }
-            //  
-            //      secSel = -1;
-            //    }
-            //    break;
-            //  }
-            //}
-
             SECTION(primary selection and group selection effects)
             {
               if(inNode && clk && (priSel<0||priSel!=ndOrdr) )
               {
-                //MoveToBack( &nd_ordr, i);
                 grph.moveToBack(i);
                 priSel     = ndOrdr;
                 drgP       = pntr;
 
-                //if(!sels[ndOrdr]){
-                //  TO(sels.size(),i) sels[i]=false;
-                //  sels[ndOrdr] = true;
-                //}
-
                 if(!grph.sel(ndOrdr)){
-                  //TO(sels.size(),i) grph.sel(i,false);
                   TO(grph.selsz(),i) grph.sel(i,false);
                   grph.sel(ndOrdr,true);
+                  clearSelections = true;
                 }
                 break;                                                  // without breaking from the loop, a node could be moved down and hit again
               }
@@ -1600,8 +1587,10 @@ ENTRY_DECLARATION
           }
         
           if(!inAny){
-            if(lftDn && priSel<0){ drgbox = true; }
+            if(lftDn && priSel<0){ drgbox=true; clearSelections=false; }
             if(rtDn && !prevRtDn){ secSel = -1; }
+          }else{
+            clearSelections=false;
           }
         }
         SECTION(slot selection and connection creation)
@@ -1610,62 +1599,45 @@ ENTRY_DECLARATION
           i32 outClk = -1;
           if(lftDn && !prevLftDn){
             TO(grph.getSlots().size(), i){
-              //bool inSlt = len(pntr - slots_out[i].P) < io_rad;
-              bool inSlt = len(pntr - grph.slot(i).P) < io_rad;
-              if(inSlt) outClk = (i32)i;
+              slot&    s = grph.slot(i);
+              bool inSlt = len(pntr - s.P) < io_rad;
+              if(inSlt){
+                outClk      = (i32)i;
+                s.state     = slot::SELECTED;
+              }
             }
-            
-            //TO(slots_out.size(), i){
-            //
-            //TO(slots_in.size(),  i){ 
-            //  bool inSlt = len(pntr - slots_in[i].P) < io_rad;
-            //  if(inSlt) inClk = (i32)i;           
-            //}
+            clearSelections = false;
           }
 
-          if(outClk > -1)
-          {
+          if(outClk > -1){
             if(outClk==slotOutSel) 
               slotOutSel = -1;                                           // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
-            else if(slotInSel > -1)
-            {
-              cnct c = {outClk, slotInSel};
-
-              //auto curCnct = find(ALL(cncts), c);
-              //if(curCnct==end(cncts)) 
-
-              //auto curCnct = find(ALL(grph.cncts), c);              
-              //if(curCnct==end(cncts)) 
-              //  cncts.push_back( {outClk, slotInSel} );
-              //else cncts.erase(curCnct);                                 // have to find another way to index connections if they are going to be referenced, since any deletion will invalidate their positions
-
+            else if(slotInSel > -1){
               grph.addCnct(slotInSel, outClk);
-
               slotOutSel = slotInSel = -1;
-            }
-            else
+              clearSelections = false;
+            }else{
               slotOutSel = outClk;
+              clearSelections = false;
+            }
           }
 
           if(inClk > -1){
             if(inClk==slotInSel)
               slotInSel = -1;                                            // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
-            else if(slotOutSel > -1)
-            {
-              //cnct c = {slotOutSel, inClk};
-              //auto curCnct = find(ALL(cncts), c);
-              //if(curCnct == end(cncts)) 
-              //  cncts.push_back(c);
-              //else
-              //  cncts.erase(curCnct);                                   // have to find another way to index connections if they are going to be referenced, since any deletion will invalidate their positions
-
+            else if(slotOutSel > -1){
               grph.addCnct(inClk, slotInSel);
-
               slotOutSel = slotInSel = -1;
-            }            
-            else 
-              slotInSel = inClk;
+              clearSelections = false;
+            }else{
+              slotInSel  = inClk;
+              clearSelections = false;
+            }
           }
+        }
+        
+        if(clearSelections && !lftDn && prevLftDn){ 
+          clear_selections(&grph);
         }
       }
       SECTION(movement)
@@ -1833,14 +1805,6 @@ ENTRY_DECLARATION
           }
           SECTION(draw nodes)
           {
-            //int sz = (int)nd_ordr.size();
-            //auto sz = fd.grph.getNodes().size();
-            //
-            //node&     n = nodes[ndOrdr];
-            //bool selctd = ndOrdr==priSel || sels[ndOrdr];
-            //
-            //nbnds[ndOrdr] = node_draw(vg, 0, n, clr, round);
-
             auto sz = fd.grph.nsz();
             TO(sz,i)
             {
@@ -1859,26 +1823,21 @@ ENTRY_DECLARATION
                 nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
                 nvgStrokeWidth(vg, BORDER);
                 auto sIter = grph.nodeSlots(ndOrdr);            // sIter is slot iterator
-                for(;sIter!=grph.slotEnd() && sIter->first==ndOrdr; ++sIter){
-                  auto sIdx = sIter->second;               // sIdx is slot index
+                for(; sIter!=grph.slotEnd() && sIter->first==ndOrdr; ++sIter)
+                {
+                  auto     sIdx = sIter->second;                    // sIdx is slot index
                   slot const& s = grph.slot(sIdx);
                   bool   inSlot = len(pntr - s.P) < io_rad;
-                  slot_draw(vg, s, inSlot);
+
+                  slot::State drawState = slot::NORMAL;
+                  if(s.state==slot::SELECTED) drawState = slot::SELECTED;
+                  else if(inSlot)             drawState = slot::HIGHLIGHTED;
+                  slot_draw(vg, s, drawState);
                 }
               }
 
             }
           }
-          //SECTION(draw slots)
-          //{
-            //nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
-            //nvgStrokeWidth(vg, BORDER);
-            //TO(grph.ssz(),i){
-            //  slot const& s = grph.slot(i);
-            //  bool inSlot = len(pntr - s.P) < io_rad;
-            //  slot_draw(vg, s, inSlot);
-            //}
-          //}
           SECTION(draw selection box)
           {
             if(lftDn && priSel<0)
@@ -1938,6 +1897,99 @@ ENTRY_DECLARATION
 
 
 
+
+//sels[i] = isIn(nbnds[i],drgbnd);
+//sels[ndOrdr] = inNode;
+
+//int      sz = (int)nd_ordr.size();
+//
+// (int)nd_ordr.size();
+
+//cnct c = {slotOutSel, inClk};
+//auto curCnct = find(ALL(cncts), c);
+//if(curCnct == end(cncts)) 
+//  cncts.push_back(c);
+//else
+//  cncts.erase(curCnct);                                   // have to find another way to index connections if they are going to be referenced, since any deletion will invalidate their positions
+//
+//inAny = true;
+
+//MoveToBack( &nd_ordr, i);
+//
+//if(!sels[ndOrdr]){
+//  TO(sels.size(),i) sels[i]=false;
+//  sels[ndOrdr] = true;
+//}
+//
+//TO(sels.size(),i) grph.sel(i,false);
+
+//int  ndOrdr = nd_ordr[i];
+//node&     n = grph.orderedNode(i);
+//node&     n = nodes[ndOrdr];
+//bool inNode = isIn(pntr.x,pntr.y, nbnds[ndOrdr]);
+
+//SECTION(secondary selection (for connections) )
+//{
+//  if(inNode && rtDn && !prevRtDn)
+//  {
+//    if(secSel<0) secSel=ndOrdr;
+//    else{ // create a connection between secSel and i
+//      if( insUnq(&cnct_src,  ndOrdr, secSel) &&
+//          insUnq(&cnct_dest, secSel, ndOrdr) ){
+//        cncts.push_back( {ndOrdr, secSel} );
+//      }
+//  
+//      secSel = -1;
+//    }
+//    break;
+//  }
+//}
+
+//slot_draw(vg, s, inSlot);
+//                  
+//bool slot_selected = false;
+//
+//inSlot? slot::HIGHLIGHTED : slot::NORMAL
+
+//int sz = (int)nd_ordr.size();
+//auto sz = fd.grph.getNodes().size();
+//
+//node&     n = nodes[ndOrdr];
+//bool selctd = ndOrdr==priSel || sels[ndOrdr];
+//
+//nbnds[ndOrdr] = node_draw(vg, 0, n, clr, round);
+
+//cnct c = {outClk, slotInSel};
+//
+//auto curCnct = find(ALL(cncts), c);
+//if(curCnct==end(cncts)) 
+
+//auto curCnct = find(ALL(grph.cncts), c);              
+//if(curCnct==end(cncts)) 
+//  cncts.push_back( {outClk, slotInSel} );
+//else cncts.erase(curCnct);                                 // have to find another way to index connections if they are going to be referenced, since any deletion will invalidate their positions
+
+//bool inSlt = len(pntr - slots_out[i].P) < io_rad;
+//
+// else s.state = slot::NORMAL;
+
+//TO(slots_out.size(), i){
+//
+//TO(slots_in.size(),  i){ 
+//  bool inSlt = len(pntr - slots_in[i].P) < io_rad;
+//  if(inSlt) inClk = (i32)i;           
+//}
+
+//SECTION(draw slots)
+//{
+//nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
+//nvgStrokeWidth(vg, BORDER);
+//TO(grph.ssz(),i){
+//  slot const& s = grph.slot(i);
+//  bool inSlot = len(pntr - s.P) < io_rad;
+//  slot_draw(vg, s, inSlot);
+//}
+//}
 
 //TO(slots_out.size(),i){
 //  bool inSlot = len(pntr-slots_out[i].P) < io_rad;

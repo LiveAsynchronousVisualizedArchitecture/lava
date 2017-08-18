@@ -203,6 +203,11 @@ public:
   u64           ssz(){ return slots.size(); }
   u64         selsz(){ return selected.size(); }
   u64        cnctsz(){ return out_cncts.size(); }
+  void    clearSels()
+  {
+    for(auto& sel : selected) sel = false;
+    for(auto& slt : slots) slt.state = slot::NORMAL;
+  }
 
 };
 
