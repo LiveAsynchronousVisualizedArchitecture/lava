@@ -107,7 +107,7 @@ class  GraphDB
 public:
   using NodeSlotMap = std::multimap<u64, u64>;          // The key is the index into the node array, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used.
   using CnctMap     = std::multimap<u32, u32>;
-  using SrcMap      = std::multimap<u32, u32>;
+  using SrcMap      = std::multimap<u32, u32>;          // todo: change this to a single map
 
 private:
   vec_nd             m_nodes;
@@ -184,11 +184,23 @@ public:
   {
     auto srcIter = m_inCncts.find(dest);
     if(srcIter != m_inCncts.end()){
+      m_outCncts.erase(src);
       m_inCncts.erase(dest);
     }
 
     m_outCncts.insert({src, dest});
     m_inCncts.insert({dest, src});
+  }
+  void      toggleCnct(u32 src, u32 dest)
+  {
+    auto srcIter = m_inCncts.find(dest);
+    if(srcIter != m_inCncts.end()){
+      m_outCncts.erase(src);
+      m_inCncts.erase(dest);
+    }else{
+      m_outCncts.insert({src, dest});
+      m_inCncts.insert({dest, src});
+    }
   }
   auto      cnctEnd() -> decltype(m_outCncts.end())  { return m_outCncts.end(); }
   auto        cncts() -> decltype(m_outCncts.begin()) { return m_outCncts.begin(); }

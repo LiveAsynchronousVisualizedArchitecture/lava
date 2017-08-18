@@ -8,10 +8,9 @@
 // -todo: fix slots not staying selected - slots clicked need to turn off clearSelection - clearSelection turned off on left click up when inside a slot
 // -todo: solve assert(win==NULL) on window resize - was using void* attached to glfw instead of static state
 // -todo: fix in/dest connections when not connected
+// -todo: make selection of one dest and one src slot trigger connection create 
+// -todo: make a GraphDB function that toggles a selection on or off
 
-// todo: make selection of one dest and one src slot trigger connection create or deletes
-// todo: make a GraphDB function that toggles a selection on or off
-// todo: make connection delete and create trigger when 1 or more in/dest slots are selected and 1 out/src slot is connected
 // idea: make drawing of one src to multiple connections draw first to the average of all the slots, then draw to all the dest slots
 // todo: make bnd also work for message passing nodes
 // todo: make graphToStr use graphdb
@@ -32,6 +31,7 @@
 // todo: add data to node for inputs
 // todo: add data to connection for input and output indices
 
+// idea: make connection delete and create trigger when 1 or more in/dest slots are selected and 1 out/src slot is connected
 // idea: make a single file include all nanoui into one compilation unit
 // idea: make msg loop that would deal with selections, clicks and drags? 
 // idea: take out redudant node position + bnd information 
@@ -1146,16 +1146,17 @@ ENTRY_DECLARATION
       io_rad = IORAD;
 
       // nodes
-      fd.grph.addNode( Node("one",   Node::FLOW, {300.f,300.f}) );
-      fd.grph.addNode( Node("two",   Node::FLOW, {300.f,500.f}) );
-      //fd.grph.addNode( node("three", node::FLOW, {300.f,300.f}) );
+      fd.grph.addNode( Node("one",   Node::FLOW, {400.f,300.f}) );
+      fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
+      fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
 
       // slots
       fd.grph.addSlot( Slot(0, false) );
       fd.grph.addSlot( Slot(1,  true) );
-      //fd.grph.addSlot( slot(2,  true) );
+      fd.grph.addSlot( Slot(2,  true) );
 
-      //fd.grph.addCnct(0, 1);
+      fd.grph.addCnct(0, 1);
+      fd.grph.addCnct(0, 2);
 
       auto sz = fd.grph.nsz();
     }
@@ -1389,6 +1390,13 @@ ENTRY_DECLARATION
             }
           }
 
+          if(slotInSel>-1 && slotOutSel>-1){
+            grph.toggleCnct(slotOutSel, slotInSel);
+            slotOutSel = slotInSel = -1;
+            clear_selections(&grph);
+            clearSelections = false;
+          }
+
           //if(outClk > -1){
           //  if(outClk==slotOutSel) 
           //    slotOutSel = -1;                                           // deselects if clicking elsewhere or if inside the selected slot - this creates a toggle
@@ -1402,13 +1410,6 @@ ENTRY_DECLARATION
           //  }
           //  //clearSelections = false;
           //}
-
-          if(slotInSel>-1 && slotOutSel>-1){
-            grph.addCnct(slotOutSel, slotInSel);
-            slotOutSel = slotInSel = -1;
-            clear_selections(&grph);
-            clearSelections = false;
-          }
 
           //if(inClk > -1){
           //  if(inClk==slotInSel)
@@ -1537,72 +1538,123 @@ ENTRY_DECLARATION
         {
           nvgBeginFrame(vg, fd.ui.w, fd.ui.h, pxRatio);
           SECTION(draw connections)
-          {
-            auto ci = grph.cncts();                                 // ci is connection iterator 
-            for(; ci!=grph.cnctEnd(); ++ci)
+          {                                 // ci is connection iterator 
+            auto en = grph.cnctEnd();
+            for(auto ci = grph.cncts(); ci != en; )
             {
-              const v2 hlfsz = io_rad/2.f;
-              Slot const&  src = grph.slot(ci->first);
-              Slot const& dest = grph.slot(ci->second);
+              auto     srcIdx = ci->first;
+              Slot const& src = grph.slot(srcIdx);
+              
+              v2 avgP=src.P; v2 avgN={0,0}; u32 cnt=0;
+              for(auto avgIter=ci; avgIter!=en && avgIter->first == srcIdx; ++avgIter, ++cnt){
+                Slot const& dest = grph.slot(avgIter->second);
+                avgP += dest.P;
+                avgP += src.P;
+                //avgN += norm(dest.P
+              }
+              avgP    /= (f32)(cnt*2+1); // can't forget the first position for averaging - the src position
+              v2 midN  = norm(src.P - avgP);
 
-              f32  halfx = lerp(.5f, dest.P.x, src.P.x);
-              f32  halfy = lerp(.5f, dest.P.y, src.P.y);
-              f32   dist = len(src.P - dest.P);
+              //f32  halfx = lerp(.5f, dest.P.x, src.P.x);
+              //f32  halfy = lerp(.5f, dest.P.y, src.P.y);
+              //f32   dist = len(src.P - dest.P);
+              f32  halfx = lerp(.5f, src.P.x, avgP.x);
+              f32  halfy = lerp(.5f, src.P.y, avgP.y);
+              f32   dist = len(src.P - avgP);
               v2  outNxt = src.P  + src.N * min(NODE_SZ.x/2, (dist/3));         // divide by 3 because there are 3 sections to the bezier
-              v2   inNxt = dest.P + dest.N * min(NODE_SZ.x/2, (dist/3));        // todo: make these limited by a fraction of the node's size
+              v2   inNxt = avgP   +  midN * min(NODE_SZ.x/2, (dist/3));         // todo: make these limited by a fraction of the node's size
 
               nvgBeginPath(vg);
-                nvgMoveTo(vg,   src.P.x,src.P.y);
-                nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, dest.P.x,dest.P.y);
+                nvgMoveTo(vg,   src.P.x, src.P.y);
+                //nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, dest.P.x,dest.P.y);
+                nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, avgP.x, avgP.y);
                 nvgStrokeWidth(vg, 3.f);
                 nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
               nvgStroke(vg);
-            }
 
-            //auto&   cn = cncts[i];
-            //v2     out = slots_out[cn.src].P;
-            //
-            //v2 outNrml = slots_out_nrmls[cn.src];
-            //v2      in = slots_in[cn.dest].P;
-            //v2  inNrml = slots_in_nrmls[cn.dest];
+              for(auto dhIter=ci; ci!=en && ci->first == srcIdx; ++ci){   // dhIter is draw half iterator - this is where the the connections are drawn from the average position of all slots 
+                const v2 hlfsz = io_rad/2.f;
+                Slot const& dest = grph.slot(ci->second);
 
-            //TO(cncts.size(),i)
-            //{
-            //  const v2 hlfsz = io_rad/2.f;
-            //  auto&   cn = cncts[i];
-            //  v2     out = slots_out[cn.src].P;
-            //  v2 outNrml = slots_out_nrmls[cn.src];
-            //  v2      in = slots_in[cn.dest].P;
-            //  v2  inNrml = slots_in_nrmls[cn.dest];
-            //  f32  halfx = lerp(.5f, in.x, out.x);
-            //  f32  halfy = lerp(.5f, in.y, out.y);
-            //  f32   dist = len(out - in);
-            //  v2  outNxt = out + outNrml*(dist/3);              // divide by 3 because there are 3 sections to the bezier
-            //  v2   inNxt = in  +  inNrml*(dist/3);
-            //
-            //  // draw normal
-            //  //nvgBeginPath(vg);
-            //  //  nvgMoveTo(vg,   out.x,out.y);
-            //  //  nvgLineTo(vg,  outNxt.x,outNxt.y);
-            //  //  nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
-            //  //nvgStroke(vg);
-            //
-            //  nvgBeginPath(vg);
-            //    nvgMoveTo(vg,   out.x,out.y);
-            //    nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, in.x,in.y);
+                f32  halfx = lerp(.5f, dest.P.x, avgP.x);
+                f32  halfy = lerp(.5f, dest.P.y, avgP.y);
+                f32   dist = len(avgP - dest.P);
+                v2  outNxt = dest.P  + dest.N * min(NODE_SZ.x/2, (dist/3));         // divide by 3 because there are 3 sections to the bezier
+                v2   inNxt = avgP + -1.f*midN * min(NODE_SZ.x/2, (dist/3));        // todo: make these limited by a fraction of the node's size
+                nvgBeginPath(vg);
+                  nvgMoveTo(vg,   dest.P.x,dest.P.y);
+                  nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, avgP.x, avgP.y);
+                  nvgStrokeWidth(vg, 3.f);
+                  nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+                nvgStroke(vg);
+              }
+
+              nvgBeginPath(vg);
+                //nvgMoveTo(vg, avgP.x, avgP.y);
+                nvgCircle(vg, avgP.x, avgP.y, 6.f); 
+                nvgFillColor(vg, nvgRGBAf(.18f, .18f, .18f, 1.f) );
+                nvgStrokeWidth(vg, 3.f);
+                nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f) );
+              nvgStroke(vg);
+              nvgFill(vg);
+
+             }
+
+            //  for(; ci!=en && ci->first == srcIdx; ++ci)
+            //  {
+            //    f32  halfx = lerp(.5f, dest.P.x, src.P.x);
+            //    f32  halfy = lerp(.5f, dest.P.y, src.P.y);
+            //    f32   dist = len(src.P - dest.P);
+            //    v2  outNxt = src.P  + src.N * min(NODE_SZ.x/2, (dist/3));         // divide by 3 because there are 3 sections to the bezier
+            //    v2   inNxt = dest.P + dest.N * min(NODE_SZ.x/2, (dist/3));        // todo: make these limited by a fraction of the node's size
+            //    nvgBeginPath(vg);
+            //    nvgMoveTo(vg,   src.P.x,src.P.y);
+            //    nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, dest.P.x,dest.P.y);
             //    nvgStrokeWidth(vg, 3.f);
             //    nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
-            //  nvgStroke(vg);
-            //
-            //  //v2 nrmlEnd = in + inNrml*100.f;
-            //  //nvgBeginPath(vg);
-            //  //  nvgMoveTo(vg,   in.x,in.y);
-            //  //  nvgLineTo(vg,  nrmlEnd.x, nrmlEnd.y);
-            //  //nvgStroke(vg);
-            //  //
-            //  //nvgBezierTo(vg, halfx,out.y, halfx,in.y, in.x,in.y);
+            //    nvgStroke(vg);
+            //  }
             //}
+
+            //for(auto ci = grph.cncts(); ci != en; ){
+
+            //f32  halfx = lerp(.5f, dest.P.x, src.P.x);
+            //f32  halfy = lerp(.5f, dest.P.y, src.P.y);
+            //f32   dist = len(src.P - dest.P);
+            //v2  outNxt = src.P  + src.N * min(NODE_SZ.x/2, (dist/3));         // divide by 3 because there are 3 sections to the bezier
+            //v2   inNxt = dest.P + dest.N * min(NODE_SZ.x/2, (dist/3));        // todo: make these limited by a fraction of the node's size
+            //nvgBeginPath(vg);
+            //  nvgMoveTo(vg,   src.P.x,src.P.y);
+            //  nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, dest.P.x,dest.P.y);
+            //  nvgStrokeWidth(vg, 3.f);
+            //  nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+            //nvgStroke(vg);
+
+
           }
+          //SECTION(draw connections)
+          //{
+          //  auto ci = grph.cncts();                                 // ci is connection iterator 
+          //  for(; ci!=grph.cnctEnd(); ++ci)
+          //  {
+          //    const v2 hlfsz = io_rad/2.f;
+          //    Slot const&  src = grph.slot(ci->first);
+          //    Slot const& dest = grph.slot(ci->second);
+
+          //    f32  halfx = lerp(.5f, dest.P.x, src.P.x);
+          //    f32  halfy = lerp(.5f, dest.P.y, src.P.y);
+          //    f32   dist = len(src.P - dest.P);
+          //    v2  outNxt = src.P  + src.N * min(NODE_SZ.x/2, (dist/3));         // divide by 3 because there are 3 sections to the bezier
+          //    v2   inNxt = dest.P + dest.N * min(NODE_SZ.x/2, (dist/3));        // todo: make these limited by a fraction of the node's size
+
+          //    nvgBeginPath(vg);
+          //      nvgMoveTo(vg,   src.P.x,src.P.y);
+          //      nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, dest.P.x,dest.P.y);
+          //      nvgStrokeWidth(vg, 3.f);
+          //      nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+          //    nvgStroke(vg);
+          //  }
+          //}
           SECTION(draw nodes)
           {
             auto sz = fd.grph.nsz();
@@ -1696,6 +1748,49 @@ ENTRY_DECLARATION
 
 
 
+//auto&   cn = cncts[i];
+//v2     out = slots_out[cn.src].P;
+//
+//v2 outNrml = slots_out_nrmls[cn.src];
+//v2      in = slots_in[cn.dest].P;
+//v2  inNrml = slots_in_nrmls[cn.dest];
+
+//TO(cncts.size(),i)
+//{
+//  const v2 hlfsz = io_rad/2.f;
+//  auto&   cn = cncts[i];
+//  v2     out = slots_out[cn.src].P;
+//  v2 outNrml = slots_out_nrmls[cn.src];
+//  v2      in = slots_in[cn.dest].P;
+//  v2  inNrml = slots_in_nrmls[cn.dest];
+//  f32  halfx = lerp(.5f, in.x, out.x);
+//  f32  halfy = lerp(.5f, in.y, out.y);
+//  f32   dist = len(out - in);
+//  v2  outNxt = out + outNrml*(dist/3);              // divide by 3 because there are 3 sections to the bezier
+//  v2   inNxt = in  +  inNrml*(dist/3);
+//
+//  // draw normal
+//  //nvgBeginPath(vg);
+//  //  nvgMoveTo(vg,   out.x,out.y);
+//  //  nvgLineTo(vg,  outNxt.x,outNxt.y);
+//  //  nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+//  //nvgStroke(vg);
+//
+//  nvgBeginPath(vg);
+//    nvgMoveTo(vg,   out.x,out.y);
+//    nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, in.x,in.y);
+//    nvgStrokeWidth(vg, 3.f);
+//    nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+//  nvgStroke(vg);
+//
+//  //v2 nrmlEnd = in + inNrml*100.f;
+//  //nvgBeginPath(vg);
+//  //  nvgMoveTo(vg,   in.x,in.y);
+//  //  nvgLineTo(vg,  nrmlEnd.x, nrmlEnd.y);
+//  //nvgStroke(vg);
+//  //
+//  //nvgBezierTo(vg, halfx,out.y, halfx,in.y, in.x,in.y);
+//}
 
 //if(lftDn && !prevLftDn){
 //  TO(grph.getSlots().size(), i){
