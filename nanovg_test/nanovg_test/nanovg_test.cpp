@@ -264,64 +264,71 @@ v2        angleToNormal(f32 angle)
 }
 
 // serialize to and from json
-//inline str           graphToStr()
-//{
-//  using namespace std;
-//  
-//  Jzon::Node nds = Jzon::object();
-//  SECTION(nodes)
-//  {
-//    auto sz = nodes.size();
-//
-//    Jzon::Node nd_txt = Jzon::array();
-//    TO(sz,i) nd_txt.add(nodes[i].txt);
-//
-//    Jzon::Node   nd_x = Jzon::array();
-//    TO(sz,i) nd_x.add(nodes[i].P.x);
-//
-//    Jzon::Node   nd_y = Jzon::array();
-//    TO(sz,i) nd_y.add(nodes[i].P.y);
-//
-//    //Jzon::Node ordr = Jzon::array();
-//    //TO(sz,i) ordr.add(nd_ordr[i]);
-//
-//    nds.add("x",      nd_x);
-//    nds.add("y",      nd_y);
-//    nds.add("txt",  nd_txt);
-//    //nds.add("order",  ordr);
-//  }
-//  Jzon::Node jcncts = Jzon::object();
-//  SECTION(connections)
-//  {
-//    auto sz = cncts.size();
-//
-//    Jzon::Node src  = Jzon::array();
-//    Jzon::Node dest = Jzon::array();
-//
-//    TO(sz,i) src.add(cncts[i].src);
-//    TO(sz,i) dest.add(cncts[i].dest);
-//
-//    jcncts.add("src",   src);
-//    jcncts.add("dest", dest);
-//  }
-//  
-//  Jzon::Node graph = Jzon::object();
-//  graph.add("nodes", nds);
-//  graph.add("connections", jcncts);
-//
-//  //Jzon::Format format;
-//  //format.newline    = true;
-//  //format.indentSize = 1;
-//  //format.spacing    = true;
-//  //format.useTabs    = false;
-//
-//  Jzon::Writer w;
-//  //w.setFormat(format);  // breaks reading for some reason
-//  str s;
-//  w.writeString(graph, s);
-//
-//  return s;
-//}
+str           graphToStr(GraphDB const& g)
+{
+  using namespace std;
+  
+  Jzon::Node nds = Jzon::object();
+  SECTION(nodes)
+  {
+    //auto sz = nodes.size();
+    auto sz = g.nsz();
+
+    Jzon::Node nd_txt = Jzon::array();
+    TO(sz,i) nd_txt.add(g.node(i).txt);
+    //TO(sz,i) nd_txt.add(nodes[i].txt);
+
+    Jzon::Node   nd_x = Jzon::array();
+    TO(sz,i) nd_x.add(g.node(i).P.x);
+
+    Jzon::Node   nd_y = Jzon::array();
+    TO(sz,i) nd_y.add(g.node(i).P.y);
+
+    //Jzon::Node ordr = Jzon::array();
+    //TO(sz,i) ordr.add(nd_ordr[i]);
+
+    nds.add("x",      nd_x);
+    nds.add("y",      nd_y);
+    nds.add("txt",  nd_txt);
+    //nds.add("order",  ordr);
+  }
+  Jzon::Node jcncts = Jzon::object();
+  SECTION(connections)
+  {
+    //auto sz = cncts.size();
+    auto sz = g.cnctsz();
+
+    Jzon::Node src  = Jzon::array();
+    Jzon::Node dest = Jzon::array();
+
+    for(auto kv : g.cncts()){
+      src.add(kv.first);
+      dest.add(kv.second);
+    }
+    //TO(sz,i) src.add(cncts[i].src);
+    //TO(sz,i) dest.add(cncts[i].dest);
+
+    jcncts.add("src",   src);
+    jcncts.add("dest", dest);
+  }
+  
+  Jzon::Node graph = Jzon::object();
+  graph.add("nodes", nds);
+  graph.add("connections", jcncts);
+
+  //Jzon::Format format;
+  //format.newline    = true;
+  //format.indentSize = 1;
+  //format.spacing    = true;
+  //format.useTabs    = false;
+
+  Jzon::Writer w;
+  //w.setFormat(format);  // breaks reading for some reason
+  str s;
+  w.writeString(graph, s);
+
+  return s;
+}
 //void          strToGraph(str const& s)
 //{
 //  cnct_src.clear();
@@ -361,21 +368,21 @@ v2        angleToNormal(f32 angle)
 //
 //  //TO(cnt,i) nd_ordr[i] = (int)i;
 //}
-//bool            saveFile(str path)
-//{
-//  str fileStr = graphToStr();
-//  
-//  FILE* f = fopen(path.c_str(), "w");
-//  if(!f) return false;
-//
-//  size_t writeSz = fwrite(fileStr.c_str(), 1, fileStr.size(), f);
-//  if(writeSz != fileStr.size()) return false;
-//
-//  int closeRet = fclose(f);
-//  if(closeRet == EOF) return false;
-//
-//  return true;
-//}
+bool            saveFile(GraphDB const& g, str path)
+{
+  str fileStr = graphToStr(g);
+  
+  FILE* f = fopen(path.c_str(), "w");
+  if(!f) return false;
+
+  size_t writeSz = fwrite(fileStr.c_str(), 1, fileStr.size(), f);
+  if(writeSz != fileStr.size()) return false;
+
+  int closeRet = fclose(f);
+  if(closeRet == EOF) return false;
+
+  return true;
+}
 //bool            loadFile(str path)
 //{
 //  FILE* f = fopen(path.c_str(), "r");
@@ -1243,11 +1250,11 @@ ENTRY_DECLARATION
 
         //printf("\n\nfile dialog: %d %s \n\n", result, outPath);
 
-        //if(outPath){
-        //  bool ok = saveFile(outPath);
-        //  if(ok) printf("\nFile Written to %s\n", outPath);
-        //  else   printf("\nSave did not write successfully to %s\n", outPath);
-        //}
+        if(outPath){
+          bool ok = saveFile(fd.grph, outPath);
+          if(ok) printf("\nFile Written to %s\n", outPath);
+          else   printf("\nSave did not write successfully to %s\n", outPath);
+        }
       });
 
       GraphDB* grphPtr = &fd.grph;

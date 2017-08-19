@@ -133,6 +133,7 @@ public:
     return nodeIdx;
   }
   auto         node(u64 nIdx)  -> struct Node& { return m_nodes[nIdx]; }
+  auto         node(u64 nIdx) const -> struct Node const& { return m_nodes[nIdx]; }
   auto  orderedNode(u64 order) -> struct Node& { return m_nodes[m_ordr[order]]; }
   void   moveToBack(u64 nIdx)
   {
@@ -146,7 +147,7 @@ public:
     m_ordr[sz-1] = tmp;
   }
   auto     getNodes() -> vec_nd&   { return m_nodes; }
-  u64           nsz(){ return m_nodes.size(); }
+  u64           nsz() const { return m_nodes.size(); }
 
   u64       addSlot(Slot s)
   {
@@ -192,7 +193,7 @@ public:
     return m_outCncts.find(srcSlotIdx);
   }
   auto      slotEnd() -> decltype(m_nodeSlots.end()) { return m_nodeSlots.end(); }
-  u64           ssz(){ return m_slots.size(); }
+  u64           ssz() const { return m_slots.size(); }
 
   void      addCnct(u32 src, u32 dest)
   {
@@ -230,8 +231,9 @@ public:
   }
   auto      cnctEnd() -> decltype(m_outCncts.end())  { return m_outCncts.end(); }
   auto    cnctBegin() -> decltype(m_outCncts.begin()) { return m_outCncts.begin(); }
-  auto        cncts() -> CnctMap { return m_outCncts; }
-  u64        cnctsz(){ return m_outCncts.size(); }
+  auto        cncts() -> CnctMap& { return m_outCncts; }
+  auto        cncts() const -> CnctMap const& { return m_outCncts; }
+  u64        cnctsz() const { return m_outCncts.size(); }
 
   auto          bnd(u64 idx) -> Bnd& { return m_bnds[idx]; }
   auto       bounds() -> vec_bnd& { return m_bnds; }
@@ -244,7 +246,7 @@ public:
     for(auto& sel : m_selected) sel = false;
     for(auto& slt : m_slots) slt.state = Slot::NORMAL;
   }
-  u64         selsz(){ return m_selected.size(); }
+  u64         selsz() const { return m_selected.size(); }
 
   i32         order(u64 idx){ return m_ordr[idx]; }
   void        order(u64 idx, i32 o){ m_ordr[idx] = o; }
