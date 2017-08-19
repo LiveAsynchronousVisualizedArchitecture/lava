@@ -16,6 +16,7 @@
 // -todo: debug toggle killing all connection drawing - just needed to only delete the outCncts that had the same dest
 // -todo: make graphToStr and saveFile use graphdb
 // -todo: make strToGraph and loadFile use graphdb
+// -todo: make box selection stick - needed to check if the box was being dragged before drgBox gets set to false for the left mouse button not being down 
 
 // todo: make slots part of file writing 
 // todo: make slots part of file reading
@@ -24,7 +25,8 @@
 // todo: make 'delete' and 'backspace' delete selected nodes
 // todo: make 'delete' and 'backspace' delete selected connections
 // todo: put node type into written file
-// todo: draw message node slots as sliding angles
+// todo: debug flashing connections - possibly due to numeric error handling
+// idea: draw message node slots as sliding angles
 // todo: make one node snap to another node
 // todo: use scroll wheel and nanovg scale transforms to zoom in and out
 // todo: group ui state variables together - priSel, connecting
@@ -1375,6 +1377,7 @@ ENTRY_DECLARATION
         Bnd  drgbnd;
         SECTION(selection box)
         {
+          if(drgbox){ clearSelections=false; }
           if(!lftDn){ drgP=pntr; drgbox=false; }
 
           drgbnd = Bnd( min(drgP.x, pntr.x),
