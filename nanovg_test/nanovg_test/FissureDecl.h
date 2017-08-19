@@ -119,8 +119,24 @@ private:
   CnctMap         m_outCncts;
   SrcMap           m_inCncts;
 
+  void mv(GraphDB&& rval)
+  {
+    using namespace std;
+
+    m_nodes     = move(rval.m_nodes); 
+    m_bnds      = move(rval.m_bnds); 
+    m_ordr      = move(rval.m_ordr); 
+    m_selected  = move(rval.m_selected); 
+    m_slots     = move(rval.m_slots); 
+    m_nodeSlots = move(rval.m_nodeSlots); 
+    m_outCncts  = move(rval.m_outCncts); 
+    m_inCncts   = move(rval.m_inCncts);
+  }
+
 public:
   GraphDB(){}
+  GraphDB(GraphDB&& rval){ mv(std::move(rval)); }
+  GraphDB& operator=(GraphDB&& rval){ mv(std::move(rval)); return *this; }
 
   u64       addNode(Node n)
   {
@@ -147,6 +163,7 @@ public:
     m_ordr[sz-1] = tmp;
   }
   auto     getNodes() -> vec_nd&   { return m_nodes; }
+  auto        nodes() -> vec_nd&   { return m_nodes; }
   u64           nsz() const { return m_nodes.size(); }
 
   u64       addSlot(Slot s)
@@ -250,6 +267,18 @@ public:
 
   i32         order(u64 idx){ return m_ordr[idx]; }
   void        order(u64 idx, i32 o){ m_ordr[idx] = o; }
+
+  void        clear()
+  {
+    m_nodes.clear();
+    m_bnds.clear();
+    m_ordr.clear();
+    m_selected.clear();
+    m_slots.clear();
+    m_nodeSlots.clear();
+    m_outCncts.clear();
+    m_inCncts.clear();
+  }
 };
 
 struct FisData

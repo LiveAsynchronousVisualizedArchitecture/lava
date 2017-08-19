@@ -14,9 +14,13 @@
 // -todo: use previous drawing technique for connection to one in/dest slot
 // -todo: make bnd also work for message passing nodes
 // -todo: debug toggle killing all connection drawing - just needed to only delete the outCncts that had the same dest
+// -todo: make graphToStr and saveFile use graphdb
+// -todo: make strToGraph and loadFile use graphdb
 
-// todo: make graphToStr use graphdb
-// todo: make strToGraph use graphdb
+// todo: make slots part of file writing 
+// todo: make slots part of file reading
+// todo: make node type part of file writing
+// todo: make node type part of file reading
 // todo: make 'delete' and 'backspace' delete selected nodes
 // todo: make 'delete' and 'backspace' delete selected connections
 // todo: put node type into written file
@@ -329,45 +333,64 @@ str           graphToStr(GraphDB const& g)
 
   return s;
 }
-//void          strToGraph(str const& s)
-//{
-//  cnct_src.clear();
-//  cnct_dest.clear();
-//
-//  Jzon::Parser prs;
-//  auto graph = prs.parseString(s);
-//
-//  auto nd_x   = graph.get("nodes").get("x");
-//  auto nd_y   = graph.get("nodes").get("y");
-//  auto nd_txt = graph.get("nodes").get("txt");
-//  auto ordr   = graph.get("nodes").get("order");
-//  auto src    = graph.get("connections").get("src");
-//  auto dest   = graph.get("connections").get("dest");
-//    
-//  auto cnt = nd_x.getCount();
-//  nodes.resize(cnt);  
-//  TO(cnt,i) nodes[i].P.x = nd_x.get(i).toFloat();
-//  TO(cnt,i) nodes[i].P.y = nd_y.get(i).toFloat();
-//  TO(cnt,i) nodes[i].txt = nd_txt.get(i).toString();
-//
-//  auto cnct_cnt = src.getCount();
-//  cncts.resize(cnct_cnt);
-//  TO(cnct_cnt,i) cncts[i].src  = src.get(i).toInt();
-//  TO(cnct_cnt,i) cncts[i].dest = dest.get(i).toInt();
-//
-//  for(auto c : cncts){
-//    cnct_src.insert( {c.src, c.dest} );
-//    cnct_dest.insert( {c.dest, c.src} );
-//  }
-//
-//  //sels.resize(cnt);
-//  //nbnds.resize(cnt);
-//
-//  //nd_ordr.resize(cnt);
-//  //TO(cnt,i) nd_ordr[i] = ordr.get(i).toInt();
-//
-//  //TO(cnt,i) nd_ordr[i] = (int)i;
-//}
+GraphDB       strToGraph(str const& s)
+{
+  using namespace std;
+
+  GraphDB g;
+
+  Jzon::Parser prs;
+  auto graph = prs.parseString(s);
+
+  auto nd_x   = graph.get("nodes").get("x");
+  auto nd_y   = graph.get("nodes").get("y");
+  auto nd_txt = graph.get("nodes").get("txt");
+  auto ordr   = graph.get("nodes").get("order");
+  auto src    = graph.get("connections").get("src");
+  auto dest   = graph.get("connections").get("dest");
+  
+  auto cnt = nd_x.getCount();
+  TO(cnt,i){
+    Node n;
+    n.P.x = nd_x.get(i).toFloat();
+    n.P.y = nd_y.get(i).toFloat();
+    n.txt = nd_txt.get(i).toString();
+    g.addNode(n);
+  }
+  
+  //g.nodes().resize(cnt);
+  //nodes.resize(cnt);  
+  //TO(cnt,i) nodes[i].P.x = nd_x.get(i).toFloat();
+  //TO(cnt,i) nodes[i].P.y = nd_y.get(i).toFloat();
+  //TO(cnt,i) nodes[i].txt = nd_txt.get(i).toString();
+
+  auto cnct_cnt = src.getCount();
+  TO(cnct_cnt,i){
+    g.addCnct(src.get(i).toInt(), dest.get(i).toInt());
+  }
+
+  //cncts.resize(cnct_cnt);
+  //TO(cnct_cnt,i) cncts[i].src  = src.get(i).toInt();
+  //TO(cnct_cnt,i) cncts[i].dest = dest.get(i).toInt();
+  //
+  //for(auto c : cncts){
+  //  cnct_src.insert( {c.src, c.dest} );
+  //  cnct_dest.insert( {c.dest, c.src} );
+  //}
+
+  return move(g);
+
+  //cnct_src.clear();
+  //cnct_dest.clear();
+  //
+  //sels.resize(cnt);
+  //nbnds.resize(cnt);
+  //
+  //nd_ordr.resize(cnt);
+  //TO(cnt,i) nd_ordr[i] = ordr.get(i).toInt();
+  //
+  //TO(cnt,i) nd_ordr[i] = (int)i;
+}
 bool            saveFile(GraphDB const& g, str path)
 {
   str fileStr = graphToStr(g);
@@ -383,24 +406,24 @@ bool            saveFile(GraphDB const& g, str path)
 
   return true;
 }
-//bool            loadFile(str path)
-//{
-//  FILE* f = fopen(path.c_str(), "r");
-//  if(!f) return false;
-//  fseek(f, 0, SEEK_END);
-//  str s;
-//  s.resize( ftell(f) );
-//  fseek(f, 0, SEEK_SET);
-//
-//  size_t redRet = fread( (void*)s.data(), 1, s.size(), f);
-//  if(redRet != s.size()) return false; 
-//
-//  if(fclose(f) == EOF) return false;
-//
-//  strToGraph(s);
-//
-//  return true;
-//}
+bool            loadFile(str path, GraphDB* out_g)
+{
+  FILE* f = fopen(path.c_str(), "r");
+  if(!f) return false;
+  fseek(f, 0, SEEK_END);
+  str s;
+  s.resize( ftell(f) );
+  fseek(f, 0, SEEK_SET);
+
+  size_t redRet = fread( (void*)s.data(), 1, s.size(), f);
+  if(redRet != s.size()) return false; 
+
+  if(fclose(f) == EOF) return false;
+
+  *out_g = strToGraph(s);
+
+  return true;
+}
 
 // state manipulation
 void            node_add(str txt, Node::Type type=Node::FLOW)
@@ -1239,9 +1262,9 @@ ENTRY_DECLARATION
         //printf("\n\nfile dialog: %d %s \n\n", result, inPath);
 
         if(inPath){
-          //bool ok = loadFile(inPath);
-          //if(ok) printf("\nFile loaded from %s\n", inPath);
-          //else   printf("\nLoad did not read successfully from %s\n", inPath);
+          bool ok = loadFile(inPath, &fd.grph);
+          if(ok) printf("\nFile loaded from %s\n", inPath);
+          else   printf("\nLoad did not read successfully from %s\n", inPath);
         }
       });
       saveBtn->setCallback([](){
