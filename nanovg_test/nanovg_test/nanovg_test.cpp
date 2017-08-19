@@ -13,6 +13,7 @@
 // -todo: make drawing of one src to multiple connections draw first to the average of all the slots, then draw to all the dest slots - works and works well
 // -todo: use previous drawing technique for connection to one in/dest slot
 // -todo: make bnd also work for message passing nodes
+// -todo: debug toggle killing all connection drawing - just needed to only delete the outCncts that had the same dest
 
 // todo: make graphToStr use graphdb
 // todo: make strToGraph use graphdb
@@ -262,6 +263,7 @@ v2        angleToNormal(f32 angle)
   return { cos(angle), sin(angle) };
 }
 
+// serialize to and from json
 //inline str           graphToStr()
 //{
 //  using namespace std;

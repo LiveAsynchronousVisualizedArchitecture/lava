@@ -205,11 +205,23 @@ public:
     m_outCncts.insert({src, dest});
     m_inCncts.insert({dest, src});
   }
-  void      toggleCnct(u32 src, u32 dest)
+  void   toggleCnct(u32 src, u32 dest)
   {
     auto srcIter = m_inCncts.find(dest);
     if(srcIter != m_inCncts.end()){
-      m_outCncts.erase(src);
+      //m_outCncts.erase(src);
+
+      auto iter = m_outCncts.find(src);
+      for(; iter != m_outCncts.end() && iter->first==src; ){
+        auto cpy = iter;
+        ++iter;
+        if(cpy->second == dest) m_outCncts.erase(cpy);
+      }
+
+      //if(iter != m_outCncts.end()){
+      //}
+
+      //m_outCncts.erase(src);
       m_inCncts.erase(dest);
     }else{
       m_outCncts.insert({src, dest});
