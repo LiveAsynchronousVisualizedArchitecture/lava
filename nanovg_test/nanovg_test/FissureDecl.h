@@ -195,6 +195,8 @@ public:
     auto iter = m_nodeSlots.find(nIdx);
     return iter;
   }
+  auto        slots() -> vec_slot& { return m_slots; }
+  auto        slots() const -> vec_slot const& { return m_slots; }
   auto     getSlots() -> vec_slot& { return m_slots; }
   auto      srcSlot(u32 destSlotIdx) -> struct Slot* 
   {

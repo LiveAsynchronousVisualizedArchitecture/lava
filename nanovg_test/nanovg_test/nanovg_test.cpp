@@ -17,8 +17,8 @@
 // -todo: make graphToStr and saveFile use graphdb
 // -todo: make strToGraph and loadFile use graphdb
 // -todo: make box selection stick - needed to check if the box was being dragged before drgBox gets set to false for the left mouse button not being down 
+// -todo: make slots part of file writing 
 
-// todo: make slots part of file writing 
 // todo: make slots part of file reading
 // todo: make node type part of file writing
 // todo: make node type part of file reading
@@ -298,10 +298,23 @@ str           graphToStr(GraphDB const& g)
     nds.add("txt",  nd_txt);
     //nds.add("order",  ordr);
   }
+  Jzon::Node jslots = Jzon::object();
+  SECTION(slots)
+  {
+    Jzon::Node src  = Jzon::array();
+    Jzon::Node dest = Jzon::array();
+
+    for(auto& s : g.slots()){
+      if(s.in) dest.add(s.nidx);
+      else     src.add(s.nidx);
+    }
+
+    jslots.add("src",   src);
+    jslots.add("dest", dest);
+  }
   Jzon::Node jcncts = Jzon::object();
   SECTION(connections)
   {
-    //auto sz = cncts.size();
     auto sz = g.cnctsz();
 
     Jzon::Node src  = Jzon::array();
@@ -311,8 +324,6 @@ str           graphToStr(GraphDB const& g)
       src.add(kv.first);
       dest.add(kv.second);
     }
-    //TO(sz,i) src.add(cncts[i].src);
-    //TO(sz,i) dest.add(cncts[i].dest);
 
     jcncts.add("src",   src);
     jcncts.add("dest", dest);
@@ -320,6 +331,7 @@ str           graphToStr(GraphDB const& g)
   
   Jzon::Node graph = Jzon::object();
   graph.add("nodes", nds);
+  graph.add("slots", jslots);
   graph.add("connections", jcncts);
 
   //Jzon::Format format;
@@ -334,6 +346,10 @@ str           graphToStr(GraphDB const& g)
   w.writeString(graph, s);
 
   return s;
+
+  //auto sz = cncts.size();
+  //TO(sz,i) src.add(cncts[i].src);
+  //TO(sz,i) dest.add(cncts[i].dest);
 }
 GraphDB       strToGraph(str const& s)
 {
@@ -344,13 +360,15 @@ GraphDB       strToGraph(str const& s)
   Jzon::Parser prs;
   auto graph = prs.parseString(s);
 
-  auto nd_x   = graph.get("nodes").get("x");
-  auto nd_y   = graph.get("nodes").get("y");
-  auto nd_txt = graph.get("nodes").get("txt");
-  auto ordr   = graph.get("nodes").get("order");
-  auto src    = graph.get("connections").get("src");
-  auto dest   = graph.get("connections").get("dest");
-  
+  auto nd_x    = graph.get("nodes").get("x");
+  auto nd_y    = graph.get("nodes").get("y");
+  auto nd_txt  = graph.get("nodes").get("txt");
+  auto ordr    = graph.get("nodes").get("order");
+  auto src     = graph.get("connections").get("src");
+  auto dest    = graph.get("connections").get("dest");
+  auto sltSrc  = graph.get("slots").get("src");
+  auto sltDest = graph.get("slots").get("dest");
+
   auto cnt = nd_x.getCount();
   TO(cnt,i){
     Node n;
@@ -360,16 +378,23 @@ GraphDB       strToGraph(str const& s)
     g.addNode(n);
   }
   
-  //g.nodes().resize(cnt);
-  //nodes.resize(cnt);  
-  //TO(cnt,i) nodes[i].P.x = nd_x.get(i).toFloat();
-  //TO(cnt,i) nodes[i].P.y = nd_y.get(i).toFloat();
-  //TO(cnt,i) nodes[i].txt = nd_txt.get(i).toString();
+  TO(sltSrc.getCount(),i){
+    sltSrc.get(i).toInt();
+
+  }
 
   auto cnct_cnt = src.getCount();
   TO(cnct_cnt,i){
     g.addCnct(src.get(i).toInt(), dest.get(i).toInt());
   }
+
+  return move(g);
+
+  //g.nodes().resize(cnt);
+  //nodes.resize(cnt);  
+  //TO(cnt,i) nodes[i].P.x = nd_x.get(i).toFloat();
+  //TO(cnt,i) nodes[i].P.y = nd_y.get(i).toFloat();
+  //TO(cnt,i) nodes[i].txt = nd_txt.get(i).toString();
 
   //cncts.resize(cnct_cnt);
   //TO(cnct_cnt,i) cncts[i].src  = src.get(i).toInt();
@@ -379,8 +404,6 @@ GraphDB       strToGraph(str const& s)
   //  cnct_src.insert( {c.src, c.dest} );
   //  cnct_dest.insert( {c.dest, c.src} );
   //}
-
-  return move(g);
 
   //cnct_src.clear();
   //cnct_dest.clear();
