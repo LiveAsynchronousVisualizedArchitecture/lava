@@ -12,9 +12,8 @@
 // -todo: make a GraphDB function that toggles a selection on or off
 // -todo: make drawing of one src to multiple connections draw first to the average of all the slots, then draw to all the dest slots - works and works well
 // -todo: use previous drawing technique for connection to one in/dest slot
+// -todo: make bnd also work for message passing nodes
 
-// todo: make function to draw a bezier from one slot to another with normals
-// todo: make bnd also work for message passing nodes
 // todo: make graphToStr use graphdb
 // todo: make strToGraph use graphdb
 // todo: make 'delete' and 'backspace' delete selected nodes
@@ -32,6 +31,7 @@
 // todo: make a node to split text into lines and scatter the result
 // todo: add data to node for inputs
 // todo: add data to connection for input and output indices
+// todo: make function to draw a bezier from one slot to another with normals
 
 // idea: make connection delete and create trigger when 1 or more in/dest slots are selected and 1 out/src slot is connected
 // idea: make a single file include all nanoui into one compilation unit
@@ -562,6 +562,7 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
 	float rad = lerp(rnd, 0.f, h/2.f);           // rad is corner radius
   float cntrX=x+w/2, cntrY=y+h/2, rr=rad;      // rr is rail radius
   //float io_rad=10.f;
+  Bnd b;
 
   nvgResetTransform(vg);
   nvgGlobalAlpha(vg, 1.f);
@@ -591,6 +592,7 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
 	    nvgFillPaint(vg, bg);
 	    nvgFill(vg);
     }
+    b = {x,y, x+w, y+h};
   } break;
   case Node::MSG: {
     f32 msgRad = NODE_SZ.x / 2;
@@ -617,8 +619,14 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
     nvgFill(vg);
 
     nvgBeginPath(vg);
-      nvgCircle(vg, x + w/2, y + h/2, msgRad);
+      nvgCircle(vg, cntrX, cntrY, msgRad);
     nvgStroke(vg);
+
+    b = {cntrX-msgRad/1.2f, cntrY-msgRad/1.2f, cntrX+msgRad/1.2f, cntrY+msgRad/1.2f};
+
+    //nvgBeginPath(vg);
+    //  nvgRect(vg, b.xmn, b.ymn, b.w(), b.h());
+    //nvgStroke(vg);
   } break;
   }
 
@@ -674,21 +682,7 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
     //nvgStroke(vg);
   }
 
-  return {x,y, x+w, y+h};
-
-  //nvgBeginPath(vg);
-  //  nvgCircle(vg, x+w/2,y+h/2, msgRad);
-  //  //nvgRoundedRect(vg, x,y,w,h, rad);
-  //nvgFillColor(vg, nvgRGBAf(.15f, .15f, .15f, .95f));
-  //nvgFill(vg);
-  //
-  //x-msgRad*.1f, y-msgRad*.1f, x+msgRad*.1f, y+msgRad*.1f, 
-
-  //nvgRoundedRect(vg, x,y,w,h, rad+BORDER); //-.5f);
-  //nvgRoundedRect(vg, x+0.5f,y+0.5f, w-1,h-1, cornerRad-.5f);
-  //
-  //nvgStrokeColor(vg, nvgRGBA(0,0,0,128));
-  //nvgStroke(vg);
+  return b;
 }
 
 v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
@@ -1151,14 +1145,17 @@ ENTRY_DECLARATION
       fd.grph.addNode( Node("one",   Node::FLOW, {400.f,300.f}) );
       fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
       fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
+      fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
 
       // slots
       fd.grph.addSlot( Slot(0, false) );
       fd.grph.addSlot( Slot(1,  true) );
       fd.grph.addSlot( Slot(2,  true) );
+      fd.grph.addSlot( Slot(3,  true) );
 
       fd.grph.addCnct(0, 1);
-      //fd.grph.addCnct(0, 2);
+      fd.grph.addCnct(0, 2);
+      fd.grph.addCnct(0, 3);
 
       auto sz = fd.grph.nsz();
     }
@@ -1471,14 +1468,6 @@ ENTRY_DECLARATION
       {
         SECTION(node movement)
         {
-          //int sz = (int)nd_ordr.size();
-          //auto sz = fd.grph.getNodes().size();
-          //auto sz = grph.nsz();
-          //
-          //int  ndOrdr = nd_ordr[i];
-          //node&     n = nodes[ndOrdr];
-          //bool selctd = ndOrdr==priSel || sels[ndOrdr];
-
           TO(grph.nsz(),i)
           {
             int  ndOrdr = grph.order(i);
@@ -1739,6 +1728,32 @@ ENTRY_DECLARATION
 
 
 
+
+
+
+
+
+//nvgBeginPath(vg);
+//  nvgCircle(vg, x+w/2,y+h/2, msgRad);
+//  //nvgRoundedRect(vg, x,y,w,h, rad);
+//nvgFillColor(vg, nvgRGBAf(.15f, .15f, .15f, .95f));
+//nvgFill(vg);
+//
+//x-msgRad*.1f, y-msgRad*.1f, x+msgRad*.1f, y+msgRad*.1f, 
+
+//nvgRoundedRect(vg, x,y,w,h, rad+BORDER); //-.5f);
+//nvgRoundedRect(vg, x+0.5f,y+0.5f, w-1,h-1, cornerRad-.5f);
+//
+//nvgStrokeColor(vg, nvgRGBA(0,0,0,128));
+//nvgStroke(vg);
+
+//int sz = (int)nd_ordr.size();
+//auto sz = fd.grph.getNodes().size();
+//auto sz = grph.nsz();
+//
+//int  ndOrdr = nd_ordr[i];
+//node&     n = nodes[ndOrdr];
+//bool selctd = ndOrdr==priSel || sels[ndOrdr];
 
 //  for(; ci!=en && ci->first == srcIdx; ++ci)
 //  {
