@@ -10,8 +10,10 @@
 // -todo: fix in/dest connections when not connected
 // -todo: make selection of one dest and one src slot trigger connection create 
 // -todo: make a GraphDB function that toggles a selection on or off
+// -todo: make drawing of one src to multiple connections draw first to the average of all the slots, then draw to all the dest slots - works and works well
+// -todo: use previous drawing technique for connection to one in/dest slot
 
-// idea: make drawing of one src to multiple connections draw first to the average of all the slots, then draw to all the dest slots
+// todo: make function to draw a bezier from one slot to another with normals
 // todo: make bnd also work for message passing nodes
 // todo: make graphToStr use graphdb
 // todo: make strToGraph use graphdb
@@ -1156,7 +1158,7 @@ ENTRY_DECLARATION
       fd.grph.addSlot( Slot(2,  true) );
 
       fd.grph.addCnct(0, 1);
-      fd.grph.addCnct(0, 2);
+      //fd.grph.addCnct(0, 2);
 
       auto sz = fd.grph.nsz();
     }
@@ -1518,9 +1520,11 @@ ENTRY_DECLARATION
                   v2  destP={0,0}, destN={0,0};
                   int   cnt = 0;
                   for(; ci != grph.cnctEnd() && ci->first==i; ++cnt, ++ci){
+                    if(!grph.hasSlot(ci->second)){ cnt -= 1; continue; }   // todo: does this need to subtract 1 from count?
+
                     v2 curP = grph.slot(ci->second).P;
-                    destP += curP; 
-                    destN += norm(curP - nP);
+                    destP  += curP; 
+                    destN  += norm(curP - nP);
                   }
                   destP /= (f32)cnt;
                   destN /= (f32)cnt;
@@ -1540,19 +1544,41 @@ ENTRY_DECLARATION
           SECTION(draw connections)
           {                                 // ci is connection iterator 
             auto en = grph.cnctEnd();
-            for(auto ci = grph.cncts(); ci != en; )
+            for(auto ci = grph.cnctBegin(); ci != en; )
             {
               auto     srcIdx = ci->first;
               Slot const& src = grph.slot(srcIdx);
+              auto      count = grph.cncts().count(ci->first);
               
+              if(count==1){
+                Slot const& dest = grph.slot(ci->second);
+                f32  halfx = lerp(.5f, src.P.x, dest.P.x);
+                f32  halfy = lerp(.5f, src.P.y, dest.P.y);
+                f32   dist = len(src.P - dest.P);
+                v2  outNxt = src.P  + src.N  * min(NODE_SZ.x/2, (dist/3));         // divide by 3 because there are 3 sections to the bezier
+                v2   inNxt = dest.P + dest.N * min(NODE_SZ.x/2, (dist/3));         // todo: make these limited by a fraction of the node's size
+
+                nvgBeginPath(vg);
+                  nvgMoveTo(vg,   src.P.x, src.P.y);
+                  nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, dest.P.x,dest.P.y);
+                  nvgStrokeWidth(vg, 3.f);
+                  nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+                nvgStroke(vg);
+
+                ++ci; continue;
+              }
+
               v2 avgP=src.P; v2 avgN={0,0}; u32 cnt=0;
-              for(auto avgIter=ci; avgIter!=en && avgIter->first == srcIdx; ++avgIter, ++cnt){
+              auto avgIter=ci;
+              for(; avgIter!=en && avgIter->first == srcIdx; ++avgIter, ++cnt){
+                if(!grph.hasSlot(avgIter->second)){ --cnt; continue; }
+
                 Slot const& dest = grph.slot(avgIter->second);
                 avgP += dest.P;
                 avgP += src.P;
                 //avgN += norm(dest.P
               }
-              avgP    /= (f32)(cnt*2+1); // can't forget the first position for averaging - the src position
+              avgP    /= (f32)(cnt*2+1);             // can't forget the first position for averaging - the src position - the avgP is weighted 1:1 with the srcP and all the destination positions combined
               v2 midN  = norm(src.P - avgP);
 
               //f32  halfx = lerp(.5f, dest.P.x, src.P.x);
@@ -1597,40 +1623,7 @@ ENTRY_DECLARATION
                 nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f) );
               nvgStroke(vg);
               nvgFill(vg);
-
-             }
-
-            //  for(; ci!=en && ci->first == srcIdx; ++ci)
-            //  {
-            //    f32  halfx = lerp(.5f, dest.P.x, src.P.x);
-            //    f32  halfy = lerp(.5f, dest.P.y, src.P.y);
-            //    f32   dist = len(src.P - dest.P);
-            //    v2  outNxt = src.P  + src.N * min(NODE_SZ.x/2, (dist/3));         // divide by 3 because there are 3 sections to the bezier
-            //    v2   inNxt = dest.P + dest.N * min(NODE_SZ.x/2, (dist/3));        // todo: make these limited by a fraction of the node's size
-            //    nvgBeginPath(vg);
-            //    nvgMoveTo(vg,   src.P.x,src.P.y);
-            //    nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, dest.P.x,dest.P.y);
-            //    nvgStrokeWidth(vg, 3.f);
-            //    nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
-            //    nvgStroke(vg);
-            //  }
-            //}
-
-            //for(auto ci = grph.cncts(); ci != en; ){
-
-            //f32  halfx = lerp(.5f, dest.P.x, src.P.x);
-            //f32  halfy = lerp(.5f, dest.P.y, src.P.y);
-            //f32   dist = len(src.P - dest.P);
-            //v2  outNxt = src.P  + src.N * min(NODE_SZ.x/2, (dist/3));         // divide by 3 because there are 3 sections to the bezier
-            //v2   inNxt = dest.P + dest.N * min(NODE_SZ.x/2, (dist/3));        // todo: make these limited by a fraction of the node's size
-            //nvgBeginPath(vg);
-            //  nvgMoveTo(vg,   src.P.x,src.P.y);
-            //  nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, dest.P.x,dest.P.y);
-            //  nvgStrokeWidth(vg, 3.f);
-            //  nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
-            //nvgStroke(vg);
-
-
+            }
           }
           //SECTION(draw connections)
           //{
@@ -1640,13 +1633,13 @@ ENTRY_DECLARATION
           //    const v2 hlfsz = io_rad/2.f;
           //    Slot const&  src = grph.slot(ci->first);
           //    Slot const& dest = grph.slot(ci->second);
-
+          //
           //    f32  halfx = lerp(.5f, dest.P.x, src.P.x);
           //    f32  halfy = lerp(.5f, dest.P.y, src.P.y);
           //    f32   dist = len(src.P - dest.P);
           //    v2  outNxt = src.P  + src.N * min(NODE_SZ.x/2, (dist/3));         // divide by 3 because there are 3 sections to the bezier
           //    v2   inNxt = dest.P + dest.N * min(NODE_SZ.x/2, (dist/3));        // todo: make these limited by a fraction of the node's size
-
+          //
           //    nvgBeginPath(vg);
           //      nvgMoveTo(vg,   src.P.x,src.P.y);
           //      nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, dest.P.x,dest.P.y);
@@ -1747,6 +1740,35 @@ ENTRY_DECLARATION
 
 
 
+//  for(; ci!=en && ci->first == srcIdx; ++ci)
+//  {
+//    f32  halfx = lerp(.5f, dest.P.x, src.P.x);
+//    f32  halfy = lerp(.5f, dest.P.y, src.P.y);
+//    f32   dist = len(src.P - dest.P);
+//    v2  outNxt = src.P  + src.N * min(NODE_SZ.x/2, (dist/3));         // divide by 3 because there are 3 sections to the bezier
+//    v2   inNxt = dest.P + dest.N * min(NODE_SZ.x/2, (dist/3));        // todo: make these limited by a fraction of the node's size
+//    nvgBeginPath(vg);
+//    nvgMoveTo(vg,   src.P.x,src.P.y);
+//    nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, dest.P.x,dest.P.y);
+//    nvgStrokeWidth(vg, 3.f);
+//    nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+//    nvgStroke(vg);
+//  }
+//}
+//
+//for(auto ci = grph.cncts(); ci != en; ){
+//
+//f32  halfx = lerp(.5f, dest.P.x, src.P.x);
+//f32  halfy = lerp(.5f, dest.P.y, src.P.y);
+//f32   dist = len(src.P - dest.P);
+//v2  outNxt = src.P  + src.N * min(NODE_SZ.x/2, (dist/3));         // divide by 3 because there are 3 sections to the bezier
+//v2   inNxt = dest.P + dest.N * min(NODE_SZ.x/2, (dist/3));        // todo: make these limited by a fraction of the node's size
+//nvgBeginPath(vg);
+//  nvgMoveTo(vg,   src.P.x,src.P.y);
+//  nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, dest.P.x,dest.P.y);
+//  nvgStrokeWidth(vg, 3.f);
+//  nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+//nvgStroke(vg);
 
 //auto&   cn = cncts[i];
 //v2     out = slots_out[cn.src].P;

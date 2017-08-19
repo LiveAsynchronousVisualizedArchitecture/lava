@@ -94,11 +94,11 @@ struct    cnct {
 using  vec_con     =    vec<cnct>;
 
 struct    Slot { 
-  enum State { NORMAL=0, HIGHLIGHTED, SELECTED };
+  enum State { NORMAL=0, HIGHLIGHTED, SELECTED, SLOT_ERROR };
 
   v2 P; u64 nidx; v2 N; bool in=false; State state=NORMAL;
 
-  Slot(u64 nIdx, bool In=false) : nidx(nIdx), in(In), P(0,0), N(0,1) {}
+  Slot(u64 nIdx, bool In=false) : nidx(nIdx), in(In), P(0,0), N(0,1), state(NORMAL) {}
 };
 using vec_slot     =    vec<Slot>;
 
@@ -157,7 +157,21 @@ public:
     
     return slotIdx;
   }
-  auto         slot(u64 sIdx)  -> Slot& { return m_slots[sIdx]; }
+  bool      hasSlot(u64 sIdx)
+  {
+    return sIdx < m_slots.size();
+  }
+  auto         slot(u64 sIdx) -> Slot& 
+  {
+    //static Slot slot_error(0,false);  // = { {0,0}, 0, {0,0}, false, Slot::SLOT_ERROR };
+
+    //if(sIdx<m_slots.size())
+      return m_slots[sIdx];
+    //else{
+    //  slot_error.state = Slot::SLOT_ERROR;
+    //  return slot_error;
+    //}
+  }
   auto    nodeSlots(u64 nIdx) -> decltype(m_nodeSlots.find(nIdx))
   {
     auto iter = m_nodeSlots.find(nIdx);
@@ -203,7 +217,8 @@ public:
     }
   }
   auto      cnctEnd() -> decltype(m_outCncts.end())  { return m_outCncts.end(); }
-  auto        cncts() -> decltype(m_outCncts.begin()) { return m_outCncts.begin(); }
+  auto    cnctBegin() -> decltype(m_outCncts.begin()) { return m_outCncts.begin(); }
+  auto        cncts() -> CnctMap { return m_outCncts; }
   u64        cnctsz(){ return m_outCncts.size(); }
 
   auto          bnd(u64 idx) -> Bnd& { return m_bnds[idx]; }
