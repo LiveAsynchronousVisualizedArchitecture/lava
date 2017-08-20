@@ -19,12 +19,12 @@
 // -todo: make box selection stick - needed to check if the box was being dragged before drgBox gets set to false for the left mouse button not being down 
 // -todo: make slots part of file writing 
 // -todo: make slots part of file reading
+// -todo: make node type part of file writing
+// -todo: make node type part of file reading
+// -todo: put node type into written file
 
-// todo: make node type part of file writing
-// todo: make node type part of file reading
 // todo: make 'delete' and 'backspace' delete selected nodes
 // todo: make 'delete' and 'backspace' delete selected connections
-// todo: put node type into written file
 // todo: debug flashing connections - possibly due to numeric error handling
 // idea: draw message node slots as sliding angles
 // todo: make one node snap to another node
@@ -280,22 +280,26 @@ str           graphToStr(GraphDB const& g)
     //auto sz = nodes.size();
     auto sz = g.nsz();
 
-    Jzon::Node nd_txt = Jzon::array();
+    Jzon::Node  nd_txt = Jzon::array();
     TO(sz,i) nd_txt.add(g.node(i).txt);
     //TO(sz,i) nd_txt.add(nodes[i].txt);
 
-    Jzon::Node   nd_x = Jzon::array();
+    Jzon::Node    nd_x = Jzon::array();
     TO(sz,i) nd_x.add(g.node(i).P.x);
 
-    Jzon::Node   nd_y = Jzon::array();
+    Jzon::Node    nd_y = Jzon::array();
     TO(sz,i) nd_y.add(g.node(i).P.y);
+
+    Jzon::Node nd_type = Jzon::array();
+    TO(sz,i) nd_type.add(g.node(i).type);
 
     //Jzon::Node ordr = Jzon::array();
     //TO(sz,i) ordr.add(nd_ordr[i]);
 
-    nds.add("x",      nd_x);
-    nds.add("y",      nd_y);
-    nds.add("txt",  nd_txt);
+    nds.add("x",       nd_x);
+    nds.add("y",       nd_y);
+    nds.add("txt",   nd_txt);
+    nds.add("type", nd_type);
     //nds.add("order",  ordr);
   }
   Jzon::Node jslots = Jzon::object();
@@ -360,21 +364,23 @@ GraphDB       strToGraph(str const& s)
   Jzon::Parser prs;
   auto graph = prs.parseString(s);
 
-  auto nd_x    = graph.get("nodes").get("x");
-  auto nd_y    = graph.get("nodes").get("y");
-  auto nd_txt  = graph.get("nodes").get("txt");
-  auto ordr    = graph.get("nodes").get("order");
-  auto src     = graph.get("connections").get("src");
-  auto dest    = graph.get("connections").get("dest");
-  auto sltSrc  = graph.get("slots").get("src");
-  auto sltDest = graph.get("slots").get("dest");
+  auto nd_x     = graph.get("nodes").get("x");
+  auto nd_y     = graph.get("nodes").get("y");
+  auto nd_txt   = graph.get("nodes").get("txt");
+  auto nd_type  = graph.get("nodes").get("type");
+  auto ordr     = graph.get("nodes").get("order");
+  auto src      = graph.get("connections").get("src");
+  auto dest     = graph.get("connections").get("dest");
+  auto sltSrc   = graph.get("slots").get("src");
+  auto sltDest  = graph.get("slots").get("dest");
 
   auto cnt = nd_x.getCount();
   TO(cnt,i){
     Node n;
-    n.P.x = nd_x.get(i).toFloat();
-    n.P.y = nd_y.get(i).toFloat();
-    n.txt = nd_txt.get(i).toString();
+    n.P.x  = nd_x.get(i).toFloat();
+    n.P.y  = nd_y.get(i).toFloat();
+    n.txt  = nd_txt.get(i).toString();
+    n.type = (Node::Type)nd_type.get(i).toInt();
     g.addNode(n);
   }
   
