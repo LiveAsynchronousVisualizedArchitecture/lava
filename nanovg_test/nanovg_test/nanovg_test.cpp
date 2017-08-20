@@ -18,8 +18,8 @@
 // -todo: make strToGraph and loadFile use graphdb
 // -todo: make box selection stick - needed to check if the box was being dragged before drgBox gets set to false for the left mouse button not being down 
 // -todo: make slots part of file writing 
+// -todo: make slots part of file reading
 
-// todo: make slots part of file reading
 // todo: make node type part of file writing
 // todo: make node type part of file reading
 // todo: make 'delete' and 'backspace' delete selected nodes
@@ -379,8 +379,14 @@ GraphDB       strToGraph(str const& s)
   }
   
   TO(sltSrc.getCount(),i){
-    sltSrc.get(i).toInt();
-
+    u32 nIdx = sltSrc.get(i).toInt();
+    Slot s(nIdx,false);
+    g.addSlot(s);
+  }
+  TO(sltDest.getCount(),i){
+    u32 nIdx = sltDest.get(i).toInt();
+    Slot s(nIdx,true);
+    g.addSlot(s);
   }
 
   auto cnct_cnt = src.getCount();
