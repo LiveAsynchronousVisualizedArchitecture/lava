@@ -105,11 +105,13 @@ using vec_slot     =    vec<Slot>;
 class  GraphDB
 {
 public:
-  using NodeSlotMap = std::multimap<u64, u64>;          // The key is the index into the node array, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used.
-  using CnctMap     = std::multimap<u32, u32>;
-  using SrcMap      = std::multimap<u32, u32>;          // todo: change this to a single map
+  using NodeSlotMap  = std::multimap<u64, u64>;            // The key is the index into the node array, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used.
+  using CnctMap      = std::multimap<u32, u32>;
+  //using SrcMap      = std::multimap<u32, u32>;          // todo: change this to a single map
+  using SrcMap       = std::unordered_map<u32, u32>;
 
 private:
+  u64                m_nxtId;             // nxtId is next id - a counter for every node created that only increases, giving each node a unique id
   vec_nd             m_nodes;
   vec_bnd             m_bnds;
   veci                m_ordr;
@@ -119,6 +121,7 @@ private:
   CnctMap         m_outCncts;
   SrcMap           m_inCncts;
 
+  void init(){}
   void mv(GraphDB&& rval)
   {
     using namespace std;
@@ -134,11 +137,11 @@ private:
   }
 
 public:
-  GraphDB(){}
+  GraphDB() : m_nxtId(1) { init(); }
   GraphDB(GraphDB&& rval){ mv(std::move(rval)); }
   GraphDB& operator=(GraphDB&& rval){ mv(std::move(rval)); return *this; }
 
-  u64       addNode(Node n)
+  u64        addNode(Node n)
   {
     m_nodes.push_back(n);
     u64 nodeIdx = (u64)(m_nodes.size()-1);
@@ -148,10 +151,85 @@ public:
 
     return nodeIdx;
   }
-  auto         node(u64 nIdx)  -> struct Node& { return m_nodes[nIdx]; }
-  auto         node(u64 nIdx) const -> struct Node const& { return m_nodes[nIdx]; }
-  auto  orderedNode(u64 order) -> struct Node& { return m_nodes[m_ordr[order]]; }
-  void   moveToBack(u64 nIdx)
+  void       delNode(u64 nIdx)
+  {
+    Node&     n = this->node(nIdx);
+    auto  sIter = nodeSlots(nIdx);                          // sIter is slot iterator
+    auto sltCpy = sIter;
+    auto sltIdx = sIter->first;
+    for(; sltCpy!=slotEnd() && sltCpy->first==sltIdx; ++sltCpy){
+      
+    }
+  }
+  u64    delSelected()
+  {
+    using namespace std;
+    
+    // accumulate nodes
+    // accumulate slots
+    // accumulate dest slots
+    // delete cncts with dest slots
+    // delete slots
+    // delete nodes
+    u64 cnt=0;
+    vec<u64> nidxs;
+    vec<u32> sidxs;                               // sidxs is slot indexes
+    vec<u32> cidxs;                               // cidxs is connection indexes
+    TO(m_selected.size(),i){
+      //if(m_selected[i]){ delNode(i); ++cnt; }
+      if(m_selected[i]){
+        nidxs.push_back(i);
+        auto sIter = nodeSlots(i);
+        auto  nidx = sIter->first;
+        for(; sIter!=slotEnd() && sIter->first==nidx; ++sIter){
+          sidxs.push_back( sIter->second );
+        }
+
+        for(auto sidx : sidxs){
+          if( slot(sidx).in ){
+            auto destIter = m_inCncts.find(sidx);
+            if(destIter != m_inCncts.end())
+              cidxs.push_back(sidx);
+          }else{
+            auto srcIter = m_outCncts.find(sidx);
+            if(srcIter != m_outCncts.end())
+              cidxs.push_back(srcIter->second);
+          }
+        }
+      }
+    }
+
+    for(auto destIdx : cidxs){
+      auto delCnt = delDestCnct(destIdx);
+      assert(delCnt==0 || delCnt==1);
+    }
+
+    sort(ALL(sidxs));
+    for(auto sidx : sidxs){
+      m_slots.erase( m_slots.begin()+sidx );
+    }
+
+    sort(ALL(nidxs));
+    for(auto nidx : nidxs){
+      m_nodes.erase( m_nodes.begin()+nidx );
+    }
+
+    for(auto nidx : nidxs){
+      m_ordr.erase(find(ALL(m_ordr), nidx));             // O(n^2)
+    }
+
+    return cnt;
+    
+    //
+    //for(auto& s : sIter){
+
+    //for(auto& sel : m_selected) if(sel){      
+    //}
+  }
+  auto          node(u64 nIdx)  -> struct Node& { return m_nodes[nIdx]; }
+  auto          node(u64 nIdx) const -> struct Node const& { return m_nodes[nIdx]; }
+  auto   orderedNode(u64 order) -> struct Node& { return m_nodes[m_ordr[order]]; }
+  void    moveToBack(u64 nIdx)
   {
     using namespace std;
 
@@ -162,12 +240,14 @@ public:
 
     m_ordr[sz-1] = tmp;
   }
-  auto     getNodes() -> vec_nd&   { return m_nodes; }
-  auto        nodes() -> vec_nd&   { return m_nodes; }
-  u64           nsz() const { return m_nodes.size(); }
+  auto      getNodes() -> vec_nd&   { return m_nodes; }
+  auto         nodes() -> vec_nd&   { return m_nodes; }
+  u64            nsz() const { return m_nodes.size(); }
 
-  u64       addSlot(Slot s)
+  u64        addSlot(Slot s)
   {
+    //if(s.nidx < m_nodes.size
+
     m_slots.push_back(s);
     u64 slotIdx = (u64)(m_slots.size() - 1);
 
@@ -175,11 +255,11 @@ public:
     
     return slotIdx;
   }
-  bool      hasSlot(u64 sIdx)
+  bool       hasSlot(u64 sIdx)
   {
     return sIdx < m_slots.size();
   }
-  auto         slot(u64 sIdx) -> Slot& 
+  auto          slot(u64 sIdx) -> Slot& 
   {
     //static Slot slot_error(0,false);  // = { {0,0}, 0, {0,0}, false, Slot::SLOT_ERROR };
 
@@ -190,15 +270,15 @@ public:
     //  return slot_error;
     //}
   }
-  auto    nodeSlots(u64 nIdx) -> decltype(m_nodeSlots.find(nIdx))
+  auto     nodeSlots(u64 nIdx) -> decltype(m_nodeSlots.find(nIdx))
   {
     auto iter = m_nodeSlots.find(nIdx);
     return iter;
   }
-  auto        slots() -> vec_slot& { return m_slots; }
-  auto        slots() const -> vec_slot const& { return m_slots; }
-  auto     getSlots() -> vec_slot& { return m_slots; }
-  auto      srcSlot(u32 destSlotIdx) -> struct Slot* 
+  auto         slots() -> vec_slot& { return m_slots; }
+  auto         slots() const -> vec_slot const& { return m_slots; }
+  auto      getSlots() -> vec_slot& { return m_slots; }
+  auto       srcSlot(u32 destSlotIdx) -> struct Slot* 
   {
     auto ci = m_inCncts.find(destSlotIdx);
     if(ci != m_inCncts.end()){
@@ -207,14 +287,14 @@ public:
     }else 
       return nullptr;
   }
-  auto    destSlots(u32 srcSlotIdx) -> decltype(m_outCncts.end())
+  auto     destSlots(u32 srcSlotIdx) -> decltype(m_outCncts.end())
   {
     return m_outCncts.find(srcSlotIdx);
   }
-  auto      slotEnd() -> decltype(m_nodeSlots.end()) { return m_nodeSlots.end(); }
-  u64           ssz() const { return m_slots.size(); }
+  auto       slotEnd() -> decltype(m_nodeSlots.end()) { return m_nodeSlots.end(); }
+  u64            ssz() const { return m_slots.size(); }
 
-  void      addCnct(u32 src, u32 dest)
+  void       addCnct(u32 src, u32 dest)
   {
     auto srcIter = m_inCncts.find(dest);
     if(srcIter != m_inCncts.end()){
@@ -225,34 +305,86 @@ public:
     m_outCncts.insert({src, dest});
     m_inCncts.insert({dest, src});
   }
-  void   toggleCnct(u32 src, u32 dest)
+  void    toggleCnct(u32 src, u32 dest)
   {
-    auto srcIter = m_inCncts.find(dest);
-    if(srcIter != m_inCncts.end()){
-      //m_outCncts.erase(src);
+    if( delCnct(src,dest)==0 ){
+      m_outCncts.insert({src, dest});
+      m_inCncts.insert({dest, src});
+    }
 
+    //auto srcIter = m_inCncts.find(dest);
+    //if(srcIter != m_inCncts.end()){
+    //  auto iter = m_outCncts.find(src);
+    //  for(; iter != m_outCncts.end() && iter->first==src; ){
+    //    auto cpy = iter;
+    //    ++iter;
+    //    if(cpy->second == dest) m_outCncts.erase(cpy);
+    //  }
+    //  m_inCncts.erase(dest);
+    //
+    //}else{
+
+    //m_outCncts.erase(src);
+    //
+    //if(iter != m_outCncts.end()){
+    //}
+    //
+    //m_outCncts.erase(src);
+  }
+  u32        delCnct(u32 src, u32 dest)
+  {
+    u32 cnt=0;
+    auto srcIter = m_inCncts.find(dest);
+    if(srcIter != m_inCncts.end())
+    {
       auto iter = m_outCncts.find(src);
       for(; iter != m_outCncts.end() && iter->first==src; ){
         auto cpy = iter;
         ++iter;
-        if(cpy->second == dest) m_outCncts.erase(cpy);
+        if(cpy->second == dest){
+          m_outCncts.erase(cpy);
+          ++cnt;
+        }
       }
-
-      //if(iter != m_outCncts.end()){
-      //}
-
-      //m_outCncts.erase(src);
       m_inCncts.erase(dest);
-    }else{
-      m_outCncts.insert({src, dest});
-      m_inCncts.insert({dest, src});
     }
+
+    return cnt;
   }
-  auto      cnctEnd() -> decltype(m_outCncts.end())  { return m_outCncts.end(); }
-  auto    cnctBegin() -> decltype(m_outCncts.begin()) { return m_outCncts.begin(); }
-  auto        cncts() -> CnctMap& { return m_outCncts; }
-  auto        cncts() const -> CnctMap const& { return m_outCncts; }
-  u64        cnctsz() const { return m_outCncts.size(); }
+  u32    delDestCnct(u32 dest)
+  {
+    auto iter = m_inCncts.find(dest);
+    if(iter != m_inCncts.end()){
+      auto src = iter->second;
+      return delCnct(src, iter->first);
+    }
+
+    return 0;
+  }
+  auto       cnctEnd() -> decltype(m_outCncts.end())  { return m_outCncts.end(); }
+  auto     cnctBegin() -> decltype(m_outCncts.begin()) { return m_outCncts.begin(); }
+  auto         cncts() -> CnctMap& { return m_outCncts; }
+  auto         cncts() const -> CnctMap const& { return m_outCncts; }
+  u64         cnctsz() const { return m_outCncts.size(); }
+  u32        delCnct(u64 sltIdx)
+  {
+    u32 cnt=0;
+    Slot& s = slot(sltIdx);
+    if(s.in){
+      auto iter = m_inCncts.find(sltIdx);
+      return delCnct(iter->second, iter->first);
+    }else{
+      auto iter = m_outCncts.find(sltIdx);
+      auto  idx = iter->first;
+      while(iter != m_outCncts.end() && iter->first == idx){
+        m_inCncts.erase(iter->second);
+        iter = m_outCncts.erase(iter);
+        ++cnt;
+      }
+    }
+
+    return cnt;
+  }
 
   auto          bnd(u64 idx) -> Bnd& { return m_bnds[idx]; }
   auto       bounds() -> vec_bnd& { return m_bnds; }
