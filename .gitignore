@@ -33,6 +33,7 @@
 *.app
 
 # visual studio nonsense
+*.sqlite
 *.sdf
 *.pdb
 *.idb
