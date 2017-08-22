@@ -6,9 +6,10 @@
 #ifndef __FISSURE_DECL_HEADERGUARD_HPP__
 #define __FISSURE_DECL_HEADERGUARD_HPP__
 
+#include <set>
+#include <nanogui/nanogui.h>
 #include "../no_rt_util.h"
 #include "vec.hpp"
-#include <nanogui/nanogui.h>
 
 using namespace nanogui;
 
@@ -68,16 +69,20 @@ using  vec_bnd     =    vec<Bnd>;
 
 struct    Node
 {
-  enum Type { MSG=0, FLOW=1 };
+  enum Type { MSG=0, FLOW=1, NODE_ERROR };
 
+  u64      id = 0;
+  u64   order = 0;
   v2        P = {0,0};
-  //bnd       B;
   str     txt; 
-  Type   type = FLOW;
+  Type   type = NODE_ERROR;
+
+  //bnd       B;
   //LavaNode ln;
 
   Node(){}
   Node(str _txt, Type _type=FLOW, v2 _P=v2(0,0) ) : txt(_txt), P(_P), type(_type) {}
+  bool operator<(Node const& l){ return l.order; }
 };
 using   vec_nd     =    vec<Node>;
 
@@ -105,35 +110,59 @@ using vec_slot     =    vec<Slot>;
 class  GraphDB
 {
 public:
+  using NodeMap      = std::map<u64, Node>;
+  using NodeIdMap    = std::unordered_map<u64, u64>;
   using NodeSlotMap  = std::multimap<u64, u64>;            // The key is the index into the node array, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used.
   using CnctMap      = std::multimap<u32, u32>;
-  //using SrcMap      = std::multimap<u32, u32>;          // todo: change this to a single map
   using SrcMap       = std::unordered_map<u32, u32>;
+  //using NodeSet      = std::set<Node>;
+  //using SrcMap      = std::multimap<u32, u32>;          // todo: change this to a single map
+
+  //static const Node CONST_ERR_NODE;
+  static Node ERR_NODE;
 
 private:
   u64                m_nxtId;             // nxtId is next id - a counter for every node created that only increases, giving each node a unique id
-  vec_nd             m_nodes;
+  NodeMap            m_nodes;
+  NodeIdMap            m_ids;
   vec_bnd             m_bnds;
-  veci                m_ordr;
   vec<bool>       m_selected;             // bitfield for selected nodes
   vec_slot           m_slots;
   NodeSlotMap    m_nodeSlots;
   CnctMap         m_outCncts;
   SrcMap           m_inCncts;
 
-  void init(){}
-  void mv(GraphDB&& rval)
+  //vec_nd             m_nodes;
+  //veci                m_ordr;
+
+  void          init(){}
+  void            mv(GraphDB&& rval)
   {
     using namespace std;
 
     m_nodes     = move(rval.m_nodes); 
     m_bnds      = move(rval.m_bnds); 
-    m_ordr      = move(rval.m_ordr); 
+    m_ids       = move(rval.m_ids);
     m_selected  = move(rval.m_selected); 
     m_slots     = move(rval.m_slots); 
     m_nodeSlots = move(rval.m_nodeSlots); 
     m_outCncts  = move(rval.m_outCncts); 
     m_inCncts   = move(rval.m_inCncts);
+  }
+  u64            nxt(){ return m_nxtId++; }
+  auto selectedNodes() -> vec<u64> 
+  {
+    vec<u64> nids;                                         // nids is node ids
+    TO(m_selected.size(),i)
+    {
+      if(m_selected[i]){
+        nidxs.push_back(node(i).id);
+        auto sIter = nodeSlots(i);
+        auto  nidx = sIter->first;
+        for(; sIter!=slotEnd() && sIter->first==nidx; ++sIter){
+          sidxs.push_back( sIter->second );
+        }
+    }
   }
 
 public:
@@ -141,11 +170,17 @@ public:
   GraphDB(GraphDB&& rval){ mv(std::move(rval)); }
   GraphDB& operator=(GraphDB&& rval){ mv(std::move(rval)); return *this; }
 
-  u64        addNode(Node n)
+  u64        addNode(Node n, bool newId=true)
   {
-    m_nodes.push_back(n);
+    if(newId) n.id = nxt();
+
+    auto order = m_nodes.rbegin()->first + 1;
+    n.order    = order;
+    m_nodes.insert({order, n});
     u64 nodeIdx = (u64)(m_nodes.size()-1);
-    m_ordr.push_back( (i32)nodeIdx );
+
+    m_ids.insert({n.id, n.order});
+    
     m_bnds.emplace_back();
     m_selected.push_back(false);
 
@@ -164,21 +199,21 @@ public:
   u64    delSelected()
   {
     using namespace std;
-    
-    // accumulate nodes
+
     // accumulate slots
     // accumulate dest slots
     // delete cncts with dest slots
     // delete slots
     // delete nodes
     u64 cnt=0;
-    vec<u64> nidxs;
     vec<u32> sidxs;                               // sidxs is slot indexes
     vec<u32> cidxs;                               // cidxs is connection indexes
-    TO(m_selected.size(),i){
-      //if(m_selected[i]){ delNode(i); ++cnt; }
+    TO(m_selected.size(),i)
+    {
+
+      // accumulate nodes
       if(m_selected[i]){
-        nidxs.push_back(i);
+        nidxs.push_back(node(i).id);
         auto sIter = nodeSlots(i);
         auto  nidx = sIter->first;
         for(; sIter!=slotEnd() && sIter->first==nidx; ++sIter){
@@ -211,37 +246,126 @@ public:
 
     sort(ALL(nidxs));
     for(auto nidx : nidxs){
-      m_nodes.erase( m_nodes.begin()+nidx );
+      m_nodes.erase();
     }
 
-    for(auto nidx : nidxs){
-      m_ordr.erase(find(ALL(m_ordr), nidx));             // O(n^2)
-    }
+    //sort(ALL(nidxs));
+    //for(auto nidx : nidxs){
+    //  m_nodes.erase( m_nodes.begin()+nidx );
+    //}
+
+    //for(auto nidx : nidxs){
+    //  m_ordr.erase(find(ALL(m_ordr), nidx));             // O(n^2)
+    //}
 
     return cnt;
-    
-    //
-    //for(auto& s : sIter){
-
-    //for(auto& sel : m_selected) if(sel){      
-    //}
   }
-  auto          node(u64 nIdx)  -> struct Node& { return m_nodes[nIdx]; }
-  auto          node(u64 nIdx) const -> struct Node const& { return m_nodes[nIdx]; }
-  auto   orderedNode(u64 order) -> struct Node& { return m_nodes[m_ordr[order]]; }
-  void    moveToBack(u64 nIdx)
+  //u64    delSelected()
+  //{
+  //  using namespace std;
+  //  
+  //  // accumulate nodes
+  //  // accumulate slots
+  //  // accumulate dest slots
+  //  // delete cncts with dest slots
+  //  // delete slots
+  //  // delete nodes
+  //  u64 cnt=0;
+  //  vec<u64> nidxs;
+  //  vec<u32> sidxs;                               // sidxs is slot indexes
+  //  vec<u32> cidxs;                               // cidxs is connection indexes
+  //  TO(m_selected.size(),i){
+  //    //if(m_selected[i]){ delNode(i); ++cnt; }
+  //    if(m_selected[i]){
+  //      nidxs.push_back(node(i).id);
+  //      auto sIter = nodeSlots(i);
+  //      auto  nidx = sIter->first;
+  //      for(; sIter!=slotEnd() && sIter->first==nidx; ++sIter){
+  //        sidxs.push_back( sIter->second );
+  //      }
+  //
+  //      for(auto sidx : sidxs){
+  //        if( slot(sidx).in ){
+  //          auto destIter = m_inCncts.find(sidx);
+  //          if(destIter != m_inCncts.end())
+  //            cidxs.push_back(sidx);
+  //        }else{
+  //          auto srcIter = m_outCncts.find(sidx);
+  //          if(srcIter != m_outCncts.end())
+  //            cidxs.push_back(srcIter->second);
+  //        }
+  //      }
+  //    }
+  //  }
+  //
+  //  for(auto destIdx : cidxs){
+  //    auto delCnt = delDestCnct(destIdx);
+  //    assert(delCnt==0 || delCnt==1);
+  //  }
+  //
+  //  sort(ALL(sidxs));
+  //  for(auto sidx : sidxs){
+  //    m_slots.erase( m_slots.begin()+sidx );
+  //  }
+  //
+  //  sort(ALL(nidxs));
+  //  for(auto nidx : nidxs){
+  //    m_nodes.erase();
+  //  }
+  //
+  //  //sort(ALL(nidxs));
+  //  //for(auto nidx : nidxs){
+  //  //  m_nodes.erase( m_nodes.begin()+nidx );
+  //  //}
+  //
+  //  //for(auto nidx : nidxs){
+  //  //  m_ordr.erase(find(ALL(m_ordr), nidx));             // O(n^2)
+  //  //}
+  //
+  //  return cnt;
+  //  
+  //  //
+  //  //for(auto& s : sIter){
+  //
+  //  //for(auto& sel : m_selected) if(sel){      
+  //  //}
+  //}
+  auto          node(u64 id)  -> struct Node&
+  {
+    auto idIter = m_ids.find(id);                     // idIter is identification iterator
+    if(idIter == end(m_ids)) return ERR_NODE;
+
+    auto nIter = m_nodes.find(idIter->second);        // nIter is node iterator
+    if(nIter == end(m_nodes)) return ERR_NODE;
+
+    return nIter->second;
+  }
+  auto          node(u64 id) const -> struct Node const& 
+  { 
+    auto idIter = m_ids.find(id);                     // idIter is identification iterator
+    if(idIter == end(m_ids)) return ERR_NODE;
+
+    auto nIter = m_nodes.find(idIter->second);        // nIter is node iterator
+    if(nIter == end(m_nodes)) return ERR_NODE;
+
+    return nIter->second;
+  }
+  auto   orderedNode(u64 order) -> struct Node& { return m_nodes.find(order)->second; }
+  bool   moveToFront(u64 id)
   {
     using namespace std;
 
-    auto  sz = m_ordr.size();
-    auto tmp = move(m_ordr[nIdx]);
-    for(auto j=nIdx; j<sz-1; ++j)
-      m_ordr[j] = move( m_ordr[j+1] );
+    Node n = node(id);
+    n.order;
 
-    m_ordr[sz-1] = tmp;
+    if(n.type==Node::NODE_ERROR) return false;
+    m_nodes.erase(n.order); // todo: use a delNode here instead
+    m_ids.erase(id);
+
+    addNode(n, false);
   }
-  auto      getNodes() -> vec_nd&   { return m_nodes; }
-  auto         nodes() -> vec_nd&   { return m_nodes; }
+  auto      getNodes() -> NodeMap&   { return m_nodes; }
+  auto         nodes() -> NodeMap&   { return m_nodes; }
   u64            nsz() const { return m_nodes.size(); }
 
   u64        addSlot(Slot s)
@@ -399,8 +523,14 @@ public:
   }
   u64         selsz() const { return m_selected.size(); }
 
-  i32         order(u64 idx){ return m_ordr[idx]; }
-  void        order(u64 idx, i32 o){ m_ordr[idx] = o; }
+  i32         order(u64 id){ return node(id).order; }
+  //void        order(u64 id, i32 o)
+  //{
+  //  node(id).order = o;
+  //}
+
+  //i32         order(u64 idx){ return m_ordr[idx]; }
+  //void        order(u64 idx, i32 o){ m_ordr[idx] = o; }
 
   void        clear()
   {
@@ -435,7 +565,33 @@ struct FisData
 
 
 
+//n.order = m_nodes.rbegin()->order + 1;
+//m_ordr.push_back( (i32)nodeIdx );
 
+//m_nodes.push_back(n);
+//u64 nodeIdx = (u64)(m_nodes.size()-1);
+//m_ordr.push_back( (i32)nodeIdx );
+//m_bnds.emplace_back();
+//m_selected.push_back(false);
+//
+//return nodeIdx;
+
+//void    moveToBack(u64 nIdx)
+//{
+//  using namespace std;
+//
+//  auto  sz = m_ordr.size();
+//  auto tmp = move(m_ordr[nIdx]);
+//  for(auto j=nIdx; j<sz-1; ++j)
+//    m_ordr[j] = move( m_ordr[j+1] );
+//
+//  m_ordr[sz-1] = tmp;
+//}
+//auto          node(u64 nIdx)  -> struct Node& { return m_nodes[nIdx]; }
+//auto          node(u64 nIdx) const -> struct Node const& { return m_nodes[nIdx]; }
+//auto   orderedNode(u64 order) -> struct Node& { return m_nodes[m_ordr[order]]; }
+//auto      getNodes() -> vec_nd&   { return m_nodes; }
+//auto         nodes() -> vec_nd&   { return m_nodes; }
 
 //auto&  o = order;
 //move_backward(a.front()+i+1ul, a.back(), a.back()-1);

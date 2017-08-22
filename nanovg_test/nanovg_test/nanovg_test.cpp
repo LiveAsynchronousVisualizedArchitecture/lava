@@ -26,23 +26,26 @@
 // -todo: make a delete node function - will need to find the slots on the node and the connections on the slots, then delete the connection, then delete the slot then delete the node
 // -todo: make 'delete' and 'backspace' delete selected nodes
 // -todo: make 'delete' and 'backspace' delete selected connections
+// -todo: add data to node for inputs - slots not done with per node data
+// -todo: add data to connection for input and output indices - connections done with maps
+// -todo: print to console with ReadFile.cpp function - not sure what this was about
+// -todo: make a node Id map that maps ids on to the ordered node set
+// -todo: change nodes to be a set or ordered set that counts from 1 on on every node creation
 
-// todo: change nodes to be a set or ordered set that counts from 1 on on every node creation
-// todo: debug flashing connections - possibly due to numeric error handling
-// idea: draw message node slots as sliding angles
+// todo: make selected a boolean in the Node struct since there is no linear ordering with the node being a map based on order with access based on an unordered_map based on id
+// todo: redo delNode()
 // todo: make one node snap to another node
 // todo: use scroll wheel and nanovg scale transforms to zoom in and out
 // todo: group ui state variables together - priSel, connecting
 // todo: make two snapped nodes group together and be dragged together
 // todo: separate finding node the pointer is inside from the action to take
-// todo: print to console with ReadFile.cpp function
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
 // todo: make a node to split text into lines and scatter the result
-// todo: add data to node for inputs
-// todo: add data to connection for input and output indices
 // todo: make function to draw a bezier from one slot to another with normals
+// todo: debug flashing connections - possibly due to numeric error handling - have to repeat first
 
+// idea: draw message node slots as sliding angles
 // idea: make connection delete and create trigger when 1 or more in/dest slots are selected and 1 out/src slot is connected
 // idea: make a single file include all nanoui into one compilation unit
 // idea: make msg loop that would deal with selections, clicks and drags? 
