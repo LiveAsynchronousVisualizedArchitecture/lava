@@ -44,22 +44,28 @@
 // -todo: test multiple nodes
 // -todo: make sure NodeSlotMap is a map from a node Id to a slot index and not from a node index to a slot index - if Slot::id is a node id then the NodeSlotMap will be a node.id -> slotIdx map
 // -todo: debug file save not writing node four text and writing an empty string - needed to use the node pointer vector or iterate over nodes - using an index won't get all the nodes because they are looked up by ID now
+// -todo: test loading - seems to work
+// -todo: make selected a boolean in the Node struct since there is no linear ordering with the node being a map based on order with access based on an unordered_map based on id
+// -todo: test node deletions again - slot deletion is problematic due to linear indexing
 
-// todo: test loading
-// todo: investigate making slots into an unordered set - is this neccesary for proper slot deletion?
-// todo: make selected a boolean in the Node struct since there is no linear ordering with the node being a map based on order with access based on an unordered_map based on id
+// todo: investigate making slots into an unordered set - is this neccesary for proper slot deletion?  what data and access is needed ?
+//       |- a slot struct has a node id associated with it - a node can have multiple slots - slots are going to be accessed by the node id they are attached to - slots can not exist without a node - a node.id to slot multi-map should hold all the slots?
+//       |- how do connections access the slots? they have a slot index - should slots have a unique Id also? - if slots are deleted in the linear indexed vector, all their positions change and their indices are invalidated 
+//       |- slots don't need to be ordered - need to be accessed by their own id and by their node id - if slots are always part of a particular node, should their id be a subset of the nodeID? should there only be one id between them?
+// todo: make function to draw a bezier from one slot to another with normals
+// todo: debug flashing connections - possibly due to numeric error handling - have to repeat first
 // todo: redo delNode()
 // todo: make one node snap to another node
 // todo: use scroll wheel and nanovg scale transforms to zoom in and out
 // todo: group ui state variables together - priSel, connecting
 // todo: make two snapped nodes group together and be dragged together
-// todo: separate finding node the pointer is inside from the action to take
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
 // todo: make a node to split text into lines and scatter the result
-// todo: make function to draw a bezier from one slot to another with normals
-// todo: debug flashing connections - possibly due to numeric error handling - have to repeat first
+// todo: separate finding node the pointer is inside from the action to take
 
+
+// idea: build in focus as information separate from selection
 // idea: draw message node slots as sliding angles
 // idea: make connection delete and create trigger when 1 or more in/dest slots are selected and 1 out/src slot is connected
 // idea: make a single file include all nanoui into one compilation unit
