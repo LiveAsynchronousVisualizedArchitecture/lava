@@ -38,9 +38,12 @@
 // -todo: fix node movement and drawing 
 // -todo: make main loop use an array of node pointers
 // -todo: make bounds be properly set in main loop
+// -todo: fix srcSlot() function to fix slot movement so that in/dest slot ends up on the node - actual problem was that the node id was being compared to nsz() so ever increasing node IDs quickly go out of the bounds of the size of the node structure
 
+// todo: test connection drawing 
+// todo: test multiple nodes
 // todo: make sure NodeSlotMap is a map from a node Id to a slot index and not from a node index to a slot index
-// todo: make slots into an unordered set?
+// todo: investigate making slots into an unordered set
 // todo: make selected a boolean in the Node struct since there is no linear ordering with the node being a map based on order with access based on an unordered_map based on id
 // todo: redo delNode()
 // todo: make one node snap to another node
@@ -1447,6 +1450,7 @@ ENTRY_DECLARATION
             TO(sz,i){
               //bool selected = isIn(grph.bnd(i), drgbnd);
               //grph.sel(i, selected);
+
               Node& n = *(nds[i]);
               n.sel   = isIn(n.b, drgbnd);     
             }
@@ -1560,11 +1564,11 @@ ENTRY_DECLARATION
           TO(grph.ssz(),i)
           {
             Slot& s      = grph.slot(i);
-            auto    nidx = s.nid;
-            if(nidx < grph.nsz())
-            {
+            auto    nid = s.nid;
+            //if(nid < grph.nsz())
+            //{
               v2        nrml;
-              Node const& n = grph.node(nidx);
+              Node const& n = grph.node(nid);
               v2 nP = n.P + NODE_SZ/2;
               
               if(s.in){                                              // dest / in / blue slots
@@ -1598,7 +1602,7 @@ ENTRY_DECLARATION
                   s.P = node_border(n, s.N);
                 }
               }
-            }
+            //}
           }
         }
       }

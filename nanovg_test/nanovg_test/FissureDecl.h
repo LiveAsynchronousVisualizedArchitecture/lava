@@ -318,15 +318,6 @@ public:
   }
   auto          slot(u64 sIdx) -> Slot& 
   {
-    //static Slot slot_error(0,false);  // = { {0,0}, 0, {0,0}, false, Slot::SLOT_ERROR };
-    //
-    //if(sIdx<m_slots.size())
-    //
-    //else{
-    //  slot_error.state = Slot::SLOT_ERROR;
-    //  return slot_error;
-    //}
-
     return m_slots[sIdx];
   }
   auto     nodeSlots(u64 id) -> decltype(m_nodeSlots.find(id))
@@ -492,6 +483,14 @@ struct FisData
 
 
 
+//static Slot slot_error(0,false);  // = { {0,0}, 0, {0,0}, false, Slot::SLOT_ERROR };
+//
+//if(sIdx<m_slots.size())
+//
+//else{
+//  slot_error.state = Slot::SLOT_ERROR;
+//  return slot_error;
+//}
 
 //void       delNode(u64 id)
 //{
