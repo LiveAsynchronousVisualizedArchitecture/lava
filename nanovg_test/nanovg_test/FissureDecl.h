@@ -141,12 +141,15 @@ public:
     struct { u64 id : 48; u64 idx : 16; };
     u64 asInt;
 
-    bool operator<(Id const& r){
+    Id() : id(0), idx(0) {}
+    Id(u64 _id) : id(_id), idx(0) {}
+
+    bool   operator==(Id  r) const { return id==r.id && idx==r.idx; }
+    bool    operator<(Id const& r) const {
       if(id==r.id) return idx < r.idx;
       else         return id  < r.id;
     }
-
-    size_t operator()(Id const& _id){
+    size_t operator()(Id const& _id) const {
       return std::hash<u64>()(_id.id) ^ std::hash<u64>()(_id.idx);
     }
   };
@@ -158,6 +161,7 @@ public:
   using SrcMap       = std::multimap<Id, Id>;           // maps connections from their single source slot to their one or more destination slots
   using vec_nptrs    = std::vector<Node*>;
   using vec_cnptrs   = std::vector<Node const*>;
+  using vec_ids      = std::vector<Id>;
 
   //using CnctMap      = std::multimap<u32, u32>;            // maps connections from their single source slot to their one or more destination slots
   //using SrcMap       = std::unordered_map<u32, u32>;       // maps connections from their single destination slot to their single source slot 
@@ -167,14 +171,14 @@ public:
   //using NodeSlotMap  = std::multimap<u64, u64>;            // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used.
 
 private:
-  u64                m_nxtId;             // nxtId is next id - a counter for every node created that only increases, giving each node a unique id
+  u64                m_nxtId;               // nxtId is next id - a counter for every node created that only increases, giving each node a unique id
   NodeMap            m_nodes;
   NodeIdMap            m_ids;
-  vec<bool>       m_selected;             // bitfield for selected nodes
   Slots              m_slots;
-  CnctMap         m_outCncts;
-  SrcMap           m_inCncts;
+  CnctMap            m_cncts;
+  SrcMap         m_destCncts;
 
+  //vec<bool>       m_selected;             // bitfield for selected nodes
   //vec_slot           m_slots;
   //SlotIdxs           m_slots;
   //NodeSlotMap    m_nodeSlots;
@@ -186,12 +190,12 @@ private:
 
     m_nodes     = move(rval.m_nodes); 
     m_ids       = move(rval.m_ids);
-    m_selected  = move(rval.m_selected); 
     m_slots     = move(rval.m_slots); 
-    m_nodeSlots = move(rval.m_nodeSlots); 
-    m_outCncts  = move(rval.m_outCncts); 
-    m_inCncts   = move(rval.m_inCncts);
+    m_cncts  = move(rval.m_cncts); 
+    m_destCncts   = move(rval.m_destCncts);
 
+    //m_slots     = move(rval.m_slots); 
+    //m_selected  = move(rval.m_selected); 
     //m_bnds      = move(rval.m_bnds); 
   }
   u64            nxt(){ return m_nxtId++; }
@@ -212,15 +216,27 @@ private:
 
     return nds;                                         // counting on RVO (return value optimization) here
   }
-  auto nodeDestSlots(vec_nptrs const& nds) -> vecui
+  auto nodeDestSlots(vec_nptrs const& nds) -> vec_ids
   {
-    vecui sidxs;                                        // sidxs is slot indexes
-    for(auto np : nds){                                 // np is node pointer and nds is nodes
-      auto si = m_nodeSlots.find(np->id);               // si is slot iterator
-      if(si != end(m_nodeSlots)){
-        auto sidx = si->second;
-        if(slot(sidx).in) sidxs.push_back(sidx);
+    using namespace std;
+    
+    //vecui sidxs;                                            // sidxs is slot indexes
+    vec_ids sidxs;                                            // sidxs is slot indexes
+    for(auto np : nds){                                     // np is node pointer and nds is nodes
+      auto si = lower_bound(ALL(m_slots), Id(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
+      if(si != end(m_slots)  &&  si->first.id == np->id){
+        Slot& s = si->second;
+        if(s.in) sidxs.push_back(si->first);
+
+        //auto sidx = si->second;
+        //if(slot(sidx).in) sidxs.push_back(sidx);
       }
+
+      //auto si = m_slots.find(np->id);                   // si is slot iterator
+      //if(si != end(m_slots)){
+      //  auto sidx = si->second;
+      //  if(slot(sidx).in) sidxs.push_back(sidx);
+      //}
     }
     return sidxs;                                        // RVO
   }
@@ -256,7 +272,9 @@ public:
     }
 
     // delete slots
-    for(auto sidx : sidxs){ m_slots.erase( m_slots.begin() + sidx ); }
+    for(auto sidx : sidxs){ m_slots.erase(sidx); }
+    //m_slots.erase(ALL(sidxs));
+    //for(auto sidx : sidxs){ m_slots.erase( m_slots.begin() + sidx ); }
 
     // delete nodes
     for(auto n : nds){
@@ -341,61 +359,81 @@ public:
   {
     //if(s.nidx < m_nodes.size
 
-    m_slots.push_back(s);
-    u64 slotIdx = (u64)(m_slots.size() - 1);
+    //m_slots.push_back(s);
+    //{s.nid,1}
+    Id id(s.nid);
+    id.idx = 1;
+    m_slots.insert({id, s}); // todo: make this find the last slot idx and make it sequential
 
-    auto iter = m_nodeSlots.insert({s.nid, slotIdx});
-    
-    return slotIdx;
+    //u64 slotIdx = (u64)(m_slots.size() - 1);
+    //auto iter = m_slots.insert({s.nid, slotIdx});
+    //return slotIdx;
+
+    return 0;
   }
-  bool       hasSlot(u64 sIdx)
+  //bool       hasSlot(u64 sIdx)
+  //{
+  //  return sIdx < m_slots.size();
+  //}
+  auto          slot(Id id) -> Slot*
   {
-    return sIdx < m_slots.size();
+    auto si = m_slots.find(id);
+    if(si == m_slots.end()) return nullptr;   // errorSlot();
+
+    return &si->second;
+    //return m_slots[sIdx];
   }
-  auto          slot(u64 sIdx) -> Slot& 
+  //auto          slot(u64 sIdx) -> Slot& 
+  //{
+  //  return m_slots[sIdx];
+  //}
+  auto     nodeSlots(u64 id) -> decltype(m_slots.find(id))
   {
-    return m_slots[sIdx];
-  }
-  auto     nodeSlots(u64 id) -> decltype(m_nodeSlots.find(id))
-  {
-    auto iter = m_nodeSlots.find(id);
+    auto iter = m_slots.find(id);
     return iter;
   }
   auto         slots() -> Slots& { return m_slots; }
   auto         slots() const -> Slots const& { return m_slots; }
   auto      getSlots() -> Slots& { return m_slots; }
-  auto       srcSlot(u32 destSlotIdx) -> struct Slot* 
+  auto       srcSlot(Id destId) -> Slot* 
   {
-    auto ci = m_inCncts.find(destSlotIdx);
-    if(ci != m_inCncts.end()){
-      struct Slot& s = slot(ci->second);
-      return &s;
+    auto ci = m_cncts.find(destId);
+    if(ci != m_cncts.end()){
+      Slot* s = slot(ci->second);
+      return s;
     }else 
       return nullptr;
+
+    //auto ci = m_inCncts.find(destId);
+    //if(ci != m_inCncts.end()){
+    //  Slot* s = slot(ci->second);
+    //  return s;
+    //}else 
+    //  return nullptr;
   }
-  auto     destSlots(u32 srcSlotIdx) -> decltype(m_outCncts.end())
+  auto     destSlots(Id srcId) -> decltype(m_destCncts.find(srcId))
   {
-    return m_outCncts.find(srcSlotIdx);
+    return m_destCncts.find(srcId);
   }
-  auto       slotEnd() -> decltype(m_nodeSlots.end()) { return m_nodeSlots.end(); }
+  auto       slotEnd() -> decltype(m_slots.end()) { return m_slots.end(); }
   u64            ssz() const { return m_slots.size(); }
 
   void       addCnct(u32 src, u32 dest)
   {
-    auto srcIter = m_inCncts.find(dest);
-    if(srcIter != m_inCncts.end()){
-      m_outCncts.erase(src);
-      m_inCncts.erase(dest);
+    auto srcIter = m_destCncts.find(dest);
+    if(srcIter != m_destCncts.end()){
+      m_cncts.erase(src);
+      m_destCncts.erase(dest);
     }
 
-    m_outCncts.insert({src, dest});
-    m_inCncts.insert({dest, src});
+    m_cncts.insert({src, dest});
+    m_destCncts.insert({dest, src});
   }
   void    toggleCnct(u32 src, u32 dest)
   {
     if( delCnct(src,dest)==0 ){
-      m_outCncts.insert({src, dest});
-      m_inCncts.insert({dest, src});
+      m_cncts.insert({src, dest});
+      m_destCncts.insert({dest, src});
     }
 
     //auto srcIter = m_inCncts.find(dest);
@@ -417,54 +455,67 @@ public:
     //
     //m_outCncts.erase(src);
   }
-  u32        delCnct(u32 src, u32 dest)
+  u32        delCnct(Id src, Id dest)
   {
     u32 cnt=0;
-    auto srcIter = m_inCncts.find(dest);
-    if(srcIter != m_inCncts.end())
+    auto srcIter = m_destCncts.find(dest);
+    if(srcIter != m_destCncts.end())
     {
-      auto iter = m_outCncts.find(src);
-      for(; iter != m_outCncts.end() && iter->first==src; ){
+      auto iter = m_cncts.find(src);
+      for(; iter != m_cncts.end() && iter->first == src; ){
         auto cpy = iter;
         ++iter;
         if(cpy->second == dest){
-          m_outCncts.erase(cpy);
+          m_cncts.erase(cpy);
           ++cnt;
         }
       }
-      m_inCncts.erase(dest);
+      m_destCncts.erase(dest);
     }
 
     return cnt;
   }
-  bool   delDestCnct(u32 dest)
+  bool   delDestCnct(Id dest)
   {
-    auto iter = m_inCncts.find(dest);
-    if(iter == m_inCncts.end()) return false;
+    auto iter = m_destCncts.find(dest);
+    if(iter == m_destCncts.end()) return false;
 
     auto src = iter->second;
     delCnct(src, iter->first);
 
     return true;
   }
-  auto       cnctEnd() -> decltype(m_outCncts.end())  { return m_outCncts.end(); }
-  auto     cnctBegin() -> decltype(m_outCncts.begin()) { return m_outCncts.begin(); }
-  auto         cncts() -> CnctMap& { return m_outCncts; }
-  auto         cncts() const -> CnctMap const& { return m_outCncts; }
-  u64         cnctsz() const { return m_outCncts.size(); }
-  u32        delCnct(u64 sltIdx)
+  //bool   delDestCnct(u32 dest)
+  //{
+  //  auto iter = m_inCncts.find(dest);
+  //  if(iter == m_inCncts.end()) return false;
+  //
+  //  auto src = iter->second;
+  //  delCnct(src, iter->first);
+  //
+  //  return true;
+  //}
+  auto   destCnctEnd() -> decltype(m_destCncts.end())  { return m_destCncts.end(); }
+  auto       cnctEnd() -> decltype(m_cncts.end())  { return m_cncts.end(); }
+  auto     cnctBegin() -> decltype(m_cncts.begin()) { return m_cncts.begin(); }
+  auto         cncts() -> CnctMap& { return m_cncts; }
+  auto         cncts() const -> CnctMap const& { return m_cncts; }
+  u64         cnctsz() const { return m_cncts.size(); }
+  u32        delCnct(Id id)
   {
-    u32 cnt=0;
-    Slot& s = slot(sltIdx);
-    if(s.in){
-      auto iter = m_inCncts.find(sltIdx);
+    u32 cnt = 0;
+    Slot* s = slot(id);
+    if(!s) return 0;
+
+    if(s->in){
+      auto iter = m_destCncts.find(id);
       return delCnct(iter->second, iter->first);
     }else{
-      auto iter = m_outCncts.find(sltIdx);
+      auto iter = m_cncts.find(id);
       auto  idx = iter->first;
-      while(iter != m_outCncts.end() && iter->first == idx){
-        m_inCncts.erase(iter->second);
-        iter = m_outCncts.erase(iter);
+      while(iter != m_cncts.end() && iter->first == idx){
+        m_destCncts.erase(iter->second);
+        iter = m_cncts.erase(iter);
         ++cnt;
       }
     }
@@ -477,19 +528,20 @@ public:
   void    clearSels()
   {
     for(auto& on : m_nodes) on.second.sel = false;
-    for(auto& slt : m_slots) slt.state = Slot::NORMAL;
+    //for(auto& slt : m_slots) slt.state = Slot::NORMAL;
   }
-  u64         selsz() const { return m_selected.size(); }
-  i32         order(u64 id){ return node(id).order; }
+  //u64         selsz() const { return m_selected.size(); }
+  u64         order(u64 id){ return node(id).order; }
   void        clear()
   {
     m_nodes.clear();
     m_ids.clear();
-    m_selected.clear();
     m_slots.clear();
-    m_nodeSlots.clear();
-    m_outCncts.clear();
-    m_inCncts.clear();
+    m_cncts.clear();
+    m_destCncts.clear();
+
+    //m_slots.clear();
+    //m_selected.clear();
   }
 };
 

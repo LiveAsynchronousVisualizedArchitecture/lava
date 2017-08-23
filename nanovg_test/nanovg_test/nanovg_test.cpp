@@ -47,13 +47,16 @@
 // -todo: test loading - seems to work
 // -todo: make selected a boolean in the Node struct since there is no linear ordering with the node being a map based on order with access based on an unordered_map based on id
 // -todo: test node deletions again - slot deletion is problematic due to linear indexing
-
-// todo: investigate making slots into an unordered set - is this neccesary for proper slot deletion?  what data and access is needed ?
+// -todo: investigate making slots into an unordered set - is this neccesary for proper slot deletion?  what data and access is needed ?
 //       |- a slot struct has a node id associated with it - a node can have multiple slots - slots are going to be accessed by the node id they are attached to - slots can not exist without a node - a node.id to slot multi-map should hold all the slots?
 //       |- how do connections access the slots? they have a slot index - should slots have a unique Id also? - if slots are deleted in the linear indexed vector, all their positions change and their indices are invalidated 
 //       |- slots don't need to be ordered - need to be accessed by their own id and by their node id - if slots are always part of a particular node, should their id be a subset of the nodeID? should there only be one id between them? - should one struct hold a 48 bit integer and a 16 bit integer for slots?
 //       |- when drawing slots, use a ranged lookup (lower_bound) to find all slots that have that the same node? 
 //       |- lookup slots when drawing by a multi-map of slotId -> to nodeOrder - look up actual slots with an Id to slot unordered_map
+
+// todo: debug slots not drawing
+// todo: make addSlot check for current slots to make its slot index sequential
+// todo: redo clearSelected loop over slots
 // todo: make saving, normalize the node id numbers 
 // todo: make loading find the highest node id and set the current id of the GraphDB
 // todo: make function to draw a bezier from one slot to another with normals
@@ -344,7 +347,8 @@ str           graphToStr(GraphDB const& g)
     Jzon::Node src  = Jzon::array();
     Jzon::Node dest = Jzon::array();
 
-    for(auto& s : g.slots()){
+    for(auto kv : g.slots()){
+      auto& s = kv.second;
       if(s.in) dest.add(s.nid);
       else     src.add(s.nid);
     }
@@ -361,8 +365,8 @@ str           graphToStr(GraphDB const& g)
     Jzon::Node dest = Jzon::array();
 
     for(auto kv : g.cncts()){
-      src.add(kv.first);
-      dest.add(kv.second);
+      src.add(kv.first.asInt);
+      dest.add(kv.second.asInt);
     }
 
     jcncts.add("src",   src);
@@ -1489,7 +1493,7 @@ ENTRY_DECLARATION
           TO(grph.ssz(), i)
           {
             if(lftClkDn){  //lftDn && !prevLftDn)
-              Slot&    s = grph.slot(i);
+              Slot&    s = *(grph.slot(i));
               bool inSlt = len(pntr - s.P) < io_rad;
               if(inSlt){
                 outClk  = (i32)i;
@@ -1501,7 +1505,7 @@ ENTRY_DECLARATION
                 clearSelections = false;
               }
             }else if(lftClkUp){
-              Slot&    s = grph.slot(i);
+              Slot&    s = *(grph.slot(i));
               bool inSlt = len(pntr - s.P) < io_rad;
               if(inSlt) clearSelections = false;
             }
@@ -1582,9 +1586,12 @@ ENTRY_DECLARATION
         }
         SECTION(slot movement)
         {
-          TO(grph.ssz(),i)
+          //TO(grph.ssz(),i)
+          for(auto kv : grph.slots())
           {
-            Slot& s      = grph.slot(i);
+            //auto sp = grph.slot(i);
+            //Slot& s      = *(grph.slot(i));
+            Slot&     s = kv.second;
             auto    nid = s.nid;
             //if(nid < grph.nsz())
             //{
@@ -1593,7 +1600,8 @@ ENTRY_DECLARATION
               v2 nP = n.P + NODE_SZ/2;
               
               if(s.in){                                              // dest / in / blue slots
-                Slot* src = grph.srcSlot(i);
+                //Slot* src = grph.srcSlot(i);
+                Slot* src = grph.srcSlot(kv.first);
                 if(src){
                   auto srcNdP = grph.node(src->nid).P + NODE_SZ/2;
                   s.P = node_border(n, srcNdP - nP, &nrml);
@@ -1603,17 +1611,17 @@ ENTRY_DECLARATION
                   s.N = {0,-1.f};
                 }
               }else{
-                auto ci = grph.destSlots(i);
-                if(ci == grph.cnctEnd()){
+                auto ci = grph.destSlots(kv.first);
+                if(ci == grph.destCnctEnd()){
                   s.P = node_border(n, v2(0,s.in? -1.f : 1.f), &nrml);
                   s.N = nrml;
                 }else{
                   v2  destP={0,0}, destN={0,0};
                   int   cnt = 0;
-                  for(; ci != grph.cnctEnd() && ci->first==i; ++cnt, ++ci){
-                    if(!grph.hasSlot(ci->second)){ cnt -= 1; continue; }   // todo: does this need to subtract 1 from count?
+                  for(; ci != grph.destCnctEnd() && ci->first==nid; ++cnt, ++ci){
+                    if(!grph.slot(ci->second)){ cnt -= 1; continue; }   // todo: does this need to subtract 1 from count?
 
-                    v2 curP = grph.slot(ci->second).P;
+                    v2 curP = grph.slot(ci->second)->P;
                     destP  += curP; 
                     destN  += norm(curP - nP);
                   }
@@ -1638,12 +1646,12 @@ ENTRY_DECLARATION
             for(auto ci = grph.cnctBegin(); ci != en; )
             {
               auto     srcIdx = ci->first;
-              Slot const& src = grph.slot(srcIdx);
+              Slot const& src = *(grph.slot(srcIdx));
               auto      count = grph.cncts().count(ci->first);
               
               if(count==1)
               {
-                Slot const& dest = grph.slot(ci->second);
+                Slot const& dest = *(grph.slot(ci->second));
                 f32  halfx = lerp(.5f, src.P.x, dest.P.x);
                 f32  halfy = lerp(.5f, src.P.y, dest.P.y);
                 f32   dist = len(src.P - dest.P);
@@ -1664,9 +1672,9 @@ ENTRY_DECLARATION
                 v2 avgP=src.P; v2 avgN={0,0}; u32 cnt=0;
                 auto avgIter=ci;
                 for(; avgIter!=en && avgIter->first == srcIdx; ++avgIter, ++cnt){
-                  if(!grph.hasSlot(avgIter->second)){ --cnt; continue; }
+                  if(!grph.slot(avgIter->second)){ --cnt; continue; }
 
-                  Slot const& dest = grph.slot(avgIter->second);
+                  Slot const& dest = *(grph.slot(avgIter->second));
                   avgP += dest.P;
                   avgP += src.P;
                   //avgN += norm(dest.P
@@ -1693,7 +1701,7 @@ ENTRY_DECLARATION
 
                 for(auto dhIter=ci; ci!=en && ci->first == srcIdx; ++ci){   // dhIter is draw half iterator - this is where the the connections are drawn from the average position of all slots 
                   const v2 hlfsz = io_rad/2.f;
-                  Slot const& dest = grph.slot(ci->second);
+                  Slot const& dest = *(grph.slot(ci->second));
 
                   f32  halfx = lerp(.5f, dest.P.x, avgP.x);
                   f32  halfy = lerp(.5f, dest.P.y, avgP.y);
@@ -1749,8 +1757,9 @@ ENTRY_DECLARATION
                 auto sIter = grph.nodeSlots(n.id);            // sIter is slot iterator
                 for(; sIter!=grph.slotEnd() && sIter->first==n.id; ++sIter)
                 {
-                  auto     sIdx = sIter->second;                    // sIdx is slot index
-                  Slot const& s = grph.slot(sIdx);
+                  //auto     sIdx = sIter->second;                    // sIdx is slot index
+                  auto     sIdx = sIter->first;                    // todo: needs to be redone
+                  Slot const& s = *(grph.slot(sIdx));
                   bool   inSlot = len(pntr - s.P) < io_rad;
                 
                   Slot::State drawState = Slot::NORMAL;
