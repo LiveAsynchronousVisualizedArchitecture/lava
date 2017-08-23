@@ -136,23 +136,48 @@ using vec_slot     =    vec<Slot>;
 class  GraphDB
 {
 public:
-  using NodeMap      = std::map<u64, Node>;                // maps an order to a Node struct
-  using NodeIdMap    = std::unordered_map<u64, u64>;       // maps a node id to its order, which can be used to find the node in the NodeMap
-  using NodeSlotMap  = std::multimap<u64, u64>;            // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used.
-  using CnctMap      = std::multimap<u32, u32>;            // maps connections from their single source slot to their one or more destination slots
-  using SrcMap       = std::unordered_map<u32, u32>;       // maps connections from their single destination slot to their single source slot 
+  union Id                                                 // this Id serves as both a nodeId and slot index, since a slot index will alway coordinate with only one node 
+  {    
+    struct { u64 id : 48; u64 idx : 16; };
+    u64 asInt;
+
+    bool operator<(Id const& r){
+      if(id==r.id) return idx < r.idx;
+      else         return id  < r.id;
+    }
+
+    size_t operator()(Id const& _id){
+      return std::hash<u64>()(_id.id) ^ std::hash<u64>()(_id.idx);
+    }
+  };
+
+  using NodeMap      = std::map<u64, Node>;             // maps an order to a Node struct
+  using NodeIdMap    = std::unordered_map<u64, u64>;    // maps a node id to its order, which can be used to find the node in the NodeMap
+  using Slots        = std::multimap<Id, Slot>;         // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
+  using CnctMap      = std::unordered_map<Id, Id, Id>;  // Id is the hash function object in the third template argument - maps connections from their single destination slot to their single source slot 
+  using SrcMap       = std::multimap<Id, Id>;           // maps connections from their single source slot to their one or more destination slots
   using vec_nptrs    = std::vector<Node*>;
   using vec_cnptrs   = std::vector<Node const*>;
+
+  //using CnctMap      = std::multimap<u32, u32>;            // maps connections from their single source slot to their one or more destination slots
+  //using SrcMap       = std::unordered_map<u32, u32>;       // maps connections from their single destination slot to their single source slot 
+  //using NodeSlotMap  = std::multimap<Id, u64>;             // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
+  //using SlotIdxs     = std::set<Id>;
+  //using SlotMap
+  //using NodeSlotMap  = std::multimap<u64, u64>;            // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used.
 
 private:
   u64                m_nxtId;             // nxtId is next id - a counter for every node created that only increases, giving each node a unique id
   NodeMap            m_nodes;
   NodeIdMap            m_ids;
   vec<bool>       m_selected;             // bitfield for selected nodes
-  vec_slot           m_slots;
-  NodeSlotMap    m_nodeSlots;
+  Slots              m_slots;
   CnctMap         m_outCncts;
   SrcMap           m_inCncts;
+
+  //vec_slot           m_slots;
+  //SlotIdxs           m_slots;
+  //NodeSlotMap    m_nodeSlots;
 
   void          init(){}
   void            mv(GraphDB&& rval)
@@ -242,7 +267,7 @@ public:
     return cnt;
   }
 
-  auto        addNode(Node n, bool newId=true) -> Node&
+  auto       addNode(Node n, bool newId=true) -> Node&
   {
     if(newId) n.id = nxt();
 
@@ -336,9 +361,9 @@ public:
     auto iter = m_nodeSlots.find(id);
     return iter;
   }
-  auto         slots() -> vec_slot& { return m_slots; }
-  auto         slots() const -> vec_slot const& { return m_slots; }
-  auto      getSlots() -> vec_slot& { return m_slots; }
+  auto         slots() -> Slots& { return m_slots; }
+  auto         slots() const -> Slots const& { return m_slots; }
+  auto      getSlots() -> Slots& { return m_slots; }
   auto       srcSlot(u32 destSlotIdx) -> struct Slot* 
   {
     auto ci = m_inCncts.find(destSlotIdx);
@@ -493,6 +518,16 @@ struct FisData
 
 
 
+//static Id nxtId()
+//{
+//  static u64 curId = 1;
+//
+//  Id ret;
+//  ret.id  = curId++;
+//  ret.idx = 0;
+//
+//  return ret;
+//}
 
 //static Slot slot_error(0,false);  // = { {0,0}, 0, {0,0}, false, Slot::SLOT_ERROR };
 //

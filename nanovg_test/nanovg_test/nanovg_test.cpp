@@ -51,7 +51,11 @@
 // todo: investigate making slots into an unordered set - is this neccesary for proper slot deletion?  what data and access is needed ?
 //       |- a slot struct has a node id associated with it - a node can have multiple slots - slots are going to be accessed by the node id they are attached to - slots can not exist without a node - a node.id to slot multi-map should hold all the slots?
 //       |- how do connections access the slots? they have a slot index - should slots have a unique Id also? - if slots are deleted in the linear indexed vector, all their positions change and their indices are invalidated 
-//       |- slots don't need to be ordered - need to be accessed by their own id and by their node id - if slots are always part of a particular node, should their id be a subset of the nodeID? should there only be one id between them?
+//       |- slots don't need to be ordered - need to be accessed by their own id and by their node id - if slots are always part of a particular node, should their id be a subset of the nodeID? should there only be one id between them? - should one struct hold a 48 bit integer and a 16 bit integer for slots?
+//       |- when drawing slots, use a ranged lookup (lower_bound) to find all slots that have that the same node? 
+//       |- lookup slots when drawing by a multi-map of slotId -> to nodeOrder - look up actual slots with an Id to slot unordered_map
+// todo: make saving, normalize the node id numbers 
+// todo: make loading find the highest node id and set the current id of the GraphDB
 // todo: make function to draw a bezier from one slot to another with normals
 // todo: debug flashing connections - possibly due to numeric error handling - have to repeat first
 // todo: redo delNode()
@@ -1245,6 +1249,9 @@ ENTRY_DECLARATION
   {
     SECTION(test data init)
     {
+      //GraphDB::Id id;
+      //printf("\n sizeof(GraphDB::Id): %d \n", sizeof(GraphDB::Id) );
+
       io_rad = IORAD;
 
       // nodes
