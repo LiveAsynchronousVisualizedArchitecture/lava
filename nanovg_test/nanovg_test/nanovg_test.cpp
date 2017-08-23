@@ -39,11 +39,14 @@
 // -todo: make main loop use an array of node pointers
 // -todo: make bounds be properly set in main loop
 // -todo: fix srcSlot() function to fix slot movement so that in/dest slot ends up on the node - actual problem was that the node id was being compared to nsz() so ever increasing node IDs quickly go out of the bounds of the size of the node structure
+// -todo: test saving 
+// -todo: test connection drawing 
+// -todo: test multiple nodes
+// -todo: make sure NodeSlotMap is a map from a node Id to a slot index and not from a node index to a slot index - if Slot::id is a node id then the NodeSlotMap will be a node.id -> slotIdx map
+// -todo: debug file save not writing node four text and writing an empty string - needed to use the node pointer vector or iterate over nodes - using an index won't get all the nodes because they are looked up by ID now
 
-// todo: test connection drawing 
-// todo: test multiple nodes
-// todo: make sure NodeSlotMap is a map from a node Id to a slot index and not from a node index to a slot index
-// todo: investigate making slots into an unordered set
+// todo: test loading
+// todo: investigate making slots into an unordered set - is this neccesary for proper slot deletion?
 // todo: make selected a boolean in the Node struct since there is no linear ordering with the node being a map based on order with access based on an unordered_map based on id
 // todo: redo delNode()
 // todo: make one node snap to another node
@@ -158,21 +161,21 @@ static FisData fd;
 
 namespace{
 
-template<class T> 
-void MoveToBack(T* v, ui64 i)
-{
-  using namespace std;
-  
-  auto&  a = *v;
-  auto  sz = a.size();
-  auto tmp = move(a[i]);
-
-  //move_backward(a.front()+i+1ul, a.back(), a.back()-1);
-  for(auto j=i; j<sz-1; ++j)
-    a[j] = move( a[j+1] );
-  
-  a[sz-1] = tmp;
-}
+//template<class T> 
+//void MoveToBack(T* v, ui64 i)
+//{
+//  using namespace std;
+//  
+//  auto&  a = *v;
+//  auto  sz = a.size();
+//  auto tmp = move(a[i]);
+//
+//  //move_backward(a.front()+i+1ul, a.back(), a.back()-1);
+//  for(auto j=i; j<sz-1; ++j)
+//    a[j] = move( a[j+1] );
+//  
+//  a[sz-1] = tmp;
+//}
 
 float               lerp(float p, float lo, float hi)
 {
@@ -287,7 +290,7 @@ v2        angleToNormal(f32 angle)
   return { cos(angle), sin(angle) };
 }
 
-// serialize to and from json
+// serialize to and from json - put in FisTfm.hpp file?
 str           graphToStr(GraphDB const& g)
 {
   using namespace std;
@@ -296,20 +299,25 @@ str           graphToStr(GraphDB const& g)
   SECTION(nodes)
   {
     //auto sz = nodes.size();
-    auto sz = g.nsz();
+    auto ndp = g.nodes();
+    auto  sz = g.nsz();
 
     Jzon::Node  nd_txt = Jzon::array();
-    TO(sz,i) nd_txt.add(g.node(i).txt);
+    TO(sz,i) nd_txt.add(ndp[i]->txt);
+    //TO(sz,i) nd_txt.add(g.node(i).txt);
     //TO(sz,i) nd_txt.add(nodes[i].txt);
 
     Jzon::Node    nd_x = Jzon::array();
-    TO(sz,i) nd_x.add(g.node(i).P.x);
+    TO(sz,i) nd_x.add(ndp[i]->P.x);
+    //TO(sz,i) nd_x.add(g.node(i).P.x);
 
     Jzon::Node    nd_y = Jzon::array();
-    TO(sz,i) nd_y.add(g.node(i).P.y);
+    TO(sz,i) nd_y.add(ndp[i]->P.y);
+    //TO(sz,i) nd_y.add(g.node(i).P.y);
 
     Jzon::Node nd_type = Jzon::array();
-    TO(sz,i) nd_type.add(g.node(i).type);
+    TO(sz,i) nd_type.add(ndp[i]->type);
+    //TO(sz,i) nd_type.add(g.node(i).type);
 
     //Jzon::Node ordr = Jzon::array();
     //TO(sz,i) ordr.add(nd_ordr[i]);
@@ -1236,14 +1244,14 @@ ENTRY_DECLARATION
       // nodes
       Node& n0 = fd.grph.addNode( Node("one",   Node::FLOW, {400.f,300.f}) );
       Node& n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
-      //fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
-      //fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
+      Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
+      Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
 
       // slots
       fd.grph.addSlot( Slot(n0.id, false) );
       fd.grph.addSlot( Slot(n1.id,  true) );
-      //fd.grph.addSlot( Slot(2,  true) );
-      //fd.grph.addSlot( Slot(3,  true) );
+      fd.grph.addSlot( Slot(n2.id,  true) );
+      fd.grph.addSlot( Slot(n3.id,  true) );
 
       //fd.grph.addCnct(0, 1);
       //fd.grph.addCnct(0, 2);

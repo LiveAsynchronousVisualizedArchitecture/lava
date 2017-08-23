@@ -142,6 +142,7 @@ public:
   using CnctMap      = std::multimap<u32, u32>;            // maps connections from their single source slot to their one or more destination slots
   using SrcMap       = std::unordered_map<u32, u32>;       // maps connections from their single destination slot to their single source slot 
   using vec_nptrs    = std::vector<Node*>;
+  using vec_cnptrs   = std::vector<Node const*>;
 
 private:
   u64                m_nxtId;             // nxtId is next id - a counter for every node created that only increases, giving each node a unique id
@@ -292,6 +293,16 @@ public:
   auto         nodes() -> vec_nptrs
   {
     vec_nptrs nds;
+    nds.reserve(m_nodes.size());
+    for(auto& on : m_nodes){                            // on is order and node - order is on.first    node is on.second
+      nds.push_back(&on.second);
+    }
+
+    return nds;
+  }
+  auto         nodes() const -> vec_cnptrs  // these two versions could be done with a single template
+  {
+    vec_cnptrs nds;
     nds.reserve(m_nodes.size());
     for(auto& on : m_nodes){                            // on is order and node - order is on.first    node is on.second
       nds.push_back(&on.second);
