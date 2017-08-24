@@ -171,8 +171,8 @@ private:
   CnctMap            m_cncts;
   SrcMap         m_destCncts;
 
-  void          init(){}
-  void            mv(GraphDB&& rval)
+  void           init(){}
+  void             mv(GraphDB&& rval)
   {
     using namespace std;
 
@@ -186,8 +186,8 @@ private:
     //m_selected  = move(rval.m_selected); 
     //m_bnds      = move(rval.m_bnds); 
   }
-  u64            nxt(){ return m_nxtId++; }
-  u64       nxtOrder()
+  u64             nxt(){ return m_nxtId++; }
+  u64        nxtOrder()
   {
     u64 order = 1;
     if(m_nodes.size() > 0)
@@ -195,7 +195,7 @@ private:
 
     return order;
   }
-  auto selectedNodes() -> vec_nptrs
+  auto  selectedNodes() -> vec_nptrs
   {
     vec<Node*> nds;                                     // nids is node ids
     for(auto& on : m_nodes){                            // on is order and node - order is on.first    node is on.second
@@ -204,7 +204,7 @@ private:
 
     return nds;                                         // counting on RVO (return value optimization) here
   }
-  auto nodeDestSlots(vec_nptrs const& nds) -> vec_ids
+  auto  nodeDestSlots(vec_nptrs const& nds) -> vec_ids
   {
     using namespace std;
     
@@ -228,13 +228,12 @@ private:
     }
     return sidxs;                                        // RVO
   }
-
-  auto errorNode() -> Node&
+  auto      errorNode() -> Node&
   { // default contrutor sets the type to Node::NODE_ERROR
     static Node ERR_NODE;
     return ERR_NODE; 
   }
-  auto errorNode() const -> Node const&
+  auto      errorNode() const -> Node const&
   { // default contrutor sets the type to Node::NODE_ERROR
     static Node ERR_NODE;
     return ERR_NODE; 
@@ -500,6 +499,7 @@ public:
   void     clearSels()
   {
     for(auto& on : m_nodes) on.second.sel = false;
+    for(auto& kv : m_slots) kv.second.state = Slot::NORMAL;
     //for(auto& slt : m_slots) slt.state = Slot::NORMAL;
   }
   u64          order(u64 id){ return node(id).order; }

@@ -55,9 +55,11 @@
 //       |- lookup slots when drawing by a multi-map of slotId -> to nodeOrder - look up actual slots with an Id to slot unordered_map
 // -todo: debug slots not drawing - needed lower bound instead of exact search for node id
 // -todo: debug slot movement - needed to use a reference to the iterator so that the internal slot could be modified and wouldn't be copied
+// -todo: redo clearSelected loop over slots
+// -todo: put fps in the upper right corner
+// -todo: try gui button layout horizontal across the top
 
 // todo: make addSlot check for current slots to make its slot index sequential
-// todo: redo clearSelected loop over slots
 // todo: make saving, normalize the node id numbers 
 // todo: make loading find the highest node id and set the current id of the GraphDB
 // todo: make function to draw a bezier from one slot to another with normals
@@ -1331,7 +1333,8 @@ ENTRY_DECLARATION
     {
       fd.ui.screen.initialize(fd.win, false);
 
-      fd.ui.keyLay   = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
+      //fd.ui.keyLay   = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
+      fd.ui.keyLay   = new BoxLayout(Orientation::Horizontal, Alignment::Fill, 0,10);
       fd.ui.keyWin   = new Window(&fd.ui.screen,  "");
       auto spcr1     = new Label(fd.ui.keyWin,    "");
       auto spcr2     = new Label(fd.ui.keyWin,    "");
@@ -1802,9 +1805,10 @@ ENTRY_DECLARATION
             f32 tb = nvgTextBounds(vg, 10,0, fpsStr, NULL, NULL);
             nvgFontSize(vg, 15.0f);
             nvgFontFace(vg, "sans-bold");
-            nvgTextAlign(vg,  NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
+            //nvgTextAlign(vg,  NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
+            nvgTextAlign(vg,  NVG_ALIGN_RIGHT);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
             nvgFillColor(vg, nvgRGBA(255,255,255,255));
-            nvgText(vg, tb-40, 10, fpsStr, NULL);
+            nvgText(vg,  fd.ui.w - tb + 40, 10, fpsStr, NULL);
           }
           nvgEndFrame(vg);
         }
