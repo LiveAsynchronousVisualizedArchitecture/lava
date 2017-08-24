@@ -138,7 +138,10 @@ class  GraphDB
 public:
   union Id                                                 // this Id serves as both a nodeId and slot index, since a slot index will alway coordinate with only one node 
   {    
-    struct { u64 id : 48; u64 idx : 16; };
+    struct { 
+      u64 id  : 48;                                       // id is the node id number - This is a unique number for each node that doesn't change. It can refer back to a node since it doesn't represent an ordering or an index into an array 
+      u64 idx : 16;                                       // idx is the index of the slot - for a node this is 0
+    };
     u64 asInt;
 
     Id() : id(0), idx(0) {}
@@ -244,6 +247,7 @@ public:
   GraphDB(GraphDB&& rval){ mv(std::move(rval)); }
   GraphDB& operator=(GraphDB&& rval){ mv(std::move(rval)); return *this; }
 
+  // global
   u64    delSelected()
   {
     using namespace std;
@@ -271,7 +275,77 @@ public:
 
     return cnt;
   }
+  void     normalize()
+  {
+    using namespace std;
+    
+    // create a mapping of old node Ids to new ones, new ones will be their position + 1
+    vec<u64> nids;
+    nids.reserve(m_nodes.size());
+    for(auto& kv : m_nodes) nids.push_back(kv.first);
 
+    // connections 
+    CnctMap nxtCncts;
+    TO(nids.size(),i){
+      u64 nid = nids[i];
+      auto ci = m_cncts.find(Id(nid));
+      for(; ci != m_cncts.end() && ci->first.id==nid; ++ci){
+        Id nxtId(i+1);
+        nxtId.idx = ci->first.idx;
+        nxtCncts.insert({nxtId, move(ci->second)});
+      }
+    }
+    m_cncts = move(nxtCncts);
+
+    SrcMap nxtDestCncts;
+    TO(nids.size(),i){
+      u64 nid = nids[i];
+      auto ci = m_destCncts.find(Id(nid));
+      for(; ci != m_destCncts.end() && ci->first.id==nid; ++ci){
+        Id nxtId(i+1);
+        nxtId.idx = ci->first.idx;
+        nxtDestCncts.insert({nxtId, move(ci->second)});
+      }
+    }
+    m_destCncts = move(nxtDestCncts);
+
+    // slots
+    Slots nxtSlots;
+    TO(nids.size(),i){
+      u64 nid = nids[i];
+      auto si = m_slots.find(Id(nid));
+      for(; si != m_slots.end() && si->first.id==nid; ++si){
+        Id nxtId(i+1);
+        nxtId.idx = si->first.idx;
+        nxtSlots.insert({nxtId, move(si->second)});
+      }
+    }
+    m_slots = move(nxtSlots);
+
+    // and finally nodes
+    NodeMap nxtNodes;
+    TO(nids.size(),i){
+      u64 nid = nids[i];
+      auto ni = m_nodes.find(nid);
+      for(; ni != m_nodes.end() && ni->first==nid; ++ni){
+        u64 nxtId = i+1;
+        nxtNodes.insert({nxtId, move(ni->second)});
+      }
+    }
+    m_nodes = move(nxtNodes);
+
+    //for(auto& kv : m_cncts){
+    //  kv.first.id = 
+    //}
+    //
+
+    //binary_search(ALL(nids), val);
+
+    //for(auto nid : nids){
+    //m_cncts.erase(ci);
+  }
+
+  // nodes
   auto       addNode(Node n, bool newId=true) -> Node&
   {
     if(newId) n.id = nxt();
@@ -342,6 +416,7 @@ public:
   }
   u64            nsz() const { return m_nodes.size(); }
 
+  // slots
   u64        addSlot(Slot s)
   {
     //if(s.nidx < m_nodes.size

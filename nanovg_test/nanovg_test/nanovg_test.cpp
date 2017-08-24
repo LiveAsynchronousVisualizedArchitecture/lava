@@ -59,8 +59,10 @@
 // -todo: put fps in the upper right corner
 // -todo: try gui button layout horizontal across the top
 
+// todo: test connection drawing
+// todo: test node deletion
+// todo: make saving normalize the node id numbers - make normalize function
 // todo: make addSlot check for current slots to make its slot index sequential
-// todo: make saving, normalize the node id numbers 
 // todo: make loading find the highest node id and set the current id of the GraphDB
 // todo: make function to draw a bezier from one slot to another with normals
 // todo: debug flashing connections - possibly due to numeric error handling - have to repeat first
