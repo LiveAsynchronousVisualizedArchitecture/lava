@@ -145,7 +145,7 @@ public:
     u64 asInt;
 
     Id() : id(0), idx(0) {}
-    Id(u64 _id) : id(_id), idx(0) {}
+    Id(u64 _id, u64 _idx=0) : id(_id), idx(_idx) {}
 
     bool   operator==(Id  r) const { return id==r.id && idx==r.idx; }
     bool    operator<(Id const& r) const {
@@ -462,7 +462,7 @@ public:
   {
     auto si = m_slots.find(id);
     if(si == m_slots.end()) return nullptr;   // errorSlot();
-
+  
     return &si->second;
     //return m_slots[sIdx];
   }
@@ -485,7 +485,7 @@ public:
     }else 
       return nullptr;
   }
-  auto     destSlots(Id srcId) -> decltype(m_destCncts.find(srcId))
+  auto     destSlots(Id  srcId) -> decltype(m_destCncts.find(srcId))
   {
     return m_destCncts.find(srcId);
   }
@@ -493,46 +493,9 @@ public:
   u64            ssz() const { return m_slots.size(); }
 
   // connections
-  void       addCnct(u32 src, u32 dest)
-  {
-    auto srcIter = m_destCncts.find(dest);
-    if(srcIter != m_destCncts.end()){
-      m_cncts.erase(src);
-      m_destCncts.erase(dest);
-    }
-
-    m_cncts.insert({src, dest});
-    m_destCncts.insert({dest, src});
-  }
-  void    toggleCnct(u32 src, u32 dest)
-  {
-    if( delCnct(src,dest)==0 ){
-      m_cncts.insert({src, dest});
-      m_destCncts.insert({dest, src});
-    }
-
-    //auto srcIter = m_inCncts.find(dest);
-    //if(srcIter != m_inCncts.end()){
-    //  auto iter = m_outCncts.find(src);
-    //  for(; iter != m_outCncts.end() && iter->first==src; ){
-    //    auto cpy = iter;
-    //    ++iter;
-    //    if(cpy->second == dest) m_outCncts.erase(cpy);
-    //  }
-    //  m_inCncts.erase(dest);
-    //
-    //}else{
-
-    //m_outCncts.erase(src);
-    //
-    //if(iter != m_outCncts.end()){
-    //}
-    //
-    //m_outCncts.erase(src);
-  }
   u32        delCnct(Id  src, Id  dest)
   {
-    u32 cnt=0;
+    u32      cnt = 0;
     auto srcIter = m_destCncts.find(dest);
     if(srcIter != m_destCncts.end())
     {
@@ -559,6 +522,44 @@ public:
     delCnct(src, iter->first);
 
     return true;
+  }
+  void       addCnct(u32 src, u32 dest)
+  {
+    auto srcIter = m_destCncts.find(dest);
+    if(srcIter != m_destCncts.end()){
+      m_cncts.erase(src);
+      m_destCncts.erase(dest);
+    }
+
+    m_cncts.insert({src, dest});
+    m_destCncts.insert({dest, src});
+  }
+  //void    toggleCnct(u32 src, u32 dest)
+  void    toggleCnct(Id src, Id dest)
+  {
+    if( delCnct(src,dest)==0 ){
+      m_cncts.insert({src, dest});
+      m_destCncts.insert({dest, src});
+    }
+
+    //auto srcIter = m_inCncts.find(dest);
+    //if(srcIter != m_inCncts.end()){
+    //  auto iter = m_outCncts.find(src);
+    //  for(; iter != m_outCncts.end() && iter->first==src; ){
+    //    auto cpy = iter;
+    //    ++iter;
+    //    if(cpy->second == dest) m_outCncts.erase(cpy);
+    //  }
+    //  m_inCncts.erase(dest);
+    //
+    //}else{
+
+    //m_outCncts.erase(src);
+    //
+    //if(iter != m_outCncts.end()){
+    //}
+    //
+    //m_outCncts.erase(src);
   }
   auto   destCnctEnd() -> decltype(m_destCncts.end())  { return m_destCncts.end(); }
   auto       cnctEnd() -> decltype(m_cncts.end())  { return m_cncts.end(); }

@@ -62,6 +62,7 @@
 // -todo: make saving normalize the node id numbers - make normalize function
 // -todo: correct unconnected src slot drawing
 
+// todo: change global selection variables to be Id
 // todo: test and fix connection creation - crashes
 // todo: test node deletion
 // todo: make addSlot check for current slots to make its slot index sequential
@@ -79,6 +80,7 @@
 // todo: separate finding node the pointer is inside from the action to take
 
 
+// idea: make connections thicker when there is more data and brighter when there are more packets
 // idea: build in focus as information separate from selection
 // idea: draw message node slots as sliding angles
 // idea: make connection delete and create trigger when 1 or more in/dest slots are selected and 1 out/src slot is connected
@@ -153,6 +155,8 @@
 #include "../LavaNode.h"
 #include "FissureDecl.h"
 
+using Id = GraphDB::Id;
+
 char              winTitle[TITLE_MAX_LEN];
 int                premult = 0;
 Bnd                   nbnd;
@@ -166,8 +170,8 @@ float              ndOfstY;
 float                  ndx = 512.f;
 float                  ndy = 512.f;
 
-i32              slotInSel = -1;
-i32             slotOutSel = -1;
+Id               slotInSel;
+Id              slotOutSel;
 int                 priSel = -1;
 int                 secSel = -1;
 f32                 io_rad;
@@ -1500,21 +1504,25 @@ ENTRY_DECLARATION
         }
         SECTION(slot selection and connection creation)
         {
-          i32  inClk = -1;
-          i32 outClk = -1;
+          //i32  inClk = -1;
+          //i32 outClk = -1;
+          Id  inClk = -1;
+          Id outClk = -1;
           //TO(grph.ssz(), i)
           for(auto kv : grph.slots())
           {
-            auto   nid = kv.first.id;
+            //auto   nid = kv.first.id;
+            Id     sid = kv.first;                       // sid is slot id
             Slot&    s = kv.second;
             if(lftClkDn){  //lftDn && !prevLftDn)
               //Slot&    s = *(grph.slot(i));
               bool inSlt = len(pntr - s.P) < io_rad;
               if(inSlt){
-                outClk  = (i32)nid;
+                //outClk  = (i32)nid;
+                outClk  = sid;  // Id(nid);
                 s.state = Slot::SELECTED;
-                if(s.in) slotInSel  = nid;
-                else     slotOutSel = nid;
+                if(s.in) slotInSel  = sid; // Id(nid, );
+                else     slotOutSel = sid; // Id(nid, );
                 clearSelections = false;
               }
             }else if(lftClkUp){
@@ -1524,9 +1532,9 @@ ENTRY_DECLARATION
             }
           }
           
-          if(slotInSel>-1 && slotOutSel>-1){
+          if(slotInSel.idx>0 && slotOutSel.idx>0){
             grph.toggleCnct(slotOutSel, slotInSel);
-            slotOutSel = slotInSel = -1;
+            slotOutSel = slotInSel = Id(0,0);
             clear_selections(&grph);
             clearSelections = false;
           }
@@ -1600,51 +1608,54 @@ ENTRY_DECLARATION
         SECTION(slot movement)
         {
           //TO(grph.ssz(),i)
+          //
+          //auto sp = grph.slot(i);
+          //Slot& s      = *(grph.slot(i));
+          //
+          //if(nid < grph.nsz())
+          //{
+
           for(auto& kv : grph.slots())
           {
-            //auto sp = grph.slot(i);
-            //Slot& s      = *(grph.slot(i));
-            Slot&     s = kv.second;
-            auto    nid = s.nid;
-            //if(nid < grph.nsz())
-            //{
-              v2        nrml;
-              Node const& n = grph.node(nid);
-              v2 nP = n.P + NODE_SZ/2;
+            auto   nid = kv.first; // s.nid;
+            Slot&    s = kv.second;
+            v2    nrml;
+            Node const& n = grph.node(nid.id);
+            v2 nP = n.P + NODE_SZ/2;
               
-              if(!s.in){                                              // dest / in / blue slots
-                //Slot* src = grph.srcSlot(i);
-                Slot* src = grph.srcSlot(kv.first);
-                if(src){
-                  auto srcNdP = grph.node(src->nid).P + NODE_SZ/2;
-                  s.P = node_border(n, srcNdP - nP, &nrml);
-                  s.N = nrml;
-                }else{
-                  s.P = node_border(n, {0,1.f}, &nrml);
-                  s.N = {0,1.f};
-                }
+            if(!s.in){                                              // dest / in / blue slots
+              //Slot* src = grph.srcSlot(i);
+              Slot* src = grph.srcSlot(kv.first);
+              if(src){
+                auto srcNdP = grph.node(src->nid).P + NODE_SZ/2;
+                s.P = node_border(n, srcNdP - nP, &nrml);
+                s.N = nrml;
               }else{
-                auto ci = grph.destSlots(kv.first);
-                if(ci == grph.destCnctEnd()){
-                  //s.P = node_border(n, v2(0,s.in? -1.f : 1.f), &nrml);
-                  s.P = node_border(n, v2(0,-1.f), &nrml);
-                  s.N = nrml;
-                }else{
-                  v2  destP={0,0}, destN={0,0};
-                  int   cnt = 0;
-                  for(; ci != grph.destCnctEnd() && ci->first==nid; ++cnt, ++ci){
-                    if(!grph.slot(ci->second)){ cnt -= 1; continue; }   // todo: does this need to subtract 1 from count?
-
-                    v2 curP = grph.slot(ci->second)->P;
-                    destP  += curP; 
-                    destN  += norm(curP - nP);
-                  }
-                  destP /= (f32)cnt;
-                  destN /= (f32)cnt;
-                  s.N = norm(destN);
-                  s.P = node_border(n, s.N);
-                }
+                s.P = node_border(n, {0,1.f}, &nrml);
+                s.N = {0,1.f};
               }
+            }else{
+              auto ci = grph.destSlots(kv.first);
+              if(ci == grph.destCnctEnd()){
+                //s.P = node_border(n, v2(0,s.in? -1.f : 1.f), &nrml);
+                s.P = node_border(n, v2(0,-1.f), &nrml);
+                s.N = nrml;
+              }else{
+                v2  destP={0,0}, destN={0,0};
+                int   cnt = 0;
+                for(; ci != grph.destCnctEnd() && ci->first==nid; ++cnt, ++ci){
+                  if(!grph.slot(ci->second)){ cnt -= 1; continue; }   // todo: does this need to subtract 1 from count?
+
+                  v2 curP = grph.slot(ci->second)->P;
+                  destP  += curP; 
+                  destN  += norm(curP - nP);
+                }
+                destP /= (f32)cnt;
+                destN /= (f32)cnt;
+                s.N = norm(destN);
+                s.P = node_border(n, s.N);
+              }
+            }
             //}
           }
         }
@@ -1657,15 +1668,17 @@ ENTRY_DECLARATION
           SECTION(draw connections)
           {                                 // ci is connection iterator 
             auto en = grph.cnctEnd();
+            //for(auto const& ci : grph.cncts())
             for(auto ci = grph.cnctBegin(); ci != en; )
             {
-              auto     srcIdx = ci->first;
+              //auto     srcIdx = ci->first;
+              auto     srcIdx = ci->second;
               Slot const& src = *(grph.slot(srcIdx));
               auto      count = grph.cncts().count(ci->first);
               
               if(count==1)
               {
-                Slot const& dest = *(grph.slot(ci->second));
+                Slot const& dest = *(grph.slot(ci->first));
                 f32  halfx = lerp(.5f, src.P.x, dest.P.x);
                 f32  halfy = lerp(.5f, src.P.y, dest.P.y);
                 f32   dist = len(src.P - dest.P);
@@ -1679,7 +1692,7 @@ ENTRY_DECLARATION
                   nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
                 nvgStroke(vg);
 
-                ++ci; //continue;
+                //++ci; //continue;
               }
               else
               {
