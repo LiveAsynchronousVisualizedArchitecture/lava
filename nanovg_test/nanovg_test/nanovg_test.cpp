@@ -58,10 +58,12 @@
 // -todo: redo clearSelected loop over slots
 // -todo: put fps in the upper right corner
 // -todo: try gui button layout horizontal across the top
+// -todo: fix slot disappearing after normalization - find() with only a node id doesn't find the exact slot - need lower_bound through a call to nodeSlots()
+// -todo: make saving normalize the node id numbers - make normalize function
+// -todo: correct unconnected src slot drawing
 
-// todo: test connection drawing
+// todo: test and fix connection creation - crashes
 // todo: test node deletion
-// todo: make saving normalize the node id numbers - make normalize function
 // todo: make addSlot check for current slots to make its slot index sequential
 // todo: make loading find the highest node id and set the current id of the GraphDB
 // todo: make function to draw a bezier from one slot to another with normals
@@ -303,7 +305,7 @@ f32        normalToAngle(v2 N)
 {
   return atan2(N.y, N.x);
 }
-v2        angleToNormal(f32 angle)
+v2         angleToNormal(f32 angle)
 {
   return { cos(angle), sin(angle) };
 }
@@ -1265,13 +1267,13 @@ ENTRY_DECLARATION
 
       // nodes
       Node& n0 = fd.grph.addNode( Node("one",   Node::FLOW, {400.f,300.f}) );
-      //Node& n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
+      Node& n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
       //Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
       //Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
 
       // slots
       fd.grph.addSlot( Slot(n0.id, false) );
-      //fd.grph.addSlot( Slot(n1.id,  true) );
+      fd.grph.addSlot( Slot(n1.id,  true) );
       //fd.grph.addSlot( Slot(n2.id,  true) );
       //fd.grph.addSlot( Slot(n3.id,  true) );
 
@@ -1359,12 +1361,16 @@ ENTRY_DECLARATION
         }
       });
       saveBtn->setCallback([](){
+        fd.grph.normalizeIndices();
+
         nfdchar_t *outPath = NULL;
         nfdresult_t result = NFD_SaveDialog("lava", NULL, &outPath );
 
         //printf("\n\nfile dialog: %d %s \n\n", result, outPath);
 
         if(outPath){
+          //fd.grph.normalizeIndices();
+
           bool ok = saveFile(fd.grph, outPath);
           if(ok) printf("\nFile Written to %s\n", outPath);
           else   printf("\nSave did not write successfully to %s\n", outPath);
@@ -1614,7 +1620,7 @@ ENTRY_DECLARATION
                   s.P = node_border(n, srcNdP - nP, &nrml);
                   s.N = nrml;
                 }else{
-                  s.P = node_border(n, {0,-1.f}, &nrml);
+                  s.P = node_border(n, {0,1.f}, &nrml);
                   s.N = {0,1.f};
                 }
               }else{

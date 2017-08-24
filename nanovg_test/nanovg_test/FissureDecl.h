@@ -32,7 +32,7 @@ extern "C" unsigned char entypo_ttf[];
 extern "C" unsigned int  entypo_ttf_len;
 
 template<class T> using vec = std::vector<T>;
-using str = std::string;
+using str  =  std::string;
 
 using e2i  =  Eigen::Vector2i;
 using e4f  =  Eigen::Vector4f;
@@ -248,34 +248,7 @@ public:
   GraphDB& operator=(GraphDB&& rval){ mv(std::move(rval)); return *this; }
 
   // global
-  u64    delSelected()
-  {
-    using namespace std;
-
-    u64 cnt=0;
-
-    auto   nds = selectedNodes();      // accumulate nodes
-    auto sidxs = nodeDestSlots(nds);   // accumulate dest slots  // accumulate slots
-
-    // delete cncts with dest slots
-    for(auto sidx : sidxs){ 
-      if( delDestCnct(sidx) ){ ++cnt; }
-    }
-
-    // delete slots
-    for(auto sidx : sidxs){ m_slots.erase(sidx); }
-    //m_slots.erase(ALL(sidxs));
-    //for(auto sidx : sidxs){ m_slots.erase( m_slots.begin() + sidx ); }
-
-    // delete nodes
-    for(auto n : nds){
-      m_ids.erase(n->id);
-      m_nodes.erase(n->order);
-    }
-
-    return cnt;
-  }
-  void     normalize()
+  void  normalizeIndices()
   {
     using namespace std;
     
@@ -310,10 +283,14 @@ public:
     m_destCncts = move(nxtDestCncts);
 
     // slots
+    //auto si = m_slots.find(Id(nid));
+    //for(; si != m_slots.end() && si->first.id==nid; ++si){
+    //auto  s = slot(nid);
     Slots nxtSlots;
-    TO(nids.size(),i){
+    TO(nids.size(),i)
+    {
       u64 nid = nids[i];
-      auto si = m_slots.find(Id(nid));
+      auto si = nodeSlots(nid);
       for(; si != m_slots.end() && si->first.id==nid; ++si){
         Id nxtId(i+1);
         nxtId.idx = si->first.idx;
@@ -338,11 +315,57 @@ public:
     //  kv.first.id = 
     //}
     //
-
+    //
     //binary_search(ALL(nids), val);
-
+    //
     //for(auto nid : nids){
     //m_cncts.erase(ci);
+  }
+  void             clear()
+  {
+    m_nodes.clear();
+    m_ids.clear();
+    m_slots.clear();
+    m_cncts.clear();
+    m_destCncts.clear();
+
+    //m_slots.clear();
+    //m_selected.clear();
+  }
+
+  // selection
+  u64        delSelected()
+  {
+    using namespace std;
+
+    u64    cnt = 0;
+    auto   nds = selectedNodes();      // accumulate nodes
+    auto sidxs = nodeDestSlots(nds);   // accumulate dest slots  // accumulate slots
+
+                                       // delete cncts with dest slots
+    for(auto sidx : sidxs){ 
+      if( delDestCnct(sidx) ){ ++cnt; }
+    }
+
+    // delete slots
+    for(auto sidx : sidxs){ m_slots.erase(sidx); }
+
+    // delete nodes
+    for(auto n : nds){
+      m_ids.erase(n->id);
+      m_nodes.erase(n->order);
+    }
+
+    return cnt;
+
+    //m_slots.erase(ALL(sidxs));
+    //for(auto sidx : sidxs){ m_slots.erase( m_slots.begin() + sidx ); }
+  }
+  void         clearSels()
+  {
+    for(auto& on : m_nodes) on.second.sel = false;
+    for(auto& kv : m_slots) kv.second.state = Slot::NORMAL;
+    //for(auto& slt : m_slots) slt.state = Slot::NORMAL;
   }
 
   // nodes
@@ -414,10 +437,12 @@ public:
 
     return nds;
   }
+  u64          order(u64 id){ return node(id).order; }
+  auto           bnd(u64 id) -> Bnd& { return node(id).b; }
   u64            nsz() const { return m_nodes.size(); }
 
   // slots
-  u64        addSlot(Slot s)
+  u64        addSlot(Slot  s)
   {
     //if(s.nidx < m_nodes.size
 
@@ -433,7 +458,7 @@ public:
 
     return 0;
   }
-  auto          slot(Id id) -> Slot*
+  auto          slot(Id   id) -> Slot*
   {
     auto si = m_slots.find(id);
     if(si == m_slots.end()) return nullptr;   // errorSlot();
@@ -441,7 +466,7 @@ public:
     return &si->second;
     //return m_slots[sIdx];
   }
-  auto     nodeSlots(u64 nid) // C++14 -> decltype(m_slots.find(Id(nid)))
+  auto     nodeSlots(u64 nid) -> decltype(m_slots.begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
   {
     //auto iter = m_slots.find(id);
     //return iter;
@@ -459,13 +484,6 @@ public:
       return s;
     }else 
       return nullptr;
-
-    //auto ci = m_inCncts.find(destId);
-    //if(ci != m_inCncts.end()){
-    //  Slot* s = slot(ci->second);
-    //  return s;
-    //}else 
-    //  return nullptr;
   }
   auto     destSlots(Id srcId) -> decltype(m_destCncts.find(srcId))
   {
@@ -474,6 +492,7 @@ public:
   auto       slotEnd() -> decltype(m_slots.end()) { return m_slots.end(); }
   u64            ssz() const { return m_slots.size(); }
 
+  // connections
   void       addCnct(u32 src, u32 dest)
   {
     auto srcIter = m_destCncts.find(dest);
@@ -569,26 +588,6 @@ public:
     return cnt;
   }
 
-  auto           bnd(u64 id) -> Bnd& { return node(id).b; }
-
-  void     clearSels()
-  {
-    for(auto& on : m_nodes) on.second.sel = false;
-    for(auto& kv : m_slots) kv.second.state = Slot::NORMAL;
-    //for(auto& slt : m_slots) slt.state = Slot::NORMAL;
-  }
-  u64          order(u64 id){ return node(id).order; }
-  void         clear()
-  {
-    m_nodes.clear();
-    m_ids.clear();
-    m_slots.clear();
-    m_cncts.clear();
-    m_destCncts.clear();
-
-    //m_slots.clear();
-    //m_selected.clear();
-  }
 };
 
 struct FisData
@@ -617,6 +616,13 @@ struct FisData
 
 
 
+
+//auto ci = m_inCncts.find(destId);
+//if(ci != m_inCncts.end()){
+//  Slot* s = slot(ci->second);
+//  return s;
+//}else 
+//  return nullptr;
 
 //using CnctMap      = std::multimap<u32, u32>;            // maps connections from their single source slot to their one or more destination slots
 //using SrcMap       = std::unordered_map<u32, u32>;       // maps connections from their single destination slot to their single source slot 
