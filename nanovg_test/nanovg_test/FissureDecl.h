@@ -163,13 +163,6 @@ public:
   using vec_cnptrs   = std::vector<Node const*>;
   using vec_ids      = std::vector<Id>;
 
-  //using CnctMap      = std::multimap<u32, u32>;            // maps connections from their single source slot to their one or more destination slots
-  //using SrcMap       = std::unordered_map<u32, u32>;       // maps connections from their single destination slot to their single source slot 
-  //using NodeSlotMap  = std::multimap<Id, u64>;             // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
-  //using SlotIdxs     = std::set<Id>;
-  //using SlotMap
-  //using NodeSlotMap  = std::multimap<u64, u64>;            // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used.
-
 private:
   u64                m_nxtId;               // nxtId is next id - a counter for every node created that only increases, giving each node a unique id
   NodeMap            m_nodes;
@@ -177,11 +170,6 @@ private:
   Slots              m_slots;
   CnctMap            m_cncts;
   SrcMap         m_destCncts;
-
-  //vec<bool>       m_selected;             // bitfield for selected nodes
-  //vec_slot           m_slots;
-  //SlotIdxs           m_slots;
-  //NodeSlotMap    m_nodeSlots;
 
   void          init(){}
   void            mv(GraphDB&& rval)
@@ -371,10 +359,6 @@ public:
 
     return 0;
   }
-  //bool       hasSlot(u64 sIdx)
-  //{
-  //  return sIdx < m_slots.size();
-  //}
   auto          slot(Id id) -> Slot*
   {
     auto si = m_slots.find(id);
@@ -383,14 +367,12 @@ public:
     return &si->second;
     //return m_slots[sIdx];
   }
-  //auto          slot(u64 sIdx) -> Slot& 
-  //{
-  //  return m_slots[sIdx];
-  //}
-  auto     nodeSlots(u64 id) -> decltype(m_slots.find(id))
+  auto     nodeSlots(u64 nid) // C++14 -> decltype(m_slots.find(Id(nid)))
   {
-    auto iter = m_slots.find(id);
-    return iter;
+    //auto iter = m_slots.find(id);
+    //return iter;
+
+    return lower_bound(ALL(m_slots), Id(nid), [](auto a,auto b){ return a.first < b; } );
   }
   auto         slots() -> Slots& { return m_slots; }
   auto         slots() const -> Slots const& { return m_slots; }
@@ -455,7 +437,7 @@ public:
     //
     //m_outCncts.erase(src);
   }
-  u32        delCnct(Id src, Id dest)
+  u32        delCnct(Id  src, Id  dest)
   {
     u32 cnt=0;
     auto srcIter = m_destCncts.find(dest);
@@ -485,16 +467,6 @@ public:
 
     return true;
   }
-  //bool   delDestCnct(u32 dest)
-  //{
-  //  auto iter = m_inCncts.find(dest);
-  //  if(iter == m_inCncts.end()) return false;
-  //
-  //  auto src = iter->second;
-  //  delCnct(src, iter->first);
-  //
-  //  return true;
-  //}
   auto   destCnctEnd() -> decltype(m_destCncts.end())  { return m_destCncts.end(); }
   auto       cnctEnd() -> decltype(m_cncts.end())  { return m_cncts.end(); }
   auto     cnctBegin() -> decltype(m_cncts.begin()) { return m_cncts.begin(); }
@@ -523,16 +495,15 @@ public:
     return cnt;
   }
 
-  auto          bnd(u64 id) -> Bnd& { return node(id).b; }
+  auto           bnd(u64 id) -> Bnd& { return node(id).b; }
 
-  void    clearSels()
+  void     clearSels()
   {
     for(auto& on : m_nodes) on.second.sel = false;
     //for(auto& slt : m_slots) slt.state = Slot::NORMAL;
   }
-  //u64         selsz() const { return m_selected.size(); }
-  u64         order(u64 id){ return node(id).order; }
-  void        clear()
+  u64          order(u64 id){ return node(id).order; }
+  void         clear()
   {
     m_nodes.clear();
     m_ids.clear();
@@ -569,6 +540,41 @@ struct FisData
 
 
 
+
+
+
+//using CnctMap      = std::multimap<u32, u32>;            // maps connections from their single source slot to their one or more destination slots
+//using SrcMap       = std::unordered_map<u32, u32>;       // maps connections from their single destination slot to their single source slot 
+//using NodeSlotMap  = std::multimap<Id, u64>;             // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
+//using SlotIdxs     = std::set<Id>;
+//using SlotMap
+//using NodeSlotMap  = std::multimap<u64, u64>;            // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used.
+//
+//vec<bool>       m_selected;             // bitfield for selected nodes
+//vec_slot           m_slots;
+//SlotIdxs           m_slots;
+//NodeSlotMap    m_nodeSlots;
+
+//bool       hasSlot(u64 sIdx)
+//{
+//  return sIdx < m_slots.size();
+//}
+//auto          slot(u64 sIdx) -> Slot& 
+//{
+//  return m_slots[sIdx];
+//}
+//bool   delDestCnct(u32 dest)
+//{
+//  auto iter = m_inCncts.find(dest);
+//  if(iter == m_inCncts.end()) return false;
+//
+//  auto src = iter->second;
+//  delCnct(src, iter->first);
+//
+//  return true;
+//}
+//
+//u64         selsz() const { return m_selected.size(); }
 
 //static Id nxtId()
 //{

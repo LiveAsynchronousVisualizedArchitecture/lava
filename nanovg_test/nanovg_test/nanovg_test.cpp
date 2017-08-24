@@ -1260,15 +1260,15 @@ ENTRY_DECLARATION
 
       // nodes
       Node& n0 = fd.grph.addNode( Node("one",   Node::FLOW, {400.f,300.f}) );
-      Node& n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
-      Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
-      Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
+      //Node& n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
+      //Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
+      //Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
 
       // slots
       fd.grph.addSlot( Slot(n0.id, false) );
-      fd.grph.addSlot( Slot(n1.id,  true) );
-      fd.grph.addSlot( Slot(n2.id,  true) );
-      fd.grph.addSlot( Slot(n3.id,  true) );
+      //fd.grph.addSlot( Slot(n1.id,  true) );
+      //fd.grph.addSlot( Slot(n2.id,  true) );
+      //fd.grph.addSlot( Slot(n3.id,  true) );
 
       //fd.grph.addCnct(0, 1);
       //fd.grph.addCnct(0, 2);
@@ -1490,22 +1490,23 @@ ENTRY_DECLARATION
         {
           i32  inClk = -1;
           i32 outClk = -1;
-          TO(grph.ssz(), i)
+          //TO(grph.ssz(), i)
+          for(auto kv : grph.slots())
           {
+            auto   nid = kv.first.id;
+            Slot&    s = kv.second;
             if(lftClkDn){  //lftDn && !prevLftDn)
-              Slot&    s = *(grph.slot(i));
+              //Slot&    s = *(grph.slot(i));
               bool inSlt = len(pntr - s.P) < io_rad;
               if(inSlt){
-                outClk  = (i32)i;
+                outClk  = (i32)nid;
                 s.state = Slot::SELECTED;
-                if(s.in)
-                  slotInSel  = i;
-                else
-                  slotOutSel = i;
+                if(s.in) slotInSel  = nid;
+                else     slotOutSel = nid;
                 clearSelections = false;
               }
             }else if(lftClkUp){
-              Slot&    s = *(grph.slot(i));
+              //Slot&    s = *(grph.slot(i));
               bool inSlt = len(pntr - s.P) < io_rad;
               if(inSlt) clearSelections = false;
             }
@@ -1599,7 +1600,7 @@ ENTRY_DECLARATION
               Node const& n = grph.node(nid);
               v2 nP = n.P + NODE_SZ/2;
               
-              if(s.in){                                              // dest / in / blue slots
+              if(!s.in){                                              // dest / in / blue slots
                 //Slot* src = grph.srcSlot(i);
                 Slot* src = grph.srcSlot(kv.first);
                 if(src){
@@ -1755,7 +1756,7 @@ ENTRY_DECLARATION
                 nvgStrokeWidth(vg, BORDER);
                 //auto sIter = grph.nodeSlots(ndOrdr);            // sIter is slot iterator
                 auto sIter = grph.nodeSlots(n.id);            // sIter is slot iterator
-                for(; sIter!=grph.slotEnd() && sIter->first==n.id; ++sIter)
+                for(; sIter!=grph.slotEnd() && sIter->first.id==n.id; ++sIter)
                 {
                   //auto     sIdx = sIter->second;                    // sIdx is slot index
                   auto     sIdx = sIter->first;                    // todo: needs to be redone
