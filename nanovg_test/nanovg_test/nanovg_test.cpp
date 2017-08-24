@@ -53,8 +53,9 @@
 //       |- slots don't need to be ordered - need to be accessed by their own id and by their node id - if slots are always part of a particular node, should their id be a subset of the nodeID? should there only be one id between them? - should one struct hold a 48 bit integer and a 16 bit integer for slots?
 //       |- when drawing slots, use a ranged lookup (lower_bound) to find all slots that have that the same node? 
 //       |- lookup slots when drawing by a multi-map of slotId -> to nodeOrder - look up actual slots with an Id to slot unordered_map
+// -todo: debug slots not drawing - needed lower bound instead of exact search for node id
+// -todo: debug slot movement - needed to use a reference to the iterator so that the internal slot could be modified and wouldn't be copied
 
-// todo: debug slots not drawing
 // todo: make addSlot check for current slots to make its slot index sequential
 // todo: redo clearSelected loop over slots
 // todo: make saving, normalize the node id numbers 
@@ -1588,7 +1589,7 @@ ENTRY_DECLARATION
         SECTION(slot movement)
         {
           //TO(grph.ssz(),i)
-          for(auto kv : grph.slots())
+          for(auto& kv : grph.slots())
           {
             //auto sp = grph.slot(i);
             //Slot& s      = *(grph.slot(i));
@@ -1609,12 +1610,13 @@ ENTRY_DECLARATION
                   s.N = nrml;
                 }else{
                   s.P = node_border(n, {0,-1.f}, &nrml);
-                  s.N = {0,-1.f};
+                  s.N = {0,1.f};
                 }
               }else{
                 auto ci = grph.destSlots(kv.first);
                 if(ci == grph.destCnctEnd()){
-                  s.P = node_border(n, v2(0,s.in? -1.f : 1.f), &nrml);
+                  //s.P = node_border(n, v2(0,s.in? -1.f : 1.f), &nrml);
+                  s.P = node_border(n, v2(0,-1.f), &nrml);
                   s.N = nrml;
                 }else{
                   v2  destP={0,0}, destN={0,0};
