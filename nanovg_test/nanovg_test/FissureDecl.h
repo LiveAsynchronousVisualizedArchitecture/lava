@@ -63,8 +63,14 @@ union      Bnd
   }
   operator v4&(){ return mnmx; }
 
-  float w(){return abs(xmx-xmn);}
-  float h(){return abs(ymx-ymn);}
+  float      w(){ return abs(xmx-xmn); }
+  float      h(){ return abs(ymx-ymn); }
+  float   area(){ return w() * h();    }
+  bool  hasLen()
+  { 
+    using namespace std;
+    return max(0.f,xmx-xmn) + max(0.f,ymx-ymn);
+  }
 };
 using  vec_bnd     =    vec<Bnd>;
 

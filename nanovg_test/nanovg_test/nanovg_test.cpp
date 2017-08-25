@@ -71,9 +71,11 @@
 // -todo: try multiple nodes and connections
 // -todo: redo delNode() - delSelection works for now
 // -todo: fix and put back yellow highlighting of slots that are selected - for loop needed to use auto& so that the slot state could be altered
+// -todo: make click in blank space clear selections - needed to do more than just test drgbox boolean - made a hasLen() function of bound that makes sure there is positive length of the bounding box
+// -todo: retest saving
 
-// todo: make click in blank space deselect slots
-// todo: retest saving
+// todo: fix slots not moving around borders 
+// todo: fix connections disappearing on saving/normalization
 // todo: make loading find the highest node id and set the current id of the GraphDB
 // todo: make addSlot check for current slots to make its slot index sequential
 // todo: make function to modularize drawing a bezier from one slot to another with normals
@@ -1468,25 +1470,28 @@ ENTRY_DECLARATION
         Bnd  drgbnd;
         SECTION(selection box)
         {
-          if(drgbox){ clearSelections=false; }
+          //if(drgbox){ 
+          //  clearSelections=false;
+          //}
           if(!lftDn){ drgP=pntr; drgbox=false; }
 
-          drgbnd = Bnd( min(drgP.x, pntr.x),
-                        min(drgP.y, pntr.y),
-                        max(drgP.x, pntr.x),
-                        max(drgP.y, pntr.y) );
+          if(drgbox)
+            drgbnd = Bnd( min(drgP.x, pntr.x),
+                          min(drgP.y, pntr.y),
+                          max(drgP.x, pntr.x),
+                          max(drgP.y, pntr.y) );
+          else
+            drgbnd = Bnd();
         }
         SECTION(select)
         {
           if(drgbox){
             TO(sz,i){
-              //bool selected = isIn(grph.bnd(i), drgbnd);
-              //grph.sel(i, selected);
-
               Node& n = *(nds[i]);
-              n.sel   = isIn(n.b, drgbnd);     
+              n.sel   = isIn(n.b, drgbnd);
             }
-            clearSelections = false;
+            if(drgbnd.hasLen())
+              clearSelections = false;
           }
         
           if(!lftDn){
@@ -1569,15 +1574,27 @@ ENTRY_DECLARATION
             } 
           }
 
-          if(!inAny){
-            if(lftDn && priSel<0){ drgbox=true; clearSelections=false; }
+          if(!inAny)
+          {
+            //if( lftClkUp && !(priSel>0) ){
+            //  clearSelections=false;
+            //}
+
+            if( lftClkDn && !(priSel>0) ){ 
+              drgbox=true;
+            }
+
+            //if( (drgbnd.w()+drgbnd.h()) > 0 ){
+            //  clearSelections=false;
+            //}
+
             if(rtDn && !prevRtDn){ secSel = -1; }
-          }else{
+          }else if(lftClkDn && lftClkUp){
             clearSelections=false;
           }
         }
 
-        if(clearSelections && !lftDn && prevLftDn){ 
+        if(clearSelections && lftClkUp){ // !lftDn && prevLftDn){ 
           clear_selections(&grph);
         }
       }
@@ -1848,6 +1865,8 @@ ENTRY_DECLARATION
 
 
 
+//bool selected = isIn(grph.bnd(i), drgbnd);
+//grph.sel(i, selected);
 
 //template<class T> 
 //void MoveToBack(T* v, ui64 i)
