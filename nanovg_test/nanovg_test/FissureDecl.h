@@ -213,12 +213,38 @@ private:
     
     //vecui sidxs;                                            // sidxs is slot indexes
     vec_ids sidxs;                                            // sidxs is slot indexes
-    for(auto np : nds){                                     // np is node pointer and nds is nodes
+    for(auto np : nds){                                       // np is node pointer and nds is nodes
       auto si = lower_bound(ALL(m_slots), Id(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
       if(si != end(m_slots)  &&  si->first.id == np->id){
         Slot& s = si->second;
         if(s.in) sidxs.push_back(si->first);
 
+        //auto sidx = si->second;
+        //if(slot(sidx).in) sidxs.push_back(sidx);
+      }
+
+      //auto si = m_slots.find(np->id);                   // si is slot iterator
+      //if(si != end(m_slots)){
+      //  auto sidx = si->second;
+      //  if(slot(sidx).in) sidxs.push_back(sidx);
+      //}
+    }
+    return sidxs;                                        // RVO
+  }
+  auto  nodeSlots(vec_nptrs const& nds) -> vec_ids
+  {
+    using namespace std;
+
+    //vecui sidxs;                                            // sidxs is slot indexes
+    vec_ids sidxs;                                            // sidxs is slot indexes
+    for(auto np : nds){                                     // np is node pointer and nds is nodes
+      auto si = lower_bound(ALL(m_slots), Id(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
+      if(si != end(m_slots)  &&  si->first.id == np->id){
+        Slot& s = si->second;
+        sidxs.push_back(si->first);
+        
+        //if(s.in) sidxs.push_back(si->first);
+        //
         //auto sidx = si->second;
         //if(slot(sidx).in) sidxs.push_back(sidx);
       }
@@ -340,11 +366,15 @@ public:
 
     u64    cnt = 0;
     auto   nds = selectedNodes();      // accumulate nodes
-    auto sidxs = nodeDestSlots(nds);   // accumulate dest slots  // accumulate slots
+    //auto sidxs = nodeDestSlots(nds);   // accumulate dest slots  // accumulate slots
+    auto sidxs = nodeSlots(nds);   // accumulate dest slots  // accumulate slots
 
                                        // delete cncts with dest slots
     for(auto sidx : sidxs){ 
-      if( delDestCnct(sidx) ){ ++cnt; }
+      //if( delDestCnct(sidx) ){ ++cnt; }
+      auto s = slot(sidx);
+      if(s->in) delDestCnct(sidx);  //){ ++cnt; }
+      else      delSrcCncts(sidx);
     }
 
     // delete slots
@@ -493,6 +523,31 @@ public:
   u64            ssz() const { return m_slots.size(); }
 
   // connections
+  u32    delSrcCncts(Id  src)
+  {
+    u32      cnt = 0;
+    auto destIter = m_destCncts.find(src);
+    if(destIter != m_destCncts.end())
+    {
+      auto iter = m_cncts.find(destIter->second);
+      //auto dest = iter->second;
+      for(; iter!=m_cncts.end() && iter->first==src; ++cnt){
+        auto cpy = iter++; //++iter;
+        m_cncts.erase(cpy);
+        //++cnt;
+        //if(cpy->second == dest){
+        //}
+      }
+      m_destCncts.erase(src);
+    }
+
+    return cnt;
+  }
+
+  auto     destCncts(Id src) -> decltype(m_destCncts.begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
+  {
+    return lower_bound(ALL(m_destCncts), Id(src), [](auto a,auto b){ return a.first < b; } );
+  }
   u32        delCnct(Id  src, Id  dest)
   {
     u32      cnt = 0;
@@ -523,23 +578,22 @@ public:
 
     return true;
   }
-  void       addCnct(u32 src, u32 dest)
+  void       addCnct(Id src, Id dest)
   {
-    auto srcIter = m_destCncts.find(dest);
-    if(srcIter != m_destCncts.end()){
-      m_cncts.erase(src);
-      m_destCncts.erase(dest);
+    auto destIter = m_destCncts.find(src);
+    if(destIter != m_destCncts.end()){
+      m_cncts.erase(dest);
+      m_destCncts.erase(src);
     }
 
-    m_cncts.insert({src, dest});
-    m_destCncts.insert({dest, src});
+    m_cncts.insert({dest, src});
+    m_destCncts.insert({src, dest});
   }
-  //void    toggleCnct(u32 src, u32 dest)
   void    toggleCnct(Id src, Id dest)
   {
     if( delCnct(src,dest)==0 ){
-      m_cncts.insert({src, dest});
-      m_destCncts.insert({dest, src});
+      m_cncts.insert({dest, src});
+      m_destCncts.insert({src, dest});
     }
 
     //auto srcIter = m_inCncts.find(dest);
@@ -574,14 +628,15 @@ public:
     if(!s) return 0;
 
     if(s->in){
-      auto iter = m_destCncts.find(id);
+      //auto iter = m_destCncts.find(id);
+      auto iter = m_cncts.find(id);
       return delCnct(iter->second, iter->first);
     }else{
-      auto iter = m_cncts.find(id);
+      auto iter = m_destCncts.find(id);
       auto  idx = iter->first;
-      while(iter != m_cncts.end() && iter->first == idx){
-        m_destCncts.erase(iter->second);
-        iter = m_cncts.erase(iter);
+      while(iter != m_destCncts.end() && iter->first == idx){
+        m_cncts.erase(iter->second);
+        iter = m_destCncts.erase(iter);
         ++cnt;
       }
     }

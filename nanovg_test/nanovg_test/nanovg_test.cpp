@@ -61,10 +61,11 @@
 // -todo: fix slot disappearing after normalization - find() with only a node id doesn't find the exact slot - need lower_bound through a call to nodeSlots()
 // -todo: make saving normalize the node id numbers - make normalize function
 // -todo: correct unconnected src slot drawing
+// -todo: change global selection variables to be Id
+// -todo: test and fix connection creation - crashes - NaNs fixed and infinite loop fixed
+// -todo: test node deletion
 
-// todo: change global selection variables to be Id
-// todo: test and fix connection creation - crashes
-// todo: test node deletion
+// todo: fix deletion of src node hanging connection
 // todo: make addSlot check for current slots to make its slot index sequential
 // todo: make loading find the highest node id and set the current id of the GraphDB
 // todo: make function to draw a bezier from one slot to another with normals
@@ -1692,7 +1693,7 @@ ENTRY_DECLARATION
                   nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
                 nvgStroke(vg);
 
-                //++ci; //continue;
+                ++ci; //continue;
               }
               else
               {
@@ -1827,9 +1828,9 @@ ENTRY_DECLARATION
             nvgFontSize(vg, 15.0f);
             nvgFontFace(vg, "sans-bold");
             //nvgTextAlign(vg,  NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
-            nvgTextAlign(vg,  NVG_ALIGN_RIGHT);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
+            nvgTextAlign(vg,  NVG_ALIGN_LEFT);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
             nvgFillColor(vg, nvgRGBA(255,255,255,255));
-            nvgText(vg,  fd.ui.w - tb + 40, 10, fpsStr, NULL);
+            nvgText(vg,  fd.ui.w - tb , 10, fpsStr, NULL);
           }
           nvgEndFrame(vg);
         }
