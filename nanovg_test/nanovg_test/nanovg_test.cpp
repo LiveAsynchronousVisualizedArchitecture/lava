@@ -68,23 +68,24 @@
 // -todo: fix crashing on deletion of node with src slot and connection - for loop was incrementing iterator after it had been invalidated by m_destCncts.erase()
 // -todo: fix crash on node deletion when src node has 2 connections - deleting from destCncts multi-map only needs to happen once since it will match all the connections to that src slot
 // -todo: fix crash on deletion of dest node when connected to a multi-connected node - delDestCnct needed to be redone after underlying data structure changes
+// -todo: try multiple nodes and connections
+// -todo: redo delNode() - delSelection works for now
+// -todo: fix and put back yellow highlighting of slots that are selected - for loop needed to use auto& so that the slot state could be altered
 
-// todo: try multiple nodes and connections
-// todo: fix and put back yellow highlighting of slots that are selected
-// todo: make addSlot check for current slots to make its slot index sequential
+// todo: make click in blank space deselect slots
+// todo: retest saving
 // todo: make loading find the highest node id and set the current id of the GraphDB
+// todo: make addSlot check for current slots to make its slot index sequential
 // todo: make function to modularize drawing a bezier from one slot to another with normals
 // todo: debug flashing connections - possibly due to numeric error handling - have to repeat first
-// todo: redo delNode()
 // todo: make one node snap to another node
-// todo: use scroll wheel and nanovg scale transforms to zoom in and out
 // todo: group ui state variables together - priSel, connecting
 // todo: make two snapped nodes group together and be dragged together
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
 // todo: make a node to split text into lines and scatter the result
 // todo: separate finding node the pointer is inside from the action to take
-
+// todo: use scroll wheel and nanovg scale transforms to zoom in and out - will need to scale mouse pointer position as well to 'canvas' coordinates
 
 // idea: make connections thicker when there is more data and brighter when there are more packets
 // idea: build in focus as information separate from selection
@@ -190,22 +191,6 @@ bool                drgbox = false;
 static FisData fd;
 
 namespace{
-
-//template<class T> 
-//void MoveToBack(T* v, ui64 i)
-//{
-//  using namespace std;
-//  
-//  auto&  a = *v;
-//  auto  sz = a.size();
-//  auto tmp = move(a[i]);
-//
-//  //move_backward(a.front()+i+1ul, a.back(), a.back()-1);
-//  for(auto j=i; j<sz-1; ++j)
-//    a[j] = move( a[j+1] );
-//  
-//  a[sz-1] = tmp;
-//}
 
 float               lerp(float p, float lo, float hi)
 {
@@ -1512,10 +1497,10 @@ ENTRY_DECLARATION
         {
           //i32  inClk = -1;
           //i32 outClk = -1;
-          Id  inClk = -1;
-          Id outClk = -1;
+          Id  inClk(0);
+          Id outClk(0);
           //TO(grph.ssz(), i)
-          for(auto kv : grph.slots())
+          for(auto& kv : grph.slots())
           {
             //auto   nid = kv.first.id;
             Id     sid = kv.first;                       // sid is slot id
@@ -1576,7 +1561,7 @@ ENTRY_DECLARATION
                   //TO(grph.selsz(),i) grph.sel(i,false);
                   //grph.sel(ndOrdr,true);
                   TO(sz,j){ nds[j]->sel = false; }  // todo: move this out of the outer loop due to being O(n^2)
-                  n->sel           = true;
+                  n->sel = true;
                   //clearSelections = true;
                 }
                 break;                                                  // without breaking from the loop, a node could be moved down and hit again
@@ -1864,6 +1849,21 @@ ENTRY_DECLARATION
 
 
 
+//template<class T> 
+//void MoveToBack(T* v, ui64 i)
+//{
+//  using namespace std;
+//  
+//  auto&  a = *v;
+//  auto  sz = a.size();
+//  auto tmp = move(a[i]);
+//
+//  //move_backward(a.front()+i+1ul, a.back(), a.back()-1);
+//  for(auto j=i; j<sz-1; ++j)
+//    a[j] = move( a[j+1] );
+//  
+//  a[sz-1] = tmp;
+//}
 
 //int  ndOrdr = grph.order(i);
 //if( !(ndOrdr < grph.nsz()) ){ continue; }
