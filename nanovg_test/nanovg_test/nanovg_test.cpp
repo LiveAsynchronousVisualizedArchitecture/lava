@@ -75,8 +75,8 @@
 // -todo: retest saving
 // -todo: fix in/dest slots pointing the wrong way - negated normal in case of no connection
 // -todo: fix slots not moving around borders - in/dest slot finding was done in the src case
+// -todo: put back intermediate position with multiple connections
 
-// todo: put back intermediate position with multiple connections
 // todo: fix node becoming deselected after drag
 // todo: fix connections disappearing on saving/normalization
 // todo: make loading find the highest node id and set the current id of the GraphDB
@@ -1274,17 +1274,21 @@ ENTRY_DECLARATION
       Node& n0 = fd.grph.addNode( Node("one",   Node::FLOW, {400.f,300.f}) );
       Node& n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
       Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
-      //Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
+      Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
 
       // slots
-      fd.grph.addSlot( Slot(n0.id, false) );
-      fd.grph.addSlot( Slot(n1.id,  true) );
-      fd.grph.addSlot( Slot(n2.id,  true) );
-      //fd.grph.addSlot( Slot(n3.id,  true) );
+      Id s0 = fd.grph.addSlot( Slot(n0.id, false) );
+      Id s1 = fd.grph.addSlot( Slot(n1.id,  true) );
+      Id s2 = fd.grph.addSlot( Slot(n2.id,  true) );
+      Id s3 = fd.grph.addSlot( Slot(n3.id,  true) );
 
-      //fd.grph.addCnct(0, 1);
-      //fd.grph.addCnct(0, 2);
-      //fd.grph.addCnct(0, 3);
+      fd.grph.toggleCnct(s0, s1);
+      fd.grph.toggleCnct(s0, s2);
+      fd.grph.toggleCnct(s0, s3);
+
+      //fd.grph.addCnct(Id(1,1), Id(1,1));
+      //fd.grph.addCnct(Id(1,1), Id(2,1));
+      //fd.grph.addCnct(Id(1,1), Id(3,1));
 
       //auto sz = fd.grph.nsz();
     }
@@ -1624,7 +1628,6 @@ ENTRY_DECLARATION
             if( priSel>-1 && selctd ){           // if a node is primary selected (left mouse down on a node) or the selected flag is set
               n.P +=  pntr - prevPntr;
             }
-
           }
         }
         SECTION(slot movement)
@@ -1680,18 +1683,24 @@ ENTRY_DECLARATION
           nvgBeginFrame(vg, fd.ui.w, fd.ui.h, pxRatio);
           SECTION(draw connections)
           {                                 // ci is connection iterator 
-            auto en = grph.cnctEnd();
+            //auto en = grph.cnctEnd();
             //for(auto const& ci : grph.cncts())
-            for(auto ci = grph.cnctBegin(); ci != en; )
+            //for(auto ci = grph.cnctBegin(); ci != en; )
+            //for(auto di : grph.srcCnctsMap())  // multi-map of src->dest connections, di is destination iterator 
+            auto di = grph.srcCnctsMap().begin();
+            auto en = grph.srcCnctsMap().end();
+            for(auto di = grph.srcCnctsMap().begin(); di != en; )
             {
-              //auto     srcIdx = ci->first;
-              auto     srcIdx = ci->second;
+              //auto     srcIdx = ci->second;
+              //auto      count = grph.cncts().count(ci->first);
+              auto     srcIdx = di->first;
+              auto    destIdx = di->second;
               Slot const& src = *(grph.slot(srcIdx));
-              auto      count = grph.cncts().count(ci->first);
-              
+              auto      count = grph.destCnctCount(srcIdx);
+
               if(count==1)
               {
-                Slot const& dest = *(grph.slot(ci->first));
+                Slot const& dest = *(grph.slot(destIdx));
                 f32  halfx = lerp(.5f, src.P.x, dest.P.x);
                 f32  halfy = lerp(.5f, src.P.y, dest.P.y);
                 f32   dist = len(src.P - dest.P);
@@ -1705,18 +1714,20 @@ ENTRY_DECLARATION
                   nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
                 nvgStroke(vg);
 
-                ++ci; //continue;
+                ++di; //continue;
               }
               else
               {
                 v2 avgP=src.P; v2 avgN={0,0}; u32 cnt=0;
-                auto avgIter=ci;
-                for(; avgIter!=en && avgIter->first == srcIdx; ++avgIter, ++cnt){
-                  if(!grph.slot(avgIter->second)){ --cnt; continue; }
+                auto avgIter=di;
+                for(; avgIter!=en && avgIter->first==srcIdx; ++avgIter ){     // ++cnt
+                  if(!grph.slot(avgIter->second)){ /*--cnt;*/ continue; }
 
                   Slot const& dest = *(grph.slot(avgIter->second));
                   avgP += dest.P;
                   avgP += src.P;
+                  ++cnt;
+
                   //avgN += norm(dest.P
                 }
                 avgP    /= (f32)(cnt*2+1);             // can't forget the first position for averaging - the src position - the avgP is weighted 1:1 with the srcP and all the destination positions combined
@@ -1739,9 +1750,9 @@ ENTRY_DECLARATION
                   nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
                 nvgStroke(vg);
 
-                for(auto dhIter=ci; ci!=en && ci->first == srcIdx; ++ci){   // dhIter is draw half iterator - this is where the the connections are drawn from the average position of all slots 
+                for(auto dhIter=di; di!=en && di->first == srcIdx; ++di){   // dhIter is draw half iterator - this is where the the connections are drawn from the average position of all slots 
                   const v2 hlfsz = io_rad/2.f;
-                  Slot const& dest = *(grph.slot(ci->second));
+                  Slot const& dest = *(grph.slot(di->second));
 
                   f32  halfx = lerp(.5f, dest.P.x, avgP.x);
                   f32  halfy = lerp(.5f, dest.P.y, avgP.y);

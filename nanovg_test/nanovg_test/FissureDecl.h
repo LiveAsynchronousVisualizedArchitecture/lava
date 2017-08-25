@@ -480,21 +480,23 @@ public:
   u64            nsz() const { return m_nodes.size(); }
 
   // slots
-  u64        addSlot(Slot  s)
+  Id        addSlot(Slot  s)
   {
-    //if(s.nidx < m_nodes.size
-
-    //m_slots.push_back(s);
-    //{s.nid,1}
     Id id(s.nid);
     id.idx = 1;
-    m_slots.insert({id, s}); // todo: make this find the last slot idx and make it sequential
+    m_slots.insert({id, s});                   // todo: make this find the last slot idx and make it sequential
 
+    //
+    //if(s.nidx < m_nodes.size
+    //
+    //m_slots.push_back(s);
+    //{s.nid,1}
+    //
     //u64 slotIdx = (u64)(m_slots.size() - 1);
     //auto iter = m_slots.insert({s.nid, slotIdx});
     //return slotIdx;
 
-    return 0;
+    return id;
   }
   auto          slot(Id   id) -> Slot*
   {
@@ -533,14 +535,23 @@ public:
   // connections
   void       addCnct(Id src, Id dest)
   {
-    auto destIter = m_destCncts.find(src);
-    if(destIter != m_destCncts.end()){
+    auto ci = m_cncts.find(dest);
+    if(ci != m_cncts.end()){
       m_cncts.erase(dest);
       m_destCncts.erase(src);
     }
 
     m_cncts.insert({dest, src});
     m_destCncts.insert({src, dest});
+
+    //auto destIter = m_destCncts.find(src);
+    //if(destIter != m_destCncts.end()){
+    //  m_cncts.erase(dest);
+    //  m_destCncts.erase(src);
+    //}
+    //
+    //m_cncts.insert({dest, src});
+    //m_destCncts.insert({src, dest});
   }
   u32    delSrcCncts(Id  src)
   {
@@ -557,6 +568,10 @@ public:
   auto     destCncts(Id  src) -> decltype(m_destCncts.begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
   {
     return lower_bound(ALL(m_destCncts), Id(src), [](auto a,auto b){ return a.first < b; } );
+  }
+  u64  destCnctCount(Id  src)
+  {
+    return m_destCncts.count(src);
   }
   u32        delCnct(Id  src, Id  dest)
   {
@@ -609,6 +624,8 @@ public:
       m_destCncts.insert({src, dest});
     }
 
+    
+
     //auto srcIter = m_inCncts.find(dest);
     //if(srcIter != m_inCncts.end()){
     //  auto iter = m_outCncts.find(src);
@@ -656,7 +673,10 @@ public:
 
     return cnt;
   }
-
+  auto   srcCnctsMap() -> SrcMap&   //decltype(m_destCncts)
+  {
+    return m_destCncts;
+  }
 };
 
 struct FisData
