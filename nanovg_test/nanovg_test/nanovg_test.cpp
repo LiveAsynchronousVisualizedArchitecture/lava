@@ -73,8 +73,11 @@
 // -todo: fix and put back yellow highlighting of slots that are selected - for loop needed to use auto& so that the slot state could be altered
 // -todo: make click in blank space clear selections - needed to do more than just test drgbox boolean - made a hasLen() function of bound that makes sure there is positive length of the bounding box
 // -todo: retest saving
+// -todo: fix in/dest slots pointing the wrong way - negated normal in case of no connection
+// -todo: fix slots not moving around borders - in/dest slot finding was done in the src case
 
-// todo: fix slots not moving around borders 
+// todo: put back intermediate position with multiple connections
+// todo: fix node becoming deselected after drag
 // todo: fix connections disappearing on saving/normalization
 // todo: make loading find the highest node id and set the current id of the GraphDB
 // todo: make addSlot check for current slots to make its slot index sequential
@@ -88,7 +91,13 @@
 // todo: make a node to split text into lines and scatter the result
 // todo: separate finding node the pointer is inside from the action to take
 // todo: use scroll wheel and nanovg scale transforms to zoom in and out - will need to scale mouse pointer position as well to 'canvas' coordinates
+// todo: make node size draw using node bnds
+// todo: make flow node size dependant on text bounds
+// todo: make message node diameter dependant on text bounds
+// todo: don't select a slot if it is under an existing node
 
+
+// idea: have a panel or window that shows information about the selected node and the shared library it represents
 // idea: make connections thicker when there is more data and brighter when there are more packets
 // idea: build in focus as information separate from selection
 // idea: draw message node slots as sliding angles
@@ -97,7 +106,6 @@
 // idea: make msg loop that would deal with selections, clicks and drags? 
 // idea: take out redudant node position + bnd information 
 // idea: look into quantized gradients of nanovg
-// idea: don't select a slot if it is under an existing node
 // idea: switch over to using json.hpp
 // idea: make load file take the state in
 // idea: make an io file
@@ -1502,19 +1510,26 @@ ENTRY_DECLARATION
         {
           //i32  inClk = -1;
           //i32 outClk = -1;
+          //
+          //TO(grph.ssz(), i)
+          //auto   nid = kv.first.id;
+          //
+          //lftDn && !prevLftDn)
+          //Slot&    s = *(grph.slot(i));
+          //
+          //outClk  = (i32)nid;
+          //
+          //Slot&    s = *(grph.slot(i));
+
           Id  inClk(0);
           Id outClk(0);
-          //TO(grph.ssz(), i)
           for(auto& kv : grph.slots())
           {
-            //auto   nid = kv.first.id;
             Id     sid = kv.first;                       // sid is slot id
             Slot&    s = kv.second;
-            if(lftClkDn){  //lftDn && !prevLftDn)
-              //Slot&    s = *(grph.slot(i));
+            if(lftClkDn){  
               bool inSlt = len(pntr - s.P) < io_rad;
               if(inSlt){
-                //outClk  = (i32)nid;
                 outClk  = sid;  // Id(nid);
                 s.state = Slot::SELECTED;
                 if(s.in) slotInSel  = sid; // Id(nid, );
@@ -1522,7 +1537,6 @@ ENTRY_DECLARATION
                 clearSelections = false;
               }
             }else if(lftClkUp){
-              //Slot&    s = *(grph.slot(i));
               bool inSlt = len(pntr - s.P) < io_rad;
               if(inSlt) clearSelections = false;
             }
@@ -1615,38 +1629,30 @@ ENTRY_DECLARATION
         }
         SECTION(slot movement)
         {
-          //TO(grph.ssz(),i)
-          //
-          //auto sp = grph.slot(i);
-          //Slot& s      = *(grph.slot(i));
-          //
-          //if(nid < grph.nsz())
-          //{
-
           for(auto& kv : grph.slots())
           {
-            auto   nid = kv.first; // s.nid;
+            Id     nid = kv.first; // s.nid;
             Slot&    s = kv.second;
             v2    nrml;
             Node const& n = grph.node(nid.id);
             v2 nP = n.P + NODE_SZ/2;
               
-            if(!s.in){                                              // dest / in / blue slots
-              //Slot* src = grph.srcSlot(i);
+            if(s.in)
+            {                                                 // dest / in / blue slots
               Slot* src = grph.srcSlot(kv.first);
               if(src){
                 auto srcNdP = grph.node(src->nid).P + NODE_SZ/2;
                 s.P = node_border(n, srcNdP - nP, &nrml);
                 s.N = nrml;
               }else{
-                s.P = node_border(n, {0,1.f}, &nrml);
-                s.N = {0,1.f};
+                s.P = node_border(n, {0,-1.f}, &nrml);
+                s.N = {0,-1.f};
               }
-            }else{
+            }else
+            {
               auto ci = grph.destSlots(kv.first);
-              if(ci == grph.destCnctEnd()){
-                //s.P = node_border(n, v2(0,s.in? -1.f : 1.f), &nrml);
-                s.P = node_border(n, v2(0,-1.f), &nrml);
+              if(ci==grph.destCnctEnd()){
+                s.P = node_border(n, v2(0,1.f), &nrml);
                 s.N = nrml;
               }else{
                 v2  destP={0,0}, destN={0,0};
@@ -1664,7 +1670,6 @@ ENTRY_DECLARATION
                 s.P = node_border(n, s.N);
               }
             }
-            //}
           }
         }
       }
@@ -1863,7 +1868,16 @@ ENTRY_DECLARATION
 
 
 
+//s.P = node_border(n, v2(0,s.in? -1.f : 1.f), &nrml);
+//Slot* src = grph.srcSlot(i);
 
+//TO(grph.ssz(),i)
+//
+//auto sp = grph.slot(i);
+//Slot& s      = *(grph.slot(i));
+//
+//if(nid < grph.nsz())
+//{
 
 //bool selected = isIn(grph.bnd(i), drgbnd);
 //grph.sel(i, selected);

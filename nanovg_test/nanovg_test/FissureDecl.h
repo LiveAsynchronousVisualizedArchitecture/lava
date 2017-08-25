@@ -531,6 +531,17 @@ public:
   u64            ssz() const { return m_slots.size(); }
 
   // connections
+  void       addCnct(Id src, Id dest)
+  {
+    auto destIter = m_destCncts.find(src);
+    if(destIter != m_destCncts.end()){
+      m_cncts.erase(dest);
+      m_destCncts.erase(src);
+    }
+
+    m_cncts.insert({dest, src});
+    m_destCncts.insert({src, dest});
+  }
   u32    delSrcCncts(Id  src)
   {
     u32  cnt = 0;
@@ -590,17 +601,6 @@ public:
     //delCnct(src, iter->first);
 
     return true;
-  }
-  void       addCnct(Id src, Id dest)
-  {
-    auto destIter = m_destCncts.find(src);
-    if(destIter != m_destCncts.end()){
-      m_cncts.erase(dest);
-      m_destCncts.erase(src);
-    }
-
-    m_cncts.insert({dest, src});
-    m_destCncts.insert({src, dest});
   }
   void    toggleCnct(Id src, Id dest)
   {
