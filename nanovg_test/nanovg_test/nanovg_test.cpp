@@ -64,11 +64,13 @@
 // -todo: change global selection variables to be Id
 // -todo: test and fix connection creation - crashes - NaNs fixed and infinite loop fixed
 // -todo: test node deletion
+// -todo: fix deletion of src node hanging connection
+// -todo: fix crashing on deletion of node with src slot and connection - for loop was incrementing iterator after it had been invalidated by m_destCncts.erase()
 
-// todo: fix deletion of src node hanging connection
+// todo: try multiple nodes and connections
 // todo: make addSlot check for current slots to make its slot index sequential
 // todo: make loading find the highest node id and set the current id of the GraphDB
-// todo: make function to draw a bezier from one slot to another with normals
+// todo: make function to modularize drawing a bezier from one slot to another with normals
 // todo: debug flashing connections - possibly due to numeric error handling - have to repeat first
 // todo: redo delNode()
 // todo: make one node snap to another node

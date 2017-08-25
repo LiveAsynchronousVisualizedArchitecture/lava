@@ -231,7 +231,7 @@ private:
     }
     return sidxs;                                        // RVO
   }
-  auto  nodeSlots(vec_nptrs const& nds) -> vec_ids
+  auto      nodeSlots(vec_nptrs const& nds) -> vec_ids
   {
     using namespace std;
 
@@ -373,8 +373,10 @@ public:
     for(auto sidx : sidxs){ 
       //if( delDestCnct(sidx) ){ ++cnt; }
       auto s = slot(sidx);
-      if(s->in) delDestCnct(sidx);  //){ ++cnt; }
-      else      delSrcCncts(sidx);
+      if(s->in)
+        delDestCnct(sidx);  //){ ++cnt; }
+      else
+        delSrcCncts(sidx);
     }
 
     // delete slots
@@ -525,25 +527,29 @@ public:
   // connections
   u32    delSrcCncts(Id  src)
   {
-    u32      cnt = 0;
-    auto destIter = m_destCncts.find(src);
-    if(destIter != m_destCncts.end())
-    {
-      auto iter = m_cncts.find(destIter->second);
-      //auto dest = iter->second;
-      for(; iter!=m_cncts.end() && iter->first==src; ++cnt){
-        auto cpy = iter++; //++iter;
-        m_cncts.erase(cpy);
-        //++cnt;
-        //if(cpy->second == dest){
-        //}
-      }
+    u32  cnt = 0;
+    auto  di = m_destCncts.find(src);
+    for(; di!=m_destCncts.end() && di->first==src; ++cnt){   // ++di,
+      m_cncts.erase(di->second);
       m_destCncts.erase(src);
+      di = m_destCncts.find(src);
     }
 
     return cnt;
-  }
 
+    //auto iter = m_cncts.find(di->second);
+    //for(; iter!=m_cncts.end() && iter->first==src; ++cnt){
+    //  auto cpy = iter++;
+    //  m_cncts.erase(cpy);
+    //}
+
+    //if(di != m_destCncts.end())
+    //auto dest = iter->second;
+    //
+    //++cnt;
+    //if(cpy->second == dest){
+    //}
+  }
   auto     destCncts(Id src) -> decltype(m_destCncts.begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
   {
     return lower_bound(ALL(m_destCncts), Id(src), [](auto a,auto b){ return a.first < b; } );
