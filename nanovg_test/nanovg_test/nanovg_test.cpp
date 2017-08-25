@@ -76,8 +76,8 @@
 // -todo: fix in/dest slots pointing the wrong way - negated normal in case of no connection
 // -todo: fix slots not moving around borders - in/dest slot finding was done in the src case
 // -todo: put back intermediate position with multiple connections
+// -todo: fix node becoming deselected after drag - inAny was being combined with clicks
 
-// todo: fix node becoming deselected after drag
 // todo: fix connections disappearing on saving/normalization
 // todo: make loading find the highest node id and set the current id of the GraphDB
 // todo: make addSlot check for current slots to make its slot index sequential
@@ -1607,7 +1607,7 @@ ENTRY_DECLARATION
             //}
 
             if(rtDn && !prevRtDn){ secSel = -1; }
-          }else if(lftClkDn && lftClkUp){
+          }else{ // if(lftClkDn && lftClkUp){
             clearSelections=false;
           }
         }

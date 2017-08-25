@@ -480,21 +480,11 @@ public:
   u64            nsz() const { return m_nodes.size(); }
 
   // slots
-  Id        addSlot(Slot  s)
+  Id         addSlot(Slot  s)
   {
     Id id(s.nid);
     id.idx = 1;
     m_slots.insert({id, s});                   // todo: make this find the last slot idx and make it sequential
-
-    //
-    //if(s.nidx < m_nodes.size
-    //
-    //m_slots.push_back(s);
-    //{s.nid,1}
-    //
-    //u64 slotIdx = (u64)(m_slots.size() - 1);
-    //auto iter = m_slots.insert({s.nid, slotIdx});
-    //return slotIdx;
 
     return id;
   }
@@ -543,15 +533,6 @@ public:
 
     m_cncts.insert({dest, src});
     m_destCncts.insert({src, dest});
-
-    //auto destIter = m_destCncts.find(src);
-    //if(destIter != m_destCncts.end()){
-    //  m_cncts.erase(dest);
-    //  m_destCncts.erase(src);
-    //}
-    //
-    //m_cncts.insert({dest, src});
-    //m_destCncts.insert({src, dest});
   }
   u32    delSrcCncts(Id  src)
   {
@@ -623,27 +604,6 @@ public:
       m_cncts.insert({dest, src});
       m_destCncts.insert({src, dest});
     }
-
-    
-
-    //auto srcIter = m_inCncts.find(dest);
-    //if(srcIter != m_inCncts.end()){
-    //  auto iter = m_outCncts.find(src);
-    //  for(; iter != m_outCncts.end() && iter->first==src; ){
-    //    auto cpy = iter;
-    //    ++iter;
-    //    if(cpy->second == dest) m_outCncts.erase(cpy);
-    //  }
-    //  m_inCncts.erase(dest);
-    //
-    //}else{
-
-    //m_outCncts.erase(src);
-    //
-    //if(iter != m_outCncts.end()){
-    //}
-    //
-    //m_outCncts.erase(src);
   }
   auto   destCnctEnd() -> decltype(m_destCncts.end())  { return m_destCncts.end(); }
   auto       cnctEnd() -> decltype(m_cncts.end())  { return m_cncts.end(); }
@@ -702,8 +662,43 @@ struct FisData
 
 
 
+//
+//if(s.nidx < m_nodes.size
+//
+//m_slots.push_back(s);
+//{s.nid,1}
+//
+//u64 slotIdx = (u64)(m_slots.size() - 1);
+//auto iter = m_slots.insert({s.nid, slotIdx});
+//return slotIdx;
 
+//auto destIter = m_destCncts.find(src);
+//if(destIter != m_destCncts.end()){
+//  m_cncts.erase(dest);
+//  m_destCncts.erase(src);
+//}
+//
+//m_cncts.insert({dest, src});
+//m_destCncts.insert({src, dest});
 
+//auto srcIter = m_inCncts.find(dest);
+//if(srcIter != m_inCncts.end()){
+//  auto iter = m_outCncts.find(src);
+//  for(; iter != m_outCncts.end() && iter->first==src; ){
+//    auto cpy = iter;
+//    ++iter;
+//    if(cpy->second == dest) m_outCncts.erase(cpy);
+//  }
+//  m_inCncts.erase(dest);
+//
+//}else{
+
+//m_outCncts.erase(src);
+//
+//if(iter != m_outCncts.end()){
+//}
+//
+//m_outCncts.erase(src);
 
 //auto iter = m_cncts.find(di->second);
 //for(; iter!=m_cncts.end() && iter->first==src; ++cnt){
