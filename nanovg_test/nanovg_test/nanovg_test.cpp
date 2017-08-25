@@ -66,8 +66,11 @@
 // -todo: test node deletion
 // -todo: fix deletion of src node hanging connection
 // -todo: fix crashing on deletion of node with src slot and connection - for loop was incrementing iterator after it had been invalidated by m_destCncts.erase()
+// -todo: fix crash on node deletion when src node has 2 connections - deleting from destCncts multi-map only needs to happen once since it will match all the connections to that src slot
+// -todo: fix crash on deletion of dest node when connected to a multi-connected node - delDestCnct needed to be redone after underlying data structure changes
 
 // todo: try multiple nodes and connections
+// todo: fix and put back yellow highlighting of slots that are selected
 // todo: make addSlot check for current slots to make its slot index sequential
 // todo: make loading find the highest node id and set the current id of the GraphDB
 // todo: make function to modularize drawing a bezier from one slot to another with normals
@@ -1275,13 +1278,13 @@ ENTRY_DECLARATION
       // nodes
       Node& n0 = fd.grph.addNode( Node("one",   Node::FLOW, {400.f,300.f}) );
       Node& n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
-      //Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
+      Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
       //Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
 
       // slots
       fd.grph.addSlot( Slot(n0.id, false) );
       fd.grph.addSlot( Slot(n1.id,  true) );
-      //fd.grph.addSlot( Slot(n2.id,  true) );
+      fd.grph.addSlot( Slot(n2.id,  true) );
       //fd.grph.addSlot( Slot(n3.id,  true) );
 
       //fd.grph.addCnct(0, 1);

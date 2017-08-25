@@ -529,28 +529,15 @@ public:
   {
     u32  cnt = 0;
     auto  di = m_destCncts.find(src);
-    for(; di!=m_destCncts.end() && di->first==src; ++cnt){   // ++di,
+    for(; di!=m_destCncts.end() && di->first==src; ++cnt, ++di){   // ++di,
       m_cncts.erase(di->second);
-      m_destCncts.erase(src);
-      di = m_destCncts.find(src);
+      //di = m_destCncts.find(src);
     }
+    m_destCncts.erase(src);
 
     return cnt;
-
-    //auto iter = m_cncts.find(di->second);
-    //for(; iter!=m_cncts.end() && iter->first==src; ++cnt){
-    //  auto cpy = iter++;
-    //  m_cncts.erase(cpy);
-    //}
-
-    //if(di != m_destCncts.end())
-    //auto dest = iter->second;
-    //
-    //++cnt;
-    //if(cpy->second == dest){
-    //}
   }
-  auto     destCncts(Id src) -> decltype(m_destCncts.begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
+  auto     destCncts(Id  src) -> decltype(m_destCncts.begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
   {
     return lower_bound(ALL(m_destCncts), Id(src), [](auto a,auto b){ return a.first < b; } );
   }
@@ -576,11 +563,25 @@ public:
   }
   bool   delDestCnct(Id dest)
   {
-    auto iter = m_destCncts.find(dest);
-    if(iter == m_destCncts.end()) return false;
+    auto iter = m_cncts.find(dest);
+    if(iter==m_cncts.end()) return false;
 
     auto src = iter->second;
-    delCnct(src, iter->first);
+    m_cncts.erase(dest);
+
+    auto srcIter = m_destCncts.find(src);
+    for(; srcIter!=end(m_destCncts) && srcIter->first==src && srcIter->second==dest; ){
+      auto cpy = srcIter++;
+      m_destCncts.erase(cpy);
+    }
+
+    //delCnct(src, dest);
+
+    //auto iter = m_destCncts.find(dest);
+    //if(iter == m_destCncts.end()) return false;
+
+    //auto src = iter->second;
+    //delCnct(src, iter->first);
 
     return true;
   }
@@ -678,6 +679,18 @@ struct FisData
 
 
 
+//auto iter = m_cncts.find(di->second);
+//for(; iter!=m_cncts.end() && iter->first==src; ++cnt){
+//  auto cpy = iter++;
+//  m_cncts.erase(cpy);
+//}
+
+//if(di != m_destCncts.end())
+//auto dest = iter->second;
+//
+//++cnt;
+//if(cpy->second == dest){
+//}
 
 //auto ci = m_inCncts.find(destId);
 //if(ci != m_inCncts.end()){
