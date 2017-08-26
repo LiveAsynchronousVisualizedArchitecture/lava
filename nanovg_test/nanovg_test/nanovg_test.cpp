@@ -88,9 +88,11 @@
 // -todo: investigate crash on drawing after file load - possibly doesn't work due to javascript having double as a number limitation
 // -todo: write node index to json file
 // -todo: write order array with nodes - is the order in the file good enough - should be since add node will increment the order
+// -todo: add idx to addSlot()
+// -todo: figure out why slot types get flipped when loading file - addNode() needed newId to have false passed to it
+// -todo: write slot indices into json file
+// -todo: test saving and loading with normalization back on
 
-// todo: write slot indices into json file
-// todo: test saving and loading with normalization back on
 // todo: make addSlot check for current slots to make its slot index sequential
 // todo: make function to modularize drawing a bezier from one slot to another with normals
 // todo: debug flashing connections - possibly due to numeric error handling - have to repeat first
@@ -109,6 +111,7 @@
 // todo: separate finding node the pointer is inside from the action to take
 // todo: make message node diameter dependant on text bounds
 
+// idea: combine src and dest slots when writing json and just use a boolean to separate them 
 // idea: have a panel or window that shows information about the selected node and the shared library it represents
 // idea: make connections thicker when there is more data and brighter when there are more packets
 // idea: build in focus as information separate from selection
@@ -372,17 +375,27 @@ str           graphToStr(GraphDB const& g)
   Jzon::Node jslots = Jzon::object();
   SECTION(slots)
   {
-    Jzon::Node src  = Jzon::array();
-    Jzon::Node dest = Jzon::array();
+    Jzon::Node srcId   = Jzon::array();
+    Jzon::Node srcIdx  = Jzon::array();
+    Jzon::Node destId  = Jzon::array();
+    Jzon::Node destIdx = Jzon::array();
 
     for(auto kv : g.slots()){
+      Id  sid = kv.first;
       auto& s = kv.second;
-      if(s.in) dest.add(s.nid);
-      else     src.add(s.nid);
+      if(s.in){
+        destId.add(sid.id);
+        destIdx.add(sid.idx);
+      }else{
+        srcId.add(sid.id);
+        srcIdx.add(sid.idx);
+      }
     }
 
-    jslots.add("src",   src);
-    jslots.add("dest", dest);
+    jslots.add("destId",   destId);
+    jslots.add("destIdx", destIdx);
+    jslots.add("srcId",     srcId);
+    jslots.add("srcIdx",   srcIdx);
   }
   Jzon::Node jcncts = Jzon::object();
   SECTION(connections)
@@ -438,20 +451,22 @@ GraphDB       strToGraph(str const& s)
   Jzon::Parser prs;
   auto graph = prs.parseString(s);
 
-  auto nd_id    = graph.get("nodes").get("id");
-  auto nd_txt   = graph.get("nodes").get("txt");
-  auto nd_x     = graph.get("nodes").get("x");
-  auto nd_y     = graph.get("nodes").get("y");
-  auto nd_type  = graph.get("nodes").get("type");
-  auto ordr     = graph.get("nodes").get("order");
-  auto srcId    = graph.get("connections").get("srcId");
-  auto srcIdx   = graph.get("connections").get("srcIdx");
-  auto destId   = graph.get("connections").get("destId");
-  auto destIdx  = graph.get("connections").get("destIdx");
-  auto sltSrc   = graph.get("slots").get("src");
-  auto sltDest  = graph.get("slots").get("dest");
+  auto nd_id      = graph.get("nodes").get("id");
+  auto nd_txt     = graph.get("nodes").get("txt");
+  auto nd_x       = graph.get("nodes").get("x");
+  auto nd_y       = graph.get("nodes").get("y");
+  auto nd_type    = graph.get("nodes").get("type");
+  auto ordr       = graph.get("nodes").get("order");
+  auto destId     = graph.get("connections").get("destId");
+  auto destIdx    = graph.get("connections").get("destIdx");
+  auto srcId      = graph.get("connections").get("srcId");
+  auto srcIdx     = graph.get("connections").get("srcIdx");
+  auto sltDestId  = graph.get("slots").get("destId");
+  auto sltDestIdx = graph.get("slots").get("destIdx");
+  auto sltSrcId   = graph.get("slots").get("srcId");
+  auto sltSrcIdx  = graph.get("slots").get("srcIdx");
 
-  auto cnt = nd_x.getCount();
+  auto cnt = nd_id.getCount();
   TO(cnt,i){
     Node n;
     n.id   = nd_id.get(i).toInt();
@@ -459,18 +474,22 @@ GraphDB       strToGraph(str const& s)
     n.P.x  = nd_x.get(i).toFloat();
     n.P.y  = nd_y.get(i).toFloat();
     n.type = (Node::Type)nd_type.get(i).toInt();
-    g.addNode(n);
+    g.addNode(n, false);
   }
   
-  TO(sltSrc.getCount(),i){
-    u32 nIdx = sltSrc.get(i).toInt();
-    Slot s(nIdx,false);
-    g.addSlot(s);
+  TO(sltSrcId.getCount(),i){
+    Id sltId;
+    sltId.id  = sltSrcId.get(i).toInt();
+    sltId.idx = sltSrcIdx.get(i).toInt();
+    Slot s(sltId.id,false);
+    g.addSlot(s, sltId.idx);
   }
-  TO(sltDest.getCount(),i){
-    u32 nIdx = sltDest.get(i).toInt();
-    Slot s(nIdx,true);
-    g.addSlot(s);
+  TO(sltDestId.getCount(),i){
+    Id sltId;
+    sltId.id  = sltDestId.get(i).toInt();
+    sltId.idx = sltDestIdx.get(i).toInt();
+    Slot s(sltId.id,true);
+    g.addSlot(s, sltId.idx);
   }
 
   auto cnct_cnt = destId.getCount();
@@ -1383,7 +1402,7 @@ ENTRY_DECLARATION
         nfdresult_t result = NFD_SaveDialog("lava", NULL, &outPath );
         //printf("\n\nfile dialog: %d %s \n\n", result, outPath);
         if(outPath){
-          //fd.grph.normalizeIndices();
+          fd.grph.normalizeIndices();
           bool ok = saveFile(fd.grph, outPath);
           if(ok) printf("\nFile Written to %s\n", outPath);
           else   printf("\nSave did not write successfully to %s\n", outPath);

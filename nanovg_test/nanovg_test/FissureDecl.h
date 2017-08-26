@@ -487,10 +487,10 @@ public:
   u64            nsz() const { return m_nodes.size(); }
 
   // slots
-  Id         addSlot(Slot  s)
+  Id         addSlot(Slot  s, u64 idx=1)
   {
-    Id id(s.nid);
-    id.idx = 1;
+    Id id(s.nid, idx);
+    //id.idx = idx;
     m_slots.insert({id, s});                   // todo: make this find the last slot idx and make it sequential
 
     return id;
