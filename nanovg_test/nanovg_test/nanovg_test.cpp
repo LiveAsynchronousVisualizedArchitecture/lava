@@ -77,8 +77,10 @@
 // -todo: fix slots not moving around borders - in/dest slot finding was done in the src case
 // -todo: put back intermediate position with multiple connections
 // -todo: fix node becoming deselected after drag - inAny was being combined with clicks
+// -todo: make sure normalization also normalizes ordering
+// -todo: fix connections disappearing on saving/normalization - need to use an unordered_map to associate Ids
+// -todo: figure out why src slot stops pointing toward dest after normalization - m_destCncts loop was switching src and dest
 
-// todo: fix connections disappearing on saving/normalization - need to use an unsorted_map to associate Ids
 // todo: make loading find the highest node id and set the current id of the GraphDB
 // todo: make addSlot check for current slots to make its slot index sequential
 // todo: make function to modularize drawing a bezier from one slot to another with normals
@@ -1370,16 +1372,17 @@ ENTRY_DECLARATION
         }
       });
       saveBtn->setCallback([](){
-        fd.grph.normalizeIndices();
+        //fd.grph.normalizeIndices();
 
-        //nfdchar_t *outPath = NULL;
-        //nfdresult_t result = NFD_SaveDialog("lava", NULL, &outPath );
-        ////printf("\n\nfile dialog: %d %s \n\n", result, outPath);
-        //if(outPath){
-        //  bool ok = saveFile(fd.grph, outPath);
-        //  if(ok) printf("\nFile Written to %s\n", outPath);
-        //  else   printf("\nSave did not write successfully to %s\n", outPath);
-        //}
+        nfdchar_t *outPath = NULL;
+        nfdresult_t result = NFD_SaveDialog("lava", NULL, &outPath );
+        //printf("\n\nfile dialog: %d %s \n\n", result, outPath);
+        if(outPath){
+          fd.grph.normalizeIndices();
+          bool ok = saveFile(fd.grph, outPath);
+          if(ok) printf("\nFile Written to %s\n", outPath);
+          else   printf("\nSave did not write successfully to %s\n", outPath);
+        }
       });
 
       GraphDB* grphPtr = &fd.grph;

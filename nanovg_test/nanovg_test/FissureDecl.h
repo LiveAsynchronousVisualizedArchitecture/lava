@@ -285,15 +285,18 @@ public:
     using namespace std;
     
     // create a mapping of old node Ids to new ones, new ones will be their position + 1
-    //vec<u64> nids;
-    //nids.reserve(m_nodes.size());
-    //for(auto& kv : m_nodes) nids.push_back(kv.first);
-
     unordered_map<u64,u64> nids;
     nids.reserve(m_ids.size());
     u64 cur = 1;
     for(auto& kv : m_ids){
       nids[kv.first] = cur++;
+    }
+
+    unordered_map<u64,u64> ordrs;
+    ordrs.reserve(m_nodes.size());
+    u64 curOrdr = 1;
+    for(auto& kv : m_nodes){
+      ordrs[kv.first] = curOrdr++;
     }
 
     // connections 
@@ -309,13 +312,59 @@ public:
 
     SrcMap nxtDestCncts;
     for(auto kv : m_destCncts){
-      Id nxtDest  = kv.first;
-      Id nxtSrc   = kv.second;
-      nxtDest.id  = nids[nxtDest.id];
+      Id nxtSrc   = kv.first;
+      Id nxtDest  = kv.second;
       nxtSrc.id   = nids[nxtSrc.id];
+      nxtDest.id  = nids[nxtDest.id];
       nxtDestCncts.insert({nxtSrc, nxtDest});
     }
     m_destCncts = move(nxtDestCncts);
+
+    // slots
+    Slots nxtSlots;
+    for(auto& kv : m_slots){
+      Id nxtId  = kv.first;
+      nxtId.id  = nids[nxtId.id];
+      Slot nxtS = kv.second;
+      nxtS.nid  = nids[nxtS.nid];
+      nxtSlots.insert({nxtId, nxtS});
+    }
+    m_slots = move(nxtSlots);
+
+    // node ids 
+    NodeIdMap nxtIds;
+    for(auto& kv : m_ids){
+      u64   nxtId = nids[kv.first];
+      u64 nxtOrdr = ordrs[kv.second];
+      nxtIds.insert({nxtId, nxtOrdr});
+    }
+    m_ids = move(nxtIds);
+
+    // and finally nodes
+    NodeMap nxtOrdrs;
+    for(auto& kv : m_nodes){
+      Node nxtNd  = kv.second;
+      nxtNd.id    = nids[nxtNd.id];
+      u64 nxtOrdr = ordrs[kv.first];
+      nxtOrdrs.insert({nxtOrdr, nxtNd});
+    }
+    m_nodes = move(nxtOrdrs);
+
+
+
+
+
+    //vec<u64> nids;
+    //nids.reserve(m_nodes.size());
+    //for(auto& kv : m_nodes) nids.push_back(kv.first);
+
+    //
+    //u64   nxtId = nids[kv.first];
+
+    //u64 nxtId = nids[kv.first];
+    //nxtNodes.insert({nxtId, kv.second});
+    //kv.second.id = nxt;
+    //nxtIds.insert({nxt, kv.first});
 
     //CnctMap nxtCncts;
     //TO(nids.size(),i){
@@ -342,16 +391,6 @@ public:
     //}
     //m_destCncts = move(nxtDestCncts);
 
-    // slots
-    Slots nxtSlots;
-    for(auto& kv : m_slots){
-      Id nxtId = kv.first;
-      nxtId.id = nids[nxtId.id];
-      nxtSlots.insert({nxtId, kv.second});
-    }
-    m_slots = move(nxtSlots);
-
-
     //TO(nids.size(),i)
     //{
     //  u64 nid = nids[i];
@@ -377,17 +416,6 @@ public:
     //}
     //m_slots = move(nxtSlots);
 
-    // and finally nodes
-    NodeIdMap nxtIds;
-    for(auto& kv : m_nodes){
-      //u64 nxtId = nids[kv.first];
-      //nxtNodes.insert({nxtId, kv.second});
-      u64 nxt = nids[kv.second.id];
-      kv.second.id = nxt;
-      nxtIds.insert({nxt, kv.first});
-    }
-    m_ids = move(nxtIds);
-
     //NodeMap nxtNodes;
     //TO(nids.size(),i){
     //  u64 nid = nids[i];
@@ -398,7 +426,6 @@ public:
     //  }
     //}
     //m_nodes = move(nxtNodes);
-
 
     //auto si = m_slots.find(Id(nid));
     //for(; si != m_slots.end() && si->first.id==nid; ++si){
