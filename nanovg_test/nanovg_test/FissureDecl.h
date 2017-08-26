@@ -285,63 +285,124 @@ public:
     using namespace std;
     
     // create a mapping of old node Ids to new ones, new ones will be their position + 1
-    vec<u64> nids;
-    nids.reserve(m_nodes.size());
-    for(auto& kv : m_nodes) nids.push_back(kv.first);
+    //vec<u64> nids;
+    //nids.reserve(m_nodes.size());
+    //for(auto& kv : m_nodes) nids.push_back(kv.first);
+
+    unordered_map<u64,u64> nids;
+    nids.reserve(m_ids.size());
+    u64 cur = 1;
+    for(auto& kv : m_ids){
+      nids[kv.first] = cur++;
+    }
 
     // connections 
     CnctMap nxtCncts;
-    TO(nids.size(),i){
-      u64 nid = nids[i];
-      auto ci = m_cncts.find(Id(nid));
-      for(; ci != m_cncts.end() && ci->first.id==nid; ++ci){
-        Id nxtId(i+1);
-        nxtId.idx = ci->first.idx;
-        nxtCncts.insert({nxtId, move(ci->second)});
-      }
+    for(auto kv : m_cncts){
+      Id nxtDest = kv.first;
+      Id nxtSrc  = kv.second;
+      nxtDest.id = nids[nxtDest.id];
+      nxtSrc.id  = nids[nxtSrc.id];
+      nxtCncts.insert({nxtDest, nxtSrc});
     }
     m_cncts = move(nxtCncts);
 
     SrcMap nxtDestCncts;
-    TO(nids.size(),i){
-      u64 nid = nids[i];
-      auto ci = m_destCncts.find(Id(nid));
-      for(; ci != m_destCncts.end() && ci->first.id==nid; ++ci){
-        Id nxtId(i+1);
-        nxtId.idx = ci->first.idx;
-        nxtDestCncts.insert({nxtId, move(ci->second)});
-      }
+    for(auto kv : m_destCncts){
+      Id nxtDest  = kv.first;
+      Id nxtSrc   = kv.second;
+      nxtDest.id  = nids[nxtDest.id];
+      nxtSrc.id   = nids[nxtSrc.id];
+      nxtDestCncts.insert({nxtSrc, nxtDest});
     }
     m_destCncts = move(nxtDestCncts);
 
+    //CnctMap nxtCncts;
+    //TO(nids.size(),i){
+    //  u64 nid = nids[i];
+    //  auto ci = m_cncts.find(Id(nid));
+    //  for(; ci != m_cncts.end() && ci->first.id==nid; ++ci){
+    //    Id nxtId = ci->first;
+    //    //nxtId.idx = 
+    //    //nxtId.idx = ci->first.idx;
+    //    nxtCncts.insert({nxtId, move(ci->second)});
+    //  }
+    //}
+    //m_cncts = move(nxtCncts);
+
+    //SrcMap nxtDestCncts;
+    //TO(nids.size(),i){
+    //  u64 nid = nids[i];
+    //  auto ci = m_destCncts.find(Id(nid));
+    //  for(; ci != m_destCncts.end() && ci->first.id==nid; ++ci){
+    //    Id nxtId(i+1);
+    //    nxtId.idx = ci->first.idx;
+    //    nxtDestCncts.insert({nxtId, move(ci->second)});
+    //  }
+    //}
+    //m_destCncts = move(nxtDestCncts);
+
     // slots
-    //auto si = m_slots.find(Id(nid));
-    //for(; si != m_slots.end() && si->first.id==nid; ++si){
-    //auto  s = slot(nid);
     Slots nxtSlots;
-    TO(nids.size(),i)
-    {
-      u64 nid = nids[i];
-      auto si = nodeSlots(nid);
-      for(; si != m_slots.end() && si->first.id==nid; ++si){
-        Id nxtId(i+1);
-        nxtId.idx = si->first.idx;
-        nxtSlots.insert({nxtId, move(si->second)});
-      }
+    for(auto& kv : m_slots){
+      Id nxtId = kv.first;
+      nxtId.id = nids[nxtId.id];
+      nxtSlots.insert({nxtId, kv.second});
     }
     m_slots = move(nxtSlots);
 
+
+    //TO(nids.size(),i)
+    //{
+    //  u64 nid = nids[i];
+    //  auto si = nodeSlots(nid);
+    //  for(; si != m_slots.end() && si->first.id==nid; ++si){
+    //    Id nxtId(i+1);
+    //    nxtId.idx = si->first.idx;
+    //    nxtSlots.insert({nxtId, move(si->second)});
+    //  }
+    //}
+    //m_slots = move(nxtSlots);
+
+    //Slots nxtSlots;
+    //TO(nids.size(),i)
+    //{
+    //  u64 nid = nids[i];
+    //  auto si = nodeSlots(nid);
+    //  for(; si != m_slots.end() && si->first.id==nid; ++si){
+    //    Id nxtId(i+1);
+    //    nxtId.idx = si->first.idx;
+    //    nxtSlots.insert({nxtId, move(si->second)});
+    //  }
+    //}
+    //m_slots = move(nxtSlots);
+
     // and finally nodes
-    NodeMap nxtNodes;
-    TO(nids.size(),i){
-      u64 nid = nids[i];
-      auto ni = m_nodes.find(nid);
-      for(; ni != m_nodes.end() && ni->first==nid; ++ni){
-        u64 nxtId = i+1;
-        nxtNodes.insert({nxtId, move(ni->second)});
-      }
+    NodeIdMap nxtIds;
+    for(auto& kv : m_nodes){
+      //u64 nxtId = nids[kv.first];
+      //nxtNodes.insert({nxtId, kv.second});
+      u64 nxt = nids[kv.second.id];
+      kv.second.id = nxt;
+      nxtIds.insert({nxt, kv.first});
     }
-    m_nodes = move(nxtNodes);
+    m_ids = move(nxtIds);
+
+    //NodeMap nxtNodes;
+    //TO(nids.size(),i){
+    //  u64 nid = nids[i];
+    //  auto ni = m_nodes.find(nid);
+    //  for(; ni != m_nodes.end() && ni->first==nid; ++ni){
+    //    u64 nxtId = i+1;
+    //    nxtNodes.insert({nxtId, move(ni->second)});
+    //  }
+    //}
+    //m_nodes = move(nxtNodes);
+
+
+    //auto si = m_slots.find(Id(nid));
+    //for(; si != m_slots.end() && si->first.id==nid; ++si){
+    //auto  s = slot(nid);
 
     //for(auto& kv : m_cncts){
     //  kv.first.id = 

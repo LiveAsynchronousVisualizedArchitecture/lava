@@ -78,7 +78,7 @@
 // -todo: put back intermediate position with multiple connections
 // -todo: fix node becoming deselected after drag - inAny was being combined with clicks
 
-// todo: fix connections disappearing on saving/normalization
+// todo: fix connections disappearing on saving/normalization - need to use an unsorted_map to associate Ids
 // todo: make loading find the highest node id and set the current id of the GraphDB
 // todo: make addSlot check for current slots to make its slot index sequential
 // todo: make function to modularize drawing a bezier from one slot to another with normals
@@ -1273,18 +1273,18 @@ ENTRY_DECLARATION
       // nodes
       Node& n0 = fd.grph.addNode( Node("one",   Node::FLOW, {400.f,300.f}) );
       Node& n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
-      Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
-      Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
+      //Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
+      //Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
 
       // slots
       Id s0 = fd.grph.addSlot( Slot(n0.id, false) );
       Id s1 = fd.grph.addSlot( Slot(n1.id,  true) );
-      Id s2 = fd.grph.addSlot( Slot(n2.id,  true) );
-      Id s3 = fd.grph.addSlot( Slot(n3.id,  true) );
+      //Id s2 = fd.grph.addSlot( Slot(n2.id,  true) );
+      //Id s3 = fd.grph.addSlot( Slot(n3.id,  true) );
 
       fd.grph.toggleCnct(s0, s1);
-      fd.grph.toggleCnct(s0, s2);
-      fd.grph.toggleCnct(s0, s3);
+      //fd.grph.toggleCnct(s0, s2);
+      //fd.grph.toggleCnct(s0, s3);
 
       //fd.grph.addCnct(Id(1,1), Id(1,1));
       //fd.grph.addCnct(Id(1,1), Id(2,1));
@@ -1372,18 +1372,14 @@ ENTRY_DECLARATION
       saveBtn->setCallback([](){
         fd.grph.normalizeIndices();
 
-        nfdchar_t *outPath = NULL;
-        nfdresult_t result = NFD_SaveDialog("lava", NULL, &outPath );
-
-        //printf("\n\nfile dialog: %d %s \n\n", result, outPath);
-
-        if(outPath){
-          //fd.grph.normalizeIndices();
-
-          bool ok = saveFile(fd.grph, outPath);
-          if(ok) printf("\nFile Written to %s\n", outPath);
-          else   printf("\nSave did not write successfully to %s\n", outPath);
-        }
+        //nfdchar_t *outPath = NULL;
+        //nfdresult_t result = NFD_SaveDialog("lava", NULL, &outPath );
+        ////printf("\n\nfile dialog: %d %s \n\n", result, outPath);
+        //if(outPath){
+        //  bool ok = saveFile(fd.grph, outPath);
+        //  if(ok) printf("\nFile Written to %s\n", outPath);
+        //  else   printf("\nSave did not write successfully to %s\n", outPath);
+        //}
       });
 
       GraphDB* grphPtr = &fd.grph;
