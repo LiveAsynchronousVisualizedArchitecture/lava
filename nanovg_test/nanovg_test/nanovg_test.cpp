@@ -84,23 +84,30 @@
 // -todo: make loading find the highest node id and set the current id of the GraphDB
 // -todo: fix drag selection from clearing selections - put back check for drgbox == true to clear selections with addition of drgbox && lftClkUp
 // -todo: clean comments to graveyard
+// -todo: separate connection node ids and slot indices - have to do the same thing for slots?
+// -todo: investigate crash on drawing after file load - possibly doesn't work due to javascript having double as a number limitation
+// -todo: write node index to json file
+// -todo: write order array with nodes - is the order in the file good enough - should be since add node will increment the order
 
-// todo: fix crash on file load
+// todo: write slot indices into json file
+// todo: test saving and loading with normalization back on
 // todo: make addSlot check for current slots to make its slot index sequential
 // todo: make function to modularize drawing a bezier from one slot to another with normals
 // todo: debug flashing connections - possibly due to numeric error handling - have to repeat first
-// todo: make one node snap to another node
+// todo: don't select a slot if it is under an existing node
+// todo: draw bg grid
 // todo: group ui state variables together - priSel, connecting
-// todo: make two snapped nodes group together and be dragged together
+
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
 // todo: make a node to split text into lines and scatter the result
-// todo: separate finding node the pointer is inside from the action to take
+// todo: make one node snap to another node
+// todo: make two snapped nodes group together and be dragged together
 // todo: use scroll wheel and nanovg scale transforms to zoom in and out - will need to scale mouse pointer position as well to 'canvas' coordinates
 // todo: make node size draw using node bnds
 // todo: make flow node size dependant on text bounds
+// todo: separate finding node the pointer is inside from the action to take
 // todo: make message node diameter dependant on text bounds
-// todo: don't select a slot if it is under an existing node
 
 // idea: have a panel or window that shows information about the selected node and the shared library it represents
 // idea: make connections thicker when there is more data and brighter when there are more packets
@@ -332,6 +339,9 @@ str           graphToStr(GraphDB const& g)
     auto ndp = g.nodes();
     auto  sz = g.nsz();
 
+    Jzon::Node  nd_id = Jzon::array();
+    TO(sz,i) nd_id.add(ndp[i]->id);
+
     Jzon::Node  nd_txt = Jzon::array();
     TO(sz,i) nd_txt.add(ndp[i]->txt);
     //TO(sz,i) nd_txt.add(g.node(i).txt);
@@ -352,9 +362,10 @@ str           graphToStr(GraphDB const& g)
     //Jzon::Node ordr = Jzon::array();
     //TO(sz,i) ordr.add(nd_ordr[i]);
 
+    nds.add("id",     nd_id);
+    nds.add("txt",   nd_txt);
     nds.add("x",       nd_x);
     nds.add("y",       nd_y);
-    nds.add("txt",   nd_txt);
     nds.add("type", nd_type);
     //nds.add("order",  ordr);
   }
@@ -378,16 +389,22 @@ str           graphToStr(GraphDB const& g)
   {
     auto sz = g.cnctsz();
 
-    Jzon::Node src  = Jzon::array();
-    Jzon::Node dest = Jzon::array();
+    Jzon::Node srcId   = Jzon::array();
+    Jzon::Node srcIdx  = Jzon::array();
+    Jzon::Node destId  = Jzon::array();
+    Jzon::Node destIdx = Jzon::array();
 
     for(auto kv : g.cncts()){
-      src.add(kv.first.asInt);
-      dest.add(kv.second.asInt);
+      destId.add(kv.first.id);
+      destIdx.add(kv.first.idx);
+      srcId.add(kv.second.id);
+      srcIdx.add(kv.second.idx);
     }
 
-    jcncts.add("src",   src);
-    jcncts.add("dest", dest);
+    jcncts.add("destId",   destId);
+    jcncts.add("destIdx", destIdx);
+    jcncts.add("srcId",     srcId);
+    jcncts.add("srcIdx",   srcIdx);
   }
   
   Jzon::Node graph = Jzon::object();
@@ -421,22 +438,26 @@ GraphDB       strToGraph(str const& s)
   Jzon::Parser prs;
   auto graph = prs.parseString(s);
 
+  auto nd_id    = graph.get("nodes").get("id");
+  auto nd_txt   = graph.get("nodes").get("txt");
   auto nd_x     = graph.get("nodes").get("x");
   auto nd_y     = graph.get("nodes").get("y");
-  auto nd_txt   = graph.get("nodes").get("txt");
   auto nd_type  = graph.get("nodes").get("type");
   auto ordr     = graph.get("nodes").get("order");
-  auto src      = graph.get("connections").get("src");
-  auto dest     = graph.get("connections").get("dest");
+  auto srcId    = graph.get("connections").get("srcId");
+  auto srcIdx   = graph.get("connections").get("srcIdx");
+  auto destId   = graph.get("connections").get("destId");
+  auto destIdx  = graph.get("connections").get("destIdx");
   auto sltSrc   = graph.get("slots").get("src");
   auto sltDest  = graph.get("slots").get("dest");
 
   auto cnt = nd_x.getCount();
   TO(cnt,i){
     Node n;
+    n.id   = nd_id.get(i).toInt();
+    n.txt  = nd_txt.get(i).toString();
     n.P.x  = nd_x.get(i).toFloat();
     n.P.y  = nd_y.get(i).toFloat();
-    n.txt  = nd_txt.get(i).toString();
     n.type = (Node::Type)nd_type.get(i).toInt();
     g.addNode(n);
   }
@@ -452,12 +473,14 @@ GraphDB       strToGraph(str const& s)
     g.addSlot(s);
   }
 
-  auto cnct_cnt = src.getCount();
+  auto cnct_cnt = destId.getCount();
   TO(cnct_cnt,i){
-    Id srcId, destId;
-    srcId.asInt  = src.get(i).toInt();
-    destId.asInt = dest.get(i).toInt();
-    g.addCnct(srcId, destId);
+    Id src, dest;
+    src.id   = srcId.get(i).toInt();
+    src.idx  = srcIdx.get(i).toInt();
+    dest.id  = destId.get(i).toInt();
+    dest.idx = destIdx.get(i).toInt();
+    g.addCnct(src, dest);
   }
 
   g.setNextNodeId( g.maxId() );
@@ -1360,7 +1383,7 @@ ENTRY_DECLARATION
         nfdresult_t result = NFD_SaveDialog("lava", NULL, &outPath );
         //printf("\n\nfile dialog: %d %s \n\n", result, outPath);
         if(outPath){
-          fd.grph.normalizeIndices();
+          //fd.grph.normalizeIndices();
           bool ok = saveFile(fd.grph, outPath);
           if(ok) printf("\nFile Written to %s\n", outPath);
           else   printf("\nSave did not write successfully to %s\n", outPath);
@@ -1861,3 +1884,17 @@ ENTRY_DECLARATION
 
 
 
+
+
+//auto srcInt  = srcId.get(i).toInt();
+//auto destInt = destId.get(i).toInt();
+
+//auto st = src.get(i).getType();
+//auto dt = dest.get(i).getType();
+//auto srcInt  = src.get(i).toInt();
+//auto destInt = dest.get(i).toInt();
+
+//Id srcId, destId;
+//srcId.asInt  = srcInt;
+//destId.asInt = destInt;
+//g.addCnct(srcId, destId);

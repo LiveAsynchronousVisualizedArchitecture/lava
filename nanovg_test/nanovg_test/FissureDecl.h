@@ -166,7 +166,7 @@ public:
   using NodeMap      = std::map<u64, Node>;             // maps an order to a Node struct
   using NodeIdMap    = std::unordered_map<u64, u64>;    // maps a node id to its order, which can be used to find the node in the NodeMap
   using Slots        = std::multimap<Id, Slot>;         // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
-  using CnctMap      = std::unordered_map<Id, Id, Id>;  // Id is the hash function object in the third template argument - maps connections from their single destination slot to their single source slot 
+  using CnctMap      = std::unordered_map<Id, Id, Id>;  // maps connections from their single destination slot to their single source slot - Id is the hash function object in the third template argument
   using SrcMap       = std::multimap<Id, Id>;           // maps connections from their single source slot to their one or more destination slots
   using vec_nptrs    = std::vector<Node*>;
   using vec_cnptrs   = std::vector<Node const*>;
@@ -349,97 +349,6 @@ public:
       nxtOrdrs.insert({nxtOrdr, nxtNd});
     }
     m_nodes = move(nxtOrdrs);
-
-
-
-
-
-    //vec<u64> nids;
-    //nids.reserve(m_nodes.size());
-    //for(auto& kv : m_nodes) nids.push_back(kv.first);
-
-    //
-    //u64   nxtId = nids[kv.first];
-
-    //u64 nxtId = nids[kv.first];
-    //nxtNodes.insert({nxtId, kv.second});
-    //kv.second.id = nxt;
-    //nxtIds.insert({nxt, kv.first});
-
-    //CnctMap nxtCncts;
-    //TO(nids.size(),i){
-    //  u64 nid = nids[i];
-    //  auto ci = m_cncts.find(Id(nid));
-    //  for(; ci != m_cncts.end() && ci->first.id==nid; ++ci){
-    //    Id nxtId = ci->first;
-    //    //nxtId.idx = 
-    //    //nxtId.idx = ci->first.idx;
-    //    nxtCncts.insert({nxtId, move(ci->second)});
-    //  }
-    //}
-    //m_cncts = move(nxtCncts);
-
-    //SrcMap nxtDestCncts;
-    //TO(nids.size(),i){
-    //  u64 nid = nids[i];
-    //  auto ci = m_destCncts.find(Id(nid));
-    //  for(; ci != m_destCncts.end() && ci->first.id==nid; ++ci){
-    //    Id nxtId(i+1);
-    //    nxtId.idx = ci->first.idx;
-    //    nxtDestCncts.insert({nxtId, move(ci->second)});
-    //  }
-    //}
-    //m_destCncts = move(nxtDestCncts);
-
-    //TO(nids.size(),i)
-    //{
-    //  u64 nid = nids[i];
-    //  auto si = nodeSlots(nid);
-    //  for(; si != m_slots.end() && si->first.id==nid; ++si){
-    //    Id nxtId(i+1);
-    //    nxtId.idx = si->first.idx;
-    //    nxtSlots.insert({nxtId, move(si->second)});
-    //  }
-    //}
-    //m_slots = move(nxtSlots);
-
-    //Slots nxtSlots;
-    //TO(nids.size(),i)
-    //{
-    //  u64 nid = nids[i];
-    //  auto si = nodeSlots(nid);
-    //  for(; si != m_slots.end() && si->first.id==nid; ++si){
-    //    Id nxtId(i+1);
-    //    nxtId.idx = si->first.idx;
-    //    nxtSlots.insert({nxtId, move(si->second)});
-    //  }
-    //}
-    //m_slots = move(nxtSlots);
-
-    //NodeMap nxtNodes;
-    //TO(nids.size(),i){
-    //  u64 nid = nids[i];
-    //  auto ni = m_nodes.find(nid);
-    //  for(; ni != m_nodes.end() && ni->first==nid; ++ni){
-    //    u64 nxtId = i+1;
-    //    nxtNodes.insert({nxtId, move(ni->second)});
-    //  }
-    //}
-    //m_nodes = move(nxtNodes);
-
-    //auto si = m_slots.find(Id(nid));
-    //for(; si != m_slots.end() && si->first.id==nid; ++si){
-    //auto  s = slot(nid);
-
-    //for(auto& kv : m_cncts){
-    //  kv.first.id = 
-    //}
-    //
-    //
-    //binary_search(ALL(nids), val);
-    //
-    //for(auto nid : nids){
-    //m_cncts.erase(ci);
   }
   void             clear()
   {
@@ -589,7 +498,8 @@ public:
   auto          slot(Id   id) -> Slot*
   {
     auto si = m_slots.find(id);
-    if(si == m_slots.end()) return nullptr;   // errorSlot();
+    if(si == m_slots.end()) 
+      return nullptr;   // errorSlot();
   
     return &si->second;
     //return m_slots[sIdx];
@@ -756,3 +666,89 @@ struct FisData
 
 
 
+//vec<u64> nids;
+//nids.reserve(m_nodes.size());
+//for(auto& kv : m_nodes) nids.push_back(kv.first);
+
+//
+//u64   nxtId = nids[kv.first];
+
+//u64 nxtId = nids[kv.first];
+//nxtNodes.insert({nxtId, kv.second});
+//kv.second.id = nxt;
+//nxtIds.insert({nxt, kv.first});
+
+//CnctMap nxtCncts;
+//TO(nids.size(),i){
+//  u64 nid = nids[i];
+//  auto ci = m_cncts.find(Id(nid));
+//  for(; ci != m_cncts.end() && ci->first.id==nid; ++ci){
+//    Id nxtId = ci->first;
+//    //nxtId.idx = 
+//    //nxtId.idx = ci->first.idx;
+//    nxtCncts.insert({nxtId, move(ci->second)});
+//  }
+//}
+//m_cncts = move(nxtCncts);
+
+//SrcMap nxtDestCncts;
+//TO(nids.size(),i){
+//  u64 nid = nids[i];
+//  auto ci = m_destCncts.find(Id(nid));
+//  for(; ci != m_destCncts.end() && ci->first.id==nid; ++ci){
+//    Id nxtId(i+1);
+//    nxtId.idx = ci->first.idx;
+//    nxtDestCncts.insert({nxtId, move(ci->second)});
+//  }
+//}
+//m_destCncts = move(nxtDestCncts);
+
+//TO(nids.size(),i)
+//{
+//  u64 nid = nids[i];
+//  auto si = nodeSlots(nid);
+//  for(; si != m_slots.end() && si->first.id==nid; ++si){
+//    Id nxtId(i+1);
+//    nxtId.idx = si->first.idx;
+//    nxtSlots.insert({nxtId, move(si->second)});
+//  }
+//}
+//m_slots = move(nxtSlots);
+
+//Slots nxtSlots;
+//TO(nids.size(),i)
+//{
+//  u64 nid = nids[i];
+//  auto si = nodeSlots(nid);
+//  for(; si != m_slots.end() && si->first.id==nid; ++si){
+//    Id nxtId(i+1);
+//    nxtId.idx = si->first.idx;
+//    nxtSlots.insert({nxtId, move(si->second)});
+//  }
+//}
+//m_slots = move(nxtSlots);
+
+//NodeMap nxtNodes;
+//TO(nids.size(),i){
+//  u64 nid = nids[i];
+//  auto ni = m_nodes.find(nid);
+//  for(; ni != m_nodes.end() && ni->first==nid; ++ni){
+//    u64 nxtId = i+1;
+//    nxtNodes.insert({nxtId, move(ni->second)});
+//  }
+//}
+//m_nodes = move(nxtNodes);
+
+//auto si = m_slots.find(Id(nid));
+//for(; si != m_slots.end() && si->first.id==nid; ++si){
+//auto  s = slot(nid);
+
+//for(auto& kv : m_cncts){
+//  kv.first.id = 
+//}
+//
+//
+//binary_search(ALL(nids), val);
+//
+//for(auto nid : nids){
+//m_cncts.erase(ci);
