@@ -98,9 +98,11 @@
 // -todo: draw bg grid
 // -todo: make function to modularize drawing a bezier from one slot to another with normals
 // -todo: make addSlot check for current slots to make its slot index sequential
+// -todo: clean comments out of main functions
 
-// todo: clean comments out of main functions
+// todo: profile 
 // todo: group ui state variables together - priSel, connecting
+// todo: test two slots
 
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
@@ -112,8 +114,8 @@
 // todo: make flow node size dependant on text bounds
 // todo: separate finding node the pointer is inside from the action to take
 // todo: make message node diameter dependant on text bounds
-// todo: make nodes snap to a grid
 // todo: make multiple slots avoid each other - might need to have discreet sections around a node for a slot to sit in
+// todo: make nodes snap to a grid
 // todo: don't select a slot if it is under an existing node
 
 // idea: combine src and dest slots when writing json and just use a boolean to separate them 
@@ -559,21 +561,6 @@ void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int
   }break;
   case 'L':
   {
-    //#ifdef _WIN32
-    //  HMODULE lib = LoadLibrary(TEXT("TfmTestLib.dll"));
-    //  if(lib){
-    //    auto   getNds = (GetLavaNodes_t)GetProcAddress(lib, TEXT("GetNodes") );
-    //    LavaNode* nds = getNds();
-    //    sprintf(sngl, "%s    %s    %s", nds[0].name, nds[0].in_types[0], nds[0].out_types[0] );
-    //    while(nds && nds->name)
-    //      node_add( (nds++)->name );
-    //  }else{ sprintf(sngl, "zero", lib); }
-    //
-    //  glfwSetWindowTitle(win, sngl);
-    //#endif
-
-
-
     #ifdef _WIN32
       HMODULE lib = LoadLibrary(TEXT("ReadFile.dll"));
       if(lib){
@@ -1475,6 +1462,22 @@ ENTRY_DECLARATION
 
 
 
+
+
+
+
+//#ifdef _WIN32
+//  HMODULE lib = LoadLibrary(TEXT("TfmTestLib.dll"));
+//  if(lib){
+//    auto   getNds = (GetLavaNodes_t)GetProcAddress(lib, TEXT("GetNodes") );
+//    LavaNode* nds = getNds();
+//    sprintf(sngl, "%s    %s    %s", nds[0].name, nds[0].in_types[0], nds[0].out_types[0] );
+//    while(nds && nds->name)
+//      node_add( (nds++)->name );
+//  }else{ sprintf(sngl, "zero", lib); }
+//
+//  glfwSetWindowTitle(win, sngl);
+//#endif
 
 //
 //int font = nvgCreateFont(vg, "sans-bold", "Roboto-Bold.ttf");

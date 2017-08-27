@@ -190,10 +190,6 @@ private:
     m_slots     = move(rval.m_slots); 
     m_cncts  = move(rval.m_cncts); 
     m_destCncts   = move(rval.m_destCncts);
-
-    //m_slots     = move(rval.m_slots); 
-    //m_selected  = move(rval.m_selected); 
-    //m_bnds      = move(rval.m_bnds); 
   }
   u64             nxt(){ return m_nxtId++; }
   u64        nxtOrder()
@@ -217,23 +213,13 @@ private:
   {
     using namespace std;
     
-    //vecui sidxs;                                            // sidxs is slot indexes
     vec_ids sidxs;                                            // sidxs is slot indexes
     for(auto np : nds){                                       // np is node pointer and nds is nodes
       auto si = lower_bound(ALL(m_slots), Id(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
       if(si != end(m_slots)  &&  si->first.id == np->id){
         Slot& s = si->second;
         if(s.in) sidxs.push_back(si->first);
-
-        //auto sidx = si->second;
-        //if(slot(sidx).in) sidxs.push_back(sidx);
       }
-
-      //auto si = m_slots.find(np->id);                   // si is slot iterator
-      //if(si != end(m_slots)){
-      //  auto sidx = si->second;
-      //  if(slot(sidx).in) sidxs.push_back(sidx);
-      //}
     }
     return sidxs;                                        // RVO
   }
@@ -241,25 +227,13 @@ private:
   {
     using namespace std;
 
-    //vecui sidxs;                                            // sidxs is slot indexes
     vec_ids sidxs;                                            // sidxs is slot indexes
     for(auto np : nds){                                     // np is node pointer and nds is nodes
       auto si = lower_bound(ALL(m_slots), Id(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
       if(si != end(m_slots)  &&  si->first.id == np->id){
         Slot& s = si->second;
-        sidxs.push_back(si->first);
-        
-        //if(s.in) sidxs.push_back(si->first);
-        //
-        //auto sidx = si->second;
-        //if(slot(sidx).in) sidxs.push_back(sidx);
+        sidxs.push_back(si->first);        
       }
-
-      //auto si = m_slots.find(np->id);                   // si is slot iterator
-      //if(si != end(m_slots)){
-      //  auto sidx = si->second;
-      //  if(slot(sidx).in) sidxs.push_back(sidx);
-      //}
     }
     return sidxs;                                        // RVO
   }
@@ -275,8 +249,7 @@ private:
   }
   u64         nxtSlot(u64 nid)
   {
-    auto   si = nodeSlots(nid);                   // si is slot iterator
-    //u64  = si->first.id;
+    auto si = nodeSlots(nid);                   // si is slot iterator
     u64 cur = 1;
     while(si != end(m_slots)   && 
           si->first.id  == nid && 
@@ -371,9 +344,6 @@ public:
     m_slots.clear();
     m_cncts.clear();
     m_destCncts.clear();
-
-    //m_slots.clear();
-    //m_selected.clear();
   }
   void     setNextNodeId(u64 nxt){ m_nxtId = nxt; }
 
@@ -384,12 +354,10 @@ public:
 
     u64    cnt = 0;
     auto   nds = selectedNodes();      // accumulate nodes
-    //auto sidxs = nodeDestSlots(nds);   // accumulate dest slots  // accumulate slots
     auto sidxs = nodeSlots(nds);   // accumulate dest slots  // accumulate slots
 
-                                       // delete cncts with dest slots
+    // delete cncts with dest slots
     for(auto sidx : sidxs){ 
-      //if( delDestCnct(sidx) ){ ++cnt; }
       auto s = slot(sidx);
       if(s->in)
         delDestCnct(sidx);  //){ ++cnt; }
@@ -407,15 +375,11 @@ public:
     }
 
     return cnt;
-
-    //m_slots.erase(ALL(sidxs));
-    //for(auto sidx : sidxs){ m_slots.erase( m_slots.begin() + sidx ); }
   }
   void         clearSels()
   {
     for(auto& on : m_nodes) on.second.sel = false;
     for(auto& kv : m_slots) kv.second.state = Slot::NORMAL;
-    //for(auto& slt : m_slots) slt.state = Slot::NORMAL;
   }
   void     clearSlotSels()
   {
@@ -429,12 +393,9 @@ public:
 
     n.order    = nxtOrder();
     Node& nref = m_nodes.insert({n.order, n}).first->second;
-    //u64 nodeIdx = (u64)(m_nodes.size()-1);
 
     m_ids.insert({n.id, n.order});
     
-    //m_selected.push_back(false);
-
     return nref;
   }
   auto          node(u64 id)  -> struct Node&
@@ -512,17 +473,14 @@ public:
     m_slots.insert({id, s});
 
     return id;
-
-    //m_slots.insert({id, s});                   // todo: make this find the last slot idx and make it sequential
   }
   auto          slot(Id   id) -> Slot*
   {
     auto si = m_slots.find(id);
     if(si == m_slots.end()) 
-      return nullptr;   // errorSlot();
+      return nullptr;
   
     return &si->second;
-    //return m_slots[sIdx];
   }
   auto     nodeSlots(u64 nid) -> decltype(m_slots.begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
   {
@@ -565,11 +523,12 @@ public:
     auto  di = m_destCncts.find(src);
     for(; di!=m_destCncts.end() && di->first==src; ++cnt, ++di){   // ++di,
       m_cncts.erase(di->second);
-      //di = m_destCncts.find(src);
     }
     m_destCncts.erase(src);
 
     return cnt;
+
+    //di = m_destCncts.find(src);
   }
   auto     destCncts(Id  src) -> decltype(m_destCncts.begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
   {
@@ -592,14 +551,6 @@ public:
       auto cpy = srcIter++;
       m_destCncts.erase(cpy);
     }
-
-    //delCnct(src, dest);
-
-    //auto iter = m_destCncts.find(dest);
-    //if(iter == m_destCncts.end()) return false;
-
-    //auto src = iter->second;
-    //delCnct(src, iter->first);
 
     return true;
   }
@@ -642,7 +593,6 @@ public:
     if(!s) return 0;
 
     if(s->in){
-      //auto iter = m_destCncts.find(id);
       auto iter = m_cncts.find(id);
       return delCnct(iter->second, iter->first);
     }else{
@@ -682,6 +632,68 @@ struct FisData
 
 
 
+
+
+
+
+
+//
+//u64  = si->first.id;
+
+//vecui sidxs;                                            // sidxs is slot indexes
+//
+//auto sidx = si->second;
+//if(slot(sidx).in) sidxs.push_back(sidx);
+//
+//auto si = m_slots.find(np->id);                   // si is slot iterator
+//if(si != end(m_slots)){
+//  auto sidx = si->second;
+//  if(slot(sidx).in) sidxs.push_back(sidx);
+//}
+
+//vecui sidxs;                                            // sidxs is slot indexes
+//
+//if(s.in) sidxs.push_back(si->first);
+//
+//auto sidx = si->second;
+//if(slot(sidx).in) sidxs.push_back(sidx);
+//
+//auto si = m_slots.find(np->id);                   // si is slot iterator
+//if(si != end(m_slots)){
+//  auto sidx = si->second;
+//  if(slot(sidx).in) sidxs.push_back(sidx);
+//}
+
+//m_slots.clear();
+//m_selected.clear();
+
+//auto sidxs = nodeDestSlots(nds);   // accumulate dest slots  // accumulate slots
+//if( delDestCnct(sidx) ){ ++cnt; }
+
+//m_slots.erase(ALL(sidxs));
+//for(auto sidx : sidxs){ m_slots.erase( m_slots.begin() + sidx ); }
+
+//u64 nodeIdx = (u64)(m_nodes.size()-1);
+//
+//m_selected.push_back(false);
+
+//delCnct(src, dest);
+//
+//auto iter = m_destCncts.find(dest);
+//if(iter == m_destCncts.end()) return false;
+//
+//auto src = iter->second;
+//delCnct(src, iter->first);
+
+//
+//auto iter = m_destCncts.find(id);
+
+//m_slots     = move(rval.m_slots); 
+//m_selected  = move(rval.m_selected); 
+//m_bnds      = move(rval.m_bnds); 
+
+//
+//m_slots.insert({id, s});                   // todo: make this find the last slot idx and make it sequential
 
 //auto iter = m_slots.find(id);
 //return iter;
