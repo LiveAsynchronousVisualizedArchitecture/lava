@@ -95,11 +95,11 @@
 // -todo: debug flashing connections - possibly due to numeric error handling - have to repeat first - can't repeat
 // -todo: fix duplicate connections being created - delCnct needed to be redone after switching cncts and destCncts
 // -todo: make clear_selections clear selected slots - clear_selections not triggering right, split out clearing slots into separate function
+// -todo: draw bg grid
+// -todo: make function to modularize drawing a bezier from one slot to another with normals
+// -todo: make addSlot check for current slots to make its slot index sequential
 
-// todo: make addSlot check for current slots to make its slot index sequential
-// todo: make function to modularize drawing a bezier from one slot to another with normals
-// todo: don't select a slot if it is under an existing node
-// todo: draw bg grid
+// todo: clean comments out of main functions
 // todo: group ui state variables together - priSel, connecting
 
 // todo: make two nodes execute in order
@@ -112,6 +112,9 @@
 // todo: make flow node size dependant on text bounds
 // todo: separate finding node the pointer is inside from the action to take
 // todo: make message node diameter dependant on text bounds
+// todo: make nodes snap to a grid
+// todo: make multiple slots avoid each other - might need to have discreet sections around a node for a slot to sit in
+// todo: don't select a slot if it is under an existing node
 
 // idea: combine src and dest slots when writing json and just use a boolean to separate them 
 // idea: have a panel or window that shows information about the selected node and the shared library it represents
@@ -1277,6 +1280,23 @@ void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState) /
   nvgFill(vg);
   nvgResetTransform(vg);
 }
+void           draw_cnct(NVGcontext* vg, v2 srcP, v2 destP, v2 srcN, v2 destN, f32 minCenterDist=INFf)
+{ 
+  using namespace std;
+  
+  f32  halfx = lerp(.5f, srcP.x, destP.x);
+  f32  halfy = lerp(.5f, srcP.y, destP.y);
+  f32   dist = len(srcP - destP);
+  v2  outNxt = srcP  + srcN  * min(minCenterDist, (dist/3));         // divide by 3 because there are 3 sections to the bezier
+  v2   inNxt = destP + destN * min(minCenterDist, (dist/3));
+
+  nvgBeginPath(vg);
+    nvgMoveTo(vg,   srcP.x, srcP.y);
+    nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, destP.x,destP.y);
+    nvgStrokeWidth(vg, 3.f);
+    nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+  nvgStroke(vg);
+}
 
 void        debug_coords(v2 a)
 {
@@ -1540,19 +1560,6 @@ ENTRY_DECLARATION
         }
         SECTION(slot selection and connection creation)
         {
-          //i32  inClk = -1;
-          //i32 outClk = -1;
-          //
-          //TO(grph.ssz(), i)
-          //auto   nid = kv.first.id;
-          //
-          //lftDn && !prevLftDn)
-          //Slot&    s = *(grph.slot(i));
-          //
-          //outClk  = (i32)nid;
-          //
-          //Slot&    s = *(grph.slot(i));
-
           bool inAnySlt = false;
           Id  inClk(0);
           Id outClk(0);
@@ -1569,9 +1576,6 @@ ENTRY_DECLARATION
                 else     slotOutSel = sid; // Id(nid, );
                 clearSelections = false;
                 inAnySlt = true;
-              }else{
-                //slotOutSel = slotInSel = Id(0,0);
-                //grph.clearSlotSels();
               }
             }else if(lftClkUp){
               bool inSlt = len(pntr - s.P) < io_rad;
@@ -1600,53 +1604,30 @@ ENTRY_DECLARATION
           bool inAny = false;
           FROM(sz,i)                                                // loop backwards so that the top nodes are dealt with first
           {
-            //int  ndOrdr = grph.order(i);
-            //Node&     n = grph.node(i);
-            //bool inNode = isIn(pntr.x,pntr.y, grph.bnd(ndOrdr) );
-
             Node*     n = nds[i];
             bool inNode = isIn(pntr.x,pntr.y, n->b);
             inAny      |= inNode;
 
             SECTION(primary selection and group selection effects)
             {
-              //if(inNode && clk && (priSel<0||priSel!=ndOrdr) )
-              // priSel!=ndOrdr) )
-              if(inNode && clk && (priSel<0 || priSel!=n->id) ) 
-              {
+              if(inNode && clk && (priSel<0 || priSel!=n->id) ){
                 n   = &(grph.moveToFront(n->id));
                 nds = grph.nodes(); // move to the front will invalidate some pointers in the nds array so it needs to be remade
                 
-                //priSel     = ndOrdr;
                 priSel = n->id;
                 drgP   = pntr;
 
-                //if(!grph.sel(ndOrdr)){
                 if(!n->sel){
-                  //TO(grph.selsz(),i) grph.sel(i,false);
-                  //grph.sel(ndOrdr,true);
                   TO(sz,j){ nds[j]->sel = false; }  // todo: move this out of the outer loop due to being O(n^2)
                   n->sel = true;
-                  //clearSelections = true;
                 }
-                break;                                                  // without breaking from the loop, a node could be moved down and hit again
+                break;                              // without breaking from the loop, a node could be moved down and hit again
               }
             } 
           }
 
-          if(!inAny)
-          {
-            //if( lftClkUp && !(priSel>0) ){
-            //  clearSelections=false;
-            //}
-
-            if( lftClkDn && !(priSel>0) ){ 
-              drgbox=true;
-            }
-
-            //if( (drgbnd.w()+drgbnd.h()) > 0 ){
-            //  clearSelections=false;
-            //}
+          if(!inAny){
+            if( lftClkDn && !(priSel>0) ){ drgbox=true; }
 
             if(rtDn && !prevRtDn){ secSel = -1; }
           }else{ // if(lftClkDn && lftClkUp){
@@ -1723,18 +1704,41 @@ ENTRY_DECLARATION
         SECTION(nanovg drawing)
         {
           nvgBeginFrame(vg, fd.ui.w, fd.ui.h, pxRatio);
+          SECTION(draw background grid)
+          {
+            nvgStrokeWidth(vg, 1.f);
+            nvgStrokeColor(vg, nvgRGBAf( .12f, .12f, .12f, 1.f));
+
+            u32 lineCntX = (fd.ui.w / 100) + 1;
+            f32 lineIncX  = fd.ui.w / lineCntX;
+            f32    curX  = 0; 
+            TO(lineCntX,i){
+              nvgBeginPath(vg);
+                nvgMoveTo(vg, curX, 0);
+                nvgLineTo(vg, curX, fd.ui.h);
+              nvgStroke(vg);
+
+              curX += lineIncX;
+            }
+
+            u32 lineCntY = (fd.ui.h / 100) + 1;
+            f32 lineIncY  = fd.ui.h / lineCntY;
+            f32    curY  = 0; 
+            TO(lineCntY,i){
+              nvgBeginPath(vg);
+              nvgMoveTo(vg, 0, curY);
+              nvgLineTo(vg, fd.ui.w, curY);
+              nvgStroke(vg);
+
+              curY += lineIncY;
+            }
+          }
           SECTION(draw connections)
-          {                                 // ci is connection iterator 
-            //auto en = grph.cnctEnd();
-            //for(auto const& ci : grph.cncts())
-            //for(auto ci = grph.cnctBegin(); ci != en; )
-            //for(auto di : grph.srcCnctsMap())  // multi-map of src->dest connections, di is destination iterator 
-            auto di = grph.srcCnctsMap().begin();
+          {
+            auto di = grph.srcCnctsMap().begin();                                    // di is destination iterator
             auto en = grph.srcCnctsMap().end();
             for(auto di = grph.srcCnctsMap().begin(); di != en; )
             {
-              //auto     srcIdx = ci->second;
-              //auto      count = grph.cncts().count(ci->first);
               auto     srcIdx = di->first;
               auto    destIdx = di->second;
               Slot const& src = *(grph.slot(srcIdx));
@@ -1743,18 +1747,7 @@ ENTRY_DECLARATION
               if(count==1)
               {
                 Slot const& dest = *(grph.slot(destIdx));
-                f32  halfx = lerp(.5f, src.P.x, dest.P.x);
-                f32  halfy = lerp(.5f, src.P.y, dest.P.y);
-                f32   dist = len(src.P - dest.P);
-                v2  outNxt = src.P  + src.N  * min(NODE_SZ.x/2, (dist/3));         // divide by 3 because there are 3 sections to the bezier
-                v2   inNxt = dest.P + dest.N * min(NODE_SZ.x/2, (dist/3));         // todo: make these limited by a fraction of the node's size
-
-                nvgBeginPath(vg);
-                  nvgMoveTo(vg,   src.P.x, src.P.y);
-                  nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, dest.P.x,dest.P.y);
-                  nvgStrokeWidth(vg, 3.f);
-                  nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
-                nvgStroke(vg);
+                draw_cnct(vg, src.P, dest.P, src.N, dest.N, NODE_SZ.x/2);
 
                 ++di; //continue;
               }
@@ -1763,54 +1756,26 @@ ENTRY_DECLARATION
                 v2 avgP=src.P; v2 avgN={0,0}; u32 cnt=0;
                 auto avgIter=di;
                 for(; avgIter!=en && avgIter->first==srcIdx; ++avgIter ){     // ++cnt
-                  if(!grph.slot(avgIter->second)){ /*--cnt;*/ continue; }
+                  if(!grph.slot(avgIter->second)){ continue; }
 
                   Slot const& dest = *(grph.slot(avgIter->second));
                   avgP += dest.P;
                   avgP += src.P;
                   ++cnt;
-
-                  //avgN += norm(dest.P
                 }
                 avgP    /= (f32)(cnt*2+1);             // can't forget the first position for averaging - the src position - the avgP is weighted 1:1 with the srcP and all the destination positions combined
                 v2 midN  = norm(src.P - avgP);
 
-                //f32  halfx = lerp(.5f, dest.P.x, src.P.x);
-                //f32  halfy = lerp(.5f, dest.P.y, src.P.y);
-                //f32   dist = len(src.P - dest.P);
-                f32  halfx = lerp(.5f, src.P.x, avgP.x);
-                f32  halfy = lerp(.5f, src.P.y, avgP.y);
-                f32   dist = len(src.P - avgP);
-                v2  outNxt = src.P  + src.N * min(NODE_SZ.x/2, (dist/3));         // divide by 3 because there are 3 sections to the bezier
-                v2   inNxt = avgP   +  midN * min(NODE_SZ.x/2, (dist/3));         // todo: make these limited by a fraction of the node's size
-
-                nvgBeginPath(vg);
-                  nvgMoveTo(vg,   src.P.x, src.P.y);
-                  //nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, dest.P.x,dest.P.y);
-                  nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, avgP.x, avgP.y);
-                  nvgStrokeWidth(vg, 3.f);
-                  nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
-                nvgStroke(vg);
+                draw_cnct(vg, src.P, avgP, src.N, midN, NODE_SZ.x/2);
 
                 for(auto dhIter=di; di!=en && di->first == srcIdx; ++di){   // dhIter is draw half iterator - this is where the the connections are drawn from the average position of all slots 
                   const v2 hlfsz = io_rad/2.f;
                   Slot const& dest = *(grph.slot(di->second));
 
-                  f32  halfx = lerp(.5f, dest.P.x, avgP.x);
-                  f32  halfy = lerp(.5f, dest.P.y, avgP.y);
-                  f32   dist = len(avgP - dest.P);
-                  v2  outNxt = dest.P  + dest.N * min(NODE_SZ.x/2, (dist/3));         // divide by 3 because there are 3 sections to the bezier
-                  v2   inNxt = avgP + -1.f*midN * min(NODE_SZ.x/2, (dist/3));        // todo: make these limited by a fraction of the node's size
-                  nvgBeginPath(vg);
-                    nvgMoveTo(vg,   dest.P.x,dest.P.y);
-                    nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, avgP.x, avgP.y);
-                    nvgStrokeWidth(vg, 3.f);
-                    nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
-                  nvgStroke(vg);
+                  draw_cnct(vg, avgP, dest.P, -1.f*midN, dest.N, NODE_SZ.x/2);
                 }
 
                 nvgBeginPath(vg);
-                  //nvgMoveTo(vg, avgP.x, avgP.y);
                   nvgCircle(vg, avgP.x, avgP.y, 6.f); 
                   nvgFillColor(vg, nvgRGBAf(.18f, .18f, .18f, 1.f) );
                   nvgStrokeWidth(vg, 3.f);
@@ -1822,18 +1787,8 @@ ENTRY_DECLARATION
           }
           SECTION(draw nodes)
           {
-            //auto sz = fd.grph.nsz();
             TO(sz,i)
             {
-              //int  ndOrdr = fd.grph.order(i);            // nd_ordr[i];
-              //if( !(ndOrdr < grph.nsz()) ){ continue; }
-              //
-              //auto      n = fd.grph.node(ndOrdr);
-              //bool selctd = ndOrdr==priSel || fd.grph.sel(ndOrdr);
-              //
-              //float round = secSel==ndOrdr? 0 : 1.f;
-              //fd.grph.bnd(ndOrdr) = node_draw(vg, 0, n, clr, round);
-
               Node&     n = *(nds[i]);
               bool selctd = n.id==priSel || n.sel;
 
@@ -1922,6 +1877,122 @@ ENTRY_DECLARATION
 
 
 
+
+
+
+
+
+
+
+
+//TO(grph.selsz(),i) grph.sel(i,false);
+//grph.sel(ndOrdr,true);
+//
+//clearSelections = true;
+
+//if(inNode && clk && (priSel<0||priSel!=ndOrdr) )
+// priSel!=ndOrdr) )
+//
+//priSel     = ndOrdr;
+//
+//if(!grph.sel(ndOrdr)){
+
+//int  ndOrdr = grph.order(i);
+//Node&     n = grph.node(i);
+//bool inNode = isIn(pntr.x,pntr.y, grph.bnd(ndOrdr) );
+
+//if( lftClkUp && !(priSel>0) ){
+//  clearSelections=false;
+//}
+
+//if( (drgbnd.w()+drgbnd.h()) > 0 ){
+//  clearSelections=false;
+//}
+
+//i32  inClk = -1;
+//i32 outClk = -1;
+//
+//TO(grph.ssz(), i)
+//auto   nid = kv.first.id;
+//
+//lftDn && !prevLftDn)
+//Slot&    s = *(grph.slot(i));
+//
+//outClk  = (i32)nid;
+//
+//Slot&    s = *(grph.slot(i));
+
+//else{
+//slotOutSel = slotInSel = Id(0,0);
+//grph.clearSlotSels();
+//}
+
+//auto sz = fd.grph.nsz();
+//
+//int  ndOrdr = fd.grph.order(i);            // nd_ordr[i];
+//if( !(ndOrdr < grph.nsz()) ){ continue; }
+//
+//auto      n = fd.grph.node(ndOrdr);
+//bool selctd = ndOrdr==priSel || fd.grph.sel(ndOrdr);
+//
+//float round = secSel==ndOrdr? 0 : 1.f;
+//fd.grph.bnd(ndOrdr) = node_draw(vg, 0, n, clr, round);
+
+//f32  halfx = lerp(.5f, src.P.x, dest.P.x);
+//f32  halfy = lerp(.5f, src.P.y, dest.P.y);
+//f32   dist = len(src.P - dest.P);
+//v2  outNxt = src.P  + src.N  * min(NODE_SZ.x/2, (dist/3));         // divide by 3 because there are 3 sections to the bezier
+//v2   inNxt = dest.P + dest.N * min(NODE_SZ.x/2, (dist/3));
+
+//nvgBeginPath(vg);
+//  nvgMoveTo(vg,   src.P.x, src.P.y);
+//  nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, dest.P.x,dest.P.y);
+//  nvgStrokeWidth(vg, 3.f);
+//  nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+//nvgStroke(vg);
+
+//f32  halfx = lerp(.5f, src.P.x, avgP.x);
+//f32  halfy = lerp(.5f, src.P.y, avgP.y);
+//f32   dist = len(src.P - avgP);
+//v2  outNxt = src.P  + src.N * min(NODE_SZ.x/2, (dist/3));         // divide by 3 because there are 3 sections to the bezier
+//v2   inNxt = avgP   +  midN * min(NODE_SZ.x/2, (dist/3));
+
+//nvgBeginPath(vg);
+//  nvgMoveTo(vg,   src.P.x, src.P.y);
+//  nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, avgP.x, avgP.y);
+//  nvgStrokeWidth(vg, 3.f);
+//  nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+//nvgStroke(vg);
+
+//f32  halfx = lerp(.5f, dest.P.x, avgP.x);
+//f32  halfy = lerp(.5f, dest.P.y, avgP.y);
+//f32   dist = len(avgP - dest.P);
+//v2  outNxt = dest.P  + dest.N * min(NODE_SZ.x/2, (dist/3));         // divide by 3 because there are 3 sections to the bezier
+//v2   inNxt = avgP + -1.f*midN * min(NODE_SZ.x/2, (dist/3));
+//nvgBeginPath(vg);
+//  nvgMoveTo(vg,   dest.P.x,dest.P.y);
+//  nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, avgP.x, avgP.y);
+//  nvgStrokeWidth(vg, 3.f);
+//  nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+//nvgStroke(vg);
+
+//auto en = grph.cnctEnd();
+//for(auto const& ci : grph.cncts())
+//for(auto ci = grph.cnctBegin(); ci != en; )
+//for(auto di : grph.srcCnctsMap())  // multi-map of src->dest connections, di is destination iterator 
+
+//avgN += norm(dest.P
+//
+//f32  halfx = lerp(.5f, dest.P.x, src.P.x);
+//f32  halfy = lerp(.5f, dest.P.y, src.P.y);
+//f32   dist = len(src.P - dest.P);
+//
+//nvgMoveTo(vg, avgP.x, avgP.y);
+//
+//nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, dest.P.x,dest.P.y);
+
+//auto     srcIdx = ci->second;
+//auto      count = grph.cncts().count(ci->first);
 
 //auto srcInt  = srcId.get(i).toInt();
 //auto destInt = destId.get(i).toInt();

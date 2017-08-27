@@ -273,6 +273,20 @@ private:
     static Node ERR_NODE;
     return ERR_NODE; 
   }
+  u64         nxtSlot(u64 nid)
+  {
+    auto   si = nodeSlots(nid);                   // si is slot iterator
+    //u64  = si->first.id;
+    u64 cur = 1;
+    while(si != end(m_slots)   && 
+          si->first.id  == nid && 
+          si->first.idx <= cur+1 ){
+      cur = si->first.idx;
+      ++si;
+    }
+    
+    return cur + 1;
+  }
 
 public:
   GraphDB() : m_nxtId(1) { init(); }
@@ -491,13 +505,15 @@ public:
   u64            nsz() const { return m_nodes.size(); }
 
   // slots
-  Id         addSlot(Slot  s, u64 idx=1)
+  Id         addSlot(Slot  s, u64 idx=0)
   {
     Id id(s.nid, idx);
-    //id.idx = idx;
-    m_slots.insert({id, s});                   // todo: make this find the last slot idx and make it sequential
+    id.idx = idx? idx  :  nxtSlot(s.nid);
+    m_slots.insert({id, s});
 
     return id;
+
+    //m_slots.insert({id, s});                   // todo: make this find the last slot idx and make it sequential
   }
   auto          slot(Id   id) -> Slot*
   {
@@ -510,9 +526,6 @@ public:
   }
   auto     nodeSlots(u64 nid) -> decltype(m_slots.begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
   {
-    //auto iter = m_slots.find(id);
-    //return iter;
-
     return lower_bound(ALL(m_slots), Id(nid), [](auto a,auto b){ return a.first < b; } );
   }
   auto         slots() -> Slots& { return m_slots; }
@@ -668,6 +681,10 @@ struct FisData
 #endif
 
 
+
+
+//auto iter = m_slots.find(id);
+//return iter;
 
 //vec<u64> nids;
 //nids.reserve(m_nodes.size());
