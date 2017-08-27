@@ -232,7 +232,6 @@ float            linNorm(float n, float lo, float hi)
 }
 float              remap(float n, float lo, float hi, float toLo, float toHi)
 {
-  //float p = (n-lo) / (hi-lo);
   float p = linNorm(n, lo, hi);
   return lerp(p, toLo, toHi);
 }
@@ -301,10 +300,6 @@ v2      lineCircleIntsct(v2 P, v2 dir, v2 crcl, f32 r)  // only works for circle
   v2  intrsct = v2( sign(dir.x)*x, sign(dir.y)*y)*r + crcl;
 
   return intrsct;
-
-  //f32       r = NODE_SZ.y/2.f;
-  //v2  dirCirc = abs(pdir) / r;
-  //v2 circCntr = n.P + NODE_SZ - r;
 }
 bool              insUnq(cnct_tbl* cnct, int a, int b)   // insUnq is insert unique - this inserts into a multi-set only if the combination of int key and int val does not already exist
 {
@@ -319,12 +314,6 @@ bool              insUnq(cnct_tbl* cnct, int a, int b)   // insUnq is insert uni
   cnct->insert( {a, b} );
 
   return true;
-
-  //auto bkt = find(rnge.first, rnge.second, );
-  //if(bkt!=rnge.second){
-  //  cnct->insert( {a, b} );
-  //  return true;
-  //} 
 }
 f32        normalToAngle(v2 N)
 {
@@ -343,7 +332,6 @@ str           graphToStr(GraphDB const& g)
   Jzon::Node nds = Jzon::object();
   SECTION(nodes)
   {
-    //auto sz = nodes.size();
     auto ndp = g.nodes();
     auto  sz = g.nsz();
 
@@ -352,30 +340,21 @@ str           graphToStr(GraphDB const& g)
 
     Jzon::Node  nd_txt = Jzon::array();
     TO(sz,i) nd_txt.add(ndp[i]->txt);
-    //TO(sz,i) nd_txt.add(g.node(i).txt);
-    //TO(sz,i) nd_txt.add(nodes[i].txt);
 
     Jzon::Node    nd_x = Jzon::array();
     TO(sz,i) nd_x.add(ndp[i]->P.x);
-    //TO(sz,i) nd_x.add(g.node(i).P.x);
 
     Jzon::Node    nd_y = Jzon::array();
     TO(sz,i) nd_y.add(ndp[i]->P.y);
-    //TO(sz,i) nd_y.add(g.node(i).P.y);
 
     Jzon::Node nd_type = Jzon::array();
     TO(sz,i) nd_type.add(ndp[i]->type);
-    //TO(sz,i) nd_type.add(g.node(i).type);
-
-    //Jzon::Node ordr = Jzon::array();
-    //TO(sz,i) ordr.add(nd_ordr[i]);
 
     nds.add("id",     nd_id);
     nds.add("txt",   nd_txt);
     nds.add("x",       nd_x);
     nds.add("y",       nd_y);
     nds.add("type", nd_type);
-    //nds.add("order",  ordr);
   }
   Jzon::Node jslots = Jzon::object();
   SECTION(slots)
@@ -442,10 +421,6 @@ str           graphToStr(GraphDB const& g)
   w.writeString(graph, s);
 
   return s;
-
-  //auto sz = cncts.size();
-  //TO(sz,i) src.add(cncts[i].src);
-  //TO(sz,i) dest.add(cncts[i].dest);
 }
 GraphDB       strToGraph(str const& s)
 {
@@ -546,30 +521,12 @@ bool            loadFile(str path, GraphDB* out_g)
 }
 
 // state manipulation
-void            node_add(str txt, Node::Type type=Node::FLOW)
-{
-  //v2 P = v2(512,512);
-  Node n(txt, type);
-  n.P = v2(512,512);
-  //nodes.push_back(n);
-
-  //nodes.push_back( {P,txt} );
-  //nodes.back().type = type;
-
-  //sels.push_back(false);
-  //nbnds.emplace_back();
-
-  //nd_ordr.push_back( (int)(nodes.size()-1) );
-}
 void    clear_selections(GraphDB* inout_grph)
 {
   inout_grph->clearSels();
   slotOutSel = slotInSel = Id(0,0);
   priSel      =  -1;
   secSel      =  -1;
-
-  //slotInSel   =  Id(0,0);
-  //slotOutSel  =  Id(0,0);
 }
 
 void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
@@ -623,8 +580,8 @@ void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int
         auto   getNds = (GetLavaNodes_t)GetProcAddress(lib, TEXT("GetNodes") );
         LavaNode* nds = getNds();
         printf("%s    %s    %s", nds[0].name, nds[0].in_types[0], nds[0].out_types[0] );
-        while(nds && nds->name)
-          node_add( (nds++)->name );
+        //while(nds && nds->name)
+          //node_add( (nds++)->name );
       }else{ printf("zero"); }
       //}else{ printf("zero", lib); }
 
@@ -672,11 +629,7 @@ void           scrollCallback(GLFWwindow* window, double xofst, double yofst)
 }
 void        cursorPosCallback(GLFWwindow* window, double x, double y)
 {
-  //using namespace glm;
   const static float _2PI = 2.f* PIf; //  pi<float>();
-
-  //FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
-
   fd.ui.screen.cursorPosCallbackEvent(x,y);
 }
 void             charCallback(GLFWwindow* window, unsigned int codepoint)
@@ -693,9 +646,6 @@ void             dropCallback(GLFWwindow* window, int count, const char** filena
 }
 void  framebufferSizeCallback(GLFWwindow* window, int w, int h)
 {
-  //FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
-  //fd->ui.screen.resizeCallbackEvent(w, h);
-
   fd.ui.screen.resizeCallbackEvent(w, h);
 }
 
@@ -759,33 +709,36 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
     nvgStrokeColor(vg, nvgRGBAf(.04f, .04f, .04f, 1.f));
     nvgStrokeWidth(vg, BORDER);
 
-    nvgBeginPath(vg);
-    nvgCircle(vg, cntrX, cntrY, msgRad);
-    auto radial = nvgRadialGradient(vg,
-      cntrX, cntrY, msgRad*.5f, msgRad,
-      nvgRGBAf( .15f, .15f,  .15f,   .95f ),
-      nvgRGBAf( .2f, .2f,    .2f,   1.f)  );
-    nvgFillPaint(vg, radial);
-    nvgFill(vg);
-
-    nvgBeginPath(vg);
-      nvgCircle(vg, x+w/2,y+h/2, msgRad);
-      auto lin = nvgLinearGradient(vg, 
-                                   cntrX, cntrY-msgRad, x, y+msgRad,
-                                   nvgRGBAf( .3f,   .3f,   .3f,  0.5f), 
-                                   nvgRGBAf( .15f,  .15f,  .15f,  .45f) );
-      nvgFillPaint(vg, lin);
-    nvgFill(vg);
-
-    nvgBeginPath(vg);
+    SECTION(radial gradient)
+    {
+      nvgBeginPath(vg);
       nvgCircle(vg, cntrX, cntrY, msgRad);
-    nvgStroke(vg);
+      auto radial = nvgRadialGradient(vg,
+        cntrX, cntrY, msgRad*.5f, msgRad,
+        nvgRGBAf( .15f, .15f,  .15f,   .95f ),
+        nvgRGBAf( .2f, .2f,    .2f,   1.f)  );
+      nvgFillPaint(vg, radial);
+      nvgFill(vg);
+    }
+    SECTION(linear gradient from upper left)
+    {
+      nvgBeginPath(vg);
+        nvgCircle(vg, x+w/2,y+h/2, msgRad);
+        auto lin = nvgLinearGradient(vg, 
+                                     cntrX, cntrY-msgRad, x, y+msgRad,
+                                     nvgRGBAf( .3f,   .3f,   .3f,  0.5f), 
+                                     nvgRGBAf( .15f,  .15f,  .15f,  .45f) );
+        nvgFillPaint(vg, lin);
+      nvgFill(vg);
+    }
+    SECTION(circle outline)
+    {
+      nvgBeginPath(vg);
+        nvgCircle(vg, cntrX, cntrY, msgRad);
+      nvgStroke(vg);
+    }
 
     b = {cntrX-msgRad/1.2f, cntrY-msgRad/1.2f, cntrX+msgRad/1.2f, cntrY+msgRad/1.2f};
-
-    //nvgBeginPath(vg);
-    //  nvgRect(vg, b.xmn, b.ymn, b.w(), b.h());
-    //nvgStroke(vg);
   } break;
   }
 
@@ -801,14 +754,6 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
 		  iw += h*0.15f;
 	  }
 
-    //if(preicon != 0){
-	  //	nvgFontSize(vg, h*1.3f);
-	  //	nvgFontFace(vg, "icons");
-	  //	nvgFillColor(vg, nvgRGBA(255,255,255,96));
-	  //	nvgTextAlign(vg,NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
-	  //	nvgText(vg, x+w*0.5f-tw*0.5f-iw*0.75f, y+h*0.5f, cpToUTF8(preicon,icon), NULL);
-	  //}
-
 	  nvgFontSize(vg, 30.0f);
 	  nvgFontFace(vg, "sans-bold");
 	  nvgTextAlign(vg, NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
@@ -817,7 +762,6 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
 	  nvgFillColor(vg, nvgRGBA(255,255,255,255));
 	  nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f,n.txt.c_str(), NULL);
   }
-
   SECTION(debug circle sides)
   {
     //nvgStrokeColor(vg, nvgRGBAf(1,1,1,1) );
@@ -876,7 +820,6 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 
     if(out_nrml){
       if(hit) *out_nrml = norm(borderPt - circCntr);
-      //if(hit) *out_nrml = norm(circCntr - borderPt);
       else    *out_nrml = { 0.f, sign(ndir).y };
     }
   } break;
@@ -890,342 +833,8 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
   }
 
   return borderPt;
-
-  //  && !hasNaN(intrsct);
-  //
-  //f32        r = hlf.y;
-  //
-  //if(hit && borderPt.x > (nP.x+rad) && borderPt.x < (nP.x-rad) ){
-  //  if(ds.y > .5f) borderPt.y = nP.y + NODE_SZ.y;
-  //  else           borderPt.y = nP.y;
-  //}
 }
-void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw_rail is draw_rail
-{
-  using namespace std;
-  
-  const f32    hPi = PIf/2;      // hPi is half pi 
-  const int border = 2;
-  const f32   rthk = 8.f;        // rthk is rail thickness
 
-  f32 rnd = 1.f;
-  f32 tw=0, iw=0, x=nP.x, y=nP.y, w=NODE_SZ.x, h=NODE_SZ.y;
-  v2   hlf = NODE_HALF_SZ;
-  f32 vMid = nP.y +  NODE_SZ.y/2;
-  f32  rad = hlf.y; 
-  f32   rr = NODE_SZ.y/2;          // rr is rail radius
-  f32 rlen = NODE_SZ.x/2;          // rlen is rail length
-  
-  v2 ndCntr = {nP.x + hlf.x, nP.y + hlf.y};
-
-  bool leftSide = P.x < ndCntr.x;
-  v2    lftCirc = { nP.x+rad, ndCntr.y };
-  v2    rgtCirc = { nP.x+NODE_SZ.x-rad, ndCntr.y };
-
-  bool inLeftCircle = P.x < (nP.x + rad);
-  bool  inRgtCircle = P.x > (nP.x+NODE_SZ.x - rad);
-  bool        onTop = P.y < ndCntr.y;
-  enum Place { BOTTOM=0, LEFT, TOP, RIGHT };
-  Place place = BOTTOM;
-  if(inLeftCircle)     place = LEFT;
-  else if(inRgtCircle) place = RIGHT;
-  else if(onTop)       place = TOP;
-
-  v2 dir;
-  if(inLeftCircle)      dir = norm(P-lftCirc);
-  else if(inRgtCircle)  dir = norm(P-rgtCirc);
-  else dir = norm(P-ndCntr);
-
-  f32 railRad, arcSt, lftDist, lftArc, lftOpp, lftArcSt=hPi, rgtDist, rgtArc, rgtOpp, rgtArcSt=hPi; 
-  railRad = rlen/2;
-
-
-  if(inLeftCircle)     arcSt = PIf - asin(dir.y);
-  else if(inRgtCircle) arcSt = asin(dir.y);
-
-  if(inLeftCircle) lftArcSt = PIf - asin(dir.y);
-  lftDist = (inLeftCircle || inRgtCircle)? 0 : max(0.f, min(railRad, P.x-(nP.x+rad)) );
-  lftArc  = min(hPi*3 - lftArcSt, (railRad-lftDist) / rad );          // maximum arc amount is half a circle, which is PI radians
-  if(inRgtCircle){
-    lftArc  = max(0.f, min(hPi - lftArcSt, (railRad-lftDist)/rad) );
-  }
-  lftOpp  = railRad - lftArc*rad - lftDist;                           // lftOpp is left opposite side segment length
-
-  if(inRgtCircle) rgtArcSt = asin(dir.y);
-  rgtDist = inRgtCircle? 0 : max(0.f, min(railRad, (nP.x+NODE_SZ.x-rad)-P.x) );
-  rgtArc  = min(rgtArcSt + hPi, (railRad-rgtDist)/rad );              // maximum arc amount is half a circle, which is PI radians
-  rgtOpp  = railRad - rgtArc*rad - rgtDist;                           // rgtOpp is right opposite side segment length
-
-
-  //if(inLeftCircle)     arcSt = PIf - asin(dir.y);
-  //else if(inRgtCircle) arcSt = asin(dir.y);
-
-  Bnd nb(nP.x, nP.y, nP.x+NODE_SZ.x, nP.y+NODE_SZ.y);
-  
-  // relative distances
-  f32 lDst = max(0.f, min(railRad, (P.x-(nb.xmn+rad))) );
-  f32 rDst = max(0.f, min(railRad, ((nb.xmx-rad)-P.x)) );
-  f32 lArc = (railRad-lDst) / rad;
-  f32 rArc = (railRad-rDst) / rad;
-  f32 lOpp = railRad - lDst - lArc*rad;
-  f32 rOpp = railRad - rDst - rArc*rad;
-
-  if(inLeftCircle){
-    f32 ang = P.y>vMid?  acos(P.x)  :  PIf+acos(P.x);
-    lArc = min(hPi*3.f - ang, railRad);
-    rArc = min(ang - hPi, railRad);
-  }
-
-  // absolute positions
-  //v2  lArcPt =  node_border(nP, dir, io_rad);
-
-  v2  lPt    = { P.x - lDst, P.y };
-  v2  rPt    = { P.x + rDst, P.y };
-  f32 lArcSt = hPi + lArc;
-  f32 lArcEn = hPi; 
-  f32 rArcSt = hPi;
-  f32 rArcEn = hPi - rArc;
-  v2  lOppPt = { nb.xmn + rad + lOpp , nb.ymn };
-  v2  rOppPt = { nb.xmx - rad - rOpp , nb.ymn };
-  v2  lArcPt = { acos(lArcSt), asin(lArcSt) };
-  v2  rArcPt = { acos(rArcSt), asin(rArcSt) };
-
-  if(inLeftCircle){
-    
-  }
-
-  //SECTION(drawing fourth attempt)
-  //{
-  //  // maybe the rounded rectangle should be broken down into one number that represents a position on the border
-  //  // then taking the number backwards and forwards would at least give the start and end points 
-  //
-  //
-  //  v2 orthDir = { dir.y, -dir.x };
-  //  v2 lBrdr = node_border(nP, orthDir, io_rad);
-  //
-  //  nvgStrokeWidth(vg, rthk);
-  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
-  //
-  //  nvgBeginPath(vg);
-  //    nvgMoveTo(vg, P.x, P.y);
-  //    nvgLineTo(vg, lBrdr.x, lBrdr.y);
-  //    //nvgRoundedRect(vg, nP.x, nP.y, NODE_SZ.x, NODE_SZ.y, NODE_SZ.y/2 );
-  //    //nvgRect(vg, nP.x, nP.y, NODE_SZ.x, NODE_SZ.y); 
-  //  nvgStroke(vg);
-  //}
-
-  //SECTION(drawing third attempt)
-  //{
-  //  nvgStrokeWidth(vg, rthk);
-  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
-  //
-  //  nvgBeginPath(vg);
-  //    if(lOpp>0){
-  //      nvgMoveTo(vg, lOppPt.x, lOppPt.y);
-  //    }else if(lArc>0){
-  //      nvgMoveTo(vg, lArcPt.x, lArcPt.y);
-  //      nvgArc(vg, lftCirc.x, lftCirc.y, rad, lArcSt, lArcEn, NVG_CCW);
-  //    }else{
-  //      nvgMoveTo(vg, lPt.x, lPt.y);
-  //    }
-  //    if(rDst>0) nvgLineTo(vg, rPt.x, rPt.y);
-  //
-  //    if(rArc>0){
-  //      nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, rArcSt, rArcEn, NVG_CCW);
-  //    }
-  //    if(rOpp>0) nvgLineTo(vg, rOppPt.x, rOppPt.y);
-  //
-  //    //if(lArc>0) nvgArc(vg, lftCirc.x, lftCirc.y, rad, lArcSt, lArcEn, NVG_CCW);
-  //  nvgStroke(vg);  
-  //}
-
-  //SECTION(drawing second attempt)
-  //{
-  //  nvgStrokeWidth(vg, rthk);
-  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
-  //
-  //  nvgBeginPath(vg);  // left side
-  //    nvgMoveTo(vg, P.x, P.y);
-  //    //switch(place){      
-  //    if(onTop && !inLeftCircle)
-  //    { 
-  //      if(lftDist>0){ nvgLineTo(vg, P.x - lftDist, P.y); }
-  //      if(lftArc>0)   nvgArc(vg, lftCirc.x, lftCirc.y, rad, hPi*3, hPi*3 - lftArc, NVG_CCW);
-  //      if(lftOpp>0)   nvgLineTo(vg, nP.x+rad+lftOpp, nP.y+NODE_SZ.y);
-  //    }
-  //    else{
-  //      if(lftDist>0){ nvgLineTo(vg, P.x - lftDist, P.y); }
-  //      if(inLeftCircle){
-  //        if(lftArc>0) nvgArc(vg, lftCirc.x, lftCirc.y, rad, arcSt, arcSt + lftArc, NVG_CW);
-  //        if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
-  //      }else if(inRgtCircle){
-  //        if(lftArc>0) nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, arcSt, arcSt + lftArc, NVG_CW);
-  //        if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
-  //      }else{
-  //        if(lftArc>0) nvgArc(vg, lftCirc.x, lftCirc.y, rad, hPi, hPi + lftArc, NVG_CW);
-  //        if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
-  //      }
-  //    }
-  //    //}
-  //  nvgStroke(vg);
-  //
-  //  nvgBeginPath(vg);  // left side
-  //  nvgMoveTo(vg, P.x, P.y);
-  //  //switch(place){      
-  //  if(onTop && !inRgtCircle)
-  //  { 
-  //    if(rgtDist>0){ nvgLineTo(vg, P.x + rgtDist, P.y); }
-  //    if(rgtArc>0)   nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, -hPi, -hPi + rgtArc, NVG_CW);
-  //    if(rgtOpp>0)   nvgLineTo(vg, nP.x+rad+rgtOpp, nP.y+NODE_SZ.y);
-  //  }
-  //  else{
-  //    if(rgtDist>0){ nvgLineTo(vg, P.x + rgtDist, P.y); }
-  //    if(inRgtCircle){
-  //      if(rgtArc>0) nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, arcSt, arcSt - rgtArc, NVG_CCW);
-  //    }else{
-  //      if(rgtArc>0) nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, hPi, hPi - rgtArc, NVG_CCW);
-  //    }
-  //    if(rgtOpp>0) nvgLineTo(vg, nP.x+NODE_SZ.x-rad-rgtOpp, nP.y);
-  //  }
-  //  //}
-  //  nvgStroke(vg);
-  //}
-
-  //f32 rad = lerp(rnd, 0.f, h/2.f);                               // rad is corner radius
-  //f32 cntrX = x+border+rad, cntrY = y+border+h/2, 
-  //f32 rr=rad;        // rr is rail radius
-
-  //v2  hlf = NODE_HALF_SZ;
-  //v2 ndir = norm(nP - P);
-  //v2 pdir = ndir;
-  //v2   ds = sign(pdir);                                  // ds is direction sign
-  //f32  ax = abs(pdir.x);
-  //if( ax > hlf.x ){
-  //  pdir /= ax/hlf.x;                                    // can this never be 0, since ax is positive, hlf.x is positive, and ax is greater than hlf.x ? 
-  //}else{
-  //  f32 ay = abs(pdir.y);
-  //  pdir /= ay==0.f?  1.f  :  ay/hlf.y;
-  //}
-  //f32       r = hlf.y;
-  //v2 circCntr = (pdir.x<0)? nP+v2(r,r)  :  nP+NODE_SZ-r;
-
-  //v2 lftCirc;
-  //lftCirc.y = nP.y + hlf.y;
-  //lftCirc.x = leftSide? nP.x+rad  :  nP.x+NODE_SZ.x-rad;
-  //lftCirc.y = nP.y + hlf.y;
-
-  //f32      leftLine = P.x - rlen/2;
-  //f32 leftLineLimit = max(nP.x + rad, leftLine);
-  //f32     leftExtra = abs(leftLineLimit - leftLine);
-  ////f32       leftArc = inLeftCircle? (rlen/2)/rad  :  min(PIf*1.5f, leftExtra/rad);
-  //f32       leftArc = min(PIf*1.5f, leftExtra/rad);
-  //f32         arcSt = inLeftCircle? hPi + hPi-asin(dir.y) :  hPi;
-  //f32         arcEn = min(arcSt+leftArc, PIf*1.5f);
-  //f32       arcDist = (arcEn - arcSt) * rad;
-  //f32      leftWrap = max(0.f, leftExtra -  arcDist);
-
-  //st      = PIf - asin(dir.y);
-  //f32   lftSeg = P.x - lftDist;
-  //
-  //f32 leftLineLen = P.x - rlen/2 - leftLimit;  // nP.x + 2*rad rlen/2 - 
-  //
-  // black border
-  //f32 bthk = rthk+2;                        // bthk is black thickness 
-  //nvgBeginPath(vg);
-  //  nvgMoveTo(vg, x-bthk/2, P.y);
-  //  nvgArc(vg, P.x, P.y, rr, PIf*1.f, PIf*1.5f, NVG_CW);
-  //  nvgStrokeWidth(vg, bthk);
-  //nvgStrokeColor(vg, nvgRGBAf(0, 0, 0, 1.f) );
-  //nvgStroke(vg);
-  //
-  // inner color
-  //nvgBeginPath(vg);
-  //  nvgMoveTo(vg, x-rthk/2, P.y);
-  //  nvgArc(vg, P.x, P.y, rr, PIf*1.f, PIf*1.5f, NVG_CW);
-  //  nvgStrokeWidth(vg, rthk);
-  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
-  //nvgStroke(vg);
-  //
-  //v2 brdr = node_border(nP, P - ndCntr, io_rad);      // brdr is border
-  //
-  //nvgBeginPath(vg);
-  //  nvgCircle(vg, P.x, P.y, 5.f);
-  //  nvgStrokeWidth(vg, rthk);
-  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
-  //nvgStroke(vg);
-  //
-  //nvgBeginPath(vg);
-  //  nvgCircle(vg, circCntr.x, circCntr.y, 5.f);
-  //  nvgStrokeWidth(vg, rthk);
-  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
-  //nvgStroke(vg);
-  //
-  //f32 angle = inLeftCircle? asin(dir.y) :  PIf/2;
-  //f32 arcSt = PIf/2.0f;
-  //f32 arcEn = PIf*1.5f;
-  //NVGwinding windDirection = leftSide? NVG_CW  :  NVG_CCW;
-  //if(onTop){
-  //  swap(arcSt, arcEn);
-  //  windDirection = NVG_CCW;
-  //}
-
-  //SECTION(drawing first attempt)
-  //{
-  //  nvgBeginPath(vg);
-  //    //if(inLeftCircle){
-  //    //  nvgMoveTo(vg, P.x, P.y);
-  //    //  if(leftArc>0){
-  //    //    nvgArc(vg, circCntr.x, circCntr.y, rad, arcSt, arcEn, windDirection);    // PIf*1.f, PIf*1.5f, NVG_CW);
-  //    //    if(leftWrap>0)
-  //    //      nvgLineTo(vg, nP.x+rad+leftWrap, nP.y);
-  //    //  }
-  //    //}else{
-  //    //if(leftSide){
-  //
-  //    //if(onTop && !inLeftCircle){
-  //    //  nvgMoveTo(vg, P.x, P.y);
-  //    //  nvgLineTo(vg, leftLineLimit, P.y);
-  //    //  nvgArc(vg, circCntr.x, circCntr.y, rad, arcEn, arcSt, NVG_CCW);      // PIf*1.f, PIf*1.5f, NVG_CW);
-  //    //  if(leftWrap>0)
-  //    //    nvgLineTo(vg, nP.x+rad+leftWrap, nP.y+NODE_SZ.y);
-  //    //}else{
-  //      nvgMoveTo(vg, P.x, P.y);
-  //      if(!inLeftCircle){ nvgLineTo(vg, leftLineLimit, P.y); }
-  //      if(leftArc>0){
-  //        if(onTop) nvgArc(vg, circCntr.x, circCntr.y, rad, arcEn, arcSt, NVG_CCW);
-  //        else      nvgArc(vg, circCntr.x, circCntr.y, rad, arcSt, arcEn, windDirection);
-  //        if(leftWrap>0)
-  //          nvgLineTo(vg, nP.x+rad+leftWrap, nP.y);
-  //      }
-  //    //}
-  //    //}
-  //    //}else if(leftSide && onTop){
-  //    //  
-  //    //}
-  //
-  //    //nvgMoveTo(vg, leftLineLimit, P.y);
-  //    //nvgLineTo(vg, P.x, P.y);
-  //    //nvgArc(vg, circCntr.x, circCntr.y, rr, arcSt, arcEn, windDirection);    // PIf*1.f, PIf*1.5f, NVG_CW);
-  //    nvgStrokeWidth(vg, rthk);
-  //    nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
-  //  nvgStroke(vg);
-  //}
-  //
-  //f32 arcEn = leftSide? PIf*1.5f  :  -PIf*0.5f;
-  //if(leftSide==false){ swap(arcSt, arcEn); }
-
-  //nvgBeginPath(vg);
-  //  nvgCircle(vg, nP.x, nP.y, 5.f);
-  //  nvgStrokeWidth(vg, rthk);
-  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
-  //nvgStroke(vg);
-  //
-  //nvgBeginPath(vg);
-  //  nvgCircle(vg, P.x, P.y, 5.f);
-  //  nvgStrokeWidth(vg, rthk);
-  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
-  //nvgStroke(vg);
-}
 void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState) //bool highlight=false, bool selected=false)
 {
   nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
@@ -1315,9 +924,6 @@ ENTRY_DECLARATION
   {
     SECTION(test data init)
     {
-      //GraphDB::Id id;
-      //printf("\n sizeof(GraphDB::Id): %d \n", sizeof(GraphDB::Id) );
-
       io_rad = IORAD;
 
       // nodes
@@ -1339,8 +945,6 @@ ENTRY_DECLARATION
       //fd.grph.addCnct(Id(1,1), Id(1,1));
       //fd.grph.addCnct(Id(1,1), Id(2,1));
       //fd.grph.addCnct(Id(1,1), Id(3,1));
-
-      //auto sz = fd.grph.nsz();
     }
     SECTION(FisData)
     { 
@@ -1396,8 +1000,7 @@ ENTRY_DECLARATION
     {
       fd.ui.screen.initialize(fd.win, false);
 
-      //fd.ui.keyLay   = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
-      fd.ui.keyLay   = new BoxLayout(Orientation::Horizontal, Alignment::Fill, 0,10);
+      fd.ui.keyLay   = new BoxLayout(Orientation::Horizontal, Alignment::Fill, 0,10);      //fd.ui.keyLay   = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
       fd.ui.keyWin   = new Window(&fd.ui.screen,  "");
       auto spcr1     = new Label(fd.ui.keyWin,    "");
       auto spcr2     = new Label(fd.ui.keyWin,    "");
@@ -1435,11 +1038,9 @@ ENTRY_DECLARATION
 
       GraphDB* grphPtr = &fd.grph;
       flowBtn->setCallback([grphPtr](){
-        //node_add("new node");
         grphPtr->addNode( Node("new node", Node::FLOW) );
       });
       msgBtn->setCallback([grphPtr](){
-        //node_add("message node", node::MSG);
         grphPtr->addNode( Node("message node", Node::MSG) );
       });
 
@@ -1462,7 +1063,6 @@ ENTRY_DECLARATION
 		    return -1;
 	    }
       int font = nvgCreateFontMem(vg, "sans-bold", Roboto_Bold_ttf, Roboto_Bold_ttf_len, 0);
-      //int font = nvgCreateFont(vg, "sans-bold", "Roboto-Bold.ttf");
       if(font == -1) {
 		    printf("Could not add font bold.\n");
 		    return -1;
@@ -1801,11 +1401,9 @@ ENTRY_DECLARATION
               {
                 nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
                 nvgStrokeWidth(vg, BORDER);
-                //auto sIter = grph.nodeSlots(ndOrdr);            // sIter is slot iterator
                 auto sIter = grph.nodeSlots(n.id);            // sIter is slot iterator
                 for(; sIter!=grph.slotEnd() && sIter->first.id==n.id; ++sIter)
                 {
-                  //auto     sIdx = sIter->second;                    // sIdx is slot index
                   auto     sIdx = sIter->first;                    // todo: needs to be redone
                   Slot const& s = *(grph.slot(sIdx));
                   bool   inSlot = len(pntr - s.P) < io_rad;
@@ -1847,7 +1445,6 @@ ENTRY_DECLARATION
             f32 tb = nvgTextBounds(vg, 10,0, fpsStr, NULL, NULL);
             nvgFontSize(vg, 15.0f);
             nvgFontFace(vg, "sans-bold");
-            //nvgTextAlign(vg,  NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
             nvgTextAlign(vg,  NVG_ALIGN_LEFT);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
             nvgFillColor(vg, nvgRGBA(255,255,255,255));
             nvgText(vg,  fd.ui.w - tb , 10, fpsStr, NULL);
@@ -1879,11 +1476,427 @@ ENTRY_DECLARATION
 
 
 
+//
+//int font = nvgCreateFont(vg, "sans-bold", "Roboto-Bold.ttf");
 
+//using namespace glm;
+//
+//FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
 
+//auto sz = nodes.size();
+//
+//TO(sz,i) nd_txt.add(g.node(i).txt);
+//TO(sz,i) nd_txt.add(nodes[i].txt);
+//
+//TO(sz,i) nd_x.add(g.node(i).P.x);
+//
+//TO(sz,i) nd_y.add(g.node(i).P.y);
+//
+//TO(sz,i) nd_type.add(g.node(i).type);
+//
+//Jzon::Node ordr = Jzon::array();
+//TO(sz,i) ordr.add(nd_ordr[i]);
+//
+//nds.add("order",  ordr);
 
+//void            node_add(str txt, Node::Type type=Node::FLOW)
+//{
+//  //v2 P = v2(512,512);
+//  Node n(txt, type);
+//  n.P = v2(512,512);
+//  //nodes.push_back(n);
+//
+//  //nodes.push_back( {P,txt} );
+//  //nodes.back().type = type;
+//
+//  //sels.push_back(false);
+//  //nbnds.emplace_back();
+//
+//  //nd_ordr.push_back( (int)(nodes.size()-1) );
+//}
 
+// draw rail
+//void            drw_rail(NVGcontext* vg, v2 P, v2 nP)                     // drw_rail is draw_rail
+//{
+//  using namespace std;
+//  
+//  const f32    hPi = PIf/2;      // hPi is half pi 
+//  const int border = 2;
+//  const f32   rthk = 8.f;        // rthk is rail thickness
+//
+//  f32 rnd = 1.f;
+//  f32 tw=0, iw=0, x=nP.x, y=nP.y, w=NODE_SZ.x, h=NODE_SZ.y;
+//  v2   hlf = NODE_HALF_SZ;
+//  f32 vMid = nP.y +  NODE_SZ.y/2;
+//  f32  rad = hlf.y; 
+//  f32   rr = NODE_SZ.y/2;          // rr is rail radius
+//  f32 rlen = NODE_SZ.x/2;          // rlen is rail length
+//  
+//  v2 ndCntr = {nP.x + hlf.x, nP.y + hlf.y};
+//
+//  bool leftSide = P.x < ndCntr.x;
+//  v2    lftCirc = { nP.x+rad, ndCntr.y };
+//  v2    rgtCirc = { nP.x+NODE_SZ.x-rad, ndCntr.y };
+//
+//  bool inLeftCircle = P.x < (nP.x + rad);
+//  bool  inRgtCircle = P.x > (nP.x+NODE_SZ.x - rad);
+//  bool        onTop = P.y < ndCntr.y;
+//  enum Place { BOTTOM=0, LEFT, TOP, RIGHT };
+//  Place place = BOTTOM;
+//  if(inLeftCircle)     place = LEFT;
+//  else if(inRgtCircle) place = RIGHT;
+//  else if(onTop)       place = TOP;
+//
+//  v2 dir;
+//  if(inLeftCircle)      dir = norm(P-lftCirc);
+//  else if(inRgtCircle)  dir = norm(P-rgtCirc);
+//  else dir = norm(P-ndCntr);
+//
+//  f32 railRad, arcSt, lftDist, lftArc, lftOpp, lftArcSt=hPi, rgtDist, rgtArc, rgtOpp, rgtArcSt=hPi; 
+//  railRad = rlen/2;
+//
+//
+//  if(inLeftCircle)     arcSt = PIf - asin(dir.y);
+//  else if(inRgtCircle) arcSt = asin(dir.y);
+//
+//  if(inLeftCircle) lftArcSt = PIf - asin(dir.y);
+//  lftDist = (inLeftCircle || inRgtCircle)? 0 : max(0.f, min(railRad, P.x-(nP.x+rad)) );
+//  lftArc  = min(hPi*3 - lftArcSt, (railRad-lftDist) / rad );          // maximum arc amount is half a circle, which is PI radians
+//  if(inRgtCircle){
+//    lftArc  = max(0.f, min(hPi - lftArcSt, (railRad-lftDist)/rad) );
+//  }
+//  lftOpp  = railRad - lftArc*rad - lftDist;                           // lftOpp is left opposite side segment length
+//
+//  if(inRgtCircle) rgtArcSt = asin(dir.y);
+//  rgtDist = inRgtCircle? 0 : max(0.f, min(railRad, (nP.x+NODE_SZ.x-rad)-P.x) );
+//  rgtArc  = min(rgtArcSt + hPi, (railRad-rgtDist)/rad );              // maximum arc amount is half a circle, which is PI radians
+//  rgtOpp  = railRad - rgtArc*rad - rgtDist;                           // rgtOpp is right opposite side segment length
+//
+//
+//  //if(inLeftCircle)     arcSt = PIf - asin(dir.y);
+//  //else if(inRgtCircle) arcSt = asin(dir.y);
+//
+//  Bnd nb(nP.x, nP.y, nP.x+NODE_SZ.x, nP.y+NODE_SZ.y);
+//  
+//  // relative distances
+//  f32 lDst = max(0.f, min(railRad, (P.x-(nb.xmn+rad))) );
+//  f32 rDst = max(0.f, min(railRad, ((nb.xmx-rad)-P.x)) );
+//  f32 lArc = (railRad-lDst) / rad;
+//  f32 rArc = (railRad-rDst) / rad;
+//  f32 lOpp = railRad - lDst - lArc*rad;
+//  f32 rOpp = railRad - rDst - rArc*rad;
+//
+//  if(inLeftCircle){
+//    f32 ang = P.y>vMid?  acos(P.x)  :  PIf+acos(P.x);
+//    lArc = min(hPi*3.f - ang, railRad);
+//    rArc = min(ang - hPi, railRad);
+//  }
+//
+//  // absolute positions
+//  //v2  lArcPt =  node_border(nP, dir, io_rad);
+//
+//  v2  lPt    = { P.x - lDst, P.y };
+//  v2  rPt    = { P.x + rDst, P.y };
+//  f32 lArcSt = hPi + lArc;
+//  f32 lArcEn = hPi; 
+//  f32 rArcSt = hPi;
+//  f32 rArcEn = hPi - rArc;
+//  v2  lOppPt = { nb.xmn + rad + lOpp , nb.ymn };
+//  v2  rOppPt = { nb.xmx - rad - rOpp , nb.ymn };
+//  v2  lArcPt = { acos(lArcSt), asin(lArcSt) };
+//  v2  rArcPt = { acos(rArcSt), asin(rArcSt) };
+//
+//  if(inLeftCircle){
+//    
+//  }
+//
+//  //SECTION(drawing fourth attempt)
+//  //{
+//  //  // maybe the rounded rectangle should be broken down into one number that represents a position on the border
+//  //  // then taking the number backwards and forwards would at least give the start and end points 
+//  //
+//  //
+//  //  v2 orthDir = { dir.y, -dir.x };
+//  //  v2 lBrdr = node_border(nP, orthDir, io_rad);
+//  //
+//  //  nvgStrokeWidth(vg, rthk);
+//  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+//  //
+//  //  nvgBeginPath(vg);
+//  //    nvgMoveTo(vg, P.x, P.y);
+//  //    nvgLineTo(vg, lBrdr.x, lBrdr.y);
+//  //    //nvgRoundedRect(vg, nP.x, nP.y, NODE_SZ.x, NODE_SZ.y, NODE_SZ.y/2 );
+//  //    //nvgRect(vg, nP.x, nP.y, NODE_SZ.x, NODE_SZ.y); 
+//  //  nvgStroke(vg);
+//  //}
+//
+//  //SECTION(drawing third attempt)
+//  //{
+//  //  nvgStrokeWidth(vg, rthk);
+//  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+//  //
+//  //  nvgBeginPath(vg);
+//  //    if(lOpp>0){
+//  //      nvgMoveTo(vg, lOppPt.x, lOppPt.y);
+//  //    }else if(lArc>0){
+//  //      nvgMoveTo(vg, lArcPt.x, lArcPt.y);
+//  //      nvgArc(vg, lftCirc.x, lftCirc.y, rad, lArcSt, lArcEn, NVG_CCW);
+//  //    }else{
+//  //      nvgMoveTo(vg, lPt.x, lPt.y);
+//  //    }
+//  //    if(rDst>0) nvgLineTo(vg, rPt.x, rPt.y);
+//  //
+//  //    if(rArc>0){
+//  //      nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, rArcSt, rArcEn, NVG_CCW);
+//  //    }
+//  //    if(rOpp>0) nvgLineTo(vg, rOppPt.x, rOppPt.y);
+//  //
+//  //    //if(lArc>0) nvgArc(vg, lftCirc.x, lftCirc.y, rad, lArcSt, lArcEn, NVG_CCW);
+//  //  nvgStroke(vg);  
+//  //}
+//
+//  //SECTION(drawing second attempt)
+//  //{
+//  //  nvgStrokeWidth(vg, rthk);
+//  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+//  //
+//  //  nvgBeginPath(vg);  // left side
+//  //    nvgMoveTo(vg, P.x, P.y);
+//  //    //switch(place){      
+//  //    if(onTop && !inLeftCircle)
+//  //    { 
+//  //      if(lftDist>0){ nvgLineTo(vg, P.x - lftDist, P.y); }
+//  //      if(lftArc>0)   nvgArc(vg, lftCirc.x, lftCirc.y, rad, hPi*3, hPi*3 - lftArc, NVG_CCW);
+//  //      if(lftOpp>0)   nvgLineTo(vg, nP.x+rad+lftOpp, nP.y+NODE_SZ.y);
+//  //    }
+//  //    else{
+//  //      if(lftDist>0){ nvgLineTo(vg, P.x - lftDist, P.y); }
+//  //      if(inLeftCircle){
+//  //        if(lftArc>0) nvgArc(vg, lftCirc.x, lftCirc.y, rad, arcSt, arcSt + lftArc, NVG_CW);
+//  //        if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
+//  //      }else if(inRgtCircle){
+//  //        if(lftArc>0) nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, arcSt, arcSt + lftArc, NVG_CW);
+//  //        if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
+//  //      }else{
+//  //        if(lftArc>0) nvgArc(vg, lftCirc.x, lftCirc.y, rad, hPi, hPi + lftArc, NVG_CW);
+//  //        if(lftOpp>0) nvgLineTo(vg, nP.x+rad+lftOpp, nP.y);
+//  //      }
+//  //    }
+//  //    //}
+//  //  nvgStroke(vg);
+//  //
+//  //  nvgBeginPath(vg);  // left side
+//  //  nvgMoveTo(vg, P.x, P.y);
+//  //  //switch(place){      
+//  //  if(onTop && !inRgtCircle)
+//  //  { 
+//  //    if(rgtDist>0){ nvgLineTo(vg, P.x + rgtDist, P.y); }
+//  //    if(rgtArc>0)   nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, -hPi, -hPi + rgtArc, NVG_CW);
+//  //    if(rgtOpp>0)   nvgLineTo(vg, nP.x+rad+rgtOpp, nP.y+NODE_SZ.y);
+//  //  }
+//  //  else{
+//  //    if(rgtDist>0){ nvgLineTo(vg, P.x + rgtDist, P.y); }
+//  //    if(inRgtCircle){
+//  //      if(rgtArc>0) nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, arcSt, arcSt - rgtArc, NVG_CCW);
+//  //    }else{
+//  //      if(rgtArc>0) nvgArc(vg, rgtCirc.x, rgtCirc.y, rad, hPi, hPi - rgtArc, NVG_CCW);
+//  //    }
+//  //    if(rgtOpp>0) nvgLineTo(vg, nP.x+NODE_SZ.x-rad-rgtOpp, nP.y);
+//  //  }
+//  //  //}
+//  //  nvgStroke(vg);
+//  //}
+//
+//  //f32 rad = lerp(rnd, 0.f, h/2.f);                               // rad is corner radius
+//  //f32 cntrX = x+border+rad, cntrY = y+border+h/2, 
+//  //f32 rr=rad;        // rr is rail radius
+//
+//  //v2  hlf = NODE_HALF_SZ;
+//  //v2 ndir = norm(nP - P);
+//  //v2 pdir = ndir;
+//  //v2   ds = sign(pdir);                                  // ds is direction sign
+//  //f32  ax = abs(pdir.x);
+//  //if( ax > hlf.x ){
+//  //  pdir /= ax/hlf.x;                                    // can this never be 0, since ax is positive, hlf.x is positive, and ax is greater than hlf.x ? 
+//  //}else{
+//  //  f32 ay = abs(pdir.y);
+//  //  pdir /= ay==0.f?  1.f  :  ay/hlf.y;
+//  //}
+//  //f32       r = hlf.y;
+//  //v2 circCntr = (pdir.x<0)? nP+v2(r,r)  :  nP+NODE_SZ-r;
+//
+//  //v2 lftCirc;
+//  //lftCirc.y = nP.y + hlf.y;
+//  //lftCirc.x = leftSide? nP.x+rad  :  nP.x+NODE_SZ.x-rad;
+//  //lftCirc.y = nP.y + hlf.y;
+//
+//  //f32      leftLine = P.x - rlen/2;
+//  //f32 leftLineLimit = max(nP.x + rad, leftLine);
+//  //f32     leftExtra = abs(leftLineLimit - leftLine);
+//  ////f32       leftArc = inLeftCircle? (rlen/2)/rad  :  min(PIf*1.5f, leftExtra/rad);
+//  //f32       leftArc = min(PIf*1.5f, leftExtra/rad);
+//  //f32         arcSt = inLeftCircle? hPi + hPi-asin(dir.y) :  hPi;
+//  //f32         arcEn = min(arcSt+leftArc, PIf*1.5f);
+//  //f32       arcDist = (arcEn - arcSt) * rad;
+//  //f32      leftWrap = max(0.f, leftExtra -  arcDist);
+//
+//  //st      = PIf - asin(dir.y);
+//  //f32   lftSeg = P.x - lftDist;
+//  //
+//  //f32 leftLineLen = P.x - rlen/2 - leftLimit;  // nP.x + 2*rad rlen/2 - 
+//  //
+//  // black border
+//  //f32 bthk = rthk+2;                        // bthk is black thickness 
+//  //nvgBeginPath(vg);
+//  //  nvgMoveTo(vg, x-bthk/2, P.y);
+//  //  nvgArc(vg, P.x, P.y, rr, PIf*1.f, PIf*1.5f, NVG_CW);
+//  //  nvgStrokeWidth(vg, bthk);
+//  //nvgStrokeColor(vg, nvgRGBAf(0, 0, 0, 1.f) );
+//  //nvgStroke(vg);
+//  //
+//  // inner color
+//  //nvgBeginPath(vg);
+//  //  nvgMoveTo(vg, x-rthk/2, P.y);
+//  //  nvgArc(vg, P.x, P.y, rr, PIf*1.f, PIf*1.5f, NVG_CW);
+//  //  nvgStrokeWidth(vg, rthk);
+//  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+//  //nvgStroke(vg);
+//  //
+//  //v2 brdr = node_border(nP, P - ndCntr, io_rad);      // brdr is border
+//  //
+//  //nvgBeginPath(vg);
+//  //  nvgCircle(vg, P.x, P.y, 5.f);
+//  //  nvgStrokeWidth(vg, rthk);
+//  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+//  //nvgStroke(vg);
+//  //
+//  //nvgBeginPath(vg);
+//  //  nvgCircle(vg, circCntr.x, circCntr.y, 5.f);
+//  //  nvgStrokeWidth(vg, rthk);
+//  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+//  //nvgStroke(vg);
+//  //
+//  //f32 angle = inLeftCircle? asin(dir.y) :  PIf/2;
+//  //f32 arcSt = PIf/2.0f;
+//  //f32 arcEn = PIf*1.5f;
+//  //NVGwinding windDirection = leftSide? NVG_CW  :  NVG_CCW;
+//  //if(onTop){
+//  //  swap(arcSt, arcEn);
+//  //  windDirection = NVG_CCW;
+//  //}
+//
+//  //SECTION(drawing first attempt)
+//  //{
+//  //  nvgBeginPath(vg);
+//  //    //if(inLeftCircle){
+//  //    //  nvgMoveTo(vg, P.x, P.y);
+//  //    //  if(leftArc>0){
+//  //    //    nvgArc(vg, circCntr.x, circCntr.y, rad, arcSt, arcEn, windDirection);    // PIf*1.f, PIf*1.5f, NVG_CW);
+//  //    //    if(leftWrap>0)
+//  //    //      nvgLineTo(vg, nP.x+rad+leftWrap, nP.y);
+//  //    //  }
+//  //    //}else{
+//  //    //if(leftSide){
+//  //
+//  //    //if(onTop && !inLeftCircle){
+//  //    //  nvgMoveTo(vg, P.x, P.y);
+//  //    //  nvgLineTo(vg, leftLineLimit, P.y);
+//  //    //  nvgArc(vg, circCntr.x, circCntr.y, rad, arcEn, arcSt, NVG_CCW);      // PIf*1.f, PIf*1.5f, NVG_CW);
+//  //    //  if(leftWrap>0)
+//  //    //    nvgLineTo(vg, nP.x+rad+leftWrap, nP.y+NODE_SZ.y);
+//  //    //}else{
+//  //      nvgMoveTo(vg, P.x, P.y);
+//  //      if(!inLeftCircle){ nvgLineTo(vg, leftLineLimit, P.y); }
+//  //      if(leftArc>0){
+//  //        if(onTop) nvgArc(vg, circCntr.x, circCntr.y, rad, arcEn, arcSt, NVG_CCW);
+//  //        else      nvgArc(vg, circCntr.x, circCntr.y, rad, arcSt, arcEn, windDirection);
+//  //        if(leftWrap>0)
+//  //          nvgLineTo(vg, nP.x+rad+leftWrap, nP.y);
+//  //      }
+//  //    //}
+//  //    //}
+//  //    //}else if(leftSide && onTop){
+//  //    //  
+//  //    //}
+//  //
+//  //    //nvgMoveTo(vg, leftLineLimit, P.y);
+//  //    //nvgLineTo(vg, P.x, P.y);
+//  //    //nvgArc(vg, circCntr.x, circCntr.y, rr, arcSt, arcEn, windDirection);    // PIf*1.f, PIf*1.5f, NVG_CW);
+//  //    nvgStrokeWidth(vg, rthk);
+//  //    nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+//  //  nvgStroke(vg);
+//  //}
+//  //
+//  //f32 arcEn = leftSide? PIf*1.5f  :  -PIf*0.5f;
+//  //if(leftSide==false){ swap(arcSt, arcEn); }
+//
+//  //nvgBeginPath(vg);
+//  //  nvgCircle(vg, nP.x, nP.y, 5.f);
+//  //  nvgStrokeWidth(vg, rthk);
+//  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+//  //nvgStroke(vg);
+//  //
+//  //nvgBeginPath(vg);
+//  //  nvgCircle(vg, P.x, P.y, 5.f);
+//  //  nvgStrokeWidth(vg, rthk);
+//  //  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, 1.f));
+//  //nvgStroke(vg);
+//}
 
+//GraphDB::Id id;
+//printf("\n sizeof(GraphDB::Id): %d \n", sizeof(GraphDB::Id) );
+
+//node_add("new node");
+//
+//node_add("message node", node::MSG);
+
+//auto sIter = grph.nodeSlots(ndOrdr);            // sIter is slot iterator
+//
+//auto     sIdx = sIter->second;                    // sIdx is slot index
+
+//
+//nvgTextAlign(vg,  NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
+
+//auto sz = cncts.size();
+//TO(sz,i) src.add(cncts[i].src);
+//TO(sz,i) dest.add(cncts[i].dest);
+
+//FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
+//fd->ui.screen.resizeCallbackEvent(w, h);
+
+//if(hit) *out_nrml = norm(circCntr - borderPt);
+//
+//  && !hasNaN(intrsct);
+//
+//f32        r = hlf.y;
+//
+//if(hit && borderPt.x > (nP.x+rad) && borderPt.x < (nP.x-rad) ){
+//  if(ds.y > .5f) borderPt.y = nP.y + NODE_SZ.y;
+//  else           borderPt.y = nP.y;
+//}
+
+//nvgBeginPath(vg);
+//  nvgRect(vg, b.xmn, b.ymn, b.w(), b.h());
+//nvgStroke(vg);
+
+//if(preicon != 0){
+//	nvgFontSize(vg, h*1.3f);
+//	nvgFontFace(vg, "icons");
+//	nvgFillColor(vg, nvgRGBA(255,255,255,96));
+//	nvgTextAlign(vg,NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
+//	nvgText(vg, x+w*0.5f-tw*0.5f-iw*0.75f, y+h*0.5f, cpToUTF8(preicon,icon), NULL);
+//}
+
+// lineCircleIntersect
+//f32       r = NODE_SZ.y/2.f;
+//v2  dirCirc = abs(pdir) / r;
+//v2 circCntr = n.P + NODE_SZ - r;
+
+//auto bkt = find(rnge.first, rnge.second, );
+//if(bkt!=rnge.second){
+//  cnct->insert( {a, b} );
+//  return true;
+//} 
 
 //TO(grph.selsz(),i) grph.sel(i,false);
 //grph.sel(ndOrdr,true);
