@@ -92,10 +92,12 @@
 // -todo: figure out why slot types get flipped when loading file - addNode() needed newId to have false passed to it
 // -todo: write slot indices into json file
 // -todo: test saving and loading with normalization back on
+// -todo: debug flashing connections - possibly due to numeric error handling - have to repeat first - can't repeat
+// -todo: fix duplicate connections being created - delCnct needed to be redone after switching cncts and destCncts
+// -todo: make clear_selections clear selected slots - clear_selections not triggering right, split out clearing slots into separate function
 
 // todo: make addSlot check for current slots to make its slot index sequential
 // todo: make function to modularize drawing a bezier from one slot to another with normals
-// todo: debug flashing connections - possibly due to numeric error handling - have to repeat first
 // todo: don't select a slot if it is under an existing node
 // todo: draw bg grid
 // todo: group ui state variables together - priSel, connecting
@@ -559,10 +561,12 @@ void            node_add(str txt, Node::Type type=Node::FLOW)
 void    clear_selections(GraphDB* inout_grph)
 {
   inout_grph->clearSels();
-  slotInSel   =  -1;
-  slotOutSel  =  -1;
+  slotOutSel = slotInSel = Id(0,0);
   priSel      =  -1;
   secSel      =  -1;
+
+  //slotInSel   =  Id(0,0);
+  //slotOutSel  =  Id(0,0);
 }
 
 void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
@@ -1299,18 +1303,18 @@ ENTRY_DECLARATION
       // nodes
       Node& n0 = fd.grph.addNode( Node("one",   Node::FLOW, {400.f,300.f}) );
       Node& n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
-      //Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
-      //Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
+      Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
+      Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
 
       // slots
       Id s0 = fd.grph.addSlot( Slot(n0.id, false) );
       Id s1 = fd.grph.addSlot( Slot(n1.id,  true) );
-      //Id s2 = fd.grph.addSlot( Slot(n2.id,  true) );
-      //Id s3 = fd.grph.addSlot( Slot(n3.id,  true) );
+      Id s2 = fd.grph.addSlot( Slot(n2.id,  true) );
+      Id s3 = fd.grph.addSlot( Slot(n3.id,  true) );
 
       fd.grph.toggleCnct(s0, s1);
-      //fd.grph.toggleCnct(s0, s2);
-      //fd.grph.toggleCnct(s0, s3);
+      fd.grph.toggleCnct(s0, s2);
+      fd.grph.toggleCnct(s0, s3);
 
       //fd.grph.addCnct(Id(1,1), Id(1,1));
       //fd.grph.addCnct(Id(1,1), Id(2,1));
@@ -1505,7 +1509,7 @@ ENTRY_DECLARATION
         Bnd  drgbnd;
         SECTION(selection box)
         {
-          if(drgbox && lftClkUp){
+          if(drgbox || drgbnd.hasLen()){    // && lftClkUp
             clearSelections=false;
           }
 
@@ -1549,6 +1553,7 @@ ENTRY_DECLARATION
           //
           //Slot&    s = *(grph.slot(i));
 
+          bool inAnySlt = false;
           Id  inClk(0);
           Id outClk(0);
           for(auto& kv : grph.slots())
@@ -1563,11 +1568,24 @@ ENTRY_DECLARATION
                 if(s.in) slotInSel  = sid; // Id(nid, );
                 else     slotOutSel = sid; // Id(nid, );
                 clearSelections = false;
+                inAnySlt = true;
+              }else{
+                //slotOutSel = slotInSel = Id(0,0);
+                //grph.clearSlotSels();
               }
             }else if(lftClkUp){
               bool inSlt = len(pntr - s.P) < io_rad;
-              if(inSlt) clearSelections = false;
+              if(inSlt){
+                clearSelections = false;
+                inAnySlt = true;
+              }else{
+              }
             }
+          }
+
+          if(!inAnySlt && lftClkUp){
+            slotOutSel = slotInSel = Id(0,0);
+            grph.clearSlotSels();
           }
           
           if(slotInSel.idx>0 && slotOutSel.idx>0){

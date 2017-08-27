@@ -403,6 +403,10 @@ public:
     for(auto& kv : m_slots) kv.second.state = Slot::NORMAL;
     //for(auto& slt : m_slots) slt.state = Slot::NORMAL;
   }
+  void     clearSlotSels()
+  {
+    for(auto& kv : m_slots) kv.second.state = Slot::NORMAL;
+  }
 
   // nodes
   auto       addNode(Node n, bool newId=true) -> Node&
@@ -562,26 +566,6 @@ public:
   {
     return m_destCncts.count(src);
   }
-  u32        delCnct(Id  src, Id  dest)
-  {
-    u32      cnt = 0;
-    auto srcIter = m_destCncts.find(dest);
-    if(srcIter != m_destCncts.end())
-    {
-      auto iter = m_cncts.find(src);
-      for(; iter != m_cncts.end() && iter->first == src; ){
-        auto cpy = iter;
-        ++iter;
-        if(cpy->second == dest){
-          m_cncts.erase(cpy);
-          ++cnt;
-        }
-      }
-      m_destCncts.erase(dest);
-    }
-
-    return cnt;
-  }
   bool   delDestCnct(Id dest)
   {
     auto iter = m_cncts.find(dest);
@@ -605,6 +589,25 @@ public:
     //delCnct(src, iter->first);
 
     return true;
+  }
+  u32        delCnct(Id  src, Id  dest)
+  {
+    u32      cnt = 0;
+    auto srcIter = m_cncts.find(dest);
+    if(srcIter != m_cncts.end())
+    {
+      auto iter = m_destCncts.find(src);
+      for(; iter != m_destCncts.end() && iter->first == src; ){
+        auto cpy = iter++;          // ++iter;
+        if(cpy->second == dest){
+          m_destCncts.erase(cpy);
+          ++cnt;
+        }
+      }
+      m_cncts.erase(dest);
+    }
+
+    return cnt;
   }
   void    toggleCnct(Id src, Id dest)
   {
