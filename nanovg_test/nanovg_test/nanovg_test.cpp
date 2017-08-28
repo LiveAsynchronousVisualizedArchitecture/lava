@@ -108,10 +108,16 @@
 // -todo: put color and border size drawing constants into FisData as variables
 // -todo: put mouse state and prev mouse state variable into FisData
 // -todo: group global input state variables into FisData
+// -todo: take out unused functions
+// -todo: fix connections not getting deleted - toggle was doing delCnt twice instead of once and checking the return value
+// -todo: put message node colors into FisData
+// -todo: make selected color for message passing nodes
+// -todo: take color argument out of node_draw
 
-// todo: take out unused functions
+// todo: make node size draw using node bnds
 
-// todo: make selected color for message passing nodes
+// todo: make message node diameter dependant on text bounds
+// todo: make flow node size dependant on text bounds
 // todo: make unconnected slots not overlap
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
@@ -119,10 +125,7 @@
 // todo: make one node snap to another node
 // todo: make two snapped nodes group together and be dragged together
 // todo: use scroll wheel and nanovg scale transforms to zoom in and out - will need to scale mouse pointer position as well to 'canvas' coordinates
-// todo: make node size draw using node bnds
-// todo: make flow node size dependant on text bounds
 // todo: separate finding node the pointer is inside from the action to take
-// todo: make message node diameter dependant on text bounds
 // todo: make multiple slots avoid each other - might need to have discreet sections around a node for a slot to sit in
 // todo: make nodes snap to a grid
 // todo: don't select a slot if it is under an existing node
@@ -288,20 +291,6 @@ v2      lineCircleIntsct(v2 P, v2 dir, v2 crcl, f32 r)  // only works for circle
 
   return intrsct;
 }
-bool              insUnq(cnct_tbl* cnct, int a, int b)   // insUnq is insert unique - this inserts into a multi-set only if the combination of int key and int val does not already exist
-{
-  using namespace std;
-  
-  auto rnge = cnct->equal_range(a);
-  if(rnge.first != rnge.second){
-    for(auto i=rnge.first; i!=rnge.second; ++i){
-      if( i->second == b ) return false;
-    }
-  }
-  cnct->insert( {a, b} );
-
-  return true;
-}
 f32        normalToAngle(v2 N)
 {
   return atan2(N.y, N.x);
@@ -466,7 +455,8 @@ GraphDB       strToGraph(str const& s)
     src.idx  = srcIdx.get(i).toInt();
     dest.id  = destId.get(i).toInt();
     dest.idx = destIdx.get(i).toInt();
-    g.addCnct(src, dest);
+    //g.addCnct(src, dest);
+    g.toggleCnct(src, dest);
   }
 
   g.setNextNodeId( g.maxId() );
@@ -633,7 +623,7 @@ v2              out_cntr(Node const& n, f32 r)
 Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
                             int preicon,
                           Node const& n,
-                           NVGcolor col,
+                           //NVGcolor col,
                          float      rnd,               // rnd is corner rounding
                          f32     border=3.5f)
 {
@@ -644,7 +634,6 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
   float tw=0, iw=0, x=n.P.x, y=n.P.y, w=NODE_SZ.x, h=NODE_SZ.y;
 	float rad = lerp(rnd, 0.f, h/2.f);           // rad is corner radius
   float cntrX=x+w/2, cntrY=y+h/2, rr=rad;      // rr is rail radius
-  //float io_rad=10.f;
   Bnd b;
 
   nvgResetTransform(vg);
@@ -652,68 +641,80 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
   switch(n.type)
   {
   case Node::FLOW: {
-    SECTION(grey border)
+    SECTION(draw flow node)
     {
-	    nvgBeginPath(vg);
-       nvgRoundedRect(vg, x,y,w,h, rad);
-      nvgFillColor(vg, nvgRGBA(0,0,0,128));
-	    nvgFill(vg);
+      SECTION(grey border)
+      {
+	      nvgBeginPath(vg);
+         nvgRoundedRect(vg, x,y,w,h, rad);
+        nvgFillColor(vg, nvgRGBA(0,0,0,128));
+	      nvgFill(vg);
+      }
+      SECTION(shaded color inside)
+      {
+        auto    col = n.sel? fd.ui.nd_selclr  : fd.ui.nd_color;
+        int    grad = (int)lerp(rnd, 0, 48);
+        auto topClr = nvgRGBA(255,255,255,isBlack(col)?16:grad);
+        auto botClr = nvgRGBA(0,0,0,isBlack(col)?16:grad);
+	      bg = nvgLinearGradient(vg, x,y,x,y+h, topClr, botClr);
+	      nvgBeginPath(vg);
+	        nvgRoundedRect(vg, x+border,y+border, w-(border*2),h-(border*2), rad-border);
+          col.a = 0.8f;
+	        if(!isBlack(col)){
+		        nvgFillColor(vg, col);
+		        nvgFill(vg);
+	        }
+	      nvgFillPaint(vg, bg);
+	      nvgFill(vg);
+      }
+      b = {x,y, x+w, y+h};
     }
-    SECTION(shaded color inside)
-    {
-      int    grad = (int)lerp(rnd, 0, 48);
-      auto topClr = nvgRGBA(255,255,255,isBlack(col)?16:grad);
-      auto botClr = nvgRGBA(0,0,0,isBlack(col)?16:grad);
-	    bg = nvgLinearGradient(vg, x,y,x,y+h, topClr, botClr);
-	    nvgBeginPath(vg);
-	      nvgRoundedRect(vg, x+border,y+border, w-(border*2),h-(border*2), rad-border);
-        col.a = 0.8f;
-	      if(!isBlack(col)){
-		      nvgFillColor(vg, col);
-		      nvgFill(vg);
-	      }
-	    nvgFillPaint(vg, bg);
-	    nvgFill(vg);
-    }
-    b = {x,y, x+w, y+h};
   } break;
   case Node::MSG: {
-    f32 msgRad = NODE_SZ.x / 2;
-
-    nvgStrokeColor(vg, nvgRGBAf(.04f, .04f, .04f, 1.f));
-    nvgStrokeWidth(vg, border);
-
-    SECTION(radial gradient)
+    SECTION(draw message node)
     {
-      nvgBeginPath(vg);
-      nvgCircle(vg, cntrX, cntrY, msgRad);
-      auto radial = nvgRadialGradient(vg,
-        cntrX, cntrY, msgRad*.5f, msgRad,
-        nvgRGBAf( .15f, .15f,  .15f,   .95f ),
-        nvgRGBAf( .2f, .2f,    .2f,   1.f)  );
-      nvgFillPaint(vg, radial);
-      nvgFill(vg);
-    }
-    SECTION(linear gradient from upper left)
-    {
-      nvgBeginPath(vg);
+      f32 msgRad = NODE_SZ.x / 2;
+
+      nvgStrokeColor(vg, fd.ui.lineClr); // nvgRGBAf(.04f, .04f, .04f, 1.f));
+      nvgStrokeWidth(vg, border);
+
+      SECTION(linear gradient from upper left)
+      {
+        nvgBeginPath(vg);
         nvgCircle(vg, x+w/2,y+h/2, msgRad);
         auto lin = nvgLinearGradient(vg, 
-                                     cntrX, cntrY-msgRad, x, y+msgRad,
-                                     nvgRGBAf( .3f,   .3f,   .3f,  0.5f), 
-                                     nvgRGBAf( .15f,  .15f,  .15f,  .45f) );
-        nvgFillPaint(vg, lin);
-      nvgFill(vg);
-    }
-    SECTION(circle outline)
-    {
-      nvgBeginPath(vg);
-        nvgCircle(vg, cntrX, cntrY, msgRad);
-      nvgStroke(vg);
-    }
+          cntrX, cntrY-msgRad, x, y+msgRad,
+          n.sel? fd.ui.msgnd_selclr : fd.ui.msgnd_gradst,
+          n.sel? fd.ui.msgnd_selclr : fd.ui.msgnd_graden );
 
-    b = {cntrX-msgRad/1.2f, cntrY-msgRad/1.2f, cntrX+msgRad/1.2f, cntrY+msgRad/1.2f};
-  } break;
+        //nvgRGBAf( .3f,   .3f,   .3f,  0.5f), 
+        //nvgRGBAf( .15f,  .15f,  .15f,  .45f) );
+        nvgFillPaint(vg, lin);
+        nvgFill(vg);
+      }
+      SECTION(radial gradient)
+      {
+        nvgBeginPath(vg);
+        nvgCircle(vg, cntrX, cntrY, msgRad);
+        auto radial = nvgRadialGradient(vg,
+          cntrX, cntrY, msgRad*.5f, msgRad,
+          fd.ui.msgnd_gradst,
+          fd.ui.msgnd_graden  );
+        //nvgRGBAf( .15f, .15f,  .15f,   .95f ),
+        //nvgRGBAf( .2f, .2f,    .2f,   1.f)  );
+        nvgFillPaint(vg, radial);
+        nvgFill(vg);
+      }
+      SECTION(circle outline)
+      {
+        nvgBeginPath(vg);
+          nvgCircle(vg, cntrX, cntrY, msgRad);
+        nvgStroke(vg);
+      }
+
+      b = {cntrX-msgRad/1.2f, cntrY-msgRad/1.2f, cntrX+msgRad/1.2f, cntrY+msgRad/1.2f};
+    } break;
+  }
   }
 
   SECTION(text)
@@ -1367,10 +1368,12 @@ ENTRY_DECLARATION
               Node&     n = *(nds[i]);
               bool selctd = n.id==fd.sel.pri || n.sel;
 
-              auto clr = fd.ui.nd_color;    // NODE_CLR;
-              if(selctd){ clr = fd.ui.nd_selclr; }  //nvgRGBf(.5f,.4f,.1f); }
-              
-              n.b = node_draw(vg, 0, n, clr, 1.f, fd.ui.nd_border);
+              //auto clr = fd.ui.nd_color;    // NODE_CLR;
+              //if(selctd){ clr = fd.ui.nd_selclr; }  //nvgRGBf(.5f,.4f,.1f); }
+              //
+              //n.b = node_draw(vg, 0, n, clr, 1.f, fd.ui.nd_border);
+
+              n.b = node_draw(vg, 0, n, 1.f, fd.ui.nd_border);
 
               SECTION(draw node slots)
               {
@@ -1450,6 +1453,24 @@ ENTRY_DECLARATION
 
 
 
+
+//nvgRGBAf( .15f, .15f,  .15f,   .95f ),
+//nvgRGBAf( .2f, .2f,    .2f,   1.f)  );
+
+//bool              insUnq(cnct_tbl* cnct, int a, int b)   // insUnq is insert unique - this inserts into a multi-set only if the combination of int key and int val does not already exist
+//{
+//  using namespace std;
+//  
+//  auto rnge = cnct->equal_range(a);
+//  if(rnge.first != rnge.second){
+//    for(auto i=rnge.first; i!=rnge.second; ++i){
+//      if( i->second == b ) return false;
+//    }
+//  }
+//  cnct->insert( {a, b} );
+//
+//  return true;
+//}
 
 //bool                 drgNd = false;
 //v2                    drgP;

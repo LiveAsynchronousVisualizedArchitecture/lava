@@ -12,3 +12,6 @@ color code for performance in performance visualization mode (node graph)
 |  |  time spent relative to the amount of data that comes into it
 
 
+if there is a timeline of text edits, can the edit that causes a compiler error be narrowed down? 
+|  the timeline could be colored by whether it compiles or not at the time
+

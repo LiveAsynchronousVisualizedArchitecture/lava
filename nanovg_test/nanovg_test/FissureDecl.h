@@ -507,17 +507,6 @@ public:
   u64            ssz() const { return m_slots.size(); }
 
   // connections
-  void       addCnct(Id src, Id dest)
-  {
-    auto ci = m_cncts.find(dest);
-    if(ci != m_cncts.end()){
-      m_cncts.erase(dest);
-      m_destCncts.erase(src);
-    }
-
-    m_cncts.insert({dest, src});
-    m_destCncts.insert({src, dest});
-  }
   u32    delSrcCncts(Id  src)
   {
     u32  cnt = 0;
@@ -576,15 +565,17 @@ public:
   }
   void    toggleCnct(Id src, Id dest)
   {
+    u32 delcnt = 0;
     auto di = m_cncts.find(dest);
     if( di != end(m_cncts) ){
-      delCnct(di->second,dest);
+      delcnt = delCnct(di->second,dest);
     }
 
-    if( delCnct(src,dest)==0 ){
+    if(delcnt == 0){
       m_cncts.insert({dest, src});
       m_destCncts.insert({src, dest});
     }
+    //delCnct(src,dest)==0 
   }
   auto   destCnctEnd() -> decltype(m_destCncts.end())  { return m_destCncts.end(); }
   auto       cnctEnd() -> decltype(m_cncts.end())  { return m_cncts.end(); }
@@ -617,6 +608,18 @@ public:
   {
     return m_destCncts;
   }
+
+  //void       addCnct(Id src, Id dest)
+  //{
+  //  auto ci = m_cncts.find(dest);
+  //  if(ci != m_cncts.end()){
+  //    m_cncts.erase(dest);
+  //    m_destCncts.erase(src);
+  //  }
+  //
+  //  m_cncts.insert({dest, src});
+  //  m_destCncts.insert({src, dest});
+  //}
 };
 
 struct FisData
@@ -635,20 +638,25 @@ struct FisData
     BoxLayout*     keyLay = nullptr;
 
     // mouse
-    v2           prevPntr;
+    v2                prevPntr;
     bool                  rtDn = false;    // right mouse button down
     bool                 lftDn = false;    // left mouse button down
     bool              prevRtDn = false;    // right mouse button down
     bool             prevLftDn = false;    // left mouse button down
 
     // drawing
-    NVGcolor     nd_color  =  nvgRGBf(.2f, .3f, .375f);
-    NVGcolor    nd_selclr  =  nvgRGBf(.5f,.4f,.1f);
-    f32         nd_border  =   3.5f;
-    f32          slot_rad  =   15.f;
-    f32       slot_border  =   3.5f;
-  } ui;
+    NVGcolor        lineClr  =  nvgRGBAf(.04f, .04f, .04f, 1.f);
+    NVGcolor       nd_color  =  nvgRGBf(.2f, .3f, .375f);
+    NVGcolor      nd_selclr  =  nvgRGBf(.5f,.4f,.1f);
+    NVGcolor    msgnd_color  =  nvgRGBf(.2f, .3f, .375f);
+    NVGcolor   msgnd_selclr  =  nvgRGBAf(.5f,.4f,.1f, .75f);
+    NVGcolor   msgnd_gradst  =  nvgRGBAf(.3f, .3f, .3f, .5f);
+    NVGcolor   msgnd_graden  =  nvgRGBAf(.15f, .15f, .15f, .45f); 
 
+    f32           nd_border  =   3.5f;
+    f32            slot_rad  =   15.f;
+    f32         slot_border  =   3.5f;
+  } ui;
   struct
   {
     v2                prevPntr;
@@ -662,7 +670,6 @@ struct FisData
     bool                drgbox = false;
     bool                 drgNd = false;
   } mouse;
-
   struct 
   {
     i64        pri = -1;
