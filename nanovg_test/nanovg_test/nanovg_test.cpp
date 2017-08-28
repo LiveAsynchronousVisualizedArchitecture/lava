@@ -113,23 +113,23 @@
 // -todo: put message node colors into FisData
 // -todo: make selected color for message passing nodes
 // -todo: take color argument out of node_draw
+// -todo: make node size draw using node bnds
 
-// todo: make node size draw using node bnds
-
-// todo: make message node diameter dependant on text bounds
-// todo: make flow node size dependant on text bounds
-// todo: make unconnected slots not overlap
+// todo: change slot movement to follow node bnds
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
 // todo: make a node to split text into lines and scatter the result
+// todo: make message node diameter dependant on text bounds
+// todo: make flow node size dependant on text bounds
+// todo: make unconnected slots not overlap
 // todo: make one node snap to another node
 // todo: make two snapped nodes group together and be dragged together
 // todo: use scroll wheel and nanovg scale transforms to zoom in and out - will need to scale mouse pointer position as well to 'canvas' coordinates
-// todo: separate finding node the pointer is inside from the action to take
 // todo: make multiple slots avoid each other - might need to have discreet sections around a node for a slot to sit in
-// todo: make nodes snap to a grid
 // todo: don't select a slot if it is under an existing node
 
+// idea: separate finding node the pointer is inside from the action to take
+// idea: make nodes snap to a grid
 // idea: combine src and dest slots when writing json and just use a boolean to separate them 
 // idea: have a panel or window that shows information about the selected node and the shared library it represents
 // idea: make connections thicker when there is more data and brighter when there are more packets
@@ -623,7 +623,6 @@ v2              out_cntr(Node const& n, f32 r)
 Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
                             int preicon,
                           Node const& n,
-                           //NVGcolor col,
                          float      rnd,               // rnd is corner rounding
                          f32     border=3.5f)
 {
@@ -631,9 +630,11 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
 
 	NVGpaint bg;
 	char icon[8];
-  float tw=0, iw=0, x=n.P.x, y=n.P.y, w=NODE_SZ.x, h=NODE_SZ.y;
+  float tw=0, iw=0, x=n.P.x, y=n.P.y, w=n.b.w(), h=n.b.h();
 	float rad = lerp(rnd, 0.f, h/2.f);           // rad is corner radius
-  float cntrX=x+w/2, cntrY=y+h/2, rr=rad;      // rr is rail radius
+  f32 cntrX = (n.P.x + n.b.xmx)/2;
+  f32 cntrY = (n.P.y + n.b.ymx)/2; 
+  f32 rr    = rad;      // rr is rail radius
   Bnd b;
 
   nvgResetTransform(vg);
@@ -713,8 +714,8 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
       }
 
       b = {cntrX-msgRad/1.2f, cntrY-msgRad/1.2f, cntrX+msgRad/1.2f, cntrY+msgRad/1.2f};
-    } break;
-  }
+    }
+  } break;
   }
 
   SECTION(text)
@@ -761,23 +762,32 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
   }
 
   return b;
+
+  //f32 cntrX = (n.b.xmn+n.b.xmx)/2;
+  //f32 cntrY = (n.b.ymn+n.b.ymx)/2; 
+  //
+  //NVGcolor col,
+  //
+  //float tw=0, iw=0, x=n.P.x, y=n.P.y, w=NODE_SZ.x, h=NODE_SZ.y;
+  //float cntrX=x+w/2, cntrY=y+h/2, rr=rad;      // rr is rail radius
 }
 v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 {
+  //v2      hlf = { n.b.xmx/2, n.b.ymx/2 };
+  v2      hlf = NODE_SZ/2;
   v2       nP = n.P;
   v2 borderPt = {0,0};
   v2     ndir = norm(dir);
-  v2    ncntr = nP + NODE_HALF_SZ;
+  v2    ncntr = nP + hlf; // n.b.mx/2.f; // hlf; // n.mx/2.f; // NODE_HALF_SZ;
 
   switch(n.type)
   {
   case Node::FLOW: {
-    v2   hlf = NODE_HALF_SZ;
-    f32  rad = hlf.y;
-
-    v2 pdir = ndir;
-    v2   ds = sign(pdir);                                  // ds is direction sign
-    f32  ax = abs(pdir.x);
+    //v2   hlf  =  NODE_HALF_SZ;
+    f32  rad  =  hlf.y;
+    v2  pdir  =  ndir;
+    v2    ds  =  sign(pdir);                                  // ds is direction sign
+    f32   ax  =  abs(pdir.x);
     if( ax > hlf.x ){
       pdir /= ax/hlf.x;                                    // can this never be 0, since ax is positive, hlf.x is positive, and ax is greater than hlf.x ? 
     }else{
@@ -785,9 +795,9 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
       pdir /= ay==0.f?  1.f  :  ay/hlf.y;
     }
 
-    v2  circCntr = (pdir.x<0)? nP+v2(rad,rad)  :  nP+NODE_SZ-v2(rad,rad);
+    v2  circCntr = (pdir.x<0)? nP+v2(rad,rad)  :  nP + NODE_SZ - v2(rad,rad);  // NODE_SZ
     v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, rad);
-    bool     hit = !hasInf(intrsct)  &&  (intrsct.x < nP.x+rad || intrsct.x > nP.x+NODE_SZ.x-rad); 
+    bool     hit = !hasInf(intrsct)  &&  (intrsct.x < nP.x+rad || intrsct.x > nP.x + NODE_SZ.x - rad); 
     if(hit){ pdir = intrsct - ncntr; }
 
     borderPt = ncntr + pdir;
@@ -800,7 +810,7 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
   case Node::MSG: 
   default: 
   {
-    f32  rad = NODE_SZ.x/2;
+    f32  rad = NODE_SZ.x/2;  // n.b.xmx/2.f;   // NODE_SZ.x/2;
     borderPt = ncntr + ndir*rad; 
     if(out_nrml){ *out_nrml = ndir; }
   } break;
@@ -1063,9 +1073,6 @@ ENTRY_DECLARATION
       auto    nds = grph.nodes();
       auto     sz = grph.nsz();
 
-      //bool lftClk = (fd.mouse.lftDn && !fd.mouse.prevLftDn);
-      //bool    clk = lftClk || rtClk;
-
       SECTION(time)
       {
         t     = glfwGetTime();
@@ -1158,8 +1165,9 @@ ENTRY_DECLARATION
               if(inSlt){
                 clearSelections = false;
                 inAnySlt = true;
-              }else{
               }
+              //else{
+              //}
             }
           }
 
@@ -1237,13 +1245,13 @@ ENTRY_DECLARATION
             Slot&    s = kv.second;
             v2    nrml;
             Node const& n = grph.node(nid.id);
-            v2 nP = n.P + NODE_SZ/2;
+            v2 nP = n.P + NODE_SZ/2; // n.b.mx; // w()/2; // NODE_SZ/2;
               
             if(s.in)
             {                                                 // dest / in / blue slots
               Slot* src = grph.srcSlot(kv.first);
               if(src){
-                auto srcNdP = grph.node(src->nid).P + NODE_SZ/2;
+                auto srcNdP = grph.node(src->nid).P + NODE_SZ/2; // n.b.mx; // NODE_SZ/2;
                 s.P = node_border(n, srcNdP - nP, &nrml);
                 s.N = nrml;
               }else{
@@ -1437,7 +1445,7 @@ ENTRY_DECLARATION
       }
 
       fd.mouse.prevRtDn  =  fd.mouse.rtDn;
-      fd.mouse.prevLftDn = fd.mouse.lftDn;
+      fd.mouse.prevLftDn =  fd.mouse.lftDn;
 
       glfwSwapBuffers(fd.win);
       glfwPollEvents();
@@ -1453,6 +1461,12 @@ ENTRY_DECLARATION
 
 
 
+
+
+
+
+//bool lftClk = (fd.mouse.lftDn && !fd.mouse.prevLftDn);
+//bool    clk = lftClk || rtClk;
 
 //nvgRGBAf( .15f, .15f,  .15f,   .95f ),
 //nvgRGBAf( .2f, .2f,    .2f,   1.f)  );

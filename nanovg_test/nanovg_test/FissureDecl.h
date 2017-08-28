@@ -64,10 +64,11 @@ union      Bnd
   }
   operator v4&(){ return mnmx; }
 
-  float      w(){ return abs(xmx-xmn); }
-  float      h(){ return abs(ymx-ymn); }
-  float   area(){ return w() * h();    }
-  bool  hasLen()
+  float      w() const { return abs(xmx-xmn); }
+  float      h() const { return abs(ymx-ymn); }
+  v2        wh() const { return {w(), h()};   }
+  float   area() const { return w() * h();    }
+  bool  hasLen() const
   { 
     using namespace std;
     return max(0.f,xmx-xmn) + max(0.f,ymx-ymn);
@@ -84,7 +85,8 @@ struct    Node
   v2        P = {0,0};
   Type   type = NODE_ERROR;
   bool    sel = false;                            // sel is selected
-  Bnd       b;
+  //Bnd       b = {0, 0, 128.f, 42.f};
+  Bnd       b = {0, 0, 256.f, 64.f};
   str     txt = ""; 
 
   void cp(Node const& l)
