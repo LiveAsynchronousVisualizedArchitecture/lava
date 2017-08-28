@@ -16,11 +16,12 @@ using namespace nanogui;
 const int     TITLE_MAX_LEN = 256;
 const v2      NODE_SZ       = { 256.f, 64.f };
 const v2      NODE_HALF_SZ  = NODE_SZ/2.f;
-const auto    NODE_CLR      = nvgRGBf(.2f, .3f, .375f);
 const float   INFf          = std::numeric_limits<float>::infinity();
 const float   SIG_NANf      = std::numeric_limits<float>::signaling_NaN();
+
+//const auto    NODE_CLR      = nvgRGBf(.2f, .3f, .375f);
+//const float   BORDER        = 3.5f;
 //const f32     IORAD         = 15.f;
-const float   BORDER        = 3.5f;
 
 extern "C" unsigned char Roboto_Regular_ttf[];
 extern "C" unsigned int  Roboto_Regular_ttf_len;
@@ -633,8 +634,34 @@ struct FisData
     Window*         dbWin = nullptr;
     BoxLayout*     keyLay = nullptr;
 
-    f32          slot_rad = 10.f;
+    // mouse
+    v2           prevPntr;
+    bool                  rtDn = false;    // right mouse button down
+    bool                 lftDn = false;    // left mouse button down
+    bool              prevRtDn = false;    // right mouse button down
+    bool             prevLftDn = false;    // left mouse button down
+
+    // drawing
+    NVGcolor     nd_color  =  nvgRGBf(.2f, .3f, .375f);
+    NVGcolor    nd_selclr  =  nvgRGBf(.5f,.4f,.1f);
+    f32         nd_border  =   3.5f;
+    f32          slot_rad  =   15.f;
+    f32       slot_border  =   3.5f;
   } ui;
+
+  struct
+  {
+    v2                prevPntr;
+    bool                  rtDn = false;    // right mouse button down
+    bool                 lftDn = false;    // left mouse button down
+    bool              prevRtDn = false;    // right mouse button down
+    bool             prevLftDn = false;    // left mouse button down
+
+    v2                    drgP;
+    v2                 drgofst;
+    bool                drgbox = false;
+    bool                 drgNd = false;
+  } mouse;
 
   struct 
   {

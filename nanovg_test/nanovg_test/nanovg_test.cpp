@@ -104,10 +104,12 @@
 // -todo: fix multiple connections to a single dest - made toggleCnct delete any connections to the dest Id
 // -todo: group ui state variables together - priSel, secSel, slot selections
 // -todo: fix warnings
+// -todo: make io_rad into slot_rad in FisData
+// -todo: put color and border size drawing constants into FisData as variables
+// -todo: put mouse state and prev mouse state variable into FisData
+// -todo: group global input state variables into FisData
 
-// todo: make io_rad into slot_rad in FisData
 // todo: take out unused functions
-// todo: group global input state variables into FisData
 
 // todo: make selected color for message passing nodes
 // todo: make unconnected slots not overlap
@@ -202,37 +204,6 @@
 #include "FissureDecl.h"
 
 using Id = GraphDB::Id;
-
-v2                prevPntr;
-bool                  rtDn = false;    // right mouse button down
-bool                 lftDn = false;    // left mouse button down
-bool              prevRtDn = false;    // right mouse button down
-bool             prevLftDn = false;    // left mouse button down
-
-bool                 drgNd = false;
-v2                    drgP;
-v2                 drgofst;
-bool                drgbox = false;
-
-
-//char              winTitle[TITLE_MAX_LEN];
-//
-//int                premult = 0;
-//
-//Bnd                   nbnd;
-//
-//float              ndOfstX;
-//float              ndOfstY;
-//
-//float                  ndx = 512.f;
-//float                  ndy = 512.f;
-//
-//Id               slotInSel;
-//Id              slotOutSel;
-//int                 pri = -1;
-//int                 sec = -1;
-//f32                 io_rad;
-
 
 static FisData fd;
 
@@ -609,13 +580,13 @@ void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int
 void    mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 {
   if(button==GLFW_MOUSE_BUTTON_LEFT){
-    if(action==GLFW_PRESS) lftDn = true;
-    else if(action==GLFW_RELEASE) lftDn = false;
+    if(action==GLFW_PRESS) fd.mouse.lftDn = true;
+    else if(action==GLFW_RELEASE) fd.mouse.lftDn = false;
   }
 
   if(button==GLFW_MOUSE_BUTTON_RIGHT){
-    if(action==GLFW_PRESS) rtDn = true;
-    else if(action==GLFW_RELEASE) rtDn = false;
+    if(action==GLFW_PRESS) fd.mouse.rtDn = true;
+    else if(action==GLFW_RELEASE) fd.mouse.rtDn = false;
   }
 
   fd.ui.screen.mouseButtonCallbackEvent(button, action, mods);
@@ -663,7 +634,8 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
                             int preicon,
                           Node const& n,
                            NVGcolor col,
-                         float      rnd)     // rnd is corner rounding
+                         float      rnd,               // rnd is corner rounding
+                         f32     border=3.5f)
 {
   const float   rthk = 8.f;    // rw is rail thickness
 
@@ -694,7 +666,7 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
       auto botClr = nvgRGBA(0,0,0,isBlack(col)?16:grad);
 	    bg = nvgLinearGradient(vg, x,y,x,y+h, topClr, botClr);
 	    nvgBeginPath(vg);
-	      nvgRoundedRect(vg, x+BORDER,y+BORDER, w-(BORDER*2),h-(BORDER*2), rad-BORDER);
+	      nvgRoundedRect(vg, x+border,y+border, w-(border*2),h-(border*2), rad-border);
         col.a = 0.8f;
 	      if(!isBlack(col)){
 		      nvgFillColor(vg, col);
@@ -709,7 +681,7 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
     f32 msgRad = NODE_SZ.x / 2;
 
     nvgStrokeColor(vg, nvgRGBAf(.04f, .04f, .04f, 1.f));
-    nvgStrokeWidth(vg, BORDER);
+    nvgStrokeWidth(vg, border);
 
     SECTION(radial gradient)
     {
@@ -1085,11 +1057,13 @@ ENTRY_DECLARATION
 
     while(!glfwWindowShouldClose(fd.win))
     {
-      bool lftClk = (lftDn && !prevLftDn);
-      bool  rtClk = (rtDn  && !prevRtDn);
-      bool    clk = lftClk || rtClk;
+      auto&    ms = fd.mouse;
+      bool  rtClk = (ms.rtDn  && !ms.prevRtDn);
       auto    nds = grph.nodes();
       auto     sz = grph.nsz();
+
+      //bool lftClk = (fd.mouse.lftDn && !fd.mouse.prevLftDn);
+      //bool    clk = lftClk || rtClk;
 
       SECTION(time)
       {
@@ -1102,7 +1076,7 @@ ENTRY_DECLARATION
         glfwPollEvents();                                             // PollEvents must be done after zeroing out the deltas
   	    glfwGetCursorPos(fd.win, &cx, &cy);
 
-        prevPntr = pntr;
+        fd.ui.prevPntr = pntr;
         pntr=Vec2((float)cx, (float)cy);
 
         //sprintf(winTitle, "%.4f  %.4f", px, py);
@@ -1124,29 +1098,29 @@ ENTRY_DECLARATION
       }
       SECTION(selection)
       {
-        bool lftClkDn =  lftDn && !prevLftDn;    // lftClkDn is left click down
-        bool lftClkUp = !lftDn &&  prevLftDn;    // lftClkDn is left click up
+        bool lftClkDn =  ms.lftDn && !ms.prevLftDn;    // lftClkDn is left click down
+        bool lftClkUp = !ms.lftDn &&  ms.prevLftDn;    // lftClkDn is left click up
         bool clearSelections = true;
         Bnd  drgbnd;
         SECTION(selection box)
         {
-          if(drgbox || drgbnd.hasLen()){    // && lftClkUp
+          if(ms.drgbox || drgbnd.hasLen()){    // && lftClkUp
             clearSelections=false;
           }
 
-          if(!lftDn){ drgP=pntr; drgbox=false; }
+          if(!ms.lftDn){ ms.drgP=pntr; ms.drgbox=false; }
 
-          if(drgbox)
-            drgbnd = Bnd( min(drgP.x, pntr.x),
-                          min(drgP.y, pntr.y),
-                          max(drgP.x, pntr.x),
-                          max(drgP.y, pntr.y) );
+          if(ms.drgbox)
+            drgbnd = Bnd( min(ms.drgP.x, pntr.x),
+                          min(ms.drgP.y, pntr.y),
+                          max(ms.drgP.x, pntr.x),
+                          max(ms.drgP.y, pntr.y) );
           else
             drgbnd = Bnd();
         }
         SECTION(select)
         {
-          if(drgbox){
+          if(ms.drgbox){
             TO(sz,i){
               Node& n = *(nds[i]);
               n.sel   = isIn(n.b, drgbnd);
@@ -1155,7 +1129,7 @@ ENTRY_DECLARATION
               clearSelections = false;
           }
         
-          if(!lftDn){
+          if(!fd.mouse.lftDn){
             fd.sel.pri = -1;
           }
         }
@@ -1211,12 +1185,12 @@ ENTRY_DECLARATION
 
             SECTION(primary selection and group selection effects)
             {
-              if(inNode && clk && (fd.sel.pri<0 || fd.sel.pri!=n->id) ){
+              if(inNode && lftClkDn && (fd.sel.pri<0 || fd.sel.pri!=n->id) ){
                 n   = &(grph.moveToFront(n->id));
                 nds = grph.nodes(); // move to the front will invalidate some pointers in the nds array so it needs to be remade
                 
                 fd.sel.pri = n->id;
-                drgP       = pntr;
+                ms.drgP    = pntr;
 
                 if(!n->sel){
                   TO(sz,j){ nds[j]->sel = false; }  // todo: move this out of the outer loop due to being O(n^2)
@@ -1228,9 +1202,9 @@ ENTRY_DECLARATION
           }
 
           if(!inAny){
-            if( lftClkDn && !(fd.sel.pri>0) ){ drgbox=true; }
+            if( lftClkDn && !(fd.sel.pri>0) ){ ms.drgbox=true; }
 
-            if(rtDn && !prevRtDn){ fd.sel.sec = -1; }
+            if(fd.mouse.rtDn && !fd.mouse.prevRtDn){ fd.sel.sec = -1; }
           }else{ // if(lftClkDn && lftClkUp){
             clearSelections=false;
           }
@@ -1250,7 +1224,7 @@ ENTRY_DECLARATION
             bool selctd = n.id==fd.sel.pri || n.sel;
 
             if( fd.sel.pri>-1 && selctd ){           // if a node is primary selected (left mouse down on a node) or the selected flag is set
-              n.P +=  pntr - prevPntr;
+              n.P +=  pntr - fd.ui.prevPntr;
             }
           }
         }
@@ -1393,15 +1367,15 @@ ENTRY_DECLARATION
               Node&     n = *(nds[i]);
               bool selctd = n.id==fd.sel.pri || n.sel;
 
-              auto clr = NODE_CLR;
-              if(selctd){ clr = nvgRGBf(.5f,.4f,.1f); }
+              auto clr = fd.ui.nd_color;    // NODE_CLR;
+              if(selctd){ clr = fd.ui.nd_selclr; }  //nvgRGBf(.5f,.4f,.1f); }
               
-              n.b = node_draw(vg, 0, n, clr, 1.f);
+              n.b = node_draw(vg, 0, n, clr, 1.f, fd.ui.nd_border);
 
               SECTION(draw node slots)
               {
                 nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
-                nvgStrokeWidth(vg, BORDER);
+                nvgStrokeWidth(vg, fd.ui.slot_border);
                 auto sIter = grph.nodeSlots(n.id);            // sIter is slot iterator
                 for(; sIter!=grph.slotEnd() && sIter->first.id==n.id; ++sIter)
                 {
@@ -1412,7 +1386,7 @@ ENTRY_DECLARATION
                   Slot::State drawState = Slot::NORMAL;
                   if(s.state==Slot::SELECTED) drawState = Slot::SELECTED;
                   else if(inSlot)             drawState = Slot::HIGHLIGHTED;
-                  slot_draw(vg, s, drawState);
+                  slot_draw(vg, s, drawState, fd.ui.slot_rad);
                 }
               }
 
@@ -1420,14 +1394,14 @@ ENTRY_DECLARATION
           }
           SECTION(draw selection box)
           {
-            if(lftDn && fd.sel.pri<0)
+            if(fd.mouse.lftDn && fd.sel.pri<0)
             {
               nvgBeginPath(vg);
                 float x,y,w,h;
-                x = min(drgP.x, pntr.x); 
-                y = min(drgP.y, pntr.y); 
-                w = abs(drgP.x - pntr.x);
-                h = abs(drgP.y - pntr.y);
+                x = min(ms.drgP.x, pntr.x); 
+                y = min(ms.drgP.y, pntr.y); 
+                w = abs(ms.drgP.x - pntr.x);
+                h = abs(ms.drgP.y - pntr.y);
                 nvgRect(vg, x,y, w,h);
                 nvgStrokeWidth(vg, 1.f);
                 nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, .75f));
@@ -1459,8 +1433,8 @@ ENTRY_DECLARATION
         }
       }
 
-      prevRtDn  =  rtDn;
-      prevLftDn = lftDn;
+      fd.mouse.prevRtDn  =  fd.mouse.rtDn;
+      fd.mouse.prevLftDn = fd.mouse.lftDn;
 
       glfwSwapBuffers(fd.win);
       glfwPollEvents();
@@ -1476,6 +1450,37 @@ ENTRY_DECLARATION
 
 
 
+
+//bool                 drgNd = false;
+//v2                    drgP;
+//v2                 drgofst;
+//bool                drgbox = false;
+
+//bool                  rtDn = false;    // right mouse button down
+//bool                 lftDn = false;    // left mouse button down
+//bool              prevRtDn = false;    // right mouse button down
+//bool             prevLftDn = false;    // left mouse button down
+
+//v2                prevPntr;
+//
+
+//char              winTitle[TITLE_MAX_LEN];
+//
+//int                premult = 0;
+//
+//Bnd                   nbnd;
+//
+//float              ndOfstX;
+//float              ndOfstY;
+//
+//float                  ndx = 512.f;
+//float                  ndy = 512.f;
+//
+//Id               slotInSel;
+//Id              slotOutSel;
+//int                 pri = -1;
+//int                 sec = -1;
+//f32                 io_rad;
 
 //
 //bool highlight=false, bool selected=false)
