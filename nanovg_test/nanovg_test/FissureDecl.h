@@ -575,6 +575,11 @@ public:
   }
   void    toggleCnct(Id src, Id dest)
   {
+    auto di = m_cncts.find(dest);
+    if( di != end(m_cncts) ){
+      delCnct(di->second,dest);
+    }
+
     if( delCnct(src,dest)==0 ){
       m_cncts.insert({dest, src});
       m_destCncts.insert({src, dest});

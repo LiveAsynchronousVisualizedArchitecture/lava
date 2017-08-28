@@ -99,10 +99,11 @@
 // -todo: make function to modularize drawing a bezier from one slot to another with normals
 // -todo: make addSlot check for current slots to make its slot index sequential
 // -todo: clean comments out of main functions
+// -todo: profile - all time coming from nvg drawing functions
+// -todo: test two slots - two connections can be made to one dest
+// -todo: fix multiple connections to a single dest - made toggleCnct delete any connections to the dest Id
 
-// todo: profile 
 // todo: group ui state variables together - priSel, connecting
-// todo: test two slots
 
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
@@ -924,6 +925,7 @@ ENTRY_DECLARATION
       Id s1 = fd.grph.addSlot( Slot(n1.id,  true) );
       Id s2 = fd.grph.addSlot( Slot(n2.id,  true) );
       Id s3 = fd.grph.addSlot( Slot(n3.id,  true) );
+      Id s4 = fd.grph.addSlot( Slot(n0.id, false) );
 
       fd.grph.toggleCnct(s0, s1);
       fd.grph.toggleCnct(s0, s2);
