@@ -620,6 +620,8 @@ public:
 
 struct FisData
 {
+  using Id = GraphDB::Id;
+  
   GLFWwindow*         win = nullptr;                     // Platform 
   GraphDB            grph;
 
@@ -631,6 +633,14 @@ struct FisData
     Window*         dbWin = nullptr;
     BoxLayout*     keyLay = nullptr;
   } ui;
+
+  struct 
+  {
+    i64        pri = -1;
+    i64        sec = -1;
+    Id   slotInSel;
+    Id  slotOutSel;
+  } sel;
 };
 
 #endif

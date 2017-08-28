@@ -102,9 +102,13 @@
 // -todo: profile - all time coming from nvg drawing functions
 // -todo: test two slots - two connections can be made to one dest
 // -todo: fix multiple connections to a single dest - made toggleCnct delete any connections to the dest Id
+// -todo: group ui state variables together - priSel, secSel, slot selections
 
-// todo: group ui state variables together - priSel, connecting
+// todo: fix warnings
+// todo: group global input state variables into FisData
 
+// todo: make selected color for message passing nodes
+// todo: make unconnected slots not overlap
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
 // todo: make a node to split text into lines and scatter the result
@@ -210,10 +214,10 @@ float              ndOfstY;
 float                  ndx = 512.f;
 float                  ndy = 512.f;
 
-Id               slotInSel;
-Id              slotOutSel;
-int                 priSel = -1;
-int                 secSel = -1;
+//Id               slotInSel;
+//Id              slotOutSel;
+//int                 pri = -1;
+//int                 sec = -1;
 f32                 io_rad;
 
 bool                 drgNd = false;
@@ -524,12 +528,13 @@ bool            loadFile(str path, GraphDB* out_g)
 }
 
 // state manipulation
-void    clear_selections(GraphDB* inout_grph)
+void    clear_selections(GraphDB* inout_grph, FisData* inout_fd)
 {
   inout_grph->clearSels();
-  slotOutSel = slotInSel = Id(0,0);
-  priSel      =  -1;
-  secSel      =  -1;
+  inout_fd->sel.slotOutSel = Id(0,0);
+  inout_fd->sel.slotInSel  = Id(0,0);
+  inout_fd->sel.pri        =  -1;
+  inout_fd->sel.sec        =  -1;
 }
 
 void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
@@ -1087,9 +1092,6 @@ ENTRY_DECLARATION
         glfwPollEvents();                                             // PollEvents must be done after zeroing out the deltas
   	    glfwGetCursorPos(fd.win, &cx, &cy);
 
-        //px=(float)cx; py=(float)cy;
-        //prevX=px; prevY=py; 
-
         prevPntr = pntr;
         pntr=Vec2((float)cx, (float)cy);
 
@@ -1144,7 +1146,7 @@ ENTRY_DECLARATION
           }
         
           if(!lftDn){
-            priSel = -1;
+            fd.sel.pri = -1;
           }
         }
         SECTION(slot selection and connection creation)
@@ -1161,8 +1163,8 @@ ENTRY_DECLARATION
               if(inSlt){
                 outClk  = sid;  // Id(nid);
                 s.state = Slot::SELECTED;
-                if(s.in) slotInSel  = sid; // Id(nid, );
-                else     slotOutSel = sid; // Id(nid, );
+                if(s.in) fd.sel.slotInSel  = sid; // Id(nid, );
+                else     fd.sel.slotOutSel = sid; // Id(nid, );
                 clearSelections = false;
                 inAnySlt = true;
               }
@@ -1177,14 +1179,14 @@ ENTRY_DECLARATION
           }
 
           if(!inAnySlt && lftClkUp){
-            slotOutSel = slotInSel = Id(0,0);
+            fd.sel.slotOutSel = fd.sel.slotInSel = Id(0,0);
             grph.clearSlotSels();
           }
           
-          if(slotInSel.idx>0 && slotOutSel.idx>0){
-            grph.toggleCnct(slotOutSel, slotInSel);
-            slotOutSel = slotInSel = Id(0,0);
-            clear_selections(&grph);
+          if(fd.sel.slotInSel.idx>0 && fd.sel.slotOutSel.idx>0){
+            grph.toggleCnct(fd.sel.slotOutSel, fd.sel.slotInSel);
+            fd.sel.slotOutSel = fd.sel.slotInSel = Id(0,0);
+            clear_selections(&grph, &fd);
             clearSelections = false;
           }
         }
@@ -1199,12 +1201,12 @@ ENTRY_DECLARATION
 
             SECTION(primary selection and group selection effects)
             {
-              if(inNode && clk && (priSel<0 || priSel!=n->id) ){
+              if(inNode && clk && (fd.sel.pri<0 || fd.sel.pri!=n->id) ){
                 n   = &(grph.moveToFront(n->id));
                 nds = grph.nodes(); // move to the front will invalidate some pointers in the nds array so it needs to be remade
                 
-                priSel = n->id;
-                drgP   = pntr;
+                fd.sel.pri = n->id;
+                drgP       = pntr;
 
                 if(!n->sel){
                   TO(sz,j){ nds[j]->sel = false; }  // todo: move this out of the outer loop due to being O(n^2)
@@ -1216,16 +1218,16 @@ ENTRY_DECLARATION
           }
 
           if(!inAny){
-            if( lftClkDn && !(priSel>0) ){ drgbox=true; }
+            if( lftClkDn && !(fd.sel.pri>0) ){ drgbox=true; }
 
-            if(rtDn && !prevRtDn){ secSel = -1; }
+            if(rtDn && !prevRtDn){ fd.sel.sec = -1; }
           }else{ // if(lftClkDn && lftClkUp){
             clearSelections=false;
           }
         }
 
         if(clearSelections && lftClkUp){ // !lftDn && prevLftDn){ 
-          clear_selections(&grph);
+          clear_selections(&grph, &fd);
         }
       }
       SECTION(movement)
@@ -1235,9 +1237,9 @@ ENTRY_DECLARATION
           TO(sz,i)
           {
             Node&     n = *(nds[i]);
-            bool selctd = n.id==priSel || n.sel;
+            bool selctd = n.id==fd.sel.pri || n.sel;
 
-            if( priSel>-1 && selctd ){           // if a node is primary selected (left mouse down on a node) or the selected flag is set
+            if( fd.sel.pri>-1 && selctd ){           // if a node is primary selected (left mouse down on a node) or the selected flag is set
               n.P +=  pntr - prevPntr;
             }
           }
@@ -1299,24 +1301,24 @@ ENTRY_DECLARATION
             nvgStrokeColor(vg, nvgRGBAf( .12f, .12f, .12f, 1.f));
 
             u32 lineCntX = (fd.ui.w / 100) + 1;
-            f32 lineIncX  = fd.ui.w / lineCntX;
+            f32 lineIncX  = fd.ui.w / (f32)lineCntX;
             f32    curX  = 0; 
             TO(lineCntX,i){
               nvgBeginPath(vg);
                 nvgMoveTo(vg, curX, 0);
-                nvgLineTo(vg, curX, fd.ui.h);
+                nvgLineTo(vg, curX, (f32)fd.ui.h);
               nvgStroke(vg);
 
               curX += lineIncX;
             }
 
             u32 lineCntY = (fd.ui.h / 100) + 1;
-            f32 lineIncY  = fd.ui.h / lineCntY;
+            f32 lineIncY  = fd.ui.h / (f32)lineCntY;
             f32    curY  = 0; 
             TO(lineCntY,i){
               nvgBeginPath(vg);
               nvgMoveTo(vg, 0, curY);
-              nvgLineTo(vg, fd.ui.w, curY);
+              nvgLineTo(vg, (f32)fd.ui.w, curY);
               nvgStroke(vg);
 
               curY += lineIncY;
@@ -1379,7 +1381,7 @@ ENTRY_DECLARATION
             TO(sz,i)
             {
               Node&     n = *(nds[i]);
-              bool selctd = n.id==priSel || n.sel;
+              bool selctd = n.id==fd.sel.pri || n.sel;
 
               auto clr = NODE_CLR;
               if(selctd){ clr = nvgRGBf(.5f,.4f,.1f); }
@@ -1408,7 +1410,7 @@ ENTRY_DECLARATION
           }
           SECTION(draw selection box)
           {
-            if(lftDn && priSel<0)
+            if(lftDn && fd.sel.pri<0)
             {
               nvgBeginPath(vg);
                 float x,y,w,h;
@@ -1467,6 +1469,8 @@ ENTRY_DECLARATION
 
 
 
+//px=(float)cx; py=(float)cy;
+//prevX=px; prevY=py; 
 
 //#ifdef _WIN32
 //  HMODULE lib = LoadLibrary(TEXT("TfmTestLib.dll"));
