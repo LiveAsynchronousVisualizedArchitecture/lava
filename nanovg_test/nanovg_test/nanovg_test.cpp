@@ -103,8 +103,10 @@
 // -todo: test two slots - two connections can be made to one dest
 // -todo: fix multiple connections to a single dest - made toggleCnct delete any connections to the dest Id
 // -todo: group ui state variables together - priSel, secSel, slot selections
+// -todo: fix warnings
 
-// todo: fix warnings
+// todo: make io_rad into slot_rad in FisData
+// todo: take out unused functions
 // todo: group global input state variables into FisData
 
 // todo: make selected color for message passing nodes
@@ -201,29 +203,36 @@
 
 using Id = GraphDB::Id;
 
-char              winTitle[TITLE_MAX_LEN];
-int                premult = 0;
-Bnd                   nbnd;
 v2                prevPntr;
 bool                  rtDn = false;    // right mouse button down
 bool                 lftDn = false;    // left mouse button down
 bool              prevRtDn = false;    // right mouse button down
 bool             prevLftDn = false;    // left mouse button down
-float              ndOfstX;
-float              ndOfstY;
-float                  ndx = 512.f;
-float                  ndy = 512.f;
-
-//Id               slotInSel;
-//Id              slotOutSel;
-//int                 pri = -1;
-//int                 sec = -1;
-f32                 io_rad;
 
 bool                 drgNd = false;
 v2                    drgP;
 v2                 drgofst;
 bool                drgbox = false;
+
+
+//char              winTitle[TITLE_MAX_LEN];
+//
+//int                premult = 0;
+//
+//Bnd                   nbnd;
+//
+//float              ndOfstX;
+//float              ndOfstY;
+//
+//float                  ndx = 512.f;
+//float                  ndy = 512.f;
+//
+//Id               slotInSel;
+//Id              slotOutSel;
+//int                 pri = -1;
+//int                 sec = -1;
+//f32                 io_rad;
+
 
 static FisData fd;
 
@@ -780,7 +789,6 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
 
   return b;
 }
-
 v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 {
   v2       nP = n.P;
@@ -827,8 +835,7 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 
   return borderPt;
 }
-
-void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState) //bool highlight=false, bool selected=false)
+void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState, f32 slot_rad=10.f)
 {
   nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
   nvgStrokeWidth(vg, 3.f);
@@ -857,12 +864,12 @@ void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState) /
   nvgFillColor(vg, fillClr);
 
   nvgBeginPath(vg);
-    nvgCircle(vg, out.x, out.y, io_rad);
+    nvgCircle(vg, out.x, out.y, slot_rad);  //io_rad);
   nvgFill(vg);
   nvgStroke(vg);
 
   // slot triangle drawing
-  f32  triRad = io_rad - 2.f;
+  f32  triRad = slot_rad - 2.f;
   auto inrClr = fillClr;
   inrClr.r += 0.2f;
   inrClr.g += 0.2f;
@@ -902,6 +909,8 @@ void           draw_cnct(NVGcontext* vg, v2 srcP, v2 destP, v2 srcN, v2 destN, f
 
 void        debug_coords(v2 a)
 {
+  char  winTitle[TITLE_MAX_LEN];  // does glfw copy this string or just use the pointer? looks like it converts to a different character format which copies it / transforms it
+
   sprintf(winTitle, "%.2f  %.2f", a.x, a.y);
   glfwSetWindowTitle(fd.win, winTitle);
 }
@@ -917,7 +926,8 @@ ENTRY_DECLARATION
   {
     SECTION(test data init)
     {
-      io_rad = IORAD;
+      //io_rad = IORAD;
+      fd.ui.slot_rad = 15.f;
 
       // nodes
       Node& n0 = fd.grph.addNode( Node("one",   Node::FLOW, {400.f,300.f}) );
@@ -958,7 +968,7 @@ ENTRY_DECLARATION
       glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
       glfwWindowHint(GLFW_SAMPLES, 16);
 
-      fd.win = glfwCreateWindow(1024, 768, "Demo", NULL, NULL);        // assert(win!=nullptr);
+      fd.win = glfwCreateWindow(1024, 768, "Fissure", NULL, NULL);        // assert(win!=nullptr);
       glfwMakeContextCurrent(fd.win);
 
       glfwSetKeyCallback(fd.win,                keyCallback);
@@ -1106,9 +1116,9 @@ ENTRY_DECLARATION
       SECTION(gl frame setup)
       {
 		    glViewport(0, 0, fbWidth, fbHeight);
-		    if(premult)
-			    glClearColor(0,0,0,0);
-		    else
+		    //if(premult)
+			   // glClearColor(0,0,0,0);
+		    //else
 			    glClearColor(.075f, .075f, .075f, 1.0f);
 		    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
       }
@@ -1159,7 +1169,7 @@ ENTRY_DECLARATION
             Id     sid = kv.first;                       // sid is slot id
             Slot&    s = kv.second;
             if(lftClkDn){  
-              bool inSlt = len(pntr - s.P) < io_rad;
+              bool inSlt = len(pntr - s.P) < fd.ui.slot_rad; // io_rad;
               if(inSlt){
                 outClk  = sid;  // Id(nid);
                 s.state = Slot::SELECTED;
@@ -1169,7 +1179,7 @@ ENTRY_DECLARATION
                 inAnySlt = true;
               }
             }else if(lftClkUp){
-              bool inSlt = len(pntr - s.P) < io_rad;
+              bool inSlt = len(pntr - s.P) < fd.ui.slot_rad;  // io_rad;
               if(inSlt){
                 clearSelections = false;
                 inAnySlt = true;
@@ -1360,7 +1370,7 @@ ENTRY_DECLARATION
                 draw_cnct(vg, src.P, avgP, src.N, midN, NODE_SZ.x/2);
 
                 for(auto dhIter=di; di!=en && di->first == srcIdx; ++di){   // dhIter is draw half iterator - this is where the the connections are drawn from the average position of all slots 
-                  const v2 hlfsz = io_rad/2.f;
+                  const v2 hlfsz = fd.ui.slot_rad/2.f;
                   Slot const& dest = *(grph.slot(di->second));
 
                   draw_cnct(vg, avgP, dest.P, -1.f*midN, dest.N, NODE_SZ.x/2);
@@ -1397,7 +1407,7 @@ ENTRY_DECLARATION
                 {
                   auto     sIdx = sIter->first;                    // todo: needs to be redone
                   Slot const& s = *(grph.slot(sIdx));
-                  bool   inSlot = len(pntr - s.P) < io_rad;
+                  bool   inSlot = len(pntr - s.P) < fd.ui.slot_rad; //io_rad;
                 
                   Slot::State drawState = Slot::NORMAL;
                   if(s.state==Slot::SELECTED) drawState = Slot::SELECTED;
@@ -1467,7 +1477,8 @@ ENTRY_DECLARATION
 
 
 
-
+//
+//bool highlight=false, bool selected=false)
 
 //px=(float)cx; py=(float)cy;
 //prevX=px; prevY=py; 

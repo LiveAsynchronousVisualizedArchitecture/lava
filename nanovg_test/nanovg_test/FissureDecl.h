@@ -19,7 +19,7 @@ const v2      NODE_HALF_SZ  = NODE_SZ/2.f;
 const auto    NODE_CLR      = nvgRGBf(.2f, .3f, .375f);
 const float   INFf          = std::numeric_limits<float>::infinity();
 const float   SIG_NANf      = std::numeric_limits<float>::signaling_NaN();
-const f32     IORAD         = 15.f;
+//const f32     IORAD         = 15.f;
 const float   BORDER        = 3.5f;
 
 extern "C" unsigned char Roboto_Regular_ttf[];
@@ -632,6 +632,8 @@ struct FisData
     Window*        keyWin = nullptr;
     Window*         dbWin = nullptr;
     BoxLayout*     keyLay = nullptr;
+
+    f32          slot_rad = 10.f;
   } ui;
 
   struct 
