@@ -21,9 +21,6 @@
     <Filter Include="Source Files\libs">
       <UniqueIdentifier>{e2df391f-1db1-41d0-ab93-1c39becde07b}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files\libs\nanovg">
-      <UniqueIdentifier>{f5c0f4e2-e42f-4d4d-b7ec-ccb440b72fd5}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Header Files\libs">
       <UniqueIdentifier>{c4607905-505b-4a58-90e9-43b23e88cd93}</UniqueIdentifier>
     </Filter>
@@ -43,9 +40,6 @@
     </ClCompile>
     <ClCompile Include="glfw.c">
       <Filter>Source Files\libh</Filter>
-    </ClCompile>
-    <ClCompile Include="..\nanovg-master\src\nanovg.c">
-      <Filter>Source Files\libs\nanovg</Filter>
     </ClCompile>
     <ClCompile Include="Jzon.cpp">
       <Filter>Source Files\libs</Filter>
@@ -148,6 +142,9 @@
     </ClCompile>
     <ClCompile Include="nfd_common.c">
       <Filter>Source Files\unified</Filter>
+    </ClCompile>
+    <ClCompile Include="..\nanovg-master\src\nanovg.c">
+      <Filter>Source Files\libs</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

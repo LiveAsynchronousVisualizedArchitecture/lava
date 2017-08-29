@@ -114,8 +114,16 @@
 // -todo: make selected color for message passing nodes
 // -todo: take color argument out of node_draw
 // -todo: make node size draw using node bnds
+// -todo: put up screen shot on github
+// -todo: try without libc - linking in opengl32.lib works for openGL symbols - some C++ like operator new and possibly vtables, vector constructor, basic_ostream 
+// -todo: try a smaller font for buttons - works
 
 // todo: change slot movement to follow node bnds
+// todo: make nodes smaller 
+// todo: try compiling nanogui into one file
+// todo: change project to be named Fissure 
+// todo: put slots on message passing node
+
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
 // todo: make a node to split text into lines and scatter the result
@@ -928,10 +936,6 @@ ENTRY_DECLARATION
       fd.grph.toggleCnct(s0, s1);
       fd.grph.toggleCnct(s0, s2);
       fd.grph.toggleCnct(s0, s3);
-
-      //fd.grph.addCnct(Id(1,1), Id(1,1));
-      //fd.grph.addCnct(Id(1,1), Id(2,1));
-      //fd.grph.addCnct(Id(1,1), Id(3,1));
     }
     SECTION(FisData)
     { 
@@ -1034,7 +1038,7 @@ ENTRY_DECLARATION
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
 
       Theme* thm = fd.ui.keyWin->theme();
-      thm->mButtonFontSize      = 20;
+      thm->mButtonFontSize      = 16;
       thm->mTransparent         = e4f( .0f,  .0f,  .0f,    .0f );
       thm->mWindowFillUnfocused = e4f( .2f,  .2f,  .225f,  .3f );
       thm->mWindowFillFocused   = e4f( .3f,  .28f, .275f,  .3f );
@@ -1429,7 +1433,7 @@ ENTRY_DECLARATION
             sprintf(fpsStr, "%d", fps);
 
             f32 tb = nvgTextBounds(vg, 10,0, fpsStr, NULL, NULL);
-            nvgFontSize(vg, 15.0f);
+            nvgFontSize(vg, 12.0f);
             nvgFontFace(vg, "sans-bold");
             nvgTextAlign(vg,  NVG_ALIGN_LEFT);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
             nvgFillColor(vg, nvgRGBA(255,255,255,255));
@@ -1464,6 +1468,9 @@ ENTRY_DECLARATION
 
 
 
+//fd.grph.addCnct(Id(1,1), Id(1,1));
+//fd.grph.addCnct(Id(1,1), Id(2,1));
+//fd.grph.addCnct(Id(1,1), Id(3,1));
 
 //bool lftClk = (fd.mouse.lftDn && !fd.mouse.prevLftDn);
 //bool    clk = lftClk || rtClk;
