@@ -35,3 +35,4 @@ Development is made easier through multiple techniques:
 
 #### 5. A visual interface for both message passing and data flow nodes reduces the complexity of understanding how a program fits together. 
   
+![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/Fissure_8_29_2017.png "The current state of the node graph GUI")
