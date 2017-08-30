@@ -119,6 +119,7 @@
 // -todo: try a smaller font for buttons - works
 // -todo: change slot movement to follow node bnds
 // -todo: make nodes smaller 
+// -todo: take out NODE_SZ
 
 // todo: try compiling nanogui into one file
 // todo: change project to be named Fissure 
@@ -622,11 +623,13 @@ void  framebufferSizeCallback(GLFWwindow* window, int w, int h)
 
 v2               in_cntr(Node const& n, f32 r)
 {
-  return v2(n.P.x + NODE_SZ.x/2, n.P.y-r);
+  //return v2(n.P.x + NODE_SZ.x/2, n.P.y-r);
+  return v2(n.P.x + n.b.w()/2, n.P.y-r);
 }
 v2              out_cntr(Node const& n, f32 r)
 {
-  return v2(n.P.x + NODE_SZ.x/2, n.P.y + NODE_SZ.y + r);
+  //return v2(n.P.x + NODE_SZ.x/2, n.P.y + NODE_SZ.y + r);
+  return v2(n.P.x + n.b.w()/2, n.P.y + n.b.h() + r);
 }
 Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
                             int preicon,
@@ -682,7 +685,8 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
   case Node::MSG: {
     SECTION(draw message node)
     {
-      f32 msgRad = NODE_SZ.x / 2;
+      //f32 msgRad = NODE_SZ.x / 2;
+      f32 msgRad = n.b.w() / 2;
 
       nvgStrokeColor(vg, fd.ui.lineClr); // nvgRGBAf(.04f, .04f, .04f, 1.f));
       nvgStrokeWidth(vg, border);
@@ -773,8 +777,9 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
 }
 v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 {
-  f32 w=n.b.w(), h=n.b.h();
-  v2       wh = {w,h};
+  //f32 w=n.b.w(), h=n.b.h();
+  //v2       wh = {w,h};
+  v2       wh = n.b.wh();
   //v2      hlf = { n.b.xmx/2, n.b.ymx/2 };
   //v2      hlf = NODE_SZ/2;
   v2      hlf = wh / 2;
@@ -1248,13 +1253,14 @@ ENTRY_DECLARATION
             Slot&    s = kv.second;
             v2    nrml;
             Node const& n = grph.node(nid.id);
-            v2 nP = n.P + NODE_SZ/2; // n.b.mx; // w()/2; // NODE_SZ/2;
+            v2 wh = n.b.wh();
+            v2 nP = n.P + wh/2; //NODE_SZ/2; // n.b.mx; // w()/2; // NODE_SZ/2;
               
             if(s.in)
             {                                                 // dest / in / blue slots
               Slot* src = grph.srcSlot(kv.first);
               if(src){
-                auto srcNdP = grph.node(src->nid).P + NODE_SZ/2; // n.b.mx; // NODE_SZ/2;
+                auto srcNdP = grph.node(src->nid).P + wh/2;  //NODE_SZ/2; // n.b.mx; // NODE_SZ/2;
                 s.P = node_border(n, srcNdP - nP, &nrml);
                 s.N = nrml;
               }else{
@@ -1334,7 +1340,9 @@ ENTRY_DECLARATION
               if(count==1)
               {
                 Slot const& dest = *(grph.slot(destIdx));
-                draw_cnct(vg, src.P, dest.P, src.N, dest.N, NODE_SZ.x/2);
+                //draw_cnct(vg, src.P, dest.P, src.N, dest.N, NODE_SZ.x/2);
+                f32 w = grph.node(destIdx.id).b.w();
+                draw_cnct(vg, src.P, dest.P, src.N, dest.N, w/2);
 
                 ++di; //continue;
               }
@@ -1352,14 +1360,16 @@ ENTRY_DECLARATION
                 }
                 avgP    /= (f32)(cnt*2+1);             // can't forget the first position for averaging - the src position - the avgP is weighted 1:1 with the srcP and all the destination positions combined
                 v2 midN  = norm(src.P - avgP);
-
-                draw_cnct(vg, src.P, avgP, src.N, midN, NODE_SZ.x/2);
+                f32   w  = grph.node(destIdx.id).b.w();
+                //draw_cnct(vg, src.P, avgP, src.N, midN, NODE_SZ.x/2);
+                draw_cnct(vg, src.P, avgP, src.N, midN, w/2);
 
                 for(auto dhIter=di; di!=en && di->first == srcIdx; ++di){   // dhIter is draw half iterator - this is where the the connections are drawn from the average position of all slots 
                   const v2 hlfsz = fd.ui.slot_rad/2.f;
                   Slot const& dest = *(grph.slot(di->second));
 
-                  draw_cnct(vg, avgP, dest.P, -1.f*midN, dest.N, NODE_SZ.x/2);
+                  //draw_cnct(vg, avgP, dest.P, -1.f*midN, dest.N, NODE_SZ.x/2);
+                  draw_cnct(vg, avgP, dest.P, -1.f*midN, dest.N, w/2);
                 }
 
                 nvgBeginPath(vg);

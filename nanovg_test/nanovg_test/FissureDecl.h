@@ -14,8 +14,6 @@
 using namespace nanogui;
 
 const int     TITLE_MAX_LEN = 256;
-const v2      NODE_SZ       = { 256.f, 64.f };
-const v2      NODE_HALF_SZ  = NODE_SZ/2.f;
 const float   INFf          = std::numeric_limits<float>::infinity();
 const float   SIG_NANf      = std::numeric_limits<float>::signaling_NaN();
 
@@ -686,6 +684,8 @@ struct FisData
 
 
 
+//const v2      NODE_SZ       = { 256.f, 64.f };
+//const v2      NODE_HALF_SZ  = NODE_SZ/2.f;
 
 //const auto    NODE_CLR      = nvgRGBf(.2f, .3f, .375f);
 //const float   BORDER        = 3.5f;
