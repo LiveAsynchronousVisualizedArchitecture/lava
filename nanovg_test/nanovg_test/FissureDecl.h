@@ -80,7 +80,7 @@ struct    Node
   Type   type = NODE_ERROR;
   bool    sel = false;                            // sel is selected
   //Bnd       b = {0, 0, 128.f, 42.f};
-  Bnd       b = {0, 0, 128.f, 42.f};
+  Bnd       b = {0, 0, 128.f, 48.f};
   str     txt = ""; 
 
   void cp(Node const& l)

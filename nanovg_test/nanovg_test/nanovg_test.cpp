@@ -120,10 +120,12 @@
 // -todo: change slot movement to follow node bnds
 // -todo: make nodes smaller 
 // -todo: take out NODE_SZ
+// -todo: get message passing nodes to draw correctly after no longer using NODE_SZ - node bounds cycles down for some reason
 
-// todo: try compiling nanogui into one file
-// todo: change project to be named Fissure 
+// todo: separate drawing and node bounds calculation
 // todo: put slots on message passing node
+// todo: try compiling nanogui into one file - depends on eigen, stb and glfw
+// todo: change project to be named Fissure 
 
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
@@ -643,8 +645,12 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
 	char icon[8];
   float tw=0, iw=0, x=n.P.x, y=n.P.y, w=n.b.w(), h=n.b.h();
 	float rad = lerp(rnd, 0.f, h/2.f);           // rad is corner radius
-  f32 cntrX = (n.P.x + n.b.xmx)/2;
-  f32 cntrY = (n.P.y + n.b.ymx)/2; 
+  //f32 cntrX = (n.P.x + n.b.xmx)/2;
+  //f32 cntrY = (n.P.y + n.b.ymx)/2; 
+  //f32 cntrX = (n.P.x + n.b.w()) / 2;
+  //f32 cntrY = (n.P.y + n.b.h()) / 2; 
+  f32 cntrX = x + w/2.f;
+  f32 cntrY = y + h/2.f; 
   f32 rr    = rad;      // rr is rail radius
   Bnd b;
 
@@ -686,7 +692,7 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
     SECTION(draw message node)
     {
       //f32 msgRad = NODE_SZ.x / 2;
-      f32 msgRad = n.b.w() / 2;
+      f32 msgRad = n.b.w() / 2.f;
 
       nvgStrokeColor(vg, fd.ui.lineClr); // nvgRGBAf(.04f, .04f, .04f, 1.f));
       nvgStrokeWidth(vg, border);
@@ -694,14 +700,12 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
       SECTION(linear gradient from upper left)
       {
         nvgBeginPath(vg);
-        nvgCircle(vg, x+w/2,y+h/2, msgRad);
+        //nvgCircle(vg, x+w/2,y+h/2, msgRad);
+        nvgCircle(vg, cntrX, cntrY, msgRad);
         auto lin = nvgLinearGradient(vg, 
           cntrX, cntrY-msgRad, x, y+msgRad,
           n.sel? fd.ui.msgnd_selclr : fd.ui.msgnd_gradst,
           n.sel? fd.ui.msgnd_selclr : fd.ui.msgnd_graden );
-
-        //nvgRGBAf( .3f,   .3f,   .3f,  0.5f), 
-        //nvgRGBAf( .15f,  .15f,  .15f,  .45f) );
         nvgFillPaint(vg, lin);
         nvgFill(vg);
       }
@@ -709,12 +713,11 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
       {
         nvgBeginPath(vg);
         nvgCircle(vg, cntrX, cntrY, msgRad);
+        //nvgCircle(vg, x+w/2,y+h/2, msgRad);
         auto radial = nvgRadialGradient(vg,
           cntrX, cntrY, msgRad*.5f, msgRad,
           fd.ui.msgnd_gradst,
           fd.ui.msgnd_graden  );
-        //nvgRGBAf( .15f, .15f,  .15f,   .95f ),
-        //nvgRGBAf( .2f, .2f,    .2f,   1.f)  );
         nvgFillPaint(vg, radial);
         nvgFill(vg);
       }
@@ -725,7 +728,11 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
         nvgStroke(vg);
       }
 
-      b = {cntrX-msgRad/1.2f, cntrY-msgRad/1.2f, cntrX+msgRad/1.2f, cntrY+msgRad/1.2f};
+      //b = {cntrX-msgRad/1.2f, cntrY-msgRad/1.2f, cntrX+msgRad/1.2f, cntrY+msgRad/1.2f};
+      //f32 mn = cntrX-msgRad, mx = cntrX+msgRad;
+      //b = {mn, mn, mx, mx};
+      //b = n.b;
+      b = { x, y, x+w, y+w };
     }
   } break;
   }
@@ -739,29 +746,41 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
 		  nvgFontSize(vg, h*1.3f);
 		  nvgFontFace(vg, "icons");
 		  iw = nvgTextBounds(vg, 0,0, cpToUTF8(preicon,icon), NULL, NULL);
-		  iw += h*0.15f;
+		  //iw += h*0.15f;
 	  }
 
+    f32 txtX = x+w*0.5f - tw*0.5f + iw*0.25f;
+    f32 txtY = y + h*0.5f;
 	  nvgFontSize(vg, 30.0f);
 	  nvgFontFace(vg, "sans-bold");
 	  nvgTextAlign(vg, NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
 	  nvgFillColor(vg, nvgRGBA(0,0,0,160));
-	  nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f-1, n.txt.c_str(), NULL);
+	  //nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f-1, n.txt.c_str(), NULL);
+    nvgText(vg, txtX, txtY-1, n.txt.c_str(), NULL);
 	  nvgFillColor(vg, nvgRGBA(255,255,255,255));
-	  nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f,n.txt.c_str(), NULL);
+	  //nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f,n.txt.c_str(), NULL);
+    nvgText(vg, txtX, txtY, n.txt.c_str(), NULL);
   }
-  SECTION(debug circle sides)
+  SECTION(debug circle sides and bnd)
   {
     //nvgStrokeColor(vg, nvgRGBAf(1,1,1,1) );
     //nvgStrokeWidth(vg, 1.f);
+    //
+    //nvgBeginPath(vg);
+    //  nvgRect(vg, b.xmn, b.ymn, b.w(), b.h());
+    //nvgStroke(vg);
+   //
     //nvgBeginPath(vg);
     // nvgMoveTo(vg, n.P.x+rad,n.P.y);
-    // nvgLineTo(vg, n.P.x+rad,n.P.y + NODE_SZ.y);
+    // //nvgLineTo(vg, n.P.x+rad,n.P.y + NODE_SZ.y);
+    // nvgLineTo(vg, n.P.x+rad,n.P.y + h);
     //nvgStroke(vg);
     //
     //nvgBeginPath(vg);
-    //  nvgMoveTo(vg, n.P.x+NODE_SZ.x-rad, n.P.y);
-    //  nvgLineTo(vg, n.P.x+NODE_SZ.x-rad, n.P.y + NODE_SZ.y);
+    //  //nvgMoveTo(vg, n.P.x+NODE_SZ.x-rad, n.P.y);
+    //  //nvgLineTo(vg, n.P.x+NODE_SZ.x-rad, n.P.y + NODE_SZ.y);
+    //  nvgMoveTo(vg, n.P.x + w - rad, n.P.y);
+    //  nvgLineTo(vg, n.P.x + w - rad, n.P.y + h);
     //nvgStroke(vg);
     //
     //nvgBeginPath(vg);
@@ -769,7 +788,8 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
     //nvgStroke(vg);
     //
     //nvgBeginPath(vg);
-    //  nvgCircle(vg, n.P.x+NODE_SZ.x-rad, n.P.y+NODE_SZ.y-rad, rad);
+    //  //nvgCircle(vg, n.P.x+NODE_SZ.x-rad, n.P.y+NODE_SZ.y-rad, rad);
+    //  nvgCircle(vg, n.P.x + w - rad, n.P.y + h - rad, rad);
     //nvgStroke(vg);
   }
 
@@ -779,9 +799,10 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 {
   //f32 w=n.b.w(), h=n.b.h();
   //v2       wh = {w,h};
-  v2       wh = n.b.wh();
   //v2      hlf = { n.b.xmx/2, n.b.ymx/2 };
   //v2      hlf = NODE_SZ/2;
+
+  v2       wh = n.b.wh();
   v2      hlf = wh / 2;
   v2       nP = n.P;
   v2 borderPt = {0,0};
@@ -924,21 +945,25 @@ ENTRY_DECLARATION
       fd.ui.slot_rad = 15.f;
 
       // nodes
-      Node& n0 = fd.grph.addNode( Node("one",   Node::FLOW, {400.f,300.f}) );
-      Node& n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
-      Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
-      Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
+      //Node& n0 = fd.grph.addNode( Node("one",   Node::FLOW, {400.f,300.f}) );
+      //Node& n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
+      //Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
+      //Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
+      Node& n4 = fd.grph.addNode( Node("five",  Node::MSG,  {200.f,200.f}) );
+      
+      //n4.b.ymx = n4.b.xmx;
 
       // slots
-      Id s0 = fd.grph.addSlot( Slot(n0.id, false) );
-      Id s1 = fd.grph.addSlot( Slot(n1.id,  true) );
-      Id s2 = fd.grph.addSlot( Slot(n2.id,  true) );
-      Id s3 = fd.grph.addSlot( Slot(n3.id,  true) );
-      Id s4 = fd.grph.addSlot( Slot(n0.id, false) );
+      //Id s0 = fd.grph.addSlot( Slot(n0.id, false) );
+      //Id s1 = fd.grph.addSlot( Slot(n1.id,  true) );
+      //Id s2 = fd.grph.addSlot( Slot(n2.id,  true) );
+      //Id s3 = fd.grph.addSlot( Slot(n3.id,  true) );
+      //Id s4 = fd.grph.addSlot( Slot(n0.id, false) );
+      Id s5 = fd.grph.addSlot( Slot(n4.id, false) );
 
-      fd.grph.toggleCnct(s0, s1);
-      fd.grph.toggleCnct(s0, s2);
-      fd.grph.toggleCnct(s0, s3);
+      //fd.grph.toggleCnct(s0, s1);
+      //fd.grph.toggleCnct(s0, s2);
+      //fd.grph.toggleCnct(s0, s3);
     }
     SECTION(FisData)
     { 
@@ -1294,7 +1319,7 @@ ENTRY_DECLARATION
       }
       SECTION(drawing)
       {
-        SECTION(nanovg drawing)
+        SECTION(nanovg drawing - |node graph|)
         {
           nvgBeginFrame(vg, fd.ui.w, fd.ui.h, pxRatio);
           SECTION(draw background grid)
@@ -1475,6 +1500,16 @@ ENTRY_DECLARATION
 
 
 
+
+
+
+
+
+//nvgRGBAf( .15f, .15f,  .15f,   .95f ),
+//nvgRGBAf( .2f, .2f,    .2f,   1.f)  );
+//
+//nvgRGBAf( .3f,   .3f,   .3f,  0.5f), 
+//nvgRGBAf( .15f,  .15f,  .15f,  .45f) );
 
 //f32 cntrX = (n.b.xmn+n.b.xmx)/2;
 //f32 cntrY = (n.b.ymn+n.b.ymx)/2; 
