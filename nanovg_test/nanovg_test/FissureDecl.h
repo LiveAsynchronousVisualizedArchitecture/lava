@@ -79,7 +79,6 @@ struct    Node
   v2        P = {0,0};
   Type   type = NODE_ERROR;
   bool    sel = false;                            // sel is selected
-  //Bnd       b = {0, 0, 128.f, 42.f};
   Bnd       b = {0, 0, 128.f, 48.f};
   str     txt = ""; 
 
@@ -561,13 +560,16 @@ public:
   }
   void    toggleCnct(Id src, Id dest)
   {
-    u32 delcnt = 0;
-    auto di = m_cncts.find(dest);
+    u32    delcnt = 0;
+    auto       di = m_cncts.find(dest);
+    bool matchSrc = false;
     if( di != end(m_cncts) ){
-      delcnt = delCnct(di->second,dest);
+      matchSrc = src == di->second;
+      delcnt   = delCnct(di->second,dest);
     }
 
-    if(delcnt == 0){
+    //if(delcnt==0 || !matchSrc ){
+    if( !(matchSrc && delcnt>0) ){
       m_cncts.insert({dest, src});
       m_destCncts.insert({src, dest});
     }
@@ -604,18 +606,6 @@ public:
   {
     return m_destCncts;
   }
-
-  //void       addCnct(Id src, Id dest)
-  //{
-  //  auto ci = m_cncts.find(dest);
-  //  if(ci != m_cncts.end()){
-  //    m_cncts.erase(dest);
-  //    m_destCncts.erase(src);
-  //  }
-  //
-  //  m_cncts.insert({dest, src});
-  //  m_destCncts.insert({src, dest});
-  //}
 };
 
 struct FisData
@@ -683,6 +673,19 @@ struct FisData
 
 
 
+
+
+//void       addCnct(Id src, Id dest)
+//{
+//  auto ci = m_cncts.find(dest);
+//  if(ci != m_cncts.end()){
+//    m_cncts.erase(dest);
+//    m_destCncts.erase(src);
+//  }
+//
+//  m_cncts.insert({dest, src});
+//  m_destCncts.insert({src, dest});
+//}
 
 //const v2      NODE_SZ       = { 256.f, 64.f };
 //const v2      NODE_HALF_SZ  = NODE_SZ/2.f;

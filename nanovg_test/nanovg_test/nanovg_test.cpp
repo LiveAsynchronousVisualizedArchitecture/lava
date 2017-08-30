@@ -121,12 +121,14 @@
 // -todo: make nodes smaller 
 // -todo: take out NODE_SZ
 // -todo: get message passing nodes to draw correctly after no longer using NODE_SZ - node bounds cycles down for some reason
+// todo: put slots on message passing node
+// -todo: make slot on message node be correct - works automatically
+// -todo: make connection creation destroy current connection to dest and create new connection
 
 // todo: separate drawing and node bounds calculation
-// todo: put slots on message passing node
-// todo: try compiling nanogui into one file - depends on eigen, stb and glfw
 // todo: change project to be named Fissure 
 
+// idea: try compiling nanogui into one file - depends on eigen, stb and glfw
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
 // todo: make a node to split text into lines and scatter the result
@@ -645,10 +647,6 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
 	char icon[8];
   float tw=0, iw=0, x=n.P.x, y=n.P.y, w=n.b.w(), h=n.b.h();
 	float rad = lerp(rnd, 0.f, h/2.f);           // rad is corner radius
-  //f32 cntrX = (n.P.x + n.b.xmx)/2;
-  //f32 cntrY = (n.P.y + n.b.ymx)/2; 
-  //f32 cntrX = (n.P.x + n.b.w()) / 2;
-  //f32 cntrY = (n.P.y + n.b.h()) / 2; 
   f32 cntrX = x + w/2.f;
   f32 cntrY = y + h/2.f; 
   f32 rr    = rad;      // rr is rail radius
@@ -692,7 +690,8 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
     SECTION(draw message node)
     {
       //f32 msgRad = NODE_SZ.x / 2;
-      f32 msgRad = n.b.w() / 2.f;
+      //f32 msgRad = n.b.w() / 2.f;
+      f32 msgRad = w/2.f;
 
       nvgStrokeColor(vg, fd.ui.lineClr); // nvgRGBAf(.04f, .04f, .04f, 1.f));
       nvgStrokeWidth(vg, border);
@@ -743,7 +742,8 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
 	  nvgFontFace(vg, "sans-bold");
 	  tw = nvgTextBounds(vg, 0,0, n.txt.c_str(), NULL, NULL);
 	  if(preicon != 0){
-		  nvgFontSize(vg, h*1.3f);
+		  //nvgFontSize(vg, h*1.3f);
+      nvgFontSize(vg, h);
 		  nvgFontFace(vg, "icons");
 		  iw = nvgTextBounds(vg, 0,0, cpToUTF8(preicon,icon), NULL, NULL);
 		  //iw += h*0.15f;
@@ -945,25 +945,25 @@ ENTRY_DECLARATION
       fd.ui.slot_rad = 15.f;
 
       // nodes
-      //Node& n0 = fd.grph.addNode( Node("one",   Node::FLOW, {400.f,300.f}) );
-      //Node& n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
-      //Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
-      //Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
+      Node& n0 = fd.grph.addNode( Node("one",   Node::FLOW, {400.f,300.f}) );
+      Node& n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
+      Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
+      Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
       Node& n4 = fd.grph.addNode( Node("five",  Node::MSG,  {200.f,200.f}) );
       
       //n4.b.ymx = n4.b.xmx;
 
       // slots
-      //Id s0 = fd.grph.addSlot( Slot(n0.id, false) );
-      //Id s1 = fd.grph.addSlot( Slot(n1.id,  true) );
-      //Id s2 = fd.grph.addSlot( Slot(n2.id,  true) );
-      //Id s3 = fd.grph.addSlot( Slot(n3.id,  true) );
-      //Id s4 = fd.grph.addSlot( Slot(n0.id, false) );
+      Id s0 = fd.grph.addSlot( Slot(n0.id, false) );
+      Id s1 = fd.grph.addSlot( Slot(n1.id,  true) );
+      Id s2 = fd.grph.addSlot( Slot(n2.id,  true) );
+      Id s3 = fd.grph.addSlot( Slot(n3.id,  true) );
+      Id s4 = fd.grph.addSlot( Slot(n0.id, false) );
       Id s5 = fd.grph.addSlot( Slot(n4.id, false) );
 
-      //fd.grph.toggleCnct(s0, s1);
-      //fd.grph.toggleCnct(s0, s2);
-      //fd.grph.toggleCnct(s0, s3);
+      fd.grph.toggleCnct(s0, s1);
+      fd.grph.toggleCnct(s0, s2);
+      fd.grph.toggleCnct(s0, s3);
     }
     SECTION(FisData)
     { 
