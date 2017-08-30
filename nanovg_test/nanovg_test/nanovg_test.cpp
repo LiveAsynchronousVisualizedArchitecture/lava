@@ -117,9 +117,9 @@
 // -todo: put up screen shot on github
 // -todo: try without libc - linking in opengl32.lib works for openGL symbols - some C++ like operator new and possibly vtables, vector constructor, basic_ostream 
 // -todo: try a smaller font for buttons - works
+// -todo: change slot movement to follow node bnds
+// -todo: make nodes smaller 
 
-// todo: change slot movement to follow node bnds
-// todo: make nodes smaller 
 // todo: try compiling nanogui into one file
 // todo: change project to be named Fissure 
 // todo: put slots on message passing node
@@ -631,7 +631,7 @@ v2              out_cntr(Node const& n, f32 r)
 Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
                             int preicon,
                           Node const& n,
-                         float      rnd,               // rnd is corner rounding
+                         float      rnd,      // rnd is corner rounding
                          f32     border=3.5f)
 {
   const float   rthk = 8.f;    // rw is rail thickness
@@ -770,23 +770,18 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
   }
 
   return b;
-
-  //f32 cntrX = (n.b.xmn+n.b.xmx)/2;
-  //f32 cntrY = (n.b.ymn+n.b.ymx)/2; 
-  //
-  //NVGcolor col,
-  //
-  //float tw=0, iw=0, x=n.P.x, y=n.P.y, w=NODE_SZ.x, h=NODE_SZ.y;
-  //float cntrX=x+w/2, cntrY=y+h/2, rr=rad;      // rr is rail radius
 }
 v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 {
+  f32 w=n.b.w(), h=n.b.h();
+  v2       wh = {w,h};
   //v2      hlf = { n.b.xmx/2, n.b.ymx/2 };
-  v2      hlf = NODE_SZ/2;
+  //v2      hlf = NODE_SZ/2;
+  v2      hlf = wh / 2;
   v2       nP = n.P;
   v2 borderPt = {0,0};
   v2     ndir = norm(dir);
-  v2    ncntr = nP + hlf; // n.b.mx/2.f; // hlf; // n.mx/2.f; // NODE_HALF_SZ;
+  v2    ncntr = nP + hlf;      // n.b.mx/2.f; // hlf; // n.mx/2.f; // NODE_HALF_SZ;
 
   switch(n.type)
   {
@@ -803,9 +798,11 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
       pdir /= ay==0.f?  1.f  :  ay/hlf.y;
     }
 
-    v2  circCntr = (pdir.x<0)? nP+v2(rad,rad)  :  nP + NODE_SZ - v2(rad,rad);  // NODE_SZ
+    //v2  circCntr = (pdir.x<0)? nP+v2(rad,rad)  :  nP + NODE_SZ - v2(rad,rad);  // NODE_SZ
+    v2  circCntr = (pdir.x<0)? nP+v2(rad,rad)  :  nP + wh - v2(rad,rad);
     v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, rad);
-    bool     hit = !hasInf(intrsct)  &&  (intrsct.x < nP.x+rad || intrsct.x > nP.x + NODE_SZ.x - rad); 
+    //bool     hit = !hasInf(intrsct)  &&  (intrsct.x < nP.x+rad || intrsct.x > nP.x + NODE_SZ.x - rad); 
+    bool     hit = !hasInf(intrsct)  &&  (intrsct.x < nP.x+rad || intrsct.x > nP.x + wh.x - rad); 
     if(hit){ pdir = intrsct - ncntr; }
 
     borderPt = ncntr + pdir;
@@ -818,7 +815,8 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
   case Node::MSG: 
   default: 
   {
-    f32  rad = NODE_SZ.x/2;  // n.b.xmx/2.f;   // NODE_SZ.x/2;
+    //f32  rad = NODE_SZ.x/2;  // n.b.xmx/2.f;   // NODE_SZ.x/2;
+    f32  rad = wh.x/2;  // n.b.xmx/2.f;   // NODE_SZ.x/2;
     borderPt = ncntr + ndir*rad; 
     if(out_nrml){ *out_nrml = ndir; }
   } break;
@@ -954,6 +952,7 @@ ENTRY_DECLARATION
       glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
       glfwWindowHint(GLFW_DOUBLEBUFFER, GL_TRUE);
       glfwWindowHint(GLFW_SAMPLES, 16);
+      //glfwWindowHint(GLFW_DECORATED, GL_FALSE);
 
       fd.win = glfwCreateWindow(1024, 768, "Fissure", NULL, NULL);        // assert(win!=nullptr);
       glfwMakeContextCurrent(fd.win);
@@ -1467,6 +1466,13 @@ ENTRY_DECLARATION
 
 
 
+//f32 cntrX = (n.b.xmn+n.b.xmx)/2;
+//f32 cntrY = (n.b.ymn+n.b.ymx)/2; 
+//
+//NVGcolor col,
+//
+//float tw=0, iw=0, x=n.P.x, y=n.P.y, w=NODE_SZ.x, h=NODE_SZ.y;
+//float cntrX=x+w/2, cntrY=y+h/2, rr=rad;      // rr is rail radius
 
 //fd.grph.addCnct(Id(1,1), Id(1,1));
 //fd.grph.addCnct(Id(1,1), Id(2,1));

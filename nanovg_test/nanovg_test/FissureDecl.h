@@ -19,10 +19,6 @@ const v2      NODE_HALF_SZ  = NODE_SZ/2.f;
 const float   INFf          = std::numeric_limits<float>::infinity();
 const float   SIG_NANf      = std::numeric_limits<float>::signaling_NaN();
 
-//const auto    NODE_CLR      = nvgRGBf(.2f, .3f, .375f);
-//const float   BORDER        = 3.5f;
-//const f32     IORAD         = 15.f;
-
 extern "C" unsigned char Roboto_Regular_ttf[];
 extern "C" unsigned int  Roboto_Regular_ttf_len;
 
@@ -86,7 +82,7 @@ struct    Node
   Type   type = NODE_ERROR;
   bool    sel = false;                            // sel is selected
   //Bnd       b = {0, 0, 128.f, 42.f};
-  Bnd       b = {0, 0, 256.f, 64.f};
+  Bnd       b = {0, 0, 128.f, 42.f};
   str     txt = ""; 
 
   void cp(Node const& l)
@@ -648,9 +644,9 @@ struct FisData
 
     // drawing
     NVGcolor        lineClr  =  nvgRGBAf(.04f, .04f, .04f, 1.f);
-    NVGcolor       nd_color  =  nvgRGBf(.2f, .3f, .375f);
-    NVGcolor      nd_selclr  =  nvgRGBf(.5f,.4f,.1f);
-    NVGcolor    msgnd_color  =  nvgRGBf(.2f, .3f, .375f);
+    NVGcolor       nd_color  =  nvgRGBAf(.2f, .3f, .375f, 1.f);
+    NVGcolor      nd_selclr  =  nvgRGBAf(.5f,.4f,.1f, 1.f);
+    NVGcolor    msgnd_color  =  nvgRGBAf(.2f, .3f, .375f, 1.f);
     NVGcolor   msgnd_selclr  =  nvgRGBAf(.5f,.4f,.1f, .75f);
     NVGcolor   msgnd_gradst  =  nvgRGBAf(.3f, .3f, .3f, .5f);
     NVGcolor   msgnd_graden  =  nvgRGBAf(.15f, .15f, .15f, .45f); 
@@ -689,6 +685,11 @@ struct FisData
 
 
 
+
+
+//const auto    NODE_CLR      = nvgRGBf(.2f, .3f, .375f);
+//const float   BORDER        = 3.5f;
+//const f32     IORAD         = 15.f;
 
 //
 //u64  = si->first.id;
