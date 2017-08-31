@@ -128,7 +128,6 @@
 // todo: separate drawing and node bounds calculation
 // todo: change project to be named Fissure 
 
-// idea: try compiling nanogui into one file - depends on eigen, stb and glfw
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
 // todo: make a node to split text into lines and scatter the result
@@ -141,6 +140,7 @@
 // todo: make multiple slots avoid each other - might need to have discreet sections around a node for a slot to sit in
 // todo: don't select a slot if it is under an existing node
 
+// idea: try compiling nanogui into one file - depends on eigen, stb and glfw
 // idea: separate finding node the pointer is inside from the action to take
 // idea: make nodes snap to a grid
 // idea: combine src and dest slots when writing json and just use a boolean to separate them 
@@ -218,6 +218,7 @@
 #include "../Transform.h"
 #include "../LavaNode.h"
 #include "FissureDecl.h"
+#include "LavaFlow.hpp"
 
 using Id = GraphDB::Id;
 
@@ -941,6 +942,10 @@ ENTRY_DECLARATION
   {
     SECTION(test data init)
     {
+      printf("Arg    size: %lld \n\n", sizeof(Arg));
+      printf("Msg    size: %lld \n\n", sizeof(Msg));
+      printf("Packet size: %lld \n\n", sizeof(Packet));
+
       //io_rad = IORAD;
       fd.ui.slot_rad = 15.f;
 
