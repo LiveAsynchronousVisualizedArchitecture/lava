@@ -1,24 +1,33 @@
 
-#include <cstdio>
+// -todo: try single file libc
+
+// todo: make FileToString output a test tbl
+// todo: make lava thread local allocation
+
+//#include <cstdio>
 #include "../no_rt_util.h"
 #include "../LavaFlow.hpp"
+
+#define LIBC_HPP_IMPL
+#include "../libc.hpp"
 
 extern "C"
 {
 
-const char* ReadFileOutTypes[] = {"tbl_str"};
+const char* FileToStringTypes[] = {"tbl_str"};
 
-uint64_t ReadFile(LavaArg* in, LavaArg* out)
+uint64_t FileToString(LavaArg* in, LavaArg* out)
 {
+  // output temp string here
   return 0;
 }
 
 LavaFlowNode lavaFlowNodes[] =
 {
-  {ReadFile, (uint64_t)LavaNodeType::FLOW,     // function, node_type  
-  0, 1, "ReadFile",                            // inputs, outputs, name                                   
-  nullptr, ReadFileOutTypes,                   // in_types, out_types 
-  0, 0},                                       // version, id
+  {FileToString, (uint64_t)LavaNodeType::FLOW,   // function, node_type  
+  0, 1, "ReadFile",                              // inputs, outputs, name                                   
+  nullptr, FileToStringTypes,                    // in_types, out_types 
+  0, 0},                                         // version, id
 
   {nullptr, (uint64_t)LavaNodeType::NONE, 0,0, nullptr, nullptr,nullptr, 0, 0}
 };
