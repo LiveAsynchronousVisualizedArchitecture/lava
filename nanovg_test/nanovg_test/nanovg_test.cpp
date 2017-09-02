@@ -216,9 +216,9 @@
 #include "vec.hpp"
 #include "../no_rt_util.h"
 #include "../Transform.h"
-#include "../LavaNode.h"
+//#include "../LavaNode.h"
 #include "FissureDecl.h"
-#include "LavaFlow.hpp"
+#include "../LavaFlow.hpp"
 
 using Id = GraphDB::Id;
 
@@ -554,22 +554,35 @@ void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int
     #ifdef _WIN32
       HMODULE lib = LoadLibrary(TEXT("ReadFile.dll"));
       if(lib){
-        auto   getNds = (GetLavaNodes_t)GetProcAddress(lib, TEXT("GetNodes") );
-        LavaNode* nds = getNds();
-        printf("%s    %s    %s", nds[0].name, nds[0].in_types[0], nds[0].out_types[0] );
+        auto   getNds = (GetLavaFlowNodes_t)GetProcAddress(lib, TEXT("GetLavaFlowNodes") );
+        LavaFlowNode* nds = getNds();
+        printf("%s    %s", nds[0].name, nds[0].out_types[0] );
+        //printf("%s    %s    %s", nds[0].name, nds[0].in_types[0], nds[0].out_types[0] );
         //while(nds && nds->name)
           //node_add( (nds++)->name );
       }else{ printf("zero"); }
       //}else{ printf("zero", lib); }
-
-
     #endif
+
+//#ifdef _WIN32
+//      HMODULE lib = LoadLibrary(TEXT("ReadFile.dll"));
+//      if(lib){
+//        auto   getNds = (GetLavaNodes_t)GetProcAddress(lib, TEXT("GetNodes") );
+//        LavaNode* nds = getNds();
+//        printf("%s    %s    %s", nds[0].name, nds[0].in_types[0], nds[0].out_types[0] );
+//        //while(nds && nds->name)
+//        //node_add( (nds++)->name );
+//      }else{ printf("zero"); }
+//      //}else{ printf("zero", lib); }
+//#endif
+
   }break;
   case 'Y':
   {
     //sprintf(sngl, "sizeof LavaData %d", sizeof(LavaData) );
     //glfwSetWindowTitle(win, sngl);    
-    printf("sizeof LavaData %lld \n", sizeof(LavaData) );
+
+    //printf("sizeof LavaData %lld \n", sizeof(LavaData) );
   }break;
   default:
     ;
@@ -942,9 +955,9 @@ ENTRY_DECLARATION
   {
     SECTION(test data init)
     {
-      printf("Arg    size: %lld \n\n", sizeof(Arg));
-      printf("Msg    size: %lld \n\n", sizeof(Msg));
-      printf("Packet size: %lld \n\n", sizeof(Packet));
+      printf("Arg    size: %lld \n\n", sizeof(LavaArg));
+      printf("Msg    size: %lld \n\n", sizeof(LavaMsg));
+      printf("Packet size: %lld \n\n", sizeof(LavaPacket));
 
       //io_rad = IORAD;
       fd.ui.slot_rad = 15.f;

@@ -1,37 +1,77 @@
 
 #include <cstdio>
 #include "../no_rt_util.h"
-#include "../LavaNode.h"
+#include "../LavaFlow.hpp"
 
 extern "C"
 {
 
-LavaArg* ReadFile(LavaArg* in)
-{
-  TO(in->len,i){
-    printf(" %l \n", in->idx);
-  }
+const char* ReadFileOutTypes[] = {"tbl_str"};
 
-  return nullptr;
+uint64_t ReadFile(LavaArg* in, LavaArg* out)
+{
+  return 0;
 }
 
-const char* ReadFileIn[]  = {"string"};
-const char* ReadFileOut[] = {"string"};
-
-LavaNode nodes[] =
+LavaFlowNode lavaFlowNodes[] =
 {
-  {ReadFile, "ReadFile",                     // function, name
-  1, ReadFileIn, 1, ReadFileOut,             // inputs, in_types, outputs, out_types 
-  0, 0},                                     // version, id
+  {ReadFile, (uint64_t)LavaNodeType::FLOW,     // function, node_type  
+  0, 1, "ReadFile",                            // inputs, outputs, name                                   
+  nullptr, ReadFileOutTypes,                   // in_types, out_types 
+  0, 0},                                       // version, id
 
-  {nullptr, nullptr, 0, nullptr, 0, nullptr, 0, 0}
+  {nullptr, (uint64_t)LavaNodeType::NONE, 0,0, nullptr, nullptr,nullptr, 0, 0}
 };
 
-__declspec(dllexport) LavaNode* GetNodes()
+__declspec(dllexport) LavaFlowNode* GetLavaFlowNodes()
 {
-  return (LavaNode*)nodes;
+  return (LavaFlowNode*)lavaFlowNodes;
 }
 
+
+
+
+//
+//#include "../LavaNode.h"
+
+//
+//nullptr, (char**)({"tbl_str"},             // in_types, out_types 
+
+//{ReadFile, "ReadFile",                     // function, name
+//1, ReadFileIn, 1, ReadFileOut,             // inputs, in_types, outputs, out_types 
+//0, 0},                                     // version, id
+
+//__declspec(dllexport) LavaFlowNode* GetNodes()
+//{
+//  return (LavaFlowNode*)nodes;
+//
+
+//LavaArg* ReadFile(LavaArg* in)
+//{
+//  TO(in->len,i){
+//    printf(" %l \n", in->idx);
+//  }
+//
+//  return nullptr;
+//}
+//
+//const char* ReadFileIn[]  = {"string"};
+//const char* ReadFileOut[] = {"string"};
+//
+//LavaNode nodes[] =
+//{
+//  {ReadFile, "ReadFile",                     // function, name
+//  1, ReadFileIn, 1, ReadFileOut,             // inputs, in_types, outputs, out_types 
+//  0, 0},                                     // version, id
+//
+//  {nullptr, nullptr, 0, nullptr, 0, nullptr, 0, 0}
+//};
+//
+//__declspec(dllexport) LavaNode* GetNodes()
+//{
+//  return (LavaNode*)nodes;
+//}
+//
 
 }
 
@@ -71,3 +111,5 @@ __declspec(dllexport) LavaNode* GetNodes()
 //memset(iv->pixels, 0, 4*sizeof(float));
 //
 //return iv;
+
+

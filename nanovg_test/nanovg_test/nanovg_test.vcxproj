@@ -194,6 +194,7 @@
     <ClCompile Include="unified.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\LavaFlow.hpp" />
     <ClInclude Include="..\LavaNode.h" />
     <ClInclude Include="..\nanovg-master\example\demo.h" />
     <ClInclude Include="..\nanovg-master\src\fontstash.h" />
@@ -206,7 +207,6 @@
     <ClInclude Include="FissureDecl.h" />
     <ClInclude Include="glew_2.0.0.h" />
     <ClInclude Include="glfw_3.2.1.h" />
-    <ClInclude Include="LavaFlow.hpp" />
     <ClInclude Include="picojson.h" />
     <ClInclude Include="vec.hpp" />
   </ItemGroup>

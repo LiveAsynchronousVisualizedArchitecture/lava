@@ -31,3 +31,16 @@ Can there be a node that enables shared memory parallelism like openMP?
 |  |  Would want a tbl with it that would contain parameters for how to use the memory and the ID (like image dimensions)
 
 
+
+
+Node Types
+|  how to handle constant inputs
+|  |  should each node have a potential tbl of constants?
+|  |  this would mean the first argument could be a tbl/pointer to the table memory
+|  |  when using the node graph, the table could be output as a .h file and compiled into the shared library 
+|  |  the constants tbl could be passed into the node function or use an implicit pointer
+
+
+
+
+

@@ -190,7 +190,7 @@
     <ClInclude Include="..\nanovg-master\src\fontstash.h">
       <Filter>Header Files\nanovg</Filter>
     </ClInclude>
-    <ClInclude Include="LavaFlow.hpp">
+    <ClInclude Include="..\LavaFlow.hpp">
       <Filter>hpp</Filter>
     </ClInclude>
   </ItemGroup>
