@@ -8,8 +8,8 @@
 #include "../no_rt_util.h"
 #include "../LavaFlow.hpp"
 
-#define LIBC_HPP_IMPL
-#include "../libc.hpp"
+//#define LIBC_HPP_IMPL
+//#include "../libc.hpp"
 
 extern "C"
 {
@@ -19,13 +19,13 @@ const char* FileToStringTypes[] = {"tbl_str"};
 uint64_t FileToString(LavaArg* in, LavaArg* out)
 {
   // output temp string here
-  return 0;
+  return 85;
 }
 
 LavaFlowNode lavaFlowNodes[] =
 {
   {FileToString, (uint64_t)LavaNodeType::FLOW,   // function, node_type  
-  0, 1, "ReadFile",                              // inputs, outputs, name                                   
+  0, 1, "FileToString",                          // inputs, outputs, name                                   
   nullptr, FileToStringTypes,                    // in_types, out_types 
   0, 0},                                         // version, id
 

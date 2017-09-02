@@ -326,7 +326,7 @@ extern "C" void     _fltused() {}  // symbol needs to be defined for some reason
 //  auto argc = _ConvertCommandLineToArgcArgv();
 //  entry(argc, _ppszArgv);
 //}
-void DllMain() {}
+//void DllMain() {}
 // end various windows entry points
 
 extern "C" int    __cdecl   isspace(int c){ return c == ' ' || (unsigned)c - '\t' < 5; }

@@ -125,6 +125,8 @@
 // -todo: make slot on message node be correct - works automatically
 // -todo: make connection creation destroy current connection to dest and create new connection
 
+// todo: make shared libraries with lava_ be automatically loaded
+// todo: make shared libarary loading copy file to lava_live_ 
 // todo: separate drawing and node bounds calculation
 // todo: change project to be named Fissure 
 
@@ -216,9 +218,10 @@
 #include "vec.hpp"
 #include "../no_rt_util.h"
 #include "../Transform.h"
-//#include "../LavaNode.h"
 #include "FissureDecl.h"
 #include "../LavaFlow.hpp"
+
+//#include "../LavaNode.h"
 
 using Id = GraphDB::Id;
 
@@ -552,11 +555,19 @@ void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int
   case 'L':
   {
     #ifdef _WIN32
-      HMODULE lib = LoadLibrary(TEXT("ReadFile.dll"));
-      if(lib){
-        auto   getNds = (GetLavaFlowNodes_t)GetProcAddress(lib, TEXT("GetLavaFlowNodes") );
+      LoadSharedLibraries();
+      HMODULE lib = LoadLibrary(TEXT("lava_ReadFile.dll"));
+      if(lib)
+      {
+        auto getNds = (GetLavaFlowNodes_t)GetProcAddress(lib, TEXT("GetLavaFlowNodes") );
         LavaFlowNode* nds = getNds();
-        printf("%s    %s", nds[0].name, nds[0].out_types[0] );
+        if(nds) printf("%s    %s \n\n", nds[0].name, nds[0].out_types[0] );
+
+        auto flowFunc = nds[0].func;
+
+        if(flowFunc) printf("flow func %llu : \n\n", flowFunc(nullptr, nullptr) );
+        else         printf("flow func is nullptr \n\n");
+
         //printf("%s    %s    %s", nds[0].name, nds[0].in_types[0], nds[0].out_types[0] );
         //while(nds && nds->name)
           //node_add( (nds++)->name );
@@ -624,9 +635,7 @@ void        cursorPosCallback(GLFWwindow* window, double x, double y)
 }
 void             charCallback(GLFWwindow* window, unsigned int codepoint)
 {
-  FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
-
-  fd->ui.screen.charCallbackEvent(codepoint);
+  fd.ui.screen.charCallbackEvent(codepoint);
 }
 void             dropCallback(GLFWwindow* window, int count, const char** filenames)
 {
@@ -1522,6 +1531,9 @@ ENTRY_DECLARATION
 
 
 
+
+//FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
+//fd->ui.screen.charCallbackEvent(codepoint);
 
 //nvgRGBAf( .15f, .15f,  .15f,   .95f ),
 //nvgRGBAf( .2f, .2f,    .2f,   1.f)  );
