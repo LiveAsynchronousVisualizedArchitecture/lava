@@ -4,8 +4,8 @@
 //       -a function copy the libraries 
 //       -a function to unload the libraries 
 //       -a function to load them again
-
 // -todo: make GetRefreshPaths() avoid .live files
+
 // todo: reorganize LavaFlow to group all similar declarations and implementations together
 
 #ifdef _MSC_VER
@@ -16,6 +16,7 @@
 #define __LAVAFLOW_DECL_HEADERGUARD_HPP__
 
 //#include <vector>
+//#include <exception>
 
 #include <cstdint>
 #include <string>
@@ -265,7 +266,8 @@ auto        GetRefreshPaths() -> lava_paths
   //static const string liveExt(".live.dll");
 
   std::vector<str> paths;
-  path       root("../x64/Debug/");
+  //path       root("../x64/Debug/");
+  path       root("../x64/Release/");
   auto    dirIter = directory_iterator(root);
   for(auto& d : dirIter){
     auto   p = d.path();

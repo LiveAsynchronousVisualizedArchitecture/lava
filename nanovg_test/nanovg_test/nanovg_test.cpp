@@ -129,13 +129,14 @@
 // -todo: test library freeing and loading 
 // -todo: put loaded lib handles into LavaFlow struct
 // -todo: make function to extract the flow nodes lists from the handles
+// -todo: make loop to extract the individual LavaFlowNodes from the lists and put them into the multi-map
+// -todo: replace the LavaFlowNode structs of the loaded libs
+// -todo: make shared libraries with lava_ be automatically loaded
+// -todo: test shared lib loading speed in release mode - faster but still slow
 
-// todo: make function to extract the individual LavaFlowNodes from the lists and put them into the multi-map
-// todo: replace the LavaFlowNode structs of the loaded libs
 // todo: make Lava data structures use the Lava thread local allocator
-// todo: make shared libraries with lava_ be automatically loaded
 // todo: separate drawing and node bounds calculation
-// todo: change project to be named Fissure 
+// todo: change project name to Fissure 
 
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
@@ -521,7 +522,7 @@ bool            loadFile(str path, GraphDB* out_g)
 }
 
 // state manipulation
-void    clear_selections(GraphDB* inout_grph, FisData* inout_fd)
+void         clear_selections(GraphDB* inout_grph, FisData* inout_fd)
 {
   inout_grph->clearSels();
   inout_fd->sel.slotOutSel = Id(0,0);
@@ -596,7 +597,7 @@ void              keyCallback(GLFWwindow* win, int key, int scancode, int action
         LavaFlowNode* list = flowNdLists[i];
         if(list){
           auto const& p = livePaths[i]; 
-          fd.lf.flow.erase(p);           // delete the current node list for the livePath
+          fd.lf.flow.erase(p);                            // delete the current node list for the livePath
           for(; list->func!=nullptr; ++list){             // insert each of the LavaFlowNodes in the list into the multi-map
             fd.lf.flow.insert( {p, list} );
           }
