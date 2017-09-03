@@ -1,9 +1,11 @@
 
-// todo: make LoadSharedLibraries into:
+// -todo: make LoadSharedLibraries into:
 //       -a function to say which libraries need to be refreshed
 //       -a function copy the libraries 
-//       a function to unload the libraries 
-//       a function to load them again
+//       -a function to unload the libraries 
+//       -a function to load them again
+
+// todo: make GetRefreshPaths() avoid .live files
 
 #ifdef _MSC_VER
   #pragma once
@@ -27,6 +29,8 @@ using str = std::string;
   #define NOMINMAX
   #include <Windows.h>
 #endif
+
+static const std::string liveExt(".live.dll");                    // todo: change depending on OS
 
 // start allocator declarations
 static __declspec(thread) void* lava_thread_heap = nullptr;
@@ -203,9 +207,7 @@ struct   LavaPacket
 struct LavaFlowNode;
 
 // prototype of data flow node function
-//using FlowFunc = u64 (*)(u8 types[512], u64 values[512]);
 extern "C" using FlowFunc = uint64_t (*)(LavaArg* in, LavaArg* out);
-//using FlowFunc = uint64_t(LavaFlowNode* in, LavaFlowNode* out);
 
 struct LavaFlowNode
 {
@@ -225,20 +227,8 @@ extern "C"
 {
   using GetLavaFlowNodes_t  =  LavaFlowNode*(*)();
 
-  // array of structs of the contained nodes
-  //LavaFlowNode LavaFlowNodes[] =
-  //{
-  //  {nullptr, nullptr, nullptr, 0, 0}
-  //};
-
   // prototype of function to return static plugin loading struct
   __declspec(dllexport) LavaFlowNode* GetLavaFlowNodes();
-
-  //__declspec(dllexport) LavaFlowNode* GetLavaFlowNodes()
-  //{
-  //  return (LavaFlowNode*)LavaFlowNodes;
-  //}
-
 }
 
 // priority queue of packets - sort by frame number, then dest node, then dest slot
@@ -246,8 +236,6 @@ extern "C"
 // lock free hash table of in flight packets?
 
 // shared library loading 
-
-//using  Path      =   std::tr2::sys::path;
 namespace fs = std::tr2::sys;   // todo: different compiler versions would need different filesystem paths
 
 using lava_paths    = std::vector<std::string>;
@@ -265,7 +253,9 @@ auto      GetRefreshPaths() -> lava_paths
   using namespace std;
   using namespace  fs;
 
-  static regex lavaRegex("lava_.*");
+  static const regex lavaRegex("lava_.*");
+  static const regex extRegex(".*\\.live\\.dll");
+  //static const string liveExt(".live.dll");
 
   std::vector<str> paths;
   path       root("../x64/Debug/");
@@ -274,14 +264,16 @@ auto      GetRefreshPaths() -> lava_paths
     auto   p = d.path();
     if(!p.has_filename()){ continue; }
 
-    auto ext = p.extension().generic_string();
-    if(ext != ".dll"){ continue; }
+    auto ext = p.extension().generic_string();                     // ext is extension
+    if(ext!=".dll"){ continue; }
 
-    str fstr = p.filename().generic_string();          // fstr is file string
-    if( !regex_match(fstr, lavaRegex) ){ continue; }
+    str fstr = p.filename().generic_string();                      // fstr is file string
+    if(  regex_match(fstr, extRegex) ){ continue; }
+    if( !regex_match(fstr,lavaRegex) ){ continue; }
 
     auto livepth = p;
-    livepth.replace_extension(".live.dll");
+    livepth.replace_extension( liveExt );
+    //livepth.replace_extension(".live.dll");
 
     bool refresh = true;
     if( exists(livepth) ){
@@ -328,8 +320,51 @@ auto             LoadLibs(lava_paths const& paths) -> lava_libHndls
 
   return hndls;
 }
+uint64_t         FreeLibs(lava_libHndls const& hndls)
+{
+  uint64_t count = 0;
+  for(auto const& h : hndls){
+    if( FreeLibrary(h) ){ ++count; }
+  }
+  return count;
+}
+auto         GetLivePaths(lava_paths const& paths) -> lava_paths 
+{
+  using namespace std;
+  using namespace  fs;
+
+  lava_paths ret;
+  for(auto const& p : paths){
+    ret.emplace_back( path(p).replace_extension(liveExt).generic_string() );
+  }
+
+  return ret;
+}
+
+// end shared library loading
+
+#endif
 
 
+
+
+
+
+
+
+// array of structs of the contained nodes
+//LavaFlowNode LavaFlowNodes[] =
+//{
+//  {nullptr, nullptr, nullptr, 0, 0}
+//};
+
+//__declspec(dllexport) LavaFlowNode* GetLavaFlowNodes()
+//{
+//  return (LavaFlowNode*)LavaFlowNodes;
+//}
+
+//
+//using  Path      =   std::tr2::sys::path;
 
 //uint64_t  LoadSharedLibraries()
 //{
@@ -378,16 +413,8 @@ auto             LoadLibs(lava_paths const& paths) -> lava_libHndls
 //  return count;
 //}
 
-// end shared library loading
-
-#endif
-
-
-
-
-
-
-
+//using FlowFunc = u64 (*)(u8 types[512], u64 values[512]);
+//using FlowFunc = uint64_t(LavaFlowNode* in, LavaFlowNode* out);
 
 //File f;
 //exists();

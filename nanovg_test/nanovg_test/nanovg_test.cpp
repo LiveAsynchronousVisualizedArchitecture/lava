@@ -220,7 +220,6 @@
 #include "../no_rt_util.h"
 #include "../Transform.h"
 #include "FissureDecl.h"
-#include "../LavaFlow.hpp"
 
 //#include "../LavaNode.h"
 
@@ -525,7 +524,7 @@ void    clear_selections(GraphDB* inout_grph, FisData* inout_fd)
   inout_fd->sel.sec        =  -1;
 }
 
-void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
+void              keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
 {
   if(action==GLFW_RELEASE) return;
 
@@ -556,37 +555,48 @@ void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int
   case 'L':
   {
     #ifdef _WIN32
-      //LoadSharedLibraries();
-      //HMODULE lib = LoadLibrary(TEXT("lava_ReadFile.dll"));
-      if(lib)
-      {
-        auto getNds = (GetLavaFlowNodes_t)GetProcAddress(lib, TEXT("GetLavaFlowNodes") );
-        LavaFlowNode* nds = getNds();
-        if(nds) printf("%s    %s \n\n", nds[0].name, nds[0].out_types[0] );
+      auto paths = GetRefreshPaths();
+      auto livePaths = GetLivePaths(paths);
 
-        auto flowFunc = nds[0].func;
+      //TO(pths.size(),i) 
 
-        if(flowFunc) printf("flow func %llu : \n\n", flowFunc(nullptr, nullptr) );
-        else         printf("flow func is nullptr \n\n");
-
-        //printf("%s    %s    %s", nds[0].name, nds[0].in_types[0], nds[0].out_types[0] );
-        //while(nds && nds->name)
-          //node_add( (nds++)->name );
-      }else{ printf("zero"); }
-      //}else{ printf("zero", lib); }
+      TO(paths.size(),i) printf("\n %llu : %s \n", i, paths[i].c_str() );
+      //for(auto& p : pths) printf("\n %s \n
     #endif
 
-//#ifdef _WIN32
-//      HMODULE lib = LoadLibrary(TEXT("ReadFile.dll"));
-//      if(lib){
-//        auto   getNds = (GetLavaNodes_t)GetProcAddress(lib, TEXT("GetNodes") );
-//        LavaNode* nds = getNds();
-//        printf("%s    %s    %s", nds[0].name, nds[0].in_types[0], nds[0].out_types[0] );
-//        //while(nds && nds->name)
-//        //node_add( (nds++)->name );
-//      }else{ printf("zero"); }
-//      //}else{ printf("zero", lib); }
-//#endif
+
+    //#ifdef _WIN32
+    //  //LoadSharedLibraries();
+    //  //HMODULE lib = LoadLibrary(TEXT("lava_ReadFile.dll"));
+    //  if(lib)
+    //  {
+    //    auto getNds = (GetLavaFlowNodes_t)GetProcAddress(lib, TEXT("GetLavaFlowNodes") );
+    //    LavaFlowNode* nds = getNds();
+    //    if(nds) printf("%s    %s \n\n", nds[0].name, nds[0].out_types[0] );
+    //
+    //    auto flowFunc = nds[0].func;
+    //
+    //    if(flowFunc) printf("flow func %llu : \n\n", flowFunc(nullptr, nullptr) );
+    //    else         printf("flow func is nullptr \n\n");
+    //
+    //    //printf("%s    %s    %s", nds[0].name, nds[0].in_types[0], nds[0].out_types[0] );
+    //    //while(nds && nds->name)
+    //      //node_add( (nds++)->name );
+    //  }else{ printf("zero"); }
+    //  //}else{ printf("zero", lib); }
+    //#endif
+
+    //#ifdef _WIN32
+    //      HMODULE lib = LoadLibrary(TEXT("ReadFile.dll"));
+    //      if(lib){
+    //        auto   getNds = (GetLavaNodes_t)GetProcAddress(lib, TEXT("GetNodes") );
+    //        LavaNode* nds = getNds();
+    //        printf("%s    %s    %s", nds[0].name, nds[0].in_types[0], nds[0].out_types[0] );
+    //        //while(nds && nds->name)
+    //        //node_add( (nds++)->name );
+    //      }else{ printf("zero"); }
+    //      //}else{ printf("zero", lib); }
+    //#endif
 
   }break;
   case 'Y':
@@ -606,7 +616,7 @@ void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int
 
   fd.ui.screen.keyCallbackEvent(key, scancode, action, modbits);
 }
-void    mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
+void         mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 {
   if(button==GLFW_MOUSE_BUTTON_LEFT){
     if(action==GLFW_PRESS) fd.mouse.lftDn = true;

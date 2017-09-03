@@ -9,7 +9,9 @@
 #include <set>
 #include <nanogui/nanogui.h>
 #include "../no_rt_util.h"
+#include "../LavaFlow.hpp"
 #include "vec.hpp"
+
 
 using namespace nanogui;
 
@@ -614,6 +616,7 @@ struct FisData
   
   GLFWwindow*         win = nullptr;                     // Platform 
   GraphDB            grph;
+  LavaFlow             lf;
 
   struct
   {
