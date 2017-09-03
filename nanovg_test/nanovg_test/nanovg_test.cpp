@@ -125,6 +125,7 @@
 // -todo: make slot on message node be correct - works automatically
 // -todo: make connection creation destroy current connection to dest and create new connection
 
+// todo: make a LavaFlow struct be part of FissureData
 // todo: make shared libraries with lava_ be automatically loaded
 // todo: make shared libarary loading copy file to lava_live_ 
 // todo: separate drawing and node bounds calculation
@@ -555,8 +556,8 @@ void         keyCallback(GLFWwindow* win, int key, int scancode, int action, int
   case 'L':
   {
     #ifdef _WIN32
-      LoadSharedLibraries();
-      HMODULE lib = LoadLibrary(TEXT("lava_ReadFile.dll"));
+      //LoadSharedLibraries();
+      //HMODULE lib = LoadLibrary(TEXT("lava_ReadFile.dll"));
       if(lib)
       {
         auto getNds = (GetLavaFlowNodes_t)GetProcAddress(lib, TEXT("GetLavaFlowNodes") );

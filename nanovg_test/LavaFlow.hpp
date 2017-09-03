@@ -1,8 +1,8 @@
 
 // todo: make LoadSharedLibraries into:
 //       -a function to say which libraries need to be refreshed
+//       -a function copy the libraries 
 //       a function to unload the libraries 
-//       a function copy the libraries 
 //       a function to load them again
 
 #ifdef _MSC_VER
@@ -250,8 +250,17 @@ extern "C"
 //using  Path      =   std::tr2::sys::path;
 namespace fs = std::tr2::sys;   // todo: different compiler versions would need different filesystem paths
 
+using lava_paths    = std::vector<std::string>;
+using lava_libHndls = std::vector<HMODULE>;                       // todo: need to change this depending on OS
+using lava_hndlMap  = std::unordered_map<std::string, HMODULE>;
 
-auto GetRefreshPaths() -> std::vector<str>
+struct LavaFlow
+{
+  //lava_libHndls  handles;
+  lava_hndlMap  libs;
+};
+
+auto      GetRefreshPaths() -> lava_paths
 {
   using namespace std;
   using namespace  fs;
@@ -286,53 +295,88 @@ auto GetRefreshPaths() -> std::vector<str>
 
   return paths;
 }
-
-uint64_t LoadSharedLibraries()
+uint64_t  CopyPathsToLive(lava_paths const& paths)
 {
   using namespace std;
   using namespace  fs;
-  
-  static unordered_map<str, uint64_t> lastLoad;
-  static uint64_t lastReload = 0;
 
-  static regex lavaRegex("lava_.*");
-
-  uint64_t  count = 0;
-  path       root("../x64/Debug/");
-  auto    dirIter = directory_iterator(root);
-  for(auto& d : dirIter){
-    auto   p = d.path();
-    if(!p.has_filename()){ continue; }
-    
-    auto ext = p.extension().generic_string();
-    if(ext != ".dll"){ continue; }
-
-    //auto pstr = p.generic_string();                   // pstr is path string
-    str fstr = p.filename().generic_string();          // fstr is file string
-    if( !regex_match(fstr, lavaRegex) ){ continue; }
-
-    //auto   ll = lastLoad[pstr];                // ll is last load
-
-    auto livepth = p;
+  uint64_t count = 0;
+  for(auto const& p : paths){
+    path livepth(p);
     livepth.replace_extension(".live.dll");
-
-    bool doCopy = true;
+    
+    bool doCopy = false;
     if( exists(livepth) ){
-      auto liveWrite = last_write_time(livepth).time_since_epoch().count();     // liveWrite is live write time - the live shared library file's last write time 
-      auto origWrite = last_write_time(p).time_since_epoch().count();     // origWrite is orginal write time - the original shared library file's last write time
-      if( liveWrite > origWrite ) doCopy = false;
-    }
-      
-    if( doCopy ){
-      // shut down live file 
-      // delete live file
-      // copy old file to the live path
-      if( copy_file(p, livepth) ){ ++count; }
+      doCopy = remove(livepth);
+    }else{ doCopy = true; }
+    
+    if(doCopy){ 
+      copy_file(p, livepth);
+      ++count;
     }
   }
 
   return count;
 }
+auto             LoadLibs(lava_paths const& paths) -> lava_libHndls
+{
+  lava_libHndls hndls;
+  for(auto const& p : paths){
+    HMODULE lib = LoadLibrary(TEXT(p.c_str()));
+    hndls.push_back(lib);
+  }
+
+  return hndls;
+}
+
+
+
+//uint64_t  LoadSharedLibraries()
+//{
+//  using namespace std;
+//  using namespace  fs;
+//  
+//  static unordered_map<str, uint64_t> lastLoad;
+//  static uint64_t lastReload = 0;
+//
+//  static regex lavaRegex("lava_.*");
+//
+//  uint64_t  count = 0;
+//  path       root("../x64/Debug/");
+//  auto    dirIter = directory_iterator(root);
+//  for(auto& d : dirIter){
+//    auto   p = d.path();
+//    if(!p.has_filename()){ continue; }
+//    
+//    auto ext = p.extension().generic_string();
+//    if(ext != ".dll"){ continue; }
+//
+//    //auto pstr = p.generic_string();                   // pstr is path string
+//    str fstr = p.filename().generic_string();          // fstr is file string
+//    if( !regex_match(fstr, lavaRegex) ){ continue; }
+//
+//    //auto   ll = lastLoad[pstr];                // ll is last load
+//
+//    auto livepth = p;
+//    livepth.replace_extension(".live.dll");
+//
+//    bool doCopy = true;
+//    if( exists(livepth) ){
+//      auto liveWrite = last_write_time(livepth).time_since_epoch().count();     // liveWrite is live write time - the live shared library file's last write time 
+//      auto origWrite = last_write_time(p).time_since_epoch().count();     // origWrite is orginal write time - the original shared library file's last write time
+//      if( liveWrite > origWrite ) doCopy = false;
+//    }
+//      
+//    if( doCopy ){
+//      // shut down live file 
+//      // delete live file
+//      // copy old file to the live path
+//      if( copy_file(p, livepth) ){ ++count; }
+//    }
+//  }
+//
+//  return count;
+//}
 
 // end shared library loading
 
