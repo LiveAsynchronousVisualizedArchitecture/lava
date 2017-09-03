@@ -5,7 +5,8 @@
 //       -a function to unload the libraries 
 //       -a function to load them again
 
-// todo: make GetRefreshPaths() avoid .live files
+// -todo: make GetRefreshPaths() avoid .live files
+// todo: reorganize LavaFlow to group all similar declarations and implementations together
 
 #ifdef _MSC_VER
   #pragma once
@@ -240,20 +241,21 @@ extern "C"
 // shared library loading 
 namespace fs = std::tr2::sys;   // todo: different compiler versions would need different filesystem paths
 
-using lava_paths     =  std::vector<std::string>;
-using lava_libHndls  =  std::vector<HMODULE>;                             // todo: need to change this depending on OS
-using lava_hndlMap   =  std::unordered_map<std::string, HMODULE>;
-//using lava_nodeMap   =  std::unordered_map<std::string, HMODULE>;
-using lava_nodeMap   =  std::unordered_multimap<std::string, uint64_t>;   // std::unordered_map<std::string, HMODULE>;
+using lava_paths      =  std::vector<std::string>;
+using lava_libHndls   =  std::vector<HMODULE>;                             // todo: need to change this depending on OS
+using lava_hndlMap    =  std::unordered_map<std::string, HMODULE>;
+using lava_flowNodes  =  std::unordered_multimap<std::string, LavaFlowNode*>;
+using lava_nidMap     =  std::unordered_multimap<std::string, uint64_t>;
+using lava_flowPtrs   =  std::vector<LavaFlowNode*>;
 
 struct     LavaFlow
 {
   lava_hndlMap       libs;    // libs is libraries - this maps the live path of the shared libary with the OS specific handle that the OS loading function returns
-  lava_nodeMap       nids;    // nids is node ids  - this maps the name of the node to all of the graph node ids that use it
-
+  lava_nidMap        nids;    // nids is node ids  - this maps the name of the node to all of the graph node ids that use it
+  lava_flowNodes     flow;
 };
 
-auto      GetRefreshPaths() -> lava_paths
+auto        GetRefreshPaths() -> lava_paths
 {
   using namespace std;
   using namespace  fs;
@@ -292,7 +294,7 @@ auto      GetRefreshPaths() -> lava_paths
 
   return paths;
 }
-uint64_t  CopyPathsToLive(lava_paths const& paths)
+uint64_t    CopyPathsToLive(lava_paths    const& paths)
 {
   using namespace std;
   using namespace  fs;
@@ -315,17 +317,33 @@ uint64_t  CopyPathsToLive(lava_paths const& paths)
 
   return count;
 }
-auto             LoadLibs(lava_paths const& paths) -> lava_libHndls
+uint64_t        RemovePaths(lava_paths    const& paths)
 {
-  lava_libHndls hndls;
+  using namespace std;
+  using namespace  fs;
+
+  uint64_t count = 0;
   for(auto const& p : paths){
-    HMODULE lib = LoadLibrary(TEXT(p.c_str()));
-    hndls.push_back(lib);
+    if( remove(path(p)) ){ ++count; }
+  }
+
+  return count;
+}
+auto               LoadLibs(lava_paths    const& paths) -> lava_libHndls
+{
+  lava_libHndls hndls(paths.size(), 0);
+
+  TO(paths.size(), i){
+    HMODULE lib = LoadLibrary(TEXT(paths[i].c_str()));
+    hndls[i] = lib;
   }
 
   return hndls;
+
+  //for(auto const& p : paths){
+  //hndls.push_back(lib);
 }
-uint64_t         FreeLibs(lava_libHndls const& hndls)
+uint64_t           FreeLibs(lava_libHndls const& hndls)
 {
   uint64_t count = 0;
   for(auto const& h : hndls){
@@ -333,7 +351,7 @@ uint64_t         FreeLibs(lava_libHndls const& hndls)
   }
   return count;
 }
-auto         GetLivePaths(lava_paths const& paths) -> lava_paths 
+auto           GetLivePaths(lava_paths    const& paths) -> lava_paths 
 {
   using namespace std;
   using namespace  fs;
@@ -341,6 +359,30 @@ auto         GetLivePaths(lava_paths const& paths) -> lava_paths
   lava_paths ret;
   for(auto const& p : paths){
     ret.emplace_back( path(p).replace_extension(liveExt).generic_string() );
+  }
+
+  return ret;
+}
+auto         GetLiveHandles(lava_hndlMap  const& hndls, lava_paths const& paths) -> lava_libHndls
+{
+  lava_libHndls ret;
+  for(auto const& p : paths){
+    auto hi = hndls.find(p);         // hi is handle iterator
+    if(hi != end(hndls)) ret.push_back(hi->second);
+  }
+
+  return ret;
+}
+auto       GetFlowNodeLists(lava_libHndls const& hndls) -> lava_flowPtrs
+{
+  lava_flowPtrs ret(hndls.size(), nullptr);
+  TO(hndls.size(),i){
+    auto h = hndls[i];
+    if(h){
+      auto  GetLavaFlowNodes = (GetLavaFlowNodes_t)GetProcAddress(h, TEXT("GetLavaFlowNodes") );
+      LavaFlowNode* nodeList = GetLavaFlowNodes();
+      ret[i] = nodeList;
+    }
   }
 
   return ret;
@@ -356,6 +398,9 @@ auto         GetLivePaths(lava_paths const& paths) -> lava_paths
 
 
 
+
+// std::unordered_map<std::string, HMODULE>;
+//using lava_nodeMap   =  std::unordered_map<std::string, HMODULE>;
 
 // array of structs of the contained nodes
 //LavaFlowNode LavaFlowNodes[] =

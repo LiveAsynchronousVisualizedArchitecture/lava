@@ -124,10 +124,16 @@
 // todo: put slots on message passing node
 // -todo: make slot on message node be correct - works automatically
 // -todo: make connection creation destroy current connection to dest and create new connection
+// -todo: make a LavaFlow struct be part of FissureData
+// -todo: make shared libarary loading copy file to lava_ .live.dll 
+// -todo: test library freeing and loading 
+// -todo: put loaded lib handles into LavaFlow struct
+// -todo: make function to extract the flow nodes lists from the handles
 
-// todo: make a LavaFlow struct be part of FissureData
+// todo: make function to extract the individual LavaFlowNodes from the lists and put them into the multi-map
+// todo: replace the LavaFlowNode structs of the loaded libs
+// todo: make Lava data structures use the Lava thread local allocator
 // todo: make shared libraries with lava_ be automatically loaded
-// todo: make shared libarary loading copy file to lava_live_ 
 // todo: separate drawing and node bounds calculation
 // todo: change project to be named Fissure 
 
@@ -559,14 +565,50 @@ void              keyCallback(GLFWwindow* win, int key, int scancode, int action
       auto livePaths = GetLivePaths(paths);
 
       // coordinate live paths to handles
+      auto liveHandles  =  GetLiveHandles(fd.lf.libs, livePaths);
 
       // free the handles
+      auto   freeCount  =  FreeLibs(liveHandles); 
 
-      // copy the refresh paths
+      // delete the now unloaded live shared library files
+      auto    delCount  =  RemovePaths(livePaths);
+
+      // copy the refresh paths' files
+      auto   copyCount  =  CopyPathsToLive(paths); 
 
       // load the handles
+      auto loadedHndls  =  LoadLibs(livePaths);
 
-      // replace their functions
+      // put loaded handles into LavaFlow struct
+      TO(livePaths.size(), i){
+        auto h = loadedHndls[i];
+        if(h){
+          fd.lf.libs[livePaths[i]] = h;
+        }
+      }
+
+      // extract the flow node lists from the handles
+      auto flowNdLists = GetFlowNodeLists(loadedHndls);
+
+      // extract the flow nodes from the lists and put them into the multi-map
+      TO(livePaths.size(),i)
+      {
+        LavaFlowNode* list = flowNdLists[i];
+        if(list){
+          auto const& p = livePaths[i]; 
+          fd.lf.flow.erase(p);           // delete the current node list for the livePath
+          for(; list->func!=nullptr; ++list){             // insert each of the LavaFlowNodes in the list into the multi-map
+            fd.lf.flow.insert( {p, list} );
+          }
+        }
+      }
+
+      //// replace their nodes
+      //TO(loadedHndls.size(),i) if(loadedHndls[i]!=0)
+      //{
+      //  fd.lf.flow.find
+      //}
+
 
       // coordinate the node structures with node Ids
 
