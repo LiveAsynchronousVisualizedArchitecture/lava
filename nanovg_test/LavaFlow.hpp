@@ -1,4 +1,9 @@
 
+// todo: make LoadSharedLibraries into:
+//       -a function to say which libraries need to be refreshed
+//       a function to unload the libraries 
+//       a function copy the libraries 
+//       a function to load them again
 
 #ifdef _MSC_VER
   #pragma once
@@ -244,6 +249,43 @@ extern "C"
 
 //using  Path      =   std::tr2::sys::path;
 namespace fs = std::tr2::sys;   // todo: different compiler versions would need different filesystem paths
+
+
+auto GetRefreshPaths() -> std::vector<str>
+{
+  using namespace std;
+  using namespace  fs;
+
+  static regex lavaRegex("lava_.*");
+
+  std::vector<str> paths;
+  path       root("../x64/Debug/");
+  auto    dirIter = directory_iterator(root);
+  for(auto& d : dirIter){
+    auto   p = d.path();
+    if(!p.has_filename()){ continue; }
+
+    auto ext = p.extension().generic_string();
+    if(ext != ".dll"){ continue; }
+
+    str fstr = p.filename().generic_string();          // fstr is file string
+    if( !regex_match(fstr, lavaRegex) ){ continue; }
+
+    auto livepth = p;
+    livepth.replace_extension(".live.dll");
+
+    bool refresh = true;
+    if( exists(livepth) ){
+      auto liveWrite = last_write_time(livepth).time_since_epoch().count();         // liveWrite is live write time - the live shared library file's last write time 
+      auto origWrite = last_write_time(p).time_since_epoch().count();               // origWrite is orginal write time - the original shared library file's last write time
+      if( liveWrite > origWrite ) refresh = false;
+    }
+
+    if(refresh) paths.push_back( p.generic_string() );
+  }
+
+  return paths;
+}
 
 uint64_t LoadSharedLibraries()
 {
