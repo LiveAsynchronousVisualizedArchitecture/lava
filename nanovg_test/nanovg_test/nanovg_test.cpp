@@ -555,8 +555,20 @@ void              keyCallback(GLFWwindow* win, int key, int scancode, int action
   case 'L':
   {
     #ifdef _WIN32
-      auto paths = GetRefreshPaths();
+      auto     paths = GetRefreshPaths();
       auto livePaths = GetLivePaths(paths);
+
+      // coordinate live paths to handles
+
+      // free the handles
+
+      // copy the refresh paths
+
+      // load the handles
+
+      // replace their functions
+
+      // coordinate the node structures with node Ids
 
       //TO(pths.size(),i) 
 

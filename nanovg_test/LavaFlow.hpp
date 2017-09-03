@@ -15,11 +15,13 @@
 #define __LAVAFLOW_DECL_HEADERGUARD_HPP__
 
 //#include <vector>
+
 #include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <regex>
 #include <filesystem>
+#include <map>
 #include "no_rt_util.h"
 
 using str = std::string;
@@ -238,14 +240,17 @@ extern "C"
 // shared library loading 
 namespace fs = std::tr2::sys;   // todo: different compiler versions would need different filesystem paths
 
-using lava_paths    = std::vector<std::string>;
-using lava_libHndls = std::vector<HMODULE>;                       // todo: need to change this depending on OS
-using lava_hndlMap  = std::unordered_map<std::string, HMODULE>;
+using lava_paths     =  std::vector<std::string>;
+using lava_libHndls  =  std::vector<HMODULE>;                             // todo: need to change this depending on OS
+using lava_hndlMap   =  std::unordered_map<std::string, HMODULE>;
+//using lava_nodeMap   =  std::unordered_map<std::string, HMODULE>;
+using lava_nodeMap   =  std::unordered_multimap<std::string, uint64_t>;   // std::unordered_map<std::string, HMODULE>;
 
-struct LavaFlow
+struct     LavaFlow
 {
-  //lava_libHndls  handles;
-  lava_hndlMap  libs;
+  lava_hndlMap       libs;    // libs is libraries - this maps the live path of the shared libary with the OS specific handle that the OS loading function returns
+  lava_nodeMap       nids;    // nids is node ids  - this maps the name of the node to all of the graph node ids that use it
+
 };
 
 auto      GetRefreshPaths() -> lava_paths
