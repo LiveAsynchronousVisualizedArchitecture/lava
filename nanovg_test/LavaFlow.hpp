@@ -1,14 +1,4 @@
 
-// -todo: make LoadSharedLibraries into:
-//       -a function to say which libraries need to be refreshed
-//       -a function copy the libraries 
-//       -a function to unload the libraries 
-//       -a function to load them again
-// -todo: make GetRefreshPaths() avoid .live files
-// -todo: use path of binary for the root path
-
-// todo: reorganize LavaFlow to group all similar declarations and implementations together
-// todo: merge LavaNode with graph node
 
 #ifdef _MSC_VER
   #pragma once
@@ -35,9 +25,18 @@
 struct   LavaFlowNode;
 struct        LavaArg;
 
-using str = std::string;
-extern "C" using FlowFunc = uint64_t (*)(LavaArg* in, LavaArg* out);                  // data flow node function
-extern "C" using GetLavaFlowNodes_t  =  LavaFlowNode*(*)();                           // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
+namespace fs = std::tr2::sys;                                     // todo: different compiler versions would need different filesystem paths
+
+using str             =  std::string;
+using lava_paths      =  std::vector<std::string>;
+using lava_libHndls   =  std::vector<HMODULE>;                                  // todo: need to change this depending on OS
+using lava_hndlMap    =  std::unordered_map<std::string, HMODULE>;
+using lava_flowNodes  =  std::unordered_multimap<std::string, LavaFlowNode*>;
+using lava_nidMap     =  std::unordered_multimap<std::string, uint64_t>;
+using lava_flowPtrs   =  std::vector<LavaFlowNode*>;
+
+extern "C" using           FlowFunc  =  uint64_t (*)(LavaArg* in, LavaArg* out);        // data flow node function
+extern "C" using GetLavaFlowNodes_t  =  LavaFlowNode*(*)();                             // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
 
 enum class LavaNodeType { NONE=0, FLOW, MSG };                  // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
 
@@ -78,31 +77,69 @@ struct   LavaFlowNode
   uint64_t           version;
   uint64_t                id;
 };
+struct       LavaFlow
+{
+  lava_hndlMap       libs;    // libs is libraries - this maps the live path of the shared libary with the OS specific handle that the OS loading function returns
+  lava_nidMap        nids;    // nids is node ids  - this maps the name of the node to all of the graph node ids that use it
+  lava_flowNodes     flow;
+};
 // end data types
 
 // static data segment data
-static const              std::string   liveExt(".live.dll");                          // todo: change depending on OS
-static __declspec(thread)       void*   lava_thread_heap = nullptr;             // thread local handle for thread local heap allocations
+static const              std::string   liveExt(".live.dll");             // todo: change depending on OS
+static __declspec(thread)       void*   lava_thread_heap = nullptr;       // thread local handle for thread local heap allocations
 // end data segment data
 
 // function declarations
 BOOL WINAPI DllMain(
-  _In_  HINSTANCE  hinstDLL,
-  _In_  DWORD      fdwReason,
+  _In_  HINSTANCE     hinstDLL,
+  _In_  DWORD        fdwReason,
   _In_  LPVOID     lpvReserved
 );
 
-__declspec(noinline) void   LavaHeapDestroyCallback(void*);
-__declspec(noinline) void*             LavaHeapInit(size_t initialSz = 0);
-__declspec(noinline) void*                LavaAlloc(size_t sz);
-__declspec(noinline) int                   LavaFree(void* memptr);
+//__declspec(noinline) void   LavaHeapDestroyCallback(void*);
+//__declspec(noinline) void*             LavaHeapInit(size_t initialSz = 0);
+//__declspec(noinline) void*                LavaAlloc(size_t sz);
+//__declspec(noinline) int                   LavaFree(void* memptr);
 
 extern "C" __declspec(dllexport) LavaFlowNode* GetLavaFlowNodes();   // prototype of function to return static plugin loading struct
 // end function declarations
 
 // allocator definitions
-template <class T>
-struct ThreadAllocator
+inline void    LavaHeapDestroyCallback(void* heapHnd)
+{
+  if(heapHnd)
+    HeapDestroy(heapHnd);
+}
+inline void*   LavaHeapInit(size_t initialSz = 0)
+{
+  if(!lava_thread_heap) {
+    lava_thread_heap = HeapCreate(HEAP_NO_SERIALIZE, initialSz, 0);
+  }
+  return lava_thread_heap;
+}
+inline void*   LavaAlloc(size_t sz)
+{
+  void* thread_heap = LavaHeapInit(sz);
+
+  void* ret = nullptr;
+  if(thread_heap)
+    ret = HeapAlloc(thread_heap, HEAP_NO_SERIALIZE, sz);
+
+  return ret;
+}
+inline int     LavaFree(void* memptr)
+{
+  void* thread_heap = LavaHeapInit();
+
+  void* ret = nullptr;
+  if(thread_heap && memptr) {
+    auto ret = HeapFree(thread_heap, HEAP_NO_SERIALIZE, memptr);
+    return ret;
+  }else{ return 0; }
+}
+
+template <class T> struct ThreadAllocator
 {
   using value_type  =  T;
 
@@ -138,8 +175,7 @@ struct ThreadAllocator
     p->~U();
   }
 };
-template <class T>
-T*     ThreadAllocator<T>::allocate(const size_t n) const
+template <class T> T*     ThreadAllocator<T>::allocate(const size_t n) const
 {
   if(n==0) return nullptr;
 
@@ -152,9 +188,7 @@ T*     ThreadAllocator<T>::allocate(const size_t n) const
 
   return static_cast<T*>(p);
 }
-
-template<class T>
-void   ThreadAllocator<T>::deallocate(T*& p, size_t) const
+template<class T>  void   ThreadAllocator<T>::deallocate(T*& p, size_t) const
 {
   //if(n==0) return;
 
@@ -163,54 +197,12 @@ void   ThreadAllocator<T>::deallocate(T*& p, size_t) const
 }
 // end allocator definitions
 
-
 #if defined(__LAVAFLOW_IMPL__)
 
 // function implementations
-void    LavaHeapDestroyCallback(void* heapHnd)
-{
-  if(heapHnd)
-    HeapDestroy(heapHnd);
-  //Println("destroy called");
-}
-void*   LavaHeapInit(size_t initialSz)
-{
-  if(!lava_thread_heap) {
-    lava_thread_heap = HeapCreate(HEAP_NO_SERIALIZE, initialSz, 0);
-    //auto flsHnd = FlsAlloc(HeapDestroyCallback);
-    //FlsSetValue(flsHnd, lava_thread_heap); // need to set the value to non-null so the callback will run
-  }
-  return lava_thread_heap;
-
-  //return true;
-  //}
-  //else
-  //return false;
-}
-void*   LavaAlloc(size_t sz)
-{
-  void* thread_heap = LavaHeapInit(sz);
-
-  void* ret = nullptr;
-  if(thread_heap)
-    ret = HeapAlloc(thread_heap, HEAP_NO_SERIALIZE, sz);
-
-  return ret;
-}
-int     LavaFree(void* memptr)
-{
-  void* thread_heap = LavaHeapInit();
-
-  void* ret = nullptr;
-  if(thread_heap && memptr) {
-    auto ret = HeapFree(thread_heap, HEAP_NO_SERIALIZE, memptr);
-    return ret;
-  }else{ return 0; }
-}
-
 BOOL WINAPI DllMain(
-  _In_ HINSTANCE hinstDLL,
-  _In_ DWORD     fdwReason,
+  _In_ HINSTANCE    hinstDLL,
+  _In_ DWORD       fdwReason,
   _In_ LPVOID    lpvReserved
 )
 {
@@ -232,29 +224,6 @@ BOOL WINAPI DllMain(
   }
   return true;
 }
-// end function implementations
-
-
-// priority queue of packets - sort by frame number, then dest node, then dest slot
-
-// lock free hash table of in flight packets?
-
-// shared library loading 
-namespace fs = std::tr2::sys;   // todo: different compiler versions would need different filesystem paths
-
-using lava_paths      =  std::vector<std::string>;
-using lava_libHndls   =  std::vector<HMODULE>;                                  // todo: need to change this depending on OS
-using lava_hndlMap    =  std::unordered_map<std::string, HMODULE>;
-using lava_flowNodes  =  std::unordered_multimap<std::string, LavaFlowNode*>;
-using lava_nidMap     =  std::unordered_multimap<std::string, uint64_t>;
-using lava_flowPtrs   =  std::vector<LavaFlowNode*>;
-
-struct     LavaFlow
-{
-  lava_hndlMap       libs;    // libs is libraries - this maps the live path of the shared libary with the OS specific handle that the OS loading function returns
-  lava_nidMap        nids;    // nids is node ids  - this maps the name of the node to all of the graph node ids that use it
-  lava_flowNodes     flow;
-};
 
 auto       GetSharedLibPath() -> std::wstring
 {
@@ -402,8 +371,11 @@ auto       GetFlowNodeLists(lava_libHndls const& hndls) -> lava_flowPtrs
 
   return ret;
 }
+// end function implementations
 
-// end shared library loading
+// priority queue of packets - sort by frame number, then dest node, then dest slot
+
+// lock free hash table of in flight packets?
 
 #endif // endif for implementation
 
@@ -415,7 +387,16 @@ auto       GetFlowNodeLists(lava_libHndls const& hndls) -> lava_flowPtrs
 
 
 
+//
+//Println("destroy called");
 
+//auto flsHnd = FlsAlloc(HeapDestroyCallback);
+//FlsSetValue(flsHnd, lava_thread_heap); // need to set the value to non-null so the callback will run
+//
+//return true;
+//}
+//else
+//return false;
 
 //static const string liveExt(".live.dll");
 //

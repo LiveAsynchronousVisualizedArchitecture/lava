@@ -136,13 +136,26 @@
 // -todo: make loaded dll add a button to the gui
 // -todo: build in data structure to hold node buttons - holds button pointers
 // -todo: build in data structure to hold function states - will the C++ function object will hold state from a lamda object, making the Button class own the memory?
+// -todo: organize the LavaFlow.hpp file
+// -todo: make LoadSharedLibraries into:
+//       -a function to say which libraries need to be refreshed
+//       -a function copy the libraries 
+//       -a function to unload the libraries 
+//       -a function to load them again
+// -todo: make GetRefreshPaths() avoid .live files
+// -todo: use path of binary for the root path
+// -todo: reorganize LavaFlow to group all similar declarations and implementations together
 
-// todo: merge node and LavaFlowNode
-// todo: separate node into a NodeUi struct
+
+// todo: make functions that will need to be used by nodes inline and part of the declarations (like the per thread allocators)
+// todo: merge LavaNode with graph node
 // todo: separate drawing and node bounds calculation
-// todo: change project name to Fissure 
+// todo: separate node into a NodeUi struct
+// todo: make a separate class to hold UI information about nodes - position, bounds, UI name (node text)
+// todo: merge node and LavaFlowNode
 // todo: make Lava data structures use the Lava thread local allocator
-// todo: organize the LavaFlow.hpp file
+// todo: put minimized graphdb into LavaFlow.hpp
+// todo: change project name to Fissure 
 
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
@@ -233,8 +246,6 @@
 #include "../no_rt_util.h"
 #include "../Transform.h"
 #include "FissureDecl.h"
-
-//#include "../LavaNode.h"
 
 using Id = GraphDB::Id;
 
