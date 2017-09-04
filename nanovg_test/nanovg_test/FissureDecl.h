@@ -9,8 +9,10 @@
 #include <set>
 #include <nanogui/nanogui.h>
 #include "../no_rt_util.h"
-#include "../LavaFlow.hpp"
 #include "vec.hpp"
+
+#define __LAVAFLOW_IMPL__
+#include "../LavaFlow.hpp"
 
 
 using namespace nanogui;

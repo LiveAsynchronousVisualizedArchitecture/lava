@@ -5,19 +5,17 @@
 //       -a function to unload the libraries 
 //       -a function to load them again
 // -todo: make GetRefreshPaths() avoid .live files
+// -todo: use path of binary for the root path
 
-// todo: use path of binary for the root path
 // todo: reorganize LavaFlow to group all similar declarations and implementations together
+// todo: merge LavaNode with graph node
 
 #ifdef _MSC_VER
   #pragma once
 #endif
 
-#ifndef __LAVAFLOW_DECL_HEADERGUARD_HPP__
-#define __LAVAFLOW_DECL_HEADERGUARD_HPP__
-
-//#include <vector>
-//#include <exception>
+#ifndef __LAVAFLOW_HEADERGUARD_HPP__
+#define __LAVAFLOW_HEADERGUARD_HPP__
 
 #include <cstdint>
 #include <string>
@@ -27,30 +25,82 @@
 #include <map>
 #include "no_rt_util.h"
 
-using str = std::string;
-
 #if defined(_WIN32)
   #define WIN32_LEAN_AND_MEAN
   #define NOMINMAX
   #include <Windows.h>
 #endif
 
-static const std::string liveExt(".live.dll");                    // todo: change depending on OS
+// data types
+struct   LavaFlowNode;
+struct        LavaArg;
 
-// start allocator declarations
-static __declspec(thread) void* lava_thread_heap = nullptr;
+using str = std::string;
+extern "C" using FlowFunc = uint64_t (*)(LavaArg* in, LavaArg* out);                  // data flow node function
+extern "C" using GetLavaFlowNodes_t  =  LavaFlowNode*(*)();                           // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
 
-__declspec(noinline) void   LavaHeapDestroyCallback(void*);
-__declspec(noinline) void*  LavaHeapInit(size_t initialSz = 0);
-__declspec(noinline) void*  LavaAlloc(size_t sz);
-__declspec(noinline) int    LavaFree(void* memptr);
+enum class LavaNodeType { NONE=0, FLOW, MSG };                  // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
 
+union         ArgType{ 
+  enum { END=0, DATA_ERROR, STORE, MEMORY, SEQUENCE, ENUMERATION };
+  u8 asInt;
+};
+struct        LavaArg
+{
+  u64      type :  3;
+  u64     value : 61;
+};
+struct        LavaMsg
+{
+  u64        id;
+  LavaArg   arg;
+};
+struct     LavaPacket
+{
+  u64    ref_count;
+  u64        frame : 63;
+  u64       framed :  1;
+  u64    dest_node : 48;
+  u64    dest_slot : 16;
+  u64     src_node : 48;
+  u64     src_slot : 16;
+  LavaMsg      msg;
+};
+struct   LavaFlowNode
+{
+  FlowFunc              func;
+  uint64_t         node_type;
+  uint16_t            inputs;
+  uint16_t           outputs;
+  const char*           name;
+  const char**      in_types;
+  const char**     out_types;
+  uint64_t           version;
+  uint64_t                id;
+};
+// end data types
+
+// static data segment data
+static const              std::string   liveExt(".live.dll");                          // todo: change depending on OS
+static __declspec(thread)       void*   lava_thread_heap = nullptr;             // thread local handle for thread local heap allocations
+// end data segment data
+
+// function declarations
 BOOL WINAPI DllMain(
   _In_  HINSTANCE  hinstDLL,
   _In_  DWORD      fdwReason,
   _In_  LPVOID     lpvReserved
 );
 
+__declspec(noinline) void   LavaHeapDestroyCallback(void*);
+__declspec(noinline) void*             LavaHeapInit(size_t initialSz = 0);
+__declspec(noinline) void*                LavaAlloc(size_t sz);
+__declspec(noinline) int                   LavaFree(void* memptr);
+
+extern "C" __declspec(dllexport) LavaFlowNode* GetLavaFlowNodes();   // prototype of function to return static plugin loading struct
+// end function declarations
+
+// allocator definitions
 template <class T>
 struct ThreadAllocator
 {
@@ -111,9 +161,12 @@ void   ThreadAllocator<T>::deallocate(T*& p, size_t) const
   ThreadFree(p);
   p = nullptr;
 }
-// end allocator declarations
+// end allocator definitions
 
-// start allocator implementations
+
+#if defined(__LAVAFLOW_IMPL__)
+
+// function implementations
 void    LavaHeapDestroyCallback(void* heapHnd)
 {
   if(heapHnd)
@@ -179,62 +232,8 @@ BOOL WINAPI DllMain(
   }
   return true;
 }
-// end allocator implementations
+// end function implementations
 
-// this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
-enum class LavaNodeType { NONE=0, FLOW, MSG };
-
-union       ArgType{ 
-  enum { END=0, DATA_ERROR, STORE, MEMORY, SEQUENCE, ENUMERATION };
-  u8 asInt;
-};
-struct      LavaArg
-{
-  u64      type :  3;
-  u64     value : 61;
-};
-struct      LavaMsg
-{
-  u64        id;
-  LavaArg   arg;
-};
-struct   LavaPacket
-{
-  u64    ref_count;
-  u64        frame : 63;
-  u64       framed :  1;
-  u64    dest_node : 48;
-  u64    dest_slot : 16;
-  u64     src_node : 48;
-  u64     src_slot : 16;
-  LavaMsg      msg;
-};
-struct LavaFlowNode;
-
-// prototype of data flow node function
-extern "C" using FlowFunc = uint64_t (*)(LavaArg* in, LavaArg* out);
-
-struct LavaFlowNode
-{
-  FlowFunc              func;
-  uint64_t         node_type;
-  uint16_t            inputs;
-  uint16_t           outputs;
-  const char*           name;
-  const char**      in_types;
-  const char**     out_types;
-  uint64_t           version;
-  uint64_t                id;
-};
-
-// plugin loading struct
-extern "C"
-{
-  using GetLavaFlowNodes_t  =  LavaFlowNode*(*)();
-
-  // prototype of function to return static plugin loading struct
-  __declspec(dllexport) LavaFlowNode* GetLavaFlowNodes();
-}
 
 // priority queue of packets - sort by frame number, then dest node, then dest slot
 
@@ -244,7 +243,7 @@ extern "C"
 namespace fs = std::tr2::sys;   // todo: different compiler versions would need different filesystem paths
 
 using lava_paths      =  std::vector<std::string>;
-using lava_libHndls   =  std::vector<HMODULE>;                             // todo: need to change this depending on OS
+using lava_libHndls   =  std::vector<HMODULE>;                                  // todo: need to change this depending on OS
 using lava_hndlMap    =  std::unordered_map<std::string, HMODULE>;
 using lava_flowNodes  =  std::unordered_multimap<std::string, LavaFlowNode*>;
 using lava_nidMap     =  std::unordered_multimap<std::string, uint64_t>;
@@ -257,6 +256,19 @@ struct     LavaFlow
   lava_flowNodes     flow;
 };
 
+auto       GetSharedLibPath() -> std::wstring
+{
+  using namespace std;
+  
+  #ifdef _WIN32
+    HMODULE hModule = GetModuleHandleW(NULL);
+    WCHAR path[MAX_PATH];
+    GetModuleFileNameW(hModule, path, MAX_PATH);
+
+    //return string(TEXT(path));
+    return path;
+  #endif
+}
 auto        GetRefreshPaths() -> lava_paths
 {
   using namespace std;
@@ -264,11 +276,12 @@ auto        GetRefreshPaths() -> lava_paths
 
   static const regex lavaRegex("lava_.*");
   static const regex extRegex(".*\\.live\\.dll");
-  //static const string liveExt(".live.dll");
 
-  std::vector<str> paths;
-  path       root("../x64/Debug/");
-  //path       root("../x64/Release/");
+  auto libPath = path( GetSharedLibPath() );
+  libPath.remove_filename();
+  path    root = libPath;
+
+  vector<str> paths;
   auto    dirIter = directory_iterator(root);
   for(auto& d : dirIter){
     auto   p = d.path();
@@ -283,7 +296,6 @@ auto        GetRefreshPaths() -> lava_paths
 
     auto livepth = p;
     livepth.replace_extension( liveExt );
-    //livepth.replace_extension(".live.dll");
 
     bool refresh = true;
     if( exists(livepth) ){
@@ -393,6 +405,8 @@ auto       GetFlowNodeLists(lava_libHndls const& hndls) -> lava_flowPtrs
 
 // end shared library loading
 
+#endif // endif for implementation
+
 #endif
 
 
@@ -401,6 +415,16 @@ auto       GetFlowNodeLists(lava_libHndls const& hndls) -> lava_flowPtrs
 
 
 
+
+
+//static const string liveExt(".live.dll");
+//
+//path    root = libPath.root_directory();
+//path    root = libPath.root_path();        //root( libPath );
+//path       root("../x64/Debug/");
+//path       root("../x64/Release/");
+//
+//livepth.replace_extension(".live.dll");
 
 // std::unordered_map<std::string, HMODULE>;
 //using lava_nodeMap   =  std::unordered_map<std::string, HMODULE>;

@@ -121,7 +121,7 @@
 // -todo: make nodes smaller 
 // -todo: take out NODE_SZ
 // -todo: get message passing nodes to draw correctly after no longer using NODE_SZ - node bounds cycles down for some reason
-// todo: put slots on message passing node
+// -todo: put slots on message passing node
 // -todo: make slot on message node be correct - works automatically
 // -todo: make connection creation destroy current connection to dest and create new connection
 // -todo: make a LavaFlow struct be part of FissureData
@@ -133,12 +133,16 @@
 // -todo: replace the LavaFlowNode structs of the loaded libs
 // -todo: make shared libraries with lava_ be automatically loaded
 // -todo: test shared lib loading speed in release mode - faster but still slow
+// -todo: make loaded dll add a button to the gui
+// -todo: build in data structure to hold node buttons - holds button pointers
+// -todo: build in data structure to hold function states - will the C++ function object will hold state from a lamda object, making the Button class own the memory?
 
-// todo: build in data structure to hold node buttons
-// todo: make loaded dll add a button to the gui
-// todo: make Lava data structures use the Lava thread local allocator
+// todo: merge node and LavaFlowNode
+// todo: separate node into a NodeUi struct
 // todo: separate drawing and node bounds calculation
 // todo: change project name to Fissure 
+// todo: make Lava data structures use the Lava thread local allocator
+// todo: organize the LavaFlow.hpp file
 
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
@@ -612,7 +616,10 @@ void              keyCallback(GLFWwindow* win, int key, int scancode, int action
       // redo interface node buttons
       for(auto& kv : fd.lf.flow){
         LavaFlowNode* fn = kv.second;                      // fn is flow node
-        auto ndBtn = new Button(fd.ui.keyWin, fn->name);
+        auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
+        ndBtn->setCallback([fn](){ 
+          fd.grph.addNode( Node(fn->name, Node::FLOW, {100,100}), true);
+        });
       }
       fd.ui.screen.performLayout();
 
