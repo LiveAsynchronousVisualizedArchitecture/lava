@@ -39,6 +39,7 @@ using    vecui     =    vec<u32>;
 using   vecstr     =    std::vector<str>;
 using   vec_v2     =    vec<v2>;
 using cnct_tbl     =    std::unordered_multimap<int,int>;
+using  vec_btn     =    vec<Button*>;
 
 union      Bnd 
 {
@@ -625,6 +626,7 @@ struct FisData
     Window*        keyWin = nullptr;
     Window*         dbWin = nullptr;
     BoxLayout*     keyLay = nullptr;
+    vec_btn        ndBtns;
 
     // mouse
     v2                prevPntr;

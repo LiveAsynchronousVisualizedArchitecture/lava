@@ -6,6 +6,7 @@
 //       -a function to load them again
 // -todo: make GetRefreshPaths() avoid .live files
 
+// todo: use path of binary for the root path
 // todo: reorganize LavaFlow to group all similar declarations and implementations together
 
 #ifdef _MSC_VER
@@ -266,8 +267,8 @@ auto        GetRefreshPaths() -> lava_paths
   //static const string liveExt(".live.dll");
 
   std::vector<str> paths;
-  //path       root("../x64/Debug/");
-  path       root("../x64/Release/");
+  path       root("../x64/Debug/");
+  //path       root("../x64/Release/");
   auto    dirIter = directory_iterator(root);
   for(auto& d : dirIter){
     auto   p = d.path();

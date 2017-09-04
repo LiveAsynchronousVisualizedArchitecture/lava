@@ -134,6 +134,8 @@
 // -todo: make shared libraries with lava_ be automatically loaded
 // -todo: test shared lib loading speed in release mode - faster but still slow
 
+// todo: build in data structure to hold node buttons
+// todo: make loaded dll add a button to the gui
 // todo: make Lava data structures use the Lava thread local allocator
 // todo: separate drawing and node bounds calculation
 // todo: change project name to Fissure 
@@ -604,12 +606,21 @@ void              keyCallback(GLFWwindow* win, int key, int scancode, int action
         }
       }
 
+      // delete interface buttons from the nanogui window
+      fd.ui.ndBtns.clear();
+      
+      // redo interface node buttons
+      for(auto& kv : fd.lf.flow){
+        LavaFlowNode* fn = kv.second;                      // fn is flow node
+        auto ndBtn = new Button(fd.ui.keyWin, fn->name);
+      }
+      fd.ui.screen.performLayout();
+
       //// replace their nodes
       //TO(loadedHndls.size(),i) if(loadedHndls[i]!=0)
       //{
       //  fd.lf.flow.find
       //}
-
 
       // coordinate the node structures with node Ids
 
@@ -619,47 +630,9 @@ void              keyCallback(GLFWwindow* win, int key, int scancode, int action
       //for(auto& p : pths) printf("\n %s \n
     #endif
 
-
-    //#ifdef _WIN32
-    //  //LoadSharedLibraries();
-    //  //HMODULE lib = LoadLibrary(TEXT("lava_ReadFile.dll"));
-    //  if(lib)
-    //  {
-    //    auto getNds = (GetLavaFlowNodes_t)GetProcAddress(lib, TEXT("GetLavaFlowNodes") );
-    //    LavaFlowNode* nds = getNds();
-    //    if(nds) printf("%s    %s \n\n", nds[0].name, nds[0].out_types[0] );
-    //
-    //    auto flowFunc = nds[0].func;
-    //
-    //    if(flowFunc) printf("flow func %llu : \n\n", flowFunc(nullptr, nullptr) );
-    //    else         printf("flow func is nullptr \n\n");
-    //
-    //    //printf("%s    %s    %s", nds[0].name, nds[0].in_types[0], nds[0].out_types[0] );
-    //    //while(nds && nds->name)
-    //      //node_add( (nds++)->name );
-    //  }else{ printf("zero"); }
-    //  //}else{ printf("zero", lib); }
-    //#endif
-
-    //#ifdef _WIN32
-    //      HMODULE lib = LoadLibrary(TEXT("ReadFile.dll"));
-    //      if(lib){
-    //        auto   getNds = (GetLavaNodes_t)GetProcAddress(lib, TEXT("GetNodes") );
-    //        LavaNode* nds = getNds();
-    //        printf("%s    %s    %s", nds[0].name, nds[0].in_types[0], nds[0].out_types[0] );
-    //        //while(nds && nds->name)
-    //        //node_add( (nds++)->name );
-    //      }else{ printf("zero"); }
-    //      //}else{ printf("zero", lib); }
-    //#endif
-
   }break;
   case 'Y':
   {
-    //sprintf(sngl, "sizeof LavaData %d", sizeof(LavaData) );
-    //glfwSetWindowTitle(win, sngl);    
-
-    //printf("sizeof LavaData %lld \n", sizeof(LavaData) );
   }break;
   default:
     ;
@@ -1114,10 +1087,10 @@ ENTRY_DECLARATION
       fd.ui.screen.initialize(fd.win, false);
 
       fd.ui.keyLay   = new BoxLayout(Orientation::Horizontal, Alignment::Fill, 0,10);      //fd.ui.keyLay   = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
-      fd.ui.keyWin   = new Window(&fd.ui.screen,  "");
-      auto spcr1     = new Label(fd.ui.keyWin,    "");
-      auto spcr2     = new Label(fd.ui.keyWin,    "");
-      auto spcr3     = new Label(fd.ui.keyWin,    "");
+      fd.ui.keyWin   = new Window(&fd.ui.screen,   "");
+      auto spcr1     = new Label(fd.ui.keyWin,     "");
+      auto spcr2     = new Label(fd.ui.keyWin,     "");
+      auto spcr3     = new Label(fd.ui.keyWin,     "");
       auto loadBtn   = new Button(fd.ui.keyWin,    "Load");
       auto saveBtn   = new Button(fd.ui.keyWin,    "Save");
       auto flowBtn   = new Button(fd.ui.keyWin,    "Flow Node");
@@ -1597,6 +1570,44 @@ ENTRY_DECLARATION
 
 
 
+//#ifdef _WIN32
+//  //LoadSharedLibraries();
+//  //HMODULE lib = LoadLibrary(TEXT("lava_ReadFile.dll"));
+//  if(lib)
+//  {
+//    auto getNds = (GetLavaFlowNodes_t)GetProcAddress(lib, TEXT("GetLavaFlowNodes") );
+//    LavaFlowNode* nds = getNds();
+//    if(nds) printf("%s    %s \n\n", nds[0].name, nds[0].out_types[0] );
+//
+//    auto flowFunc = nds[0].func;
+//
+//    if(flowFunc) printf("flow func %llu : \n\n", flowFunc(nullptr, nullptr) );
+//    else         printf("flow func is nullptr \n\n");
+//
+//    //printf("%s    %s    %s", nds[0].name, nds[0].in_types[0], nds[0].out_types[0] );
+//    //while(nds && nds->name)
+//      //node_add( (nds++)->name );
+//  }else{ printf("zero"); }
+//  //}else{ printf("zero", lib); }
+//#endif
+
+//#ifdef _WIN32
+//      HMODULE lib = LoadLibrary(TEXT("ReadFile.dll"));
+//      if(lib){
+//        auto   getNds = (GetLavaNodes_t)GetProcAddress(lib, TEXT("GetNodes") );
+//        LavaNode* nds = getNds();
+//        printf("%s    %s    %s", nds[0].name, nds[0].in_types[0], nds[0].out_types[0] );
+//        //while(nds && nds->name)
+//        //node_add( (nds++)->name );
+//      }else{ printf("zero"); }
+//      //}else{ printf("zero", lib); }
+//#endif
+
+//sprintf(sngl, "sizeof LavaData %d", sizeof(LavaData) );
+//glfwSetWindowTitle(win, sngl);    
+
+//
+//printf("sizeof LavaData %lld \n", sizeof(LavaData) );
 
 //FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
 //fd->ui.screen.charCallbackEvent(codepoint);
