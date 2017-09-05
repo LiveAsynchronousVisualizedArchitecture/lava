@@ -155,20 +155,28 @@
 //       -| node selected bool is UI only 
 //       -| slot selection is UI only
 // -todo: move LavaNodeType global enum class into LavaNode - not used in many places
-
-// todo: make NodeMap into Nodes type and unordered_map
-// todo: make a data structure for the graph UI
+// -todo: make NodeMap into Nodes type and unordered_map
+// -todo: merge LavaNode with graph node - LavaFlowNode used in separate LavaFlowGraph
+// -todo: make a data structure for the graph UI
 //       | node order is UI only
 //       | node position and bnd are UI only
 //       | slots position and normal are UI only
 //       | node selected bool is UI only 
 //       | slot selection is UI only
-// todo: separate node into a NodeUi struct
-// todo: merge LavaNode with graph node
+//       | node txt label needs to be created
+// -todo: separate node into a NodeUi struct - make a Node struct - node struct almost unchanged
+// -todo: put minimized graphdb into LavaFlow.hpp
+
+// todo: transition lava_nodePtrs to be a set with handles referenced by their node's address
+// todo: make a LavaNode instance struct
+//       | what data does it need?  LavaFlowNode pointer?, id?, index into the map of the lava flow node pointers? 
+// todo: make sure LavaFlowNode is only used as a pointer is LavaFlowGraph - need to separate LavaFlowNode pointers from instaces
+// todo: make types to deal with what the UI needs for drawing 
+//       | only needs the graph to find the slots that are attached to each node
+//       | can this be cached ?
 // todo: make a separate class to hold UI information about nodes - position, bounds, UI name (node text)
 // todo: merge node and LavaFlowNode
 // todo: make Lava data structures use the Lava thread local allocator
-// todo: put minimized graphdb into LavaFlow.hpp
 // todo: change project name to Fissure 
 
 // todo: make two nodes execute in order

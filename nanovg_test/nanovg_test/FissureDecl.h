@@ -79,13 +79,14 @@ struct    Node
 {
   enum Type { MSG=0, FLOW=1, NODE_ERROR };
 
+  LavaFlowNode* lfn;                              // lfn is Lava Flow Node
   u64      id = 0;
   u64   order = 0;
   v2        P = {0,0};
-  Type   type = NODE_ERROR;
   bool    sel = false;                            // sel is selected
   Bnd       b = {0, 0, 128.f, 48.f};
-  str     txt = ""; 
+  str     txt = "";
+  Type   type = NODE_ERROR;
 
   void cp(Node const& l)
   {
@@ -100,7 +101,7 @@ struct    Node
   void mv(Node&&      r)
   {
     using namespace std;
-    
+
     id    = move(r.id);
     order = move(r.order);
     P     = move(r.P);
@@ -681,6 +682,48 @@ struct FisData
 
 
 
+//struct    Node
+//{
+//  enum Type { MSG=0, FLOW=1, NODE_ERROR };
+//
+//  u64      id = 0;
+//  u64   order = 0;
+//  v2        P = {0,0};
+//  Type   type = NODE_ERROR;
+//  bool    sel = false;                            // sel is selected
+//  Bnd       b = {0, 0, 128.f, 48.f};
+//  str     txt = ""; 
+//
+//  void cp(Node const& l)
+//  {
+//    id    = l.id;
+//    order = l.order;
+//    P     = l.P;
+//    type  = l.type;
+//    sel   = l.sel;
+//    b     = l.b;
+//    txt   = l.txt;
+//  }
+//  void mv(Node&&      r)
+//  {
+//    using namespace std;
+//    
+//    id    = move(r.id);
+//    order = move(r.order);
+//    P     = move(r.P);
+//    type  = move(r.type);
+//    sel   = move(r.sel);
+//    b     = move(r.b);
+//    txt   = move(r.txt);
+//  }
+//
+//  Node(){}
+//  Node(str _txt, Type _type=FLOW, v2 _P=v2(0,0) ) : txt(_txt), P(_P), type(_type) {}
+//  Node(Node const& l){ cp(l); }
+//  Node(Node&& r){ mv(std::move(r)); }
+//
+//  bool operator<(Node const& l){ return l.order; }
+//};
 
 //void       addCnct(Id src, Id dest)
 //{
