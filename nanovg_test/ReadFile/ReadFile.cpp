@@ -1,8 +1,8 @@
 
 // -todo: try single file libc
+// -todo: make lava thread local allocation
 
 // todo: make FileToString output a test tbl
-// todo: make lava thread local allocation
 
 //#include <cstdio>
 #include "../no_rt_util.h"
@@ -36,6 +36,7 @@ __declspec(dllexport) LavaFlowNode* GetLavaFlowNodes()
 {
   return (LavaFlowNode*)lavaFlowNodes;
 }
+
 
 
 

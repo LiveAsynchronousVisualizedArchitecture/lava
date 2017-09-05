@@ -36,12 +36,12 @@ using str  =  std::string;
 using e2i  =  Eigen::Vector2i;
 using e4f  =  Eigen::Vector4f;
 
-using     veci     =    vec<i32>;
-using    vecui     =    vec<u32>;
-using   vecstr     =    std::vector<str>;
-using   vec_v2     =    vec<v2>;
-using cnct_tbl     =    std::unordered_multimap<int,int>;
-using  vec_btn     =    vec<Button*>;
+using      veci    =    vec<i32>;
+using     vecui    =    vec<u32>;
+using    vecstr    =    std::vector<str>;
+using    vec_v2    =    vec<v2>;
+using  cnct_tbl    =    std::unordered_multimap<int,int>;
+using   vec_btn    =    vec<Button*>;
 
 union      Bnd 
 {
@@ -143,7 +143,7 @@ using vec_slot     =    vec<Slot>;
 class  GraphDB
 {
 public:
-  union Id                                                 // this Id serves as both a nodeId and slot index, since a slot index will alway coordinate with only one node 
+  union Id                                                // this Id serves as both a nodeId and slot index, since a slot index will alway coordinate with only one node 
   {    
     struct { 
       u64 id  : 48;                                       // id is the node id number - This is a unique number for each node that doesn't change. It can refer back to a node since it doesn't represent an ordering or an index into an array 
