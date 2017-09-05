@@ -155,6 +155,7 @@
 //       | slots position and normal are UI only
 //       | node selected bool is UI only 
 //       | slot selection is UI only
+// todo: make NodeMap into Nodes type and unordered_map
 // todo: separate node into a NodeUi struct
 // todo: merge LavaNode with graph node
 // todo: make a separate class to hold UI information about nodes - position, bounds, UI name (node text)

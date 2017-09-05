@@ -97,7 +97,7 @@ struct    Node
     b     = l.b;
     txt   = l.txt;
   }
-  void mv(Node&& r)
+  void mv(Node&&      r)
   {
     using namespace std;
     

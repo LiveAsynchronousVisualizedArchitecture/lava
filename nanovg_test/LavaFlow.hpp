@@ -231,9 +231,10 @@ public:
     }
   };
 
-  using NodeMap      = std::map<u64, LavaFlowNode>;         // maps an order to a LavaFlowNode struct
+  //using NodeMap      = std::map<u64, LavaFlowNode>;         // maps an order to a LavaFlowNode struct
+  using NodeMap      = std::map<u64, LavaFlowNode>;         // maps an id to a LavaFlowNode struct
   using NodeIdMap    = std::unordered_map<u64, u64>;        // maps a node id to its order, which can be used to find the node in the NodeMap
-  using Slots        = std::multimap<Id, LavaFlowSlot>;             // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
+  using Slots        = std::multimap<Id, LavaFlowSlot>;     // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
   using CnctMap      = std::unordered_map<Id, Id, Id>;      // maps connections from their single destination slot to their single source slot - Id is the hash function object in the third template argument
   using SrcMap       = std::multimap<Id, Id>;               // maps connections from their single source slot to their one or more destination slots
   using vec_nptrs    = std::vector<LavaFlowNode*>;
@@ -243,7 +244,7 @@ public:
 private:
   u64                m_nxtId;               // nxtId is next id - a counter for every node created that only increases, giving each node a unique id
   NodeMap            m_nodes;
-  NodeIdMap            m_ids;
+  //NodeIdMap            m_ids;
   Slots              m_slots;
   CnctMap            m_cncts;
   SrcMap         m_destCncts;
@@ -254,7 +255,7 @@ private:
     using namespace std;
 
     m_nodes     = move(rval.m_nodes); 
-    m_ids       = move(rval.m_ids);
+    //m_ids       = move(rval.m_ids);
     m_slots     = move(rval.m_slots); 
     m_cncts     = move(rval.m_cncts); 
     m_destCncts = move(rval.m_destCncts);
@@ -332,18 +333,18 @@ public:
 
     // create a mapping of old node Ids to new ones, new ones will be their position + 1
     unordered_map<u64,u64> nids;
-    nids.reserve(m_ids.size());
+    nids.reserve(m_nodes.size());
     u64 cur = 1;
-    for(auto& kv : m_ids){
+    for(auto& kv : m_nodes){
       nids[kv.first] = cur++;
     }
 
-    unordered_map<u64,u64> ordrs;
-    ordrs.reserve(m_nodes.size());
-    u64 curOrdr = 1;
-    for(auto& kv : m_nodes){
-      ordrs[kv.first] = curOrdr++;
-    }
+    //unordered_map<u64,u64> ordrs;
+    //ordrs.reserve(m_nodes.size());
+    //u64 curOrdr = 1;
+    //for(auto& kv : m_nodes){
+    //  ordrs[kv.first] = curOrdr++;
+    //}
 
     // connections 
     CnctMap nxtCncts;
@@ -378,28 +379,37 @@ public:
     m_slots = move(nxtSlots);
 
     // node ids 
-    NodeIdMap nxtIds;
-    for(auto& kv : m_ids){
+    NodeMap nxtNds;
+    for(auto& kv : m_nodes){
       u64   nxtId = nids[kv.first];
-      u64 nxtOrdr = ordrs[kv.second];
-      nxtIds.insert({nxtId, nxtOrdr});
+      //u64 nxtOrdr = ordrs[kv.second];
+      LavaFlowNode nd = m_nodes[kv.first];
+      nxtNds.insert({nxtId, nd});
     }
-    m_ids = move(nxtIds);
+    m_nodes = move(nxtNds);
+
+    //NodeIdMap nxtIds;
+    //for(auto& kv : m_ids){
+    //  u64   nxtId = nids[kv.first];
+    //  u64 nxtOrdr = ordrs[kv.second];
+    //  nxtIds.insert({nxtId, nxtOrdr});
+    //}
+    //m_ids = move(nxtIds);
 
     // and finally nodes
-    NodeMap nxtOrdrs;
-    for(auto& kv : m_nodes){
-      LavaFlowNode nxtNd  = kv.second;
-      nxtNd.id    = nids[nxtNd.id];
-      u64 nxtOrdr = ordrs[kv.first];
-      nxtOrdrs.insert({nxtOrdr, nxtNd});
-    }
-    m_nodes = move(nxtOrdrs);
+    //NodeMap nxtOrdrs;
+    //for(auto& kv : m_nodes){
+    //  LavaFlowNode nxtNd  = kv.second;
+    //  nxtNd.id    = nids[nxtNd.id];
+    //  //u64 nxtOrdr = ordrs[kv.first];
+    //  //nxtOrdrs.insert({nxtOrdr, nxtNd});
+    //}
+    //m_nodes = move(nxtOrdrs);
   }
   void             clear()
   {
     m_nodes.clear();
-    m_ids.clear();
+    //m_ids.clear();
     m_slots.clear();
     m_cncts.clear();
     m_destCncts.clear();
@@ -414,24 +424,31 @@ public:
   }
   auto          node(u64 id)  -> struct LavaFlowNode&
   {
-    auto idIter = m_ids.find(id);                     // idIter is identification iterator
-    if(idIter == end(m_ids)) return errorNode();
-
-    auto nIter = m_nodes.find(idIter->second);        // nIter is node iterator
+    auto nIter = m_nodes.find(id);                         // nIter is node iterator
     if(nIter == end(m_nodes)) return errorNode();
 
     return nIter->second;
   }
-  auto          node(u64 id) const -> struct LavaFlowNode const& 
-  { 
-    auto idIter = m_ids.find(id);                     // idIter is identification iterator
-    if(idIter == end(m_ids)) return errorNode();      // ERR_NODE;
-
-    auto nIter = m_nodes.find(idIter->second);        // nIter is node iterator
-    if(nIter == end(m_nodes)) return errorNode();     // ERR_NODE;
-
-    return nIter->second;
-  }
+  //auto          node(u64 id)  -> struct LavaFlowNode&
+  //{
+  //  auto idIter = m_ids.find(id);                     // idIter is identification iterator
+  //  if(idIter == end(m_ids)) return errorNode();
+  //
+  //  auto nIter = m_nodes.find(idIter->second);        // nIter is node iterator
+  //  if(nIter == end(m_nodes)) return errorNode();
+  //
+  //  return nIter->second;
+  //}
+  //auto          node(u64 id) const -> struct LavaFlowNode const& 
+  //{ 
+  //  auto idIter = m_ids.find(id);                     // idIter is identification iterator
+  //  if(idIter == end(m_ids)) return errorNode();      // ERR_NODE;
+  //
+  //  auto nIter = m_nodes.find(idIter->second);        // nIter is node iterator
+  //  if(nIter == end(m_nodes)) return errorNode();     // ERR_NODE;
+  //
+  //  return nIter->second;
+  //}
 
   auto         nodes() -> vec_nptrs
   {
@@ -458,9 +475,11 @@ public:
     using namespace std;
 
     u64 mx = 0;
-    for(auto kv : m_ids){ mx = max(mx, kv.first); }
+    for(auto kv : m_nodes){ mx = max(mx, kv.first); }
 
     return mx;
+
+    //for(auto kv : m_ids){ mx = max(mx, kv.first); }
   }
   u64            nsz() const { return m_nodes.size(); }
 
