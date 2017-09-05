@@ -232,7 +232,7 @@ public:
   };
 
   //using NodeMap      = std::map<u64, LavaFlowNode>;         // maps an id to a LavaFlowNode struct
-  using NodeMap      = std::unordered_map<u64, LavaFlowNode>;         // maps an id to a LavaFlowNode struct
+  using Node      = std::unordered_map<u64, LavaFlowNode>;         // maps an id to a LavaFlowNode struct
   //using NodeIdMap    = std::unordered_map<u64, u64>;        // maps a node id to its order, which can be used to find the node in the NodeMap
   using Slots        = std::multimap<Id, LavaFlowSlot>;     // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
   using CnctMap      = std::unordered_map<Id, Id, Id>;      // maps connections from their single destination slot to their single source slot - Id is the hash function object in the third template argument
@@ -243,7 +243,7 @@ public:
 
 private:
   u64                m_nxtId;               // nxtId is next id - a counter for every node created that only increases, giving each node a unique id
-  NodeMap            m_nodes;
+  Node            m_nodes;
   Slots              m_slots;
   CnctMap            m_cncts;
   SrcMap         m_destCncts;
@@ -372,7 +372,7 @@ public:
     m_slots = move(nxtSlots);
 
     // node ids 
-    NodeMap nxtNds;
+    Node nxtNds;
     for(auto& kv : m_nodes){
       u64   nxtId = nids[kv.first];
       //u64 nxtOrdr = ordrs[kv.second];
