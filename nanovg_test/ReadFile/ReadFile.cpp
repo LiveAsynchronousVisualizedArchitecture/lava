@@ -24,12 +24,12 @@ uint64_t FileToString(LavaArg* in, LavaArg* out)
 
 LavaFlowNode lavaFlowNodes[] =
 {
-  {FileToString, (uint64_t)LavaNodeType::FLOW,   // function, node_type  
+  {FileToString, (uint64_t)LavaFlowNode::FLOW,   // function, node_type  
   0, 1, "FileToString",                          // inputs, outputs, name                                   
   nullptr, FileToStringTypes,                    // in_types, out_types 
   0, 0},                                         // version, id
 
-  {nullptr, (uint64_t)LavaNodeType::NONE, 0,0, nullptr, nullptr,nullptr, 0, 0}
+  {nullptr, (uint64_t)LavaFlowNode::NONE, 0,0, nullptr, nullptr,nullptr, 0, 0}
 };
 
 __declspec(dllexport) LavaFlowNode* GetLavaFlowNodes()

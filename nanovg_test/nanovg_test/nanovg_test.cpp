@@ -148,14 +148,21 @@
 // -todo: make functions that will need to be used by nodes inline and part of the declarations (like the per thread allocators)
 // -todo: separate drawing and node bounds calculation
 // -todo: fix all nodes being drawn as message nodes - bounds not being set right
+// -todo: take out all UI from LavaFlowGraph
+//       -| node order is UI only
+//       -| node position and bnd are UI only
+//       -| slots position and normal are UI only
+//       -| node selected bool is UI only 
+//       -| slot selection is UI only
+// -todo: move LavaNodeType global enum class into LavaNode - not used in many places
 
+// todo: make NodeMap into Nodes type and unordered_map
 // todo: make a data structure for the graph UI
 //       | node order is UI only
 //       | node position and bnd are UI only
 //       | slots position and normal are UI only
 //       | node selected bool is UI only 
 //       | slot selection is UI only
-// todo: make NodeMap into Nodes type and unordered_map
 // todo: separate node into a NodeUi struct
 // todo: merge LavaNode with graph node
 // todo: make a separate class to hold UI information about nodes - position, bounds, UI name (node text)

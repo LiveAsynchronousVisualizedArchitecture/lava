@@ -38,7 +38,7 @@ using lava_flowPtrs   =  std::vector<LavaFlowNode*>;
 extern "C" using           FlowFunc  =  uint64_t (*)(LavaArg* in, LavaArg* out);        // data flow node function
 extern "C" using GetLavaFlowNodes_t  =  LavaFlowNode*(*)();                             // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
 
-enum class LavaNodeType { NONE=0, FLOW, MSG, NODE_ERROR };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
+//enum class LavaNodeType { NONE=0, FLOW, MSG, NODE_ERROR };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
 
 union         ArgType{ 
   enum { END=0, DATA_ERROR, STORE, MEMORY, SEQUENCE, ENUMERATION };
@@ -231,9 +231,9 @@ public:
     }
   };
 
-  //using NodeMap      = std::map<u64, LavaFlowNode>;         // maps an order to a LavaFlowNode struct
-  using NodeMap      = std::map<u64, LavaFlowNode>;         // maps an id to a LavaFlowNode struct
-  using NodeIdMap    = std::unordered_map<u64, u64>;        // maps a node id to its order, which can be used to find the node in the NodeMap
+  //using NodeMap      = std::map<u64, LavaFlowNode>;         // maps an id to a LavaFlowNode struct
+  using NodeMap      = std::unordered_map<u64, LavaFlowNode>;         // maps an id to a LavaFlowNode struct
+  //using NodeIdMap    = std::unordered_map<u64, u64>;        // maps a node id to its order, which can be used to find the node in the NodeMap
   using Slots        = std::multimap<Id, LavaFlowSlot>;     // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
   using CnctMap      = std::unordered_map<Id, Id, Id>;      // maps connections from their single destination slot to their single source slot - Id is the hash function object in the third template argument
   using SrcMap       = std::multimap<Id, Id>;               // maps connections from their single source slot to their one or more destination slots
@@ -244,7 +244,6 @@ public:
 private:
   u64                m_nxtId;               // nxtId is next id - a counter for every node created that only increases, giving each node a unique id
   NodeMap            m_nodes;
-  //NodeIdMap            m_ids;
   Slots              m_slots;
   CnctMap            m_cncts;
   SrcMap         m_destCncts;
@@ -255,20 +254,14 @@ private:
     using namespace std;
 
     m_nodes     = move(rval.m_nodes); 
-    //m_ids       = move(rval.m_ids);
     m_slots     = move(rval.m_slots); 
     m_cncts     = move(rval.m_cncts); 
     m_destCncts = move(rval.m_destCncts);
+
+    //m_ids       = move(rval.m_ids);
   }
   u64             nxt(){ return m_nxtId++; }
-  u64        nxtOrder()
-  {
-    u64 order = 1;
-    if(m_nodes.size() > 0)
-      order = m_nodes.rbegin()->first + 1;
 
-    return order;
-  }
   auto  nodeDestSlots(vec_nptrs const& nds) -> vec_ids
   {
     using namespace std;
@@ -409,10 +402,11 @@ public:
   void             clear()
   {
     m_nodes.clear();
-    //m_ids.clear();
     m_slots.clear();
     m_cncts.clear();
     m_destCncts.clear();
+
+    //m_ids.clear();
   }
   void     setNextNodeId(u64 nxt){ m_nxtId = nxt; }
 
@@ -429,6 +423,7 @@ public:
 
     return nIter->second;
   }
+
   //auto          node(u64 id)  -> struct LavaFlowNode&
   //{
   //  auto idIter = m_ids.find(id);                     // idIter is identification iterator
@@ -580,7 +575,7 @@ public:
 
     return cnt;
   }
-  void    toggleCnct(Id src, Id dest)
+  void    toggleCnct(Id  src, Id  dest)
   {
     u32    delcnt = 0;
     auto       di = m_cncts.find(dest);
@@ -823,6 +818,24 @@ auto       GetFlowNodeLists(lava_libHndls const& hndls) -> lava_flowPtrs
 
 
 
+
+
+
+
+
+
+//u64        nxtOrder()
+//{
+//  u64 order = 1;
+//  if(m_nodes.size() > 0)
+//    order = m_nodes.rbegin()->first + 1;
+//
+//  return order;
+//}
+
+//using NodeMap      = std::map<u64, LavaFlowNode>;         // maps an order to a LavaFlowNode struct
+//
+//NodeIdMap            m_ids;
 
 //auto  selectedNodes() -> vec_nptrs
 //{
