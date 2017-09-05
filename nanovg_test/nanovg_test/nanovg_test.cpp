@@ -149,6 +149,12 @@
 // -todo: separate drawing and node bounds calculation
 // -todo: fix all nodes being drawn as message nodes - bounds not being set right
 
+// todo: make a data structure for the graph UI
+//       | node order is UI only
+//       | node position and bnd are UI only
+//       | slots position and normal are UI only
+//       | node selected bool is UI only 
+//       | slot selection is UI only
 // todo: separate node into a NodeUi struct
 // todo: merge LavaNode with graph node
 // todo: make a separate class to hold UI information about nodes - position, bounds, UI name (node text)
