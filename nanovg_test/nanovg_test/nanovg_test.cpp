@@ -145,12 +145,12 @@
 // -todo: make GetRefreshPaths() avoid .live files
 // -todo: use path of binary for the root path
 // -todo: reorganize LavaFlow to group all similar declarations and implementations together
+// -todo: make functions that will need to be used by nodes inline and part of the declarations (like the per thread allocators)
+// -todo: separate drawing and node bounds calculation
+// -todo: fix all nodes being drawn as message nodes - bounds not being set right
 
-
-// todo: make functions that will need to be used by nodes inline and part of the declarations (like the per thread allocators)
-// todo: merge LavaNode with graph node
-// todo: separate drawing and node bounds calculation
 // todo: separate node into a NodeUi struct
+// todo: merge LavaNode with graph node
 // todo: make a separate class to hold UI information about nodes - position, bounds, UI name (node text)
 // todo: merge node and LavaFlowNode
 // todo: make Lava data structures use the Lava thread local allocator
@@ -715,7 +715,14 @@ v2              out_cntr(Node const& n, f32 r)
   //return v2(n.P.x + NODE_SZ.x/2, n.P.y + NODE_SZ.y + r);
   return v2(n.P.x + n.b.w()/2, n.P.y + n.b.h() + r);
 }
-Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
+
+Bnd             node_bnd(NVGcontext* vg, Node const&  n)
+{
+  f32 x=n.P.x, y=n.P.y, w=n.b.w(), h=n.b.h();
+  Bnd b = { x, y, x+w, y+h };
+  return b;
+}
+void           node_draw(NVGcontext* vg,      // drw_node is draw node
                             int preicon,
                           Node const& n,
                          float      rnd,      // rnd is corner rounding
@@ -730,7 +737,7 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
   f32 cntrX = x + w/2.f;
   f32 cntrY = y + h/2.f; 
   f32 rr    = rad;      // rr is rail radius
-  Bnd b;
+  //Bnd b;
 
   nvgResetTransform(vg);
   nvgGlobalAlpha(vg, 1.f);
@@ -763,23 +770,20 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
 	      nvgFillPaint(vg, bg);
 	      nvgFill(vg);
       }
-      b = {x,y, x+w, y+h};
+      //b = {x,y, x+w, y+h};
     }
   } break;
   case Node::MSG: {
     SECTION(draw message node)
     {
-      //f32 msgRad = NODE_SZ.x / 2;
-      //f32 msgRad = n.b.w() / 2.f;
       f32 msgRad = w/2.f;
 
-      nvgStrokeColor(vg, fd.ui.lineClr); // nvgRGBAf(.04f, .04f, .04f, 1.f));
+      nvgStrokeColor(vg, fd.ui.lineClr);
       nvgStrokeWidth(vg, border);
 
       SECTION(linear gradient from upper left)
       {
         nvgBeginPath(vg);
-        //nvgCircle(vg, x+w/2,y+h/2, msgRad);
         nvgCircle(vg, cntrX, cntrY, msgRad);
         auto lin = nvgLinearGradient(vg, 
           cntrX, cntrY-msgRad, x, y+msgRad,
@@ -792,7 +796,6 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
       {
         nvgBeginPath(vg);
         nvgCircle(vg, cntrX, cntrY, msgRad);
-        //nvgCircle(vg, x+w/2,y+h/2, msgRad);
         auto radial = nvgRadialGradient(vg,
           cntrX, cntrY, msgRad*.5f, msgRad,
           fd.ui.msgnd_gradst,
@@ -807,11 +810,7 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
         nvgStroke(vg);
       }
 
-      //b = {cntrX-msgRad/1.2f, cntrY-msgRad/1.2f, cntrX+msgRad/1.2f, cntrY+msgRad/1.2f};
-      //f32 mn = cntrX-msgRad, mx = cntrX+msgRad;
-      //b = {mn, mn, mx, mx};
-      //b = n.b;
-      b = { x, y, x+w, y+w };
+      //b = { x, y, x+w, y+w };
     }
   } break;
   }
@@ -835,10 +834,8 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
 	  nvgFontFace(vg, "sans-bold");
 	  nvgTextAlign(vg, NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
 	  nvgFillColor(vg, nvgRGBA(0,0,0,160));
-	  //nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f-1, n.txt.c_str(), NULL);
     nvgText(vg, txtX, txtY-1, n.txt.c_str(), NULL);
 	  nvgFillColor(vg, nvgRGBA(255,255,255,255));
-	  //nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f,n.txt.c_str(), NULL);
     nvgText(vg, txtX, txtY, n.txt.c_str(), NULL);
   }
   SECTION(debug circle sides and bnd)
@@ -849,7 +846,7 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
     //nvgBeginPath(vg);
     //  nvgRect(vg, b.xmn, b.ymn, b.w(), b.h());
     //nvgStroke(vg);
-   //
+    //
     //nvgBeginPath(vg);
     // nvgMoveTo(vg, n.P.x+rad,n.P.y);
     // //nvgLineTo(vg, n.P.x+rad,n.P.y + NODE_SZ.y);
@@ -873,15 +870,11 @@ Bnd            node_draw(NVGcontext* vg,      // drw_node is draw node
     //nvgStroke(vg);
   }
 
-  return b;
+  return;
+  //return b;
 }
 v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 {
-  //f32 w=n.b.w(), h=n.b.h();
-  //v2       wh = {w,h};
-  //v2      hlf = { n.b.xmx/2, n.b.ymx/2 };
-  //v2      hlf = NODE_SZ/2;
-
   v2       wh = n.b.wh();
   v2      hlf = wh / 2;
   v2       nP = n.P;
@@ -892,22 +885,19 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
   switch(n.type)
   {
   case Node::FLOW: {
-    //v2   hlf  =  NODE_HALF_SZ;
     f32  rad  =  hlf.y;
     v2  pdir  =  ndir;
     v2    ds  =  sign(pdir);                                  // ds is direction sign
     f32   ax  =  abs(pdir.x);
     if( ax > hlf.x ){
-      pdir /= ax/hlf.x;                                    // can this never be 0, since ax is positive, hlf.x is positive, and ax is greater than hlf.x ? 
+      pdir /= ax/hlf.x;                                       // can this never be 0, since ax is positive, hlf.x is positive, and ax is greater than hlf.x ? 
     }else{
       f32 ay = abs(pdir.y);
       pdir /= ay==0.f?  1.f  :  ay/hlf.y;
     }
 
-    //v2  circCntr = (pdir.x<0)? nP+v2(rad,rad)  :  nP + NODE_SZ - v2(rad,rad);  // NODE_SZ
     v2  circCntr = (pdir.x<0)? nP+v2(rad,rad)  :  nP + wh - v2(rad,rad);
     v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, rad);
-    //bool     hit = !hasInf(intrsct)  &&  (intrsct.x < nP.x+rad || intrsct.x > nP.x + NODE_SZ.x - rad); 
     bool     hit = !hasInf(intrsct)  &&  (intrsct.x < nP.x+rad || intrsct.x > nP.x + wh.x - rad); 
     if(hit){ pdir = intrsct - ncntr; }
 
@@ -921,8 +911,7 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
   case Node::MSG: 
   default: 
   {
-    //f32  rad = NODE_SZ.x/2;  // n.b.xmx/2.f;   // NODE_SZ.x/2;
-    f32  rad = wh.x/2;  // n.b.xmx/2.f;   // NODE_SZ.x/2;
+    f32  rad = wh.x/2;
     borderPt = ncntr + ndir*rad; 
     if(out_nrml){ *out_nrml = ndir; }
   } break;
@@ -940,7 +929,6 @@ void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState, f
 
   NVGcolor fillClr;
   if(s.in){
-    //switch(s.state){
     switch(drawState){
     case Slot::SELECTED:    fillClr = nvgRGBAf(1.f,   1.f,   .5f,  1.f); break;
     case Slot::HIGHLIGHTED: fillClr = nvgRGBAf( .36f,  .9f, 1.f,   1.f); break;
@@ -948,7 +936,6 @@ void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState, f
     default:                fillClr = nvgRGBAf( .18f,  .6f,  .75f, 1.f); break;
     }
   }else{
-    //switch(s.state){
     switch(drawState){
     case Slot::SELECTED:    fillClr = nvgRGBAf(1.f,   1.f,   .5f,   1.f); break;
     case Slot::HIGHLIGHTED: fillClr = nvgRGBAf( .36f, 1.f,   .36f,  1.f); break;
@@ -1352,13 +1339,15 @@ ENTRY_DECLARATION
             if( fd.sel.pri>-1 && selctd ){           // if a node is primary selected (left mouse down on a node) or the selected flag is set
               n.P +=  pntr - fd.ui.prevPntr;
             }
+
+            n.b = node_bnd(vg, n);
           }
         }
         SECTION(slot movement)
         {
           for(auto& kv : grph.slots())
           {
-            Id     nid = kv.first; // s.nid;
+            Id     nid = kv.first;            // s.nid;
             Slot&    s = kv.second;
             v2    nrml;
             Node const& n = grph.node(nid.id);
@@ -1498,12 +1487,7 @@ ENTRY_DECLARATION
               Node&     n = *(nds[i]);
               bool selctd = n.id==fd.sel.pri || n.sel;
 
-              //auto clr = fd.ui.nd_color;    // NODE_CLR;
-              //if(selctd){ clr = fd.ui.nd_selclr; }  //nvgRGBf(.5f,.4f,.1f); }
-              //
-              //n.b = node_draw(vg, 0, n, clr, 1.f, fd.ui.nd_border);
-
-              n.b = node_draw(vg, 0, n, 1.f, fd.ui.nd_border);
+              node_draw(vg, 0, n, 1.f, fd.ui.nd_border);
 
               SECTION(draw node slots)
               {
@@ -1587,6 +1571,42 @@ ENTRY_DECLARATION
 
 
 
+
+//auto clr = fd.ui.nd_color;    // NODE_CLR;
+//if(selctd){ clr = fd.ui.nd_selclr; }  //nvgRGBf(.5f,.4f,.1f); }
+//
+//n.b = node_draw(vg, 0, n, clr, 1.f, fd.ui.nd_border);
+
+//f32 w=n.b.w(), h=n.b.h();
+//v2       wh = {w,h};
+//v2      hlf = { n.b.xmx/2, n.b.ymx/2 };
+//v2      hlf = NODE_SZ/2;
+
+//v2   hlf  =  NODE_HALF_SZ;
+//
+//v2  circCntr = (pdir.x<0)? nP+v2(rad,rad)  :  nP + NODE_SZ - v2(rad,rad);  // NODE_SZ
+//bool     hit = !hasInf(intrsct)  &&  (intrsct.x < nP.x+rad || intrsct.x > nP.x + NODE_SZ.x - rad); 
+
+//
+//f32  rad = NODE_SZ.x/2;  // n.b.xmx/2.f;   // NODE_SZ.x/2; // n.b.xmx/2.f;   // NODE_SZ.x/2;
+
+//switch(s.state){
+//switch(s.state){
+
+//f32 msgRad = NODE_SZ.x / 2;
+//f32 msgRad = n.b.w() / 2.f;
+
+//nvgCircle(vg, x+w/2,y+h/2, msgRad);
+//
+//nvgCircle(vg, x+w/2,y+h/2, msgRad);
+
+//b = {cntrX-msgRad/1.2f, cntrY-msgRad/1.2f, cntrX+msgRad/1.2f, cntrY+msgRad/1.2f};
+//f32 mn = cntrX-msgRad, mx = cntrX+msgRad;
+//b = {mn, mn, mx, mx};
+//b = n.b;
+
+//nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f-1, n.txt.c_str(), NULL);
+//nvgText(vg, x+w*0.5f-tw*0.5f+iw*0.25f,y+h*0.5f,n.txt.c_str(), NULL);
 
 //#ifdef _WIN32
 //  //LoadSharedLibraries();
