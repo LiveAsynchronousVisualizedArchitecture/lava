@@ -72,7 +72,7 @@ struct     LavaPacket
 };
 struct   LavaFlowNode
 {
-  enum { NONE=0, FLOW, MSG, NODE_ERROR };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
+  enum { NONE=0, FLOW, MSG, NODE_ERROR=0xFFFFFFFFFFFFFFFF };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
 
   FlowFunc              func;
   uint64_t         node_type;

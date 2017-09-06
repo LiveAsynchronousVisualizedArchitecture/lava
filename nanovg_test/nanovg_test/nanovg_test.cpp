@@ -200,6 +200,8 @@
 // todo: make multiple slots avoid each other - might need to have discreet sections around a node for a slot to sit in
 // todo: don't select a slot if it is under an existing node
 
+// idea: load shared libs asynchronously and show a progress bar somewhere
+// idea: make command queue - use a simdb file or use the heap
 // idea: try compiling nanogui into one file - depends on eigen, stb and glfw
 // idea: separate finding node the pointer is inside from the action to take
 // idea: make nodes snap to a grid
@@ -822,6 +824,23 @@ v2              out_cntr(Node const& n, f32 r)
   return v2(n.P.x + n.b.w()/2, n.P.y + n.b.h() + r);
 }
 
+auto            node_add(str node_name, Node n=Node("",Node::FLOW,v2(0,0)) ) -> uint64_t
+{
+  using namespace std;
+
+  auto      pi = fd.lf.flow.find( node_name );                                  // pi is pointer iterator
+  auto instIdx = LavaFlowNode::NODE_ERROR;
+  if( pi != end(fd.lf.flow) )
+    return fd.lgrph.addNode(pi->second, true);
+
+  //n.txt = node_name;
+  //n.txt = "new node";
+  n.txt = "New: " +  node_name;
+  if(instIdx != LavaFlowNode::NODE_ERROR)
+    fd.graph.nds[instIdx] = move(n);
+
+  return instIdx;
+}
 Bnd             node_bnd(NVGcontext* vg, Node const&  n)
 {
   f32 x=n.P.x, y=n.P.y, w=n.b.w(), h=n.b.h();
@@ -1246,7 +1265,14 @@ ENTRY_DECLARATION
       reloadSharedLibs();
 
       // nodes
-      Node& n0 = fd.grph.addNode( Node("one",   Node::FLOW, {400.f,300.f}) );
+      Node&     n0 = fd.grph.addNode( Node("one", Node::FLOW, {400.f,300.f}) );
+      auto   inst0 = node_add("FileToString");
+      //auto  pi = fd.lf.flow.find("FileToString");                                  // pi is pointer iterator
+      //if(pi != end(fd.lf.flow))
+      //  return fd.lgrph.addNode(pi->second, true);
+      //else
+      //  return LavaFlowNode::NODE_ERROR;
+
       //Node& n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
       //Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
       //Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
@@ -1678,6 +1704,8 @@ ENTRY_DECLARATION
 
 
 
+//else
+//  return LavaFlowNode::NODE_ERROR;
 
 //auto clr = fd.ui.nd_color;    // NODE_CLR;
 //if(selctd){ clr = fd.ui.nd_selclr; }  //nvgRGBf(.5f,.4f,.1f); }

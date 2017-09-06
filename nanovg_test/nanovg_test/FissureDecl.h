@@ -113,7 +113,10 @@ struct    Node
   Node(){}
   Node(str _txt, Type _type=FLOW, v2 _P=v2(0,0) ) : txt(_txt), P(_P), type(_type) {}
   Node(Node const& l){ cp(l); }
-  Node(Node&& r){ mv(std::move(r)); }
+  Node(Node&&      r){ mv(std::move(r)); }
+
+  Node& operator=(Node const& l){            cp(l); return *this; }
+  Node& operator=(Node&&      r){ mv(std::move(r)); return *this; }
 
   bool operator<(Node const& l){ return l.order; }
 };
@@ -615,12 +618,27 @@ public:
 
 struct FisData
 {
-  using Id = GraphDB::Id;
+  using      Id  =  GraphDB::Id;
+  using NodeMap  =  std::unordered_map<uint64_t, Node>;
   
   GLFWwindow*         win = nullptr;                     // Platform 
   GraphDB            grph;
   LavaGraph         lgrph;
   LavaFlow             lf;
+
+  struct
+  {
+    NodeMap    nds; 
+
+    // graph colors
+    NVGcolor        lineClr  =  nvgRGBAf(.04f, .04f, .04f, 1.f);
+    NVGcolor       nd_color  =  nvgRGBAf(.2f, .3f, .375f, 1.f);
+    NVGcolor      nd_selclr  =  nvgRGBAf(.5f,.4f,.1f, 1.f);
+    NVGcolor    msgnd_color  =  nvgRGBAf(.2f, .3f, .375f, 1.f);
+    NVGcolor   msgnd_selclr  =  nvgRGBAf(.5f,.4f,.1f, .75f);
+    NVGcolor   msgnd_gradst  =  nvgRGBAf(.3f, .3f, .3f, .5f);
+    NVGcolor   msgnd_graden  =  nvgRGBAf(.15f, .15f, .15f, .45f); 
+  } graph;
 
   struct
   {
