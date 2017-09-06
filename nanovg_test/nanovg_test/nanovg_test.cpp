@@ -166,11 +166,11 @@
 //       | node txt label needs to be created
 // -todo: separate node into a NodeUi struct - make a Node struct - node struct almost unchanged
 // -todo: put minimized graphdb into LavaFlow.hpp
+// -todo: transition lava_nodePtrs to be a set with handles referenced by their node's address
 
-// todo: transition lava_nodePtrs to be a set with handles referenced by their node's address
 // todo: make a LavaNode instance struct
 //       | what data does it need?  LavaFlowNode pointer?, id?, index into the map of the lava flow node pointers? 
-// todo: make sure LavaFlowNode is only used as a pointer is LavaFlowGraph - need to separate LavaFlowNode pointers from instaces
+// todo: make sure LavaFlowNode is only used as a pointer is LavaFlowGraph - need to separate LavaFlowNode pointers from instances
 // todo: make types to deal with what the UI needs for drawing 
 //       | only needs the graph to find the slots that are attached to each node
 //       | can this be cached ?

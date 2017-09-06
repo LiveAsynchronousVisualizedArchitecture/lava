@@ -38,10 +38,6 @@ using lava_nidMap     =  std::unordered_multimap<std::string, uint64_t>;        
 using lava_flowPtrs   =  std::unordered_set<LavaFlowNode*>;                             // LavaFlowNode pointers referenced uniquely by address instead of using an id
 using lava_ptrsvec    =  std::vector<LavaFlowNode*>;
 
-//using lava_libHndls   =  std::vector<HMODULE>;                                        // todo: need to change this depending on OS
-//using lava_flowPtrs   =  std::unordered_map<uint64_t, LavaFlowNode*>;                 // maps ids to LavaFlowNode pointers
-//using lava_flowPtrs   =  std::vector<LavaFlowNode*>;
-
 extern "C" using           FlowFunc  =  uint64_t (*)(LavaArg* in, LavaArg* out);        // data flow node function
 extern "C" using GetLavaFlowNodes_t  =  LavaFlowNode*(*)();                             // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
 
@@ -237,7 +233,7 @@ public:
   using Slots        = std::multimap<Id, LavaFlowSlot>;              // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
   using CnctMap      = std::unordered_map<Id, Id, Id>;               // maps connections from their single destination slot to their single source slot - Id is the hash function object in the third template argument
   using SrcMap       = std::multimap<Id, Id>;                        // maps connections from their single source slot to their one or more destination slots
-  using vec_nptrs    = std::vector<LavaFlowNode*>;
+  using vec_nptrs    = std::vector<LavaFlowNode*>;                   // lists used for returning from reloading functions
   using vec_cnptrs   = std::vector<LavaFlowNode const*>;
   using vec_ids      = std::vector<Id>;
 
@@ -770,15 +766,14 @@ auto       GetFlowNodeLists(lava_hndlvec  const& hndls) -> lava_ptrsvec
 {
   //lava_flowPtrs ret; 
   //ret.reserve(hndls.size()); // nullptr);
-  lava_ptrsvec ret; 
-  ret.reserve(hndls.size()); // nullptr);
+  //ret.reserve(hndls.size());   // nullptr);
+  lava_ptrsvec ret(hndls.size(), nullptr);
   TO(hndls.size(),i){
     auto h = hndls[i];
     if(h){
       auto  GetLavaFlowNodes = (GetLavaFlowNodes_t)GetProcAddress(h, TEXT("GetLavaFlowNodes") );
       LavaFlowNode* nodeList = GetLavaFlowNodes();
-      //ret[i] = nodeList;
-
+      ret[i] = nodeList;
     }
   }
 
@@ -809,6 +804,9 @@ auto       GetFlowNodeLists(lava_hndlvec  const& hndls) -> lava_ptrsvec
 
 
 
+//using lava_libHndls   =  std::vector<HMODULE>;                                        // todo: need to change this depending on OS
+//using lava_flowPtrs   =  std::unordered_map<uint64_t, LavaFlowNode*>;                 // maps ids to LavaFlowNode pointers
+//using lava_flowPtrs   =  std::vector<LavaFlowNode*>;
 
 //using NodeMap      = std::map<u64, LavaFlowNode>;         // maps an id to a LavaFlowNode struct
 //using NodeIdMap    = std::unordered_map<u64, u64>;        // maps a node id to its order, which can be used to find the node in the NodeMap

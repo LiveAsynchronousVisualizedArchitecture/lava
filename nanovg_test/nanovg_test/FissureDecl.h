@@ -14,7 +14,6 @@
 #define __LAVAFLOW_IMPL__
 #include "../LavaFlow.hpp"
 
-
 using namespace nanogui;
 
 const int     TITLE_MAX_LEN = 256;
@@ -165,11 +164,11 @@ public:
     }
   };
 
-  using NodeMap      = std::map<u64, Node>;             // maps an order to a Node struct
-  using NodeIdMap    = std::unordered_map<u64, u64>;    // maps a node id to its order, which can be used to find the node in the NodeMap
-  using Slots        = std::multimap<Id, Slot>;         // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
-  using CnctMap      = std::unordered_map<Id, Id, Id>;  // maps connections from their single destination slot to their single source slot - Id is the hash function object in the third template argument
-  using SrcMap       = std::multimap<Id, Id>;           // maps connections from their single source slot to their one or more destination slots
+  using NodeMap      = std::map<u64, Node>;                    // maps an order to a Node struct
+  using NodeIdMap    = std::unordered_map<u64, u64>;           // maps a node id to its order, which can be used to find the node in the NodeMap
+  using Slots        = std::multimap<Id, Slot>;                // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
+  using CnctMap      = std::unordered_map<Id, Id, Id>;         // maps connections from their single destination slot to their single source slot - Id is the hash function object in the third template argument
+  using SrcMap       = std::multimap<Id, Id>;                  // maps connections from their single source slot to their one or more destination slots
   using vec_nptrs    = std::vector<Node*>;
   using vec_cnptrs   = std::vector<Node const*>;
   using vec_ids      = std::vector<Id>;
