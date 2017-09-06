@@ -176,8 +176,9 @@
 // -todo: merge node and LavaFlowNode
 // -todo: figure out why button is not created on load - does the UI need to be set up before the reloadSharedLibs() function is called and ultimatly the test data is set up? - seems to be the case
 // -todo: put shared lib reloading into a function
+// -todo: draw a single node using the LavaGraph
 
-// todo: draw a single node using the LavaGraph
+// todo: make dynamic FileToString button work
 // todo: transition to using the LavaGraph for connections 
 //       | mirror node instances to the LavaGraph
 //       | add connections to both graphs
@@ -606,12 +607,14 @@ void    reloadSharedLibs()
     // extract the flow nodes from the lists and put them into the multi-map
     TO(livePaths.size(),i)
     {
-      LavaFlowNode* list = flowNdLists[i];
-      if(list){
+      LavaFlowNode* ndList = flowNdLists[i];
+      if(ndList){
         auto const& p = livePaths[i]; 
-        fd.lf.flow.erase(p);                            // delete the current node list for the livePath
-        for(; list->func!=nullptr; ++list){             // insert each of the LavaFlowNodes in the list into the multi-map
-          fd.lf.flow.insert( {p, list} );
+        fd.lf.flow.erase(p);                              // delete the current node list for the livePath
+        for(; ndList->func!=nullptr; ++ndList){           // insert each of the LavaFlowNodes in the ndList into the multi-map
+          fd.lf.nameToPtr.erase(ndList->name);
+          fd.lf.nameToPtr.insert( {ndList->name, ndList} );
+          fd.lf.flow.insert( {p, ndList} );
         }
       }
     }
@@ -828,16 +831,23 @@ auto            node_add(str node_name, Node n=Node("",Node::FLOW,v2(0,0)) ) -> 
 {
   using namespace std;
 
-  auto      pi = fd.lf.flow.find( node_name );                                  // pi is pointer iterator
-  auto instIdx = LavaFlowNode::NODE_ERROR;
-  if( pi != end(fd.lf.flow) )
-    return fd.lgrph.addNode(pi->second, true);
+  auto          pi = fd.lf.nameToPtr.find( node_name );                               // pi is pointer iterator
+  uint64_t instIdx = LavaFlowNode::NODE_ERROR;
+  if( pi != end(fd.lf.nameToPtr) )
+    instIdx = fd.lgrph.addNode(pi->second, true);
 
+  //auto      pi = fd.lf.flow.find( node_name );                                  // pi is pointer iterator
+  //auto instIdx = LavaFlowNode::NODE_ERROR;
+  //if( pi != end(fd.lf.flow) )
+  //  return fd.lgrph.addNode(pi->second, true);
+  //
   //n.txt = node_name;
   //n.txt = "new node";
-  n.txt = "New: " +  node_name;
-  if(instIdx != LavaFlowNode::NODE_ERROR)
+
+  if(instIdx != LavaFlowNode::NODE_ERROR){
+    n.txt = "New: " +  node_name;
     fd.graph.nds[instIdx] = move(n);
+  }
 
   return instIdx;
 }
@@ -1307,8 +1317,15 @@ ENTRY_DECLARATION
     {
       auto&    ms = fd.mouse;
       bool  rtClk = (ms.rtDn  && !ms.prevRtDn);
-      auto    nds = grph.nodes();
-      auto     sz = grph.nsz();
+      //auto    nds = grph.nodes();
+      //auto     sz = grph.nsz();
+
+      auto     sz = fd.graph.nds.size();  // nds.nsz();
+      u64       i = 0;
+      vec_ndptrs nds(sz,nullptr);
+      for(auto& kv : fd.graph.nds){
+        nds[i++] = &kv.second;
+      }
 
       SECTION(time)
       {
@@ -1622,24 +1639,23 @@ ENTRY_DECLARATION
 
               node_draw(vg, 0, n, 1.f, fd.ui.nd_border);
 
-              SECTION(draw node slots)
-              {
-                nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
-                nvgStrokeWidth(vg, fd.ui.slot_border);
-                auto sIter = grph.nodeSlots(n.id);            // sIter is slot iterator
-                for(; sIter!=grph.slotEnd() && sIter->first.id==n.id; ++sIter)
-                {
-                  auto     sIdx = sIter->first;                    // todo: needs to be redone
-                  Slot const& s = *(grph.slot(sIdx));
-                  bool   inSlot = len(pntr - s.P) < fd.ui.slot_rad; //io_rad;
-                
-                  Slot::State drawState = Slot::NORMAL;
-                  if(s.state==Slot::SELECTED) drawState = Slot::SELECTED;
-                  else if(inSlot)             drawState = Slot::HIGHLIGHTED;
-                  slot_draw(vg, s, drawState, fd.ui.slot_rad);
-                }
-              }
-
+              //SECTION(draw node slots)
+              //{
+              //  nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
+              //  nvgStrokeWidth(vg, fd.ui.slot_border);
+              //  auto sIter = grph.nodeSlots(n.id);            // sIter is slot iterator
+              //  for(; sIter!=grph.slotEnd() && sIter->first.id==n.id; ++sIter)
+              //  {
+              //    auto     sIdx = sIter->first;                    // todo: needs to be redone
+              //    Slot const& s = *(grph.slot(sIdx));
+              //    bool   inSlot = len(pntr - s.P) < fd.ui.slot_rad; //io_rad;
+              //  
+              //    Slot::State drawState = Slot::NORMAL;
+              //    if(s.state==Slot::SELECTED) drawState = Slot::SELECTED;
+              //    else if(inSlot)             drawState = Slot::HIGHLIGHTED;
+              //    slot_draw(vg, s, drawState, fd.ui.slot_rad);
+              //  }
+              //}
             }
           }
           SECTION(draw selection box)

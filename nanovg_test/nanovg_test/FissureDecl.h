@@ -120,7 +120,8 @@ struct    Node
 
   bool operator<(Node const& l){ return l.order; }
 };
-using   vec_nd     =    vec<Node>;
+using   vec_nd      =    vec<Node>;
+using   vec_ndptrs  =    vec<Node*>;
 
 struct    cnct { 
   int src, dest;

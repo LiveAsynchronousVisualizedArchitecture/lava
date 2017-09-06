@@ -35,13 +35,14 @@ using lava_hndlNodeMap   =  std::unordered_multimap<lava_handle, LavaFlowNode*>;
 using lava_libHndls      =  std::unordered_map<LavaFlowNode*, lava_handle>;                // todo: need to change this depending on OS
 using lava_hndlvec       =  std::vector<lava_handle>;                                      // todo: need to change this depending on OS
 using lava_pathHndlMap   =  std::unordered_map<std::string, lava_handle>;                  // maps LavaFlowNode names to their OS specific handles
-using lava_flowNodes     =  std::unordered_multimap<std::string, LavaFlowNode*>;           // maps LavaFlowNode names to their pointers
+using lava_flowNodes     =  std::unordered_multimap<std::string, LavaFlowNode*>;           // maps LavaFlowNode paths to their pointers
 using lava_nidMap        =  std::unordered_multimap<std::string, uint64_t>;                // maps LavaFlowNode names to their ids 
 using lava_flowPtrs      =  std::unordered_set<LavaFlowNode*>;                             // LavaFlowNode pointers referenced uniquely by address instead of using an id
 using lava_ptrsvec       =  std::vector<LavaFlowNode*>;
+using lava_nameNodeMap   =  std::unordered_map<std::string, LavaFlowNode*>;                // maps the node names to their pointers
 
-extern "C" using            FlowFunc  =  uint64_t (*)(LavaArg* in, LavaArg* out);        // data flow node function
-extern "C" using  GetLavaFlowNodes_t  =  LavaFlowNode*(*)();                             // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
+extern "C" using            FlowFunc  =  uint64_t (*)(LavaArg* in, LavaArg* out);          // data flow node function
+extern "C" using  GetLavaFlowNodes_t  =  LavaFlowNode*(*)();                               // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
 
 //enum class LavaNodeType { NONE=0, FLOW, MSG, NODE_ERROR };                             // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
 
@@ -93,11 +94,12 @@ struct   LavaFlowSlot {
 };
 struct       LavaFlow
 {
-  lava_pathHndlMap     libs;    // libs is libraries - this maps the live path of the shared libary with the OS specific handle that the OS loading function returns
-  lava_nidMap          nids;    // nids is node ids  - this maps the name of the node to all of the graph node ids that use it
-  lava_flowNodes       flow;
-  lava_flowPtrs        ptrs;    // ptrs are the LavaFlowNode pointers - each one needs a unique id so they can be referenced elsewhere 
-  lava_hndlNodeMap   ndptrs;    // ndptrs is node pointers - a map from each handle to the one (zero?) or more LavaFlowNode pointers the shared lib contains
+  lava_pathHndlMap       libs;     // libs is libraries - this maps the live path of the shared libary with the OS specific handle that the OS loading function returns
+  lava_nidMap            nids;     // nids is node ids  - this maps the name of the node to all of the graph node ids that use it
+  lava_flowNodes         flow;
+  lava_flowPtrs          ptrs;     // ptrs are the LavaFlowNode pointers - each one needs a unique id so they can be referenced elsewhere 
+  lava_hndlNodeMap     ndptrs;     // ndptrs is node pointers - a map from each handle to the one (zero?) or more LavaFlowNode pointers the shared lib contains
+  lava_nameNodeMap  nameToPtr;     // maps node names to their pointers 
 };
 // end data types
 
@@ -233,14 +235,14 @@ public:
   };
   struct NodeInstance { uint64_t id; LavaFlowNode* nd; };            // a struct used for returning an instance of a node - the Nodes map of ids and LavaFlowNode pointers  
 
-  using NodeInsts    = std::unordered_map<u64, LavaFlowNode*>;       // maps an id to a LavaFlowNode struct
-  using Slots        = std::multimap<Id, LavaFlowSlot>;              // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
-  using CnctMap      = std::unordered_map<Id, Id, Id>;               // maps connections from their single destination slot to their single source slot - Id is the hash function object in the third template argument
-  using SrcMap       = std::multimap<Id, Id>;                        // maps connections from their single source slot to their one or more destination slots
-  using vec_insts    = std::vector<NodeInstance>;                    // list of node instances - Id and pointer pairs
-  using vec_nptrs    = std::vector<LavaFlowNode*>;                   // lists used for returning from reloading functions
-  using vec_cnptrs   = std::vector<LavaFlowNode const*>;
-  using vec_ids      = std::vector<Id>;
+  using NodeInsts    =  std::unordered_map<u64, LavaFlowNode*>;       // maps an id to a LavaFlowNode struct
+  using Slots        =  std::multimap<Id, LavaFlowSlot>;              // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
+  using CnctMap      =  std::unordered_map<Id, Id, Id>;               // maps connections from their single destination slot to their single source slot - Id is the hash function object in the third template argument
+  using SrcMap       =  std::multimap<Id, Id>;                        // maps connections from their single source slot to their one or more destination slots
+  using vec_insts    =  std::vector<NodeInstance>;                    // list of node instances - Id and pointer pairs
+  using vec_nptrs    =  std::vector<LavaFlowNode*>;                   // lists used for returning from reloading functions
+  using vec_cnptrs   =  std::vector<LavaFlowNode const*>;
+  using vec_ids      =  std::vector<Id>;
 
 private:
   u64                m_nxtId;               // nxtId is next id - a counter for every node created that only increases, giving each node a unique id
