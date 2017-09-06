@@ -619,6 +619,7 @@ struct FisData
   
   GLFWwindow*         win = nullptr;                     // Platform 
   GraphDB            grph;
+  LavaGraph         lgrph;
   LavaFlow             lf;
 
   struct

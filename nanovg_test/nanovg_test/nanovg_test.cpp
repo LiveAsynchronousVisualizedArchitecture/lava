@@ -167,15 +167,24 @@
 // -todo: separate node into a NodeUi struct - make a Node struct - node struct almost unchanged
 // -todo: put minimized graphdb into LavaFlow.hpp
 // -todo: transition lava_nodePtrs to be a set with handles referenced by their node's address
-
-// todo: make a LavaNode instance struct
+// -todo: make a LavaNode instance struct
 //       | what data does it need?  LavaFlowNode pointer?, id?, index into the map of the lava flow node pointers? 
-// todo: make sure LavaFlowNode is only used as a pointer is LavaFlowGraph - need to separate LavaFlowNode pointers from instances
+//       | NodeInstance struct as part of LavaFlowGraph - just used for returning a pair of id and LavaFlowNode pointer  - these are store as key value pairs in the Nodes map
+// -todo: make sure LavaFlowNode is only used as a pointer in LavaFlowGraph - need to separate LavaFlowNode pointers from instances
+// -todo: abstract OS specific handle into lava_handle
+// -todo: make sure to store the LavaNodePointers in a multi-map indexed by handles
+// -todo: merge node and LavaFlowNode
+// -todo: figure out why button is not created on load - does the UI need to be set up before the reloadSharedLibs() function is called and ultimatly the test data is set up? - seems to be the case
+// -todo: put shared lib reloading into a function
+
+// todo: draw a single node using the LavaGraph
+// todo: transition to using the LavaGraph for connections 
+//       | mirror node instances to the LavaGraph
+//       | add connections to both graphs
 // todo: make types to deal with what the UI needs for drawing 
 //       | only needs the graph to find the slots that are attached to each node
 //       | can this be cached ?
 // todo: make a separate class to hold UI information about nodes - position, bounds, UI name (node text)
-// todo: merge node and LavaFlowNode
 // todo: make Lava data structures use the Lava thread local allocator
 // todo: change project name to Fissure 
 
@@ -560,6 +569,80 @@ bool            loadFile(str path, GraphDB* out_g)
   return true;
 }
 
+void    reloadSharedLibs()
+{
+  #ifdef _WIN32
+    auto       paths  =  GetRefreshPaths();
+    auto   livePaths  =  GetLivePaths(paths);
+
+    // coordinate live paths to handles
+    auto liveHandles  =  GetLiveHandles(fd.lf.libs, livePaths);
+
+    // free the handles
+    auto   freeCount  =  FreeLibs(liveHandles); 
+
+    // delete the now unloaded live shared library files
+    auto    delCount  =  RemovePaths(livePaths);
+
+    // copy the refresh paths' files
+    auto   copyCount  =  CopyPathsToLive(paths); 
+
+    // load the handles
+    auto loadedHndls  =  LoadLibs(livePaths);
+
+    // put loaded handles into LavaFlow struct
+    TO(livePaths.size(), i){
+      auto h = loadedHndls[i];
+      if(h){
+        fd.lf.libs[livePaths[i]] = h;
+      }
+    }
+
+    // extract the flow node lists from the handles
+    auto flowNdLists = GetFlowNodeLists(loadedHndls);
+
+    // extract the flow nodes from the lists and put them into the multi-map
+    TO(livePaths.size(),i)
+    {
+      LavaFlowNode* list = flowNdLists[i];
+      if(list){
+        auto const& p = livePaths[i]; 
+        fd.lf.flow.erase(p);                            // delete the current node list for the livePath
+        for(; list->func!=nullptr; ++list){             // insert each of the LavaFlowNodes in the list into the multi-map
+          fd.lf.flow.insert( {p, list} );
+        }
+      }
+    }
+
+    // delete interface buttons from the nanogui window
+    fd.ui.ndBtns.clear();
+
+    // redo interface node buttons
+    for(auto& kv : fd.lf.flow){
+      LavaFlowNode* fn = kv.second;                      // fn is flow node
+      auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
+      ndBtn->setCallback([fn](){ 
+        fd.grph.addNode( Node(fn->name, Node::FLOW, {100,100}), true);
+      });
+    }
+    fd.ui.screen.performLayout();
+
+    //// replace their nodes
+    //TO(loadedHndls.size(),i) if(loadedHndls[i]!=0)
+    //{
+    //  fd.lf.flow.find
+    //}
+
+    // coordinate the node structures with node Ids
+
+    //TO(pths.size(),i) 
+
+    TO(paths.size(),i) printf("\n %llu : %s \n", i, paths[i].c_str() );
+    //for(auto& p : pths) printf("\n %s \n
+  #endif
+}
+
+
 // state manipulation
 void         clear_selections(GraphDB* inout_grph, FisData* inout_fd)
 {
@@ -600,76 +683,77 @@ void              keyCallback(GLFWwindow* win, int key, int scancode, int action
   }break;
   case 'L':
   {
-    #ifdef _WIN32
-      auto     paths = GetRefreshPaths();
-      auto livePaths = GetLivePaths(paths);
+    reloadSharedLibs();
 
-      // coordinate live paths to handles
-      auto liveHandles  =  GetLiveHandles(fd.lf.libs, livePaths);
-
-      // free the handles
-      auto   freeCount  =  FreeLibs(liveHandles); 
-
-      // delete the now unloaded live shared library files
-      auto    delCount  =  RemovePaths(livePaths);
-
-      // copy the refresh paths' files
-      auto   copyCount  =  CopyPathsToLive(paths); 
-
-      // load the handles
-      auto loadedHndls  =  LoadLibs(livePaths);
-
-      // put loaded handles into LavaFlow struct
-      TO(livePaths.size(), i){
-        auto h = loadedHndls[i];
-        if(h){
-          fd.lf.libs[livePaths[i]] = h;
-        }
-      }
-
-      // extract the flow node lists from the handles
-      auto flowNdLists = GetFlowNodeLists(loadedHndls);
-
-      // extract the flow nodes from the lists and put them into the multi-map
-      TO(livePaths.size(),i)
-      {
-        LavaFlowNode* list = flowNdLists[i];
-        if(list){
-          auto const& p = livePaths[i]; 
-          fd.lf.flow.erase(p);                            // delete the current node list for the livePath
-          for(; list->func!=nullptr; ++list){             // insert each of the LavaFlowNodes in the list into the multi-map
-            fd.lf.flow.insert( {p, list} );
-          }
-        }
-      }
-
-      // delete interface buttons from the nanogui window
-      fd.ui.ndBtns.clear();
-      
-      // redo interface node buttons
-      for(auto& kv : fd.lf.flow){
-        LavaFlowNode* fn = kv.second;                      // fn is flow node
-        auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
-        ndBtn->setCallback([fn](){ 
-          fd.grph.addNode( Node(fn->name, Node::FLOW, {100,100}), true);
-        });
-      }
-      fd.ui.screen.performLayout();
-
-      //// replace their nodes
-      //TO(loadedHndls.size(),i) if(loadedHndls[i]!=0)
-      //{
-      //  fd.lf.flow.find
-      //}
-
-      // coordinate the node structures with node Ids
-
-      //TO(pths.size(),i) 
-
-      TO(paths.size(),i) printf("\n %llu : %s \n", i, paths[i].c_str() );
-      //for(auto& p : pths) printf("\n %s \n
-    #endif
-
+    //#ifdef _WIN32
+    //  auto     paths = GetRefreshPaths();
+    //  auto livePaths = GetLivePaths(paths);
+    //
+    //  // coordinate live paths to handles
+    //  auto liveHandles  =  GetLiveHandles(fd.lf.libs, livePaths);
+    //
+    //  // free the handles
+    //  auto   freeCount  =  FreeLibs(liveHandles); 
+    //
+    //  // delete the now unloaded live shared library files
+    //  auto    delCount  =  RemovePaths(livePaths);
+    //
+    //  // copy the refresh paths' files
+    //  auto   copyCount  =  CopyPathsToLive(paths); 
+    //
+    //  // load the handles
+    //  auto loadedHndls  =  LoadLibs(livePaths);
+    //
+    //  // put loaded handles into LavaFlow struct
+    //  TO(livePaths.size(), i){
+    //    auto h = loadedHndls[i];
+    //    if(h){
+    //      fd.lf.libs[livePaths[i]] = h;
+    //    }
+    //  }
+    //
+    //  // extract the flow node lists from the handles
+    //  auto flowNdLists = GetFlowNodeLists(loadedHndls);
+    //
+    //  // extract the flow nodes from the lists and put them into the multi-map
+    //  TO(livePaths.size(),i)
+    //  {
+    //    LavaFlowNode* list = flowNdLists[i];
+    //    if(list){
+    //      auto const& p = livePaths[i]; 
+    //      fd.lf.flow.erase(p);                            // delete the current node list for the livePath
+    //      for(; list->func!=nullptr; ++list){             // insert each of the LavaFlowNodes in the list into the multi-map
+    //        fd.lf.flow.insert( {p, list} );
+    //      }
+    //    }
+    //  }
+    //
+    //  // delete interface buttons from the nanogui window
+    //  fd.ui.ndBtns.clear();
+    //  
+    //  // redo interface node buttons
+    //  for(auto& kv : fd.lf.flow){
+    //    LavaFlowNode* fn = kv.second;                      // fn is flow node
+    //    auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
+    //    ndBtn->setCallback([fn](){ 
+    //      fd.grph.addNode( Node(fn->name, Node::FLOW, {100,100}), true);
+    //    });
+    //  }
+    //  fd.ui.screen.performLayout();
+    //
+    //  //// replace their nodes
+    //  //TO(loadedHndls.size(),i) if(loadedHndls[i]!=0)
+    //  //{
+    //  //  fd.lf.flow.find
+    //  //}
+    //
+    //  // coordinate the node structures with node Ids
+    //
+    //  //TO(pths.size(),i) 
+    //
+    //  TO(paths.size(),i) printf("\n %llu : %s \n", i, paths[i].c_str() );
+    //  //for(auto& p : pths) printf("\n %s \n
+    //#endif
   }break;
   case 'Y':
   {
@@ -684,7 +768,7 @@ void              keyCallback(GLFWwindow* win, int key, int scancode, int action
 
   fd.ui.screen.keyCallbackEvent(key, scancode, action, modbits);
 }
-void         mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
+void          mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 {
   if(button==GLFW_MOUSE_BUTTON_LEFT){
     if(action==GLFW_PRESS) fd.mouse.lftDn = true;
@@ -698,31 +782,31 @@ void         mouseBtnCallback(GLFWwindow* window, int button, int action, int mo
 
   fd.ui.screen.mouseButtonCallbackEvent(button, action, mods);
 }
-void            errorCallback(int e, const char *d) {
+void             errorCallback(int e, const char *d) {
   printf("Error %d: %s\n", e, d);
   fflush(stdout);
 }
-void           scrollCallback(GLFWwindow* window, double xofst, double yofst)
+void            scrollCallback(GLFWwindow* window, double xofst, double yofst)
 {
   using namespace std;
   fd.ui.screen.scrollCallbackEvent(xofst, yofst);
 }
-void        cursorPosCallback(GLFWwindow* window, double x, double y)
+void         cursorPosCallback(GLFWwindow* window, double x, double y)
 {
   const static float _2PI = 2.f* PIf; //  pi<float>();
   fd.ui.screen.cursorPosCallbackEvent(x,y);
 }
-void             charCallback(GLFWwindow* window, unsigned int codepoint)
+void              charCallback(GLFWwindow* window, unsigned int codepoint)
 {
   fd.ui.screen.charCallbackEvent(codepoint);
 }
-void             dropCallback(GLFWwindow* window, int count, const char** filenames)
+void              dropCallback(GLFWwindow* window, int count, const char** filenames)
 {
   FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
 
   fd->ui.screen.dropCallbackEvent(count, filenames);
 }
-void  framebufferSizeCallback(GLFWwindow* window, int w, int h)
+void   framebufferSizeCallback(GLFWwindow* window, int w, int h)
 {
   fd.ui.screen.resizeCallbackEvent(w, h);
 }
@@ -941,6 +1025,7 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 
   return borderPt;
 }
+
 void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState, f32 slot_rad=10.f)
 {
   nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
@@ -993,7 +1078,8 @@ void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState, f
   nvgFill(vg);
   nvgResetTransform(vg);
 }
-void           draw_cnct(NVGcontext* vg, v2 srcP, v2 destP, v2 srcN, v2 destN, f32 minCenterDist=INFf)
+
+void           cnct_draw(NVGcontext* vg, v2 srcP, v2 destP, v2 srcN, v2 destN, f32 minCenterDist=INFf)
 { 
   using namespace std;
   
@@ -1028,39 +1114,6 @@ ENTRY_DECLARATION
 	NVGcontext* vg = NULL;
   SECTION(initialization)
   {
-    SECTION(test data init)
-    {
-      printf("Arg    size: %lld \n\n", sizeof(LavaArg));
-      printf("Msg    size: %lld \n\n", sizeof(LavaMsg));
-      printf("Packet size: %lld \n\n", sizeof(LavaPacket));
-
-      //io_rad = IORAD;
-      fd.ui.slot_rad = 15.f;
-
-      // nodes
-      Node& n0 = fd.grph.addNode( Node("one",   Node::FLOW, {400.f,300.f}) );
-      Node& n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
-      Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
-      Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
-      Node& n4 = fd.grph.addNode( Node("five",  Node::MSG,  {200.f,200.f}) );
-      
-      //n4.b.ymx = n4.b.xmx;
-
-      // slots
-      Id s0 = fd.grph.addSlot( Slot(n0.id, false) );
-      Id s1 = fd.grph.addSlot( Slot(n1.id,  true) );
-      Id s2 = fd.grph.addSlot( Slot(n2.id,  true) );
-      Id s3 = fd.grph.addSlot( Slot(n3.id,  true) );
-      Id s4 = fd.grph.addSlot( Slot(n0.id, false) );
-      Id s5 = fd.grph.addSlot( Slot(n4.id, false) );
-
-      fd.grph.toggleCnct(s0, s1);
-      fd.grph.toggleCnct(s0, s2);
-      fd.grph.toggleCnct(s0, s3);
-    }
-    SECTION(FisData)
-    { 
-    }
     SECTION(init glfw)
     {
       //glfwSetErrorCallback(errorCallback);
@@ -1180,6 +1233,38 @@ ENTRY_DECLARATION
 		    printf("Could not add font bold.\n");
 		    return -1;
 	    }
+    }
+    SECTION(test data init)
+    {
+      printf("Arg    size: %lld \n\n", sizeof(LavaArg));
+      printf("Msg    size: %lld \n\n", sizeof(LavaMsg));
+      printf("Packet size: %lld \n\n", sizeof(LavaPacket));
+
+      //io_rad = IORAD;
+      fd.ui.slot_rad = 15.f;
+
+      reloadSharedLibs();
+
+      // nodes
+      Node& n0 = fd.grph.addNode( Node("one",   Node::FLOW, {400.f,300.f}) );
+      //Node& n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
+      //Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
+      //Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
+      //Node& n4 = fd.grph.addNode( Node("five",  Node::MSG,  {200.f,200.f}) );
+
+      //n4.b.ymx = n4.b.xmx;
+
+      // slots
+      //Id s0 = fd.grph.addSlot( Slot(n0.id, false) );
+      //Id s1 = fd.grph.addSlot( Slot(n1.id,  true) );
+      //Id s2 = fd.grph.addSlot( Slot(n2.id,  true) );
+      //Id s3 = fd.grph.addSlot( Slot(n3.id,  true) );
+      //Id s4 = fd.grph.addSlot( Slot(n0.id, false) );
+      //Id s5 = fd.grph.addSlot( Slot(n4.id, false) );
+
+      //fd.grph.toggleCnct(s0, s1);
+      //fd.grph.toggleCnct(s0, s2);
+      //fd.grph.toggleCnct(s0, s3);
     }
   }
 
@@ -1462,7 +1547,7 @@ ENTRY_DECLARATION
                 Slot const& dest = *(grph.slot(destIdx));
                 //draw_cnct(vg, src.P, dest.P, src.N, dest.N, NODE_SZ.x/2);
                 f32 w = grph.node(destIdx.id).b.w();
-                draw_cnct(vg, src.P, dest.P, src.N, dest.N, w/2);
+                cnct_draw(vg, src.P, dest.P, src.N, dest.N, w/2);
 
                 ++di; //continue;
               }
@@ -1482,14 +1567,14 @@ ENTRY_DECLARATION
                 v2 midN  = norm(src.P - avgP);
                 f32   w  = grph.node(destIdx.id).b.w();
                 //draw_cnct(vg, src.P, avgP, src.N, midN, NODE_SZ.x/2);
-                draw_cnct(vg, src.P, avgP, src.N, midN, w/2);
+                cnct_draw(vg, src.P, avgP, src.N, midN, w/2);
 
                 for(auto dhIter=di; di!=en && di->first == srcIdx; ++di){   // dhIter is draw half iterator - this is where the the connections are drawn from the average position of all slots 
                   const v2 hlfsz = fd.ui.slot_rad/2.f;
                   Slot const& dest = *(grph.slot(di->second));
 
                   //draw_cnct(vg, avgP, dest.P, -1.f*midN, dest.N, NODE_SZ.x/2);
-                  draw_cnct(vg, avgP, dest.P, -1.f*midN, dest.N, w/2);
+                  cnct_draw(vg, avgP, dest.P, -1.f*midN, dest.N, w/2);
                 }
 
                 nvgBeginPath(vg);
