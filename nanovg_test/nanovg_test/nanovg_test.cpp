@@ -177,8 +177,12 @@
 // -todo: figure out why button is not created on load - does the UI need to be set up before the reloadSharedLibs() function is called and ultimatly the test data is set up? - seems to be the case
 // -todo: put shared lib reloading into a function
 // -todo: draw a single node using the LavaGraph
+// -todo: make dynamic FileToString button work
+// -todo: make clear_selections clear the node map
 
-// todo: make dynamic FileToString button work
+// todo: need to re-implement a function to get nodes
+// todo: re-implement moveToFront()
+// todo: figure out why dragging moves all nodes 
 // todo: transition to using the LavaGraph for connections 
 //       | mirror node instances to the LavaGraph
 //       | add connections to both graphs
@@ -286,6 +290,8 @@ using Id = GraphDB::Id;
 static FisData fd;
 
 namespace{
+
+auto node_add(str node_name, Node n=Node("",Node::FLOW,v2(0,0)) ) -> uint64_t;
 
 float               lerp(float p, float lo, float hi)
 {
@@ -571,7 +577,6 @@ bool            loadFile(str path, GraphDB* out_g)
 
   return true;
 }
-
 void    reloadSharedLibs()
 {
   #ifdef _WIN32
@@ -628,6 +633,8 @@ void    reloadSharedLibs()
       auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
       ndBtn->setCallback([fn](){ 
         fd.grph.addNode( Node(fn->name, Node::FLOW, {100,100}), true);
+        //node_add("FileToString", Node( str("New: ") + fn->name) );
+        node_add("FileToString");
       });
     }
     fd.ui.screen.performLayout();
@@ -647,7 +654,6 @@ void    reloadSharedLibs()
   #endif
 }
 
-
 // state manipulation
 void         clear_selections(GraphDB* inout_grph, FisData* inout_fd)
 {
@@ -656,6 +662,15 @@ void         clear_selections(GraphDB* inout_grph, FisData* inout_fd)
   inout_fd->sel.slotInSel  = Id(0,0);
   inout_fd->sel.pri        =  -1;
   inout_fd->sel.sec        =  -1;
+
+  for(auto& kv : fd.graph.nds){
+    kv.second.sel = false;
+  }
+
+  //fd.lf.nids.clear();
+  //TO(fd.lf.nids.size(),i){ 
+  //  fd.lf.nids
+  //}
 }
 
 void              keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
@@ -827,7 +842,7 @@ v2              out_cntr(Node const& n, f32 r)
   return v2(n.P.x + n.b.w()/2, n.P.y + n.b.h() + r);
 }
 
-auto            node_add(str node_name, Node n=Node("",Node::FLOW,v2(0,0)) ) -> uint64_t
+auto            node_add(str node_name, Node n) -> uint64_t
 {
   using namespace std;
 
@@ -835,14 +850,6 @@ auto            node_add(str node_name, Node n=Node("",Node::FLOW,v2(0,0)) ) -> 
   uint64_t instIdx = LavaFlowNode::NODE_ERROR;
   if( pi != end(fd.lf.nameToPtr) )
     instIdx = fd.lgrph.addNode(pi->second, true);
-
-  //auto      pi = fd.lf.flow.find( node_name );                                  // pi is pointer iterator
-  //auto instIdx = LavaFlowNode::NODE_ERROR;
-  //if( pi != end(fd.lf.flow) )
-  //  return fd.lgrph.addNode(pi->second, true);
-  //
-  //n.txt = node_name;
-  //n.txt = "new node";
 
   if(instIdx != LavaFlowNode::NODE_ERROR){
     n.txt = "New: " +  node_name;
@@ -1309,8 +1316,8 @@ ENTRY_DECLARATION
   {
     GraphDB& grph = fd.grph;
     v2       pntr = {0,0};
-    double cx, cy, t, dt, avgFps=60, prevt=0, cpuTime=0;
-    float pxRatio;
+    f64 cx, cy, t, dt, avgFps=60, prevt=0, cpuTime=0;
+    f32 pxRatio;
     int fbWidth, fbHeight;
 
     while(!glfwWindowShouldClose(fd.win))
@@ -1639,23 +1646,23 @@ ENTRY_DECLARATION
 
               node_draw(vg, 0, n, 1.f, fd.ui.nd_border);
 
-              //SECTION(draw node slots)
-              //{
-              //  nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
-              //  nvgStrokeWidth(vg, fd.ui.slot_border);
-              //  auto sIter = grph.nodeSlots(n.id);            // sIter is slot iterator
-              //  for(; sIter!=grph.slotEnd() && sIter->first.id==n.id; ++sIter)
-              //  {
-              //    auto     sIdx = sIter->first;                    // todo: needs to be redone
-              //    Slot const& s = *(grph.slot(sIdx));
-              //    bool   inSlot = len(pntr - s.P) < fd.ui.slot_rad; //io_rad;
-              //  
-              //    Slot::State drawState = Slot::NORMAL;
-              //    if(s.state==Slot::SELECTED) drawState = Slot::SELECTED;
-              //    else if(inSlot)             drawState = Slot::HIGHLIGHTED;
-              //    slot_draw(vg, s, drawState, fd.ui.slot_rad);
-              //  }
-              //}
+              SECTION(draw node slots)
+              {
+                nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
+                nvgStrokeWidth(vg, fd.ui.slot_border);
+                auto sIter = grph.nodeSlots(n.id);            // sIter is slot iterator
+                for(; sIter!=grph.slotEnd() && sIter->first.id==n.id; ++sIter)
+                {
+                  auto     sIdx = sIter->first;                    // todo: needs to be redone
+                  Slot const& s = *(grph.slot(sIdx));
+                  bool   inSlot = len(pntr - s.P) < fd.ui.slot_rad; //io_rad;
+                
+                  Slot::State drawState = Slot::NORMAL;
+                  if(s.state==Slot::SELECTED) drawState = Slot::SELECTED;
+                  else if(inSlot)             drawState = Slot::HIGHLIGHTED;
+                  slot_draw(vg, s, drawState, fd.ui.slot_rad);
+                }
+              }
             }
           }
           SECTION(draw selection box)
@@ -1719,6 +1726,15 @@ ENTRY_DECLARATION
 
 
 
+//auto            node_add(str node_name, Node n=Node("",Node::FLOW,v2(0,0)) ) -> uint64_t
+//
+//auto      pi = fd.lf.flow.find( node_name );                                  // pi is pointer iterator
+//auto instIdx = LavaFlowNode::NODE_ERROR;
+//if( pi != end(fd.lf.flow) )
+//  return fd.lgrph.addNode(pi->second, true);
+//
+//n.txt = node_name;
+//n.txt = "new node";
 
 //else
 //  return LavaFlowNode::NODE_ERROR;
