@@ -182,8 +182,10 @@
 // -todo: need to re-implement a function to get nodes
 // -todo: build ordering back in 
 // -todo: re-implement moveToFront()
+// -todo: figure out why dragging moves all nodes - node.id may be out of sync with actual map id - yes
+// -todo: fix nodes becoming unselected on left click up while still in the node - need to clear primary selection on lftClkUp
 
-// todo: figure out why dragging moves all nodes 
+// todo: transition to using a UI only slot structure to draw slots
 // todo: transition to using the LavaGraph for connections 
 //       | mirror node instances to the LavaGraph
 //       | add connections to both graphs
@@ -891,6 +893,7 @@ auto            node_add(str node_name, Node n) -> uint64_t
 
   if(instIdx != LavaFlowNode::NODE_ERROR){
     n.txt = "New: " +  node_name;
+    n.id  = instIdx;
     fd.graph.nds[instIdx] = move(n);
   }
 
@@ -906,6 +909,7 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
                             int preicon,
                           Node const& n,
                          float      rnd,      // rnd is corner rounding
+                         bool  forceSel=false,
                          f32     border=3.5f)
 {
   const float   rthk = 8.f;    // rw is rail thickness
@@ -916,8 +920,9 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
 	float rad = lerp(rnd, 0.f, h/2.f);           // rad is corner radius
   f32 cntrX = x + w/2.f;
   f32 cntrY = y + h/2.f; 
-  f32 rr    = rad;      // rr is rail radius
+  f32    rr = rad;      // rr is rail radius
   //Bnd b;
+  bool  sel = forceSel || n.sel;
 
   nvgResetTransform(vg);
   nvgGlobalAlpha(vg, 1.f);
@@ -935,7 +940,8 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
       }
       SECTION(shaded color inside)
       {
-        auto    col = n.sel? fd.ui.nd_selclr  : fd.ui.nd_color;
+        //auto    col = n.sel? fd.ui.nd_selclr  : fd.ui.nd_color;
+        auto    col = sel? fd.ui.nd_selclr  : fd.ui.nd_color;
         int    grad = (int)lerp(rnd, 0, 48);
         auto topClr = nvgRGBA(255,255,255,isBlack(col)?16:grad);
         auto botClr = nvgRGBA(0,0,0,isBlack(col)?16:grad);
@@ -967,8 +973,10 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
         nvgCircle(vg, cntrX, cntrY, msgRad);
         auto lin = nvgLinearGradient(vg, 
           cntrX, cntrY-msgRad, x, y+msgRad,
-          n.sel? fd.ui.msgnd_selclr : fd.ui.msgnd_gradst,
-          n.sel? fd.ui.msgnd_selclr : fd.ui.msgnd_graden );
+          sel? fd.ui.msgnd_selclr : fd.ui.msgnd_gradst,
+          sel? fd.ui.msgnd_selclr : fd.ui.msgnd_graden );
+          //n.sel? fd.ui.msgnd_selclr : fd.ui.msgnd_gradst,
+          //n.sel? fd.ui.msgnd_selclr : fd.ui.msgnd_graden );
         nvgFillPaint(vg, lin);
         nvgFill(vg);
       }
@@ -1440,9 +1448,9 @@ ENTRY_DECLARATION
               clearSelections = false;
           }
         
-          if(!fd.mouse.lftDn){
-            fd.sel.pri = -1;
-          }
+          //if(!fd.mouse.lftDn){
+          //  fd.sel.pri = -1;
+          //}
         }
         SECTION(slot selection and connection creation)
         {
@@ -1453,8 +1461,9 @@ ENTRY_DECLARATION
           {
             Id     sid = kv.first;                       // sid is slot id
             Slot&    s = kv.second;
-            if(lftClkDn){  
-              bool inSlt = len(pntr - s.P) < fd.ui.slot_rad; // io_rad;
+            if(lftClkDn)
+            {  
+              bool inSlt = len(pntr - s.P) < fd.ui.slot_rad;
               if(inSlt){
                 outClk  = sid;  // Id(nid);
                 s.state = Slot::SELECTED;
@@ -1464,13 +1473,11 @@ ENTRY_DECLARATION
                 inAnySlt = true;
               }
             }else if(lftClkUp){
-              bool inSlt = len(pntr - s.P) < fd.ui.slot_rad;  // io_rad;
+              bool inSlt = len(pntr - s.P) < fd.ui.slot_rad;
               if(inSlt){
                 clearSelections = false;
                 inAnySlt = true;
               }
-              //else{
-              //}
             }
           }
 
@@ -1497,24 +1504,36 @@ ENTRY_DECLARATION
 
             SECTION(primary selection and group selection effects)
             {
-              if(inNode && lftClkDn && (fd.sel.pri<0 || fd.sel.pri!=n->id) ){
-                //n   = &(grph.moveToFront(n->id));
-                //nds = grph.nodes();                   // move to the front will invalidate some pointers in the nds array so it needs to be remade
-                n    =  &(grph.moveToFront(n->id));
-                nds  =  node_getPtrs();                 // move to the front will invalidate some pointers in the nds array so it needs to be remade
-
-                fd.sel.pri = n->id;
-                ms.drgP    = pntr;
-
-                if(!n->sel){
-                  TO(sz,j){ nds[j]->sel = false; }  // todo: move this out of the outer loop due to being O(n^2)
-                  n->sel = true;
+              if(inNode)
+              {
+                if(lftClkUp){
+                  if(fd.sel.pri == n->id) n->sel = true;
+                  fd.sel.pri = -1;
                 }
-                break;                              // without breaking from the loop, a node could be moved down and hit again
+                else if(lftClkDn && (fd.sel.pri<0 || fd.sel.pri!=n->id) )
+                {               
+                  //n   = &(grph.moveToFront(n->id));
+                  //nds = grph.nodes();                   // move to the front will invalidate some pointers in the nds array so it needs to be remade
+                  n    =  &(grph.moveToFront(n->id));
+                  nds  =  node_getPtrs();                 // move to the front will invalidate some pointers in the nds array so it needs to be remade
+
+                  fd.sel.pri = n->id;
+                  //n->sel     = true;
+                  ms.drgP    = pntr;
+
+                  if(!n->sel){
+                    TO(sz,j){ nds[j]->sel = false; }      // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
+                    n->sel = true;
+                  }
+                  break;                                  // without breaking from the loop, a node could be moved down and hit again
+                }
               }
-            } 
+            }            
           }
 
+          //if(!lftClkUp)
+          //  clearSelections=false;
+          //else
           if(!inAny){
             if( lftClkDn && !(fd.sel.pri>0) ){ ms.drgbox=true; }
 
@@ -1688,7 +1707,7 @@ ENTRY_DECLARATION
               Node&     n = *(nds[i]);
               bool selctd = n.id==fd.sel.pri || n.sel;
 
-              node_draw(vg, 0, n, 1.f, fd.ui.nd_border);
+              node_draw(vg, 0, n, 1.f, selctd, fd.ui.nd_border);
 
               SECTION(draw node slots)
               {
