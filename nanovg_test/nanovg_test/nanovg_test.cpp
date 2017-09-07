@@ -179,9 +179,10 @@
 // -todo: draw a single node using the LavaGraph
 // -todo: make dynamic FileToString button work
 // -todo: make clear_selections clear the node map
+// -todo: need to re-implement a function to get nodes
+// -todo: build ordering back in 
+// -todo: re-implement moveToFront()
 
-// todo: need to re-implement a function to get nodes
-// todo: re-implement moveToFront()
 // todo: figure out why dragging moves all nodes 
 // todo: transition to using the LavaGraph for connections 
 //       | mirror node instances to the LavaGraph
@@ -842,6 +843,43 @@ v2              out_cntr(Node const& n, f32 r)
   return v2(n.P.x + n.b.w()/2, n.P.y + n.b.h() + r);
 }
 
+auto        node_getPtrs() -> vec_ndptrs
+{
+  auto     sz = fd.graph.nds.size();  // nds.nsz();
+  u64       i = 0;
+  vec_ndptrs nds(sz,nullptr);
+  for(auto& kv : fd.graph.nds){
+    nds[i++] = &kv.second;
+  }
+
+  return nds;
+}
+Node&   node_moveToFront(u64 idx)
+{
+  using namespace std;
+
+  //Node  n = node(id);
+  //auto prevOrder = n.order;     
+  //
+  // addNode will get the next order number
+  // n.order = nxtOrder();
+  //
+  //if(n->type==Node::NODE_ERROR) return errorNode();
+  //
+  //m_nodes.erase(prevOrder);     // todo: use a delNode here instead
+  //m_ids.erase(id);
+  //
+  //return addNode(n, false);
+
+  Node& n = fd.graph.nds[idx];
+
+  fd.graph.ordr.erase( {idx, n.order} );
+  n.order = fd.graph.ordr.rbegin()->order + 1;
+
+  fd.graph.ordr.insert( {idx, n.order} );
+
+  return n;
+}
 auto            node_add(str node_name, Node n) -> uint64_t
 {
   using namespace std;
@@ -1324,15 +1362,19 @@ ENTRY_DECLARATION
     {
       auto&    ms = fd.mouse;
       bool  rtClk = (ms.rtDn  && !ms.prevRtDn);
+
       //auto    nds = grph.nodes();
       //auto     sz = grph.nsz();
+      //
+      //auto     sz = fd.graph.nds.size();  // nds.nsz();
+      //u64       i = 0;
+      //vec_ndptrs nds(sz,nullptr);
+      //for(auto& kv : fd.graph.nds){
+      //  nds[i++] = &kv.second;
+      //}
 
-      auto     sz = fd.graph.nds.size();  // nds.nsz();
-      u64       i = 0;
-      vec_ndptrs nds(sz,nullptr);
-      for(auto& kv : fd.graph.nds){
-        nds[i++] = &kv.second;
-      }
+      auto nds = node_getPtrs();
+      auto  sz = fd.graph.nds.size();
 
       SECTION(time)
       {
@@ -1456,9 +1498,11 @@ ENTRY_DECLARATION
             SECTION(primary selection and group selection effects)
             {
               if(inNode && lftClkDn && (fd.sel.pri<0 || fd.sel.pri!=n->id) ){
-                n   = &(grph.moveToFront(n->id));
-                nds = grph.nodes(); // move to the front will invalidate some pointers in the nds array so it needs to be remade
-                
+                //n   = &(grph.moveToFront(n->id));
+                //nds = grph.nodes();                   // move to the front will invalidate some pointers in the nds array so it needs to be remade
+                n    =  &(grph.moveToFront(n->id));
+                nds  =  node_getPtrs();                 // move to the front will invalidate some pointers in the nds array so it needs to be remade
+
                 fd.sel.pri = n->id;
                 ms.drgP    = pntr;
 

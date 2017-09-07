@@ -117,8 +117,7 @@ struct    Node
 
   Node& operator=(Node const& l){            cp(l); return *this; }
   Node& operator=(Node&&      r){ mv(std::move(r)); return *this; }
-
-  bool operator<(Node const& l){ return l.order; }
+  bool  operator<(Node const& l){ return l.order; }
 };
 using   vec_nd      =    vec<Node>;
 using   vec_ndptrs  =    vec<Node*>;
@@ -619,9 +618,16 @@ public:
 
 struct FisData
 {
-  using      Id  =  GraphDB::Id;
-  using NodeMap  =  std::unordered_map<uint64_t, Node>;
-  
+  struct IdOrder {
+    u64      id = 0;
+    u64   order = 0;
+    bool operator<(IdOrder l) const { return order < l.order; }
+  };
+
+  using      Id    =  GraphDB::Id;
+  using NodeMap    =  std::unordered_map<uint64_t, Node>;
+  using NodeOrder  =  std::set<IdOrder>;
+
   GLFWwindow*         win = nullptr;                     // Platform 
   GraphDB            grph;
   LavaGraph         lgrph;
@@ -629,7 +635,8 @@ struct FisData
 
   struct
   {
-    NodeMap    nds; 
+    NodeMap       nds;   // nds  is nodes
+    NodeOrder    ordr;   // ordr is orders 
 
     // graph colors
     NVGcolor        lineClr  =  nvgRGBAf(.04f, .04f, .04f, 1.f);
