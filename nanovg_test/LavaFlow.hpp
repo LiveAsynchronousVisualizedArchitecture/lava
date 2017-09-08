@@ -85,7 +85,8 @@ struct   LavaFlowNode
   uint64_t           version;
   uint64_t                id;
 };
-struct   LavaFlowSlot { 
+struct   LavaFlowSlot
+{ 
   enum State { NORMAL=0, HIGHLIGHTED, SELECTED, SLOT_ERROR };
 
   u64 nid; bool in=false; State state=NORMAL;

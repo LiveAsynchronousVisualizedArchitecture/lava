@@ -119,8 +119,8 @@ struct    Node
   Node& operator=(Node&&      r){ mv(std::move(r)); return *this; }
   bool  operator<(Node const& l){ return l.order; }
 };
-using   vec_nd      =    vec<Node>;
-using   vec_ndptrs  =    vec<Node*>;
+using   vec_nd      =   vec<Node>;
+using   vec_ndptrs  =   vec<Node*>;
 
 struct    cnct { 
   int src, dest;
@@ -134,10 +134,11 @@ struct    cnct {
 };
 using  vec_con     =    vec<cnct>;
 
-struct    Slot { 
+struct    Slot
+{ 
   enum State { NORMAL=0, HIGHLIGHTED, SELECTED, SLOT_ERROR };
 
-  v2 P; u64 nid; v2 N; bool in=false; State state=NORMAL;
+  u64 nid; v2 P; v2 N; bool in=false; State state=NORMAL;
 
   Slot(u64 nId, bool In=false) : nid(nId), in(In), P(0,0), N(0,1), state(NORMAL) {}
 };
@@ -627,16 +628,18 @@ struct FisData
   using      Id    =  GraphDB::Id;
   using NodeMap    =  std::unordered_map<uint64_t, Node>;
   using NodeOrder  =  std::set<IdOrder>;
+  using Slots      =  std::multimap<uint64_t, Slot>;            // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
 
-  GLFWwindow*         win = nullptr;                     // Platform 
+  GLFWwindow*         win = nullptr;                            // Platform 
   GraphDB            grph;
   LavaGraph         lgrph;
   LavaFlow             lf;
 
   struct
   {
-    NodeMap       nds;   // nds  is nodes
-    NodeOrder    ordr;   // ordr is orders 
+    NodeMap       nds;       // nds  is nodes
+    NodeOrder    ordr;       // ordr is orders 
+    Slots       slots;       // 
 
     // graph colors
     NVGcolor        lineClr  =  nvgRGBAf(.04f, .04f, .04f, 1.f);

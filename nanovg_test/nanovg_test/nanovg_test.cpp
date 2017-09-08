@@ -185,7 +185,7 @@
 // -todo: figure out why dragging moves all nodes - node.id may be out of sync with actual map id - yes
 // -todo: fix nodes becoming unselected on left click up while still in the node - need to clear primary selection on lftClkUp
 
-// todo: transition to using a UI only slot structure to draw slots
+// todo: transition to using a UI only slot structure to draw slots - can't draw src slots correctly until connections are transitioned
 // todo: transition to using the LavaGraph for connections 
 //       | mirror node instances to the LavaGraph
 //       | add connections to both graphs
@@ -1108,6 +1108,10 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
   return borderPt;
 }
 
+void            slot_add(u64 nidx, Slot s)
+{
+  fd.graph.slots.insert( {nidx, s} );
+}
 void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState, f32 slot_rad=10.f)
 {
   nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
@@ -1330,11 +1334,6 @@ ENTRY_DECLARATION
       // nodes
       Node&     n0 = fd.grph.addNode( Node("one", Node::FLOW, {400.f,300.f}) );
       auto   inst0 = node_add("FileToString");
-      //auto  pi = fd.lf.flow.find("FileToString");                                  // pi is pointer iterator
-      //if(pi != end(fd.lf.flow))
-      //  return fd.lgrph.addNode(pi->second, true);
-      //else
-      //  return LavaFlowNode::NODE_ERROR;
 
       //Node& n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
       //Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
@@ -1344,7 +1343,8 @@ ENTRY_DECLARATION
       //n4.b.ymx = n4.b.xmx;
 
       // slots
-      //Id s0 = fd.grph.addSlot( Slot(n0.id, false) );
+      Id ls0 = fd.grph.addSlot( Slot(n0.id,true) );
+      slot_add(inst0, Slot(inst0,true) );
       //Id s1 = fd.grph.addSlot( Slot(n1.id,  true) );
       //Id s2 = fd.grph.addSlot( Slot(n2.id,  true) );
       //Id s3 = fd.grph.addSlot( Slot(n3.id,  true) );
@@ -1354,6 +1354,12 @@ ENTRY_DECLARATION
       //fd.grph.toggleCnct(s0, s1);
       //fd.grph.toggleCnct(s0, s2);
       //fd.grph.toggleCnct(s0, s3);
+
+      //auto  pi = fd.lf.flow.find("FileToString");                                  // pi is pointer iterator
+      //if(pi != end(fd.lf.flow))
+      //  return fd.lgrph.addNode(pi->second, true);
+      //else
+      //  return LavaFlowNode::NODE_ERROR;
     }
   }
 
@@ -1565,48 +1571,57 @@ ENTRY_DECLARATION
         }
         SECTION(slot movement)
         {
-          for(auto& kv : grph.slots())
+          //for(auto& kv : grph.slots())
+          //Id     nid = kv.first;            // s.nid;
+          //Node const& n = grph.node(nid.id);
+
+          for(auto& kv : fd.graph.slots)
           {
-            Id     nid = kv.first;            // s.nid;
-            Slot&    s = kv.second;
-            v2    nrml;
-            Node const& n = grph.node(nid.id);
+            u64       nid = kv.first;              // s.nid;
+            Slot&       s = kv.second;
+            Node const& n = fd.graph.nds[nid];
             v2 wh = n.b.wh();
             v2 nP = n.P + wh/2; //NODE_SZ/2; // n.b.mx; // w()/2; // NODE_SZ/2;
-              
+            v2 nrml;
+
             if(s.in)
             {                                                 // dest / in / blue slots
-              Slot* src = grph.srcSlot(kv.first);
+              //Slot* src = grph.srcSlot(kv.first);
+              //Slot* src = &s;     // srcSlot(kv.first);
+              Slot* src = nullptr;
               if(src){
-                auto srcNdP = grph.node(src->nid).P + wh/2;  //NODE_SZ/2; // n.b.mx; // NODE_SZ/2;
+                //auto srcNdP = grph.node(src->nid).P + wh/2;  //NODE_SZ/2; // n.b.mx; // NODE_SZ/2;
+                //auto srcNdP = fd.graph.nds[src->nid].P;
+                auto srcNdP = n.P + wh/2;
                 s.P = node_border(n, srcNdP - nP, &nrml);
                 s.N = nrml;
               }else{
                 s.P = node_border(n, {0,-1.f}, &nrml);
                 s.N = {0,-1.f};
               }
-            }else
-            {
-              auto ci = grph.destSlots(kv.first);
-              if(ci==grph.destCnctEnd()){
-                s.P = node_border(n, v2(0,1.f), &nrml);
-                s.N = nrml;
-              }else{
-                v2  destP={0,0}, destN={0,0};
-                int   cnt = 0;
-                for(; ci != grph.destCnctEnd() && ci->first==nid; ++cnt, ++ci){
-                  if(!grph.slot(ci->second)){ cnt -= 1; continue; }   // todo: does this need to subtract 1 from count?
-
-                  v2 curP = grph.slot(ci->second)->P;
-                  destP  += curP; 
-                  destN  += norm(curP - nP);
-                }
-                destP /= (f32)cnt;
-                destN /= (f32)cnt;
-                s.N = norm(destN);
-                s.P = node_border(n, s.N);
-              }
-            }
+            }//else
+            //{
+            //  auto ci = grph.destSlots(kv.first);
+            //  if(ci==grph.destCnctEnd()){
+            //    s.P = node_border(n, v2(0,1.f), &nrml);
+            //    s.N = nrml;
+            //  }else{
+            //    v2  destP={0,0}, destN={0,0};
+            //    int   cnt = 0;
+            //    for(; ci != grph.destCnctEnd() && ci->first==nid; ++cnt, ++ci)
+            //    {
+            //      if(!grph.slot(ci->second)){ cnt -= 1; continue; }   // todo: does this need to subtract 1 from count?
+            //
+            //      v2 curP = grph.slot(ci->second)->P;
+            //      destP  += curP; 
+            //      destN  += norm(curP - nP);
+            //    }
+            //    destP /= (f32)cnt;
+            //    destN /= (f32)cnt;
+            //    s.N = norm(destN);
+            //    s.P = node_border(n, s.N);
+            //  }
+            //}
           }
         }
       }
@@ -1702,6 +1717,7 @@ ENTRY_DECLARATION
           }
           SECTION(draw nodes)
           {
+            auto const& slots = fd.graph.slots;
             TO(sz,i)
             {
               Node&     n = *(nds[i]);
@@ -1713,18 +1729,33 @@ ENTRY_DECLARATION
               {
                 nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
                 nvgStrokeWidth(vg, fd.ui.slot_border);
-                auto sIter = grph.nodeSlots(n.id);            // sIter is slot iterator
-                for(; sIter!=grph.slotEnd() && sIter->first.id==n.id; ++sIter)
+                auto sIter = fd.graph.slots.find(n.id);      // .nodeSlots(n.id);            // sIter is slot iterator
+                //for(; sIter!=grph.slotEnd() && sIter->first.id==n.id; ++sIter)
+                for(; sIter!=end(slots) && sIter->first==n.id; ++sIter)
                 {
                   auto     sIdx = sIter->first;                    // todo: needs to be redone
-                  Slot const& s = *(grph.slot(sIdx));
+                  //Slot const& s = *(grph.slot(sIdx));
+                  Slot const& s = sIter->second;
                   bool   inSlot = len(pntr - s.P) < fd.ui.slot_rad; //io_rad;
-                
+
                   Slot::State drawState = Slot::NORMAL;
                   if(s.state==Slot::SELECTED) drawState = Slot::SELECTED;
                   else if(inSlot)             drawState = Slot::HIGHLIGHTED;
                   slot_draw(vg, s, drawState, fd.ui.slot_rad);
                 }
+
+                //auto sIter = grph.nodeSlots(n.id);            // sIter is slot iterator
+                //for(; sIter!=grph.slotEnd() && sIter->first.id==n.id; ++sIter)
+                //{
+                //  auto     sIdx = sIter->first;                    // todo: needs to be redone
+                //  Slot const& s = *(grph.slot(sIdx));
+                //  bool   inSlot = len(pntr - s.P) < fd.ui.slot_rad; //io_rad;
+                //
+                //  Slot::State drawState = Slot::NORMAL;
+                //  if(s.state==Slot::SELECTED) drawState = Slot::SELECTED;
+                //  else if(inSlot)             drawState = Slot::HIGHLIGHTED;
+                //  slot_draw(vg, s, drawState, fd.ui.slot_rad);
+                //}
               }
             }
           }
