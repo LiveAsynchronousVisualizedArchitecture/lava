@@ -147,26 +147,28 @@ using vec_slot     =    vec<Slot>;
 class  GraphDB
 {
 public:
-  union Id                                                // this Id serves as both a nodeId and slot index, since a slot index will alway coordinate with only one node 
-  {    
-    struct { 
-      u64 id  : 48;                                       // id is the node id number - This is a unique number for each node that doesn't change. It can refer back to a node since it doesn't represent an ordering or an index into an array 
-      u64 idx : 16;                                       // idx is the index of the slot - for a node this is 0
-    };
-    u64 asInt;
+  using Id = LavaGraph::Id;
 
-    Id() : id(0), idx(0) {}
-    Id(u64 _id, u64 _idx=0) : id(_id), idx(_idx) {}
-
-    bool   operator==(Id  r) const { return id==r.id && idx==r.idx; }
-    bool    operator<(Id const& r) const {
-      if(id==r.id) return idx < r.idx;
-      else         return id  < r.id;
-    }
-    size_t operator()(Id const& _id) const {
-      return std::hash<u64>()(_id.id) ^ std::hash<u64>()(_id.idx);
-    }
-  };
+  //union Id                                                // this Id serves as both a nodeId and slot index, since a slot index will alway coordinate with only one node 
+  //{    
+  //  struct { 
+  //    u64 id  : 48;                                       // id is the node id number - This is a unique number for each node that doesn't change. It can refer back to a node since it doesn't represent an ordering or an index into an array 
+  //    u64 idx : 16;                                       // idx is the index of the slot - for a node this is 0
+  //  };
+  //  u64 asInt;
+  //
+  //  Id() : id(0), idx(0) {}
+  //  Id(u64 _id, u64 _idx=0) : id(_id), idx(_idx) {}
+  //
+  //  bool   operator==(Id  r) const { return id==r.id && idx==r.idx; }
+  //  bool    operator<(Id const& r) const {
+  //    if(id==r.id) return idx < r.idx;
+  //    else         return id  < r.id;
+  //  }
+  //  size_t operator()(Id const& _id) const {
+  //    return std::hash<u64>()(_id.id) ^ std::hash<u64>()(_id.idx);
+  //  }
+  //};
 
   using NodeMap      = std::map<u64, Node>;                    // maps an order to a Node struct
   using NodeIdMap    = std::unordered_map<u64, u64>;           // maps a node id to its order, which can be used to find the node in the NodeMap
@@ -567,7 +569,7 @@ public:
 
     return cnt;
   }
-  void    toggleCnct(Id src, Id dest)
+  void    toggleCnct(Id  src, Id  dest)
   {
     u32    delcnt = 0;
     auto       di = m_cncts.find(dest);
@@ -625,10 +627,10 @@ struct FisData
     bool operator<(IdOrder l) const { return order < l.order; }
   };
 
-  using      Id    =  GraphDB::Id;
-  using NodeMap    =  std::unordered_map<uint64_t, Node>;
-  using NodeOrder  =  std::set<IdOrder>;
-  using Slots      =  std::multimap<uint64_t, Slot>;            // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
+  using         Id  =  LavaGraph::Id;
+  using    NodeMap  =  std::unordered_map<uint64_t, Node>;
+  using  NodeOrder  =  std::set<IdOrder>;
+  using      Slots  =  std::multimap<Id, Slot>;            // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
 
   GLFWwindow*         win = nullptr;                            // Platform 
   GraphDB            grph;
@@ -650,7 +652,6 @@ struct FisData
     NVGcolor   msgnd_gradst  =  nvgRGBAf(.3f, .3f, .3f, .5f);
     NVGcolor   msgnd_graden  =  nvgRGBAf(.15f, .15f, .15f, .45f); 
   } graph;
-
   struct
   {
     int w=0, h=0;

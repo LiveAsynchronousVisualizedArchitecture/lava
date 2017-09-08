@@ -95,12 +95,12 @@ struct   LavaFlowSlot
 };
 struct       LavaFlow
 {
-  lava_pathHndlMap       libs;     // libs is libraries - this maps the live path of the shared libary with the OS specific handle that the OS loading function returns
-  lava_nidMap            nids;     // nids is node ids  - this maps the name of the node to all of the graph node ids that use it
-  lava_flowNodes         flow;
-  lava_flowPtrs          ptrs;     // ptrs are the LavaFlowNode pointers - each one needs a unique id so they can be referenced elsewhere 
-  lava_hndlNodeMap     ndptrs;     // ndptrs is node pointers - a map from each handle to the one (zero?) or more LavaFlowNode pointers the shared lib contains
-  lava_nameNodeMap  nameToPtr;     // maps node names to their pointers 
+  lava_pathHndlMap        libs;     // libs is libraries - this maps the live path of the shared libary with the OS specific handle that the OS loading function returns
+  lava_nidMap             nids;     // nids is node ids  - this maps the name of the node to all of the graph node ids that use it
+  lava_flowNodes          flow;
+  lava_flowPtrs           ptrs;     // ptrs are the LavaFlowNode pointers - each one needs a unique id so they can be referenced elsewhere 
+  lava_hndlNodeMap      ndptrs;     // ndptrs is node pointers - a map from each handle to the one (zero?) or more LavaFlowNode pointers the shared lib contains
+  lava_nameNodeMap   nameToPtr;     // maps node names to their pointers 
 };
 // end data types
 

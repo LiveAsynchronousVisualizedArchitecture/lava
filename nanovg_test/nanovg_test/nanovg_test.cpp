@@ -185,6 +185,7 @@
 // -todo: figure out why dragging moves all nodes - node.id may be out of sync with actual map id - yes
 // -todo: fix nodes becoming unselected on left click up while still in the node - need to clear primary selection on lftClkUp
 
+// todo: transition to using the LavaFlowGraph for connections
 // todo: transition to using a UI only slot structure to draw slots - can't draw src slots correctly until connections are transitioned
 // todo: transition to using the LavaGraph for connections 
 //       | mirror node instances to the LavaGraph
@@ -288,7 +289,8 @@
 #include "../Transform.h"
 #include "FissureDecl.h"
 
-using Id = GraphDB::Id;
+//using Id = GraphDB::Id;
+using Id = LavaGraph::Id;
 
 static FisData fd;
 
@@ -425,7 +427,7 @@ str           graphToStr(GraphDB const& g)
     Jzon::Node destIdx = Jzon::array();
 
     for(auto kv : g.slots()){
-      Id  sid = kv.first;
+      GraphDB::Id  sid = kv.first;
       auto& s = kv.second;
       if(s.in){
         destId.add(sid.id);
@@ -534,7 +536,7 @@ GraphDB       strToGraph(str const& s)
 
   auto cnct_cnt = destId.getCount();
   TO(cnct_cnt,i){
-    Id src, dest;
+    GraphDB::Id src, dest;
     src.id   = srcId.get(i).toInt();
     src.idx  = srcIdx.get(i).toInt();
     dest.id  = destId.get(i).toInt();
@@ -1335,7 +1337,9 @@ ENTRY_DECLARATION
       Node&     n0 = fd.grph.addNode( Node("one", Node::FLOW, {400.f,300.f}) );
       auto   inst0 = node_add("FileToString");
 
-      //Node& n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
+      Node& n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
+      auto  inst1 = node_add("FileToString");
+
       //Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
       //Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
       //Node& n4 = fd.grph.addNode( Node("five",  Node::MSG,  {200.f,200.f}) );
@@ -1343,9 +1347,12 @@ ENTRY_DECLARATION
       //n4.b.ymx = n4.b.xmx;
 
       // slots
-      Id ls0 = fd.grph.addSlot( Slot(n0.id,true) );
+      GraphDB::Id ls0 = fd.grph.addSlot( Slot(n0.id,true) );
       slot_add(inst0, Slot(inst0,true) );
-      //Id s1 = fd.grph.addSlot( Slot(n1.id,  true) );
+
+      GraphDB::Id ls1 = fd.grph.addSlot( Slot(n1.id,false) );
+      slot_add(inst1, Slot(inst1,false) );
+
       //Id s2 = fd.grph.addSlot( Slot(n2.id,  true) );
       //Id s3 = fd.grph.addSlot( Slot(n3.id,  true) );
       //Id s4 = fd.grph.addSlot( Slot(n0.id, false) );
@@ -1461,11 +1468,11 @@ ENTRY_DECLARATION
         SECTION(slot selection and connection creation)
         {
           bool inAnySlt = false;
-          Id  inClk(0);
-          Id outClk(0);
+          GraphDB::Id  inClk(0);
+          GraphDB::Id outClk(0);
           for(auto& kv : grph.slots())
           {
-            Id     sid = kv.first;                       // sid is slot id
+            GraphDB::Id     sid = kv.first;                       // sid is slot id
             Slot&    s = kv.second;
             if(lftClkDn)
             {  
@@ -1577,9 +1584,10 @@ ENTRY_DECLARATION
 
           for(auto& kv : fd.graph.slots)
           {
-            u64       nid = kv.first;              // s.nid;
+            //u64       nid = kv.first;              // s.nid;
+            auto      nid = kv.first;
             Slot&       s = kv.second;
-            Node const& n = fd.graph.nds[nid];
+            Node const& n = fd.graph.nds[nid.id];
             v2 wh = n.b.wh();
             v2 nP = n.P + wh/2; //NODE_SZ/2; // n.b.mx; // w()/2; // NODE_SZ/2;
             v2 nrml;
@@ -1599,29 +1607,57 @@ ENTRY_DECLARATION
                 s.P = node_border(n, {0,-1.f}, &nrml);
                 s.N = {0,-1.f};
               }
-            }//else
-            //{
-            //  auto ci = grph.destSlots(kv.first);
-            //  if(ci==grph.destCnctEnd()){
-            //    s.P = node_border(n, v2(0,1.f), &nrml);
-            //    s.N = nrml;
-            //  }else{
-            //    v2  destP={0,0}, destN={0,0};
-            //    int   cnt = 0;
-            //    for(; ci != grph.destCnctEnd() && ci->first==nid; ++cnt, ++ci)
-            //    {
-            //      if(!grph.slot(ci->second)){ cnt -= 1; continue; }   // todo: does this need to subtract 1 from count?
-            //
-            //      v2 curP = grph.slot(ci->second)->P;
-            //      destP  += curP; 
-            //      destN  += norm(curP - nP);
-            //    }
-            //    destP /= (f32)cnt;
-            //    destN /= (f32)cnt;
-            //    s.N = norm(destN);
-            //    s.P = node_border(n, s.N);
-            //  }
-            //}
+            }else
+            {
+              auto ci = fd.lgrph.destSlots(kv.first);
+              if(ci==fd.lgrph.destCnctEnd()){
+                s.P = node_border(n, v2(0,1.f), &nrml);
+                s.N = nrml;
+              }else{
+                v2  destP={0,0}, destN={0,0};
+                int   cnt = 0;
+                for(; ci != fd.lgrph.destCnctEnd() && ci->first==nid; ++ci)
+                {
+                  if(!fd.lgrph.slot(ci->second)){ cnt -= 1; continue; }   // todo: does this need to subtract 1 from count?
+                          
+                  //v2 curP = fd.lgrph.slot(ci->second)->P;
+                  //v2 curP = fd.graph.slot.find(ci->second)->P;
+                  //fd.lgrph.srcSlot(ci->second);
+                  auto si  = fd.graph.slots.find(ci->second);
+                  if(si != fd.graph.slots.end()){
+                    auto curP  =  si->second.P;
+                    destP     +=  curP; 
+                    destN     +=  norm(curP - nP);
+                    ++cnt;
+                  }
+                }
+                destP /= (f32)cnt;
+                destN /= (f32)cnt;
+                s.N = norm(destN);
+                s.P = node_border(n, s.N);
+              }
+
+              //auto ci = grph.destSlots(kv.first);
+              //if(ci==grph.destCnctEnd()){
+              //  s.P = node_border(n, v2(0,1.f), &nrml);
+              //  s.N = nrml;
+              //}else{
+              //  v2  destP={0,0}, destN={0,0};
+              //  int   cnt = 0;
+              //  for(; ci != grph.destCnctEnd() && ci->first==nid; ++cnt, ++ci)
+              //  {
+              //    if(!grph.slot(ci->second)){ cnt -= 1; continue; }   // todo: does this need to subtract 1 from count?
+              //            
+              //    v2 curP = grph.slot(ci->second)->P;
+              //    destP  += curP; 
+              //    destN  += norm(curP - nP);
+              //  }
+              //  destP /= (f32)cnt;
+              //  destN /= (f32)cnt;
+              //  s.N = norm(destN);
+              //  s.P = node_border(n, s.N);
+              //}
+            }
           }
         }
       }
