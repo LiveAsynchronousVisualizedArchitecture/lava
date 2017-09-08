@@ -184,16 +184,17 @@
 // -todo: re-implement moveToFront()
 // -todo: figure out why dragging moves all nodes - node.id may be out of sync with actual map id - yes
 // -todo: fix nodes becoming unselected on left click up while still in the node - need to clear primary selection on lftClkUp
+// -todo: transition to using a UI only slot structure to draw slots - can't draw src slots correctly until connections are transitioned
+// -todo: make a separate class to hold UI information about nodes - position, bounds, UI name (node text) - inside FisData in graph
+// -todo: fix cnct_draw function to use LavaFlow graph - actually the setup and arguments before calling cnct_draw
 
-// todo: transition to using the LavaFlowGraph for connections
-// todo: transition to using a UI only slot structure to draw slots - can't draw src slots correctly until connections are transitioned
+// todo: transition to using the LavaFlowGraph for drawing connections
 // todo: transition to using the LavaGraph for connections 
 //       | mirror node instances to the LavaGraph
 //       | add connections to both graphs
 // todo: make types to deal with what the UI needs for drawing 
 //       | only needs the graph to find the slots that are attached to each node
 //       | can this be cached ?
-// todo: make a separate class to hold UI information about nodes - position, bounds, UI name (node text)
 // todo: make Lava data structures use the Lava thread local allocator
 // todo: change project name to Fissure 
 
@@ -1358,7 +1359,8 @@ ENTRY_DECLARATION
       //Id s4 = fd.grph.addSlot( Slot(n0.id, false) );
       //Id s5 = fd.grph.addSlot( Slot(n4.id, false) );
 
-      //fd.grph.toggleCnct(s0, s1);
+      fd.grph.toggleCnct(ls0, ls1);
+      fd.lgrph.toggleCnct(inst0, inst1);
       //fd.grph.toggleCnct(s0, s2);
       //fd.grph.toggleCnct(s0, s3);
 
@@ -1374,6 +1376,8 @@ ENTRY_DECLARATION
   SECTION(main loop)
   {
     GraphDB& grph = fd.grph;
+    //LavaFlow& grph = fd.lgrph;
+    auto&    g = fd.lgrph;
     v2       pntr = {0,0};
     f64 cx, cy, t, dt, avgFps=60, prevt=0, cpuTime=0;
     f32 pxRatio;
@@ -1383,16 +1387,6 @@ ENTRY_DECLARATION
     {
       auto&    ms = fd.mouse;
       bool  rtClk = (ms.rtDn  && !ms.prevRtDn);
-
-      //auto    nds = grph.nodes();
-      //auto     sz = grph.nsz();
-      //
-      //auto     sz = fd.graph.nds.size();  // nds.nsz();
-      //u64       i = 0;
-      //vec_ndptrs nds(sz,nullptr);
-      //for(auto& kv : fd.graph.nds){
-      //  nds[i++] = &kv.second;
-      //}
 
       auto nds = node_getPtrs();
       auto  sz = fd.graph.nds.size();
@@ -1472,8 +1466,8 @@ ENTRY_DECLARATION
           GraphDB::Id outClk(0);
           for(auto& kv : grph.slots())
           {
-            GraphDB::Id     sid = kv.first;                       // sid is slot id
-            Slot&    s = kv.second;
+            GraphDB::Id sid = kv.first;                       // sid is slot id
+            Slot&         s = kv.second;
             if(lftClkDn)
             {  
               bool inSlt = len(pntr - s.P) < fd.ui.slot_rad;
@@ -1697,41 +1691,57 @@ ENTRY_DECLARATION
           }
           SECTION(draw connections)
           {
-            auto di = grph.srcCnctsMap().begin();                                    // di is destination iterator
-            auto en = grph.srcCnctsMap().end();
-            for(auto di = grph.srcCnctsMap().begin(); di != en; )
+            //auto di = grph.srcCnctsMap().begin();                                    // di is destination iterator
+            //auto en = grph.srcCnctsMap().end();
+            //for(auto di = grph.srcCnctsMap().begin(); di != en; )
+            auto di = g.srcCnctsMap().begin();                                    // di is destination iterator
+            auto en = g.srcCnctsMap().end();
+            for(auto di = g.srcCnctsMap().begin(); di != en; )
             {
               auto     srcIdx = di->first;
               auto    destIdx = di->second;
-              Slot const& src = *(grph.slot(srcIdx));
-              auto      count = grph.destCnctCount(srcIdx);
+              //Slot const& src = *(grph.slot(srcIdx));
+              //Slot const& src = g.slot(srcIdx);
+              u64  cnt = 0; v2 srcP(0,0); v2 srcN(0,0);
+              auto const& si = fd.graph.slots.find(srcIdx);
+              if(si != fd.graph.slots.end()){
+                cnt  = g.destCnctCount(srcIdx);
+                srcP = si->second.P;
+                srcN = si->second.N;
+              }
 
-              if(count==1)
+              if(cnt==1)
               {
-                Slot const& dest = *(grph.slot(destIdx));
-                //draw_cnct(vg, src.P, dest.P, src.N, dest.N, NODE_SZ.x/2);
-                f32 w = grph.node(destIdx.id).b.w();
-                cnct_draw(vg, src.P, dest.P, src.N, dest.N, w/2);
+                //Slot const& dest = *(grph.slot(destIdx));
+                //f32 w = grph.node(destIdx.id).b.w();
 
-                ++di; //continue;
+                //Slot const& dest = *(g.slot.find(destIdx));
+                Slot const& dest = fd.graph.slots.find(destIdx)->second;
+                f32 w = fd.graph.nds[destIdx.id].b.w();
+
+                cnct_draw(vg, srcP, dest.P, srcN, dest.N, w/2);
+
+                ++di;
+                //continue;
+                //draw_cnct(vg, src.P, dest.P, src.N, dest.N, NODE_SZ.x/2);
               }
               else
               {
-                v2 avgP=src.P; v2 avgN={0,0}; u32 cnt=0;
+                v2 avgP=srcP; v2 avgN={0,0}; u32 cnt=0;
                 auto avgIter=di;
                 for(; avgIter!=en && avgIter->first==srcIdx; ++avgIter ){     // ++cnt
                   if(!grph.slot(avgIter->second)){ continue; }
 
                   Slot const& dest = *(grph.slot(avgIter->second));
                   avgP += dest.P;
-                  avgP += src.P;
+                  avgP += srcP;
                   ++cnt;
                 }
                 avgP    /= (f32)(cnt*2+1);             // can't forget the first position for averaging - the src position - the avgP is weighted 1:1 with the srcP and all the destination positions combined
-                v2 midN  = norm(src.P - avgP);
+                v2 midN  = norm(srcP - avgP);
                 f32   w  = grph.node(destIdx.id).b.w();
                 //draw_cnct(vg, src.P, avgP, src.N, midN, NODE_SZ.x/2);
-                cnct_draw(vg, src.P, avgP, src.N, midN, w/2);
+                cnct_draw(vg, srcP, avgP, srcN, midN, w/2);
 
                 for(auto dhIter=di; di!=en && di->first == srcIdx; ++di){   // dhIter is draw half iterator - this is where the the connections are drawn from the average position of all slots 
                   const v2 hlfsz = fd.ui.slot_rad/2.f;
@@ -1855,6 +1865,15 @@ ENTRY_DECLARATION
 
 
 
+//auto    nds = grph.nodes();
+//auto     sz = grph.nsz();
+//
+//auto     sz = fd.graph.nds.size();  // nds.nsz();
+//u64       i = 0;
+//vec_ndptrs nds(sz,nullptr);
+//for(auto& kv : fd.graph.nds){
+//  nds[i++] = &kv.second;
+//}
 
 //auto            node_add(str node_name, Node n=Node("",Node::FLOW,v2(0,0)) ) -> uint64_t
 //
