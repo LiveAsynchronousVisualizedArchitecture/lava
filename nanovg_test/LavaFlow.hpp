@@ -25,6 +25,9 @@
 // data types
 struct   LavaFlowNode;
 struct        LavaArg;
+union          LavaId;
+class       LavaGraph;
+//union   LavaGraph::Id;
 
 namespace fs = std::tr2::sys;                                                             // todo: different compiler versions would need different filesystem paths
 
@@ -71,6 +74,26 @@ struct     LavaPacket
   u64     src_slot : 16;
   LavaMsg      msg;
 };
+union          LavaId                                                // this Id serves as both a nodeId and LavaFlowSlot index, since a LavaFlowSlot index will alway coordinate with only one node 
+{    
+  struct { 
+    u64 id  : 48;                                       // id is the node id number - This is a unique number for each node that doesn't change. It can refer back to a node since it doesn't represent an ordering or an index into an array 
+    u64 idx : 16;                                       // idx is the index of the LavaFlowSlot - for a node this is 0
+  };
+  u64 asInt;
+
+  LavaId() : id(0), idx(0) {}
+  LavaId(u64 _id, u64 _idx=0) : id(_id), idx(_idx) {}
+
+  bool   operator==(LavaId  r) const { return id==r.id && idx==r.idx; }
+  bool    operator<(LavaId const& r) const {
+    if(id==r.id) return idx < r.idx;
+    else         return id  < r.id;
+  }
+  size_t operator()(LavaId const& _id) const {
+    return std::hash<u64>()(_id.id) ^ std::hash<u64>()(_id.idx);
+  }
+};
 struct   LavaFlowNode
 {
   enum { NONE=0, FLOW, MSG, NODE_ERROR=0xFFFFFFFFFFFFFFFF };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
@@ -87,11 +110,15 @@ struct   LavaFlowNode
 };
 struct   LavaFlowSlot
 { 
+  //u64 nid; bool in=false; State state=NORMAL;
+  //LavaFlowSlot(u64 nId, bool In=false) : nid(nId), in(In), state(NORMAL) {}
+
   enum State { NORMAL=0, HIGHLIGHTED, SELECTED, SLOT_ERROR };
 
-  u64 nid; bool in=false; State state=NORMAL;
+  LavaId id; bool in=false; State state=NORMAL;
 
-  LavaFlowSlot(u64 nId, bool In=false) : nid(nId), in(In), state(NORMAL) {}
+  LavaFlowSlot(){}
+  LavaFlowSlot(LavaId Id, bool In=false) : id(Id), in(In), state(NORMAL) {}
 };
 struct       LavaFlow
 {
@@ -214,36 +241,16 @@ template <class T> void   ThreadAllocator<T>::deallocate(T*& p, size_t) const
 class  LavaGraph
 {
 public:
-  union  Id                                                // this Id serves as both a nodeId and LavaFlowSlot index, since a LavaFlowSlot index will alway coordinate with only one node 
-  {    
-    struct { 
-      u64 id  : 48;                                       // id is the node id number - This is a unique number for each node that doesn't change. It can refer back to a node since it doesn't represent an ordering or an index into an array 
-      u64 idx : 16;                                       // idx is the index of the LavaFlowSlot - for a node this is 0
-    };
-    u64 asInt;
-
-    Id() : id(0), idx(0) {}
-    Id(u64 _id, u64 _idx=0) : id(_id), idx(_idx) {}
-
-    bool   operator==(Id  r) const { return id==r.id && idx==r.idx; }
-    bool    operator<(Id const& r) const {
-      if(id==r.id) return idx < r.idx;
-      else         return id  < r.id;
-    }
-    size_t operator()(Id const& _id) const {
-      return std::hash<u64>()(_id.id) ^ std::hash<u64>()(_id.idx);
-    }
-  };
-  struct NodeInstance { uint64_t id; LavaFlowNode* nd; };            // a struct used for returning an instance of a node - the Nodes map of ids and LavaFlowNode pointers  
+  struct NodeInstance { uint64_t id; LavaFlowNode* nd; };             // a struct used for returning an instance of a node - the Nodes map of ids and LavaFlowNode pointers  
 
   using NodeInsts    =  std::unordered_map<u64, LavaFlowNode*>;       // maps an id to a LavaFlowNode struct
-  using Slots        =  std::multimap<Id, LavaFlowSlot>;              // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
-  using CnctMap      =  std::unordered_map<Id, Id, Id>;               // maps connections from their single destination slot to their single source slot - Id is the hash function object in the third template argument
-  using SrcMap       =  std::multimap<Id, Id>;                        // maps connections from their single source slot to their one or more destination slots
+  using Slots        =  std::multimap<LavaId, LavaFlowSlot>;          // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
+  using CnctMap      =  std::unordered_map<LavaId, LavaId, LavaId>;   // maps connections from their single destination slot to their single source slot - Id is the hash function object in the third template argument
+  using SrcMap       =  std::multimap<LavaId, LavaId>;                // maps connections from their single source slot to their one or more destination slots
   using vec_insts    =  std::vector<NodeInstance>;                    // list of node instances - Id and pointer pairs
   using vec_nptrs    =  std::vector<LavaFlowNode*>;                   // lists used for returning from reloading functions
   using vec_cnptrs   =  std::vector<LavaFlowNode const*>;
-  using vec_ids      =  std::vector<Id>;
+  using vec_ids      =  std::vector<LavaId>;
 
 private:
   u64                m_nxtId;               // nxtId is next id - a counter for every node created that only increases, giving each node a unique id
@@ -272,7 +279,7 @@ private:
 
     vec_ids sidxs;                                            // sidxs is slot indexes
     for(auto np : nds){                                       // np is node pointer and nds is nodes
-      auto si = lower_bound(ALL(m_slots), Id(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
+      auto si = lower_bound(ALL(m_slots), LavaId(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
       if(si != end(m_slots)  &&  si->first.id == np->id){
         LavaFlowSlot& s = si->second;
         if(s.in) sidxs.push_back(si->first);
@@ -286,7 +293,7 @@ private:
 
     vec_ids sidxs;                                            // sidxs is LavaFlowSlot indexes
     for(auto np : nds){                                     // np is node pointer and nds is nodes
-      auto si = lower_bound(ALL(m_slots), Id(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
+      auto si = lower_bound(ALL(m_slots), LavaId(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
       if(si != end(m_slots)  &&  si->first.id == np->id){
         LavaFlowSlot& s = si->second;
         sidxs.push_back(si->first);        
@@ -302,13 +309,14 @@ private:
   u64         nxtSlot(u64 nid)
   {
     auto si = nodeSlots(nid);                   // si is slot iterator
-    u64 cur = 1;
+    i64 cur = -1;
     while(si != end(m_slots)   && 
       si->first.id  == nid && 
-      si->first.idx <= cur+1 ){
-      cur = si->first.idx;
-      ++si;
+      si->first.idx <= (u64)(cur+1) ){
+      //cur = si->first.idx;
+      ++cur; ++si;
     }
+    //return cur;
 
     return cur + 1;
   }
@@ -341,8 +349,8 @@ public:
     // connections 
     CnctMap nxtCncts;
     for(auto kv : m_cncts){
-      Id nxtDest = kv.first;
-      Id nxtSrc  = kv.second;
+      LavaId nxtDest = kv.first;
+      LavaId nxtSrc  = kv.second;
       nxtDest.id = nids[nxtDest.id];
       nxtSrc.id  = nids[nxtSrc.id];
       nxtCncts.insert({nxtDest, nxtSrc});
@@ -351,8 +359,8 @@ public:
 
     SrcMap nxtDestCncts;
     for(auto kv : m_destCncts){
-      Id nxtSrc   = kv.first;
-      Id nxtDest  = kv.second;
+      LavaId nxtSrc   = kv.first;
+      LavaId nxtDest  = kv.second;
       nxtSrc.id   = nids[nxtSrc.id];
       nxtDest.id  = nids[nxtDest.id];
       nxtDestCncts.insert({nxtSrc, nxtDest});
@@ -362,10 +370,10 @@ public:
     // slots
     Slots nxtSlots;
     for(auto& kv : m_slots){
-      Id nxtId  = kv.first;
-      nxtId.id  = nids[nxtId.id];
+      LavaId nxtId = kv.first;
+      nxtId.id     = nids[nxtId.id];
       LavaFlowSlot nxtS = kv.second;
-      nxtS.nid  = nids[nxtS.nid];
+      nxtS.id      = nids[nxtS.id.id];
       nxtSlots.insert({nxtId, nxtS});
     }
     m_slots = move(nxtSlots);
@@ -373,7 +381,7 @@ public:
     // node ids 
     NodeInsts nxtNds;
     for(auto& kv : m_nodes){
-      u64   nxtId = nids[kv.first];
+      u64 nxtId = nids[kv.first];
       //u64 nxtOrdr = ordrs[kv.second];
       LavaFlowNode* nd = m_nodes[kv.first];
       nxtNds.insert({nxtId, nd});
@@ -466,15 +474,16 @@ public:
   u64            nsz() const { return m_nodes.size(); }
 
   // slots
-  Id         addSlot(LavaFlowSlot  s, u64 idx=0)
+  LavaId     addSlot(LavaFlowSlot  s, u64 idx=0)
   {
-    Id id(s.nid, idx);
-    id.idx = idx? idx  :  nxtSlot(s.nid);
+    LavaId id(s.id.id, idx);
+    id.idx = idx? idx  :  nxtSlot(s.id.idx);
+    s.id = id;
     m_slots.insert({id, s});
 
     return id;
   }
-  auto          slot(Id   id) -> LavaFlowSlot*
+  auto          slot(LavaId   id) -> LavaFlowSlot*
   {
     auto si = m_slots.find(id);
     if(si == m_slots.end()) 
@@ -482,14 +491,14 @@ public:
 
     return &si->second;
   }
-  auto     nodeSlots(u64 nid) -> decltype(m_slots.begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
+  auto     nodeSlots(u64     nid) -> decltype(m_slots.begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
   {
-    return lower_bound(ALL(m_slots), Id(nid), [](auto a,auto b){ return a.first < b; } );
+    return lower_bound(ALL(m_slots), LavaId(nid), [](auto a,auto b){ return a.first < b; } );
   }
   auto         slots() -> Slots& { return m_slots; }
   auto         slots() const -> Slots const& { return m_slots; }
   auto      getSlots() -> Slots& { return m_slots; }
-  auto       srcSlot(Id destId) -> LavaFlowSlot* 
+  auto       srcSlot(LavaId destId) -> LavaFlowSlot* 
   {
     auto ci = m_cncts.find(destId);
     if(ci != m_cncts.end()){
@@ -498,7 +507,7 @@ public:
     }else 
       return nullptr;
   }
-  auto     destSlots(Id  srcId) -> decltype(m_destCncts.find(srcId))
+  auto     destSlots(LavaId  srcId) -> decltype(m_destCncts.find(srcId))
   {
     return m_destCncts.find(srcId);
   }
@@ -506,7 +515,7 @@ public:
   u64            ssz() const { return m_slots.size(); }
 
   // connections
-  u32    delSrcCncts(Id  src)
+  u32    delSrcCncts(LavaId  src)
   {
     u32  cnt = 0;
     auto  di = m_destCncts.find(src);
@@ -519,15 +528,15 @@ public:
 
     //di = m_destCncts.find(src);
   }
-  auto     destCncts(Id  src) -> decltype(m_destCncts.begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
+  auto     destCncts(LavaId  src) -> decltype(m_destCncts.begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
   {
-    return lower_bound(ALL(m_destCncts), Id(src), [](auto a,auto b){ return a.first < b; } );
+    return lower_bound(ALL(m_destCncts), LavaId(src), [](auto a,auto b){ return a.first < b; } );
   }
-  u64  destCnctCount(Id  src)
+  u64  destCnctCount(LavaId  src)
   {
     return m_destCncts.count(src);
   }
-  bool   delDestCnct(Id dest)
+  bool   delDestCnct(LavaId dest)
   {
     auto iter = m_cncts.find(dest);
     if(iter==m_cncts.end()) return false;
@@ -543,7 +552,7 @@ public:
 
     return true;
   }
-  u32        delCnct(Id  src, Id  dest)
+  u32        delCnct(LavaId  src, LavaId  dest)
   {
     u32      cnt = 0;
     auto srcIter = m_cncts.find(dest);
@@ -562,7 +571,7 @@ public:
 
     return cnt;
   }
-  void    toggleCnct(Id  src, Id  dest)
+  void    toggleCnct(LavaId  src, LavaId  dest)
   {
     u32    delcnt = 0;
     auto       di = m_cncts.find(dest);
@@ -585,7 +594,7 @@ public:
   auto         cncts() -> CnctMap& { return m_cncts; }
   auto         cncts() const -> CnctMap const& { return m_cncts; }
   u64         cnctsz() const { return m_cncts.size(); }
-  u32        delCnct(Id id)
+  u32        delCnct(LavaId id)
   {
     u32 cnt = 0;
     LavaFlowSlot* s = this->slot(id);

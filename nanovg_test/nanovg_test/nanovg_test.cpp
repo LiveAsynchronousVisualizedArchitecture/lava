@@ -187,8 +187,12 @@
 // -todo: transition to using a UI only slot structure to draw slots - can't draw src slots correctly until connections are transitioned
 // -todo: make a separate class to hold UI information about nodes - position, bounds, UI name (node text) - inside FisData in graph
 // -todo: fix cnct_draw function to use LavaFlow graph - actually the setup and arguments before calling cnct_draw
+// -todo: transition to using the LavaFlowGraph for drawing connections
+// -todo: make a get_slot() function
+// -todo: get slot movements to use LavaGraph for connections
 
-// todo: transition to using the LavaFlowGraph for drawing connections
+// todo: fix multiple selection on click
+// todo: change LavaId id and idx to nid and sidx
 // todo: transition to using the LavaGraph for connections 
 //       | mirror node instances to the LavaGraph
 //       | add connections to both graphs
@@ -291,7 +295,8 @@
 #include "FissureDecl.h"
 
 //using Id = GraphDB::Id;
-using Id = LavaGraph::Id;
+//using Id = LavaGraph::Id;
+using Id = LavaId;
 
 static FisData fd;
 
@@ -1111,9 +1116,20 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
   return borderPt;
 }
 
-void            slot_add(u64 nidx, Slot s)
+LavaId          slot_add(u64 nidx, Slot s)
 {
-  fd.graph.slots.insert( {nidx, s} );
+  LavaFlowSlot ls;
+  ls.id = nidx;
+  ls.in = s.in;
+  ls.state = (LavaFlowSlot::State)(s.state);
+  LavaId sid = fd.lgrph.addSlot(ls);
+  fd.graph.slots.insert( {sid, s} );
+
+  ls.id = sid;
+  return sid;
+  //return ls;
+
+  //ls.state = (LavaFlowSlot::State)((u64)s.state);
 }
 void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState, f32 slot_rad=10.f)
 {
@@ -1166,6 +1182,16 @@ void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState, f
     nvgClosePath(vg);
   nvgFill(vg);
   nvgResetTransform(vg);
+}
+Slot*           slot_get(LavaId id)
+{
+  auto& slots = fd.graph.slots;
+  
+  auto si = slots.find(id);
+  if(si == slots.end()) 
+    return nullptr;
+
+  return &si->second;
 }
 
 void           cnct_draw(NVGcontext* vg, v2 srcP, v2 destP, v2 srcN, v2 destN, f32 minCenterDist=INFf)
@@ -1338,8 +1364,8 @@ ENTRY_DECLARATION
       Node&     n0 = fd.grph.addNode( Node("one", Node::FLOW, {400.f,300.f}) );
       auto   inst0 = node_add("FileToString");
 
-      Node& n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
-      auto  inst1 = node_add("FileToString");
+      Node&     n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
+      auto   inst1 = node_add("FileToString");
 
       //Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
       //Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
@@ -1348,11 +1374,13 @@ ENTRY_DECLARATION
       //n4.b.ymx = n4.b.xmx;
 
       // slots
-      GraphDB::Id ls0 = fd.grph.addSlot( Slot(n0.id,true) );
-      slot_add(inst0, Slot(inst0,true) );
+      GraphDB::Id ls0 = fd.grph.addSlot( Slot(n0.id,false) );
+      //LavaFlowSlot s0 = slot_add(inst0, Slot(inst0,true) );
+      LavaId s0 = slot_add(inst0, Slot(inst0,false) );
 
-      GraphDB::Id ls1 = fd.grph.addSlot( Slot(n1.id,false) );
-      slot_add(inst1, Slot(inst1,false) );
+      GraphDB::Id ls1 = fd.grph.addSlot( Slot(n1.id,true) );
+      //LavaFlowSlot s1 = slot_add(inst1, Slot(inst1,false) );
+      LavaId s1 = slot_add(inst1, Slot(inst1,true) );
 
       //Id s2 = fd.grph.addSlot( Slot(n2.id,  true) );
       //Id s3 = fd.grph.addSlot( Slot(n3.id,  true) );
@@ -1360,7 +1388,7 @@ ENTRY_DECLARATION
       //Id s5 = fd.grph.addSlot( Slot(n4.id, false) );
 
       fd.grph.toggleCnct(ls0, ls1);
-      fd.lgrph.toggleCnct(inst0, inst1);
+      fd.lgrph.toggleCnct(s0, s1);
       //fd.grph.toggleCnct(s0, s2);
       //fd.grph.toggleCnct(s0, s3);
 
@@ -1513,14 +1541,16 @@ ENTRY_DECLARATION
             {
               if(inNode)
               {
-                if(lftClkUp){
-                  if(fd.sel.pri == n->id) n->sel = true;
-                  fd.sel.pri = -1;
-                }
-                else if(lftClkDn && (fd.sel.pri<0 || fd.sel.pri!=n->id) )
+                //if(lftClkUp){
+                //  //if(fd.sel.pri == n->id) n->sel = true;
+                //  fd.sel.pri = -1;
+                //}
+                //
+                //n   = &(grph.moveToFront(n->id));
+                //nds = grph.nodes();                   // move to the front will invalidate some pointers in the nds array so it needs to be remade
+
+                if(lftClkDn && (fd.sel.pri<0 || fd.sel.pri!=n->id) )
                 {               
-                  //n   = &(grph.moveToFront(n->id));
-                  //nds = grph.nodes();                   // move to the front will invalidate some pointers in the nds array so it needs to be remade
                   n    =  &(grph.moveToFront(n->id));
                   nds  =  node_getPtrs();                 // move to the front will invalidate some pointers in the nds array so it needs to be remade
 
@@ -1528,25 +1558,44 @@ ENTRY_DECLARATION
                   //n->sel     = true;
                   ms.drgP    = pntr;
 
+                  //if(!n->sel){
+                  //  TO(sz,j){ nds[j]->sel = false; }      // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
+                  //  n->sel = true;
+                  //}
+                  break;                                  // without breaking from the loop, a node could be moved down and hit again
+                }else if(lftClkUp){
                   if(!n->sel){
                     TO(sz,j){ nds[j]->sel = false; }      // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
                     n->sel = true;
+                    fd.sel.pri = -1;
+                    //fd.sel.pri = n->id;
                   }
-                  break;                                  // without breaking from the loop, a node could be moved down and hit again
+                  clearSelections = false;
+                  break;
                 }
               }
-            }            
+              //else if(lftClkUp){
+              //  fd.sel.pri = -1;
+              //}
+            }
           }
 
           //if(!lftClkUp)
           //  clearSelections=false;
           //else
-          if(!inAny){
-            if( lftClkDn && !(fd.sel.pri>0) ){ ms.drgbox=true; }
+          if(!inAny)
+          {
+            //if(lftClkUp){ fd.sel.pri = -1; }
+
+            if(lftClkDn && !(fd.sel.pri>0) ){ ms.drgbox=true; }
 
             if(fd.mouse.rtDn && !fd.mouse.prevRtDn){ fd.sel.sec = -1; }
-          }else{ // if(lftClkDn && lftClkUp){
-            clearSelections=false;
+          }else if(lftClkUp){         // if(lftClkDn && lftClkUp){
+            //auto tmp = fd.sel.pri = -1;
+            //clear_selections(&grph, &fd);
+
+          }else{
+            clearSelections = false;
           }
         }
 
@@ -1579,8 +1628,9 @@ ENTRY_DECLARATION
           for(auto& kv : fd.graph.slots)
           {
             //u64       nid = kv.first;              // s.nid;
-            auto      nid = kv.first;
+            Id        nid = kv.first;
             Slot&       s = kv.second;
+            //LavaSlot&  ls = fd.lgrph.slots();
             Node const& n = fd.graph.nds[nid.id];
             v2 wh = n.b.wh();
             v2 nP = n.P + wh/2; //NODE_SZ/2; // n.b.mx; // w()/2; // NODE_SZ/2;
@@ -1590,13 +1640,18 @@ ENTRY_DECLARATION
             {                                                 // dest / in / blue slots
               //Slot* src = grph.srcSlot(kv.first);
               //Slot* src = &s;     // srcSlot(kv.first);
-              Slot* src = nullptr;
+              //Slot* src = nullptr;
+              //auto srcNdId = g.srcSlot(nid)->nid;
+              LavaFlowSlot* src = g.srcSlot(nid);
               if(src){
                 //auto srcNdP = grph.node(src->nid).P + wh/2;  //NODE_SZ/2; // n.b.mx; // NODE_SZ/2;
-                //auto srcNdP = fd.graph.nds[src->nid].P;
-                auto srcNdP = n.P + wh/2;
-                s.P = node_border(n, srcNdP - nP, &nrml);
-                s.N = nrml;
+                //auto srcNdP = n.P + wh/2;
+                auto srcIter = fd.graph.slots.find(src->id);
+                if(srcIter != fd.graph.slots.end() ){
+                  auto  srcNdP = fd.graph.nds[src->id.id].P;
+                  s.P = node_border(n, srcNdP - nP, &nrml);
+                  s.N = nrml;
+                }
               }else{
                 s.P = node_border(n, {0,-1.f}, &nrml);
                 s.N = {0,-1.f};
@@ -1743,12 +1798,15 @@ ENTRY_DECLARATION
                 //draw_cnct(vg, src.P, avgP, src.N, midN, NODE_SZ.x/2);
                 cnct_draw(vg, srcP, avgP, srcN, midN, w/2);
 
-                for(auto dhIter=di; di!=en && di->first == srcIdx; ++di){   // dhIter is draw half iterator - this is where the the connections are drawn from the average position of all slots 
+                for(auto dhIter=di; di!=en && di->first == srcIdx; ++di){        // dhIter is draw half iterator - this is where the the connections are drawn from the average position of all slots 
                   const v2 hlfsz = fd.ui.slot_rad/2.f;
-                  Slot const& dest = *(grph.slot(di->second));
+                  //Slot const& dest = *(grph.slot(di->second));
+                  //LavaFlowSlot const& dest =  *(fd.lgrph.slot(di->second));     // *(grph.slot(di->second));
+                  //LavaFlowSlot const& dest =
+                  Slot* dest = slot_get(di->second);    // find(di->second);
 
                   //draw_cnct(vg, avgP, dest.P, -1.f*midN, dest.N, NODE_SZ.x/2);
-                  cnct_draw(vg, avgP, dest.P, -1.f*midN, dest.N, w/2);
+                  cnct_draw(vg, avgP, dest->P, -1.f*midN, dest->N, w/2);
                 }
 
                 nvgBeginPath(vg);
