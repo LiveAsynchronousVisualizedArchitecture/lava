@@ -192,15 +192,16 @@
 // -todo: get slot movements to use LavaGraph for connections
 // -todo: fix multiple selection on click
 // -todo: fix selections - some fixed 
+// -todo: change LavaId id and idx to nid and sidx
+// -todo: transition to using the LavaGraph for connections 
+//       -| mirror node instances to the LavaGraph
+//       -| add connections to both graphs
+// -todo: make types to deal with what the UI needs for drawing 
+//       -| only needs the graph to find the slots that are attached to each node
+//       -| can this be cached ? - not neccesary yet or ever - remember that there will only be a dozen to a couple hundred nodes at most
+// -todo: fix dual selections
 
-// todo: fix dual selections
-// todo: change LavaId id and idx to nid and sidx
-// todo: transition to using the LavaGraph for connections 
-//       | mirror node instances to the LavaGraph
-//       | add connections to both graphs
-// todo: make types to deal with what the UI needs for drawing 
-//       | only needs the graph to find the slots that are attached to each node
-//       | can this be cached ?
+// todo: clean up comments
 // todo: make Lava data structures use the Lava thread local allocator
 // todo: change project name to Fissure 
 // todo: make basic command queue - enum for command, priority number
@@ -1566,13 +1567,13 @@ ENTRY_DECLARATION
                   fd.sel.pri = n->id;
                   ms.drgP    = pntr;
 
-                  if(!n->sel){
+                  //if(!n->sel){
                     TO(sz,j){ nds[j]->sel = false; }       // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
                     n->sel = true;
                     //fd.sel.pri = -1;
                     //fd.sel.pri = n->id;
                     break;                                 // without breaking from the loop, a node could be moved down and hit again
-                  }
+                  //}
                   //clearSelections = false;
                 }
                 else if(lftClkUp)
