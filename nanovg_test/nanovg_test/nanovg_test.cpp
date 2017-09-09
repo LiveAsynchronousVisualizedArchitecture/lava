@@ -190,8 +190,9 @@
 // -todo: transition to using the LavaFlowGraph for drawing connections
 // -todo: make a get_slot() function
 // -todo: get slot movements to use LavaGraph for connections
+// -todo: fix multiple selection on click
 
-// todo: fix multiple selection on click
+// todo: fix selections
 // todo: change LavaId id and idx to nid and sidx
 // todo: transition to using the LavaGraph for connections 
 //       | mirror node instances to the LavaGraph
@@ -1562,15 +1563,25 @@ ENTRY_DECLARATION
                   //  TO(sz,j){ nds[j]->sel = false; }      // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
                   //  n->sel = true;
                   //}
-                  break;                                  // without breaking from the loop, a node could be moved down and hit again
-                }else if(lftClkUp){
                   if(!n->sel){
                     TO(sz,j){ nds[j]->sel = false; }      // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
                     n->sel = true;
-                    fd.sel.pri = -1;
+                    //fd.sel.pri = -1;
                     //fd.sel.pri = n->id;
                   }
-                  clearSelections = false;
+                  //clearSelections = false;
+                  break;                                  // without breaking from the loop, a node could be moved down and hit again
+                }else if(lftClkUp){
+                  if(n->sel){
+                    fd.sel.pri = -1;
+                  }
+                  //if(!n->sel){
+                  //  TO(sz,j){ nds[j]->sel = false; }      // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
+                  //  n->sel = true;
+                  //  fd.sel.pri = -1;
+                  //  //fd.sel.pri = n->id;
+                  //}
+                  //clearSelections = false;
                   break;
                 }
               }
