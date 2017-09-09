@@ -203,8 +203,8 @@
 // -todo: clean up comments
 // -todo: make node_add add ordr
 // -todo: take out GraphDB completely
+// -todo: make drawing use node ordering - does get nodes need to use the order array? - yes, along with node_nxtOrder being corrected
 
-// todo: make drawing use node ordering
 // todo: make sel_clear()
 // todo: make delSelected again - make sel_delete()
 // todo: test loading and saving
@@ -449,34 +449,25 @@ auto        node_getPtrs() -> vec_ndptrs
   auto     sz = fd.graph.nds.size();  // nds.nsz();
   u64       i = 0;
   vec_ndptrs nds(sz,nullptr);
-  for(auto& kv : fd.graph.nds){
-    nds[i++] = &kv.second;
+  for(auto& ido : fd.graph.ordr){                     // ido is id order - an IdOrdr struct
+    nds[i++] = &fd.graph.nds[ido.id];
   }
 
   return nds;
+
+  //for(auto& kv : fd.graph.nds){
+  //  nds[i++] = &kv.second;
+  //}
 }
 Node&   node_moveToFront(u64 idx)
 {
   using namespace std;
 
-  //Node  n = node(id);
-  //auto prevOrder = n.order;     
-  //
-  // addNode will get the next order number
-  // n.order = nxtOrder();
-  //
-  //if(n->type==Node::NODE_ERROR) return errorNode();
-  //
-  //m_nodes.erase(prevOrder);     // todo: use a delNode here instead
-  //m_ids.erase(id);
-  //
-  //return addNode(n, false);
-
   Node& n = fd.graph.nds[idx];
+  auto nxt = node_nxtOrder();
 
   fd.graph.ordr.erase( {idx, n.order} );
-  n.order = fd.graph.ordr.rbegin()->order + 1;
-
+  n.order = nxt;
   fd.graph.ordr.insert( {idx, n.order} );
 
   return n;
@@ -491,14 +482,15 @@ auto            node_add(str node_name, Node n) -> uint64_t
     instIdx = fd.lgrph.addNode(pi->second, true);
 
   if(instIdx != LavaFlowNode::NODE_ERROR){
-    n.txt = "New: " +  node_name;
-    n.id  = instIdx;
-    fd.graph.nds[instIdx] = move(n);
-    
     FisData::IdOrder ido;                                                          //ido is id order
     ido.id    = instIdx;
     ido.order = node_nxtOrder();
     fd.graph.ordr.insert(ido);
+
+    n.txt   = "New: " +  node_name;
+    n.id    = instIdx;
+    n.order = ido.order;
+    fd.graph.nds[instIdx] = move(n);    
   }
 
   return instIdx;
@@ -1998,6 +1990,24 @@ ENTRY_DECLARATION
 
 
 
+
+
+//Node  n = node(id);
+//auto prevOrder = n.order;     
+//
+// addNode will get the next order number
+// n.order = nxtOrder();
+//
+//if(n->type==Node::NODE_ERROR) return errorNode();
+//
+//m_nodes.erase(prevOrder);     // todo: use a delNode here instead
+//m_ids.erase(id);
+//
+//return addNode(n, false);
+//
+//fd.graph.ordr.erase( {idx, n.order} );
+//fd.graph.ordr.erase( {idx, n.order} );
+//n.order = fd.graph.ordr.rbegin()->order + 1;
 
 //f32   w  = grph.node(destIdx.nid).b.w();
 //draw_cnct(vg, src.P, avgP, src.N, midN, NODE_SZ.x/2);
