@@ -200,8 +200,15 @@
 //       -| only needs the graph to find the slots that are attached to each node
 //       -| can this be cached ? - not neccesary yet or ever - remember that there will only be a dozen to a couple hundred nodes at most
 // -todo: fix dual selections
+// -todo: clean up comments
+// -todo: make node_add add ordr
+// -todo: take out GraphDB completely
 
-// todo: clean up comments
+// todo: make drawing use node ordering
+// todo: make sel_clear()
+// todo: make delSelected again - make sel_delete()
+// todo: test loading and saving
+// todo: put back multiple nodes and connections
 // todo: make Lava data structures use the Lava thread local allocator
 // todo: change project name to Fissure 
 // todo: make basic command queue - enum for command, priority number
@@ -298,15 +305,14 @@
 #include "../Transform.h"
 #include "FissureDecl.h"
 
-//using Id = GraphDB::Id;
-//using Id = LavaGraph::Id;
-using Id = LavaId;
+using Id      = LavaId;
+using vec_ids = std::vector<Id>;
 
 static FisData fd;
 
 namespace{
 
-auto node_add(str node_name, Node n=Node("",Node::FLOW,v2(0,0)) ) -> uint64_t;
+//auto node_add(str node_name, Node n=Node("",Node::FLOW,v2(0,0)) ) -> uint64_t;
 
 float               lerp(float p, float lo, float hi)
 {
@@ -396,278 +402,6 @@ v2         angleToNormal(f32 angle)
   return { cos(angle), sin(angle) };
 }
 
-// serialize to and from json - put in FisTfm.hpp file?
-str           graphToStr(GraphDB const& g)
-{
-  using namespace std;
-  
-  Jzon::Node nds = Jzon::object();
-  SECTION(nodes)
-  {
-    auto ndp = g.nodes();
-    auto  sz = g.nsz();
-
-    Jzon::Node  nd_id = Jzon::array();
-    TO(sz,i) nd_id.add(ndp[i]->id);
-
-    Jzon::Node  nd_txt = Jzon::array();
-    TO(sz,i) nd_txt.add(ndp[i]->txt);
-
-    Jzon::Node    nd_x = Jzon::array();
-    TO(sz,i) nd_x.add(ndp[i]->P.x);
-
-    Jzon::Node    nd_y = Jzon::array();
-    TO(sz,i) nd_y.add(ndp[i]->P.y);
-
-    Jzon::Node nd_type = Jzon::array();
-    TO(sz,i) nd_type.add(ndp[i]->type);
-
-    nds.add("id",     nd_id);
-    nds.add("txt",   nd_txt);
-    nds.add("x",       nd_x);
-    nds.add("y",       nd_y);
-    nds.add("type", nd_type);
-  }
-  Jzon::Node jslots = Jzon::object();
-  SECTION(slots)
-  {
-    Jzon::Node srcId   = Jzon::array();
-    Jzon::Node srcIdx  = Jzon::array();
-    Jzon::Node destId  = Jzon::array();
-    Jzon::Node destIdx = Jzon::array();
-
-    for(auto kv : g.slots()){
-      GraphDB::Id  sid = kv.first;
-      auto& s = kv.second;
-      if(s.in){
-        destId.add(sid.nid);
-        destIdx.add(sid.sidx);
-      }else{
-        srcId.add(sid.nid);
-        srcIdx.add(sid.sidx);
-      }
-    }
-
-    jslots.add("destId",   destId);
-    jslots.add("destIdx", destIdx);
-    jslots.add("srcId",     srcId);
-    jslots.add("srcIdx",   srcIdx);
-  }
-  Jzon::Node jcncts = Jzon::object();
-  SECTION(connections)
-  {
-    auto sz = g.cnctsz();
-
-    Jzon::Node srcId   = Jzon::array();
-    Jzon::Node srcIdx  = Jzon::array();
-    Jzon::Node destId  = Jzon::array();
-    Jzon::Node destIdx = Jzon::array();
-
-    for(auto kv : g.cncts()){
-      destId.add(kv.first.nid);
-      destIdx.add(kv.first.sidx);
-      srcId.add(kv.second.nid);
-      srcIdx.add(kv.second.sidx);
-    }
-
-    jcncts.add("destId",   destId);
-    jcncts.add("destIdx", destIdx);
-    jcncts.add("srcId",     srcId);
-    jcncts.add("srcIdx",   srcIdx);
-  }
-  
-  Jzon::Node graph = Jzon::object();
-  graph.add("nodes", nds);
-  graph.add("slots", jslots);
-  graph.add("connections", jcncts);
-
-  //Jzon::Format format;
-  //format.newline    = true;
-  //format.indentSize = 1;
-  //format.spacing    = true;
-  //format.useTabs    = false;
-
-  Jzon::Writer w;
-  //w.setFormat(format);  // breaks reading for some reason
-  str s;
-  w.writeString(graph, s);
-
-  return s;
-}
-GraphDB       strToGraph(str const& s)
-{
-  using namespace std;
-
-  GraphDB g;
-
-  Jzon::Parser prs;
-  auto graph = prs.parseString(s);
-
-  auto nd_id      = graph.get("nodes").get("id");
-  auto nd_txt     = graph.get("nodes").get("txt");
-  auto nd_x       = graph.get("nodes").get("x");
-  auto nd_y       = graph.get("nodes").get("y");
-  auto nd_type    = graph.get("nodes").get("type");
-  auto ordr       = graph.get("nodes").get("order");
-  auto destId     = graph.get("connections").get("destId");
-  auto destIdx    = graph.get("connections").get("destIdx");
-  auto srcId      = graph.get("connections").get("srcId");
-  auto srcIdx     = graph.get("connections").get("srcIdx");
-  auto sltDestId  = graph.get("slots").get("destId");
-  auto sltDestIdx = graph.get("slots").get("destIdx");
-  auto sltSrcId   = graph.get("slots").get("srcId");
-  auto sltSrcIdx  = graph.get("slots").get("srcIdx");
-
-  auto cnt = nd_id.getCount();
-  TO(cnt,i){
-    Node n;
-    n.id   = nd_id.get(i).toInt();
-    n.txt  = nd_txt.get(i).toString();
-    n.P.x  = nd_x.get(i).toFloat();
-    n.P.y  = nd_y.get(i).toFloat();
-    n.type = (Node::Type)nd_type.get(i).toInt();
-    g.addNode(n, false);
-  }
-  
-  TO(sltSrcId.getCount(),i){
-    Id sltId;
-    sltId.nid  = sltSrcId.get(i).toInt();
-    sltId.sidx = sltSrcIdx.get(i).toInt();
-    Slot s(sltId.nid,false);
-    g.addSlot(s, sltId.sidx);
-  }
-  TO(sltDestId.getCount(),i){
-    Id sltId;
-    sltId.nid  = sltDestId.get(i).toInt();
-    sltId.sidx = sltDestIdx.get(i).toInt();
-    Slot s(sltId.nid,true);
-    g.addSlot(s, sltId.sidx);
-  }
-
-  auto cnct_cnt = destId.getCount();
-  TO(cnct_cnt,i){
-    GraphDB::Id src, dest;
-    src.nid   = srcId.get(i).toInt();
-    src.sidx  = srcIdx.get(i).toInt();
-    dest.nid  = destId.get(i).toInt();
-    dest.sidx = destIdx.get(i).toInt();
-    //g.addCnct(src, dest);
-    g.toggleCnct(src, dest);
-  }
-
-  g.setNextNodeId( g.maxId() );
-
-  return move(g);
-}
-bool            saveFile(GraphDB const& g, str path)
-{
-  str fileStr = graphToStr(g);
-  
-  FILE* f = fopen(path.c_str(), "w");
-  if(!f) return false;
-
-  size_t writeSz = fwrite(fileStr.c_str(), 1, fileStr.size(), f);
-  if(writeSz != fileStr.size()) return false;
-
-  int closeRet = fclose(f);
-  if(closeRet == EOF) return false;
-
-  return true;
-}
-bool            loadFile(str path, GraphDB* out_g)
-{
-  FILE* f = fopen(path.c_str(), "r");
-  if(!f) return false;
-  fseek(f, 0, SEEK_END);
-  str s;
-  s.resize( ftell(f) );
-  fseek(f, 0, SEEK_SET);
-
-  size_t redRet = fread( (void*)s.data(), 1, s.size(), f);
-  if(redRet != s.size()) return false; 
-
-  if(fclose(f) == EOF) return false;
-
-  *out_g = strToGraph(s);
-
-  return true;
-}
-void    reloadSharedLibs()
-{
-  #ifdef _WIN32
-    auto       paths  =  GetRefreshPaths();
-    auto   livePaths  =  GetLivePaths(paths);
-
-    // coordinate live paths to handles
-    auto liveHandles  =  GetLiveHandles(fd.lf.libs, livePaths);
-
-    // free the handles
-    auto   freeCount  =  FreeLibs(liveHandles); 
-
-    // delete the now unloaded live shared library files
-    auto    delCount  =  RemovePaths(livePaths);
-
-    // copy the refresh paths' files
-    auto   copyCount  =  CopyPathsToLive(paths); 
-
-    // load the handles
-    auto loadedHndls  =  LoadLibs(livePaths);
-
-    // put loaded handles into LavaFlow struct
-    TO(livePaths.size(), i){
-      auto h = loadedHndls[i];
-      if(h){
-        fd.lf.libs[livePaths[i]] = h;
-      }
-    }
-
-    // extract the flow node lists from the handles
-    auto flowNdLists = GetFlowNodeLists(loadedHndls);
-
-    // extract the flow nodes from the lists and put them into the multi-map
-    TO(livePaths.size(),i)
-    {
-      LavaFlowNode* ndList = flowNdLists[i];
-      if(ndList){
-        auto const& p = livePaths[i]; 
-        fd.lf.flow.erase(p);                              // delete the current node list for the livePath
-        for(; ndList->func!=nullptr; ++ndList){           // insert each of the LavaFlowNodes in the ndList into the multi-map
-          fd.lf.nameToPtr.erase(ndList->name);
-          fd.lf.nameToPtr.insert( {ndList->name, ndList} );
-          fd.lf.flow.insert( {p, ndList} );
-        }
-      }
-    }
-
-    // delete interface buttons from the nanogui window
-    fd.ui.ndBtns.clear();
-
-    // redo interface node buttons
-    for(auto& kv : fd.lf.flow){
-      LavaFlowNode* fn = kv.second;                      // fn is flow node
-      auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
-      ndBtn->setCallback([fn](){ 
-        fd.grph.addNode( Node(fn->name, Node::FLOW, {100,100}), true);
-        //node_add("FileToString", Node( str("New: ") + fn->name) );
-        node_add("FileToString");
-      });
-    }
-    fd.ui.screen.performLayout();
-
-    //// replace their nodes
-    //TO(loadedHndls.size(),i) if(loadedHndls[i]!=0)
-    //{
-    //  fd.lf.flow.find
-    //}
-
-    // coordinate the node structures with node Ids
-
-    //TO(pths.size(),i) 
-
-    TO(paths.size(),i) printf("\n %llu : %s \n", i, paths[i].c_str() );
-    //for(auto& p : pths) printf("\n %s \n
-  #endif
-}
 
 // state manipulation
 void         clear_selections(GraphDB* inout_grph, FisData* inout_fd)
@@ -688,164 +422,6 @@ void         clear_selections(GraphDB* inout_grph, FisData* inout_fd)
   //}
 }
 
-void              keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
-{
-  if(action==GLFW_RELEASE) return;
-
-  char sngl[256]; // = {'\0', '\0'};
-  memset(sngl, 0, 256);
-  sngl[0] = key;
-  glfwSetWindowTitle(win, sngl);
-  
-  switch(key){
-  case 'J':
-  {
-    //_s = graphToStr();
-    //glfwSetWindowTitle(win, _s.c_str() );
-    //FILE* f = fopen("nanovg_test.lava", "w");
-    //fwrite(_s.c_str(), 1, _s.size(), f);
-    //fclose(f);
-  }break;
-  case 'K':
-  {
-    //FILE* f = fopen("nanovg_test.lava", "r");
-    //fseek(f, 0, SEEK_END);
-    //_s.resize( ftell(f) );
-    //fseek(f, 0, SEEK_SET);
-    //fread( (void*)_s.data(), 1, _s.size(), f);
-    //fclose(f);
-    //strToGraph(_s);
-  }break;
-  case 'L':
-  {
-    reloadSharedLibs();
-
-    //#ifdef _WIN32
-    //  auto     paths = GetRefreshPaths();
-    //  auto livePaths = GetLivePaths(paths);
-    //
-    //  // coordinate live paths to handles
-    //  auto liveHandles  =  GetLiveHandles(fd.lf.libs, livePaths);
-    //
-    //  // free the handles
-    //  auto   freeCount  =  FreeLibs(liveHandles); 
-    //
-    //  // delete the now unloaded live shared library files
-    //  auto    delCount  =  RemovePaths(livePaths);
-    //
-    //  // copy the refresh paths' files
-    //  auto   copyCount  =  CopyPathsToLive(paths); 
-    //
-    //  // load the handles
-    //  auto loadedHndls  =  LoadLibs(livePaths);
-    //
-    //  // put loaded handles into LavaFlow struct
-    //  TO(livePaths.size(), i){
-    //    auto h = loadedHndls[i];
-    //    if(h){
-    //      fd.lf.libs[livePaths[i]] = h;
-    //    }
-    //  }
-    //
-    //  // extract the flow node lists from the handles
-    //  auto flowNdLists = GetFlowNodeLists(loadedHndls);
-    //
-    //  // extract the flow nodes from the lists and put them into the multi-map
-    //  TO(livePaths.size(),i)
-    //  {
-    //    LavaFlowNode* list = flowNdLists[i];
-    //    if(list){
-    //      auto const& p = livePaths[i]; 
-    //      fd.lf.flow.erase(p);                            // delete the current node list for the livePath
-    //      for(; list->func!=nullptr; ++list){             // insert each of the LavaFlowNodes in the list into the multi-map
-    //        fd.lf.flow.insert( {p, list} );
-    //      }
-    //    }
-    //  }
-    //
-    //  // delete interface buttons from the nanogui window
-    //  fd.ui.ndBtns.clear();
-    //  
-    //  // redo interface node buttons
-    //  for(auto& kv : fd.lf.flow){
-    //    LavaFlowNode* fn = kv.second;                      // fn is flow node
-    //    auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
-    //    ndBtn->setCallback([fn](){ 
-    //      fd.grph.addNode( Node(fn->name, Node::FLOW, {100,100}), true);
-    //    });
-    //  }
-    //  fd.ui.screen.performLayout();
-    //
-    //  //// replace their nodes
-    //  //TO(loadedHndls.size(),i) if(loadedHndls[i]!=0)
-    //  //{
-    //  //  fd.lf.flow.find
-    //  //}
-    //
-    //  // coordinate the node structures with node Ids
-    //
-    //  //TO(pths.size(),i) 
-    //
-    //  TO(paths.size(),i) printf("\n %llu : %s \n", i, paths[i].c_str() );
-    //  //for(auto& p : pths) printf("\n %s \n
-    //#endif
-  }break;
-  case 'Y':
-  {
-  }break;
-  default:
-    ;
-  }
-
-  if(key==GLFW_KEY_BACKSPACE || key==GLFW_KEY_DELETE){
-    fd.grph.delSelected();
-  }
-
-  fd.ui.screen.keyCallbackEvent(key, scancode, action, modbits);
-}
-void          mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
-{
-  if(button==GLFW_MOUSE_BUTTON_LEFT){
-    if(action==GLFW_PRESS) fd.mouse.lftDn = true;
-    else if(action==GLFW_RELEASE) fd.mouse.lftDn = false;
-  }
-
-  if(button==GLFW_MOUSE_BUTTON_RIGHT){
-    if(action==GLFW_PRESS) fd.mouse.rtDn = true;
-    else if(action==GLFW_RELEASE) fd.mouse.rtDn = false;
-  }
-
-  fd.ui.screen.mouseButtonCallbackEvent(button, action, mods);
-}
-void             errorCallback(int e, const char *d) {
-  printf("Error %d: %s\n", e, d);
-  fflush(stdout);
-}
-void            scrollCallback(GLFWwindow* window, double xofst, double yofst)
-{
-  using namespace std;
-  fd.ui.screen.scrollCallbackEvent(xofst, yofst);
-}
-void         cursorPosCallback(GLFWwindow* window, double x, double y)
-{
-  const static float _2PI = 2.f* PIf; //  pi<float>();
-  fd.ui.screen.cursorPosCallbackEvent(x,y);
-}
-void              charCallback(GLFWwindow* window, unsigned int codepoint)
-{
-  fd.ui.screen.charCallbackEvent(codepoint);
-}
-void              dropCallback(GLFWwindow* window, int count, const char** filenames)
-{
-  FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
-
-  fd->ui.screen.dropCallbackEvent(count, filenames);
-}
-void   framebufferSizeCallback(GLFWwindow* window, int w, int h)
-{
-  fd.ui.screen.resizeCallbackEvent(w, h);
-}
-
 v2               in_cntr(Node const& n, f32 r)
 {
   //return v2(n.P.x + NODE_SZ.x/2, n.P.y-r);
@@ -857,6 +433,17 @@ v2              out_cntr(Node const& n, f32 r)
   return v2(n.P.x + n.b.w()/2, n.P.y + n.b.h() + r);
 }
 
+u64        node_nxtOrder()
+{
+  auto& nodes = fd.graph.nds;
+  auto& ordrs = fd.graph.ordr;
+
+  u64 order = 1;
+  if(ordrs.size() > 0)
+    order = ordrs.rbegin()->order + 1;
+
+  return order;
+}
 auto        node_getPtrs() -> vec_ndptrs
 {
   auto     sz = fd.graph.nds.size();  // nds.nsz();
@@ -907,6 +494,11 @@ auto            node_add(str node_name, Node n) -> uint64_t
     n.txt = "New: " +  node_name;
     n.id  = instIdx;
     fd.graph.nds[instIdx] = move(n);
+    
+    FisData::IdOrder ido;                                                          //ido is id order
+    ido.id    = instIdx;
+    ido.order = node_nxtOrder();
+    fd.graph.ordr.insert(ido);
   }
 
   return instIdx;
@@ -1119,6 +711,21 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 
   return borderPt;
 }
+auto          node_slots(vec_ndptrs const& nds) -> vec_ids
+{
+  using namespace std;
+
+  auto& slots = fd.graph.slots;
+  vec_ids sidxs;                                            // sidxs is slot indexes
+  for(auto np : nds){                                       // np is node pointer and nds is nodes
+    auto si = lower_bound(ALL(slots), Id(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
+    if(si != end(slots)  &&  si->first.nid == np->id){
+      Slot& s = si->second;
+      sidxs.push_back(si->first);        
+    }
+  }
+  return sidxs;                                        // RVO
+}
 
 LavaId          slot_add(u64 nidx, Slot s)
 {
@@ -1216,6 +823,480 @@ void           cnct_draw(NVGcontext* vg, v2 srcP, v2 destP, v2 srcN, v2 destN, f
   nvgStroke(vg);
 }
 
+auto           sel_nodes() -> vec_ndptrs
+{
+  vec_ndptrs nds;                                      // nids is node ids
+                                                       //for(auto& on : m_nodes){                           // on is order and node - order is on.first    node is on.second
+  for(auto& on : fd.graph.nds){                        // on is order and node - order is on.first    node is on.second
+    if(on.second.sel) nds.push_back(&on.second);
+  }
+
+  return nds;                                          // counting on RVO (return value optimization) here
+}
+u64           sel_delete()
+{
+  using namespace std;
+
+  u64    cnt = 0;
+  auto   nds = sel_nodes();           // accumulate nodes
+  //auto   nds =                      // accumulate nodes
+  auto sidxs = node_slots(nds);       // accumulate dest slots  // accumulate slots
+
+  for(auto sidx : sidxs){            // delete cncts with dest slots
+    //auto s = slot(sidx);
+    auto s = slot_get(sidx);
+    if(s){
+      if(s->in) fd.lgrph.delDestCnct(sidx);  //){ ++cnt; }
+      else      fd.lgrph.delSrcCncts(sidx);
+    }
+  }
+
+  // delete slots
+  for(auto sidx : sidxs){ fd.graph.slots.erase(sidx); }
+
+  // delete nodes
+  for(auto n : nds){
+    //m_ids.erase(n->id);
+    fd.graph.nds.erase(n->order);
+  }
+
+  return cnt;
+}
+
+// serialize to and from json - put in FisTfm.hpp file?
+str           graphToStr(GraphDB const& g)
+{
+  using namespace std;
+
+  Jzon::Node nds = Jzon::object();
+  SECTION(nodes)
+  {
+    auto ndp = g.nodes();
+    auto  sz = g.nsz();
+
+    Jzon::Node  nd_id = Jzon::array();
+    TO(sz,i) nd_id.add(ndp[i]->id);
+
+    Jzon::Node  nd_txt = Jzon::array();
+    TO(sz,i) nd_txt.add(ndp[i]->txt);
+
+    Jzon::Node    nd_x = Jzon::array();
+    TO(sz,i) nd_x.add(ndp[i]->P.x);
+
+    Jzon::Node    nd_y = Jzon::array();
+    TO(sz,i) nd_y.add(ndp[i]->P.y);
+
+    Jzon::Node nd_type = Jzon::array();
+    TO(sz,i) nd_type.add(ndp[i]->type);
+
+    nds.add("id",     nd_id);
+    nds.add("txt",   nd_txt);
+    nds.add("x",       nd_x);
+    nds.add("y",       nd_y);
+    nds.add("type", nd_type);
+  }
+  Jzon::Node jslots = Jzon::object();
+  SECTION(slots)
+  {
+    Jzon::Node srcId   = Jzon::array();
+    Jzon::Node srcIdx  = Jzon::array();
+    Jzon::Node destId  = Jzon::array();
+    Jzon::Node destIdx = Jzon::array();
+
+    for(auto kv : g.slots()){
+      GraphDB::Id  sid = kv.first;
+      auto& s = kv.second;
+      if(s.in){
+        destId.add(sid.nid);
+        destIdx.add(sid.sidx);
+      }else{
+        srcId.add(sid.nid);
+        srcIdx.add(sid.sidx);
+      }
+    }
+
+    jslots.add("destId",   destId);
+    jslots.add("destIdx", destIdx);
+    jslots.add("srcId",     srcId);
+    jslots.add("srcIdx",   srcIdx);
+  }
+  Jzon::Node jcncts = Jzon::object();
+  SECTION(connections)
+  {
+    auto sz = g.cnctsz();
+
+    Jzon::Node srcId   = Jzon::array();
+    Jzon::Node srcIdx  = Jzon::array();
+    Jzon::Node destId  = Jzon::array();
+    Jzon::Node destIdx = Jzon::array();
+
+    for(auto kv : g.cncts()){
+      destId.add(kv.first.nid);
+      destIdx.add(kv.first.sidx);
+      srcId.add(kv.second.nid);
+      srcIdx.add(kv.second.sidx);
+    }
+
+    jcncts.add("destId",   destId);
+    jcncts.add("destIdx", destIdx);
+    jcncts.add("srcId",     srcId);
+    jcncts.add("srcIdx",   srcIdx);
+  }
+
+  Jzon::Node graph = Jzon::object();
+  graph.add("nodes", nds);
+  graph.add("slots", jslots);
+  graph.add("connections", jcncts);
+
+  //Jzon::Format format;
+  //format.newline    = true;
+  //format.indentSize = 1;
+  //format.spacing    = true;
+  //format.useTabs    = false;
+
+  Jzon::Writer w;
+  //w.setFormat(format);  // breaks reading for some reason
+  str s;
+  w.writeString(graph, s);
+
+  return s;
+}
+GraphDB       strToGraph(str const& s)
+{
+  using namespace std;
+
+  GraphDB g;
+
+  Jzon::Parser prs;
+  auto graph = prs.parseString(s);
+
+  auto nd_id      = graph.get("nodes").get("id");
+  auto nd_txt     = graph.get("nodes").get("txt");
+  auto nd_x       = graph.get("nodes").get("x");
+  auto nd_y       = graph.get("nodes").get("y");
+  auto nd_type    = graph.get("nodes").get("type");
+  auto ordr       = graph.get("nodes").get("order");
+  auto destId     = graph.get("connections").get("destId");
+  auto destIdx    = graph.get("connections").get("destIdx");
+  auto srcId      = graph.get("connections").get("srcId");
+  auto srcIdx     = graph.get("connections").get("srcIdx");
+  auto sltDestId  = graph.get("slots").get("destId");
+  auto sltDestIdx = graph.get("slots").get("destIdx");
+  auto sltSrcId   = graph.get("slots").get("srcId");
+  auto sltSrcIdx  = graph.get("slots").get("srcIdx");
+
+  auto cnt = nd_id.getCount();
+  TO(cnt,i){
+    Node n;
+    n.id   = nd_id.get(i).toInt();
+    n.txt  = nd_txt.get(i).toString();
+    n.P.x  = nd_x.get(i).toFloat();
+    n.P.y  = nd_y.get(i).toFloat();
+    n.type = (Node::Type)nd_type.get(i).toInt();
+    g.addNode(n, false);
+  }
+
+  TO(sltSrcId.getCount(),i){
+    Id sltId;
+    sltId.nid  = sltSrcId.get(i).toInt();
+    sltId.sidx = sltSrcIdx.get(i).toInt();
+    Slot s(sltId.nid,false);
+    g.addSlot(s, sltId.sidx);
+  }
+  TO(sltDestId.getCount(),i){
+    Id sltId;
+    sltId.nid  = sltDestId.get(i).toInt();
+    sltId.sidx = sltDestIdx.get(i).toInt();
+    Slot s(sltId.nid,true);
+    g.addSlot(s, sltId.sidx);
+  }
+
+  auto cnct_cnt = destId.getCount();
+  TO(cnct_cnt,i){
+    GraphDB::Id src, dest;
+    src.nid   = srcId.get(i).toInt();
+    src.sidx  = srcIdx.get(i).toInt();
+    dest.nid  = destId.get(i).toInt();
+    dest.sidx = destIdx.get(i).toInt();
+    //g.addCnct(src, dest);
+    g.toggleCnct(src, dest);
+  }
+
+  g.setNextNodeId( g.maxId() );
+
+  return move(g);
+}
+bool            saveFile(GraphDB const& g, str path)
+{
+  str fileStr = graphToStr(g);
+
+  FILE* f = fopen(path.c_str(), "w");
+  if(!f) return false;
+
+  size_t writeSz = fwrite(fileStr.c_str(), 1, fileStr.size(), f);
+  if(writeSz != fileStr.size()) return false;
+
+  int closeRet = fclose(f);
+  if(closeRet == EOF) return false;
+
+  return true;
+}
+bool            loadFile(str path, GraphDB* out_g)
+{
+  FILE* f = fopen(path.c_str(), "r");
+  if(!f) return false;
+  fseek(f, 0, SEEK_END);
+  str s;
+  s.resize( ftell(f) );
+  fseek(f, 0, SEEK_SET);
+
+  size_t redRet = fread( (void*)s.data(), 1, s.size(), f);
+  if(redRet != s.size()) return false; 
+
+  if(fclose(f) == EOF) return false;
+
+  *out_g = strToGraph(s);
+
+  return true;
+}
+void    reloadSharedLibs()
+{
+#ifdef _WIN32
+  auto       paths  =  GetRefreshPaths();
+  auto   livePaths  =  GetLivePaths(paths);
+
+  // coordinate live paths to handles
+  auto liveHandles  =  GetLiveHandles(fd.lf.libs, livePaths);
+
+  // free the handles
+  auto   freeCount  =  FreeLibs(liveHandles); 
+
+  // delete the now unloaded live shared library files
+  auto    delCount  =  RemovePaths(livePaths);
+
+  // copy the refresh paths' files
+  auto   copyCount  =  CopyPathsToLive(paths); 
+
+  // load the handles
+  auto loadedHndls  =  LoadLibs(livePaths);
+
+  // put loaded handles into LavaFlow struct
+  TO(livePaths.size(), i){
+    auto h = loadedHndls[i];
+    if(h){
+      fd.lf.libs[livePaths[i]] = h;
+    }
+  }
+
+  // extract the flow node lists from the handles
+  auto flowNdLists = GetFlowNodeLists(loadedHndls);
+
+  // extract the flow nodes from the lists and put them into the multi-map
+  TO(livePaths.size(),i)
+  {
+    LavaFlowNode* ndList = flowNdLists[i];
+    if(ndList){
+      auto const& p = livePaths[i]; 
+      fd.lf.flow.erase(p);                              // delete the current node list for the livePath
+      for(; ndList->func!=nullptr; ++ndList){           // insert each of the LavaFlowNodes in the ndList into the multi-map
+        fd.lf.nameToPtr.erase(ndList->name);
+        fd.lf.nameToPtr.insert( {ndList->name, ndList} );
+        fd.lf.flow.insert( {p, ndList} );
+      }
+    }
+  }
+
+  // delete interface buttons from the nanogui window
+  fd.ui.ndBtns.clear();
+
+  // redo interface node buttons
+  for(auto& kv : fd.lf.flow){
+    LavaFlowNode* fn = kv.second;                      // fn is flow node
+    auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
+    ndBtn->setCallback([fn](){ 
+      node_add("FileToString", Node(fn->name, Node::FLOW, {100,100}) );
+      //fd.grph.addNode( Node(fn->name, Node::FLOW, {100,100}), true);
+      //node_add("FileToString", Node( str("New: ") + fn->name) );
+      //node_add("FileToString");
+    });
+  }
+  fd.ui.screen.performLayout();
+
+  //// replace their nodes
+  //TO(loadedHndls.size(),i) if(loadedHndls[i]!=0)
+  //{
+  //  fd.lf.flow.find
+  //}
+  //
+  // coordinate the node structures with node Ids
+  //
+  //TO(pths.size(),i) 
+  //
+  //for(auto& p : pths) printf("\n %s \n
+
+  TO(paths.size(),i) printf("\n %llu : %s \n", i, paths[i].c_str() );
+#endif
+}
+
+void              keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
+{
+  if(action==GLFW_RELEASE) return;
+
+  char sngl[256]; // = {'\0', '\0'};
+  memset(sngl, 0, 256);
+  sngl[0] = key;
+  glfwSetWindowTitle(win, sngl);
+
+  switch(key){
+  case 'J':
+  {
+    //_s = graphToStr();
+    //glfwSetWindowTitle(win, _s.c_str() );
+    //FILE* f = fopen("nanovg_test.lava", "w");
+    //fwrite(_s.c_str(), 1, _s.size(), f);
+    //fclose(f);
+  }break;
+  case 'K':
+  {
+    //FILE* f = fopen("nanovg_test.lava", "r");
+    //fseek(f, 0, SEEK_END);
+    //_s.resize( ftell(f) );
+    //fseek(f, 0, SEEK_SET);
+    //fread( (void*)_s.data(), 1, _s.size(), f);
+    //fclose(f);
+    //strToGraph(_s);
+  }break;
+  case 'L':
+  {
+    reloadSharedLibs();
+
+    //#ifdef _WIN32
+    //  auto     paths = GetRefreshPaths();
+    //  auto livePaths = GetLivePaths(paths);
+    //
+    //  // coordinate live paths to handles
+    //  auto liveHandles  =  GetLiveHandles(fd.lf.libs, livePaths);
+    //
+    //  // free the handles
+    //  auto   freeCount  =  FreeLibs(liveHandles); 
+    //
+    //  // delete the now unloaded live shared library files
+    //  auto    delCount  =  RemovePaths(livePaths);
+    //
+    //  // copy the refresh paths' files
+    //  auto   copyCount  =  CopyPathsToLive(paths); 
+    //
+    //  // load the handles
+    //  auto loadedHndls  =  LoadLibs(livePaths);
+    //
+    //  // put loaded handles into LavaFlow struct
+    //  TO(livePaths.size(), i){
+    //    auto h = loadedHndls[i];
+    //    if(h){
+    //      fd.lf.libs[livePaths[i]] = h;
+    //    }
+    //  }
+    //
+    //  // extract the flow node lists from the handles
+    //  auto flowNdLists = GetFlowNodeLists(loadedHndls);
+    //
+    //  // extract the flow nodes from the lists and put them into the multi-map
+    //  TO(livePaths.size(),i)
+    //  {
+    //    LavaFlowNode* list = flowNdLists[i];
+    //    if(list){
+    //      auto const& p = livePaths[i]; 
+    //      fd.lf.flow.erase(p);                            // delete the current node list for the livePath
+    //      for(; list->func!=nullptr; ++list){             // insert each of the LavaFlowNodes in the list into the multi-map
+    //        fd.lf.flow.insert( {p, list} );
+    //      }
+    //    }
+    //  }
+    //
+    //  // delete interface buttons from the nanogui window
+    //  fd.ui.ndBtns.clear();
+    //  
+    //  // redo interface node buttons
+    //  for(auto& kv : fd.lf.flow){
+    //    LavaFlowNode* fn = kv.second;                      // fn is flow node
+    //    auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
+    //    ndBtn->setCallback([fn](){ 
+    //      fd.grph.addNode( Node(fn->name, Node::FLOW, {100,100}), true);
+    //    });
+    //  }
+    //  fd.ui.screen.performLayout();
+    //
+    //  //// replace their nodes
+    //  //TO(loadedHndls.size(),i) if(loadedHndls[i]!=0)
+    //  //{
+    //  //  fd.lf.flow.find
+    //  //}
+    //
+    //  // coordinate the node structures with node Ids
+    //
+    //  //TO(pths.size(),i) 
+    //
+    //  TO(paths.size(),i) printf("\n %llu : %s \n", i, paths[i].c_str() );
+    //  //for(auto& p : pths) printf("\n %s \n
+    //#endif
+  }break;
+  case 'Y':
+  {
+  }break;
+  default:
+    ;
+  }
+
+  if(key==GLFW_KEY_BACKSPACE || key==GLFW_KEY_DELETE){
+    //fd.grph.delSelected();
+    sel_delete();
+  }
+
+  fd.ui.screen.keyCallbackEvent(key, scancode, action, modbits);
+}
+void          mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
+{
+  if(button==GLFW_MOUSE_BUTTON_LEFT){
+    if(action==GLFW_PRESS) fd.mouse.lftDn = true;
+    else if(action==GLFW_RELEASE) fd.mouse.lftDn = false;
+  }
+
+  if(button==GLFW_MOUSE_BUTTON_RIGHT){
+    if(action==GLFW_PRESS) fd.mouse.rtDn = true;
+    else if(action==GLFW_RELEASE) fd.mouse.rtDn = false;
+  }
+
+  fd.ui.screen.mouseButtonCallbackEvent(button, action, mods);
+}
+void             errorCallback(int e, const char *d) {
+  printf("Error %d: %s\n", e, d);
+  fflush(stdout);
+}
+void            scrollCallback(GLFWwindow* window, double xofst, double yofst)
+{
+  using namespace std;
+  fd.ui.screen.scrollCallbackEvent(xofst, yofst);
+}
+void         cursorPosCallback(GLFWwindow* window, double x, double y)
+{
+  const static float _2PI = 2.f* PIf; //  pi<float>();
+  fd.ui.screen.cursorPosCallbackEvent(x,y);
+}
+void              charCallback(GLFWwindow* window, unsigned int codepoint)
+{
+  fd.ui.screen.charCallbackEvent(codepoint);
+}
+void              dropCallback(GLFWwindow* window, int count, const char** filenames)
+{
+  FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
+
+  fd->ui.screen.dropCallbackEvent(count, filenames);
+}
+void   framebufferSizeCallback(GLFWwindow* window, int w, int h)
+{
+  fd.ui.screen.resizeCallbackEvent(w, h);
+}
+
 void        debug_coords(v2 a)
 {
   char  winTitle[TITLE_MAX_LEN];  // does glfw copy this string or just use the pointer? looks like it converts to a different character format which copies it / transforms it
@@ -1302,9 +1383,10 @@ ENTRY_DECLARATION
         //printf("\n\nfile dialog: %d %s \n\n", result, inPath);
 
         if(inPath){
-          bool ok = loadFile(inPath, &fd.grph);
-          if(ok) printf("\nFile loaded from %s\n", inPath);
-          else   printf("\nLoad did not read successfully from %s\n", inPath);
+          //bool ok = loadFile(inPath, &fd.grph);
+          //bool ok = loadFile(inPath, &fd.graph);
+          //if(ok) printf("\nFile loaded from %s\n", inPath);
+          //else   printf("\nLoad did not read successfully from %s\n", inPath);
         }
       });
       saveBtn->setCallback([](){
@@ -1314,19 +1396,25 @@ ENTRY_DECLARATION
         nfdresult_t result = NFD_SaveDialog("lava", NULL, &outPath );
         //printf("\n\nfile dialog: %d %s \n\n", result, outPath);
         if(outPath){
-          fd.grph.normalizeIndices();
-          bool ok = saveFile(fd.grph, outPath);
-          if(ok) printf("\nFile Written to %s\n", outPath);
-          else   printf("\nSave did not write successfully to %s\n", outPath);
+          fd.lgrph.normalizeIndices();
+          //bool ok = saveFile(fd.lgrph, outPath);
+          //if(ok) printf("\nFile Written to %s\n", outPath);
+          //else   printf("\nSave did not write successfully to %s\n", outPath);
         }
       });
 
-      GraphDB* grphPtr = &fd.grph;
-      flowBtn->setCallback([grphPtr](){
-        grphPtr->addNode( Node("new node", Node::FLOW) );
+      //GraphDB* grphPtr = &fd.grph;
+      //flowBtn->setCallback([grphPtr](){
+      //  grphPtr->addNode( Node("new node", Node::FLOW) );
+      //});
+      //msgBtn->setCallback([grphPtr](){
+      //  grphPtr->addNode( Node("message node", Node::MSG) );
+      //});
+      flowBtn->setCallback([](){
+        node_add("FileToString", Node("new node", Node::FLOW) );
       });
-      msgBtn->setCallback([grphPtr](){
-        grphPtr->addNode( Node("message node", Node::MSG) );
+      msgBtn->setCallback([](){
+        node_add("FileToString", Node("message node", Node::MSG) );
       });
 
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
@@ -1365,11 +1453,11 @@ ENTRY_DECLARATION
       reloadSharedLibs();
 
       // nodes
-      Node&     n0 = fd.grph.addNode( Node("one", Node::FLOW, {400.f,300.f}) );
-      auto   inst0 = node_add("FileToString");
+      //Node&     n0 = fd.grph.addNode( Node("one", Node::FLOW, {400.f,300.f}) );
+      auto   inst0 = node_add("FileToString", Node("one", Node::FLOW, {400.f,300.f}) );
 
-      Node&     n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
-      auto   inst1 = node_add("FileToString");
+      //Node&     n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
+      auto   inst1 = node_add("FileToString", Node("two", Node::FLOW, {200.f,500.f}) );
 
       //Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
       //Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
@@ -1378,11 +1466,11 @@ ENTRY_DECLARATION
       //n4.b.ymx = n4.b.xmx;
 
       // slots
-      GraphDB::Id ls0 = fd.grph.addSlot( Slot(n0.id,false) );
+      //GraphDB::Id ls0 = fd.grph.addSlot( Slot(n0.id,false) );
       //LavaFlowSlot s0 = slot_add(inst0, Slot(inst0,true) );
       LavaId s0 = slot_add(inst0, Slot(inst0,false) );
 
-      GraphDB::Id ls1 = fd.grph.addSlot( Slot(n1.id,true) );
+      //GraphDB::Id ls1 = fd.grph.addSlot( Slot(n1.id,true) );
       //LavaFlowSlot s1 = slot_add(inst1, Slot(inst1,false) );
       LavaId s1 = slot_add(inst1, Slot(inst1,true) );
 
@@ -1391,7 +1479,7 @@ ENTRY_DECLARATION
       //Id s4 = fd.grph.addSlot( Slot(n0.id, false) );
       //Id s5 = fd.grph.addSlot( Slot(n4.id, false) );
 
-      fd.grph.toggleCnct(ls0, ls1);
+      //fd.grph.toggleCnct(ls0, ls1);
       fd.lgrph.toggleCnct(s0, s1);
       //fd.grph.toggleCnct(s0, s2);
       //fd.grph.toggleCnct(s0, s3);
@@ -1407,7 +1495,7 @@ ENTRY_DECLARATION
   glfwSetTime(0);
   SECTION(main loop)
   {
-    GraphDB& grph = fd.grph;
+    //GraphDB& grph = fd.grph;
     //LavaFlow& grph = fd.lgrph;
     auto&    g = fd.lgrph;
     v2       pntr = {0,0};
@@ -1488,7 +1576,6 @@ ENTRY_DECLARATION
           }
         
           if(!fd.mouse.lftDn){
-            //if(fd.sel.pri >= 0){ fd.graph.nds[fd.sel.pri].sel = true; }
             fd.sel.pri = -1;
           }
         }
@@ -1497,7 +1584,8 @@ ENTRY_DECLARATION
           bool inAnySlt = false;
           GraphDB::Id  inClk(0);
           GraphDB::Id outClk(0);
-          for(auto& kv : grph.slots())
+          //for(auto& kv : grph.slots())
+          for(auto& kv : fd.graph.slots)
           {
             GraphDB::Id sid = kv.first;                       // sid is slot id
             Slot&         s = kv.second;
@@ -1523,13 +1611,16 @@ ENTRY_DECLARATION
 
           if(!inAnySlt && lftClkUp){
             fd.sel.slotOutSel = fd.sel.slotInSel = Id(0,0);
-            grph.clearSlotSels();
+            //grph.clearSlotSels();
+            // todo: put back sel_clearSlots()
           }
           
           if(fd.sel.slotInSel.sidx>0 && fd.sel.slotOutSel.sidx>0){
-            grph.toggleCnct(fd.sel.slotOutSel, fd.sel.slotInSel);
+            //grph.toggleCnct(fd.sel.slotOutSel, fd.sel.slotInSel);
+            fd.lgrph.toggleCnct(fd.sel.slotOutSel, fd.sel.slotInSel);
             fd.sel.slotOutSel = fd.sel.slotInSel = Id(0,0);
-            clear_selections(&grph, &fd);
+            //clear_selections(&grph, &fd);
+            // todo: make sel_clear()
             clearSelections = false;
           }
         }
@@ -1546,87 +1637,42 @@ ENTRY_DECLARATION
             {
               if(inNode)
               {
-                //if(lftClkUp){
-                //  //if(fd.sel.pri == n->id) n->sel = true;
-                //  fd.sel.pri = -1;
-                //}
-                //
-                //n   = &(grph.moveToFront(n->id));
-                //nds = grph.nodes();                   // move to the front will invalidate some pointers in the nds array so it needs to be remade
-
                 if(lftClkDn && (fd.sel.pri<0 || fd.sel.pri!=n->id) )
-                {               
-                  //n->sel     = true;
-                  //if(!n->sel){
-                  //  TO(sz,j){ nds[j]->sel = false; }      // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
-                  //  n->sel = true;
-                  //}
-
-                  n    =  &(grph.moveToFront(n->id));
+                {
+                  //n    =  &(grph.moveToFront(n->id));
+                  n    =  &(node_moveToFront(n->id));
                   nds  =  node_getPtrs();                  // move to the front will invalidate some pointers in the nds array so it needs to be remade
                   fd.sel.pri = n->id;
                   ms.drgP    = pntr;
 
-                  //if(!n->sel){
-                    TO(sz,j){ nds[j]->sel = false; }       // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
-                    n->sel = true;
-                    //fd.sel.pri = -1;
-                    //fd.sel.pri = n->id;
-                    break;                                 // without breaking from the loop, a node could be moved down and hit again
-                  //}
-                  //clearSelections = false;
+                  TO(sz,j){ nds[j]->sel = false; }        // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
+                  n->sel = true;
+                  break;                                  // without breaking from the loop, a node could be moved down and hit again
                 }
                 else if(lftClkUp)
                 {
-                  TO(sz,j){ nds[j]->sel = false; }      // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
+                  TO(sz,j){ nds[j]->sel = false; }        // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
                   n->sel          = true;
-                  //fd.sel.pri = -1;
                   clearSelections = false;
-                  break;
-
-                  //if(n->sel){
-                  //  fd.sel.pri      = -1;
-                  //  clearSelections = false;
-                  //  break;
-                  //}
-                
-                  //if(!n->sel){
-                  //  TO(sz,j){ nds[j]->sel = false; }      // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
-                  //  n->sel = true;
-                  //  fd.sel.pri = -1;
-                  //  //fd.sel.pri = n->id;
-                  //}
-                  //clearSelections = false;
-                
+                  break;                
                 }
               }
-              //else if(lftClkUp){
-              //  fd.sel.pri = -1;
-              //}
             }
           }
 
-          //if(!lftClkUp)
-          //  clearSelections=false;
-          //else
           if(!inAny)
           {
-            //if(lftClkUp){ fd.sel.pri = -1; }
-
             if(lftClkDn && !(fd.sel.pri>0) ){ ms.drgbox=true; }
-
             if(fd.mouse.rtDn && !fd.mouse.prevRtDn){ fd.sel.sec = -1; }
-          //}else if(lftClkUp){         // if(lftClkDn && lftClkUp){
-          //  //auto tmp = fd.sel.pri = -1;
-          //  //clear_selections(&grph, &fd);
-
           }else{
             clearSelections = false;
           }
         }
 
         if(clearSelections && lftClkUp){ // !lftDn && prevLftDn){ 
-          clear_selections(&grph, &fd);
+          //clear_selections(&grph, &fd);
+          //clear_selections(&grph, &fd);
+          // todo: make sel_clear()
         }
       }
       SECTION(movement)
@@ -1811,27 +1857,28 @@ ENTRY_DECLARATION
                 v2 avgP=srcP; v2 avgN={0,0}; u32 cnt=0;
                 auto avgIter=di;
                 for(; avgIter!=en && avgIter->first==srcIdx; ++avgIter ){     // ++cnt
-                  if(!grph.slot(avgIter->second)){ continue; }
+                  //if(!grph.slot(avgIter->second)){ continue; }
+                  //
+                  //Slot const& dest = *(grph.slot(avgIter->second));
 
-                  Slot const& dest = *(grph.slot(avgIter->second));
+                  if(! slot_get(avgIter->second)){ continue; }
+
+                  Slot const& dest = *(slot_get(avgIter->second));
                   avgP += dest.P;
                   avgP += srcP;
                   ++cnt;
                 }
                 avgP    /= (f32)(cnt*2+1);             // can't forget the first position for averaging - the src position - the avgP is weighted 1:1 with the srcP and all the destination positions combined
                 v2 midN  = norm(srcP - avgP);
-                f32   w  = grph.node(destIdx.nid).b.w();
-                //draw_cnct(vg, src.P, avgP, src.N, midN, NODE_SZ.x/2);
+                f32   w  = fd.graph.nds[destIdx.nid].b.w();
+
                 cnct_draw(vg, srcP, avgP, srcN, midN, w/2);
 
                 for(auto dhIter=di; di!=en && di->first == srcIdx; ++di){        // dhIter is draw half iterator - this is where the the connections are drawn from the average position of all slots 
                   const v2 hlfsz = fd.ui.slot_rad/2.f;
-                  //Slot const& dest = *(grph.slot(di->second));
-                  //LavaFlowSlot const& dest =  *(fd.lgrph.slot(di->second));     // *(grph.slot(di->second));
-                  //LavaFlowSlot const& dest =
+
                   Slot* dest = slot_get(di->second);    // find(di->second);
 
-                  //draw_cnct(vg, avgP, dest.P, -1.f*midN, dest.N, NODE_SZ.x/2);
                   cnct_draw(vg, avgP, dest->P, -1.f*midN, dest->N, w/2);
                 }
 
@@ -1948,6 +1995,74 @@ ENTRY_DECLARATION
 
 
 
+
+
+
+
+//f32   w  = grph.node(destIdx.nid).b.w();
+//draw_cnct(vg, src.P, avgP, src.N, midN, NODE_SZ.x/2);
+//
+//Slot const& dest = *(grph.slot(di->second));
+//LavaFlowSlot const& dest =  *(fd.lgrph.slot(di->second));     // *(grph.slot(di->second));
+//LavaFlowSlot const& dest =
+//
+//draw_cnct(vg, avgP, dest.P, -1.f*midN, dest.N, NODE_SZ.x/2);
+
+//using Id = GraphDB::Id;
+//using Id = LavaGraph::Id;
+
+//if(lftClkUp){
+//  //if(fd.sel.pri == n->id) n->sel = true;
+//  fd.sel.pri = -1;
+//}
+//
+//n   = &(grph.moveToFront(n->id));
+//nds = grph.nodes();                   // move to the front will invalidate some pointers in the nds array so it needs to be remade
+
+//n->sel     = true;
+//if(!n->sel){
+//  TO(sz,j){ nds[j]->sel = false; }      // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
+//  n->sel = true;
+//}
+
+//if(!n->sel){
+//fd.sel.pri = -1;
+//fd.sel.pri = n->id;
+//}
+//clearSelections = false;
+
+//
+//fd.sel.pri = -1;
+
+//if(n->sel){
+//  fd.sel.pri      = -1;
+//  clearSelections = false;
+//  break;
+//}
+
+//if(!n->sel){
+//  TO(sz,j){ nds[j]->sel = false; }      // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
+//  n->sel = true;
+//  fd.sel.pri = -1;
+//  //fd.sel.pri = n->id;
+//}
+//clearSelections = false;
+
+//else if(lftClkUp){
+//  fd.sel.pri = -1;
+//}
+//
+//if(!lftClkUp)
+//  clearSelections=false;
+//else
+//
+//if(lftClkUp){ fd.sel.pri = -1; }
+//}else if(lftClkUp){         // if(lftClkDn && lftClkUp){
+//  //auto tmp = fd.sel.pri = -1;
+//  //clear_selections(&grph, &fd);
+
+//
+//if(fd.sel.pri >= 0){ fd.graph.nds[fd.sel.pri].sel = true; }
 
 //auto    nds = grph.nodes();
 //auto     sz = grph.nsz();
