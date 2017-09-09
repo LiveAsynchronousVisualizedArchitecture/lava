@@ -191,8 +191,9 @@
 // -todo: make a get_slot() function
 // -todo: get slot movements to use LavaGraph for connections
 // -todo: fix multiple selection on click
+// -todo: fix selections - some fixed 
 
-// todo: fix selections
+// todo: fix dual selections
 // todo: change LavaId id and idx to nid and sidx
 // todo: transition to using the LavaGraph for connections 
 //       | mirror node instances to the LavaGraph
@@ -202,6 +203,7 @@
 //       | can this be cached ?
 // todo: make Lava data structures use the Lava thread local allocator
 // todo: change project name to Fissure 
+// todo: make basic command queue - enum for command, priority number
 
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
@@ -437,11 +439,11 @@ str           graphToStr(GraphDB const& g)
       GraphDB::Id  sid = kv.first;
       auto& s = kv.second;
       if(s.in){
-        destId.add(sid.id);
-        destIdx.add(sid.idx);
+        destId.add(sid.nid);
+        destIdx.add(sid.sidx);
       }else{
-        srcId.add(sid.id);
-        srcIdx.add(sid.idx);
+        srcId.add(sid.nid);
+        srcIdx.add(sid.sidx);
       }
     }
 
@@ -461,10 +463,10 @@ str           graphToStr(GraphDB const& g)
     Jzon::Node destIdx = Jzon::array();
 
     for(auto kv : g.cncts()){
-      destId.add(kv.first.id);
-      destIdx.add(kv.first.idx);
-      srcId.add(kv.second.id);
-      srcIdx.add(kv.second.idx);
+      destId.add(kv.first.nid);
+      destIdx.add(kv.first.sidx);
+      srcId.add(kv.second.nid);
+      srcIdx.add(kv.second.sidx);
     }
 
     jcncts.add("destId",   destId);
@@ -528,26 +530,26 @@ GraphDB       strToGraph(str const& s)
   
   TO(sltSrcId.getCount(),i){
     Id sltId;
-    sltId.id  = sltSrcId.get(i).toInt();
-    sltId.idx = sltSrcIdx.get(i).toInt();
-    Slot s(sltId.id,false);
-    g.addSlot(s, sltId.idx);
+    sltId.nid  = sltSrcId.get(i).toInt();
+    sltId.sidx = sltSrcIdx.get(i).toInt();
+    Slot s(sltId.nid,false);
+    g.addSlot(s, sltId.sidx);
   }
   TO(sltDestId.getCount(),i){
     Id sltId;
-    sltId.id  = sltDestId.get(i).toInt();
-    sltId.idx = sltDestIdx.get(i).toInt();
-    Slot s(sltId.id,true);
-    g.addSlot(s, sltId.idx);
+    sltId.nid  = sltDestId.get(i).toInt();
+    sltId.sidx = sltDestIdx.get(i).toInt();
+    Slot s(sltId.nid,true);
+    g.addSlot(s, sltId.sidx);
   }
 
   auto cnct_cnt = destId.getCount();
   TO(cnct_cnt,i){
     GraphDB::Id src, dest;
-    src.id   = srcId.get(i).toInt();
-    src.idx  = srcIdx.get(i).toInt();
-    dest.id  = destId.get(i).toInt();
-    dest.idx = destIdx.get(i).toInt();
+    src.nid   = srcId.get(i).toInt();
+    src.sidx  = srcIdx.get(i).toInt();
+    dest.nid  = destId.get(i).toInt();
+    dest.sidx = destIdx.get(i).toInt();
     //g.addCnct(src, dest);
     g.toggleCnct(src, dest);
   }
@@ -1484,9 +1486,10 @@ ENTRY_DECLARATION
               clearSelections = false;
           }
         
-          //if(!fd.mouse.lftDn){
-          //  fd.sel.pri = -1;
-          //}
+          if(!fd.mouse.lftDn){
+            //if(fd.sel.pri >= 0){ fd.graph.nds[fd.sel.pri].sel = true; }
+            fd.sel.pri = -1;
+          }
         }
         SECTION(slot selection and connection creation)
         {
@@ -1522,7 +1525,7 @@ ENTRY_DECLARATION
             grph.clearSlotSels();
           }
           
-          if(fd.sel.slotInSel.idx>0 && fd.sel.slotOutSel.idx>0){
+          if(fd.sel.slotInSel.sidx>0 && fd.sel.slotOutSel.sidx>0){
             grph.toggleCnct(fd.sel.slotOutSel, fd.sel.slotInSel);
             fd.sel.slotOutSel = fd.sel.slotInSel = Id(0,0);
             clear_selections(&grph, &fd);
@@ -1552,29 +1555,40 @@ ENTRY_DECLARATION
 
                 if(lftClkDn && (fd.sel.pri<0 || fd.sel.pri!=n->id) )
                 {               
-                  n    =  &(grph.moveToFront(n->id));
-                  nds  =  node_getPtrs();                 // move to the front will invalidate some pointers in the nds array so it needs to be remade
-
-                  fd.sel.pri = n->id;
                   //n->sel     = true;
-                  ms.drgP    = pntr;
-
                   //if(!n->sel){
                   //  TO(sz,j){ nds[j]->sel = false; }      // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
                   //  n->sel = true;
                   //}
+
+                  n    =  &(grph.moveToFront(n->id));
+                  nds  =  node_getPtrs();                  // move to the front will invalidate some pointers in the nds array so it needs to be remade
+                  fd.sel.pri = n->id;
+                  ms.drgP    = pntr;
+
                   if(!n->sel){
-                    TO(sz,j){ nds[j]->sel = false; }      // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
+                    TO(sz,j){ nds[j]->sel = false; }       // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
                     n->sel = true;
                     //fd.sel.pri = -1;
                     //fd.sel.pri = n->id;
+                    break;                                 // without breaking from the loop, a node could be moved down and hit again
                   }
                   //clearSelections = false;
-                  break;                                  // without breaking from the loop, a node could be moved down and hit again
-                }else if(lftClkUp){
-                  if(n->sel){
-                    fd.sel.pri = -1;
-                  }
+                }
+                else if(lftClkUp)
+                {
+                  TO(sz,j){ nds[j]->sel = false; }      // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
+                  n->sel          = true;
+                  //fd.sel.pri = -1;
+                  clearSelections = false;
+                  break;
+
+                  //if(n->sel){
+                  //  fd.sel.pri      = -1;
+                  //  clearSelections = false;
+                  //  break;
+                  //}
+                
                   //if(!n->sel){
                   //  TO(sz,j){ nds[j]->sel = false; }      // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
                   //  n->sel = true;
@@ -1582,7 +1596,7 @@ ENTRY_DECLARATION
                   //  //fd.sel.pri = n->id;
                   //}
                   //clearSelections = false;
-                  break;
+                
                 }
               }
               //else if(lftClkUp){
@@ -1601,9 +1615,9 @@ ENTRY_DECLARATION
             if(lftClkDn && !(fd.sel.pri>0) ){ ms.drgbox=true; }
 
             if(fd.mouse.rtDn && !fd.mouse.prevRtDn){ fd.sel.sec = -1; }
-          }else if(lftClkUp){         // if(lftClkDn && lftClkUp){
-            //auto tmp = fd.sel.pri = -1;
-            //clear_selections(&grph, &fd);
+          //}else if(lftClkUp){         // if(lftClkDn && lftClkUp){
+          //  //auto tmp = fd.sel.pri = -1;
+          //  //clear_selections(&grph, &fd);
 
           }else{
             clearSelections = false;
@@ -1642,7 +1656,7 @@ ENTRY_DECLARATION
             Id        nid = kv.first;
             Slot&       s = kv.second;
             //LavaSlot&  ls = fd.lgrph.slots();
-            Node const& n = fd.graph.nds[nid.id];
+            Node const& n = fd.graph.nds[nid.nid];
             v2 wh = n.b.wh();
             v2 nP = n.P + wh/2; //NODE_SZ/2; // n.b.mx; // w()/2; // NODE_SZ/2;
             v2 nrml;
@@ -1659,7 +1673,7 @@ ENTRY_DECLARATION
                 //auto srcNdP = n.P + wh/2;
                 auto srcIter = fd.graph.slots.find(src->id);
                 if(srcIter != fd.graph.slots.end() ){
-                  auto  srcNdP = fd.graph.nds[src->id.id].P;
+                  auto  srcNdP = fd.graph.nds[src->id.nid].P;
                   s.P = node_border(n, srcNdP - nP, &nrml);
                   s.N = nrml;
                 }
@@ -1783,7 +1797,7 @@ ENTRY_DECLARATION
 
                 //Slot const& dest = *(g.slot.find(destIdx));
                 Slot const& dest = fd.graph.slots.find(destIdx)->second;
-                f32 w = fd.graph.nds[destIdx.id].b.w();
+                f32 w = fd.graph.nds[destIdx.nid].b.w();
 
                 cnct_draw(vg, srcP, dest.P, srcN, dest.N, w/2);
 
@@ -1805,7 +1819,7 @@ ENTRY_DECLARATION
                 }
                 avgP    /= (f32)(cnt*2+1);             // can't forget the first position for averaging - the src position - the avgP is weighted 1:1 with the srcP and all the destination positions combined
                 v2 midN  = norm(srcP - avgP);
-                f32   w  = grph.node(destIdx.id).b.w();
+                f32   w  = grph.node(destIdx.nid).b.w();
                 //draw_cnct(vg, src.P, avgP, src.N, midN, NODE_SZ.x/2);
                 cnct_draw(vg, srcP, avgP, srcN, midN, w/2);
 

@@ -225,7 +225,7 @@ private:
     vec_ids sidxs;                                            // sidxs is slot indexes
     for(auto np : nds){                                       // np is node pointer and nds is nodes
       auto si = lower_bound(ALL(m_slots), Id(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
-      if(si != end(m_slots)  &&  si->first.id == np->id){
+      if(si != end(m_slots)  &&  si->first.nid == np->id){
         Slot& s = si->second;
         if(s.in) sidxs.push_back(si->first);
       }
@@ -239,7 +239,7 @@ private:
     vec_ids sidxs;                                            // sidxs is slot indexes
     for(auto np : nds){                                     // np is node pointer and nds is nodes
       auto si = lower_bound(ALL(m_slots), Id(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
-      if(si != end(m_slots)  &&  si->first.id == np->id){
+      if(si != end(m_slots)  &&  si->first.nid == np->id){
         Slot& s = si->second;
         sidxs.push_back(si->first);        
       }
@@ -261,9 +261,9 @@ private:
     auto si = nodeSlots(nid);                   // si is slot iterator
     u64 cur = 1;
     while(si != end(m_slots)   && 
-          si->first.id  == nid && 
-          si->first.idx <= cur+1 ){
-      cur = si->first.idx;
+          si->first.nid  == nid && 
+          si->first.sidx <= cur+1 ){
+      cur = si->first.sidx;
       ++si;
     }
     
@@ -300,8 +300,8 @@ public:
     for(auto kv : m_cncts){
       Id nxtDest = kv.first;
       Id nxtSrc  = kv.second;
-      nxtDest.id = nids[nxtDest.id];
-      nxtSrc.id  = nids[nxtSrc.id];
+      nxtDest.nid = nids[nxtDest.nid];
+      nxtSrc.nid  = nids[nxtSrc.nid];
       nxtCncts.insert({nxtDest, nxtSrc});
     }
     m_cncts = move(nxtCncts);
@@ -310,8 +310,8 @@ public:
     for(auto kv : m_destCncts){
       Id nxtSrc   = kv.first;
       Id nxtDest  = kv.second;
-      nxtSrc.id   = nids[nxtSrc.id];
-      nxtDest.id  = nids[nxtDest.id];
+      nxtSrc.nid   = nids[nxtSrc.nid];
+      nxtDest.nid  = nids[nxtDest.nid];
       nxtDestCncts.insert({nxtSrc, nxtDest});
     }
     m_destCncts = move(nxtDestCncts);
@@ -320,7 +320,7 @@ public:
     Slots nxtSlots;
     for(auto& kv : m_slots){
       Id nxtId  = kv.first;
-      nxtId.id  = nids[nxtId.id];
+      nxtId.nid  = nids[nxtId.nid];
       Slot nxtS = kv.second;
       nxtS.nid  = nids[nxtS.nid];
       nxtSlots.insert({nxtId, nxtS});
@@ -478,7 +478,7 @@ public:
   Id         addSlot(Slot  s, u64 idx=0)
   {
     Id id(s.nid, idx);
-    id.idx = idx? idx  :  nxtSlot(s.nid);
+    id.sidx = idx? idx  :  nxtSlot(s.nid);
     m_slots.insert({id, s});
 
     return id;

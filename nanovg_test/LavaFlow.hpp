@@ -77,21 +77,21 @@ struct     LavaPacket
 union          LavaId                                                // this Id serves as both a nodeId and LavaFlowSlot index, since a LavaFlowSlot index will alway coordinate with only one node 
 {    
   struct { 
-    u64 id  : 48;                                       // id is the node id number - This is a unique number for each node that doesn't change. It can refer back to a node since it doesn't represent an ordering or an index into an array 
-    u64 idx : 16;                                       // idx is the index of the LavaFlowSlot - for a node this is 0
+    u64  nid : 48;                                       // id is the node id number - This is a unique number for each node that doesn't change. It can refer back to a node since it doesn't represent an ordering or an index into an array 
+    u64 sidx : 16;                                       // idx is the index of the LavaFlowSlot - for a node this is 0
   };
   u64 asInt;
 
-  LavaId() : id(0), idx(0) {}
-  LavaId(u64 _id, u64 _idx=0) : id(_id), idx(_idx) {}
+  LavaId() : nid(0), sidx(0) {}
+  LavaId(u64 _id, u64 _idx=0) : nid(_id), sidx(_idx) {}
 
-  bool   operator==(LavaId  r) const { return id==r.id && idx==r.idx; }
+  bool   operator==(LavaId  r) const { return nid==r.nid && sidx==r.sidx; }
   bool    operator<(LavaId const& r) const {
-    if(id==r.id) return idx < r.idx;
-    else         return id  < r.id;
+    if(nid==r.nid) return sidx < r.sidx;
+    else         return nid  < r.nid;
   }
   size_t operator()(LavaId const& _id) const {
-    return std::hash<u64>()(_id.id) ^ std::hash<u64>()(_id.idx);
+    return std::hash<u64>()(_id.nid) ^ std::hash<u64>()(_id.sidx);
   }
 };
 struct   LavaFlowNode
@@ -280,7 +280,7 @@ private:
     vec_ids sidxs;                                            // sidxs is slot indexes
     for(auto np : nds){                                       // np is node pointer and nds is nodes
       auto si = lower_bound(ALL(m_slots), LavaId(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
-      if(si != end(m_slots)  &&  si->first.id == np->id){
+      if(si != end(m_slots)  &&  si->first.nid == np->id){
         LavaFlowSlot& s = si->second;
         if(s.in) sidxs.push_back(si->first);
       }
@@ -294,7 +294,7 @@ private:
     vec_ids sidxs;                                            // sidxs is LavaFlowSlot indexes
     for(auto np : nds){                                     // np is node pointer and nds is nodes
       auto si = lower_bound(ALL(m_slots), LavaId(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
-      if(si != end(m_slots)  &&  si->first.id == np->id){
+      if(si != end(m_slots)  &&  si->first.nid == np->id){
         LavaFlowSlot& s = si->second;
         sidxs.push_back(si->first);        
       }
@@ -311,8 +311,8 @@ private:
     auto si = nodeSlots(nid);                   // si is slot iterator
     i64 cur = -1;
     while(si != end(m_slots)   && 
-      si->first.id  == nid && 
-      si->first.idx <= (u64)(cur+1) ){
+      si->first.nid  == nid && 
+      si->first.sidx <= (u64)(cur+1) ){
       //cur = si->first.idx;
       ++cur; ++si;
     }
@@ -351,8 +351,8 @@ public:
     for(auto kv : m_cncts){
       LavaId nxtDest = kv.first;
       LavaId nxtSrc  = kv.second;
-      nxtDest.id = nids[nxtDest.id];
-      nxtSrc.id  = nids[nxtSrc.id];
+      nxtDest.nid = nids[nxtDest.nid];
+      nxtSrc.nid  = nids[nxtSrc.nid];
       nxtCncts.insert({nxtDest, nxtSrc});
     }
     m_cncts = move(nxtCncts);
@@ -361,8 +361,8 @@ public:
     for(auto kv : m_destCncts){
       LavaId nxtSrc   = kv.first;
       LavaId nxtDest  = kv.second;
-      nxtSrc.id   = nids[nxtSrc.id];
-      nxtDest.id  = nids[nxtDest.id];
+      nxtSrc.nid   = nids[nxtSrc.nid];
+      nxtDest.nid  = nids[nxtDest.nid];
       nxtDestCncts.insert({nxtSrc, nxtDest});
     }
     m_destCncts = move(nxtDestCncts);
@@ -371,9 +371,9 @@ public:
     Slots nxtSlots;
     for(auto& kv : m_slots){
       LavaId nxtId = kv.first;
-      nxtId.id     = nids[nxtId.id];
+      nxtId.nid     = nids[nxtId.nid];
       LavaFlowSlot nxtS = kv.second;
-      nxtS.id      = nids[nxtS.id.id];
+      nxtS.id      = nids[nxtS.id.nid];
       nxtSlots.insert({nxtId, nxtS});
     }
     m_slots = move(nxtSlots);
@@ -476,8 +476,8 @@ public:
   // slots
   LavaId     addSlot(LavaFlowSlot  s, u64 idx=0)
   {
-    LavaId id(s.id.id, idx);
-    id.idx = idx? idx  :  nxtSlot(s.id.idx);
+    LavaId id(s.id.nid, idx);
+    id.sidx = idx? idx  :  nxtSlot(s.id.sidx);
     s.id = id;
     m_slots.insert({id, s});
 
