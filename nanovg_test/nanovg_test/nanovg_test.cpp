@@ -204,14 +204,13 @@
 // -todo: make node_add add ordr
 // -todo: take out GraphDB completely
 // -todo: make drawing use node ordering - does get nodes need to use the order array? - yes, along with node_nxtOrder being corrected
+// -todo: make sel_clear()
+// -todo: make delSelected again - make sel_delete() - fix sel_delete() - needed to erase from order set and node map
 
-// todo: make sel_clear()
-// todo: make delSelected again - make sel_delete()
-// todo: test loading and saving
 // todo: put back multiple nodes and connections
-// todo: make Lava data structures use the Lava thread local allocator
-// todo: change project name to Fissure 
+// todo: test loading and saving
 // todo: make basic command queue - enum for command, priority number
+// todo: change project name to Fissure 
 
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
@@ -224,6 +223,7 @@
 // todo: use scroll wheel and nanovg scale transforms to zoom in and out - will need to scale mouse pointer position as well to 'canvas' coordinates
 // todo: make multiple slots avoid each other - might need to have discreet sections around a node for a slot to sit in
 // todo: don't select a slot if it is under an existing node
+// todo: make Lava data structures use the Lava thread local allocator
 
 // idea: load shared libs asynchronously and show a progress bar somewhere
 // idea: make command queue - use a simdb file or use the heap
@@ -404,24 +404,6 @@ v2         angleToNormal(f32 angle)
 
 
 // state manipulation
-void         clear_selections(GraphDB* inout_grph, FisData* inout_fd)
-{
-  inout_grph->clearSels();
-  inout_fd->sel.slotOutSel = Id(0,0);
-  inout_fd->sel.slotInSel  = Id(0,0);
-  inout_fd->sel.pri        =  -1;
-  inout_fd->sel.sec        =  -1;
-
-  for(auto& kv : fd.graph.nds){
-    kv.second.sel = false;
-  }
-
-  //fd.lf.nids.clear();
-  //TO(fd.lf.nids.size(),i){ 
-  //  fd.lf.nids
-  //}
-}
-
 v2               in_cntr(Node const& n, f32 r)
 {
   //return v2(n.P.x + NODE_SZ.x/2, n.P.y-r);
@@ -834,7 +816,7 @@ u64           sel_delete()
   //auto   nds =                      // accumulate nodes
   auto sidxs = node_slots(nds);       // accumulate dest slots  // accumulate slots
 
-  for(auto sidx : sidxs){            // delete cncts with dest slots
+  for(auto sidx : sidxs){             // delete cncts with dest slots
     //auto s = slot(sidx);
     auto s = slot_get(sidx);
     if(s){
@@ -847,12 +829,26 @@ u64           sel_delete()
   for(auto sidx : sidxs){ fd.graph.slots.erase(sidx); }
 
   // delete nodes
-  for(auto n : nds){
+  for(auto n : nds){  // does deleting from the graph.nds unordered map invalidate the pointers? - standard says no - how is memory reclaimed? - rehash()
     //m_ids.erase(n->id);
-    fd.graph.nds.erase(n->order);
+    fd.graph.ordr.erase({n->id, n->order});
+    fd.graph.nds.erase(n->id);
   }
+  fd.graph.nds.reserve( fd.graph.nds.size() * 2 );
 
   return cnt;
+}
+void           sel_clear(GraphDB* inout_grph, FisData* inout_fd)
+{
+  inout_grph->clearSels();
+  inout_fd->sel.slotOutSel = Id(0,0);
+  inout_fd->sel.slotInSel  = Id(0,0);
+  inout_fd->sel.pri        =  -1;
+  inout_fd->sel.sec        =  -1;
+
+  for(auto& kv : fd.graph.nds){
+    kv.second.sel = false;
+  }
 }
 
 // serialize to and from json - put in FisTfm.hpp file?
@@ -1140,109 +1136,27 @@ void              keyCallback(GLFWwindow* win, int key, int scancode, int action
   glfwSetWindowTitle(win, sngl);
 
   switch(key){
-  case 'J':
-  {
-    //_s = graphToStr();
-    //glfwSetWindowTitle(win, _s.c_str() );
-    //FILE* f = fopen("nanovg_test.lava", "w");
-    //fwrite(_s.c_str(), 1, _s.size(), f);
-    //fclose(f);
+  case 'J':{
   }break;
-  case 'K':
-  {
-    //FILE* f = fopen("nanovg_test.lava", "r");
-    //fseek(f, 0, SEEK_END);
-    //_s.resize( ftell(f) );
-    //fseek(f, 0, SEEK_SET);
-    //fread( (void*)_s.data(), 1, _s.size(), f);
-    //fclose(f);
-    //strToGraph(_s);
+  case 'K':{
   }break;
-  case 'L':
-  {
+  case 'L':{
     reloadSharedLibs();
-
-    //#ifdef _WIN32
-    //  auto     paths = GetRefreshPaths();
-    //  auto livePaths = GetLivePaths(paths);
-    //
-    //  // coordinate live paths to handles
-    //  auto liveHandles  =  GetLiveHandles(fd.lf.libs, livePaths);
-    //
-    //  // free the handles
-    //  auto   freeCount  =  FreeLibs(liveHandles); 
-    //
-    //  // delete the now unloaded live shared library files
-    //  auto    delCount  =  RemovePaths(livePaths);
-    //
-    //  // copy the refresh paths' files
-    //  auto   copyCount  =  CopyPathsToLive(paths); 
-    //
-    //  // load the handles
-    //  auto loadedHndls  =  LoadLibs(livePaths);
-    //
-    //  // put loaded handles into LavaFlow struct
-    //  TO(livePaths.size(), i){
-    //    auto h = loadedHndls[i];
-    //    if(h){
-    //      fd.lf.libs[livePaths[i]] = h;
-    //    }
-    //  }
-    //
-    //  // extract the flow node lists from the handles
-    //  auto flowNdLists = GetFlowNodeLists(loadedHndls);
-    //
-    //  // extract the flow nodes from the lists and put them into the multi-map
-    //  TO(livePaths.size(),i)
-    //  {
-    //    LavaFlowNode* list = flowNdLists[i];
-    //    if(list){
-    //      auto const& p = livePaths[i]; 
-    //      fd.lf.flow.erase(p);                            // delete the current node list for the livePath
-    //      for(; list->func!=nullptr; ++list){             // insert each of the LavaFlowNodes in the list into the multi-map
-    //        fd.lf.flow.insert( {p, list} );
-    //      }
-    //    }
-    //  }
-    //
-    //  // delete interface buttons from the nanogui window
-    //  fd.ui.ndBtns.clear();
-    //  
-    //  // redo interface node buttons
-    //  for(auto& kv : fd.lf.flow){
-    //    LavaFlowNode* fn = kv.second;                      // fn is flow node
-    //    auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
-    //    ndBtn->setCallback([fn](){ 
-    //      fd.grph.addNode( Node(fn->name, Node::FLOW, {100,100}), true);
-    //    });
-    //  }
-    //  fd.ui.screen.performLayout();
-    //
-    //  //// replace their nodes
-    //  //TO(loadedHndls.size(),i) if(loadedHndls[i]!=0)
-    //  //{
-    //  //  fd.lf.flow.find
-    //  //}
-    //
-    //  // coordinate the node structures with node Ids
-    //
-    //  //TO(pths.size(),i) 
-    //
-    //  TO(paths.size(),i) printf("\n %llu : %s \n", i, paths[i].c_str() );
-    //  //for(auto& p : pths) printf("\n %s \n
-    //#endif
   }break;
-  case 'Y':
-  {
+  case 'Y':{
+  }break;
+  case GLFW_KEY_BACKSPACE:
+  case GLFW_KEY_DELETE: {
+    sel_delete();
   }break;
   default:
     ;
   }
 
-  if(key==GLFW_KEY_BACKSPACE || key==GLFW_KEY_DELETE){
-    //fd.grph.delSelected();
-    sel_delete();
-  }
+  //if(key==GLFW_KEY_BACKSPACE || key==GLFW_KEY_DELETE){
+  //  //fd.grph.delSelected();
+  //  sel_delete();
+  //}
 
   fd.ui.screen.keyCallbackEvent(key, scancode, action, modbits);
 }
@@ -1991,6 +1905,95 @@ ENTRY_DECLARATION
 
 
 
+
+//_s = graphToStr();
+//glfwSetWindowTitle(win, _s.c_str() );
+//FILE* f = fopen("nanovg_test.lava", "w");
+//fwrite(_s.c_str(), 1, _s.size(), f);
+//fclose(f);
+
+//FILE* f = fopen("nanovg_test.lava", "r");
+//fseek(f, 0, SEEK_END);
+//_s.resize( ftell(f) );
+//fseek(f, 0, SEEK_SET);
+//fread( (void*)_s.data(), 1, _s.size(), f);
+//fclose(f);
+//strToGraph(_s);
+
+//#ifdef _WIN32
+//  auto     paths = GetRefreshPaths();
+//  auto livePaths = GetLivePaths(paths);
+//
+//  // coordinate live paths to handles
+//  auto liveHandles  =  GetLiveHandles(fd.lf.libs, livePaths);
+//
+//  // free the handles
+//  auto   freeCount  =  FreeLibs(liveHandles); 
+//
+//  // delete the now unloaded live shared library files
+//  auto    delCount  =  RemovePaths(livePaths);
+//
+//  // copy the refresh paths' files
+//  auto   copyCount  =  CopyPathsToLive(paths); 
+//
+//  // load the handles
+//  auto loadedHndls  =  LoadLibs(livePaths);
+//
+//  // put loaded handles into LavaFlow struct
+//  TO(livePaths.size(), i){
+//    auto h = loadedHndls[i];
+//    if(h){
+//      fd.lf.libs[livePaths[i]] = h;
+//    }
+//  }
+//
+//  // extract the flow node lists from the handles
+//  auto flowNdLists = GetFlowNodeLists(loadedHndls);
+//
+//  // extract the flow nodes from the lists and put them into the multi-map
+//  TO(livePaths.size(),i)
+//  {
+//    LavaFlowNode* list = flowNdLists[i];
+//    if(list){
+//      auto const& p = livePaths[i]; 
+//      fd.lf.flow.erase(p);                            // delete the current node list for the livePath
+//      for(; list->func!=nullptr; ++list){             // insert each of the LavaFlowNodes in the list into the multi-map
+//        fd.lf.flow.insert( {p, list} );
+//      }
+//    }
+//  }
+//
+//  // delete interface buttons from the nanogui window
+//  fd.ui.ndBtns.clear();
+//  
+//  // redo interface node buttons
+//  for(auto& kv : fd.lf.flow){
+//    LavaFlowNode* fn = kv.second;                      // fn is flow node
+//    auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
+//    ndBtn->setCallback([fn](){ 
+//      fd.grph.addNode( Node(fn->name, Node::FLOW, {100,100}), true);
+//    });
+//  }
+//  fd.ui.screen.performLayout();
+//
+//  //// replace their nodes
+//  //TO(loadedHndls.size(),i) if(loadedHndls[i]!=0)
+//  //{
+//  //  fd.lf.flow.find
+//  //}
+//
+//  // coordinate the node structures with node Ids
+//
+//  //TO(pths.size(),i) 
+//
+//  TO(paths.size(),i) printf("\n %llu : %s \n", i, paths[i].c_str() );
+//  //for(auto& p : pths) printf("\n %s \n
+//#endif
+
+//fd.lf.nids.clear();
+//TO(fd.lf.nids.size(),i){ 
+//  fd.lf.nids
+//}
 
 //Node  n = node(id);
 //auto prevOrder = n.order;     
