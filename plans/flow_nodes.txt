@@ -41,6 +41,13 @@ Node Types
 |  |  the constants tbl could be passed into the node function or use an implicit pointer
 
 
+Accumulator / General loop and iteration 
+|  Should there be a specific accumulator node? 
+|  Can accumulation of the output with new inputs be done with:
+|  |  Nodes able to take optional arguments
+|  |  A node that takes a list and an optional argument to inject into that list
+|  |  The ability to make circular references in the graph
+|  Does the ability to make circular references depend on either branching, optional arguments or both so that there is a way to break out of the loop? 
 
 
 

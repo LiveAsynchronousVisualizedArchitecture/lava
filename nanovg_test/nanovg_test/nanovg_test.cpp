@@ -206,10 +206,15 @@
 // -todo: make drawing use node ordering - does get nodes need to use the order array? - yes, along with node_nxtOrder being corrected
 // -todo: make sel_clear()
 // -todo: make delSelected again - make sel_delete() - fix sel_delete() - needed to erase from order set and node map
+// -todo: make slot_add only take a slot as argument
+// -todo: put back multiple slots
+// -todo: put back test connections
 
-// todo: put back multiple nodes and connections
+// todo: fix slot selections not becoming unselected 
+// todo: fix connection creation
+// todo: fix message node bounds
 // todo: test loading and saving
-// todo: make basic command queue - enum for command, priority number
+// todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
 // todo: change project name to Fissure 
 
 // todo: make two nodes execute in order
@@ -701,20 +706,17 @@ auto          node_slots(vec_ndptrs const& nds) -> vec_ids
   return sidxs;                                        // RVO
 }
 
-LavaId          slot_add(u64 nidx, Slot s)
+LavaId          slot_add(Slot s)
 {
   LavaFlowSlot ls;
-  ls.id = nidx;
-  ls.in = s.in;
-  ls.state = (LavaFlowSlot::State)(s.state);
+  ls.id      = s.nid;
+  ls.in      = s.in;
+  ls.state   = (LavaFlowSlot::State)(s.state);
   LavaId sid = fd.lgrph.addSlot(ls);
   fd.graph.slots.insert( {sid, s} );
 
   ls.id = sid;
   return sid;
-  //return ls;
-
-  //ls.state = (LavaFlowSlot::State)((u64)s.state);
 }
 void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState, f32 slot_rad=10.f)
 {
@@ -838,16 +840,26 @@ u64           sel_delete()
 
   return cnt;
 }
-void           sel_clear(GraphDB* inout_grph, FisData* inout_fd)
+//void           sel_clear(FisData* inout_fd)
+void           sel_clear()
 {
-  inout_grph->clearSels();
-  inout_fd->sel.slotOutSel = Id(0,0);
-  inout_fd->sel.slotInSel  = Id(0,0);
-  inout_fd->sel.pri        =  -1;
-  inout_fd->sel.sec        =  -1;
+  fd.sel.slotOutSel = Id(0,0);
+  fd.sel.slotInSel  = Id(0,0);
+  fd.sel.pri        =  -1;
+  fd.sel.sec        =  -1;
 
   for(auto& kv : fd.graph.nds){
     kv.second.sel = false;
+  }
+
+  for(auto& kv : fd.graph.slots){
+    kv.second.state = Slot::NORMAL;
+  }
+}
+void      sel_clearSlots()
+{
+  for(auto& kv : fd.graph.slots){
+    kv.second.state = Slot::NORMAL;
   }
 }
 
@@ -1360,35 +1372,43 @@ ENTRY_DECLARATION
 
       // nodes
       //Node&     n0 = fd.grph.addNode( Node("one", Node::FLOW, {400.f,300.f}) );
-      auto   inst0 = node_add("FileToString", Node("one", Node::FLOW, {400.f,300.f}) );
-
       //Node&     n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
-      auto   inst1 = node_add("FileToString", Node("two", Node::FLOW, {200.f,500.f}) );
-
       //Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
       //Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
       //Node& n4 = fd.grph.addNode( Node("five",  Node::MSG,  {200.f,200.f}) );
+
+      auto   inst0 = node_add("FileToString", Node("one",   Node::FLOW, {400.f,300.f}) );
+      auto   inst1 = node_add("FileToString", Node("two",   Node::FLOW, {200.f,500.f}) );
+      auto   inst2 = node_add("FileToString", Node("three", Node::FLOW, {700.f,500.f}) );
+      auto   inst3 = node_add("FileToString", Node("four",  Node::FLOW, {700.f,700.f}) );
+      auto   inst4 = node_add("FileToString", Node("five",  Node::MSG,  {200.f,200.f}) );
 
       //n4.b.ymx = n4.b.xmx;
 
       // slots
       //GraphDB::Id ls0 = fd.grph.addSlot( Slot(n0.id,false) );
       //LavaFlowSlot s0 = slot_add(inst0, Slot(inst0,true) );
-      LavaId s0 = slot_add(inst0, Slot(inst0,false) );
-
       //GraphDB::Id ls1 = fd.grph.addSlot( Slot(n1.id,true) );
       //LavaFlowSlot s1 = slot_add(inst1, Slot(inst1,false) );
-      LavaId s1 = slot_add(inst1, Slot(inst1,true) );
-
       //Id s2 = fd.grph.addSlot( Slot(n2.id,  true) );
       //Id s3 = fd.grph.addSlot( Slot(n3.id,  true) );
       //Id s4 = fd.grph.addSlot( Slot(n0.id, false) );
       //Id s5 = fd.grph.addSlot( Slot(n4.id, false) );
 
+      LavaId s0 = slot_add( Slot(inst0, false)  );
+      LavaId s1 = slot_add( Slot(inst1,  true)  );
+      LavaId s2 = slot_add( Slot(inst2,  true)  );
+      LavaId s3 = slot_add( Slot(inst3,  true)  );
+      LavaId s4 = slot_add( Slot(inst0, false)  );
+      LavaId s5 = slot_add( Slot(inst4, false)  );
+
       //fd.grph.toggleCnct(ls0, ls1);
-      fd.lgrph.toggleCnct(s0, s1);
       //fd.grph.toggleCnct(s0, s2);
       //fd.grph.toggleCnct(s0, s3);
+
+      fd.lgrph.toggleCnct(s0, s1);
+      fd.lgrph.toggleCnct(s0, s2);
+      fd.lgrph.toggleCnct(s0, s3);
 
       //auto  pi = fd.lf.flow.find("FileToString");                                  // pi is pointer iterator
       //if(pi != end(fd.lf.flow))
@@ -1488,13 +1508,13 @@ ENTRY_DECLARATION
         SECTION(slot selection and connection creation)
         {
           bool inAnySlt = false;
-          GraphDB::Id  inClk(0);
-          GraphDB::Id outClk(0);
+          LavaId  inClk(0);
+          LavaId outClk(0);
           //for(auto& kv : grph.slots())
           for(auto& kv : fd.graph.slots)
           {
-            GraphDB::Id sid = kv.first;                       // sid is slot id
-            Slot&         s = kv.second;
+            LavaId sid = kv.first;                       // sid is slot id
+            Slot&    s = kv.second;
             if(lftClkDn)
             {  
               bool inSlt = len(pntr - s.P) < fd.ui.slot_rad;
@@ -1516,7 +1536,9 @@ ENTRY_DECLARATION
           }
 
           if(!inAnySlt && lftClkUp){
-            fd.sel.slotOutSel = fd.sel.slotInSel = Id(0,0);
+            fd.sel.slotOutSel = fd.sel.slotInSel = LavaId(0,0);
+            sel_clearSlots();
+
             //grph.clearSlotSels();
             // todo: put back sel_clearSlots()
           }
@@ -1524,10 +1546,9 @@ ENTRY_DECLARATION
           if(fd.sel.slotInSel.sidx>0 && fd.sel.slotOutSel.sidx>0){
             //grph.toggleCnct(fd.sel.slotOutSel, fd.sel.slotInSel);
             fd.lgrph.toggleCnct(fd.sel.slotOutSel, fd.sel.slotInSel);
-            fd.sel.slotOutSel = fd.sel.slotInSel = Id(0,0);
-            //clear_selections(&grph, &fd);
-            // todo: make sel_clear()
-            clearSelections = false;
+            fd.sel.slotOutSel = fd.sel.slotInSel = LavaId(0,0);
+
+            //clearSelections = false;
           }
         }
         SECTION(node selection)
@@ -1575,10 +1596,9 @@ ENTRY_DECLARATION
           }
         }
 
-        if(clearSelections && lftClkUp){ // !lftDn && prevLftDn){ 
-          //clear_selections(&grph, &fd);
-          //clear_selections(&grph, &fd);
-          // todo: make sel_clear()
+        if(clearSelections && lftClkUp){ 
+          //sel_clear(&fd);
+          sel_clear();
         }
       }
       SECTION(movement)
@@ -1904,7 +1924,34 @@ ENTRY_DECLARATION
 
 
 
+//clear_selections(&grph, &fd);
+// todo: make sel_clear()
 
+// !lftDn && prevLftDn){ 
+//clear_selections(&grph, &fd);
+//clear_selections(&grph, &fd);
+
+//void           sel_clear(GraphDB* inout_grph, FisData* inout_fd)
+//{
+//  inout_grph->clearSels();
+//  inout_fd->sel.slotOutSel = Id(0,0);
+//  inout_fd->sel.slotInSel  = Id(0,0);
+//  inout_fd->sel.pri        =  -1;
+//  inout_fd->sel.sec        =  -1;
+//
+//  for(auto& kv : fd.graph.nds){
+//    kv.second.sel = false;
+//  }
+//}
+
+//
+//LavaId          slot_add(u64 nidx, Slot s)
+
+//ls.id = nidx;
+//
+//return ls;
+//
+//ls.state = (LavaFlowSlot::State)((u64)s.state);
 
 //_s = graphToStr();
 //glfwSetWindowTitle(win, _s.c_str() );
