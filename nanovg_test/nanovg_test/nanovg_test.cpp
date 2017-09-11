@@ -212,8 +212,10 @@
 // -todo: fix slot selections not becoming unselected 
 // -todo: port slot finding node over - slot_findAll
 // -todo: fix slot drawing - needed to use lower_bound in some form to just compare the node id 
+// -todo: figure out why toggleCnct is called twice - sel_clearSlots was not setting slot selections to SLOT_NONE
+// -todo: fix connection creation
+// -todo: test multiple nodes and connections - seems to work 
 
-// todo: fix connection creation
 // todo: fix message node bounds
 // todo: test loading and saving
 // todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
@@ -700,9 +702,6 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
   return borderPt;
 }
 
-//void        node_idslots(u64 nid)
-//
-//auto si = lower_bound(ALL(fd.graph.slots), Id(nid), [](auto a,auto b){ return a.first < b; } );
 auto          node_slots(u64 nid) -> decltype(fd.graph.slots.begin())
 {
   using namespace std;
@@ -880,7 +879,6 @@ u64           sel_delete()
 
   return cnt;
 }
-//void           sel_clear(FisData* inout_fd)
 void           sel_clear()
 {
   fd.sel.slotOutSel = Id(0,0);
@@ -898,6 +896,9 @@ void           sel_clear()
 }
 void      sel_clearSlots()
 {
+  fd.sel.slotInSel.sidx  = LavaId::SLOT_NONE; 
+  fd.sel.slotOutSel.sidx = LavaId::SLOT_NONE;
+
   for(auto& kv : fd.graph.slots){
     kv.second.state = Slot::NORMAL;
   }
@@ -1419,9 +1420,9 @@ ENTRY_DECLARATION
 
       auto   inst0 = node_add("FileToString", Node("one",   Node::FLOW, {400.f,300.f}) );
       auto   inst1 = node_add("FileToString", Node("two",   Node::FLOW, {200.f,500.f}) );
-      //auto   inst2 = node_add("FileToString", Node("three", Node::FLOW, {700.f,500.f}) );
-      //auto   inst3 = node_add("FileToString", Node("four",  Node::FLOW, {700.f,700.f}) );
-      //auto   inst4 = node_add("FileToString", Node("five",  Node::MSG,  {200.f,200.f}) );
+      auto   inst2 = node_add("FileToString", Node("three", Node::FLOW, {700.f,500.f}) );
+      auto   inst3 = node_add("FileToString", Node("four",  Node::FLOW, {700.f,700.f}) );
+      auto   inst4 = node_add("FileToString", Node("five",  Node::MSG,  {200.f,200.f}) );
 
       //n4.b.ymx = n4.b.xmx;
 
@@ -1437,18 +1438,18 @@ ENTRY_DECLARATION
 
       LavaId s0 = slot_add( Slot(inst0, false)  );
       LavaId s1 = slot_add( Slot(inst1,  true)  );
-      //LavaId s2 = slot_add( Slot(inst2,  true)  );
-      //LavaId s3 = slot_add( Slot(inst3,  true)  );
-      //LavaId s4 = slot_add( Slot(inst0, false)  );
-      //LavaId s5 = slot_add( Slot(inst4, false)  );
+      LavaId s2 = slot_add( Slot(inst2,  true)  );
+      LavaId s3 = slot_add( Slot(inst3,  true)  );
+      LavaId s4 = slot_add( Slot(inst0, false)  );
+      LavaId s5 = slot_add( Slot(inst4, false)  );
 
       //fd.grph.toggleCnct(ls0, ls1);
       //fd.grph.toggleCnct(s0, s2);
       //fd.grph.toggleCnct(s0, s3);
 
       fd.lgrph.toggleCnct(s0, s1);
-      //fd.lgrph.toggleCnct(s0, s2);
-      //fd.lgrph.toggleCnct(s0, s3);
+      fd.lgrph.toggleCnct(s0, s2);
+      fd.lgrph.toggleCnct(s0, s3);
 
       //auto  pi = fd.lf.flow.find("FileToString");                                  // pi is pointer iterator
       //if(pi != end(fd.lf.flow))
@@ -1588,6 +1589,8 @@ ENTRY_DECLARATION
             //grph.toggleCnct(fd.sel.slotOutSel, fd.sel.slotInSel);
             fd.lgrph.toggleCnct(fd.sel.slotOutSel, fd.sel.slotInSel);
             fd.sel.slotOutSel = fd.sel.slotInSel = LavaId(0,0);
+
+            sel_clearSlots();
 
             //clearSelections = false;
           }
@@ -1953,6 +1956,9 @@ ENTRY_DECLARATION
 
 
 
+//void        node_idslots(u64 nid)
+//
+//auto si = lower_bound(ALL(fd.graph.slots), Id(nid), [](auto a,auto b){ return a.first < b; } );
 
 //for(; sIter!=grph.slotEnd() && sIter->first.id==n.id; ++sIter)
 // .nodeSlots(n.id);
