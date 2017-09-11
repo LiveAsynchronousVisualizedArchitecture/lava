@@ -215,8 +215,8 @@
 // -todo: figure out why toggleCnct is called twice - sel_clearSlots was not setting slot selections to SLOT_NONE
 // -todo: fix connection creation
 // -todo: test multiple nodes and connections - seems to work 
+// -todo: fix message node bounds - simple MSG check in Node constructor
 
-// todo: fix message node bounds
 // todo: test loading and saving
 // todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
 // todo: change project name to Fissure 
@@ -496,8 +496,14 @@ auto            node_add(str node_name, Node n) -> uint64_t
 Bnd             node_bnd(NVGcontext* vg, Node const&  n)
 {
   f32 x=n.P.x, y=n.P.y, w=n.b.w(), h=n.b.h();
-  Bnd b = { x, y, x+w, y+h };
+  Bnd b;
+  b = { x, y, x+w, y+h };
+
   return b;
+
+  //if(n.type==Node::MSG){
+  //  b = { x, y, x+w, x+w };
+  //}else
 }
 void           node_draw(NVGcontext* vg,      // drw_node is draw node
                             int preicon,
@@ -1475,7 +1481,6 @@ ENTRY_DECLARATION
 
       auto nds = node_getPtrs();
       auto  sz = nds.size();
-      //auto  sz = fd.graph.nds.size();
 
       SECTION(time)
       {
@@ -1578,21 +1583,15 @@ ENTRY_DECLARATION
           if(!inAnySlt && lftClkUp){
             fd.sel.slotOutSel = fd.sel.slotInSel = LavaId(0,0);
             sel_clearSlots();
-
-            //grph.clearSlotSels();
-            // todo: put back sel_clearSlots()
           }
           
           if(fd.sel.slotInSel.sidx  != LavaId::SLOT_NONE && 
              fd.sel.slotOutSel.sidx != LavaId::SLOT_NONE)
           {
-            //grph.toggleCnct(fd.sel.slotOutSel, fd.sel.slotInSel);
             fd.lgrph.toggleCnct(fd.sel.slotOutSel, fd.sel.slotInSel);
             fd.sel.slotOutSel = fd.sel.slotInSel = LavaId(0,0);
 
             sel_clearSlots();
-
-            //clearSelections = false;
           }
         }
         SECTION(node selection)
@@ -1610,7 +1609,6 @@ ENTRY_DECLARATION
               {
                 if(lftClkDn && (fd.sel.pri<0 || fd.sel.pri!=n->id) )
                 {
-                  //n    =  &(grph.moveToFront(n->id));
                   n    =  &(node_moveToFront(n->id));
                   nds  =  node_getPtrs();                  // move to the front will invalidate some pointers in the nds array so it needs to be remade
                   fd.sel.pri = n->id;
@@ -1640,10 +1638,7 @@ ENTRY_DECLARATION
           }
         }
 
-        if(clearSelections && lftClkUp){
-          //sel_clear(&fd);
-          sel_clear();
-        }
+        if(clearSelections && lftClkUp){ sel_clear(); }
       }
       SECTION(movement)
       {
@@ -1788,17 +1783,12 @@ ENTRY_DECLARATION
           }
           SECTION(draw connections)
           {
-            //auto di = grph.srcCnctsMap().begin();                                    // di is destination iterator
-            //auto en = grph.srcCnctsMap().end();
-            //for(auto di = grph.srcCnctsMap().begin(); di != en; )
             auto di = g.srcCnctsMap().begin();                                    // di is destination iterator
             auto en = g.srcCnctsMap().end();
             for(auto di = g.srcCnctsMap().begin(); di != en; )
             {
               auto     srcIdx = di->first;
               auto    destIdx = di->second;
-              //Slot const& src = *(grph.slot(srcIdx));
-              //Slot const& src = g.slot(srcIdx);
               u64  cnt = 0; v2 srcP(0,0); v2 srcN(0,0);
               auto const& si = fd.graph.slots.find(srcIdx);
               if(si != fd.graph.slots.end()){
@@ -1809,29 +1799,18 @@ ENTRY_DECLARATION
 
               if(cnt==1)
               {
-                //Slot const& dest = *(grph.slot(destIdx));
-                //f32 w = grph.node(destIdx.id).b.w();
-
-                //Slot const& dest = *(g.slot.find(destIdx));
                 Slot const& dest = fd.graph.slots.find(destIdx)->second;
                 f32 w = fd.graph.nds[destIdx.nid].b.w();
 
                 cnct_draw(vg, srcP, dest.P, srcN, dest.N, w/2);
-
                 ++di;
-
-                //continue;
-                //draw_cnct(vg, src.P, dest.P, src.N, dest.N, NODE_SZ.x/2);
               }
               else
               {
                 v2 avgP=srcP; v2 avgN={0,0}; u32 cnt=0;
                 auto avgIter=di;
-                for(; avgIter!=en && avgIter->first==srcIdx; ++avgIter ){     // ++cnt
-                  //if(!grph.slot(avgIter->second)){ continue; }
-                  //
-                  //Slot const& dest = *(grph.slot(avgIter->second));
-
+                for(; avgIter!=en && avgIter->first==srcIdx; ++avgIter )
+                {    
                   if(! slot_get(avgIter->second)){ continue; }
 
                   Slot const& dest = *(slot_get(avgIter->second));
@@ -1848,7 +1827,7 @@ ENTRY_DECLARATION
                 for(auto dhIter=di; di!=en && di->first == srcIdx; ++di){        // dhIter is draw half iterator - this is where the the connections are drawn from the average position of all slots 
                   const v2 hlfsz = fd.ui.slot_rad/2.f;
 
-                  Slot* dest = slot_get(di->second);    // find(di->second);
+                  Slot* dest = slot_get(di->second);
 
                   if(dest) cnct_draw(vg, avgP, dest->P, -1.f*midN, dest->N, w/2);
                 }
@@ -1955,6 +1934,40 @@ ENTRY_DECLARATION
 
 
 
+
+
+
+
+
+
+
+//grph.toggleCnct(fd.sel.slotOutSel, fd.sel.slotInSel);
+//
+//grph.clearSlotSels();
+// todo: put back sel_clearSlots()
+
+//auto di = grph.srcCnctsMap().begin();                                    // di is destination iterator
+//auto en = grph.srcCnctsMap().end();
+//for(auto di = grph.srcCnctsMap().begin(); di != en; )
+//
+//Slot const& src = *(grph.slot(srcIdx));
+//Slot const& src = g.slot(srcIdx);
+
+//
+//n    =  &(grph.moveToFront(n->id));
+
+//Slot const& dest = *(grph.slot(destIdx));
+//f32 w = grph.node(destIdx.id).b.w();
+//
+//Slot const& dest = *(g.slot.find(destIdx));
+//
+//continue;
+//draw_cnct(vg, src.P, dest.P, src.N, dest.N, NODE_SZ.x/2);
+
+// ++cnt
+//if(!grph.slot(avgIter->second)){ continue; }
+//
+//Slot const& dest = *(grph.slot(avgIter->second));
 
 //void        node_idslots(u64 nid)
 //

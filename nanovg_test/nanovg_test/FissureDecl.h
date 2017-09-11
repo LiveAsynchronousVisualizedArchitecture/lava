@@ -111,7 +111,10 @@ struct    Node
   }
 
   Node(){}
-  Node(str _txt, Type _type=FLOW, v2 _P=v2(0,0) ) : txt(_txt), P(_P), type(_type) {}
+  Node(str _txt, Type _type=FLOW, v2 _P=v2(0,0) ) : txt(_txt), P(_P), type(_type)
+  {
+    if(type==MSG) b.ymx = b.xmx;
+  }
   Node(Node const& l){ cp(l); }
   Node(Node&&      r){ mv(std::move(r)); }
 
