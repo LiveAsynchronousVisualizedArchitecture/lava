@@ -48,6 +48,10 @@ Accumulator / General loop and iteration
 |  |  A node that takes a list and an optional argument to inject into that list
 |  |  The ability to make circular references in the graph
 |  Does the ability to make circular references depend on either branching, optional arguments or both so that there is a way to break out of the loop? 
-
+|  |  accumulation could be done with a branching node before the accumulator node 
+|  |  the branch bypasses the accumulator if there is only one packet in the list
+|  |  if there is more than one packet, the branch goes to the accumulator
+|  |  the accumulator's output would go back in to the branch   -------the branch node's single packet path and the accumulator's output path go to some node with two optional inputs - could even be another accumulator node
+|  |  the branch would need two inputs to collect all the packets - if there is only one it bypasses the accumulator, if there are multiple, it feeds them into the accumulator
 
 

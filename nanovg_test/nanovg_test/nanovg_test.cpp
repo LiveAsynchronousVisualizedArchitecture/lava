@@ -209,8 +209,10 @@
 // -todo: make slot_add only take a slot as argument
 // -todo: put back multiple slots
 // -todo: put back test connections
+// -todo: fix slot selections not becoming unselected 
+// -todo: port slot finding node over - slot_findAll
+// -todo: fix slot drawing - needed to use lower_bound in some form to just compare the node id 
 
-// todo: fix slot selections not becoming unselected 
 // todo: fix connection creation
 // todo: fix message node bounds
 // todo: test loading and saving
@@ -433,11 +435,18 @@ u64        node_nxtOrder()
 }
 auto        node_getPtrs() -> vec_ndptrs
 {
+  auto& nodes = fd.graph.nds;
   auto     sz = fd.graph.nds.size();  // nds.nsz();
   u64       i = 0;
-  vec_ndptrs nds(sz,nullptr);
+  //vec_ndptrs nds(sz,nullptr);
+  vec_ndptrs nds; 
+  nds.reserve(sz);
   for(auto& ido : fd.graph.ordr){                     // ido is id order - an IdOrdr struct
-    nds[i++] = &fd.graph.nds[ido.id];
+    //nds[i++] = &fd.graph.nds[ido.id];
+    if(nodes.find(ido.id) != end(nodes)){
+      nds.push_back( &fd.graph.nds[ido.id] );
+      ++i;
+    }
   }
 
   return nds;
@@ -690,6 +699,16 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 
   return borderPt;
 }
+
+//void        node_idslots(u64 nid)
+//
+//auto si = lower_bound(ALL(fd.graph.slots), Id(nid), [](auto a,auto b){ return a.first < b; } );
+auto          node_slots(u64 nid) -> decltype(fd.graph.slots.begin())
+{
+  using namespace std;
+  //return lower_bound(ALL(fd.graph.slots), Id(nid), [](auto a,auto b){ return a.first < b; } );
+  return lower_bound(ALL(fd.graph.slots), nid, [](auto a,auto b){ return a.first.nid < b; } );
+}
 auto          node_slots(vec_ndptrs const& nds) -> vec_ids
 {
   using namespace std;
@@ -700,7 +719,7 @@ auto          node_slots(vec_ndptrs const& nds) -> vec_ids
     auto si = lower_bound(ALL(slots), Id(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
     if(si != end(slots)  &&  si->first.nid == np->id){
       Slot& s = si->second;
-      sidxs.push_back(si->first);        
+      sidxs.push_back(si->first);     
     }
   }
   return sidxs;                                        // RVO
@@ -780,6 +799,27 @@ Slot*           slot_get(LavaId id)
 
   return &si->second;
 }
+
+//auto      nodeSlots(vec_nptrs const& nds) -> vec_ids
+//auto            slot_all() -> vec_ids
+//{
+//  using namespace std;
+//
+//  auto& slots = fd.graph.slots;
+//  auto& nodes = fd.graph.nds;
+//
+//  vec_ids sidxs;                                            // sidxs is slot indexes
+//  for(auto& kv : nodes)
+//  {                                                         // np is node pointer and nds is nodes
+//    auto nid = kv.first;
+//    auto  si = lower_bound(ALL(slots), nid, [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
+//    if(si != end(slots)  &&  si->first.nid == nid){
+//      Slot& s = si->second;
+//      sidxs.push_back(si->first);        
+//    }
+//  }
+//  return sidxs;                                        // RVO
+//}
 
 void           cnct_draw(NVGcontext* vg, v2 srcP, v2 destP, v2 srcN, v2 destN, f32 minCenterDist=INFf)
 { 
@@ -1379,9 +1419,9 @@ ENTRY_DECLARATION
 
       auto   inst0 = node_add("FileToString", Node("one",   Node::FLOW, {400.f,300.f}) );
       auto   inst1 = node_add("FileToString", Node("two",   Node::FLOW, {200.f,500.f}) );
-      auto   inst2 = node_add("FileToString", Node("three", Node::FLOW, {700.f,500.f}) );
-      auto   inst3 = node_add("FileToString", Node("four",  Node::FLOW, {700.f,700.f}) );
-      auto   inst4 = node_add("FileToString", Node("five",  Node::MSG,  {200.f,200.f}) );
+      //auto   inst2 = node_add("FileToString", Node("three", Node::FLOW, {700.f,500.f}) );
+      //auto   inst3 = node_add("FileToString", Node("four",  Node::FLOW, {700.f,700.f}) );
+      //auto   inst4 = node_add("FileToString", Node("five",  Node::MSG,  {200.f,200.f}) );
 
       //n4.b.ymx = n4.b.xmx;
 
@@ -1397,18 +1437,18 @@ ENTRY_DECLARATION
 
       LavaId s0 = slot_add( Slot(inst0, false)  );
       LavaId s1 = slot_add( Slot(inst1,  true)  );
-      LavaId s2 = slot_add( Slot(inst2,  true)  );
-      LavaId s3 = slot_add( Slot(inst3,  true)  );
-      LavaId s4 = slot_add( Slot(inst0, false)  );
-      LavaId s5 = slot_add( Slot(inst4, false)  );
+      //LavaId s2 = slot_add( Slot(inst2,  true)  );
+      //LavaId s3 = slot_add( Slot(inst3,  true)  );
+      //LavaId s4 = slot_add( Slot(inst0, false)  );
+      //LavaId s5 = slot_add( Slot(inst4, false)  );
 
       //fd.grph.toggleCnct(ls0, ls1);
       //fd.grph.toggleCnct(s0, s2);
       //fd.grph.toggleCnct(s0, s3);
 
       fd.lgrph.toggleCnct(s0, s1);
-      fd.lgrph.toggleCnct(s0, s2);
-      fd.lgrph.toggleCnct(s0, s3);
+      //fd.lgrph.toggleCnct(s0, s2);
+      //fd.lgrph.toggleCnct(s0, s3);
 
       //auto  pi = fd.lf.flow.find("FileToString");                                  // pi is pointer iterator
       //if(pi != end(fd.lf.flow))
@@ -1421,8 +1461,6 @@ ENTRY_DECLARATION
   glfwSetTime(0);
   SECTION(main loop)
   {
-    //GraphDB& grph = fd.grph;
-    //LavaFlow& grph = fd.lgrph;
     auto&    g = fd.lgrph;
     v2       pntr = {0,0};
     f64 cx, cy, t, dt, avgFps=60, prevt=0, cpuTime=0;
@@ -1435,7 +1473,8 @@ ENTRY_DECLARATION
       bool  rtClk = (ms.rtDn  && !ms.prevRtDn);
 
       auto nds = node_getPtrs();
-      auto  sz = fd.graph.nds.size();
+      auto  sz = nds.size();
+      //auto  sz = fd.graph.nds.size();
 
       SECTION(time)
       {
@@ -1508,8 +1547,8 @@ ENTRY_DECLARATION
         SECTION(slot selection and connection creation)
         {
           bool inAnySlt = false;
-          LavaId  inClk(0);
-          LavaId outClk(0);
+          LavaId  inClk(LavaId::NODE_NONE, LavaId::SLOT_NONE);
+          LavaId outClk(LavaId::NODE_NONE, LavaId::SLOT_NONE);
           //for(auto& kv : grph.slots())
           for(auto& kv : fd.graph.slots)
           {
@@ -1519,7 +1558,7 @@ ENTRY_DECLARATION
             {  
               bool inSlt = len(pntr - s.P) < fd.ui.slot_rad;
               if(inSlt){
-                outClk  = sid;  // Id(nid);
+                outClk  = sid;                     // Id(nid);
                 s.state = Slot::SELECTED;
                 if(s.in) fd.sel.slotInSel  = sid; // Id(nid, );
                 else     fd.sel.slotOutSel = sid; // Id(nid, );
@@ -1543,7 +1582,9 @@ ENTRY_DECLARATION
             // todo: put back sel_clearSlots()
           }
           
-          if(fd.sel.slotInSel.sidx>0 && fd.sel.slotOutSel.sidx>0){
+          if(fd.sel.slotInSel.sidx  != LavaId::SLOT_NONE && 
+             fd.sel.slotOutSel.sidx != LavaId::SLOT_NONE)
+          {
             //grph.toggleCnct(fd.sel.slotOutSel, fd.sel.slotInSel);
             fd.lgrph.toggleCnct(fd.sel.slotOutSel, fd.sel.slotInSel);
             fd.sel.slotOutSel = fd.sel.slotInSel = LavaId(0,0);
@@ -1596,7 +1637,7 @@ ENTRY_DECLARATION
           }
         }
 
-        if(clearSelections && lftClkUp){ 
+        if(clearSelections && lftClkUp){
           //sel_clear(&fd);
           sel_clear();
         }
@@ -1775,6 +1816,7 @@ ENTRY_DECLARATION
                 cnct_draw(vg, srcP, dest.P, srcN, dest.N, w/2);
 
                 ++di;
+
                 //continue;
                 //draw_cnct(vg, src.P, dest.P, src.N, dest.N, NODE_SZ.x/2);
               }
@@ -1805,7 +1847,7 @@ ENTRY_DECLARATION
 
                   Slot* dest = slot_get(di->second);    // find(di->second);
 
-                  cnct_draw(vg, avgP, dest->P, -1.f*midN, dest->N, w/2);
+                  if(dest) cnct_draw(vg, avgP, dest->P, -1.f*midN, dest->N, w/2);
                 }
 
                 nvgBeginPath(vg);
@@ -1818,7 +1860,7 @@ ENTRY_DECLARATION
               }
             }
           }
-          SECTION(draw nodes)
+          SECTION(draw nodes and slots)
           {
             auto const& slots = fd.graph.slots;
             TO(sz,i)
@@ -1832,9 +1874,11 @@ ENTRY_DECLARATION
               {
                 nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
                 nvgStrokeWidth(vg, fd.ui.slot_border);
-                auto sIter = fd.graph.slots.find(n.id);      // .nodeSlots(n.id);            // sIter is slot iterator
-                //for(; sIter!=grph.slotEnd() && sIter->first.id==n.id; ++sIter)
-                for(; sIter!=end(slots) && sIter->first==n.id; ++sIter)
+                
+                //auto sIter = fd.graph.slots.find(n.id);                             // sIter is slot iterator
+                //auto sIter = lower_bound( ALL(slots), n.id);                      // sIter is slot iterator
+                auto sIter = node_slots(n.id);
+                for(; sIter!=end(slots) && sIter->first.nid==n.id; ++sIter)
                 {
                   auto     sIdx = sIter->first;                    // todo: needs to be redone
                   //Slot const& s = *(grph.slot(sIdx));
@@ -1846,19 +1890,6 @@ ENTRY_DECLARATION
                   else if(inSlot)             drawState = Slot::HIGHLIGHTED;
                   slot_draw(vg, s, drawState, fd.ui.slot_rad);
                 }
-
-                //auto sIter = grph.nodeSlots(n.id);            // sIter is slot iterator
-                //for(; sIter!=grph.slotEnd() && sIter->first.id==n.id; ++sIter)
-                //{
-                //  auto     sIdx = sIter->first;                    // todo: needs to be redone
-                //  Slot const& s = *(grph.slot(sIdx));
-                //  bool   inSlot = len(pntr - s.P) < fd.ui.slot_rad; //io_rad;
-                //
-                //  Slot::State drawState = Slot::NORMAL;
-                //  if(s.state==Slot::SELECTED) drawState = Slot::SELECTED;
-                //  else if(inSlot)             drawState = Slot::HIGHLIGHTED;
-                //  slot_draw(vg, s, drawState, fd.ui.slot_rad);
-                //}
               }
             }
           }
@@ -1923,6 +1954,24 @@ ENTRY_DECLARATION
 
 
 
+//for(; sIter!=grph.slotEnd() && sIter->first.id==n.id; ++sIter)
+// .nodeSlots(n.id);
+
+//auto sIter = grph.nodeSlots(n.id);            // sIter is slot iterator
+//for(; sIter!=grph.slotEnd() && sIter->first.id==n.id; ++sIter)
+//{
+//  auto     sIdx = sIter->first;                    // todo: needs to be redone
+//  Slot const& s = *(grph.slot(sIdx));
+//  bool   inSlot = len(pntr - s.P) < fd.ui.slot_rad; //io_rad;
+//
+//  Slot::State drawState = Slot::NORMAL;
+//  if(s.state==Slot::SELECTED) drawState = Slot::SELECTED;
+//  else if(inSlot)             drawState = Slot::HIGHLIGHTED;
+//  slot_draw(vg, s, drawState, fd.ui.slot_rad);
+//}
+
+//GraphDB& grph = fd.grph;
+//LavaFlow& grph = fd.lgrph;
 
 //clear_selections(&grph, &fd);
 // todo: make sel_clear()

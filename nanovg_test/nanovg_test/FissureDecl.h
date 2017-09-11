@@ -174,8 +174,8 @@ private:
     m_nodes     = move(rval.m_nodes); 
     m_ids       = move(rval.m_ids);
     m_slots     = move(rval.m_slots); 
-    m_cncts  = move(rval.m_cncts); 
-    m_destCncts   = move(rval.m_destCncts);
+    m_cncts     = move(rval.m_cncts); 
+    m_destCncts = move(rval.m_destCncts);
   }
   u64             nxt(){ return m_nxtId++; }
   u64        nxtOrder()
@@ -214,7 +214,7 @@ private:
     using namespace std;
 
     vec_ids sidxs;                                            // sidxs is slot indexes
-    for(auto np : nds){                                     // np is node pointer and nds is nodes
+    for(auto np : nds){                                       // np is node pointer and nds is nodes
       auto si = lower_bound(ALL(m_slots), Id(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
       if(si != end(m_slots)  &&  si->first.nid == np->id){
         Slot& s = si->second;

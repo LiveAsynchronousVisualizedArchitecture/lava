@@ -76,17 +76,20 @@ struct     LavaPacket
 };
 union          LavaId                                                // this Id serves as both a nodeId and LavaFlowSlot index, since a LavaFlowSlot index will alway coordinate with only one node 
 {    
+ static  const u64 NODE_NONE = 0xFFFFFFFFFFFF;                  // 48 bits all set
+ static  const u64 SLOT_NONE = 0xFFFF;                          // 16 bits all set
+
   struct { 
     u64  nid : 48;                                       // id is the node id number - This is a unique number for each node that doesn't change. It can refer back to a node since it doesn't represent an ordering or an index into an array 
     u64 sidx : 16;                                       // idx is the index of the LavaFlowSlot - for a node this is 0
   };
   u64 asInt;
 
-  LavaId() : nid(0), sidx(0) {}
-  LavaId(u64 _id, u64 _idx=0) : nid(_id), sidx(_idx) {}
+  LavaId() : nid(NODE_NONE), sidx(SLOT_NONE) {}
+  LavaId(u64 _id, u64 _idx=SLOT_NONE) : nid(_id), sidx(_idx) {}
 
   bool   operator==(LavaId  r) const { return nid==r.nid && sidx==r.sidx; }
-  bool    operator<(LavaId const& r) const {
+  bool    operator<(LavaId const& r)   const {
     if(nid==r.nid) return sidx < r.sidx;
     else         return nid  < r.nid;
   }
@@ -478,7 +481,7 @@ public:
   {
     LavaId id(s.id.nid, idx);
     id.sidx = idx? idx  :  nxtSlot(s.id.sidx);
-    s.id = id;
+    s.id  = id;
     m_slots.insert({id, s});
 
     return id;
