@@ -216,8 +216,12 @@
 // -todo: fix connection creation
 // -todo: test multiple nodes and connections - seems to work 
 // -todo: fix message node bounds - simple MSG check in Node constructor
+// -todo: convert strToGraph() and saveFile()
+// -todo: convert graphToStr()
+// -todo: build function name in to file saving
+// -todo: test loading and saving
 
-// todo: test loading and saving
+// todo: fix dest slots not moving - only after save? yes - all slots get turned to be src/out ?  - normalize indices sets all slots.in to false
 // todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
 // todo: change project name to Fissure 
 
@@ -320,8 +324,6 @@ using vec_ids = std::vector<Id>;
 static FisData fd;
 
 namespace{
-
-//auto node_add(str node_name, Node n=Node("",Node::FLOW,v2(0,0)) ) -> uint64_t;
 
 float               lerp(float p, float lo, float hi)
 {
@@ -911,36 +913,47 @@ void      sel_clearSlots()
 }
 
 // serialize to and from json - put in FisTfm.hpp file?
-str           graphToStr(GraphDB const& g)
+//str           graphToStr(GraphDB const& g)
+//
+//str           graphToStr(FisData::Graph const& fg, LavaGraph const& lg)
+//GraphDB       strToGraph(str const& s)
+
+str           graphToStr(LavaGraph const& lg)
 {
   using namespace std;
 
-  Jzon::Node nds = Jzon::object();
+  Jzon::Node jnodes = Jzon::object();
   SECTION(nodes)
   {
-    auto ndp = g.nodes();
-    auto  sz = g.nsz();
+    auto     nps = node_getPtrs(); // fg.nds;
+    auto    lnds = lg.nodes();
+    auto      sz = lnds.size();
+    //auto  sz  = lg.nsz();
 
-    Jzon::Node  nd_id = Jzon::array();
-    TO(sz,i) nd_id.add(ndp[i]->id);
+    Jzon::Node  nd_func = Jzon::array();
+    TO(sz,i) nd_func.add(lnds[i].nd->name);
 
-    Jzon::Node  nd_txt = Jzon::array();
-    TO(sz,i) nd_txt.add(ndp[i]->txt);
+    Jzon::Node    nd_id = Jzon::array();
+    TO(sz,i) nd_id.add(nps[i]->id);
 
-    Jzon::Node    nd_x = Jzon::array();
-    TO(sz,i) nd_x.add(ndp[i]->P.x);
+    Jzon::Node   nd_txt = Jzon::array();
+    TO(sz,i) nd_txt.add(nps[i]->txt);
 
-    Jzon::Node    nd_y = Jzon::array();
-    TO(sz,i) nd_y.add(ndp[i]->P.y);
+    Jzon::Node     nd_x = Jzon::array();
+    TO(sz,i) nd_x.add(nps[i]->P.x);
+
+    Jzon::Node     nd_y = Jzon::array();
+    TO(sz,i) nd_y.add(nps[i]->P.y);
 
     Jzon::Node nd_type = Jzon::array();
-    TO(sz,i) nd_type.add(ndp[i]->type);
+    TO(sz,i) nd_type.add(nps[i]->type);
 
-    nds.add("id",     nd_id);
-    nds.add("txt",   nd_txt);
-    nds.add("x",       nd_x);
-    nds.add("y",       nd_y);
-    nds.add("type", nd_type);
+    jnodes.add("function", nd_func);
+    jnodes.add("id",         nd_id);
+    jnodes.add("txt",       nd_txt);
+    jnodes.add("x",           nd_x);
+    jnodes.add("y",           nd_y);
+    jnodes.add("type",     nd_type);
   }
   Jzon::Node jslots = Jzon::object();
   SECTION(slots)
@@ -950,9 +963,13 @@ str           graphToStr(GraphDB const& g)
     Jzon::Node destId  = Jzon::array();
     Jzon::Node destIdx = Jzon::array();
 
-    for(auto kv : g.slots()){
-      GraphDB::Id  sid = kv.first;
-      auto& s = kv.second;
+    //for(auto kv : g.slots()){
+    //for(auto kv : lg.slots())
+    for(auto const& kv : fd.graph.slots)
+    {
+      //GraphDB::Id  sid = kv.first;
+      LavaId sid = kv.first;
+      auto const& s = kv.second;
       if(s.in){
         destId.add(sid.nid);
         destIdx.add(sid.sidx);
@@ -970,14 +987,16 @@ str           graphToStr(GraphDB const& g)
   Jzon::Node jcncts = Jzon::object();
   SECTION(connections)
   {
-    auto sz = g.cnctsz();
+    //auto sz = g.cnctsz();
+    auto sz = lg.cnctsz();
 
     Jzon::Node srcId   = Jzon::array();
     Jzon::Node srcIdx  = Jzon::array();
     Jzon::Node destId  = Jzon::array();
     Jzon::Node destIdx = Jzon::array();
 
-    for(auto kv : g.cncts()){
+    //for(auto kv : g.cncts()){
+    for(auto const& kv : lg.cncts()){
       destId.add(kv.first.nid);
       destIdx.add(kv.first.sidx);
       srcId.add(kv.second.nid);
@@ -991,7 +1010,7 @@ str           graphToStr(GraphDB const& g)
   }
 
   Jzon::Node graph = Jzon::object();
-  graph.add("nodes", nds);
+  graph.add("nodes", jnodes);
   graph.add("slots", jslots);
   graph.add("connections", jcncts);
 
@@ -1008,15 +1027,21 @@ str           graphToStr(GraphDB const& g)
 
   return s;
 }
-GraphDB       strToGraph(str const& s)
+LavaGraph       strToGraph(str const& s)
 {
   using namespace std;
 
-  GraphDB g;
+  //GraphDB g;
+
+  fd.graph.nds.clear();
+  fd.graph.slots.clear();
+  fd.graph.ordr.clear();
+  LavaGraph lg;
 
   Jzon::Parser prs;
   auto graph = prs.parseString(s);
 
+  auto nd_func    = graph.get("nodes").get("function");
   auto nd_id      = graph.get("nodes").get("id");
   auto nd_txt     = graph.get("nodes").get("txt");
   auto nd_x       = graph.get("nodes").get("x");
@@ -1033,14 +1058,15 @@ GraphDB       strToGraph(str const& s)
   auto sltSrcIdx  = graph.get("slots").get("srcIdx");
 
   auto cnt = nd_id.getCount();
-  TO(cnt,i){
+  TO(cnt,i){        
     Node n;
     n.id   = nd_id.get(i).toInt();
     n.txt  = nd_txt.get(i).toString();
     n.P.x  = nd_x.get(i).toFloat();
     n.P.y  = nd_y.get(i).toFloat();
     n.type = (Node::Type)nd_type.get(i).toInt();
-    g.addNode(n, false);
+
+    node_add( nd_func.get(i).toString(), n);
   }
 
   TO(sltSrcId.getCount(),i){
@@ -1048,14 +1074,18 @@ GraphDB       strToGraph(str const& s)
     sltId.nid  = sltSrcId.get(i).toInt();
     sltId.sidx = sltSrcIdx.get(i).toInt();
     Slot s(sltId.nid,false);
-    g.addSlot(s, sltId.sidx);
+
+    //g.addSlot(s, sltId.sidx);
+    slot_add(s);
   }
   TO(sltDestId.getCount(),i){
     Id sltId;
     sltId.nid  = sltDestId.get(i).toInt();
     sltId.sidx = sltDestIdx.get(i).toInt();
     Slot s(sltId.nid,true);
-    g.addSlot(s, sltId.sidx);
+    
+    //g.addSlot(s, sltId.sidx);
+    slot_add(s);
   }
 
   auto cnct_cnt = destId.getCount();
@@ -1065,17 +1095,20 @@ GraphDB       strToGraph(str const& s)
     src.sidx  = srcIdx.get(i).toInt();
     dest.nid  = destId.get(i).toInt();
     dest.sidx = destIdx.get(i).toInt();
+
     //g.addCnct(src, dest);
-    g.toggleCnct(src, dest);
+    //g.toggleCnct(src, dest);
+    lg.toggleCnct(src, dest);
   }
 
-  g.setNextNodeId( g.maxId() );
+  lg.setNextNodeId( lg.maxId() );
 
-  return move(g);
+  return move(lg);
 }
-bool            saveFile(GraphDB const& g, str path)
+//bool            saveFile(GraphDB const& g, str path)
+bool            saveFile(LavaGraph const& lg, str path)
 {
-  str fileStr = graphToStr(g);
+  str fileStr = graphToStr(lg);
 
   FILE* f = fopen(path.c_str(), "w");
   if(!f) return false;
@@ -1088,7 +1121,8 @@ bool            saveFile(GraphDB const& g, str path)
 
   return true;
 }
-bool            loadFile(str path, GraphDB* out_g)
+//bool            loadFile(str path, GraphDB* out_g)
+bool            loadFile(str path, LavaGraph* out_g)
 {
   FILE* f = fopen(path.c_str(), "r");
   if(!f) return false;
@@ -1349,9 +1383,9 @@ ENTRY_DECLARATION
 
         if(inPath){
           //bool ok = loadFile(inPath, &fd.grph);
-          //bool ok = loadFile(inPath, &fd.graph);
-          //if(ok) printf("\nFile loaded from %s\n", inPath);
-          //else   printf("\nLoad did not read successfully from %s\n", inPath);
+          bool ok = loadFile(inPath, &fd.lgrph);
+          if(ok) printf("\nFile loaded from %s\n", inPath);
+          else   printf("\nLoad did not read successfully from %s\n", inPath);
         }
       });
       saveBtn->setCallback([](){
@@ -1361,20 +1395,13 @@ ENTRY_DECLARATION
         nfdresult_t result = NFD_SaveDialog("lava", NULL, &outPath );
         //printf("\n\nfile dialog: %d %s \n\n", result, outPath);
         if(outPath){
-          fd.lgrph.normalizeIndices();
-          //bool ok = saveFile(fd.lgrph, outPath);
-          //if(ok) printf("\nFile Written to %s\n", outPath);
-          //else   printf("\nSave did not write successfully to %s\n", outPath);
+          //fd.lgrph.normalizeIndices();
+          bool ok = saveFile(fd.lgrph, outPath);
+          if(ok) printf("\nFile Written to %s\n", outPath);
+          else   printf("\nSave did not write successfully to %s\n", outPath);
         }
       });
 
-      //GraphDB* grphPtr = &fd.grph;
-      //flowBtn->setCallback([grphPtr](){
-      //  grphPtr->addNode( Node("new node", Node::FLOW) );
-      //});
-      //msgBtn->setCallback([grphPtr](){
-      //  grphPtr->addNode( Node("message node", Node::MSG) );
-      //});
       flowBtn->setCallback([](){
         node_add("FileToString", Node("new node", Node::FLOW) );
       });
@@ -1940,6 +1967,16 @@ ENTRY_DECLARATION
 
 
 
+//GraphDB* grphPtr = &fd.grph;
+//flowBtn->setCallback([grphPtr](){
+//  grphPtr->addNode( Node("new node", Node::FLOW) );
+//});
+//msgBtn->setCallback([grphPtr](){
+//  grphPtr->addNode( Node("message node", Node::MSG) );
+//});
+
+//
+//auto node_add(str node_name, Node n=Node("",Node::FLOW,v2(0,0)) ) -> uint64_t;
 
 //grph.toggleCnct(fd.sel.slotOutSel, fd.sel.slotInSel);
 //

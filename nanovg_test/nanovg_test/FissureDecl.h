@@ -620,7 +620,7 @@ struct FisData
   LavaFlow             lf;
   //GraphDB            grph;
 
-  struct
+  struct Graph
   {
     NodeMap       nds;       // nds  is nodes
     NodeOrder    ordr;       // ordr is orders 
