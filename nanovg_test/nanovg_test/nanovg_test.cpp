@@ -220,10 +220,13 @@
 // -todo: convert graphToStr()
 // -todo: build function name in to file saving
 // -todo: test loading and saving
+// -todo: fix LavaGraph normalizeIndices() - slot idx was not being passed through and was SLOT_NONE after remap
+// -todo: fix duplicate LavaGraph slot indices - nxtSlotIdx needed a node index as an argument
+// -todo: fix normalizeIndices() - actually need to implement normalizeIndices for ui graph
+// -todo: fix dest slots not moving - only after save? yes - all slots get turned to be src/out ?  - normalize indices sets all slots.in to false
+// -todo: make node text smaller
 
-// todo: make node text smaller
-// todo: fix normalizeIndices() - actually need to implement normalizeIndices for ui graph
-// todo: fix dest slots not moving - only after save? yes - all slots get turned to be src/out ?  - normalize indices sets all slots.in to false
+// todo: 
 // todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
 // todo: change project name to Fissure 
 // todo: make LavaGraph into a template and use it for the visual graph as well
@@ -610,7 +613,7 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
 
   SECTION(text)
   {
-	  nvgFontSize(vg, 30.0f);
+	  nvgFontSize(vg, 18.0f);
 	  nvgFontFace(vg, "sans-bold");
 	  tw = nvgTextBounds(vg, 0,0, n.txt.c_str(), NULL, NULL);
 	  if(preicon != 0){
@@ -623,7 +626,7 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
 
     f32 txtX = x+w*0.5f - tw*0.5f + iw*0.25f;
     f32 txtY = y + h*0.5f;
-	  nvgFontSize(vg, 30.0f);
+	  nvgFontSize(vg, 18.0f);
 	  nvgFontFace(vg, "sans-bold");
 	  nvgTextAlign(vg, NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
 	  nvgFillColor(vg, nvgRGBA(0,0,0,160));
@@ -1517,9 +1520,9 @@ ENTRY_DECLARATION
       //fd.grph.toggleCnct(s0, s2);
       //fd.grph.toggleCnct(s0, s3);
 
-      fd.lgrph.toggleCnct(s0, s1);
-      fd.lgrph.toggleCnct(s0, s2);
-      fd.lgrph.toggleCnct(s0, s3);
+      //fd.lgrph.toggleCnct(s0, s1);
+      //fd.lgrph.toggleCnct(s0, s2);
+      //fd.lgrph.toggleCnct(s0, s3);
 
       //auto  pi = fd.lf.flow.find("FileToString");                                  // pi is pointer iterator
       //if(pi != end(fd.lf.flow))
@@ -1747,6 +1750,9 @@ ENTRY_DECLARATION
               if(src){
                 //auto srcNdP = grph.node(src->nid).P + wh/2;  //NODE_SZ/2; // n.b.mx; // NODE_SZ/2;
                 //auto srcNdP = n.P + wh/2;
+
+                //auto srcIter = fd.graph.slots.find(src->id);
+
                 auto srcIter = fd.graph.slots.find(src->id);
                 if(srcIter != fd.graph.slots.end() ){
                   auto  srcNdP = fd.graph.nds[src->id.nid].P;

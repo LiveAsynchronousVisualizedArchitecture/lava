@@ -375,10 +375,12 @@ public:
     // slots
     Slots nxtSlots;
     for(auto& kv : m_slots){
-      LavaId nxtId = kv.first;
+      LavaId nxtId  = kv.first;
       nxtId.nid     = nids[nxtId.nid];
       LavaFlowSlot nxtS = kv.second;
-      nxtS.id      = nids[nxtS.id.nid];
+      auto nxtSltId = nids[nxtS.id.nid];
+      nxtS.id.nid   = nxtSltId;
+      nxtS.id.sidx  = nxtS.id.sidx;
       nxtSlots.insert({nxtId, nxtS});
     }
     m_slots = move(nxtSlots);
@@ -481,11 +483,12 @@ public:
   u64            nsz() const { return m_nodes.size(); }
 
   // slots
-  LavaId     addSlot(LavaFlowSlot  s, u64 idx=0)
+  LavaId     addSlot(LavaFlowSlot  s, u64 sidx=0)
   {
-    LavaId id(s.id.nid, idx);
-    id.sidx = idx? idx  :  nxtSlot(s.id.sidx);
-    s.id  = id;
+    LavaId id(s.id.nid, sidx);
+    //LavaId id;
+    id.sidx = sidx? sidx  :  nxtSlot(s.id.nid);
+    s.id    = id;
     m_slots.insert({id, s});
 
     return id;
@@ -500,7 +503,8 @@ public:
   }
   auto     nodeSlots(u64     nid) -> decltype(m_slots.begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
   {
-    return lower_bound(ALL(m_slots), LavaId(nid), [](auto a,auto b){ return a.first < b; } );
+    //return lower_bound(ALL(m_slots), LavaId(nid), [](auto a,auto b){ return a.first < b; } );
+    return lower_bound(ALL(m_slots), nid, [](auto a,auto b){ return a.first.nid < b; } );
   }
   auto         slots() -> Slots& { return m_slots; }
   auto         slots() const -> Slots const& { return m_slots; }
