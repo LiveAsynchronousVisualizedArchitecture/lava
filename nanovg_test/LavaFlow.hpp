@@ -113,15 +113,15 @@ struct   LavaFlowNode
 };
 struct   LavaFlowSlot
 { 
-  //u64 nid; bool in=false; State state=NORMAL;
-  //LavaFlowSlot(u64 nId, bool In=false) : nid(nId), in(In), state(NORMAL) {}
-
   enum State { NORMAL=0, HIGHLIGHTED, SELECTED, SLOT_ERROR };
 
   LavaId id; bool in=false; State state=NORMAL;
 
   LavaFlowSlot(){}
   LavaFlowSlot(LavaId Id, bool In=false) : id(Id), in(In), state(NORMAL) {}
+
+  //u64 nid; bool in=false; State state=NORMAL;
+  //LavaFlowSlot(u64 nId, bool In=false) : nid(nId), in(In), state(NORMAL) {}
 };
 struct       LavaFlow
 {
@@ -246,14 +246,15 @@ class  LavaGraph
 public:
   struct NodeInstance { uint64_t id; LavaFlowNode* nd; };             // a struct used for returning an instance of a node - the Nodes map of ids and LavaFlowNode pointers  
 
-  using NodeInsts    =  std::unordered_map<u64, LavaFlowNode*>;       // maps an id to a LavaFlowNode struct
-  using Slots        =  std::multimap<LavaId, LavaFlowSlot>;          // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
-  using CnctMap      =  std::unordered_map<LavaId, LavaId, LavaId>;   // maps connections from their single destination slot to their single source slot - Id is the hash function object in the third template argument
-  using SrcMap       =  std::multimap<LavaId, LavaId>;                // maps connections from their single source slot to their one or more destination slots
-  using vec_insts    =  std::vector<NodeInstance>;                    // list of node instances - Id and pointer pairs
-  using vec_nptrs    =  std::vector<LavaFlowNode*>;                   // lists used for returning from reloading functions
-  using vec_cnptrs   =  std::vector<LavaFlowNode const*>;
-  using vec_ids      =  std::vector<LavaId>;
+  using NodeInsts     =  std::unordered_map<uint64_t, LavaFlowNode*>;       // maps an id to a LavaFlowNode struct
+  using Slots         =  std::multimap<LavaId, LavaFlowSlot>;          // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
+  using CnctMap       =  std::unordered_map<LavaId, LavaId, LavaId>;   // maps connections from their single destination slot to their single source slot - Id is the hash function object in the third template argument
+  using SrcMap        =  std::multimap<LavaId, LavaId>;                // maps connections from their single source slot to their one or more destination slots
+  using vec_insts     =  std::vector<NodeInstance>;                    // list of node instances - Id and pointer pairs
+  using vec_nptrs     =  std::vector<LavaFlowNode*>;                   // lists used for returning from reloading functions
+  using vec_cnptrs    =  std::vector<LavaFlowNode const*>;
+  using vec_ids       =  std::vector<LavaId>;
+  using NormalizeMap  =  std::unordered_map<uint64_t, uint64_t>;
 
 private:
   u64                m_nxtId;               // nxtId is next id - a counter for every node created that only increases, giving each node a unique id
@@ -330,17 +331,18 @@ public:
   LavaGraph& operator=(LavaGraph&& rval){ mv(std::move(rval)); return *this; }
 
   // global
-  void  normalizeIndices()
+  auto  normalizeIndices() -> NormalizeMap
   {
     using namespace std;
 
     // create a mapping of old node Ids to new ones, new ones will be their position + 1
-    unordered_map<u64,u64> nids;
+    NormalizeMap nids;
     nids.reserve(m_nodes.size());
     u64 cur = 1;
     for(auto& kv : m_nodes){
       nids[kv.first] = cur++;
     }
+    //unordered_map<u64,u64> nids;
 
     //unordered_map<u64,u64> ordrs;
     //ordrs.reserve(m_nodes.size());
@@ -385,11 +387,13 @@ public:
     NodeInsts nxtNds;
     for(auto& kv : m_nodes){
       u64 nxtId = nids[kv.first];
-      //u64 nxtOrdr = ordrs[kv.second];
       LavaFlowNode* nd = m_nodes[kv.first];
       nxtNds.insert({nxtId, nd});
     }
     m_nodes = move(nxtNds);
+    //u64 nxtOrdr = ordrs[kv.second];
+
+    return nids;
 
     //NodeIdMap nxtIds;
     //for(auto& kv : m_ids){

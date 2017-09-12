@@ -221,9 +221,12 @@
 // -todo: build function name in to file saving
 // -todo: test loading and saving
 
+// todo: make node text smaller
+// todo: fix normalizeIndices() - actually need to implement normalizeIndices for ui graph
 // todo: fix dest slots not moving - only after save? yes - all slots get turned to be src/out ?  - normalize indices sets all slots.in to false
 // todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
 // todo: change project name to Fissure 
+// todo: make LavaGraph into a template and use it for the visual graph as well
 
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
@@ -912,12 +915,46 @@ void      sel_clearSlots()
   }
 }
 
-// serialize to and from json - put in FisTfm.hpp file?
 //str           graphToStr(GraphDB const& g)
 //
 //str           graphToStr(FisData::Graph const& fg, LavaGraph const& lg)
 //GraphDB       strToGraph(str const& s)
 
+// serialize to and from json - put in FisTfm.hpp file?
+void normalizeIndices()
+{
+  using namespace std;
+  
+  auto   nmap = fd.lgrph.normalizeIndices();                              // nmap is normalization map - this contains a map of previous indices to new indices
+  //auto& nodes = fd.graph.nds;
+
+  decltype(fd.graph.nds) nxtNds;
+  for(auto& kv : fd.graph.nds){
+    auto nxtId = nmap[kv.first];
+    nxtNds[nxtId] = move(kv.second);
+  }
+  fd.graph.nds = move(nxtNds);
+
+  decltype(fd.graph.slots) nxtSlots;
+  for(auto& kv : fd.graph.slots){
+    LavaId    nxtId = kv.first;
+    nxtId.nid       = nmap[nxtId.nid];
+    //auto      nxtId = nmap[kv.first.nid];
+    nxtSlots.insert({ nxtId, move(kv.second) });
+  }
+  fd.graph.slots = move(nxtSlots);
+
+  decltype(fd.graph.ordr) nxtOrdr;
+  for(auto& o : fd.graph.ordr){
+    auto nxtId = nmap[o.id];
+    nxtOrdr.insert( {nxtId, o.order} );
+  }
+  fd.graph.ordr = move(nxtOrdr);
+
+
+  //for(auto const& kv : nmap){
+  //}
+}
 str           graphToStr(LavaGraph const& lg)
 {
   using namespace std;
@@ -1395,7 +1432,7 @@ ENTRY_DECLARATION
         nfdresult_t result = NFD_SaveDialog("lava", NULL, &outPath );
         //printf("\n\nfile dialog: %d %s \n\n", result, outPath);
         if(outPath){
-          //fd.lgrph.normalizeIndices();
+          normalizeIndices();
           bool ok = saveFile(fd.lgrph, outPath);
           if(ok) printf("\nFile Written to %s\n", outPath);
           else   printf("\nSave did not write successfully to %s\n", outPath);
