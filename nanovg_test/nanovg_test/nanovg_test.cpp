@@ -225,11 +225,24 @@
 // -todo: fix normalizeIndices() - actually need to implement normalizeIndices for ui graph
 // -todo: fix dest slots not moving - only after save? yes - all slots get turned to be src/out ?  - normalize indices sets all slots.in to false
 // -todo: make node text smaller
+// -todo: make text size a variable in the graph struct
+// -todo: make a button to designate the entry point
+// -todo: make entry button check that the selection is not negative and that it is a MSG node - check for node selection and not primary selection
+// -todo: ignore node clicks when clicking on a slot
+// -todo: figure out why click down outside a node clears the selection - drag box was deciding selections immediatly
+// -todo: make node selection stay when lftClkDn is not inside a node
+// -todo: make dragbox unselect all only on lftClkUp and no drag selects
+// -todo: make a message node designated as an entry point in LavaGraph - is this neccesary? do the message nodes just need to be in another vector that can be looped through? - for now just loop through message nodes then data 
+// -todo: make a message node vector that can be looped through 
 
-// todo: 
+// todo: prototype an entry function that loops through message nodes then loops through data packets
+// todo: prototype API for message nodes
+//       | do message nodes need some extra way to hold their state? will there ever be more than a single instance of a message node?
+// todo: create a message node shared library
+// todo: make node selection an unsigned integer that uses a special value like NODE_NONE for unselected
+// todo: make a priority queue for packets of data
 // todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
 // todo: change project name to Fissure 
-// todo: make LavaGraph into a template and use it for the visual graph as well
 
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
@@ -243,7 +256,10 @@
 // todo: make multiple slots avoid each other - might need to have discreet sections around a node for a slot to sit in
 // todo: don't select a slot if it is under an existing node
 // todo: make Lava data structures use the Lava thread local allocator
+// todo: change NODE_ERROR to NODE_NONE 
 
+// idea: give message nodes an order than can be edited
+// idea: make LavaGraph into a template and use it for the visual graph as well?
 // idea: load shared libs asynchronously and show a progress bar somewhere
 // idea: make command queue - use a simdb file or use the heap
 // idea: try compiling nanogui into one file - depends on eigen, stb and glfw
@@ -613,7 +629,8 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
 
   SECTION(text)
   {
-	  nvgFontSize(vg, 18.0f);
+    f32 txtsz = fd.graph.textSize;
+	  nvgFontSize(vg, txtsz);
 	  nvgFontFace(vg, "sans-bold");
 	  tw = nvgTextBounds(vg, 0,0, n.txt.c_str(), NULL, NULL);
 	  if(preicon != 0){
@@ -626,7 +643,7 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
 
     f32 txtX = x+w*0.5f - tw*0.5f + iw*0.25f;
     f32 txtY = y + h*0.5f;
-	  nvgFontSize(vg, 18.0f);
+	  nvgFontSize(vg, txtsz);
 	  nvgFontFace(vg, "sans-bold");
 	  nvgTextAlign(vg, NVG_ALIGN_MIDDLE);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
 	  nvgFillColor(vg, nvgRGBA(0,0,0,160));
@@ -666,8 +683,7 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
     //nvgStroke(vg);
   }
 
-  return;
-  //return b;
+  //return;
 }
 v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 {
@@ -813,27 +829,6 @@ Slot*           slot_get(LavaId id)
   return &si->second;
 }
 
-//auto      nodeSlots(vec_nptrs const& nds) -> vec_ids
-//auto            slot_all() -> vec_ids
-//{
-//  using namespace std;
-//
-//  auto& slots = fd.graph.slots;
-//  auto& nodes = fd.graph.nds;
-//
-//  vec_ids sidxs;                                            // sidxs is slot indexes
-//  for(auto& kv : nodes)
-//  {                                                         // np is node pointer and nds is nodes
-//    auto nid = kv.first;
-//    auto  si = lower_bound(ALL(slots), nid, [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
-//    if(si != end(slots)  &&  si->first.nid == nid){
-//      Slot& s = si->second;
-//      sidxs.push_back(si->first);        
-//    }
-//  }
-//  return sidxs;                                        // RVO
-//}
-
 void           cnct_draw(NVGcontext* vg, v2 srcP, v2 destP, v2 srcN, v2 destN, f32 minCenterDist=INFf)
 { 
   using namespace std;
@@ -918,13 +913,8 @@ void      sel_clearSlots()
   }
 }
 
-//str           graphToStr(GraphDB const& g)
-//
-//str           graphToStr(FisData::Graph const& fg, LavaGraph const& lg)
-//GraphDB       strToGraph(str const& s)
-
 // serialize to and from json - put in FisTfm.hpp file?
-void normalizeIndices()
+void    normalizeIndices()
 {
   using namespace std;
   
@@ -1067,7 +1057,7 @@ str           graphToStr(LavaGraph const& lg)
 
   return s;
 }
-LavaGraph       strToGraph(str const& s)
+LavaGraph     strToGraph(str const& s)
 {
   using namespace std;
 
@@ -1259,7 +1249,7 @@ void    reloadSharedLibs()
 #endif
 }
 
-void              keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
+void               keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
 {
   if(action==GLFW_RELEASE) return;
 
@@ -1336,7 +1326,7 @@ void   framebufferSizeCallback(GLFWwindow* window, int w, int h)
   fd.ui.screen.resizeCallbackEvent(w, h);
 }
 
-void        debug_coords(v2 a)
+void              debug_coords(v2 a)
 {
   char  winTitle[TITLE_MAX_LEN];  // does glfw copy this string or just use the pointer? looks like it converts to a different character format which copies it / transforms it
 
@@ -1412,8 +1402,9 @@ ENTRY_DECLARATION
       auto spcr3     = new Label(fd.ui.keyWin,     "");
       auto loadBtn   = new Button(fd.ui.keyWin,    "Load");
       auto saveBtn   = new Button(fd.ui.keyWin,    "Save");
-      auto flowBtn   = new Button(fd.ui.keyWin,    "Flow Node");
+      auto entryBtn  = new Button(fd.ui.keyWin,    "Set Entry Node");
       auto msgBtn    = new Button(fd.ui.keyWin,    "Message Node");
+      auto flowBtn   = new Button(fd.ui.keyWin,    "Flow Node");
 
       loadBtn->setCallback([](){ 
         nfdchar_t *inPath = NULL;
@@ -1441,12 +1432,28 @@ ENTRY_DECLARATION
           else   printf("\nSave did not write successfully to %s\n", outPath);
         }
       });
+      entryBtn->setCallback([](){        
+        u64 selId = Node::NODE_ERROR;
+        auto  nds = node_getPtrs();
+        for(auto n : nds) if(n->sel  &&  n->type==Node::MSG){
+          selId = n->id;
+          break;
+        }
+        if(selId==Node::NODE_ERROR){ printf("\nno message nodes selected\n"); }
 
-      flowBtn->setCallback([](){
-        node_add("FileToString", Node("new node", Node::FLOW) );
+        printf("\ntodo: primary selection node to be the entry point - selected: %d \n", (i32)selId );
+
+        //TO(nds.size(),i){
+        //  if(nds[i]->sel && nds[i]->type == Node::MSG)
+        //}
+        //
+        //if(fd.sel.pri < 0) printf("no nodes selected\n\n");
       });
       msgBtn->setCallback([](){
         node_add("FileToString", Node("message node", Node::MSG) );
+      });
+      flowBtn->setCallback([](){
+        node_add("FileToString", Node("new node", Node::FLOW) );
       });
 
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
@@ -1574,10 +1581,7 @@ ENTRY_DECLARATION
       SECTION(gl frame setup)
       {
 		    glViewport(0, 0, fbWidth, fbHeight);
-		    //if(premult)
-			   // glClearColor(0,0,0,0);
-		    //else
-			    glClearColor(.075f, .075f, .075f, 1.0f);
+			  glClearColor(.075f, .075f, .075f, 1.0f);
 		    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
       }
       SECTION(selection)
@@ -1586,9 +1590,10 @@ ENTRY_DECLARATION
         bool lftClkUp = !ms.lftDn &&  ms.prevLftDn;    // lftClkDn is left click up
         bool clearSelections = true;
         Bnd  drgbnd;
-        SECTION(selection box)
+        SECTION(selection box create)
         {
-          if(ms.drgbox || drgbnd.hasLen()){    // && lftClkUp
+          //if(ms.drgbox || drgbnd.hasLen()){    // && lftClkUp
+          if(ms.drgbox || drgbnd.area() > 1.f){    // && lftClkUp
             clearSelections=false;
           }
 
@@ -1602,24 +1607,32 @@ ENTRY_DECLARATION
           else
             drgbnd = Bnd();
         }
-        SECTION(select)
+        SECTION(select from selection box)
         {
+          bool anyInside = false;
           if(ms.drgbox){
             TO(sz,i){
-              Node& n = *(nds[i]);
-              n.sel   = isIn(n.b, drgbnd);
+              Node& n       =  *(nds[i]);
+              bool inside   =  isIn(n.b, drgbnd);
+              n.sel        |=  inside;
+              anyInside    |=  inside;
             }
-            if(drgbnd.hasLen())
+            if(drgbnd.hasLen() && fd.mouse.lftDn)
               clearSelections = false;
           }
         
+          if(!anyInside && lftClkUp){
+            clearSelections = true;
+          }
+
           if(!fd.mouse.lftDn){
             fd.sel.pri = -1;
           }
         }
+        
+        bool inAnySlt = false;
         SECTION(slot selection and connection creation)
         {
-          bool inAnySlt = false;
           LavaId  inClk(LavaId::NODE_NONE, LavaId::SLOT_NONE);
           LavaId outClk(LavaId::NODE_NONE, LavaId::SLOT_NONE);
           //for(auto& kv : grph.slots())
@@ -1631,10 +1644,10 @@ ENTRY_DECLARATION
             {  
               bool inSlt = len(pntr - s.P) < fd.ui.slot_rad;
               if(inSlt){
-                outClk  = sid;                     // Id(nid);
+                outClk  = sid;
                 s.state = Slot::SELECTED;
-                if(s.in) fd.sel.slotInSel  = sid; // Id(nid, );
-                else     fd.sel.slotOutSel = sid; // Id(nid, );
+                if(s.in) fd.sel.slotInSel  = sid;
+                else     fd.sel.slotOutSel = sid;
                 clearSelections = false;
                 inAnySlt = true;
               }
@@ -1661,7 +1674,8 @@ ENTRY_DECLARATION
             sel_clearSlots();
           }
         }
-        SECTION(node selection)
+       
+        if(!inAnySlt) SECTION(node selection)
         {
           bool inAny = false;
           FROM(sz,i)                                                // loop backwards so that the top nodes are dealt with first
@@ -1698,6 +1712,10 @@ ENTRY_DECLARATION
 
           if(!inAny)
           {
+            if(fd.mouse.lftDn){ 
+              clearSelections = false;
+            }
+
             if(lftClkDn && !(fd.sel.pri>0) ){ ms.drgbox=true; }
             if(fd.mouse.rtDn && !fd.mouse.prevRtDn){ fd.sel.sec = -1; }
           }else{
@@ -1705,7 +1723,9 @@ ENTRY_DECLARATION
           }
         }
 
-        if(clearSelections && lftClkUp){ sel_clear(); }
+        if(clearSelections && lftClkUp){ 
+          sel_clear();
+        }
       }
       SECTION(movement)
       {
@@ -2008,7 +2028,35 @@ ENTRY_DECLARATION
 
 
 
+//if(premult)
+// glClearColor(0,0,0,0);
+//else
 
+//auto      nodeSlots(vec_nptrs const& nds) -> vec_ids
+//auto            slot_all() -> vec_ids
+//{
+//  using namespace std;
+//
+//  auto& slots = fd.graph.slots;
+//  auto& nodes = fd.graph.nds;
+//
+//  vec_ids sidxs;                                            // sidxs is slot indexes
+//  for(auto& kv : nodes)
+//  {                                                         // np is node pointer and nds is nodes
+//    auto nid = kv.first;
+//    auto  si = lower_bound(ALL(slots), nid, [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
+//    if(si != end(slots)  &&  si->first.nid == nid){
+//      Slot& s = si->second;
+//      sidxs.push_back(si->first);        
+//    }
+//  }
+//  return sidxs;                                        // RVO
+//}
+//
+//str           graphToStr(GraphDB const& g)
+//
+//str           graphToStr(FisData::Graph const& fg, LavaGraph const& lg)
+//GraphDB       strToGraph(str const& s)
 
 //GraphDB* grphPtr = &fd.grph;
 //flowBtn->setCallback([grphPtr](){

@@ -7,6 +7,7 @@
 #define __FISSURE_DECL_HEADERGUARD_HPP__
 
 #include <set>
+#include <queue>
 #include <nanogui/nanogui.h>
 #include "../no_rt_util.h"
 #include "vec.hpp"
@@ -69,14 +70,14 @@ union      Bnd
   bool  hasLen() const
   { 
     using namespace std;
-    return max(0.f,xmx-xmn) + max(0.f,ymx-ymn);
+    return (max(0.f,xmx-xmn) + max(0.f,ymx-ymn)) > 0.f;
   }
 };
 using  vec_bnd     =    vec<Bnd>;
 
 struct    Node
 {
-  enum Type { MSG=0, FLOW=1, NODE_ERROR };
+  enum Type { MSG=0, FLOW=1, NODE_ERROR=0xFFFFFFFFFFFFFFFF };
 
   LavaFlowNode* lfn;                              // lfn is Lava Flow Node
   u64      id = 0;
@@ -601,7 +602,6 @@ public:
   }
 };
 
-
 struct FisData
 {
   struct IdOrder {
@@ -610,21 +610,23 @@ struct FisData
     bool operator<(IdOrder l) const { return order < l.order; }
   };
 
-  using         Id  =  LavaId;
-  using    NodeMap  =  std::unordered_map<uint64_t, Node>;
-  using  NodeOrder  =  std::set<IdOrder>;
-  using      Slots  =  std::multimap<LavaId, Slot>;            // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
+  using          Id  =  LavaId;
+  using     NodeMap  =  std::unordered_map<uint64_t, Node>;
+  using   NodeOrder  =  std::set<IdOrder>;
+  using       Slots  =  std::multimap<LavaId, Slot>;            // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
 
   GLFWwindow*         win = nullptr;                            // Platform 
   LavaGraph         lgrph;
   LavaFlow             lf;
-  //GraphDB            grph;
 
   struct Graph
   {
     NodeMap       nds;       // nds  is nodes
     NodeOrder    ordr;       // ordr is orders 
     Slots       slots;       // 
+
+    // text
+    f32            textSize  =  18.f;
 
     // graph colors
     NVGcolor        lineClr  =  nvgRGBAf(.04f, .04f, .04f, 1.f);
@@ -698,6 +700,8 @@ struct FisData
 
 
 
+//
+//GraphDB            grph;
 
 //
 //using         Id  =  LavaGraph::Id;

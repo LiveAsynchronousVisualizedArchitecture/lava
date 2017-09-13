@@ -55,3 +55,10 @@ Accumulator / General loop and iteration
 |  |  the branch would need two inputs to collect all the packets - if there is only one it bypasses the accumulator, if there are multiple, it feeds them into the accumulator
 
 
+
+Ordering
+|  Should all data packets be dealt with before going back to the message nodes?
+|  Should it be done in an interlaced way to keep message passing nodes from lagging?
+|  Should there be generator nodes and message passing nodes, or just message nodes?
+|
+

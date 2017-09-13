@@ -183,7 +183,7 @@ inline int     LavaFree(void* memptr)
   }else{ return 0; }
 }
 
-template <class T> struct ThreadAllocator
+template <class T> struct  ThreadAllocator
 {
   using value_type  =  T;
 
@@ -219,7 +219,7 @@ template <class T> struct ThreadAllocator
     p->~U();
   }
 };
-template <class T> T*     ThreadAllocator<T>::allocate(const size_t n) const
+template <class T> T*      ThreadAllocator<T>::allocate(const size_t n) const
 {
   if(n==0) return nullptr;
 
@@ -232,7 +232,7 @@ template <class T> T*     ThreadAllocator<T>::allocate(const size_t n) const
 
   return static_cast<T*>(p);
 }
-template <class T> void   ThreadAllocator<T>::deallocate(T*& p, size_t) const
+template <class T> void    ThreadAllocator<T>::deallocate(T*& p, size_t) const
 {
   //if(n==0) return;
 
@@ -244,9 +244,9 @@ template <class T> void   ThreadAllocator<T>::deallocate(T*& p, size_t) const
 class  LavaGraph
 {
 public:
-  struct NodeInstance { uint64_t id; LavaFlowNode* nd; };             // a struct used for returning an instance of a node - the Nodes map of ids and LavaFlowNode pointers  
+  struct NodeInstance { uint64_t id; LavaFlowNode* nd; };              // a struct used for returning an instance of a node - the Nodes map of ids and LavaFlowNode pointers  
 
-  using NodeInsts     =  std::unordered_map<uint64_t, LavaFlowNode*>;       // maps an id to a LavaFlowNode struct
+  using NodeInsts     =  std::unordered_map<uint64_t, LavaFlowNode*>;  // maps an id to a LavaFlowNode struct
   using Slots         =  std::multimap<LavaId, LavaFlowSlot>;          // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
   using CnctMap       =  std::unordered_map<LavaId, LavaId, LavaId>;   // maps connections from their single destination slot to their single source slot - Id is the hash function object in the third template argument
   using SrcMap        =  std::multimap<LavaId, LavaId>;                // maps connections from their single source slot to their one or more destination slots
@@ -257,17 +257,20 @@ public:
   using NormalizeMap  =  std::unordered_map<uint64_t, uint64_t>;
 
 private:
-  u64                m_nxtId;               // nxtId is next id - a counter for every node created that only increases, giving each node a unique id
+  bool             m_running;
+  uint64_t           m_nxtId;               // nxtId is next id - a counter for every node created that only increases, giving each node a unique id
   NodeInsts          m_nodes;
   Slots              m_slots;
   CnctMap            m_cncts;
   SrcMap         m_destCncts;
+  vec_ids         m_msgNodes;
 
-  void           init(){}
-  void             mv(LavaGraph&& rval)
+  void            init(){ m_running = false; }
+  void              mv(LavaGraph&& rval)
   {
     using namespace std;
 
+    m_running   = rval.m_running;
     m_nodes     = move(rval.m_nodes); 
     m_slots     = move(rval.m_slots); 
     m_cncts     = move(rval.m_cncts); 
@@ -275,9 +278,9 @@ private:
 
     //m_ids       = move(rval.m_ids);
   }
-  u64             nxt(){ return m_nxtId++; }
+  u64              nxt(){ return m_nxtId++; }
 
-  auto  nodeDestSlots(vec_nptrs const& nds) -> vec_ids
+  auto   nodeDestSlots(vec_nptrs const& nds) -> vec_ids
   {
     using namespace std;
 
@@ -291,7 +294,7 @@ private:
     }
     return sidxs;                                        // RVO
   }
-  auto      nodeSlots(vec_nptrs const& nds) -> vec_ids
+  auto       nodeSlots(vec_nptrs const& nds) -> vec_ids
   {
     using namespace std;
 
@@ -305,12 +308,12 @@ private:
     }
     return sidxs;                                        // RVO
   }
-  auto      errorInst() -> NodeInstance&
+  auto       errorInst() -> NodeInstance&
   { // default contrutor sets the type to Node::NODE_ERROR
     static NodeInstance ERR_INST;
     return ERR_INST;
   }
-  u64         nxtSlot(u64 nid)
+  u64          nxtSlot(u64 nid)
   {
     auto si = nodeSlots(nid);                   // si is slot iterator
     i64 cur = -1;
@@ -330,8 +333,23 @@ public:
   LavaGraph(LavaGraph&& rval){ mv(std::move(rval)); }
   LavaGraph& operator=(LavaGraph&& rval){ mv(std::move(rval)); return *this; }
 
+  // execution
+  void              start(){ m_running =  true; }
+  void               stop(){ m_running = false; }
+  void          enterLoop()
+  {
+    
+    while(m_running)
+    {
+    }
+  }
+  void          pauseLoop()
+  {
+    
+  }
+
   // global
-  auto  normalizeIndices() -> NormalizeMap
+  auto   normalizeIndices() -> NormalizeMap
   {
     using namespace std;
 
@@ -415,7 +433,7 @@ public:
     //}
     //m_nodes = move(nxtOrdrs);
   }
-  void             clear()
+  void              clear()
   {
     m_nodes.clear();
     m_slots.clear();
@@ -424,15 +442,19 @@ public:
 
     //m_ids.clear();
   }
-  void     setNextNodeId(u64 nxt){ m_nxtId = nxt; }
+  void      setNextNodeId(u64 nxt){ m_nxtId = nxt; }
 
   // selection
-  uint64_t   addNode(LavaFlowNode* n, bool newId=true)
+  uint64_t    addNode(LavaFlowNode* n, bool newId=true)
   {
     if(newId) n->id = nxt();
+
+    if(n->node_type == LavaFlowNode::MSG)
+      m_msgNodes.push_back(n->id);
+
     return m_nodes.insert({n->id, n}).first->first;                         // returns a pair that contains the key-value pair
   }
-  auto          node(u64 id)  -> NodeInstance
+  auto           node(u64 id)  -> NodeInstance
   {
     auto nIter = m_nodes.find(id);                                          // nIter is node iterator
     //if(nIter == end(m_nodes)) return errorNode();
@@ -445,7 +467,7 @@ public:
 
     //return nIter->second;
   }
-  auto         nodes() const -> vec_insts
+  auto          nodes() const -> vec_insts
   {
     vec_insts nds;
     nds.reserve(m_nodes.size());
@@ -457,7 +479,7 @@ public:
     }
     return nds;
   }
-  auto         nodes() -> vec_insts
+  auto          nodes() -> vec_insts
   {
     vec_insts nds;
     nds.reserve(m_nodes.size());
@@ -469,7 +491,7 @@ public:
     }
     return nds;
   }
-  u64          maxId()
+  u64           maxId()
   {
     using namespace std;
 
@@ -480,10 +502,10 @@ public:
 
     //for(auto kv : m_ids){ mx = max(mx, kv.first); }
   }
-  u64            nsz() const { return m_nodes.size(); }
+  u64             nsz() const { return m_nodes.size(); }
 
   // slots
-  LavaId     addSlot(LavaFlowSlot  s, u64 sidx=0)
+  LavaId      addSlot(LavaFlowSlot  s, u64 sidx=0)
   {
     LavaId id(s.id.nid, sidx);
     //LavaId id;
@@ -493,7 +515,7 @@ public:
 
     return id;
   }
-  auto          slot(LavaId   id) -> LavaFlowSlot*
+  auto           slot(LavaId   id) -> LavaFlowSlot*
   {
     auto si = m_slots.find(id);
     if(si == m_slots.end()) 
@@ -501,15 +523,15 @@ public:
 
     return &si->second;
   }
-  auto     nodeSlots(u64     nid) -> decltype(m_slots.begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
+  auto      nodeSlots(u64     nid) -> decltype(m_slots.begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
   {
     //return lower_bound(ALL(m_slots), LavaId(nid), [](auto a,auto b){ return a.first < b; } );
     return lower_bound(ALL(m_slots), nid, [](auto a,auto b){ return a.first.nid < b; } );
   }
-  auto         slots() -> Slots& { return m_slots; }
-  auto         slots() const -> Slots const& { return m_slots; }
-  auto      getSlots() -> Slots& { return m_slots; }
-  auto       srcSlot(LavaId destId) -> LavaFlowSlot* 
+  auto          slots() -> Slots& { return m_slots; }
+  auto          slots() const -> Slots const& { return m_slots; }
+  auto       getSlots() -> Slots& { return m_slots; }
+  auto        srcSlot(LavaId destId) -> LavaFlowSlot* 
   {
     auto ci = m_cncts.find(destId);
     if(ci != m_cncts.end()){
@@ -518,15 +540,15 @@ public:
     }else 
       return nullptr;
   }
-  auto     destSlots(LavaId  srcId) -> decltype(m_destCncts.find(srcId))
+  auto      destSlots(LavaId  srcId) -> decltype(m_destCncts.find(srcId))
   {
     return m_destCncts.find(srcId);
   }
-  auto       slotEnd() -> decltype(m_slots.end()) { return m_slots.end(); }
-  u64            ssz() const { return m_slots.size(); }
+  auto        slotEnd() -> decltype(m_slots.end()) { return m_slots.end(); }
+  u64             ssz() const { return m_slots.size(); }
 
   // connections
-  u32    delSrcCncts(LavaId  src)
+  u32     delSrcCncts(LavaId  src)
   {
     u32  cnt = 0;
     auto  di = m_destCncts.find(src);
@@ -539,15 +561,15 @@ public:
 
     //di = m_destCncts.find(src);
   }
-  auto     destCncts(LavaId  src) -> decltype(m_destCncts.begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
+  auto      destCncts(LavaId  src) -> decltype(m_destCncts.begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
   {
     return lower_bound(ALL(m_destCncts), LavaId(src), [](auto a,auto b){ return a.first < b; } );
   }
-  u64  destCnctCount(LavaId  src)
+  u64   destCnctCount(LavaId  src)
   {
     return m_destCncts.count(src);
   }
-  bool   delDestCnct(LavaId dest)
+  bool    delDestCnct(LavaId dest)
   {
     auto iter = m_cncts.find(dest);
     if(iter==m_cncts.end()) return false;
@@ -563,7 +585,7 @@ public:
 
     return true;
   }
-  u32        delCnct(LavaId  src, LavaId  dest)
+  u32         delCnct(LavaId  src, LavaId  dest)
   {
     u32      cnt = 0;
     auto srcIter = m_cncts.find(dest);
@@ -582,7 +604,7 @@ public:
 
     return cnt;
   }
-  void    toggleCnct(LavaId  src, LavaId  dest)
+  void     toggleCnct(LavaId  src, LavaId  dest)
   {
     u32    delcnt = 0;
     auto       di = m_cncts.find(dest);
@@ -599,13 +621,13 @@ public:
     }
     //delCnct(src,dest)==0 
   }
-  auto   destCnctEnd() -> decltype(m_destCncts.end())  { return m_destCncts.end(); }
-  auto       cnctEnd() -> decltype(m_cncts.end())  { return m_cncts.end(); }
-  auto     cnctBegin() -> decltype(m_cncts.begin()) { return m_cncts.begin(); }
-  auto         cncts() -> CnctMap& { return m_cncts; }
-  auto         cncts() const -> CnctMap const& { return m_cncts; }
-  u64         cnctsz() const { return m_cncts.size(); }
-  u32        delCnct(LavaId id)
+  auto    destCnctEnd() -> decltype(m_destCncts.end())  { return m_destCncts.end(); }
+  auto        cnctEnd() -> decltype(m_cncts.end())  { return m_cncts.end(); }
+  auto      cnctBegin() -> decltype(m_cncts.begin()) { return m_cncts.begin(); }
+  auto          cncts() -> CnctMap& { return m_cncts; }
+  auto          cncts() const -> CnctMap const& { return m_cncts; }
+  u64          cnctsz() const { return m_cncts.size(); }
+  u32         delCnct(LavaId id)
   {
     u32 cnt = 0;
     LavaFlowSlot* s = this->slot(id);
@@ -626,11 +648,22 @@ public:
 
     return cnt;
   }
-  auto   srcCnctsMap() -> SrcMap&
+  auto    srcCnctsMap() -> SrcMap&
   {
     return m_destCncts;
   }
 };
+
+struct      Lava
+{
+  using PacketQueue  =  std::priority_queue<LavaPacket>;
+  using MsgNodeVec   =  std::vector<uint64_t>;
+
+  MsgNodeVec      m_msgNodes;
+  PacketQueue            m_q;
+  LavaGraph          m_graph;
+};
+
 
 #if defined(__LAVAFLOW_IMPL__)
 
