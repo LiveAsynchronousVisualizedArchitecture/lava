@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2013
-VisualStudioVersion = 12.0.21005.1
+# Visual Studio 15
+VisualStudioVersion = 15.0.26430.6
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "nanovg_test", "nanovg_test\nanovg_test.vcxproj", "{42362A99-8BF4-49DD-BD67-BFA435E65B79}"
 EndProject
@@ -12,6 +12,8 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "tbl_test", "tbl_test\tbl_test.vcxproj", "{90E50FF0-13E0-4EBF-9735-E667081192E4}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lava_priq", "lava_priq\lava_priq.vcxproj", "{14CC7C03-2F5B-42F4-965E-4613E0C7D9EA}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FilePathMsg", "FilePathMsg\FilePathMsg.vcxproj", "{F9C7D269-6585-4C89-90C3-C69EBBA2B611}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -82,6 +84,18 @@ Global
 		{14CC7C03-2F5B-42F4-965E-4613E0C7D9EA}.Release|Win32.ActiveCfg = Release|Win32
 		{14CC7C03-2F5B-42F4-965E-4613E0C7D9EA}.Release|Win32.Build.0 = Release|Win32
 		{14CC7C03-2F5B-42F4-965E-4613E0C7D9EA}.Release|x64.ActiveCfg = Release|Win32
+		{F9C7D269-6585-4C89-90C3-C69EBBA2B611}.Debug|Mixed Platforms.ActiveCfg = Debug|Win32
+		{F9C7D269-6585-4C89-90C3-C69EBBA2B611}.Debug|Mixed Platforms.Build.0 = Debug|Win32
+		{F9C7D269-6585-4C89-90C3-C69EBBA2B611}.Debug|Win32.ActiveCfg = Debug|Win32
+		{F9C7D269-6585-4C89-90C3-C69EBBA2B611}.Debug|Win32.Build.0 = Debug|Win32
+		{F9C7D269-6585-4C89-90C3-C69EBBA2B611}.Debug|x64.ActiveCfg = Debug|x64
+		{F9C7D269-6585-4C89-90C3-C69EBBA2B611}.Debug|x64.Build.0 = Debug|x64
+		{F9C7D269-6585-4C89-90C3-C69EBBA2B611}.Release|Mixed Platforms.ActiveCfg = Release|Win32
+		{F9C7D269-6585-4C89-90C3-C69EBBA2B611}.Release|Mixed Platforms.Build.0 = Release|Win32
+		{F9C7D269-6585-4C89-90C3-C69EBBA2B611}.Release|Win32.ActiveCfg = Release|Win32
+		{F9C7D269-6585-4C89-90C3-C69EBBA2B611}.Release|Win32.Build.0 = Release|Win32
+		{F9C7D269-6585-4C89-90C3-C69EBBA2B611}.Release|x64.ActiveCfg = Release|x64
+		{F9C7D269-6585-4C89-90C3-C69EBBA2B611}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

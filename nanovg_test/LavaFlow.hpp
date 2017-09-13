@@ -14,6 +14,7 @@
 #include <filesystem>
 #include <unordered_set>
 #include <map>
+#include <queue>
 #include "no_rt_util.h"
 
 #if defined(_WIN32)
@@ -99,7 +100,7 @@ union          LavaId                                                // this Id 
 };
 struct   LavaFlowNode
 {
-  enum { NONE=0, FLOW, MSG, NODE_ERROR=0xFFFFFFFFFFFFFFFF };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
+  enum Type { NONE=0, FLOW, MSG, NODE_ERROR=0xFFFFFFFFFFFFFFFF };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
 
   FlowFunc              func;
   uint64_t         node_type;
@@ -257,7 +258,6 @@ public:
   using NormalizeMap  =  std::unordered_map<uint64_t, uint64_t>;
 
 private:
-  bool             m_running;
   uint64_t           m_nxtId;               // nxtId is next id - a counter for every node created that only increases, giving each node a unique id
   NodeInsts          m_nodes;
   Slots              m_slots;
@@ -265,17 +265,17 @@ private:
   SrcMap         m_destCncts;
   vec_ids         m_msgNodes;
 
-  void            init(){ m_running = false; }
+  void            init(){}
   void              mv(LavaGraph&& rval)
   {
     using namespace std;
 
-    m_running   = rval.m_running;
     m_nodes     = move(rval.m_nodes); 
     m_slots     = move(rval.m_slots); 
     m_cncts     = move(rval.m_cncts); 
     m_destCncts = move(rval.m_destCncts);
 
+    //m_running   = rval.m_running;
     //m_ids       = move(rval.m_ids);
   }
   u64              nxt(){ return m_nxtId++; }
@@ -333,19 +333,9 @@ public:
   LavaGraph(LavaGraph&& rval){ mv(std::move(rval)); }
   LavaGraph& operator=(LavaGraph&& rval){ mv(std::move(rval)); return *this; }
 
-  // execution
-  void              start(){ m_running =  true; }
-  void               stop(){ m_running = false; }
-  void          enterLoop()
+  auto      operator[](uint64_t nid) -> decltype(m_nodes[0])
   {
-    
-    while(m_running)
-    {
-    }
-  }
-  void          pauseLoop()
-  {
-    
+    return m_nodes[nid];
   }
 
   // global
@@ -444,7 +434,7 @@ public:
   }
   void      setNextNodeId(u64 nxt){ m_nxtId = nxt; }
 
-  // selection
+  // nodes
   uint64_t    addNode(LavaFlowNode* n, bool newId=true)
   {
     if(newId) n->id = nxt();
@@ -503,6 +493,18 @@ public:
     //for(auto kv : m_ids){ mx = max(mx, kv.first); }
   }
   u64             nsz() const { return m_nodes.size(); }
+  auto       msgNodes() const -> vec_ids const&
+  {
+    return m_msgNodes;
+  }
+  auto       nodeFunc(uint64_t nid) const -> FlowFunc
+  {
+    auto ni = m_nodes.find(nid);                            // ni is node iterator
+    if(ni == end(m_nodes))
+      return ni->second->func;
+    else
+      return nullptr;
+  }
 
   // slots
   LavaId      addSlot(LavaFlowSlot  s, u64 sidx=0)
@@ -659,9 +661,42 @@ struct      Lava
   using PacketQueue  =  std::priority_queue<LavaPacket>;
   using MsgNodeVec   =  std::vector<uint64_t>;
 
+  bool             m_running = false;
   MsgNodeVec      m_msgNodes;
   PacketQueue            m_q;
   LavaGraph          m_graph;
+
+  //void               init(){ m_running = false; }
+
+  // execution
+  void              start(){ m_running =  true; }
+  void               stop(){ m_running = false; }
+  void          enterLoop()
+  {
+    LavaArg   inArgs[512];         // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
+    LavaArg  outArgs[512];         // if the arguments are going to 
+    while(m_running)
+    {
+      auto const& mnds = m_graph.msgNodes();
+
+      for(auto id : mnds){
+        FlowFunc msgFunc = m_graph[id.nid]->func;
+        if(msgFunc){
+          SECTION(run function with stack array arguments)
+          {
+            // set arguments 
+            // make their last arg being a special value as the end of the list
+            uint64_t ret = msgFunc(inArgs, outArgs);
+          }
+        }
+      }
+    }
+  }
+  void          pauseLoop()
+  {
+
+  }
+
 };
 
 

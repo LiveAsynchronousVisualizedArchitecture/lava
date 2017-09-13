@@ -77,7 +77,8 @@ using  vec_bnd     =    vec<Bnd>;
 
 struct    Node
 {
-  enum Type { MSG=0, FLOW=1, NODE_ERROR=0xFFFFFFFFFFFFFFFF };
+  //enum Type { MSG=0, FLOW=1, NODE_ERROR=0xFFFFFFFFFFFFFFFF };
+  using Type = LavaFlowNode::Type;
 
   LavaFlowNode* lfn;                              // lfn is Lava Flow Node
   u64      id = 0;
@@ -86,7 +87,7 @@ struct    Node
   bool    sel = false;                            // sel is selected
   Bnd       b = {0, 0, 128.f, 48.f};
   str     txt = "";
-  Type   type = NODE_ERROR;
+  Type   type = Type::NODE_ERROR;
 
   void cp(Node const& l)
   {
@@ -112,9 +113,9 @@ struct    Node
   }
 
   Node(){}
-  Node(str _txt, Type _type=FLOW, v2 _P=v2(0,0) ) : txt(_txt), P(_P), type(_type)
+  Node(str _txt, Type _type=Node::Type::FLOW, v2 _P=v2(0,0) ) : txt(_txt), P(_P), type(_type)
   {
-    if(type==MSG) b.ymx = b.xmx;
+    if(type==Type::MSG) b.ymx = b.xmx;
   }
   Node(Node const& l){ cp(l); }
   Node(Node&&      r){ mv(std::move(r)); }
@@ -416,8 +417,8 @@ public:
     auto prevOrder = n.order;   // addNode will get the next order number
     //n.order = nxtOrder();
 
-    if(n.type==Node::NODE_ERROR) return errorNode();
-    m_nodes.erase(prevOrder); // todo: use a delNode here instead
+    if(n.type==Node::Type::NODE_ERROR) return errorNode();
+    m_nodes.erase(prevOrder);   // todo: use a delNode here instead
     m_ids.erase(id);
 
     return addNode(n, false);
@@ -616,7 +617,8 @@ struct FisData
   using       Slots  =  std::multimap<LavaId, Slot>;            // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
 
   GLFWwindow*         win = nullptr;                            // Platform 
-  LavaGraph         lgrph;
+  Lava               lava;
+  LavaGraph&         lgrph = lava.m_graph;
   LavaFlow             lf;
 
   struct Graph
@@ -665,7 +667,7 @@ struct FisData
     f32           nd_border  =   3.5f;
     f32            slot_rad  =   15.f;
     f32         slot_border  =   3.5f;
-  } ui;
+  }          ui;
   struct
   {
     v2                prevPntr;
@@ -678,14 +680,14 @@ struct FisData
     v2                 drgofst;
     bool                drgbox = false;
     bool                 drgNd = false;
-  } mouse;
+  }       mouse;
   struct 
   {
-    i64        pri = -1;
-    i64        sec = -1;
-    Id   slotInSel;
-    Id  slotOutSel;
-  } sel;
+    u64          pri = LavaFlowNode::NODE_ERROR;
+    u64          sec = LavaFlowNode::NODE_ERROR;
+    Id     slotInSel;
+    Id    slotOutSel;
+  }         sel;
 };
 
 #endif
@@ -699,6 +701,8 @@ struct FisData
 
 
 
+//i64        pri = -1;
+//i64        sec = -1;
 
 //
 //GraphDB            grph;

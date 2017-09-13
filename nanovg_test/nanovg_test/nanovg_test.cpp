@@ -234,11 +234,21 @@
 // -todo: make dragbox unselect all only on lftClkUp and no drag selects
 // -todo: make a message node designated as an entry point in LavaGraph - is this neccesary? do the message nodes just need to be in another vector that can be looped through? - for now just loop through message nodes then data 
 // -todo: make a message node vector that can be looped through 
+// -todo: make shared lib name pass through to button creation of node
+// -todo: create a message node shared library
 
+// todo: take out GraphDB
+// todo: take out Lava and put into LavaFlow
+// todo: fix box selection becoming unselected on mouse up
+// todo: change LavaFlowNode to LavaNode
+// todo: use combination of frame, node id and slot as key to simbdb
+//       |  how does that get in to the node, if all the data is in the packet struct?
+//       |  put the index information into the output array and use that 
+//       |  leave room for the hash in the output struct? 
 // todo: prototype an entry function that loops through message nodes then loops through data packets
 // todo: prototype API for message nodes
 //       | do message nodes need some extra way to hold their state? will there ever be more than a single instance of a message node?
-// todo: create a message node shared library
+//       | initially just make them thread safe or make them lock with mutexes
 // todo: make node selection an unsigned integer that uses a special value like NODE_NONE for unselected
 // todo: make a priority queue for packets of data
 // todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
@@ -333,6 +343,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <algorithm>
+#include <thread>
 #include "nfd.h"
 #include "jzon.h"
 #include "vec.hpp"
@@ -552,7 +563,7 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
   nvgGlobalAlpha(vg, 1.f);
   switch(n.type)
   {
-  case Node::FLOW: {
+  case Node::Type::FLOW: {
     SECTION(draw flow node)
     {
       SECTION(grey border)
@@ -583,7 +594,7 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
       //b = {x,y, x+w, y+h};
     }
   } break;
-  case Node::MSG: {
+  case Node::Type::MSG: {
     SECTION(draw message node)
     {
       f32 msgRad = w/2.f;
@@ -696,7 +707,7 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 
   switch(n.type)
   {
-  case Node::FLOW: {
+  case Node::Type::FLOW: {
     f32  rad  =  hlf.y;
     v2  pdir  =  ndir;
     v2    ds  =  sign(pdir);                                  // ds is direction sign
@@ -720,7 +731,7 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
       else    *out_nrml = { 0.f, sign(ndir).y };
     }
   } break;
-  case Node::MSG: 
+  case Node::Type::MSG: 
   default: 
   {
     f32  rad = wh.x/2;
@@ -892,8 +903,8 @@ void           sel_clear()
 {
   fd.sel.slotOutSel = Id(0,0);
   fd.sel.slotInSel  = Id(0,0);
-  fd.sel.pri        =  -1;
-  fd.sel.sec        =  -1;
+  fd.sel.pri        = LavaFlowNode::NODE_ERROR;
+  fd.sel.sec        = LavaFlowNode::NODE_ERROR;
 
   for(auto& kv : fd.graph.nds){
     kv.second.sel = false;
@@ -1225,25 +1236,11 @@ void    reloadSharedLibs()
     LavaFlowNode* fn = kv.second;                      // fn is flow node
     auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
     ndBtn->setCallback([fn](){ 
-      node_add("FileToString", Node(fn->name, Node::FLOW, {100,100}) );
-      //fd.grph.addNode( Node(fn->name, Node::FLOW, {100,100}), true);
-      //node_add("FileToString", Node( str("New: ") + fn->name) );
-      //node_add("FileToString");
+      node_add(fn->name, Node(fn->name, (Node::Type)((u64)fn->node_type), {100,100}) );
+      //node_add("FileToString", Node(fn->name, Node::FLOW, {100,100}) );
     });
   }
   fd.ui.screen.performLayout();
-
-  //// replace their nodes
-  //TO(loadedHndls.size(),i) if(loadedHndls[i]!=0)
-  //{
-  //  fd.lf.flow.find
-  //}
-  //
-  // coordinate the node structures with node Ids
-  //
-  //TO(pths.size(),i) 
-  //
-  //for(auto& p : pths) printf("\n %s \n
 
   TO(paths.size(),i) printf("\n %llu : %s \n", i, paths[i].c_str() );
 #endif
@@ -1403,8 +1400,8 @@ ENTRY_DECLARATION
       auto loadBtn   = new Button(fd.ui.keyWin,    "Load");
       auto saveBtn   = new Button(fd.ui.keyWin,    "Save");
       auto entryBtn  = new Button(fd.ui.keyWin,    "Set Entry Node");
-      auto msgBtn    = new Button(fd.ui.keyWin,    "Message Node");
-      auto flowBtn   = new Button(fd.ui.keyWin,    "Flow Node");
+      //auto msgBtn    = new Button(fd.ui.keyWin,    "Message Node");
+      //auto flowBtn   = new Button(fd.ui.keyWin,    "Flow Node");
 
       loadBtn->setCallback([](){ 
         nfdchar_t *inPath = NULL;
@@ -1433,13 +1430,13 @@ ENTRY_DECLARATION
         }
       });
       entryBtn->setCallback([](){        
-        u64 selId = Node::NODE_ERROR;
+        u64 selId = Node::Type::NODE_ERROR;
         auto  nds = node_getPtrs();
-        for(auto n : nds) if(n->sel  &&  n->type==Node::MSG){
+        for(auto n : nds) if(n->sel  &&  n->type==Node::Type::MSG){
           selId = n->id;
           break;
         }
-        if(selId==Node::NODE_ERROR){ printf("\nno message nodes selected\n"); }
+        if(selId==Node::Type::NODE_ERROR){ printf("\nno message nodes selected\n"); }
 
         printf("\ntodo: primary selection node to be the entry point - selected: %d \n", (i32)selId );
 
@@ -1449,12 +1446,12 @@ ENTRY_DECLARATION
         //
         //if(fd.sel.pri < 0) printf("no nodes selected\n\n");
       });
-      msgBtn->setCallback([](){
-        node_add("FileToString", Node("message node", Node::MSG) );
-      });
-      flowBtn->setCallback([](){
-        node_add("FileToString", Node("new node", Node::FLOW) );
-      });
+      //msgBtn->setCallback([](){
+      //  node_add("FileToString", Node("message node", Node::Type::MSG) );
+      //});
+      //flowBtn->setCallback([](){
+      //  node_add("FileToString", Node("new node", Node::Type::FLOW) );
+      //});
 
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
 
@@ -1486,35 +1483,15 @@ ENTRY_DECLARATION
       printf("Msg    size: %lld \n\n", sizeof(LavaMsg));
       printf("Packet size: %lld \n\n", sizeof(LavaPacket));
 
-      //io_rad = IORAD;
       fd.ui.slot_rad = 15.f;
 
       reloadSharedLibs();
 
-      // nodes
-      //Node&     n0 = fd.grph.addNode( Node("one", Node::FLOW, {400.f,300.f}) );
-      //Node&     n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
-      //Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
-      //Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
-      //Node& n4 = fd.grph.addNode( Node("five",  Node::MSG,  {200.f,200.f}) );
-
-      auto   inst0 = node_add("FileToString", Node("one",   Node::FLOW, {400.f,300.f}) );
-      auto   inst1 = node_add("FileToString", Node("two",   Node::FLOW, {200.f,500.f}) );
-      auto   inst2 = node_add("FileToString", Node("three", Node::FLOW, {700.f,500.f}) );
-      auto   inst3 = node_add("FileToString", Node("four",  Node::FLOW, {700.f,700.f}) );
-      auto   inst4 = node_add("FileToString", Node("five",  Node::MSG,  {200.f,200.f}) );
-
-      //n4.b.ymx = n4.b.xmx;
-
-      // slots
-      //GraphDB::Id ls0 = fd.grph.addSlot( Slot(n0.id,false) );
-      //LavaFlowSlot s0 = slot_add(inst0, Slot(inst0,true) );
-      //GraphDB::Id ls1 = fd.grph.addSlot( Slot(n1.id,true) );
-      //LavaFlowSlot s1 = slot_add(inst1, Slot(inst1,false) );
-      //Id s2 = fd.grph.addSlot( Slot(n2.id,  true) );
-      //Id s3 = fd.grph.addSlot( Slot(n3.id,  true) );
-      //Id s4 = fd.grph.addSlot( Slot(n0.id, false) );
-      //Id s5 = fd.grph.addSlot( Slot(n4.id, false) );
+      auto   inst0 = node_add("FileToString", Node("one",   Node::Type::FLOW, {400.f,300.f}) );
+      auto   inst1 = node_add("FileToString", Node("two",   Node::Type::FLOW, {200.f,500.f}) );
+      auto   inst2 = node_add("FileToString", Node("three", Node::Type::FLOW, {700.f,500.f}) );
+      auto   inst3 = node_add("FileToString", Node("four",  Node::Type::FLOW, {700.f,700.f}) );
+      auto   inst4 = node_add("FilePathMsg",  Node("five",  Node::Type::MSG,  {200.f,200.f}) );
 
       LavaId s0 = slot_add( Slot(inst0, false)  );
       LavaId s1 = slot_add( Slot(inst1,  true)  );
@@ -1523,27 +1500,24 @@ ENTRY_DECLARATION
       LavaId s4 = slot_add( Slot(inst0, false)  );
       LavaId s5 = slot_add( Slot(inst4, false)  );
 
-      //fd.grph.toggleCnct(ls0, ls1);
-      //fd.grph.toggleCnct(s0, s2);
-      //fd.grph.toggleCnct(s0, s3);
-
-      //fd.lgrph.toggleCnct(s0, s1);
-      //fd.lgrph.toggleCnct(s0, s2);
-      //fd.lgrph.toggleCnct(s0, s3);
-
-      //auto  pi = fd.lf.flow.find("FileToString");                                  // pi is pointer iterator
-      //if(pi != end(fd.lf.flow))
-      //  return fd.lgrph.addNode(pi->second, true);
-      //else
-      //  return LavaFlowNode::NODE_ERROR;
+      fd.lgrph.toggleCnct(s0, s1);
+      fd.lgrph.toggleCnct(s0, s2);
+      fd.lgrph.toggleCnct(s0, s3);
     }
+
+    fd.lava.start();
+    thread looper([](){
+      printf("\n running thread \n");
+      fd.lava.enterLoop();
+    });
+    looper.detach();
   }
 
   glfwSetTime(0);
   SECTION(main loop)
   {
-    auto&    g = fd.lgrph;
-    v2       pntr = {0,0};
+    auto&      g = fd.lgrph;
+    v2      pntr = {0,0};
     f64 cx, cy, t, dt, avgFps=60, prevt=0, cpuTime=0;
     f32 pxRatio;
     int fbWidth, fbHeight;
@@ -1552,9 +1526,8 @@ ENTRY_DECLARATION
     {
       auto&    ms = fd.mouse;
       bool  rtClk = (ms.rtDn  && !ms.prevRtDn);
-
-      auto nds = node_getPtrs();
-      auto  sz = nds.size();
+      auto    nds = node_getPtrs();
+      auto     sz = nds.size();
 
       SECTION(time)
       {
@@ -1626,7 +1599,7 @@ ENTRY_DECLARATION
           }
 
           if(!fd.mouse.lftDn){
-            fd.sel.pri = -1;
+            fd.sel.pri = LavaFlowNode::NODE_ERROR;
           }
         }
         
@@ -1688,7 +1661,7 @@ ENTRY_DECLARATION
             {
               if(inNode)
               {
-                if(lftClkDn && (fd.sel.pri<0 || fd.sel.pri!=n->id) )
+                if(lftClkDn && (fd.sel.pri==LavaFlowNode::NODE_ERROR || fd.sel.pri!=n->id) )
                 {
                   n    =  &(node_moveToFront(n->id));
                   nds  =  node_getPtrs();                  // move to the front will invalidate some pointers in the nds array so it needs to be remade
@@ -1716,8 +1689,8 @@ ENTRY_DECLARATION
               clearSelections = false;
             }
 
-            if(lftClkDn && !(fd.sel.pri>0) ){ ms.drgbox=true; }
-            if(fd.mouse.rtDn && !fd.mouse.prevRtDn){ fd.sel.sec = -1; }
+            if(lftClkDn && fd.sel.pri==LavaFlowNode::NODE_ERROR ){ ms.drgbox=true; }
+            if(fd.mouse.rtDn && !fd.mouse.prevRtDn){ fd.sel.sec = LavaFlowNode::NODE_ERROR; }
           }else{
             clearSelections = false;
           }
@@ -1736,7 +1709,7 @@ ENTRY_DECLARATION
             Node&     n = *(nds[i]);
             bool selctd = n.id==fd.sel.pri || n.sel;
 
-            if( fd.sel.pri>-1 && selctd ){           // if a node is primary selected (left mouse down on a node) or the selected flag is set
+            if( fd.sel.pri!=LavaFlowNode::NODE_ERROR && selctd ){           // if a node is primary selected (left mouse down on a node) or the selected flag is set
               n.P +=  pntr - fd.ui.prevPntr;
             }
 
@@ -1967,7 +1940,7 @@ ENTRY_DECLARATION
           }
           SECTION(draw selection box)
           {
-            if(fd.mouse.lftDn && fd.sel.pri<0)
+            if(fd.mouse.lftDn && fd.sel.pri==LavaFlowNode::NODE_ERROR)
             {
               nvgBeginPath(vg);
                 float x,y,w,h;
@@ -2027,6 +2000,54 @@ ENTRY_DECLARATION
 
 
 
+
+
+//io_rad = IORAD;
+//
+// nodes
+//Node&     n0 = fd.grph.addNode( Node("one", Node::FLOW, {400.f,300.f}) );
+//Node&     n1 = fd.grph.addNode( Node("two",   Node::FLOW, {200.f,500.f}) );
+//Node& n2 = fd.grph.addNode( Node("three", Node::FLOW, {700.f,500.f}) );
+//Node& n3 = fd.grph.addNode( Node("four",  Node::FLOW, {700.f,700.f}) );
+//Node& n4 = fd.grph.addNode( Node("five",  Node::MSG,  {200.f,200.f}) );
+//
+//n4.b.ymx = n4.b.xmx;
+//
+// slots
+//GraphDB::Id ls0 = fd.grph.addSlot( Slot(n0.id,false) );
+//LavaFlowSlot s0 = slot_add(inst0, Slot(inst0,true) );
+//GraphDB::Id ls1 = fd.grph.addSlot( Slot(n1.id,true) );
+//LavaFlowSlot s1 = slot_add(inst1, Slot(inst1,false) );
+//Id s2 = fd.grph.addSlot( Slot(n2.id,  true) );
+//Id s3 = fd.grph.addSlot( Slot(n3.id,  true) );
+//Id s4 = fd.grph.addSlot( Slot(n0.id, false) );
+//Id s5 = fd.grph.addSlot( Slot(n4.id, false) );
+//
+//fd.grph.toggleCnct(ls0, ls1);
+//fd.grph.toggleCnct(s0, s2);
+//fd.grph.toggleCnct(s0, s3);
+//
+//auto  pi = fd.lf.flow.find("FileToString");                                  // pi is pointer iterator
+//if(pi != end(fd.lf.flow))
+//  return fd.lgrph.addNode(pi->second, true);
+//else
+//  return LavaFlowNode::NODE_ERROR;
+
+//fd.grph.addNode( Node(fn->name, Node::FLOW, {100,100}), true);
+//node_add("FileToString", Node( str("New: ") + fn->name) );
+//node_add("FileToString");
+
+//// replace their nodes
+//TO(loadedHndls.size(),i) if(loadedHndls[i]!=0)
+//{
+//  fd.lf.flow.find
+//}
+//
+// coordinate the node structures with node Ids
+//
+//TO(pths.size(),i) 
+//
+//for(auto& p : pths) printf("\n %s \n
 
 //if(premult)
 // glClearColor(0,0,0,0);
