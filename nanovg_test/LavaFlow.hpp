@@ -691,7 +691,13 @@ struct       LavaFlow
 
   // execution
   void              start(){ m_running =  true; }
-  void               stop(){ m_running = false; }
+  void               stop()
+  {
+    m_running = false;                                 // this will make the 'running' boolean variable false, which will make the the while(running) loop stop, and the threads will end
+    //for(auto& t : fd.flowThreads){
+    //  t.join();
+    //}
+  }
   void               loop()
   {
     const LavaOut defOut = { LavaArgType::NONE, 0, 0, 0, 0 };
@@ -716,20 +722,22 @@ struct       LavaFlow
           if(msgFunc){
             SECTION(run function with stack array arguments)
             {
-              // set arguments 
               // make their last arg being a special value as the end of the list
+
+              // set arguments 
               LavaParams lp;
-              lp.frame     =   85;
-              lp.inputs    =    1;
-              lp.outputs   =  512;
-              lp.mem_alloc =  LavaHeapAlloc;
-              uint64_t ret =  msgFunc(&lp, inArgs, outArgs);
+              lp.frame      =   85;
+              lp.inputs     =    1;
+              lp.outputs    =  512;
+              lp.mem_alloc  =  malloc;  // LavaHeapAlloc;
+              uint64_t ret  =  msgFunc(&lp, inArgs, outArgs);
+
               tbl<u8> pth( (void*)outArgs[0].value );
               printf("\n out string %s \n", (char*)pth.data() );
               
               // if type == MEMORY and value != nullptr
-              LavaHeapFree( (void*)outArgs[0].value );
-              //free( (void*)outArgs[0].value );  // libc compile in so that malloc isn't in the same heap
+              //LavaHeapFree( (void*)outArgs[0].value );
+              //free( (void*)outArgs[0].value );  // libc compiled in so that malloc isn't in the same heap
             }
           }
         }

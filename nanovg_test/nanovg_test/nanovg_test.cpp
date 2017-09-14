@@ -248,8 +248,10 @@
 // -todo: work out memory allocation passing the dll boundary - thread local heap init in loop function but outside of loop - allocation function passed to node function in the LavaParams struct
 // -todo: change ArgType to LavaArgType
 // -todo: populate output struct with table, print the result, then free the memory
+// -todo: test saving and loading again - have to stop the LavaFlow loop because of graphs being changed around
+// -todo: fix selection clearing on node click
 
-// todo: test saving and loading again
+// todo: fix loading
 // todo: use malloc for passed in memory allocator
 // todo: make a packet from memory passed back from a node and put it into the packet queue
 // todo: pass output to another node
@@ -267,7 +269,6 @@
 // todo: make a priority queue for packets of data
 // todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
 // todo: change project name to Fissure 
-// todo: fix selection clearing on node click
 
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
@@ -461,8 +462,15 @@ v2         angleToNormal(f32 angle)
   return { cos(angle), sin(angle) };
 }
 
-
 // state manipulation
+void stopFlowThreads()
+{
+  fd.flow.stop();
+  for(auto& t : fd.flowThreads){
+    t.join();
+  }
+}
+
 v2               in_cntr(Node const& n, f32 r)
 {
   //return v2(n.P.x + NODE_SZ.x/2, n.P.y-r);
@@ -757,7 +765,6 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 
   return borderPt;
 }
-
 auto          node_slots(u64 nid) -> decltype(fd.graph.slots.begin())
 {
   using namespace std;
@@ -1162,7 +1169,6 @@ LavaGraph     strToGraph(str const& s)
 
   return move(lg);
 }
-//bool            saveFile(GraphDB const& g, str path)
 bool            saveFile(LavaGraph const& lg, str path)
 {
   str fileStr = graphToStr(lg);
@@ -1178,7 +1184,6 @@ bool            saveFile(LavaGraph const& lg, str path)
 
   return true;
 }
-//bool            loadFile(str path, GraphDB* out_g)
 bool            loadFile(str path, LavaGraph* out_g)
 {
   FILE* f = fopen(path.c_str(), "r");
@@ -1420,6 +1425,8 @@ ENTRY_DECLARATION
       //auto flowBtn   = new Button(fd.ui.keyWin,    "Flow Node");
 
       loadBtn->setCallback([](){ 
+        stopFlowThreads();
+
         nfdchar_t *inPath = NULL;
         nfdresult_t result = NFD_OpenDialog("lava", NULL, &inPath );
 
@@ -1439,6 +1446,7 @@ ENTRY_DECLARATION
         nfdresult_t result = NFD_SaveDialog("lava", NULL, &outPath );
         //printf("\n\nfile dialog: %d %s \n\n", result, outPath);
         if(outPath){
+          stopFlowThreads();
           normalizeIndices();
           bool ok = saveFile(fd.lgrph, outPath);
           if(ok) printf("\nFile Written to %s\n", outPath);
@@ -2014,10 +2022,12 @@ ENTRY_DECLARATION
   }
   SECTION(shutdown)
   {
-    fd.flow.stop();                                   // this will make the 'running' boolean variable false, which will make the the while(running) loop stop, and the threads will end
-    for(auto& t : fd.flowThreads){
-      t.join();
-    }
+    //fd.flow.stop();                                   // this will make the 'running' boolean variable false, which will make the the while(running) loop stop, and the threads will end
+    //for(auto& t : fd.flowThreads){
+    //  t.join();
+    //}
+
+    fd.flow.stop(); 
     nanogui::shutdown();
     glfwTerminate();
   }
@@ -2034,6 +2044,9 @@ ENTRY_DECLARATION
 
 
 
+
+//bool            saveFile(GraphDB const& g, str path)
+//bool            loadFile(str path, GraphDB* out_g)
 
 //io_rad = IORAD;
 //
