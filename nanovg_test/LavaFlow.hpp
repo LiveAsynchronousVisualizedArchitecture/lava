@@ -16,6 +16,8 @@
 #include <map>
 #include <queue>
 #include "no_rt_util.h"
+//#include "simdb.hpp"
+#include "tbl.hpp" // temp
 
 #if defined(_WIN32)
   #define WIN32_LEAN_AND_MEAN
@@ -23,46 +25,66 @@
   #include <Windows.h>
 #endif
 
+#define LAVA_ARG_COUNT 512
+
 // data types
-struct   LavaNode;
-struct        LavaArg;
+struct       LavaNode;
+struct     LavaParams;
+struct         LavaIn;
+struct        LavaOut;
 union          LavaId;
 class       LavaGraph;
 //union   LavaGraph::Id;
 
-namespace fs = std::tr2::sys;                                                             // todo: different compiler versions would need different filesystem paths
+#if defined(_WIN32) // todo: actually needs to be done by compiler
+  namespace fs = std::tr2::sys;                                                             // todo: different compiler versions would need different filesystem paths
+#endif
 
 using str                =  std::string;
-using lava_handle        =  HMODULE;                                                       // maps handles to the LavaFlowNode pointers contained in the shared libraries
+using lava_handle        =  HMODULE;                                                     // maps handles to the LavaFlowNode pointers contained in the shared libraries
 using lava_paths         =  std::vector<std::string>;
-using lava_hndlNodeMap   =  std::unordered_multimap<lava_handle, LavaNode*>;           // maps handles to the LavaFlowNode pointers contained in the shared libraries
-using lava_libHndls      =  std::unordered_map<LavaNode*, lava_handle>;                // todo: need to change this depending on OS
-using lava_hndlvec       =  std::vector<lava_handle>;                                      // todo: need to change this depending on OS
-using lava_pathHndlMap   =  std::unordered_map<std::string, lava_handle>;                  // maps LavaFlowNode names to their OS specific handles
-using lava_flowNodes     =  std::unordered_multimap<std::string, LavaNode*>;           // maps LavaFlowNode paths to their pointers
-using lava_nidMap        =  std::unordered_multimap<std::string, uint64_t>;                // maps LavaFlowNode names to their ids 
-using lava_flowPtrs      =  std::unordered_set<LavaNode*>;                             // LavaFlowNode pointers referenced uniquely by address instead of using an id
+using lava_hndlNodeMap   =  std::unordered_multimap<lava_handle, LavaNode*>;             // maps handles to the LavaFlowNode pointers contained in the shared libraries
+using lava_libHndls      =  std::unordered_map<LavaNode*, lava_handle>;                  // todo: need to change this depending on OS
+using lava_hndlvec       =  std::vector<lava_handle>;                                    // todo: need to change this depending on OS
+using lava_pathHndlMap   =  std::unordered_map<std::string, lava_handle>;                // maps LavaFlowNode names to their OS specific handles
+using lava_flowNodes     =  std::unordered_multimap<std::string, LavaNode*>;             // maps LavaFlowNode paths to their pointers
+using lava_nidMap        =  std::unordered_multimap<std::string, uint64_t>;              // maps LavaFlowNode names to their ids 
+using lava_flowPtrs      =  std::unordered_set<LavaNode*>;                               // LavaFlowNode pointers referenced uniquely by address instead of using an id
 using lava_ptrsvec       =  std::vector<LavaNode*>;
-using lava_nameNodeMap   =  std::unordered_map<std::string, LavaNode*>;                // maps the node names to their pointers
+using lava_nameNodeMap   =  std::unordered_map<std::string, LavaNode*>;                  // maps the node names to their pointers
 
-extern "C" using            FlowFunc  =  uint64_t (*)(LavaArg* in, LavaArg* out);          // data flow node function
-extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                               // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
-
-//enum class LavaNodeType { NONE=0, FLOW, MSG, NODE_ERROR };                             // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
+extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaIn*, LavaOut*);    // data flow node function
+extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                                  // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
 
 union         ArgType{ 
-  enum { END=0, DATA_ERROR, STORE, MEMORY, SEQUENCE, ENUMERATION };
+  enum { NONE=0, END, DATA_ERROR, STORE, MEMORY, SEQUENCE, ENUMERATION };                // todo: does this need store sequence and memory sequence?
   u8 asInt;
 };
-struct        LavaArg
+struct     LavaParams
+{ // should be 24 bytes
+  u32          inputs;
+  u32         outputs;
+  u64           frame;
+  void*     mem_alloc;
+};
+struct         LavaIn
 {
-  u64      type :  3;
+  u64      type :  3;          // ArgType
   u64     value : 61;
+};
+struct        LavaOut
+{
+  u64      type :  3;          // ArgType
+  u64     value : 61;          // This will hold the address in memory - could also hold the starting block index in the database 
+  union {
+    struct { u64 frame; u32 slot; u32 listIdx; };
+    u8 bytes[16];
+  }key;
 };
 struct        LavaMsg
 {
   u64        id;
-  LavaArg   arg;
+  LavaIn    arg;
 };
 struct     LavaPacket
 {
@@ -98,7 +120,7 @@ union          LavaId                                                // this Id 
     return std::hash<u64>()(_id.nid) ^ std::hash<u64>()(_id.sidx);
   }
 };
-struct   LavaNode
+struct       LavaNode
 {
   enum Type { NONE=0, FLOW, MSG, NODE_ERROR=0xFFFFFFFFFFFFFFFF };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
 
@@ -667,25 +689,46 @@ struct       LavaFlow
   // execution
   void              start(){ m_running =  true; }
   void               stop(){ m_running = false; }
-  void          enterLoop()
+  void               loop()
   {
-    LavaArg   inArgs[512];         // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
-    LavaArg  outArgs[512];         // if the arguments are going to 
+    const LavaOut defOut = { ArgType::NONE, 0, 0, 0, 0 };
+
+    LavaIn    inArgs[LAVA_ARG_COUNT];         // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
+    LavaOut  outArgs[LAVA_ARG_COUNT];         // if the arguments are going to 
+    memset(inArgs,  0, sizeof(inArgs)  );
+    memset(outArgs, 0, sizeof(outArgs) );
+
+    LavaHeapInit();
+
     while(m_running)
     {
-      auto const& mnds = graph.msgNodes();
+      SECTION(loop through message nodes)
+      {
+        printf("\n lava heap: %llu \n", (u64)lava_thread_heap);
 
-      for(auto id : mnds){
-        FlowFunc msgFunc = graph[id.nid]->func;
-        if(msgFunc){
-          SECTION(run function with stack array arguments)
-          {
-            // set arguments 
-            // make their last arg being a special value as the end of the list
-            uint64_t ret = msgFunc(inArgs, outArgs);
+        auto const& mnds = graph.msgNodes();
+        for(auto id : mnds)
+        {
+          FlowFunc msgFunc = graph[id.nid]->func;
+          if(msgFunc){
+            SECTION(run function with stack array arguments)
+            {
+              // set arguments 
+              // make their last arg being a special value as the end of the list
+              LavaParams lp;
+              lp.frame     =   85;
+              lp.inputs    =    1;
+              lp.outputs   =  512;
+              lp.mem_alloc =  LavaAlloc;
+              uint64_t ret = msgFunc(&lp, inArgs, outArgs);
+              tbl<u8> pth( (void*)outArgs[0].value );
+              printf("\n out string %s \n", (char*)pth.data() );
+              //free( (void*)outArgs[0].value );  // libc compile in so that malloc isn't in the same heap
+            }
           }
         }
       }
+
     }
   }
   void          pauseLoop(){}
@@ -885,6 +928,17 @@ auto       GetFlowNodeLists(lava_hndlvec  const& hndls) -> lava_ptrsvec
 
 
 
+
+
+
+
+
+//TO(LAVA_ARG_COUNT,i){
+//  outArgs[i] = 
+//}
+
+//
+//enum class LavaNodeType { NONE=0, FLOW, MSG, NODE_ERROR };                             // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
 
 //struct      Lava
 //{

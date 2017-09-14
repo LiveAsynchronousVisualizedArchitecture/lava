@@ -244,10 +244,18 @@
 // -todo: make node selection an unsigned integer that uses a special value like NODE_NONE for unselected
 // -todo: fix box selection becoming unselected on mouse up - need to possibly keep some sort of state for box selections being turned on - box bnds shifted after box selection, drgbnd moved to be a consistent state variable
 
+// todo: make frame input to lava func
+// todo: make lava function input for max outputs?
+// todo: change ArgType to LavaArgType
+// todo: work out memory allocation passing the dll boundary
 // todo: use combination of frame, node id and slot as key to simbdb
-//       |  how does that get in to the node, if all the data is in the packet struct?
+//       |  how does that get in to the node, if all the data is in the packet struct? - through the output Args
 //       |  put the index information into the output array and use that 
-//       |  leave room for the hash in the output struct? 
+//       |  leave room for the hash in the output struct? - not now
+//       |  the full key is needed because robin hood hashing could shift the other keys' indices around - the index into the key value slots in the db can't be used, but the starting block index can since that won't change until the data goes away
+//       |  use a union of bytes that is filled with the frame, slot, list index?
+//       |  use malloc addresses initially
+// todo: populate output struct with table, print the result, then free the memory
 // todo: prototype API for message nodes
 //       | do message nodes need some extra way to hold their state? will there ever be more than a single instance of a message node?
 //       | initially just make them thread safe or make them lock with mutexes
@@ -1482,7 +1490,7 @@ ENTRY_DECLARATION
     }
     SECTION(test data init)
     {
-      printf("Arg    size: %lld \n\n", sizeof(LavaArg));
+      printf("Arg    size: %lld \n\n", sizeof(LavaIn));
       printf("Msg    size: %lld \n\n", sizeof(LavaMsg));
       printf("Packet size: %lld \n\n", sizeof(LavaPacket));
 
@@ -1510,8 +1518,17 @@ ENTRY_DECLARATION
 
     fd.flow.start();
     fd.flowThreads.emplace_back([](){
-      printf("\n running thread \n");
-      fd.flow.enterLoop();
+      //printf("\n running thread \n");
+
+      //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key) );
+      ////printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.bytes) );
+      //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.slot) );
+      //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.listIdx) );
+      //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.frame) );
+      //printf("\n packet size: %d \n", (i32)sizeof(LavaPacket) );
+
+
+      fd.flow.loop();
     });
   }
 
