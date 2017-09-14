@@ -13,31 +13,30 @@
 
 extern "C"
 {
+  const char* FileToStringTypes[] = {"tbl_str"};
 
-const char* FileToStringTypes[] = {"tbl_str"};
+  uint64_t FileToString(LavaArg* in, LavaArg* out)
+  {
+    // output temp string here
+    return 85;
+  }
 
-uint64_t FileToString(LavaArg* in, LavaArg* out)
-{
-  // output temp string here
-  return 85;
+  LavaNode LavaNodes[] =
+  {
+    {FileToString, (uint64_t)LavaNode::FLOW,   // function, node_type  
+    0, 1, "FileToString",                          // inputs, outputs, name                                   
+    nullptr, FileToStringTypes,                    // in_types, out_types 
+    0, 0},                                         // version, id
+
+    {nullptr, (uint64_t)LavaNode::NONE, 0,0, nullptr, nullptr,nullptr, 0, 0}
+  };
+
+  __declspec(dllexport) LavaNode* GetLavaNodes()
+  {
+    return (LavaNode*)LavaNodes;
+  }
+
 }
-
-LavaFlowNode lavaFlowNodes[] =
-{
-  {FileToString, (uint64_t)LavaFlowNode::FLOW,   // function, node_type  
-  0, 1, "FileToString",                          // inputs, outputs, name                                   
-  nullptr, FileToStringTypes,                    // in_types, out_types 
-  0, 0},                                         // version, id
-
-  {nullptr, (uint64_t)LavaFlowNode::NONE, 0,0, nullptr, nullptr,nullptr, 0, 0}
-};
-
-__declspec(dllexport) LavaFlowNode* GetLavaFlowNodes()
-{
-  return (LavaFlowNode*)lavaFlowNodes;
-}
-
-
 
 
 
@@ -82,12 +81,6 @@ __declspec(dllexport) LavaFlowNode* GetLavaFlowNodes()
 //  return (LavaNode*)nodes;
 //}
 //
-
-}
-
-
-
-
 
 //auto  cs     =  (CS*)in;
 //auto& clrs   =  cs->colors();

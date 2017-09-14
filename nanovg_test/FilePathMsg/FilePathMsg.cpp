@@ -16,19 +16,19 @@ extern "C"
     return 1;
   }
 
-  LavaFlowNode lavaFlowNodes[] =
+  LavaNode LavaNodes[] =
   {
-    {FilePathMsg, (uint64_t)LavaFlowNode::MSG,     // function, node_type  
+    {FilePathMsg, (uint64_t)LavaNode::MSG,     // function, node_type  
     0, 1, "FilePathMsg",                           // inputs, outputs, name                                   
     nullptr, FilePathMsgTypes,                     // in_types, out_types 
     0, 0},                                         // version, id
 
-    {nullptr, (uint64_t)LavaFlowNode::NONE, 0,0, nullptr, nullptr,nullptr, 0, 0}
+    {nullptr, (uint64_t)LavaNode::NONE, 0,0, nullptr, nullptr,nullptr, 0, 0}
   };
 
-  __declspec(dllexport) LavaFlowNode* GetLavaFlowNodes()
+  __declspec(dllexport) LavaNode* GetLavaNodes()
   {
-    return (LavaFlowNode*)lavaFlowNodes;
+    return (LavaNode*)LavaNodes;
   }
 }
 

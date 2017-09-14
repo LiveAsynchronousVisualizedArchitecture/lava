@@ -239,9 +239,9 @@
 // -todo: take out GraphDB
 // -todo: take out Lava and put into LavaFlow
 // -todo: shut down threads gracefully with stop() so that program doesn't crash on exit
+// -todo: change LavaFlowNode to LavaNode
 
 // todo: fix box selection becoming unselected on mouse up
-// todo: change LavaFlowNode to LavaNode
 // todo: use combination of frame, node id and slot as key to simbdb
 //       |  how does that get in to the node, if all the data is in the packet struct?
 //       |  put the index information into the output array and use that 
@@ -511,11 +511,11 @@ auto            node_add(str node_name, Node n) -> uint64_t
   using namespace std;
 
   auto          pi = fd.flow.nameToPtr.find( node_name );                               // pi is pointer iterator
-  uint64_t instIdx = LavaFlowNode::NODE_ERROR;
+  uint64_t instIdx = LavaNode::NODE_ERROR;
   if( pi != end(fd.flow.nameToPtr) )
     instIdx = fd.lgrph.addNode(pi->second, true);
 
-  if(instIdx != LavaFlowNode::NODE_ERROR){
+  if(instIdx != LavaNode::NODE_ERROR){
     FisData::IdOrder ido;                                                          //ido is id order
     ido.id    = instIdx;
     ido.order = node_nxtOrder();
@@ -904,8 +904,8 @@ void           sel_clear()
 {
   fd.sel.slotOutSel = Id(0,0);
   fd.sel.slotInSel  = Id(0,0);
-  fd.sel.pri        = LavaFlowNode::NODE_ERROR;
-  fd.sel.sec        = LavaFlowNode::NODE_ERROR;
+  fd.sel.pri        = LavaNode::NODE_ERROR;
+  fd.sel.sec        = LavaNode::NODE_ERROR;
 
   for(auto& kv : fd.graph.nds){
     kv.second.sel = false;
@@ -1218,7 +1218,7 @@ void    reloadSharedLibs()
   // extract the flow nodes from the lists and put them into the multi-map
   TO(livePaths.size(),i)
   {
-    LavaFlowNode* ndList = flowNdLists[i];
+    LavaNode* ndList = flowNdLists[i];
     if(ndList){
       auto const& p = livePaths[i]; 
       fd.flow.flow.erase(p);                              // delete the current node list for the livePath
@@ -1235,7 +1235,7 @@ void    reloadSharedLibs()
 
   // redo interface node buttons
   for(auto& kv : fd.flow.flow){
-    LavaFlowNode* fn = kv.second;                      // fn is flow node
+    LavaNode* fn = kv.second;                      // fn is flow node
     auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
     ndBtn->setCallback([fn](){ 
       node_add(fn->name, Node(fn->name, (Node::Type)((u64)fn->node_type), {100,100}) );
@@ -1601,7 +1601,7 @@ ENTRY_DECLARATION
           }
 
           if(!fd.mouse.lftDn){
-            fd.sel.pri = LavaFlowNode::NODE_ERROR;
+            fd.sel.pri = LavaNode::NODE_ERROR;
           }
         }
         
@@ -1663,7 +1663,7 @@ ENTRY_DECLARATION
             {
               if(inNode)
               {
-                if(lftClkDn && (fd.sel.pri==LavaFlowNode::NODE_ERROR || fd.sel.pri!=n->id) )
+                if(lftClkDn && (fd.sel.pri==LavaNode::NODE_ERROR || fd.sel.pri!=n->id) )
                 {
                   n    =  &(node_moveToFront(n->id));
                   nds  =  node_getPtrs();                  // move to the front will invalidate some pointers in the nds array so it needs to be remade
@@ -1691,8 +1691,8 @@ ENTRY_DECLARATION
               clearSelections = false;
             }
 
-            if(lftClkDn && fd.sel.pri==LavaFlowNode::NODE_ERROR ){ ms.drgbox=true; }
-            if(fd.mouse.rtDn && !fd.mouse.prevRtDn){ fd.sel.sec = LavaFlowNode::NODE_ERROR; }
+            if(lftClkDn && fd.sel.pri==LavaNode::NODE_ERROR ){ ms.drgbox=true; }
+            if(fd.mouse.rtDn && !fd.mouse.prevRtDn){ fd.sel.sec = LavaNode::NODE_ERROR; }
           }else{
             clearSelections = false;
           }
@@ -1711,7 +1711,7 @@ ENTRY_DECLARATION
             Node&     n = *(nds[i]);
             bool selctd = n.id==fd.sel.pri || n.sel;
 
-            if( fd.sel.pri!=LavaFlowNode::NODE_ERROR && selctd ){           // if a node is primary selected (left mouse down on a node) or the selected flag is set
+            if( fd.sel.pri!=LavaNode::NODE_ERROR && selctd ){           // if a node is primary selected (left mouse down on a node) or the selected flag is set
               n.P +=  pntr - fd.ui.prevPntr;
             }
 
@@ -1942,7 +1942,7 @@ ENTRY_DECLARATION
           }
           SECTION(draw selection box)
           {
-            if(fd.mouse.lftDn && fd.sel.pri==LavaFlowNode::NODE_ERROR)
+            if(fd.mouse.lftDn && fd.sel.pri==LavaNode::NODE_ERROR)
             {
               nvgBeginPath(vg);
                 float x,y,w,h;
