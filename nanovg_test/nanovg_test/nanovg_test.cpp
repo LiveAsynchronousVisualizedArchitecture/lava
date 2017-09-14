@@ -236,9 +236,10 @@
 // -todo: make a message node vector that can be looped through 
 // -todo: make shared lib name pass through to button creation of node
 // -todo: create a message node shared library
+// -todo: take out GraphDB
+// -todo: take out Lava and put into LavaFlow
+// -todo: shut down threads gracefully with stop() so that program doesn't crash on exit
 
-// todo: take out GraphDB
-// todo: take out Lava and put into LavaFlow
 // todo: fix box selection becoming unselected on mouse up
 // todo: change LavaFlowNode to LavaNode
 // todo: use combination of frame, node id and slot as key to simbdb
@@ -509,9 +510,9 @@ auto            node_add(str node_name, Node n) -> uint64_t
 {
   using namespace std;
 
-  auto          pi = fd.lf.nameToPtr.find( node_name );                               // pi is pointer iterator
+  auto          pi = fd.flow.nameToPtr.find( node_name );                               // pi is pointer iterator
   uint64_t instIdx = LavaFlowNode::NODE_ERROR;
-  if( pi != end(fd.lf.nameToPtr) )
+  if( pi != end(fd.flow.nameToPtr) )
     instIdx = fd.lgrph.addNode(pi->second, true);
 
   if(instIdx != LavaFlowNode::NODE_ERROR){
@@ -1131,7 +1132,8 @@ LavaGraph     strToGraph(str const& s)
 
   auto cnct_cnt = destId.getCount();
   TO(cnct_cnt,i){
-    GraphDB::Id src, dest;
+    //GraphDB::Id src, dest;
+    LavaId src, dest;
     src.nid   = srcId.get(i).toInt();
     src.sidx  = srcIdx.get(i).toInt();
     dest.nid  = destId.get(i).toInt();
@@ -1188,7 +1190,7 @@ void    reloadSharedLibs()
   auto   livePaths  =  GetLivePaths(paths);
 
   // coordinate live paths to handles
-  auto liveHandles  =  GetLiveHandles(fd.lf.libs, livePaths);
+  auto liveHandles  =  GetLiveHandles(fd.flow.libs, livePaths);
 
   // free the handles
   auto   freeCount  =  FreeLibs(liveHandles); 
@@ -1206,7 +1208,7 @@ void    reloadSharedLibs()
   TO(livePaths.size(), i){
     auto h = loadedHndls[i];
     if(h){
-      fd.lf.libs[livePaths[i]] = h;
+      fd.flow.libs[livePaths[i]] = h;
     }
   }
 
@@ -1219,11 +1221,11 @@ void    reloadSharedLibs()
     LavaFlowNode* ndList = flowNdLists[i];
     if(ndList){
       auto const& p = livePaths[i]; 
-      fd.lf.flow.erase(p);                              // delete the current node list for the livePath
+      fd.flow.flow.erase(p);                              // delete the current node list for the livePath
       for(; ndList->func!=nullptr; ++ndList){           // insert each of the LavaFlowNodes in the ndList into the multi-map
-        fd.lf.nameToPtr.erase(ndList->name);
-        fd.lf.nameToPtr.insert( {ndList->name, ndList} );
-        fd.lf.flow.insert( {p, ndList} );
+        fd.flow.nameToPtr.erase(ndList->name);
+        fd.flow.nameToPtr.insert( {ndList->name, ndList} );
+        fd.flow.flow.insert( {p, ndList} );
       }
     }
   }
@@ -1232,7 +1234,7 @@ void    reloadSharedLibs()
   fd.ui.ndBtns.clear();
 
   // redo interface node buttons
-  for(auto& kv : fd.lf.flow){
+  for(auto& kv : fd.flow.flow){
     LavaFlowNode* fn = kv.second;                      // fn is flow node
     auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
     ndBtn->setCallback([fn](){ 
@@ -1505,12 +1507,12 @@ ENTRY_DECLARATION
       fd.lgrph.toggleCnct(s0, s3);
     }
 
-    fd.lava.start();
-    thread looper([](){
+    fd.flow.start();
+    fd.flowThreads.emplace_back([](){
       printf("\n running thread \n");
-      fd.lava.enterLoop();
+      fd.flow.enterLoop();
     });
-    looper.detach();
+    //looper.detach();
   }
 
   glfwSetTime(0);
@@ -1986,9 +1988,16 @@ ENTRY_DECLARATION
       glfwPollEvents();
     }
   }
+  SECTION(shutdown)
+  {
+    fd.flow.stop(); // this will make the 'running' boolean variable false, which will make the the while(running) loop stop, and the threads will end
+    for(auto& t : fd.flowThreads){
+      t.join();
+    }
+    nanogui::shutdown();
+    glfwTerminate();
+  }
 
-  nanogui::shutdown();
-  glfwTerminate();
   return 0;
 }
 

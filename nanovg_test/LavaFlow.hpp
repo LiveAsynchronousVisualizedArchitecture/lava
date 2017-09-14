@@ -124,15 +124,6 @@ struct   LavaFlowSlot
   //u64 nid; bool in=false; State state=NORMAL;
   //LavaFlowSlot(u64 nId, bool In=false) : nid(nId), in(In), state(NORMAL) {}
 };
-struct       LavaFlow
-{
-  lava_pathHndlMap        libs;     // libs is libraries - this maps the live path of the shared libary with the OS specific handle that the OS loading function returns
-  lava_nidMap             nids;     // nids is node ids  - this maps the name of the node to all of the graph node ids that use it
-  lava_flowNodes          flow;
-  lava_flowPtrs           ptrs;     // ptrs are the LavaFlowNode pointers - each one needs a unique id so they can be referenced elsewhere 
-  lava_hndlNodeMap      ndptrs;     // ndptrs is node pointers - a map from each handle to the one (zero?) or more LavaFlowNode pointers the shared lib contains
-  lava_nameNodeMap   nameToPtr;     // maps node names to their pointers 
-};
 // end data types
 
 // static data segment data
@@ -242,7 +233,7 @@ template <class T> void    ThreadAllocator<T>::deallocate(T*& p, size_t) const
 }
 // end allocator definitions
 
-class  LavaGraph
+class       LavaGraph
 {
 public:
   struct NodeInstance { uint64_t id; LavaFlowNode* nd; };              // a struct used for returning an instance of a node - the Nodes map of ids and LavaFlowNode pointers  
@@ -656,17 +647,22 @@ public:
   }
 };
 
-struct      Lava
+struct       LavaFlow
 {
   using PacketQueue  =  std::priority_queue<LavaPacket>;
   using MsgNodeVec   =  std::vector<uint64_t>;
 
-  bool             m_running = false;
-  MsgNodeVec      m_msgNodes;
-  PacketQueue            m_q;
-  LavaGraph          m_graph;
+  lava_pathHndlMap        libs;     // libs is libraries - this maps the live path of the shared libary with the OS specific handle that the OS loading function returns
+  lava_nidMap             nids;     // nids is node ids  - this maps the name of the node to all of the graph node ids that use it
+  lava_flowNodes          flow;
+  lava_flowPtrs           ptrs;     // ptrs are the LavaFlowNode pointers - each one needs a unique id so they can be referenced elsewhere 
+  lava_hndlNodeMap      ndptrs;     // ndptrs is node pointers - a map from each handle to the one (zero?) or more LavaFlowNode pointers the shared lib contains
+  lava_nameNodeMap   nameToPtr;     // maps node names to their pointers 
 
-  //void               init(){ m_running = false; }
+  bool                m_running = false;      // todo: make this atomic
+  MsgNodeVec        m_msgNodes;
+  PacketQueue                q;
+  LavaGraph              graph;
 
   // execution
   void              start(){ m_running =  true; }
@@ -677,10 +673,10 @@ struct      Lava
     LavaArg  outArgs[512];         // if the arguments are going to 
     while(m_running)
     {
-      auto const& mnds = m_graph.msgNodes();
+      auto const& mnds = graph.msgNodes();
 
       for(auto id : mnds){
-        FlowFunc msgFunc = m_graph[id.nid]->func;
+        FlowFunc msgFunc = graph[id.nid]->func;
         if(msgFunc){
           SECTION(run function with stack array arguments)
           {
@@ -692,12 +688,52 @@ struct      Lava
       }
     }
   }
-  void          pauseLoop()
-  {
-
-  }
-
+  void          pauseLoop(){}
 };
+
+
+//struct      Lava
+//{
+//  using PacketQueue  =  std::priority_queue<LavaPacket>;
+//  using MsgNodeVec   =  std::vector<uint64_t>;
+//
+//  bool             m_running = false;
+//  MsgNodeVec      m_msgNodes;
+//  PacketQueue            m_q;
+//  LavaGraph          m_graph;
+//
+//  //void               init(){ m_running = false; }
+//
+//  // execution
+//  void              start(){ m_running =  true; }
+//  void               stop(){ m_running = false; }
+//  void          enterLoop()
+//  {
+//    LavaArg   inArgs[512];         // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
+//    LavaArg  outArgs[512];         // if the arguments are going to 
+//    while(m_running)
+//    {
+//      auto const& mnds = m_graph.msgNodes();
+//
+//      for(auto id : mnds){
+//        FlowFunc msgFunc = m_graph[id.nid]->func;
+//        if(msgFunc){
+//          SECTION(run function with stack array arguments)
+//          {
+//            // set arguments 
+//            // make their last arg being a special value as the end of the list
+//            uint64_t ret = msgFunc(inArgs, outArgs);
+//          }
+//        }
+//      }
+//    }
+//  }
+//  void          pauseLoop()
+//  {
+//
+//  }
+//
+//};
 
 
 #if defined(__LAVAFLOW_IMPL__)
