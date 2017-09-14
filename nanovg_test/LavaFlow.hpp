@@ -53,8 +53,9 @@ using lava_flowPtrs      =  std::unordered_set<LavaNode*>;                      
 using lava_ptrsvec       =  std::vector<LavaNode*>;
 using lava_nameNodeMap   =  std::unordered_map<std::string, LavaNode*>;                  // maps the node names to their pointers
 
-extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaIn*, LavaOut*);    // data flow node function
-extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                                  // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
+extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaIn*, LavaOut*);   // data flow node function
+extern "C" using           LavaAlloc  =  void* (*)(uint64_t);                            // custom allocation function passed in to each node call
+extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                                 // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
 
 union         ArgType{ 
   enum { NONE=0, END, DATA_ERROR, STORE, MEMORY, SEQUENCE, ENUMERATION };                // todo: does this need store sequence and memory sequence?
@@ -62,10 +63,10 @@ union         ArgType{
 };
 struct     LavaParams
 { // should be 24 bytes
-  u32          inputs;
-  u32         outputs;
-  u64           frame;
-  void*     mem_alloc;
+  u32           inputs;
+  u32          outputs;
+  u64            frame;
+  LavaAlloc  mem_alloc;
 };
 struct         LavaIn
 {
@@ -176,7 +177,7 @@ inline void*   LavaHeapInit(size_t initialSz = 0)
   }
   return lava_thread_heap;
 }
-inline void*   LavaAlloc(size_t sz)
+inline void*   LavaHeapAlloc(size_t sz)
 {
   void* thread_heap = LavaHeapInit(sz);
 
@@ -186,7 +187,7 @@ inline void*   LavaAlloc(size_t sz)
 
   return ret;
 }
-inline int     LavaFree(void* memptr)
+inline int     LavaHeapFree(void* memptr)
 {
   void* thread_heap = LavaHeapInit();
 
@@ -719,10 +720,13 @@ struct       LavaFlow
               lp.frame     =   85;
               lp.inputs    =    1;
               lp.outputs   =  512;
-              lp.mem_alloc =  LavaAlloc;
-              uint64_t ret = msgFunc(&lp, inArgs, outArgs);
+              lp.mem_alloc =  LavaHeapAlloc;
+              uint64_t ret =  msgFunc(&lp, inArgs, outArgs);
               tbl<u8> pth( (void*)outArgs[0].value );
               printf("\n out string %s \n", (char*)pth.data() );
+              
+              // if type == MEMORY and value != nullptr
+              LavaHeapFree( (void*)outArgs[0].value );
               //free( (void*)outArgs[0].value );  // libc compile in so that malloc isn't in the same heap
             }
           }

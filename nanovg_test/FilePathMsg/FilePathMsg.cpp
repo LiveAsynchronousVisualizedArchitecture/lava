@@ -5,8 +5,6 @@
 #include "../LavaFlow.hpp"
 #include "../tbl.hpp"
 
-//using millisec = std::chrono::duration<float, std::milli>;
-
 extern "C"
 {
   const char* FilePathMsgTypes[] = {"tbl_str"};
@@ -18,15 +16,15 @@ extern "C"
     // tbl_str filePathStr = "C:\\projects\\lava\\";
     // auto dbid = simdb.put(nodeId, filePathStr);
     // LavaArg out[0] = dbid;
+    //
+    //this_thread::sleep_for( chrono::milliseconds(1000) );
+
     printf("\n FilePathMsg run \n");
 
 
     printf("\n lava heap: %llu \n", (u64)lava_thread_heap);
     LavaHeapInit();
     printf("\n lava heap: %llu \n", (u64)lava_thread_heap);
-
-
-    //this_thread::sleep_for( chrono::milliseconds(1000) );
 
     tbl<u8> filePath(256);
     memset(filePath.data(), 0, 256);
@@ -36,7 +34,8 @@ extern "C"
 
     printf("\n pthstr: %s \n  pthlen: %d  \n filePath.data(): %s \n\n", pthstr, (int)pthlen, filePath.data());
     
-    void* outmem = malloc(filePath.sizeBytes());
+    //void* outmem = malloc(filePath.sizeBytes());
+    void* outmem = inout_lp->mem_alloc(filePath.sizeBytes());
     memcpy(outmem, filePath.memStart(), filePath.sizeBytes());
     
     ((tbl<u8>)outmem).owned(false);
@@ -50,7 +49,7 @@ extern "C"
     //
     //this_thread::sleep_for( chrono::milliseconds(3000) );
 
-    free( (void*)out[0].value );
+    //free( (void*)out[0].value );
 
     return 1;
   }
