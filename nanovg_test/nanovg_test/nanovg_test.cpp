@@ -243,11 +243,17 @@
 // -todo: prototype an entry function that loops through message nodes then loops through data packets
 // -todo: make node selection an unsigned integer that uses a special value like NODE_NONE for unselected
 // -todo: fix box selection becoming unselected on mouse up - need to possibly keep some sort of state for box selections being turned on - box bnds shifted after box selection, drgbnd moved to be a consistent state variable
+// -todo: make frame input to lava func
+// -todo: make lava function input for max outputs?
+// -todo: work out memory allocation passing the dll boundary - thread local heap init in loop function but outside of loop - allocation function passed to node function in the LavaParams struct
+// -todo: change ArgType to LavaArgType
+// -todo: populate output struct with table, print the result, then free the memory
 
-// todo: make frame input to lava func
-// todo: make lava function input for max outputs?
-// todo: change ArgType to LavaArgType
-// todo: work out memory allocation passing the dll boundary
+// todo: test saving and loading again
+// todo: use malloc for passed in memory allocator
+// todo: make a packet from memory passed back from a node and put it into the packet queue
+// todo: pass output to another node
+// todo: put output in simdb
 // todo: use combination of frame, node id and slot as key to simbdb
 //       |  how does that get in to the node, if all the data is in the packet struct? - through the output Args
 //       |  put the index information into the output array and use that 
@@ -255,7 +261,6 @@
 //       |  the full key is needed because robin hood hashing could shift the other keys' indices around - the index into the key value slots in the db can't be used, but the starting block index can since that won't change until the data goes away
 //       |  use a union of bytes that is filled with the frame, slot, list index?
 //       |  use malloc addresses initially
-// todo: populate output struct with table, print the result, then free the memory
 // todo: prototype API for message nodes
 //       | do message nodes need some extra way to hold their state? will there ever be more than a single instance of a message node?
 //       | initially just make them thread safe or make them lock with mutexes

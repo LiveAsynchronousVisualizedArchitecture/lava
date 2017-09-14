@@ -57,7 +57,7 @@ extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaIn*, Lava
 extern "C" using           LavaAlloc  =  void* (*)(uint64_t);                            // custom allocation function passed in to each node call
 extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                                 // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
 
-union         ArgType{ 
+union     LavaArgType{ 
   enum { NONE=0, END, DATA_ERROR, STORE, MEMORY, SEQUENCE, ENUMERATION };                // todo: does this need store sequence and memory sequence?
   u8 asInt;
 };
@@ -150,7 +150,9 @@ struct   LavaFlowSlot
 // end data types
 
 // static data segment data
-static const              std::string   liveExt(".live.dll");             // todo: change depending on OS
+#if defined(_WIN32)
+  static const std::string  liveExt(".live.dll");
+#endif
 static __declspec(thread)       void*   lava_thread_heap = nullptr;       // thread local handle for thread local heap allocations
 // end data segment data
 
@@ -692,7 +694,7 @@ struct       LavaFlow
   void               stop(){ m_running = false; }
   void               loop()
   {
-    const LavaOut defOut = { ArgType::NONE, 0, 0, 0, 0 };
+    const LavaOut defOut = { LavaArgType::NONE, 0, 0, 0, 0 };
 
     LavaIn    inArgs[LAVA_ARG_COUNT];         // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
     LavaOut  outArgs[LAVA_ARG_COUNT];         // if the arguments are going to 
@@ -731,9 +733,8 @@ struct       LavaFlow
             }
           }
         }
-      }
-
-    }
+      } // SECTION(loop through message nodes)
+    } // while(m_running)
   }
   void          pauseLoop(){}
 };

@@ -21,7 +21,6 @@ extern "C"
 
     printf("\n FilePathMsg run \n");
 
-
     printf("\n lava heap: %llu \n", (u64)lava_thread_heap);
     LavaHeapInit();
     printf("\n lava heap: %llu \n", (u64)lava_thread_heap);
@@ -41,14 +40,14 @@ extern "C"
     ((tbl<u8>)outmem).owned(false);
     
     out[0].value = (u64)outmem;
-    out[0].type  = ArgType::MEMORY;
+    out[0].type  = LavaArgType::MEMORY;
 
     //((tbl<u8>*)out[0].value)->owned(false);
     //
     //free( (void*)out[0].value );
     //
     //this_thread::sleep_for( chrono::milliseconds(3000) );
-
+    //
     //free( (void*)out[0].value );
 
     return 1;
