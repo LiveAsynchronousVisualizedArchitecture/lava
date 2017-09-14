@@ -240,17 +240,17 @@
 // -todo: take out Lava and put into LavaFlow
 // -todo: shut down threads gracefully with stop() so that program doesn't crash on exit
 // -todo: change LavaFlowNode to LavaNode
+// -todo: prototype an entry function that loops through message nodes then loops through data packets
+// -todo: make node selection an unsigned integer that uses a special value like NODE_NONE for unselected
 
-// todo: fix box selection becoming unselected on mouse up
+// todo: fix box selection becoming unselected on mouse up - need to possibly keep some sort of state for box selections being turned on 
 // todo: use combination of frame, node id and slot as key to simbdb
 //       |  how does that get in to the node, if all the data is in the packet struct?
 //       |  put the index information into the output array and use that 
 //       |  leave room for the hash in the output struct? 
-// todo: prototype an entry function that loops through message nodes then loops through data packets
 // todo: prototype API for message nodes
 //       | do message nodes need some extra way to hold their state? will there ever be more than a single instance of a message node?
 //       | initially just make them thread safe or make them lock with mutexes
-// todo: make node selection an unsigned integer that uses a special value like NODE_NONE for unselected
 // todo: make a priority queue for packets of data
 // todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
 // todo: change project name to Fissure 
@@ -1585,7 +1585,7 @@ ENTRY_DECLARATION
         SECTION(select from selection box)
         {
           bool anyInside = false;
-          if(ms.drgbox){
+          if(lftClkUp || ms.drgbox){
             TO(sz,i){
               Node& n       =  *(nds[i]);
               bool inside   =  isIn(n.b, drgbnd);
@@ -1990,7 +1990,7 @@ ENTRY_DECLARATION
   }
   SECTION(shutdown)
   {
-    fd.flow.stop(); // this will make the 'running' boolean variable false, which will make the the while(running) loop stop, and the threads will end
+    fd.flow.stop();                                   // this will make the 'running' boolean variable false, which will make the the while(running) loop stop, and the threads will end
     for(auto& t : fd.flowThreads){
       t.join();
     }
