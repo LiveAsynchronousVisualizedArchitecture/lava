@@ -227,7 +227,9 @@ struct FisData
     v2                    drgP;
     v2                 drgofst;
     bool                drgbox = false;
+    bool            prevDrgbox = false;
     bool                 drgNd = false;
+    Bnd                 drgbnd;
   }       mouse;
   struct 
   {

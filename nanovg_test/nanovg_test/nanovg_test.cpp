@@ -242,8 +242,8 @@
 // -todo: change LavaFlowNode to LavaNode
 // -todo: prototype an entry function that loops through message nodes then loops through data packets
 // -todo: make node selection an unsigned integer that uses a special value like NODE_NONE for unselected
+// -todo: fix box selection becoming unselected on mouse up - need to possibly keep some sort of state for box selections being turned on - box bnds shifted after box selection, drgbnd moved to be a consistent state variable
 
-// todo: fix box selection becoming unselected on mouse up - need to possibly keep some sort of state for box selections being turned on 
 // todo: use combination of frame, node id and slot as key to simbdb
 //       |  how does that get in to the node, if all the data is in the packet struct?
 //       |  put the index information into the output array and use that 
@@ -254,6 +254,7 @@
 // todo: make a priority queue for packets of data
 // todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
 // todo: change project name to Fissure 
+// todo: fix selection clearing on node click
 
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
@@ -1512,7 +1513,6 @@ ENTRY_DECLARATION
       printf("\n running thread \n");
       fd.flow.enterLoop();
     });
-    //looper.detach();
   }
 
   glfwSetTime(0);
@@ -1564,38 +1564,23 @@ ENTRY_DECLARATION
         bool lftClkDn =  ms.lftDn && !ms.prevLftDn;    // lftClkDn is left click down
         bool lftClkUp = !ms.lftDn &&  ms.prevLftDn;    // lftClkDn is left click up
         bool clearSelections = true;
-        Bnd  drgbnd;
-        SECTION(selection box create)
-        {
-          //if(ms.drgbox || drgbnd.hasLen()){    // && lftClkUp
-          if(ms.drgbox || drgbnd.area() > 1.f){    // && lftClkUp
-            clearSelections=false;
-          }
-
-          if(!ms.lftDn){ ms.drgP=pntr; ms.drgbox=false; }
-
-          if(ms.drgbox)
-            drgbnd = Bnd( min(ms.drgP.x, pntr.x),
-                          min(ms.drgP.y, pntr.y),
-                          max(ms.drgP.x, pntr.x),
-                          max(ms.drgP.y, pntr.y) );
-          else
-            drgbnd = Bnd();
-        }
+        //Bnd  drgbnd;
+        ms.prevDrgbox = ms.drgbox;
         SECTION(select from selection box)
         {
-          bool anyInside = false;
-          if(lftClkUp || ms.drgbox){
+          bool anyInside = false; 
+          if(lftClkUp || ms.drgbox){    // put this above the box settings?
             TO(sz,i){
               Node& n       =  *(nds[i]);
-              bool inside   =  isIn(n.b, drgbnd);
+              bool inside   =  isIn(n.b, ms.drgbnd);
               n.sel        |=  inside;
               anyInside    |=  inside;
             }
-            if(drgbnd.hasLen() && fd.mouse.lftDn)
+            //if(drgbnd.hasLen() && fd.mouse.lftDn)
+            if(ms.drgbnd.area()>1.f && fd.mouse.lftDn)
               clearSelections = false;
           }
-        
+
           if(!anyInside && lftClkUp){
             clearSelections = true;
           }
@@ -1603,6 +1588,23 @@ ENTRY_DECLARATION
           if(!fd.mouse.lftDn){
             fd.sel.pri = LavaNode::NODE_ERROR;
           }
+        }
+        SECTION(selection box create)
+        {
+          //if(ms.drgbox || drgbnd.hasLen()){    // && lftClkUp
+          if(ms.drgbox || ms.drgbnd.area() > 1.f){
+            clearSelections=false;
+          }
+
+          if(!ms.lftDn){ ms.drgP=pntr; ms.drgbox=false; }
+
+          if(ms.drgbox)
+            ms.drgbnd = Bnd( min(ms.drgP.x, pntr.x),
+                          min(ms.drgP.y, pntr.y),
+                          max(ms.drgP.x, pntr.x),
+                          max(ms.drgP.y, pntr.y) );
+          else
+            ms.drgbnd = Bnd();
         }
         
         bool inAnySlt = false;

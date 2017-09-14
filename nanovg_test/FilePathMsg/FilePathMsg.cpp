@@ -1,7 +1,10 @@
 
 
+#include <thread>
 #include "../no_rt_util.h"
 #include "../LavaFlow.hpp"
+
+//using millisec = std::chrono::duration<float, std::milli>;
 
 extern "C"
 {
@@ -9,10 +12,15 @@ extern "C"
 
   uint64_t FilePathMsg(LavaArg* in, LavaArg* out)
   {
+    using namespace std;
+
     // tbl_str filePathStr = "C:\\projects\\lava\\";
     // auto dbid = simdb.put(nodeId, filePathStr);
     // LavaArg out[0] = dbid;
     printf("\nFilePathMsg run\n");
+    
+    this_thread::sleep_for( chrono::milliseconds(500) );
+
     return 1;
   }
 
