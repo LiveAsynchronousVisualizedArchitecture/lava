@@ -252,6 +252,8 @@
 // -todo: fix selection clearing on node click
 // -todo: figure out why loading has no slots or connections - needed to clear the graph and not move an empty graph into the global one
 
+// todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
+// todo: build in const char* constructor to tbl
 // todo: use malloc for passed in memory allocator
 // todo: make a packet from memory passed back from a node and put it into the packet queue
 // todo: pass output to another node
@@ -269,6 +271,7 @@
 // todo: make a priority queue for packets of data
 // todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
 // todo: change project name to Fissure 
+// todo: come up with locking system so that message nodes have their own threads that are only run when a looping thread visits them - how should memory allocation be done? passing the thread's allocator in the exact same way?
 
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
@@ -323,6 +326,7 @@
 // idea: convert general data structures of nodes, slots, and connections to use tbl?
 // idea: make drawing order of slots dictated by node order
 // idea: make connection class that keeps two connection arrays, each sorted by src or dest for fast searching
+// idea: keep covariance statistics of input size, output size and time taken
 
 // glew might include windows.h
 #define  WIN32_LEAN_AND_MEAN

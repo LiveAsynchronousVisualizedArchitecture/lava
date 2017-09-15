@@ -96,7 +96,17 @@ struct     LavaPacket
   u64    dest_slot : 16;
   u64     src_node : 48;
   u64     src_slot : 16;
+  u64     sz_bytes;                               // the size in bytes can be used to further sort the packets so that the largets are processed first, possibly resulting in less memory usage over time
   LavaMsg      msg;
+
+  bool operator<(LavaPacket const& r)
+  {    
+    if(frame    != r.frame)    return frame    > r.frame;               // want lowest frame numbers to be done first 
+    if(sz_bytes != r.sz_bytes) return sz_bytes < r.sz_bytes;            // want largest sizes to be done first
+    if(framed   != r.framed)   return framed   < r.framed;              // want framed packets to be done first so that their dependencies can be resolved
+
+    return msg.id > r.msg.id;
+  }
 };
 union          LavaId                                                // this Id serves as both a nodeId and LavaFlowSlot index, since a LavaFlowSlot index will alway coordinate with only one node 
 {    
@@ -679,6 +689,7 @@ public:
 
 struct       LavaFlow
 {
+public:
   using PacketQueue  =  std::priority_queue<LavaPacket>;
   using MsgNodeVec   =  std::vector<uint64_t>;
 
@@ -690,10 +701,19 @@ struct       LavaFlow
   lava_nameNodeMap   nameToPtr;     // maps node names to their pointers 
 
   bool                m_running = false;      // todo: make this atomic
+  u64                m_curMsgId = 0;          // todo: make this atomic
+  u64                   m_frame = 0;
   MsgNodeVec        m_msgNodes;
   PacketQueue                q;
   LavaGraph              graph;
 
+private:
+  uint64_t nxtMsgId()
+  {
+    return ++m_curMsgId;
+  }
+
+public:
   // execution
   void              start(){ m_running =  true; }
   void               stop()
@@ -727,26 +747,61 @@ struct       LavaFlow
           if(msgFunc){
             SECTION(run function with stack array arguments)
             {
-              // make their last arg being a special value as the end of the list
+              // make their last arg a special value as the end of the list
 
               // set arguments 
               LavaParams lp;
-              lp.frame      =   85;
-              lp.inputs     =    1;
-              lp.outputs    =  512;
-              lp.mem_alloc  =  malloc;  // LavaHeapAlloc;
-              uint64_t ret  =  msgFunc(&lp, inArgs, outArgs);
+              lp.frame       =   m_frame;
+              lp.inputs      =     1;
+              lp.outputs     =   512;
+              lp.mem_alloc   =   malloc;  // LavaHeapAlloc;
+              uint64_t ret   =   msgFunc(&lp, inArgs, outArgs);
 
               tbl<u8> pth( (void*)outArgs[0].value );
               printf("\n out string %s \n", (char*)pth.data() );
-              
+
+              LavaPacket lpckt;
+              lpckt.dest_node   =   0;          // get from the graph
+              lpckt.dest_slot   =   0;          // get from the graph
+              lpckt.frame       =   m_frame;    // increment the frame on every major loop through both data and message nodes - how to know when a full cycle has passed? maybe purely by message nodes - only increment frame if data is created through a message node cycle
+              lpckt.framed      =   false;      // would this go on the socket?
+              lpckt.src_node    =   0;
+              lpckt.src_slot    =   0;
+              lpckt.msg.id      =   nxtMsgId();
+
+              // todo: use a mutex here initially
+              // mutex lock
+                q.push(lpckt);
+              // mutex unlock
+
               // if type == MEMORY and value != nullptr
               //LavaHeapFree( (void*)outArgs[0].value );
               //free( (void*)outArgs[0].value );  // libc compiled in so that malloc isn't in the same heap
             }
           }
         }
+        ++m_frame; // todo: rething this and make sure it will work 
       } // SECTION(loop through message nodes)
+      SECTION(loop through data packets)
+      {
+        while(q.size() > 0)
+        {
+          // lock mutex
+            // need to somehow find a full set of packets for the current frame - how to keep one frame from outrunning another? 
+            // does each node's slot need its own queue? should packets be organized differently? one queue per frame? what determines a frame? one pass through all the message nodes?
+            LavaPacket pckt = q.top();
+            q.pop();
+          // unlock mutex
+
+          // get the function from the dest node and pass the packets into the dest slot
+
+          // run the function
+
+          // use the LavaParams output struct to make the LavaOut list packets
+          // route the packets with the graph (set the dest node and slot)
+          // put them into the packet queue
+        }
+      } // SECTION(loop through data packets)
     } // while(m_running)
   }
   void          pauseLoop(){}
@@ -950,6 +1005,9 @@ auto       GetFlowNodeLists(lava_hndlvec  const& hndls) -> lava_ptrsvec
 
 
 
+//bool  frameCmp  =  frame    > r.frame;         // want lowest frame numbers to be done first 
+//bool     szCmp  =  sz_bytes < r.sz_bytes;      // want largest sizes to be done first
+//bool framedCmp  =  framed   < r.framed;        // want framed packets to be done first so that their dependencies can be resolved
 
 //TO(LAVA_ARG_COUNT,i){
 //  outArgs[i] = 
