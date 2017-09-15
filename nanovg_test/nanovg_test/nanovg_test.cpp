@@ -251,14 +251,17 @@
 // -todo: test saving and loading again - have to stop the LavaFlow loop because of graphs being changed around
 // -todo: fix selection clearing on node click
 // -todo: figure out why loading has no slots or connections - needed to clear the graph and not move an empty graph into the global one
+// -todo: change LavaIn to LavaVal
+// -todo: use malloc for passed in memory allocator
+// -todo: make a priority queue for packets of data
+// -todo: make a packet from memory passed back from a node and put it into the packet queue
 
-// todo: change LavaIn to LavaVal
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
 // todo: build in const char* constructor to tbl
-// todo: use malloc for passed in memory allocator
-// todo: make a packet from memory passed back from a node and put it into the packet queue
 // todo: pass output to another node
-// todo: put output in simdb
+// todo: prototype API for message nodes
+//       | do message nodes need some extra way to hold their state? will there ever be more than a single instance of a message node?
+//       | initially just make them thread safe or make them lock with mutexes
 // todo: use combination of frame, node id and slot as key to simbdb
 //       |  how does that get in to the node, if all the data is in the packet struct? - through the output Args
 //       |  put the index information into the output array and use that 
@@ -266,16 +269,13 @@
 //       |  the full key is needed because robin hood hashing could shift the other keys' indices around - the index into the key value slots in the db can't be used, but the starting block index can since that won't change until the data goes away
 //       |  use a union of bytes that is filled with the frame, slot, list index?
 //       |  use malloc addresses initially
-// todo: prototype API for message nodes
-//       | do message nodes need some extra way to hold their state? will there ever be more than a single instance of a message node?
-//       | initially just make them thread safe or make them lock with mutexes
-// todo: make a priority queue for packets of data
-// todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
+// todo: put output in simdb
 // todo: change project name to Fissure 
-// todo: come up with locking system so that message nodes have their own threads that are only run when a looping thread visits them - how should memory allocation be done? passing the thread's allocator in the exact same way?
 // todo: make the lava allocator passed to a node allocate an extra 8 bytes for the reference count 
 //       |  make sure that extra data at the beggining is treated atomically
 //       |  make sure that memory is allocated aligned to a 64 byte cache line
+// todo: come up with locking system so that message nodes have their own threads that are only run when a looping thread visits them - how should memory allocation be done? passing the thread's allocator in the exact same way?
+// todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
 
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 

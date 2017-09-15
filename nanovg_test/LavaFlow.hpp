@@ -747,7 +747,7 @@ public:
         {
           FlowFunc msgFunc = graph[id.nid]->func;
           if(msgFunc){
-            SECTION(run function with stack array arguments)
+            SECTION(run function and route results)
             {
               // make their last arg a special value as the end of the list
 
@@ -759,7 +759,6 @@ public:
               lp.mem_alloc   =   malloc;  // LavaHeapAlloc;
               uint64_t ret   =   msgFunc(&lp, inArgs, outArgs);
 
-
               tbl<u8> pth( (void*)outArgs[0].value );
               printf("\n out string %s \n", (char*)pth.data() );
 
@@ -770,36 +769,39 @@ public:
               val.type  = outArgs[0].type;
               val.value = outArgs[0].value;
 
-              // create new packet 
-              LavaPacket basePkt;
-              basePkt.frame       =   m_frame;    // increment the frame on every major loop through both data and message nodes - how to know when a full cycle has passed? maybe purely by message nodes - only increment frame if data is created through a message node cycle
-              basePkt.framed      =   false;      // would this go on the socket?
-              basePkt.src_node    =   id.nid;
-              basePkt.src_slot    =   sidx;
-              basePkt.msg.id      =   nxtMsgId();
-              basePkt.msg.val     =   val;
+              SECTION(create packets and put them into packet queue)
+              {
+                // create new packet 
+                LavaPacket basePkt;
+                basePkt.frame       =   m_frame;    // increment the frame on every major loop through both data and message nodes - how to know when a full cycle has passed? maybe purely by message nodes - only increment frame if data is created through a message node cycle
+                basePkt.framed      =   false;      // would this go on the socket?
+                basePkt.src_node    =   id.nid;
+                basePkt.src_slot    =   sidx;
+                basePkt.msg.id      =   nxtMsgId();
+                basePkt.msg.val     =   val;
 
-              // route the packet using the graph - the packet may be copied multiple times and go to multiple destination slots
-              LavaId   src  =  { id.nid, sidx };
-              auto      di  =  graph.destCncts(src);                               // di is destination iterator
-              auto   diCnt  =  di;                                                 // diCnt is destination iterator counter - used to count the number of destination slots this packet will be copied to so that the reference count can be set correctly
-              auto    diEn  =  graph.destCnctEnd();
-              u64   refCnt  =  0;
-              for(; diCnt!=diEn && diCnt->first==src; ++diCnt){ ++refCnt; } 
-              basePkt.ref_count = refCnt; // reference count will ultimatly need to be handled very differently, not on a packet basis, since the packets are copied - it should probably be on the value somehow - maybe the allocator passed should allocate an extra 8 bytes for the reference count and that should be treated atomically 
+                // route the packet using the graph - the packet may be copied multiple times and go to multiple destination slots
+                LavaId   src  =  { id.nid, sidx };
+                auto      di  =  graph.destCncts(src);                               // di is destination iterator
+                auto   diCnt  =  di;                                                 // diCnt is destination iterator counter - used to count the number of destination slots this packet will be copied to so that the reference count can be set correctly
+                auto    diEn  =  graph.destCnctEnd();
+                u64   refCnt  =  0;
+                for(; diCnt!=diEn && diCnt->first==src; ++diCnt){ ++refCnt; } 
+                basePkt.ref_count = refCnt;                                          // reference count will ultimatly need to be handled very differently, not on a packet basis, since the packets are copied - it should probably be on the value somehow - maybe the allocator passed should allocate an extra 8 bytes for the reference count and that should be treated atomically 
 
-              for(; di!=diEn && di->first==src; ++di)
-              {                                                                  // loop through the 1 or more destination slots connected to this source
-                LavaId   pktId = di->second;
-                LavaPacket pkt;                                                  // pkt is packet
-                pkt.dest_node  = pktId.nid;
-                pkt.dest_slot  = pktId.sidx;
+                for(; di!=diEn && di->first==src; ++di)
+                {                                                                    // loop through the 1 or more destination slots connected to this source
+                  LavaId   pktId = di->second;
+                  LavaPacket pkt;                                                    // pkt is packet
+                  pkt.dest_node  = pktId.nid;
+                  pkt.dest_slot  = pktId.sidx;
 
-                // todo: use a mutex here initially
-                // mutex lock
-                q.push(pkt);
-                // mutex unlock
-              }
+                  // todo: use a mutex here initially
+                  // mutex lock
+                  q.push(pkt);
+                  // mutex unlock
+                }
+              } // SECTION(create packets and put them into packet queue)
             }
           }
         }
