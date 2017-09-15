@@ -281,7 +281,10 @@ private:
   SrcMap         m_destCncts;
   vec_ids         m_msgNodes;
 
-  void            init(){}
+  void            init()
+  { 
+    m_nxtId = 1;
+  }
   void              mv(LavaGraph&& rval)
   {
     using namespace std;
@@ -345,7 +348,7 @@ private:
   }
 
 public:
-  LavaGraph() : m_nxtId(1) { init(); }
+  LavaGraph() { init(); }
   LavaGraph(LavaGraph&& rval){ mv(std::move(rval)); }
   LavaGraph& operator=(LavaGraph&& rval){ mv(std::move(rval)); return *this; }
 
@@ -445,7 +448,9 @@ public:
     m_slots.clear();
     m_cncts.clear();
     m_destCncts.clear();
+    m_msgNodes.clear();
 
+    init();
     //m_ids.clear();
   }
   void      setNextNodeId(u64 nxt){ m_nxtId = nxt; }

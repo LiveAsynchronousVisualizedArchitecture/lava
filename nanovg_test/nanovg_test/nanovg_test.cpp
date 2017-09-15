@@ -250,8 +250,8 @@
 // -todo: populate output struct with table, print the result, then free the memory
 // -todo: test saving and loading again - have to stop the LavaFlow loop because of graphs being changed around
 // -todo: fix selection clearing on node click
+// -todo: figure out why loading has no slots or connections - needed to clear the graph and not move an empty graph into the global one
 
-// todo: fix loading
 // todo: use malloc for passed in memory allocator
 // todo: make a packet from memory passed back from a node and put it into the packet queue
 // todo: pass output to another node
@@ -463,11 +463,11 @@ v2         angleToNormal(f32 angle)
 }
 
 // state manipulation
-void stopFlowThreads()
+void     stopFlowThreads()
 {
   fd.flow.stop();
   for(auto& t : fd.flowThreads){
-    t.join();
+    if(t.joinable()) t.join();
   }
 }
 
@@ -1090,7 +1090,8 @@ str           graphToStr(LavaGraph const& lg)
 
   return s;
 }
-LavaGraph     strToGraph(str const& s)
+//LavaGraph     strToGraph(str const& s)
+void     strToGraph(str const& s)
 {
   using namespace std;
 
@@ -1099,7 +1100,8 @@ LavaGraph     strToGraph(str const& s)
   fd.graph.nds.clear();
   fd.graph.slots.clear();
   fd.graph.ordr.clear();
-  LavaGraph lg;
+  fd.lgrph.clear();
+  //LavaGraph lg;
 
   Jzon::Parser prs;
   auto graph = prs.parseString(s);
@@ -1162,12 +1164,12 @@ LavaGraph     strToGraph(str const& s)
 
     //g.addCnct(src, dest);
     //g.toggleCnct(src, dest);
-    lg.toggleCnct(src, dest);
+    fd.lgrph.toggleCnct(src, dest);
   }
 
-  lg.setNextNodeId( lg.maxId() );
+  fd.lgrph.setNextNodeId( fd.lgrph.maxId() );
 
-  return move(lg);
+  //return move(fd.lgrph);
 }
 bool            saveFile(LavaGraph const& lg, str path)
 {
@@ -1198,7 +1200,8 @@ bool            loadFile(str path, LavaGraph* out_g)
 
   if(fclose(f) == EOF) return false;
 
-  *out_g = strToGraph(s);
+   //*out_g = strToGraph(s);
+  strToGraph(s);
 
   return true;
 }
@@ -1513,20 +1516,20 @@ ENTRY_DECLARATION
 
       auto   inst0 = node_add("FileToString", Node("one",   Node::Type::FLOW, {400.f,300.f}) );
       auto   inst1 = node_add("FileToString", Node("two",   Node::Type::FLOW, {200.f,500.f}) );
-      auto   inst2 = node_add("FileToString", Node("three", Node::Type::FLOW, {700.f,500.f}) );
-      auto   inst3 = node_add("FileToString", Node("four",  Node::Type::FLOW, {700.f,700.f}) );
-      auto   inst4 = node_add("FilePathMsg",  Node("five",  Node::Type::MSG,  {200.f,200.f}) );
+      //auto   inst2 = node_add("FileToString", Node("three", Node::Type::FLOW, {700.f,500.f}) );
+      //auto   inst3 = node_add("FileToString", Node("four",  Node::Type::FLOW, {700.f,700.f}) );
+      //auto   inst4 = node_add("FilePathMsg",  Node("five",  Node::Type::MSG,  {200.f,200.f}) );
 
       LavaId s0 = slot_add( Slot(inst0, false)  );
       LavaId s1 = slot_add( Slot(inst1,  true)  );
-      LavaId s2 = slot_add( Slot(inst2,  true)  );
-      LavaId s3 = slot_add( Slot(inst3,  true)  );
-      LavaId s4 = slot_add( Slot(inst0, false)  );
-      LavaId s5 = slot_add( Slot(inst4, false)  );
+      //LavaId s2 = slot_add( Slot(inst2,  true)  );
+      //LavaId s3 = slot_add( Slot(inst3,  true)  );
+      //LavaId s4 = slot_add( Slot(inst0, false)  );
+      //LavaId s5 = slot_add( Slot(inst4, false)  );
 
       fd.lgrph.toggleCnct(s0, s1);
-      fd.lgrph.toggleCnct(s0, s2);
-      fd.lgrph.toggleCnct(s0, s3);
+      //fd.lgrph.toggleCnct(s0, s2);
+      //fd.lgrph.toggleCnct(s0, s3);
     }
 
     fd.flow.start();
