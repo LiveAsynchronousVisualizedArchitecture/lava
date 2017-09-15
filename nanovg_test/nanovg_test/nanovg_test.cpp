@@ -252,6 +252,7 @@
 // -todo: fix selection clearing on node click
 // -todo: figure out why loading has no slots or connections - needed to clear the graph and not move an empty graph into the global one
 
+// todo: change LavaIn to LavaVal
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
 // todo: build in const char* constructor to tbl
 // todo: use malloc for passed in memory allocator
@@ -272,6 +273,9 @@
 // todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
 // todo: change project name to Fissure 
 // todo: come up with locking system so that message nodes have their own threads that are only run when a looping thread visits them - how should memory allocation be done? passing the thread's allocator in the exact same way?
+// todo: make the lava allocator passed to a node allocate an extra 8 bytes for the reference count 
+//       |  make sure that extra data at the beggining is treated atomically
+//       |  make sure that memory is allocated aligned to a 64 byte cache line
 
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
@@ -1510,7 +1514,7 @@ ENTRY_DECLARATION
     }
     SECTION(test data init)
     {
-      printf("Arg    size: %lld \n\n", sizeof(LavaIn));
+      printf("Arg    size: %lld \n\n", sizeof(LavaVal));
       printf("Msg    size: %lld \n\n", sizeof(LavaMsg));
       printf("Packet size: %lld \n\n", sizeof(LavaPacket));
 

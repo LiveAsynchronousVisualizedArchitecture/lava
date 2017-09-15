@@ -30,7 +30,7 @@
 // data types
 struct       LavaNode;
 struct     LavaParams;
-struct         LavaIn;
+struct         LavaVal;
 struct        LavaOut;
 union          LavaId;
 class       LavaGraph;
@@ -53,7 +53,7 @@ using lava_flowPtrs      =  std::unordered_set<LavaNode*>;                      
 using lava_ptrsvec       =  std::vector<LavaNode*>;
 using lava_nameNodeMap   =  std::unordered_map<std::string, LavaNode*>;                  // maps the node names to their pointers
 
-extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaIn*, LavaOut*);   // data flow node function
+extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaVal*, LavaOut*);   // data flow node function
 extern "C" using           LavaAlloc  =  void* (*)(uint64_t);                            // custom allocation function passed in to each node call
 extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                                 // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
 
@@ -68,15 +68,17 @@ struct     LavaParams
   u64            frame;
   LavaAlloc  mem_alloc;
 };
-struct         LavaIn
+struct         LavaVal
 {
   u64      type :  3;          // ArgType
   u64     value : 61;
 };
 struct        LavaOut
 {
+  // todo: change to LavaVal
   u64      type :  3;          // ArgType
   u64     value : 61;          // This will hold the address in memory - could also hold the starting block index in the database 
+
   union {
     struct { u64 frame; u32 slot; u32 listIdx; };
     u8 bytes[16];
@@ -85,7 +87,7 @@ struct        LavaOut
 struct        LavaMsg
 {
   u64        id;
-  LavaIn    arg;
+  LavaVal    val;
 };
 struct     LavaPacket
 {
@@ -99,7 +101,7 @@ struct     LavaPacket
   u64     sz_bytes;                               // the size in bytes can be used to further sort the packets so that the largets are processed first, possibly resulting in less memory usage over time
   LavaMsg      msg;
 
-  bool operator<(LavaPacket const& r)
+  bool operator<(LavaPacket const& r) const
   {    
     if(frame    != r.frame)    return frame    > r.frame;               // want lowest frame numbers to be done first 
     if(sz_bytes != r.sz_bytes) return sz_bytes < r.sz_bytes;            // want largest sizes to be done first
@@ -708,7 +710,7 @@ public:
   LavaGraph              graph;
 
 private:
-  uint64_t nxtMsgId()
+  uint64_t       nxtMsgId()
   {
     return ++m_curMsgId;
   }
@@ -727,7 +729,7 @@ public:
   {
     const LavaOut defOut = { LavaArgType::NONE, 0, 0, 0, 0 };
 
-    LavaIn    inArgs[LAVA_ARG_COUNT];         // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
+    LavaVal    inArgs[LAVA_ARG_COUNT];         // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
     LavaOut  outArgs[LAVA_ARG_COUNT];         // if the arguments are going to 
     memset(inArgs,  0, sizeof(inArgs)  );
     memset(outArgs, 0, sizeof(outArgs) );
@@ -757,26 +759,47 @@ public:
               lp.mem_alloc   =   malloc;  // LavaHeapAlloc;
               uint64_t ret   =   msgFunc(&lp, inArgs, outArgs);
 
+
               tbl<u8> pth( (void*)outArgs[0].value );
               printf("\n out string %s \n", (char*)pth.data() );
 
-              LavaPacket lpckt;
-              lpckt.dest_node   =   0;          // get from the graph
-              lpckt.dest_slot   =   0;          // get from the graph
-              lpckt.frame       =   m_frame;    // increment the frame on every major loop through both data and message nodes - how to know when a full cycle has passed? maybe purely by message nodes - only increment frame if data is created through a message node cycle
-              lpckt.framed      =   false;      // would this go on the socket?
-              lpckt.src_node    =   0;
-              lpckt.src_slot    =   0;
-              lpckt.msg.id      =   nxtMsgId();
+              auto sidx = outArgs[0].key.slot;
 
-              // todo: use a mutex here initially
-              // mutex lock
-                q.push(lpckt);
-              // mutex unlock
+              // create new value for the new packet
+              LavaVal val;
+              val.type  = outArgs[0].type;
+              val.value = outArgs[0].value;
 
-              // if type == MEMORY and value != nullptr
-              //LavaHeapFree( (void*)outArgs[0].value );
-              //free( (void*)outArgs[0].value );  // libc compiled in so that malloc isn't in the same heap
+              // create new packet 
+              LavaPacket basePkt;
+              basePkt.frame       =   m_frame;    // increment the frame on every major loop through both data and message nodes - how to know when a full cycle has passed? maybe purely by message nodes - only increment frame if data is created through a message node cycle
+              basePkt.framed      =   false;      // would this go on the socket?
+              basePkt.src_node    =   id.nid;
+              basePkt.src_slot    =   sidx;
+              basePkt.msg.id      =   nxtMsgId();
+              basePkt.msg.val     =   val;
+
+              // route the packet using the graph - the packet may be copied multiple times and go to multiple destination slots
+              LavaId   src  =  { id.nid, sidx };
+              auto      di  =  graph.destCncts(src);                               // di is destination iterator
+              auto   diCnt  =  di;                                                 // diCnt is destination iterator counter - used to count the number of destination slots this packet will be copied to so that the reference count can be set correctly
+              auto    diEn  =  graph.destCnctEnd();
+              u64   refCnt  =  0;
+              for(; diCnt!=diEn && diCnt->first==src; ++diCnt){ ++refCnt; } 
+              basePkt.ref_count = refCnt; // reference count will ultimatly need to be handled very differently, not on a packet basis, since the packets are copied - it should probably be on the value somehow - maybe the allocator passed should allocate an extra 8 bytes for the reference count and that should be treated atomically 
+
+              for(; di!=diEn && di->first==src; ++di)
+              {                                                                  // loop through the 1 or more destination slots connected to this source
+                LavaId   pktId = di->second;
+                LavaPacket pkt;                                                  // pkt is packet
+                pkt.dest_node  = pktId.nid;
+                pkt.dest_slot  = pktId.sidx;
+
+                // todo: use a mutex here initially
+                // mutex lock
+                q.push(pkt);
+                // mutex unlock
+              }
             }
           }
         }
@@ -1004,6 +1027,24 @@ auto       GetFlowNodeLists(lava_hndlvec  const& hndls) -> lava_ptrsvec
 
 
 
+
+//struct        LavaVal
+//{
+//  u64      type :  3;          // ArgType
+//  u64     value : 61;
+//};
+
+//LavaId src;
+//src.nid   =  id.nid;
+//src.sidx  =  sidx;
+//auto di = graph.destCncts(src);
+//
+//lpckt.dest_node   =   0;          // get from the graph
+//lpckt.dest_slot   =   0;          // get from the graph
+//
+// if type == MEMORY and value != nullptr
+//LavaHeapFree( (void*)outArgs[0].value );
+//free( (void*)outArgs[0].value );  // libc compiled in so that malloc isn't in the same heap
 
 //bool  frameCmp  =  frame    > r.frame;         // want lowest frame numbers to be done first 
 //bool     szCmp  =  sz_bytes < r.sz_bytes;      // want largest sizes to be done first

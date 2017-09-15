@@ -15,7 +15,7 @@ extern "C"
 {
   const char* FileToStringTypes[] = {"tbl_str"};
 
-  uint64_t FileToString(LavaParams* inout_lp, LavaIn* in, LavaOut* out)
+  uint64_t FileToString(LavaParams* inout_lp, LavaVal* in, LavaOut* out)
   {
     // output temp string here
     return 85;

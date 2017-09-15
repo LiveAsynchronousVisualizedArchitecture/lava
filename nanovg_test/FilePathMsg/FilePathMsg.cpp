@@ -9,7 +9,7 @@ extern "C"
 {
   const char* FilePathMsgTypes[] = {"tbl_str"};
 
-  uint64_t FilePathMsg(LavaParams* inout_lp, LavaIn* in, LavaOut* out)
+  uint64_t FilePathMsg(LavaParams* inout_lp, LavaVal* in, LavaOut* out)
   {
     using namespace std;
 
