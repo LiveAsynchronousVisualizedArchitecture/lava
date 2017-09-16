@@ -80,14 +80,16 @@ struct    Node
   //enum Type { MSG=0, FLOW=1, NODE_ERROR=0xFFFFFFFFFFFFFFFF };
   using Type = LavaNode::Type;
 
-  LavaNode* lfn;                              // lfn is Lava Flow Node
-  u64      id = 0;
-  u64   order = 0;
-  v2        P = {0,0};
-  bool    sel = false;                            // sel is selected
-  Bnd       b = {0, 0, 128.f, 48.f};
-  str     txt = "";
-  Type   type = Type::NODE_ERROR;
+  LavaNode* lfn;                                     // lfn is Lava Flow Node
+  u64       id  =  0;
+  u64    order  =  0;
+  v2         P  =  {0,0};
+  bool     sel  =  false;                            // sel is selected
+  Bnd        b  =  {0, 0, 128.f, 48.f};
+  str      txt  =  "";
+  Type    type  =  Type::NODE_ERROR;
+  u16    incnt  =  0;
+  u16   outcnt  =  0;
 
   void cp(Node const& l)
   {
@@ -160,22 +162,22 @@ struct FisData
   using          Id  =  LavaId;
   using     NodeMap  =  std::unordered_map<uint64_t, Node>;
   using   NodeOrder  =  std::set<IdOrder>;
-  using       Slots  =  std::multimap<LavaId, Slot>;            // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
+  using       Slots  =  std::multimap<LavaId, Slot>;              // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
   using    vec_thrd  =  std::vector<std::thread>;
 
-  GLFWwindow*         win = nullptr;                            // Platform 
-  //Lava               lava;
+  GLFWwindow*           win = nullptr;                            // Platform 
   LavaFlow             flow;
   LavaGraph&          lgrph = flow.graph;
   vec_thrd      flowThreads;
+  //Lava               lava;
 
   struct Graph
   {
-    NodeMap       nds;       // nds  is nodes
-    NodeOrder    ordr;       // ordr is orders 
-    Slots       slots;       // 
+    NodeMap             nds;       // nds  is nodes
+    NodeOrder          ordr;       // ordr is orders 
+    Slots             slots;       // 
 
-    u64       curNode = LavaNode::NODE_ERROR;
+    u64             curNode = LavaNode::NODE_ERROR;
     //u64       curNode = 1;
 
     // text

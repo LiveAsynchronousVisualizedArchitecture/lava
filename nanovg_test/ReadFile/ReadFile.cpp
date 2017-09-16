@@ -13,25 +13,33 @@
 
 extern "C"
 {
-  const char* FileToStringTypes[] = {"tbl_str"};
+  const char* FileToStringInNames[]   = {"File Path",    nullptr};
+  const char* FileToStringOutNames[]  = {"File String",  nullptr};
+  const char* FileToStringInTypes[]   = {"tbl_str",      nullptr};
+  const char* FileToStringOutTypes[]  = {"tbl_str",      nullptr};
 
   uint64_t FileToString(LavaParams* inout_lp, LavaVal* in, LavaOut* out)
   {
     // output temp string here
-
     printf("\n File To String called \n");
-
     return 85;
   }
 
   LavaNode LavaNodes[] =
   {
-    {FileToString, (uint64_t)LavaNode::FLOW,   // function, node_type  
-    0, 1, "FileToString",                          // inputs, outputs, name                                   
-    nullptr, FileToStringTypes,                    // in_types, out_types 
-    0, 0},                                         // version, id
+    {
+      FileToString,                                  // function
+      (uint64_t)LavaNode::FLOW,                      // node_type  
+      "FileToString",                                // name
+      FileToStringInNames,                           // in_names
+      FileToStringOutNames,                          // out_names
+      FileToStringInTypes,                           // in_types 
+      FileToStringOutTypes,                          // out_types 
+      0,                                             // version 
+      0                                              // id
+    },                                             
 
-    {nullptr, (uint64_t)LavaNode::NONE, 0,0, nullptr, nullptr,nullptr, 0, 0}
+    {nullptr, (uint64_t)LavaNode::NONE, nullptr, nullptr, nullptr, nullptr, nullptr, 0, 0}
   };
 
   __declspec(dllexport) LavaNode* GetLavaNodes()
@@ -42,6 +50,9 @@ extern "C"
 }
 
 
+
+//
+//{nullptr, (uint64_t)LavaNode::NONE, 0,0, nullptr, nullptr,nullptr, 0, 0}
 
 //
 //#include "../LavaNode.h"

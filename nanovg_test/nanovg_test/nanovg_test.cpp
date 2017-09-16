@@ -259,10 +259,15 @@
 // -todo: fix crash on close - stopFlowThreads() wasn't being called 
 // -todo: have the draw loop check the top of the graph packet queue and visualize the next node 
 // -todo: keep track of the current number of threads
+// -todo: make init wire up a message node to a flow node
+// -todo: change input counts and output counts to be the const char* names of the slots
+// -todo: make sure that the flow node lists are getting flattened - they are, just need to put the function into the header that maps handles to a multi-map - already flattened, don't need to be dealt with
+// -todo: make dynamic lib nodes load with the proper slots - need to call slot_add in node_add
+// -todo: expand node text bounding box by the diameter of the slots so that they don't overlap - need to expand bounds by text in the first place
 
-// todo: make init wire up a message node to a flow node
-// todo: make dynamic lib nodes load with the proper slots
-// todo: put in error checking for connecting dest to dest or src to src?
+// todo: fix selection again
+// todo: put mutex locks around the flow queue
+// todo: enable restarting after loading or saving - need to stop at the top of the loop - does each thread also need it's own mutex?
 // todo: somehow draw slot names and types when slots are moused over
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array
@@ -284,6 +289,7 @@
 //       |  make sure that memory is allocated aligned to a 64 byte cache line
 // todo: come up with locking system so that message nodes have their own threads that are only run when a looping thread visits them - how should memory allocation be done? passing the thread's allocator in the exact same way?
 // todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
+// todo: put in error checking for connecting dest to dest or src to src?
 
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
@@ -500,6 +506,81 @@ v2              out_cntr(Node const& n, f32 r)
   return v2(n.P.x + n.b.w()/2, n.P.y + n.b.h() + r);
 }
 
+LavaId          slot_add(Slot s)
+{
+  LavaFlowSlot ls;
+  ls.id      = s.nid;
+  ls.in      = s.in;
+  ls.state   = (LavaFlowSlot::State)(s.state);
+  LavaId sid = fd.lgrph.addSlot(ls);
+  fd.graph.slots.insert( {sid, s} );
+
+  ls.id = sid;
+  return sid;
+}
+void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState, f32 slot_rad=10.f)
+{
+  nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
+  nvgStrokeWidth(vg, 3.f);
+
+  v2     out = s.P;
+  v2       N = s.N;
+
+  NVGcolor fillClr;
+  if(s.in){
+    switch(drawState){
+    case Slot::SELECTED:    fillClr = nvgRGBAf(1.f,   1.f,   .5f,  1.f); break;
+    case Slot::HIGHLIGHTED: fillClr = nvgRGBAf( .36f,  .9f, 1.f,   1.f); break;
+    case Slot::NORMAL:
+    default:                fillClr = nvgRGBAf( .18f,  .6f,  .75f, 1.f); break;
+    }
+  }else{
+    switch(drawState){
+    case Slot::SELECTED:    fillClr = nvgRGBAf(1.f,   1.f,   .5f,   1.f); break;
+    case Slot::HIGHLIGHTED: fillClr = nvgRGBAf( .36f, 1.f,   .36f,  1.f); break;
+    case Slot::NORMAL:      
+    default:                fillClr = nvgRGBAf( .18f,  .75f, .18f,  1.f); break;
+    }
+  }
+  nvgFillColor(vg, fillClr);
+
+  nvgBeginPath(vg);
+  nvgCircle(vg, out.x, out.y, slot_rad);  //io_rad);
+  nvgFill(vg);
+  nvgStroke(vg);
+
+  // slot triangle drawing
+  f32  triRad = slot_rad - 2.f;
+  auto inrClr = fillClr;
+  inrClr.r += 0.2f;
+  inrClr.g += 0.2f;
+  inrClr.b += 0.2f;
+  nvgFillColor(vg, inrClr);
+
+  nvgBeginPath(vg);
+  nvgResetTransform(vg);
+  nvgTranslate(vg, out.x, out.y);             // translate comes before rotate here because nanovg 'premultiplies' transformations instead of multiplying them in for some reason. this reverses the order of transformations and can be seen in the source for nanovg
+  nvgRotate(vg, normalToAngle(N) + (s.in? PIf/2.f : -PIf/2) );
+
+  nvgMoveTo(vg, -0.707f*triRad, -0.707f*triRad);
+  nvgLineTo(vg,  0.707f*triRad, -0.707f*triRad);
+  nvgLineTo(vg,  0, triRad);
+
+  nvgClosePath(vg);
+  nvgFill(vg);
+  nvgResetTransform(vg);
+}
+Slot*           slot_get(LavaId id)
+{
+  auto& slots = fd.graph.slots;
+
+  auto si = slots.find(id);
+  if(si == slots.end()) 
+    return nullptr;
+
+  return &si->second;
+}
+
 u64        node_nxtOrder()
 {
   auto& nodes = fd.graph.nds;
@@ -552,10 +633,27 @@ auto            node_add(str node_name, Node n) -> uint64_t
 
   auto          pi = fd.flow.nameToPtr.find( node_name );                               // pi is pointer iterator
   uint64_t instIdx = LavaNode::NODE_ERROR;
-  if( pi != end(fd.flow.nameToPtr) )
-    instIdx = fd.lgrph.addNode(pi->second, true);
+  LavaNode*     ln = nullptr;
+  if( pi != end(fd.flow.nameToPtr) ){
+    ln      = pi->second;
+    instIdx = fd.lgrph.addNode(ln, true);
+  }
 
-  if(instIdx != LavaNode::NODE_ERROR){
+  if(instIdx != LavaNode::NODE_ERROR)
+  {
+    auto in_types = ln->in_types;
+    for(; in_types  &&  *in_types; ++in_types){
+      slot_add( Slot(instIdx, true) );
+    }
+
+    auto out_types = ln->out_types;
+    for(; out_types  &&  *out_types; ++out_types){ 
+      slot_add( Slot(instIdx, false) );
+    }
+
+    //auto in_names = ln->in_names;
+    //while(in_names) 
+
     FisData::IdOrder ido;                                                          //ido is id order
     ido.id    = instIdx;
     ido.order = node_nxtOrder();
@@ -564,7 +662,7 @@ auto            node_add(str node_name, Node n) -> uint64_t
     n.txt   = "New: " +  node_name;
     n.id    = instIdx;
     n.order = ido.order;
-    fd.graph.nds[instIdx] = move(n);    
+    fd.graph.nds[instIdx] = move(n);
   }
 
   return instIdx;
@@ -693,7 +791,7 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
 		  //iw += h*0.15f;
 	  }
 
-    f32 txtX = x+w*0.5f - tw*0.5f + iw*0.25f;
+    f32 txtX = x+w*0.5f - tw*0.5f + iw*0.25f;   // + fd.ui.slot_rad;
     f32 txtY = y + h*0.5f;
 	  nvgFontSize(vg, txtsz);
 	  nvgFontFace(vg, "sans-bold");
@@ -803,81 +901,6 @@ auto          node_slots(vec_ndptrs const& nds) -> vec_ids
     }
   }
   return sidxs;                                        // RVO
-}
-
-LavaId          slot_add(Slot s)
-{
-  LavaFlowSlot ls;
-  ls.id      = s.nid;
-  ls.in      = s.in;
-  ls.state   = (LavaFlowSlot::State)(s.state);
-  LavaId sid = fd.lgrph.addSlot(ls);
-  fd.graph.slots.insert( {sid, s} );
-
-  ls.id = sid;
-  return sid;
-}
-void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState, f32 slot_rad=10.f)
-{
-  nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
-  nvgStrokeWidth(vg, 3.f);
-
-  v2     out = s.P;
-  v2       N = s.N;
-
-  NVGcolor fillClr;
-  if(s.in){
-    switch(drawState){
-    case Slot::SELECTED:    fillClr = nvgRGBAf(1.f,   1.f,   .5f,  1.f); break;
-    case Slot::HIGHLIGHTED: fillClr = nvgRGBAf( .36f,  .9f, 1.f,   1.f); break;
-    case Slot::NORMAL:
-    default:                fillClr = nvgRGBAf( .18f,  .6f,  .75f, 1.f); break;
-    }
-  }else{
-    switch(drawState){
-    case Slot::SELECTED:    fillClr = nvgRGBAf(1.f,   1.f,   .5f,   1.f); break;
-    case Slot::HIGHLIGHTED: fillClr = nvgRGBAf( .36f, 1.f,   .36f,  1.f); break;
-    case Slot::NORMAL:      
-    default:                fillClr = nvgRGBAf( .18f,  .75f, .18f,  1.f); break;
-    }
-  }
-  nvgFillColor(vg, fillClr);
-
-  nvgBeginPath(vg);
-    nvgCircle(vg, out.x, out.y, slot_rad);  //io_rad);
-  nvgFill(vg);
-  nvgStroke(vg);
-
-  // slot triangle drawing
-  f32  triRad = slot_rad - 2.f;
-  auto inrClr = fillClr;
-  inrClr.r += 0.2f;
-  inrClr.g += 0.2f;
-  inrClr.b += 0.2f;
-  nvgFillColor(vg, inrClr);
-
-  nvgBeginPath(vg);
-    nvgResetTransform(vg);
-    nvgTranslate(vg, out.x, out.y);             // translate comes before rotate here because nanovg 'premultiplies' transformations instead of multiplying them in for some reason. this reverses the order of transformations and can be seen in the source for nanovg
-    nvgRotate(vg, normalToAngle(N) + (s.in? PIf/2.f : -PIf/2) );
-
-    nvgMoveTo(vg, -0.707f*triRad, -0.707f*triRad);
-    nvgLineTo(vg,  0.707f*triRad, -0.707f*triRad);
-    nvgLineTo(vg,  0, triRad);
-
-    nvgClosePath(vg);
-  nvgFill(vg);
-  nvgResetTransform(vg);
-}
-Slot*           slot_get(LavaId id)
-{
-  auto& slots = fd.graph.slots;
-  
-  auto si = slots.find(id);
-  if(si == slots.end()) 
-    return nullptr;
-
-  return &si->second;
 }
 
 void           cnct_draw(NVGcontext* vg, v2 srcP, v2 destP, v2 srcN, v2 destN, f32 minCenterDist=INFf)
@@ -1261,7 +1284,7 @@ void    reloadSharedLibs()
     if(ndList){
       auto const& p = livePaths[i]; 
       fd.flow.flow.erase(p);                              // delete the current node list for the livePath
-      for(; ndList->func!=nullptr; ++ndList){           // insert each of the LavaFlowNodes in the ndList into the multi-map
+      for(; ndList->func!=nullptr; ++ndList){             // insert each of the LavaFlowNodes in the ndList into the multi-map
         fd.flow.nameToPtr.erase(ndList->name);
         fd.flow.nameToPtr.insert( {ndList->name, ndList} );
         fd.flow.flow.insert( {p, ndList} );
@@ -1532,19 +1555,19 @@ ENTRY_DECLARATION
       reloadSharedLibs();
 
       auto   inst0 = node_add("FileToString", Node("one",   Node::Type::FLOW, {400.f,300.f}) );
-      auto   inst1 = node_add("FileToString", Node("two",   Node::Type::FLOW, {200.f,500.f}) );
-      auto   inst2 = node_add("FileToString", Node("three", Node::Type::FLOW, {700.f,500.f}) );
-      auto   inst3 = node_add("FileToString", Node("four",  Node::Type::FLOW, {700.f,700.f}) );
+      //auto   inst1 = node_add("FileToString", Node("two",   Node::Type::FLOW, {200.f,500.f}) );
+      //auto   inst2 = node_add("FileToString", Node("three", Node::Type::FLOW, {700.f,500.f}) );
+      //auto   inst3 = node_add("FileToString", Node("four",  Node::Type::FLOW, {700.f,700.f}) );
       auto   inst4 = node_add("FilePathMsg",  Node("five",  Node::Type::MSG,  {200.f,200.f}) );
 
-      LavaId s0 = slot_add( Slot(inst0, false)  );
-      LavaId s1 = slot_add( Slot(inst1,  true)  );
-      LavaId s2 = slot_add( Slot(inst2,  true)  );
-      LavaId s3 = slot_add( Slot(inst3,  true)  );
-      LavaId s4 = slot_add( Slot(inst0, false)  );
-      LavaId s5 = slot_add( Slot(inst4, false)  );
+      //LavaId s0 = slot_add( Slot(inst0, false)  );
+      //LavaId s1 = slot_add( Slot(inst1,  true)  );
+      //LavaId s2 = slot_add( Slot(inst2,  true)  );
+      //LavaId s3 = slot_add( Slot(inst3,  true)  );
+      //LavaId s4 = slot_add( Slot(inst0, false)  );
+      //LavaId s5 = slot_add( Slot(inst4, false)  );
 
-      fd.lgrph.toggleCnct(s5, s1);
+      //fd.lgrph.toggleCnct(s5, s1);
       //fd.lgrph.toggleCnct(s0, s1);
       //fd.lgrph.toggleCnct(s0, s2);
       //fd.lgrph.toggleCnct(s0, s3);

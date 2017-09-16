@@ -7,7 +7,8 @@
 
 extern "C"
 {
-  const char* FilePathMsgTypes[] = {"tbl_str"};
+  const char* OutNames[]  = {"File Path", nullptr};
+  const char* OutTypes[]  = {"tbl_str",   nullptr};
 
   uint64_t FilePathMsg(LavaParams* inout_lp, LavaVal* in, LavaOut* out)
   {
@@ -42,25 +43,24 @@ extern "C"
     out[0].value = (u64)outmem;
     out[0].type  = LavaArgType::MEMORY;
 
-    //((tbl<u8>*)out[0].value)->owned(false);
-    //
-    //free( (void*)out[0].value );
-    //
-    //this_thread::sleep_for( chrono::milliseconds(3000) );
-    //
-    //free( (void*)out[0].value );
-
     return 1;
   }
 
   LavaNode LavaNodes[] =
   {
-    {FilePathMsg, (uint64_t)LavaNode::MSG,         // function, node_type  
-    0, 1, "FilePathMsg",                           // inputs, outputs, name                                   
-    nullptr, FilePathMsgTypes,                     // in_types, out_types 
-    0, 0},                                         // version, id
+    {
+      FilePathMsg,                                   // function
+      (uint64_t)LavaNode::MSG,                       // node_type  
+      "FilePathMsg",                                 // name
+      nullptr,                                       // in_names
+      OutNames,                                      // out_names
+      nullptr,                                       // in_types 
+      OutTypes,                                      // out_types 
+      0,                                             // version 
+      0                                              // id
+    },                                             
 
-    {nullptr, (uint64_t)LavaNode::NONE, 0,0, nullptr, nullptr,nullptr, 0, 0}
+    {nullptr, (uint64_t)LavaNode::NONE, nullptr, nullptr, nullptr, nullptr, nullptr, 0, 0}
   };
 
   __declspec(dllexport) LavaNode* GetLavaNodes()
@@ -70,3 +70,31 @@ extern "C"
 }
 
 
+
+
+
+
+
+
+//const char* FilePathMsgTypes[] = {"tbl_str"};
+//  
+//const char* InNames[]   = {"File Path", nullptr};
+//const char* InTypes[]   = {"tbl_str",   nullptr};
+
+//LavaNode LavaNodes[] =
+//{
+//  {FilePathMsg, (uint64_t)LavaNode::MSG,         // function, node_type  
+//  0, 1, "FilePathMsg",                           // inputs, outputs, name                                   
+//  nullptr, FilePathMsgTypes,                     // in_types, out_types 
+//  0, 0},                                         // version, id
+//
+//  {nullptr, (uint64_t)LavaNode::NONE, 0,0, nullptr, nullptr,nullptr, 0, 0}
+//};
+
+//((tbl<u8>*)out[0].value)->owned(false);
+//
+//free( (void*)out[0].value );
+//
+//this_thread::sleep_for( chrono::milliseconds(3000) );
+//
+//free( (void*)out[0].value );
