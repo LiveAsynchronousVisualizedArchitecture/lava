@@ -10,6 +10,7 @@
 #include <cstdint>
 #include <atomic>
 #include <thread>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <regex>
@@ -699,6 +700,7 @@ public:
   using au64         =  std::atomic<uint64_t>;
   using PacketQueue  =  std::priority_queue<LavaPacket>;
   using MsgNodeVec   =  std::vector<uint64_t>;
+  using Mutex        =  std::mutex;
 
   lava_pathHndlMap        libs;     // libs is libraries - this maps the live path of the shared libary with the OS specific handle that the OS loading function returns
   lava_nidMap             nids;     // nids is node ids  - this maps the name of the node to all of the graph node ids that use it
@@ -712,7 +714,8 @@ public:
   mutable u64           m_frame = 0;          // todo: make this atomic
   mutable LavaId        m_curId = 0;          // todo: make this atomic - won't be used as a single variable anyway
   mutable u64     m_threadCount = 0;          // todo: make this atomic
-  
+  mutable Mutex          m_qLck;
+
   MsgNodeVec        m_msgNodes;
   PacketQueue                q;
   LavaGraph              graph;
@@ -792,16 +795,21 @@ private:
   }
   bool          nxtPacket(LavaPacket* outPkt)
   {
+    using namespace std;
+    
     // lock mutex
     // need to somehow find a full set of packets for the current frame - how to keep one frame from outrunning another? 
     // does each node's slot need its own queue? should packets be organized differently? one queue per frame? what determines a frame? one pass through all the message nodes?
     //LavaPacket pckt = q.top();
     bool packetWritten = false;
-    if(q.size() > 0){
-      *outPkt = q.top();
-      q.pop();
-      packetWritten = true;
-    }
+    //lock_guard<Mutex> qLck(m_qLck);
+    m_qLck.lock();
+      if(q.size() > 0){
+        *outPkt = q.top();
+        q.pop();
+        packetWritten = true;
+      }
+    m_qLck.unlock();
     // unlock mutex
 
     return packetWritten;
