@@ -15,6 +15,7 @@
 #include <unordered_set>
 #include <map>
 #include <queue>
+#include <thread>
 #include "no_rt_util.h"
 //#include "simdb.hpp"
 #include "tbl.hpp" // temp
@@ -804,10 +805,12 @@ public:
   }
   void               loop()
   {
+    using namespace std;
+    
     const LavaOut defOut = { LavaArgType::NONE, 0, 0, 0, 0 };
 
     LavaVal    inArgs[LAVA_ARG_COUNT];         // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
-    LavaOut  outArgs[LAVA_ARG_COUNT];         // if the arguments are going to 
+    LavaOut   outArgs[LAVA_ARG_COUNT];         // if the arguments are going to 
     memset(inArgs,  0, sizeof(inArgs)  );
     memset(outArgs, 0, sizeof(outArgs) );
 
@@ -815,7 +818,8 @@ public:
 
     while(m_running)
     {
-      
+      this_thread::sleep_for( chrono::milliseconds(1000) );
+
       SECTION(loop through message nodes)
       {
         printf("\n lava heap: %llu \n", (u64)lava_thread_heap);
@@ -884,6 +888,9 @@ public:
         }
         ++m_frame; // todo: rething this and make sure it will work 
       } // SECTION(loop through message nodes)
+
+      this_thread::sleep_for( chrono::milliseconds(1000) );
+
       SECTION(loop through data packets)
       {
         LavaPacket pckt;

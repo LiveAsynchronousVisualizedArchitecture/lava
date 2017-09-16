@@ -255,11 +255,12 @@
 // -todo: use malloc for passed in memory allocator
 // -todo: make a priority queue for packets of data
 // -todo: make a packet from memory passed back from a node and put it into the packet queue
+// -todo: pass output to another node
+// -todo: fix crash on close - stopFlowThreads() wasn't being called 
 
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
 // todo: build in const char* constructor to tbl
-// todo: pass output to another node
 // todo: prototype API for message nodes
 //       | do message nodes need some extra way to hold their state? will there ever be more than a single instance of a message node?
 //       | initially just make them thread safe or make them lock with mutexes
@@ -476,7 +477,9 @@ void     stopFlowThreads()
 {
   fd.flow.stop();
   for(auto& t : fd.flowThreads){
-    if(t.joinable()) t.join();
+    if(t.joinable()){
+      t.join();
+    }
   }
 }
 
@@ -1099,8 +1102,7 @@ str           graphToStr(LavaGraph const& lg)
 
   return s;
 }
-//LavaGraph     strToGraph(str const& s)
-void     strToGraph(str const& s)
+void          strToGraph(str const& s)
 {
   using namespace std;
 
@@ -1525,33 +1527,32 @@ ENTRY_DECLARATION
 
       auto   inst0 = node_add("FileToString", Node("one",   Node::Type::FLOW, {400.f,300.f}) );
       auto   inst1 = node_add("FileToString", Node("two",   Node::Type::FLOW, {200.f,500.f}) );
-      //auto   inst2 = node_add("FileToString", Node("three", Node::Type::FLOW, {700.f,500.f}) );
-      //auto   inst3 = node_add("FileToString", Node("four",  Node::Type::FLOW, {700.f,700.f}) );
-      //auto   inst4 = node_add("FilePathMsg",  Node("five",  Node::Type::MSG,  {200.f,200.f}) );
+      auto   inst2 = node_add("FileToString", Node("three", Node::Type::FLOW, {700.f,500.f}) );
+      auto   inst3 = node_add("FileToString", Node("four",  Node::Type::FLOW, {700.f,700.f}) );
+      auto   inst4 = node_add("FilePathMsg",  Node("five",  Node::Type::MSG,  {200.f,200.f}) );
 
       LavaId s0 = slot_add( Slot(inst0, false)  );
       LavaId s1 = slot_add( Slot(inst1,  true)  );
-      //LavaId s2 = slot_add( Slot(inst2,  true)  );
-      //LavaId s3 = slot_add( Slot(inst3,  true)  );
-      //LavaId s4 = slot_add( Slot(inst0, false)  );
-      //LavaId s5 = slot_add( Slot(inst4, false)  );
+      LavaId s2 = slot_add( Slot(inst2,  true)  );
+      LavaId s3 = slot_add( Slot(inst3,  true)  );
+      LavaId s4 = slot_add( Slot(inst0, false)  );
+      LavaId s5 = slot_add( Slot(inst4, false)  );
 
       fd.lgrph.toggleCnct(s0, s1);
-      //fd.lgrph.toggleCnct(s0, s2);
-      //fd.lgrph.toggleCnct(s0, s3);
+      fd.lgrph.toggleCnct(s0, s2);
+      fd.lgrph.toggleCnct(s0, s3);
     }
 
     fd.flow.start();
     fd.flowThreads.emplace_back([](){
       //printf("\n running thread \n");
-
+      //
       //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key) );
       ////printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.bytes) );
       //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.slot) );
       //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.listIdx) );
       //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.frame) );
       //printf("\n packet size: %d \n", (i32)sizeof(LavaPacket) );
-
 
       fd.flow.loop();
     });
@@ -2038,8 +2039,9 @@ ENTRY_DECLARATION
     //for(auto& t : fd.flowThreads){
     //  t.join();
     //}
+    //fd.flow.stop(); 
 
-    fd.flow.stop(); 
+    stopFlowThreads();
     nanogui::shutdown();
     glfwTerminate();
   }
@@ -2056,6 +2058,8 @@ ENTRY_DECLARATION
 
 
 
+//
+//LavaGraph     strToGraph(str const& s)
 
 //bool            saveFile(GraphDB const& g, str path)
 //bool            loadFile(str path, GraphDB* out_g)

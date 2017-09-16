@@ -18,6 +18,9 @@ extern "C"
   uint64_t FileToString(LavaParams* inout_lp, LavaVal* in, LavaOut* out)
   {
     // output temp string here
+
+    printf("\n File To String called \n");
+
     return 85;
   }
 
