@@ -8,6 +8,8 @@
 #define __LAVAFLOW_HEADERGUARD_HPP__
 
 #include <cstdint>
+#include <atomic>
+#include <thread>
 #include <string>
 #include <unordered_map>
 #include <regex>
@@ -15,7 +17,6 @@
 #include <unordered_set>
 #include <map>
 #include <queue>
-#include <thread>
 #include "no_rt_util.h"
 //#include "simdb.hpp"
 #include "tbl.hpp" // temp
@@ -693,6 +694,7 @@ public:
 struct       LavaFlow
 {
 public:
+  using au64         =  std::atomic<uint64_t>;
   using PacketQueue  =  std::priority_queue<LavaPacket>;
   using MsgNodeVec   =  std::vector<uint64_t>;
 
@@ -703,21 +705,29 @@ public:
   lava_hndlNodeMap      ndptrs;     // ndptrs is node pointers - a map from each handle to the one (zero?) or more LavaFlowNode pointers the shared lib contains
   lava_nameNodeMap   nameToPtr;     // maps node names to their pointers 
 
-  bool                m_running = false;      // todo: make this atomic
-  u64                m_curMsgId = 0;          // todo: make this atomic
-  u64                   m_frame = 0;          // todo: make this atomic
-  LavaId                m_curId = 0;          // todo: make this atomic - won't be used as a single variable anyway
+  mutable bool        m_running = false;      // todo: make this atomic
+  mutable u64        m_curMsgId = 0;          // todo: make this atomic
+  mutable u64           m_frame = 0;          // todo: make this atomic
+  mutable LavaId        m_curId = 0;          // todo: make this atomic - won't be used as a single variable anyway
+  mutable u64     m_threadCount = 0;          // todo: make this atomic
   
   MsgNodeVec        m_msgNodes;
   PacketQueue                q;
   LavaGraph              graph;
 
 private:
+  u64      incThreadCount()
+  {
+    return std::atomic_fetch_add( (au64*)&m_threadCount,  1);
+  }
+  u64      decThreadCount()
+  {
+    return std::atomic_fetch_add( (au64*)&m_threadCount, -1);
+  }
   uint64_t       nxtMsgId()
   {
     return ++m_curMsgId;
   }
-
   bool            runFunc(uint64_t nid, LavaParams* lp, LavaVal* inArgs,  LavaOut* outArgs) // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
   {
     FlowFunc msgFunc = graph[nid]->func;
@@ -795,6 +805,7 @@ private:
     return packetWritten;
   }
 
+
 public:
   // execution
   void              start(){ m_running =  true; }
@@ -808,8 +819,9 @@ public:
   void               loop()
   {
     using namespace std;
-    
     const LavaOut defOut = { LavaArgType::NONE, 0, 0, 0, 0 };
+
+    incThreadCount();
 
     LavaVal    inArgs[LAVA_ARG_COUNT];         // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
     LavaOut   outArgs[LAVA_ARG_COUNT];         // if the arguments are going to 
@@ -852,6 +864,7 @@ public:
         }
       } // SECTION(loop through data packets)
     } // while(m_running)
+    decThreadCount();
   }
   void          pauseLoop(){}
 

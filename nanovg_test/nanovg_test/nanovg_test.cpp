@@ -257,11 +257,15 @@
 // -todo: make a packet from memory passed back from a node and put it into the packet queue
 // -todo: pass output to another node
 // -todo: fix crash on close - stopFlowThreads() wasn't being called 
+// -todo: have the draw loop check the top of the graph packet queue and visualize the next node 
+// -todo: keep track of the current number of threads
 
-// todo: have the draw loop check the top of the graph packet queue and visualize the next node 
-// todo: keep track of the current number of threads
-// todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array
+// todo: make init wire up a message node to a flow node
+// todo: make dynamic lib nodes load with the proper slots
+// todo: put in error checking for connecting dest to dest or src to src?
+// todo: somehow draw slot names and types when slots are moused over
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
+// todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array
 // todo: build in const char* constructor to tbl
 // todo: prototype API for message nodes
 //       | do message nodes need some extra way to hold their state? will there ever be more than a single instance of a message node?
@@ -1540,9 +1544,10 @@ ENTRY_DECLARATION
       LavaId s4 = slot_add( Slot(inst0, false)  );
       LavaId s5 = slot_add( Slot(inst4, false)  );
 
-      fd.lgrph.toggleCnct(s0, s1);
-      fd.lgrph.toggleCnct(s0, s2);
-      fd.lgrph.toggleCnct(s0, s3);
+      fd.lgrph.toggleCnct(s5, s1);
+      //fd.lgrph.toggleCnct(s0, s1);
+      //fd.lgrph.toggleCnct(s0, s2);
+      //fd.lgrph.toggleCnct(s0, s3);
     }
 
     fd.flow.start();
@@ -1607,7 +1612,7 @@ ENTRY_DECLARATION
       SECTION(lava graph visualization)
       {
         //fd.graph.curNode = fd.flow.q.top().dest_node;  // todo: race condition
-        fd.graph.curNode  =  fd.flow.m_curId.nid;        // todo: race condition
+        fd.graph.curNode  =  fd.flow.m_curId.nid;        // todo: make atomic, although this may just work since it is only reading 8 bytes
       }
       SECTION(selection)
       {

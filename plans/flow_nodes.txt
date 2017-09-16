@@ -55,10 +55,28 @@ Accumulator / General loop and iteration
 |  |  the branch would need two inputs to collect all the packets - if there is only one it bypasses the accumulator, if there are multiple, it feeds them into the accumulator
 
 
-
 Ordering
 |  Should all data packets be dealt with before going back to the message nodes?
 |  Should it be done in an interlaced way to keep message passing nodes from lagging?
 |  Should there be generator nodes and message passing nodes, or just message nodes?
-|
+|  Does the frame number need to be specific to each message node? Instead of frame number, a frame + msg node combination
+
+
+Concurrency with flow node types
+|  Revisit original node type ideas and see how they line up with the current packet method
+|  If there are lists being output, does a dedicated split node need to exist?
+|  If every input can potentially be a list is a gather node needed? 
+|  If a split can be automatically parallized, that could imply that all each node is run with only one packet from a list
+|  The flip side is entire lists being passed in automatically and splitting/parallelism done manually
+|  Automatic parallelism whenever it is possible may be a better bet than expecting anyone to manually choose a special split node or split node attribute. 
+|  A special gather node or gather node attribute to combine a list seems more reasonable because it makes parallelism automatic and the exceptional case of a gather node neccesary 
+|  If a gather node is the manual route neccesary, tools and error messages can help the learning curve. 
+|  Will message nodes need to take lists in their entirety? 
+|  Should there be something in between a full gather and a node that only takes single packets? 
+|  A "Take" node that can take as many or as few packets for each slot as it wants?  First call returns the number of packets the Take node wants.
+
+Concurrency with data structures inside LavaFlow 
+|  Likely will need a resizable array of atomic variables
+|  Look back at atomic vector / atomic array and make it double buffered so that it can be resized without locking
+
 
