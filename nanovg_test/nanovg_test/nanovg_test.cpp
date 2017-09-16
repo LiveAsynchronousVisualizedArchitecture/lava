@@ -258,6 +258,8 @@
 // -todo: pass output to another node
 // -todo: fix crash on close - stopFlowThreads() wasn't being called 
 
+// todo: have the draw loop check the top of the graph packet queue and visualize the next node 
+// todo: keep track of the current number of threads
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
 // todo: build in const char* constructor to tbl
@@ -1602,6 +1604,11 @@ ENTRY_DECLARATION
 			  glClearColor(.075f, .075f, .075f, 1.0f);
 		    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
       }
+      SECTION(lava graph visualization)
+      {
+        //fd.graph.curNode = fd.flow.q.top().dest_node;  // todo: race condition
+        fd.graph.curNode  =  fd.flow.m_curId.nid;        // todo: race condition
+      }
       SECTION(selection)
       {
         bool lftClkDn =  ms.lftDn && !ms.prevLftDn;    // lftClkDn is left click down
@@ -1891,6 +1898,31 @@ ENTRY_DECLARATION
               curY += lineIncY;
             }
           }
+          SECTION(draw current node highlights)
+          {
+            auto nid = fd.graph.curNode;
+            if(nid != LavaNode::NODE_ERROR  &&
+               fd.graph.nds.count(nid) > 0)
+            {
+              auto const& n = fd.graph.nds[nid];
+
+              auto    w = n.b.w();
+              auto hlfw = w / 2;
+              auto    h = n.b.h();
+              auto hlfh = h / 2;
+              auto   cx = n.P.x + hlfw;
+              auto   cy = n.P.y + hlfh;
+              nvgFillColor(vg, nvgRGBA(0,255,255,255));
+              nvgBeginPath(vg);
+              nvgCircle(vg, cx, cy, n.b.w()*1.25f );
+              auto radial = nvgRadialGradient(vg,
+                cx, cy, 0, hlfw*1.25f,
+                nvgRGBA(0,255,128,48),
+                nvgRGBA(0,0,0,0)  );
+              nvgFillPaint(vg, radial);
+              nvgFill(vg);
+            }
+          }
           SECTION(draw connections)
           {
             auto di = g.srcCnctsMap().begin();                                    // di is destination iterator
@@ -2035,12 +2067,6 @@ ENTRY_DECLARATION
   }
   SECTION(shutdown)
   {
-    //fd.flow.stop();                                   // this will make the 'running' boolean variable false, which will make the the while(running) loop stop, and the threads will end
-    //for(auto& t : fd.flowThreads){
-    //  t.join();
-    //}
-    //fd.flow.stop(); 
-
     stopFlowThreads();
     nanogui::shutdown();
     glfwTerminate();
@@ -2057,6 +2083,11 @@ ENTRY_DECLARATION
 
 
 
+//fd.flow.stop();                                   // this will make the 'running' boolean variable false, which will make the the while(running) loop stop, and the threads will end
+//for(auto& t : fd.flowThreads){
+//  t.join();
+//}
+//fd.flow.stop(); 
 
 //
 //LavaGraph     strToGraph(str const& s)

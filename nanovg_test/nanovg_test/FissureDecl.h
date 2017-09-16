@@ -175,6 +175,9 @@ struct FisData
     NodeOrder    ordr;       // ordr is orders 
     Slots       slots;       // 
 
+    u64       curNode = LavaNode::NODE_ERROR;
+    //u64       curNode = 1;
+
     // text
     f32            textSize  =  18.f;
 

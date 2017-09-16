@@ -69,7 +69,7 @@ struct     LavaParams
   u64            frame;
   LavaAlloc  mem_alloc;
 };
-struct         LavaVal
+struct        LavaVal
 {
   u64      type :  3;          // ArgType
   u64     value : 61;
@@ -249,7 +249,7 @@ template <class T> struct  ThreadAllocator
     p->~U();
   }
 };
-template <class T> T*      ThreadAllocator<T>::allocate(const size_t n) const
+template <class T> T*      ThreadAllocator<T>::allocate(const size_t n)  const
 {
   if(n==0) return nullptr;
 
@@ -705,7 +705,9 @@ public:
 
   bool                m_running = false;      // todo: make this atomic
   u64                m_curMsgId = 0;          // todo: make this atomic
-  u64                   m_frame = 0;
+  u64                   m_frame = 0;          // todo: make this atomic
+  LavaId                m_curId = 0;          // todo: make this atomic - won't be used as a single variable anyway
+  
   MsgNodeVec        m_msgNodes;
   PacketQueue                q;
   LavaGraph              graph;
@@ -827,64 +829,10 @@ public:
         auto const& mnds = graph.msgNodes();
         for(auto id : mnds)
         {
+          m_curId = id;
+
           LavaParams lp;
           runFunc(id.nid, &lp, inArgs, outArgs); 
-
-          //FlowFunc msgFunc = graph[id.nid]->func;
-          //if(msgFunc){
-          //  LavaParams lp;
-          //  SECTION(create arguments and call function)
-          //  {
-          //    lp.frame       =   m_frame;
-          //    lp.inputs      =     1;
-          //    lp.outputs     =   512;
-          //    lp.mem_alloc   =   malloc;  // LavaHeapAlloc;
-          //    uint64_t ret   =   msgFunc(&lp, inArgs, outArgs);
-          //
-          //    tbl<u8> pth( (void*)outArgs[0].value );
-          //    printf("\n out string %s \n", (char*)pth.data() );
-          //  }
-          //  SECTION(create packets and put them into packet queue)
-          //  {
-          //    auto sidx = outArgs[0].key.slot;
-          //
-          //    // create new value for the new packet
-          //    LavaVal val;
-          //    val.type  = outArgs[0].type;
-          //    val.value = outArgs[0].value;
-          //
-          //    // create new packet 
-          //    LavaPacket basePkt;
-          //    basePkt.frame       =   m_frame;    // increment the frame on every major loop through both data and message nodes - how to know when a full cycle has passed? maybe purely by message nodes - only increment frame if data is created through a message node cycle
-          //    basePkt.framed      =   false;      // would this go on the socket?
-          //    basePkt.src_node    =   id.nid;
-          //    basePkt.src_slot    =   sidx;
-          //    basePkt.msg.id      =   nxtMsgId();
-          //    basePkt.msg.val     =   val;
-          //
-          //    // route the packet using the graph - the packet may be copied multiple times and go to multiple destination slots
-          //    LavaId   src  =  { id.nid, sidx };
-          //    auto      di  =  graph.destCncts(src);                               // di is destination iterator
-          //    auto   diCnt  =  di;                                                 // diCnt is destination iterator counter - used to count the number of destination slots this packet will be copied to so that the reference count can be set correctly
-          //    auto    diEn  =  graph.destCnctEnd();
-          //    u64   refCnt  =  0;
-          //    for(; diCnt!=diEn && diCnt->first==src; ++diCnt){ ++refCnt; } 
-          //    basePkt.ref_count = refCnt;                                          // reference count will ultimatly need to be handled very differently, not on a packet basis, since the packets are copied - it should probably be on the value somehow - maybe the allocator passed should allocate an extra 8 bytes for the reference count and that should be treated atomically 
-          //
-          //    for(; di!=diEn && di->first==src; ++di)
-          //    {                                                                    // loop through the 1 or more destination slots connected to this source
-          //      LavaId   pktId = di->second;
-          //      LavaPacket pkt;                                                    // pkt is packet
-          //      pkt.dest_node  = pktId.nid;
-          //      pkt.dest_slot  = pktId.sidx;
-          //
-          //      // todo: use a mutex here initially
-          //      // mutex lock
-          //      q.push(pkt);
-          //      // mutex unlock
-          //    }
-          //  } // SECTION(create packets and put them into packet queue)
-          //}
         }
         ++m_frame; // todo: rething this and make sure it will work 
       } // SECTION(loop through message nodes)
@@ -894,7 +842,11 @@ public:
       SECTION(loop through data packets)
       {
         LavaPacket pckt;
-        while( nxtPacket(&pckt) ){
+        while( nxtPacket(&pckt) )
+        {
+          m_curId.nid  = pckt.dest_node;
+          m_curId.sidx = pckt.dest_slot;
+          //m_curId = 
           LavaParams lp;                                           // get the function from the dest node and put the packets into the dest LavaVal input array // run the function // use the LavaParams output struct to make the LavaOut list packets  // route the packets with the graph (set the dest node and slot)  // put them into the packet queue
           runFunc(pckt.dest_node, &lp, inArgs, outArgs); 
         }
@@ -902,6 +854,8 @@ public:
     } // while(m_running)
   }
   void          pauseLoop(){}
+
+
 };
 
 #if defined(__LAVAFLOW_IMPL__)
@@ -1102,6 +1056,65 @@ auto       GetFlowNodeLists(lava_hndlvec  const& hndls) -> lava_ptrsvec
 
 
 
+
+
+
+
+//FlowFunc msgFunc = graph[id.nid]->func;
+//if(msgFunc){
+//  LavaParams lp;
+//  SECTION(create arguments and call function)
+//  {
+//    lp.frame       =   m_frame;
+//    lp.inputs      =     1;
+//    lp.outputs     =   512;
+//    lp.mem_alloc   =   malloc;  // LavaHeapAlloc;
+//    uint64_t ret   =   msgFunc(&lp, inArgs, outArgs);
+//
+//    tbl<u8> pth( (void*)outArgs[0].value );
+//    printf("\n out string %s \n", (char*)pth.data() );
+//  }
+//  SECTION(create packets and put them into packet queue)
+//  {
+//    auto sidx = outArgs[0].key.slot;
+//
+//    // create new value for the new packet
+//    LavaVal val;
+//    val.type  = outArgs[0].type;
+//    val.value = outArgs[0].value;
+//
+//    // create new packet 
+//    LavaPacket basePkt;
+//    basePkt.frame       =   m_frame;    // increment the frame on every major loop through both data and message nodes - how to know when a full cycle has passed? maybe purely by message nodes - only increment frame if data is created through a message node cycle
+//    basePkt.framed      =   false;      // would this go on the socket?
+//    basePkt.src_node    =   id.nid;
+//    basePkt.src_slot    =   sidx;
+//    basePkt.msg.id      =   nxtMsgId();
+//    basePkt.msg.val     =   val;
+//
+//    // route the packet using the graph - the packet may be copied multiple times and go to multiple destination slots
+//    LavaId   src  =  { id.nid, sidx };
+//    auto      di  =  graph.destCncts(src);                               // di is destination iterator
+//    auto   diCnt  =  di;                                                 // diCnt is destination iterator counter - used to count the number of destination slots this packet will be copied to so that the reference count can be set correctly
+//    auto    diEn  =  graph.destCnctEnd();
+//    u64   refCnt  =  0;
+//    for(; diCnt!=diEn && diCnt->first==src; ++diCnt){ ++refCnt; } 
+//    basePkt.ref_count = refCnt;                                          // reference count will ultimatly need to be handled very differently, not on a packet basis, since the packets are copied - it should probably be on the value somehow - maybe the allocator passed should allocate an extra 8 bytes for the reference count and that should be treated atomically 
+//
+//    for(; di!=diEn && di->first==src; ++di)
+//    {                                                                    // loop through the 1 or more destination slots connected to this source
+//      LavaId   pktId = di->second;
+//      LavaPacket pkt;                                                    // pkt is packet
+//      pkt.dest_node  = pktId.nid;
+//      pkt.dest_slot  = pktId.sidx;
+//
+//      // todo: use a mutex here initially
+//      // mutex lock
+//      q.push(pkt);
+//      // mutex unlock
+//    }
+//  } // SECTION(create packets and put them into packet queue)
+//}
 
 //
 //while(q.size() > 0)
