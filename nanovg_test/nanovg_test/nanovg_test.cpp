@@ -256,6 +256,7 @@
 // -todo: make a priority queue for packets of data
 // -todo: make a packet from memory passed back from a node and put it into the packet queue
 
+// todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
 // todo: build in const char* constructor to tbl
 // todo: pass output to another node
