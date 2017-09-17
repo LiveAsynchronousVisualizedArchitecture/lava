@@ -264,17 +264,19 @@
 // -todo: make sure that the flow node lists are getting flattened - they are, just need to put the function into the header that maps handles to a multi-map - already flattened, don't need to be dealt with
 // -todo: make dynamic lib nodes load with the proper slots - need to call slot_add in node_add
 // -todo: expand node text bounding box by the diameter of the slots so that they don't overlap - need to expand bounds by text in the first place
+// -todo: put mutex locks around the flow queue
+// -todo: enable restarting after loading or saving - need to stop at the top of the loop - does each thread also need it's own mutex? - could use an atomic boolean that dictates whether to check a mutex
+// -todo: fix node types being flipped when loading - function and name are switched 
 
-// todo: fix selection again
-// todo: put mutex locks around the flow queue
-// todo: enable restarting after loading or saving - need to stop at the top of the loop - does each thread also need it's own mutex?
-// todo: somehow draw slot names and types when slots are moused over
+// todo: fix msg node being loaded with an input slot 
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
-// todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array
 // todo: build in const char* constructor to tbl
+// todo: fix selection again
+// todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array
 // todo: prototype API for message nodes
 //       | do message nodes need some extra way to hold their state? will there ever be more than a single instance of a message node?
 //       | initially just make them thread safe or make them lock with mutexes
+//       | do messages need some sort of 8 byte number to be able to do occasionally do without heap or simdb allocated values?
 // todo: use combination of frame, node id and slot as key to simbdb
 //       |  how does that get in to the node, if all the data is in the packet struct? - through the output Args
 //       |  put the index information into the output array and use that 
@@ -283,13 +285,14 @@
 //       |  use a union of bytes that is filled with the frame, slot, list index?
 //       |  use malloc addresses initially
 // todo: put output in simdb
-// todo: change project name to Fissure 
 // todo: make the lava allocator passed to a node allocate an extra 8 bytes for the reference count 
 //       |  make sure that extra data at the beggining is treated atomically
 //       |  make sure that memory is allocated aligned to a 64 byte cache line
 // todo: come up with locking system so that message nodes have their own threads that are only run when a looping thread visits them - how should memory allocation be done? passing the thread's allocator in the exact same way?
 // todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
 // todo: put in error checking for connecting dest to dest or src to src?
+// todo: somehow draw slot names and types when slots are moused over
+// todo: change project name to Fissure 
 
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
@@ -485,6 +488,25 @@ v2         angleToNormal(f32 angle)
 }
 
 // state manipulation
+void    startFlowThreads(u64 num=1)
+{
+  fd.flow.start();
+
+  TO(num,i){
+    fd.flowThreads.emplace_back([](){
+      //printf("\n running thread \n");
+      //
+      //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key) );
+      ////printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.bytes) );
+      //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.slot) );
+      //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.listIdx) );
+      //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.frame) );
+      //printf("\n packet size: %d \n", (i32)sizeof(LavaPacket) );
+
+      fd.flow.loop();
+    });
+  }
+}
 void     stopFlowThreads()
 {
   fd.flow.stop();
@@ -493,6 +515,8 @@ void     stopFlowThreads()
       t.join();
     }
   }
+  fd.flowThreads.clear();
+  fd.flowThreads.shrink_to_fit();
 }
 
 v2               in_cntr(Node const& n, f32 r)
@@ -1029,13 +1053,15 @@ str           graphToStr(LavaGraph const& lg)
   Jzon::Node jnodes = Jzon::object();
   SECTION(nodes)
   {
-    auto     nps = node_getPtrs(); // fg.nds;
-    auto    lnds = lg.nodes();
+    auto     nps = node_getPtrs();     // fg.nds;
+    auto    lnds = lg.nodes();         // lnds is Lava Nodes
     auto      sz = lnds.size();
+
     //auto  sz  = lg.nsz();
+    //TO(sz,i) nd_func.add(lnds[i].nd->name);
 
     Jzon::Node  nd_func = Jzon::array();
-    TO(sz,i) nd_func.add(lnds[i].nd->name);
+    TO(sz,i) nd_func.add( lg.node(nps[i]->id).nd->name );
 
     Jzon::Node    nd_id = Jzon::array();
     TO(sz,i) nd_id.add(nps[i]->id);
@@ -1213,6 +1239,8 @@ void          strToGraph(str const& s)
 }
 bool            saveFile(LavaGraph const& lg, str path)
 {
+  stopFlowThreads();
+
   str fileStr = graphToStr(lg);
 
   FILE* f = fopen(path.c_str(), "w");
@@ -1224,10 +1252,14 @@ bool            saveFile(LavaGraph const& lg, str path)
   int closeRet = fclose(f);
   if(closeRet == EOF) return false;
 
+  startFlowThreads(1);
+
   return true;
 }
 bool            loadFile(str path, LavaGraph* out_g)
 {
+  stopFlowThreads();
+
   FILE* f = fopen(path.c_str(), "r");
   if(!f) return false;
   fseek(f, 0, SEEK_END);
@@ -1242,6 +1274,8 @@ bool            loadFile(str path, LavaGraph* out_g)
 
    //*out_g = strToGraph(s);
   strToGraph(s);
+
+  startFlowThreads(1);
 
   return true;
 }
@@ -1468,7 +1502,7 @@ ENTRY_DECLARATION
       //auto flowBtn   = new Button(fd.ui.keyWin,    "Flow Node");
 
       loadBtn->setCallback([](){ 
-        stopFlowThreads();
+        //stopFlowThreads();
 
         nfdchar_t *inPath = NULL;
         nfdresult_t result = NFD_OpenDialog("lava", NULL, &inPath );
@@ -1573,19 +1607,7 @@ ENTRY_DECLARATION
       //fd.lgrph.toggleCnct(s0, s3);
     }
 
-    fd.flow.start();
-    fd.flowThreads.emplace_back([](){
-      //printf("\n running thread \n");
-      //
-      //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key) );
-      ////printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.bytes) );
-      //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.slot) );
-      //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.listIdx) );
-      //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.frame) );
-      //printf("\n packet size: %d \n", (i32)sizeof(LavaPacket) );
-
-      fd.flow.loop();
-    });
+    startFlowThreads(1);
   }
 
   glfwSetTime(0);
@@ -2109,7 +2131,23 @@ ENTRY_DECLARATION
 
 
 
+//for(auto& t : fd.flowThreads)
+//{
+//}
 
+//fd.flow.start();
+//fd.flowThreads.emplace_back([](){
+//  //printf("\n running thread \n");
+//  //
+//  //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key) );
+//  ////printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.bytes) );
+//  //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.slot) );
+//  //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.listIdx) );
+//  //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.frame) );
+//  //printf("\n packet size: %d \n", (i32)sizeof(LavaPacket) );
+//
+//  fd.flow.loop();
+//});
 
 //fd.flow.stop();                                   // this will make the 'running' boolean variable false, which will make the the while(running) loop stop, and the threads will end
 //for(auto& t : fd.flowThreads){

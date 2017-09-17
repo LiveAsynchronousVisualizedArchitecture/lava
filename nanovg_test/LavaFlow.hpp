@@ -349,6 +349,11 @@ private:
     static NodeInstance ERR_INST;
     return ERR_INST;
   }
+  auto       errorInst() const -> NodeInstance const&
+  { // default contrutor sets the type to Node::NODE_ERROR
+    static NodeInstance ERR_INST;
+    return ERR_INST;
+  }
   u64          nxtSlot(u64 nid)
   {
     auto si = nodeSlots(nid);                   // si is slot iterator
@@ -486,6 +491,19 @@ public:
   {
     auto nIter = m_nodes.find(id);                                          // nIter is node iterator
     //if(nIter == end(m_nodes)) return errorNode();
+    if(nIter == end(m_nodes)) return errorInst();
+
+    NodeInstance ret;
+    ret.id = nIter->first;
+    ret.nd = nIter->second;
+    return ret;
+
+    //return nIter->second;
+  }
+  auto           node(u64 id) const -> NodeInstance
+  {
+    auto nIter = m_nodes.find(id);                                          // nIter is node iterator
+                                                                            //if(nIter == end(m_nodes)) return errorNode();
     if(nIter == end(m_nodes)) return errorInst();
 
     NodeInstance ret;
@@ -661,9 +679,9 @@ public:
     }
     //delCnct(src,dest)==0 
   }
-  auto    destCnctEnd() -> decltype(m_destCncts.end())  { return m_destCncts.end(); }
-  auto        cnctEnd() -> decltype(m_cncts.end())  { return m_cncts.end(); }
-  auto      cnctBegin() -> decltype(m_cncts.begin()) { return m_cncts.begin(); }
+  auto    destCnctEnd() -> decltype(m_destCncts.end()) { return m_destCncts.end(); }
+  auto        cnctEnd() -> decltype(m_cncts.end())     { return m_cncts.end(); }
+  auto      cnctBegin() -> decltype(m_cncts.begin())   { return m_cncts.begin(); }
   auto          cncts() -> CnctMap& { return m_cncts; }
   auto          cncts() const -> CnctMap const& { return m_cncts; }
   u64          cnctsz() const { return m_cncts.size(); }
