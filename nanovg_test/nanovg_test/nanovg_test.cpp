@@ -275,10 +275,12 @@
 // -todo: fix flow to msg bug when loading then creating a new msg node - setting the id to maxId() was un-neccesary 
 // -todo: put a mutex lock around the packet queue writing
 // -todo: make a function to create a table into a memory buffer - static make_borrowed
+// -todo: fix connection not being deleted when deleting a node downstream - slots weren't being queried correctly
+// -todo: make chained flow nodes pass packets down the line
 
-// todo: fix connection not being deleted when deleting a node downstream
-// todo: make chained flow nodes pass packets down the line
 // todo: make LavaGraph store LavaInst structs instead of just nodes pointers with an id
+// todo: put more lib loading in to LavaFlow implementation so that it is done correctly and slots are given the proper index when created in the LavaGraph
+// todo: give tbl memory constructor optional owned and init boolean arguemnts with a count - assert 't' and 'b' at the start if init is false - assert that if init is true, that size/count was also passed a non-default value? no because initializing with a count of 0 should be valid (the tbl can then be pushed into or the map can be used)
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
 // todo: fix selection again - figure out all information like the slot and node that's inside, box drag etc click up or down etc, and put it all together at the end 
 // todo: build in const char* constructor to tbl
@@ -694,14 +696,14 @@ auto            node_add(str node_name, Node n) -> uint64_t
 
   if(instIdx != LavaNode::NODE_ERROR)
   {
+    auto out_types = ln->out_types;                    // do these first so that the output slots start at 0
+    for(; out_types  &&  *out_types; ++out_types){ 
+      slot_add( Slot(instIdx, false) );
+    }
+
     auto in_types = ln->in_types;
     for(; in_types  &&  *in_types; ++in_types){
       slot_add( Slot(instIdx, true) );
-    }
-
-    auto out_types = ln->out_types;
-    for(; out_types  &&  *out_types; ++out_types){ 
-      slot_add( Slot(instIdx, false) );
     }
 
     FisData::IdOrder ido;                                                          //ido is id order
@@ -944,13 +946,19 @@ auto          node_slots(vec_ndptrs const& nds) -> vec_ids
   auto& slots = fd.graph.slots;
   vec_ids sidxs;                                            // sidxs is slot indexes
   for(auto np : nds){                                       // np is node pointer and nds is nodes
-    auto si = lower_bound(ALL(slots), Id(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
-    if(si != end(slots)  &&  si->first.nid == np->id){
+    //auto si = lower_bound(ALL(slots), Id(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
+    
+    auto si = node_slots(np->id);    
+    for(; si != end(slots)  &&  si->first.nid==np->id; ++si){
       Slot& s = si->second;
       sidxs.push_back(si->first);     
     }
   }
   return sidxs;                                        // RVO
+}
+void         node_delete()
+{
+  
 }
 
 void           cnct_draw(NVGcontext* vg, v2 srcP, v2 destP, v2 srcN, v2 destN, f32 minCenterDist=INFf)
@@ -987,20 +995,30 @@ u64           sel_delete()
 
   u64    cnt = 0;
   auto   nds = sel_nodes();           // accumulate nodes
-  //auto   nds =                      // accumulate nodes
-  auto sidxs = node_slots(nds);       // accumulate dest slots  // accumulate slots
+  auto   ids = node_slots(nds);       // accumulate dest slots  // accumulate slots
 
-  for(auto sidx : sidxs){             // delete cncts with dest slots
-    //auto s = slot(sidx);
-    auto s = slot_get(sidx);
+  //auto sidxs = node_slots(nds);       // accumulate dest slots  // accumulate slots
+  //
+  //for(auto sidx : sidxs){             // delete cncts with dest slots
+  //
+  //auto s = slot_get(sidx);
+  //
+  //if(s->in) fd.lgrph.delDestCnct(sidx);  //){ ++cnt; }
+  //else      fd.lgrph.delSrcCncts(sidx);
+  
+  for(auto id : ids){             // delete cncts with dest slots
+    auto s = slot_get(id);
     if(s){
-      if(s->in) fd.lgrph.delDestCnct(sidx);  //){ ++cnt; }
-      else      fd.lgrph.delSrcCncts(sidx);
+      if(s->in) fd.lgrph.delDestCnct(id);  //){ ++cnt; }
+      else      fd.lgrph.delSrcCncts(id);
     }
   }
 
   // delete slots
-  for(auto sidx : sidxs){ fd.graph.slots.erase(sidx); }
+  //for(auto sidx : sidxs){ fd.graph.slots.erase(sidx); }
+  for(auto id : ids){                  // are LavaGraph slots deleted when deleting their node?
+    fd.graph.slots.erase(id);
+  }
 
   // delete nodes
   for(auto n : nds){  // does deleting from the graph.nds unordered map invalidate the pointers? - standard says no - how is memory reclaimed? - rehash()
