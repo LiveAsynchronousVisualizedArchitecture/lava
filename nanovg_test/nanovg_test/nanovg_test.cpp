@@ -267,16 +267,18 @@
 // -todo: put mutex locks around the flow queue
 // -todo: enable restarting after loading or saving - need to stop at the top of the loop - does each thread also need it's own mutex? - could use an atomic boolean that dictates whether to check a mutex
 // -todo: fix node types being flipped when loading - function and name are switched 
+// -todo: make play button 
+// -todo: make stop button
+// -todo: fix msg node being loaded with an input slot - nodes load their own slots now, they don't need them to come from the save file
+// -todo: take out slot loading from strToGraph()
+// -todo: take out slot saving from graphToStr()
+// -todo: fix flow to msg bug when loading then creating a new msg node - setting the id to maxId() was un-neccesary 
 
-// todo: fix msg node being loaded with an input slot 
+// todo: make chained flow nodes pass packets down the line
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
-// todo: build in const char* constructor to tbl
 // todo: fix selection again
+// todo: build in const char* constructor to tbl
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array
-// todo: prototype API for message nodes
-//       | do message nodes need some extra way to hold their state? will there ever be more than a single instance of a message node?
-//       | initially just make them thread safe or make them lock with mutexes
-//       | do messages need some sort of 8 byte number to be able to do occasionally do without heap or simdb allocated values?
 // todo: use combination of frame, node id and slot as key to simbdb
 //       |  how does that get in to the node, if all the data is in the packet struct? - through the output Args
 //       |  put the index information into the output array and use that 
@@ -289,10 +291,16 @@
 //       |  make sure that extra data at the beggining is treated atomically
 //       |  make sure that memory is allocated aligned to a 64 byte cache line
 // todo: come up with locking system so that message nodes have their own threads that are only run when a looping thread visits them - how should memory allocation be done? passing the thread's allocator in the exact same way?
+// todo: prototype API for message nodes
+//       | do message nodes need some extra way to hold their state? will there ever be more than a single instance of a message node?
+//       | initially just make them thread safe or make them lock with mutexes
+//       | do messages need some sort of 8 byte number to be able to do occasionally do without heap or simdb allocated values?
 // todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
 // todo: put in error checking for connecting dest to dest or src to src?
 // todo: somehow draw slot names and types when slots are moused over
 // todo: change project name to Fissure 
+// todo: transition to better json support to write formatted json/.lava files?
+// todo: make a thread number UI input box
 
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
@@ -307,7 +315,15 @@
 // todo: don't select a slot if it is under an existing node
 // todo: make Lava data structures use the Lava thread local allocator
 // todo: change NODE_ERROR to NODE_NONE 
+// todo: keep the time in microseconds of the execution of every node instance in a LavaNodeInst struct
+//       | use the execution time to draw the saturation of the node color a long with a background indicator to see the nodes with the most execution time
 
+// idea: keep track of covariance matrix for time vs size of data 
+//       | keep track of multiple moments and detect if a node has a quadratic / O(n^2) time
+//       | keep track of the covariance of input data, time, and other parameters to show how they affect the running time of that node?
+//       | also keep track of the parameters and input size to see how they affect the data output size - does this complete the data needed to estimate how long calculations will take with a breakdown of where all the time will be spent? 
+// idea: make an optional main message node that takes command line input 
+// idea: make an execute count on each Node - accumulate on every frame to draw which nodes are executing
 // idea: give message nodes an order than can be edited
 // idea: make LavaGraph into a template and use it for the visual graph as well?
 // idea: load shared libs asynchronously and show a progress bar somewhere
@@ -519,6 +535,15 @@ void     stopFlowThreads()
   fd.flowThreads.shrink_to_fit();
 }
 
+void         graph_clear()
+{
+  fd.graph.nds.clear();
+  fd.graph.slots.clear();
+  fd.graph.ordr.clear();
+
+  fd.lgrph.clear();
+}
+
 v2               in_cntr(Node const& n, f32 r)
 {
   //return v2(n.P.x + NODE_SZ.x/2, n.P.y-r);
@@ -674,9 +699,6 @@ auto            node_add(str node_name, Node n) -> uint64_t
     for(; out_types  &&  *out_types; ++out_types){ 
       slot_add( Slot(instIdx, false) );
     }
-
-    //auto in_names = ln->in_names;
-    //while(in_names) 
 
     FisData::IdOrder ido;                                                          //ido is id order
     ido.id    = instIdx;
@@ -1085,35 +1107,35 @@ str           graphToStr(LavaGraph const& lg)
     jnodes.add("y",           nd_y);
     jnodes.add("type",     nd_type);
   }
-  Jzon::Node jslots = Jzon::object();
-  SECTION(slots)
-  {
-    Jzon::Node srcId   = Jzon::array();
-    Jzon::Node srcIdx  = Jzon::array();
-    Jzon::Node destId  = Jzon::array();
-    Jzon::Node destIdx = Jzon::array();
-
-    //for(auto kv : g.slots()){
-    //for(auto kv : lg.slots())
-    for(auto const& kv : fd.graph.slots)
-    {
-      //GraphDB::Id  sid = kv.first;
-      LavaId sid = kv.first;
-      auto const& s = kv.second;
-      if(s.in){
-        destId.add(sid.nid);
-        destIdx.add(sid.sidx);
-      }else{
-        srcId.add(sid.nid);
-        srcIdx.add(sid.sidx);
-      }
-    }
-
-    jslots.add("destId",   destId);
-    jslots.add("destIdx", destIdx);
-    jslots.add("srcId",     srcId);
-    jslots.add("srcIdx",   srcIdx);
-  }
+  //Jzon::Node jslots = Jzon::object();
+  //SECTION(slots)
+  //{
+  //  Jzon::Node srcId   = Jzon::array();
+  //  Jzon::Node srcIdx  = Jzon::array();
+  //  Jzon::Node destId  = Jzon::array();
+  //  Jzon::Node destIdx = Jzon::array();
+  //
+  //  //for(auto kv : g.slots()){
+  //  //for(auto kv : lg.slots())
+  //  for(auto const& kv : fd.graph.slots)
+  //  {
+  //    //GraphDB::Id  sid = kv.first;
+  //    LavaId sid = kv.first;
+  //    auto const& s = kv.second;
+  //    if(s.in){
+  //      destId.add(sid.nid);
+  //      destIdx.add(sid.sidx);
+  //    }else{
+  //      srcId.add(sid.nid);
+  //      srcIdx.add(sid.sidx);
+  //    }
+  //  }
+  //
+  //  jslots.add("destId",   destId);
+  //  jslots.add("destIdx", destIdx);
+  //  jslots.add("srcId",     srcId);
+  //  jslots.add("srcIdx",   srcIdx);
+  //}
   Jzon::Node jcncts = Jzon::object();
   SECTION(connections)
   {
@@ -1141,7 +1163,7 @@ str           graphToStr(LavaGraph const& lg)
 
   Jzon::Node graph = Jzon::object();
   graph.add("nodes", jnodes);
-  graph.add("slots", jslots);
+  //graph.add("slots", jslots);
   graph.add("connections", jcncts);
 
   //Jzon::Format format;
@@ -1162,12 +1184,10 @@ void          strToGraph(str const& s)
   using namespace std;
 
   //GraphDB g;
-
-  fd.graph.nds.clear();
-  fd.graph.slots.clear();
-  fd.graph.ordr.clear();
-  fd.lgrph.clear();
+  //fd.lgrph.clear();
   //LavaGraph lg;
+
+  graph_clear();
 
   Jzon::Parser prs;
   auto graph = prs.parseString(s);
@@ -1200,24 +1220,24 @@ void          strToGraph(str const& s)
     node_add( nd_func.get(i).toString(), n);
   }
 
-  TO(sltSrcId.getCount(),i){
-    Id sltId;
-    sltId.nid  = sltSrcId.get(i).toInt();
-    sltId.sidx = sltSrcIdx.get(i).toInt();
-    Slot s(sltId.nid,false);
-
-    //g.addSlot(s, sltId.sidx);
-    slot_add(s);
-  }
-  TO(sltDestId.getCount(),i){
-    Id sltId;
-    sltId.nid  = sltDestId.get(i).toInt();
-    sltId.sidx = sltDestIdx.get(i).toInt();
-    Slot s(sltId.nid,true);
-    
-    //g.addSlot(s, sltId.sidx);
-    slot_add(s);
-  }
+  //TO(sltSrcId.getCount(),i){
+  //  Id sltId;
+  //  sltId.nid  = sltSrcId.get(i).toInt();
+  //  sltId.sidx = sltSrcIdx.get(i).toInt();
+  //  Slot s(sltId.nid,false);
+  //
+  //  //g.addSlot(s, sltId.sidx);
+  //  slot_add(s);
+  //}
+  //TO(sltDestId.getCount(),i){
+  //  Id sltId;
+  //  sltId.nid  = sltDestId.get(i).toInt();
+  //  sltId.sidx = sltDestIdx.get(i).toInt();
+  //  Slot s(sltId.nid,true);
+  //  
+  //  //g.addSlot(s, sltId.sidx);
+  //  slot_add(s);
+  //}
 
   auto cnct_cnt = destId.getCount();
   TO(cnct_cnt,i){
@@ -1233,7 +1253,7 @@ void          strToGraph(str const& s)
     fd.lgrph.toggleCnct(src, dest);
   }
 
-  fd.lgrph.setNextNodeId( fd.lgrph.maxId() );
+  //fd.lgrph.setNextNodeId( fd.lgrph.maxId() );
 
   //return move(fd.lgrph);
 }
@@ -1252,7 +1272,7 @@ bool            saveFile(LavaGraph const& lg, str path)
   int closeRet = fclose(f);
   if(closeRet == EOF) return false;
 
-  startFlowThreads(1);
+  //startFlowThreads(1);
 
   return true;
 }
@@ -1275,7 +1295,7 @@ bool            loadFile(str path, LavaGraph* out_g)
    //*out_g = strToGraph(s);
   strToGraph(s);
 
-  startFlowThreads(1);
+  //startFlowThreads(1);
 
   return true;
 }
@@ -1335,7 +1355,6 @@ void    reloadSharedLibs()
     auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
     ndBtn->setCallback([fn](){ 
       node_add(fn->name, Node(fn->name, (Node::Type)((u64)fn->node_type), {100,100}) );
-      //node_add("FileToString", Node(fn->name, Node::FLOW, {100,100}) );
     });
   }
   fd.ui.screen.performLayout();
@@ -1495,9 +1514,14 @@ ENTRY_DECLARATION
       auto spcr1     = new Label(fd.ui.keyWin,     "");
       auto spcr2     = new Label(fd.ui.keyWin,     "");
       auto spcr3     = new Label(fd.ui.keyWin,     "");
-      auto loadBtn   = new Button(fd.ui.keyWin,    "Load");
-      auto saveBtn   = new Button(fd.ui.keyWin,    "Save");
-      auto entryBtn  = new Button(fd.ui.keyWin,    "Set Entry Node");
+      auto loadBtn   = new Button(fd.ui.keyWin,      "Load");
+      auto saveBtn   = new Button(fd.ui.keyWin,      "Save");
+      auto playBtn   = new Button(fd.ui.keyWin,    "Play >");
+      auto pauseBtn  = new Button(fd.ui.keyWin,  "Pause ||");
+      auto stopBtn   = new Button(fd.ui.keyWin,  "Stop |_|");
+
+      //auto entryBtn  = new Button(fd.ui.keyWin,    "Set Entry Node");
+
       //auto msgBtn    = new Button(fd.ui.keyWin,    "Message Node");
       //auto flowBtn   = new Button(fd.ui.keyWin,    "Flow Node");
 
@@ -1523,30 +1547,41 @@ ENTRY_DECLARATION
         nfdresult_t result = NFD_SaveDialog("lava", NULL, &outPath );
         //printf("\n\nfile dialog: %d %s \n\n", result, outPath);
         if(outPath){
-          stopFlowThreads();
-          normalizeIndices();
+          //stopFlowThreads();
+          normalizeIndices(); // todo: put this into the save function
           bool ok = saveFile(fd.lgrph, outPath);
           if(ok) printf("\nFile Written to %s\n", outPath);
           else   printf("\nSave did not write successfully to %s\n", outPath);
         }
       });
-      entryBtn->setCallback([](){        
-        u64 selId = Node::Type::NODE_ERROR;
-        auto  nds = node_getPtrs();
-        for(auto n : nds) if(n->sel  &&  n->type==Node::Type::MSG){
-          selId = n->id;
-          break;
-        }
-        if(selId==Node::Type::NODE_ERROR){ printf("\nno message nodes selected\n"); }
-
-        printf("\ntodo: primary selection node to be the entry point - selected: %d \n", (i32)selId );
-
-        //TO(nds.size(),i){
-        //  if(nds[i]->sel && nds[i]->type == Node::MSG)
-        //}
-        //
-        //if(fd.sel.pri < 0) printf("no nodes selected\n\n");
+      playBtn->setCallback([](){
+        startFlowThreads(1);
       });
+      pauseBtn->setCallback([](){
+        stopFlowThreads();
+      });
+      stopBtn->setCallback([](){
+        stopFlowThreads();
+      });
+
+      //entryBtn->setCallback([](){        
+      //  u64 selId = Node::Type::NODE_ERROR;
+      //  auto  nds = node_getPtrs();
+      //  for(auto n : nds) if(n->sel  &&  n->type==Node::Type::MSG){
+      //    selId = n->id;
+      //    break;
+      //  }
+      //  if(selId==Node::Type::NODE_ERROR){ printf("\nno message nodes selected\n"); }
+      //
+      //  printf("\ntodo: primary selection node to be the entry point - selected: %d \n", (i32)selId );
+      //
+      //  //TO(nds.size(),i){
+      //  //  if(nds[i]->sel && nds[i]->type == Node::MSG)
+      //  //}
+      //  //
+      //  //if(fd.sel.pri < 0) printf("no nodes selected\n\n");
+      //});
+
       //msgBtn->setCallback([](){
       //  node_add("FileToString", Node("message node", Node::Type::MSG) );
       //});
@@ -1588,7 +1623,7 @@ ENTRY_DECLARATION
 
       reloadSharedLibs();
 
-      auto   inst0 = node_add("FileToString", Node("one",   Node::Type::FLOW, {400.f,300.f}) );
+      //auto   inst0 = node_add("FileToString", Node("one",   Node::Type::FLOW, {400.f,300.f}) );
       //auto   inst1 = node_add("FileToString", Node("two",   Node::Type::FLOW, {200.f,500.f}) );
       //auto   inst2 = node_add("FileToString", Node("three", Node::Type::FLOW, {700.f,500.f}) );
       //auto   inst3 = node_add("FileToString", Node("four",  Node::Type::FLOW, {700.f,700.f}) );

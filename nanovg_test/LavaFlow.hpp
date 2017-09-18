@@ -587,7 +587,7 @@ public:
     return lower_bound(ALL(m_slots), nid, [](auto a,auto b){ return a.first.nid < b; } );
   }
   auto          slots() -> Slots& { return m_slots; }
-  auto          slots() const -> Slots const& { return m_slots; }
+  auto          slots() const -> Slots const& { return m_slots;  }
   auto       getSlots() -> Slots& { return m_slots; }
   auto        srcSlot(LavaId destId) -> LavaFlowSlot* 
   {
