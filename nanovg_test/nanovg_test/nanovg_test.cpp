@@ -273,10 +273,12 @@
 // -todo: take out slot loading from strToGraph()
 // -todo: take out slot saving from graphToStr()
 // -todo: fix flow to msg bug when loading then creating a new msg node - setting the id to maxId() was un-neccesary 
+// -todo: put a mutex lock around the packet queue writing
 
 // todo: make chained flow nodes pass packets down the line
+// todo: make LavaGraph store LavaInst structs instead of just nodes pointers with an id
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
-// todo: fix selection again
+// todo: fix selection again - figure out all information like the slot and node that's inside, box drag etc click up or down etc, and put it all together at the end 
 // todo: build in const char* constructor to tbl
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array
 // todo: use combination of frame, node id and slot as key to simbdb
@@ -1642,7 +1644,7 @@ ENTRY_DECLARATION
       //fd.lgrph.toggleCnct(s0, s3);
     }
 
-    startFlowThreads(1);
+    //startFlowThreads(1);
   }
 
   glfwSetTime(0);
@@ -1691,8 +1693,9 @@ ENTRY_DECLARATION
       }
       SECTION(lava graph visualization)
       {
-        //fd.graph.curNode = fd.flow.q.top().dest_node;  // todo: race condition
-        fd.graph.curNode  =  fd.flow.m_curId.nid;        // todo: make atomic, although this may just work since it is only reading 8 bytes
+        //fd.graph.curNode = fd.flow.q.top().dest_node;      // todo: race condition
+        //fd.graph.curNode  =  fd.flow.m_curId.nid;          // todo: make atomic, although this may just work since it is only reading 8 bytes
+        fd.graph.curNode  =  fd.flow.getNxtPacketId().nid;
       }
       SECTION(selection)
       {

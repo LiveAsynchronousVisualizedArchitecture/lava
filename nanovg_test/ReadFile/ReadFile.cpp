@@ -20,8 +20,11 @@ extern "C"
 
   uint64_t FileToString(LavaParams* inout_lp, LavaVal* in, LavaOut* out)
   {
+    using namespace std;
+
     // output temp string here
     printf("\n File To String called \n");
+    this_thread::sleep_for( chrono::milliseconds(500) );
     return 85;
   }
 

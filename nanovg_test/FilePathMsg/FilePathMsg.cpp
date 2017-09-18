@@ -43,6 +43,8 @@ extern "C"
     out[0].value = (u64)outmem;
     out[0].type  = LavaArgType::MEMORY;
 
+    this_thread::sleep_for( chrono::milliseconds(500) );
+
     return 1;
   }
 
