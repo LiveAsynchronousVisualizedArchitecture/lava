@@ -40,6 +40,7 @@ extern "C"
     
     ((tbl<u8>)outmem).owned(false);
     
+    inout_lp->outputs = 1;
     out[0].value = (u64)outmem;
     out[0].type  = LavaArgType::MEMORY;
 

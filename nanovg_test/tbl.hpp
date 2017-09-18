@@ -454,6 +454,7 @@ struct  TblFields
 template<class T> class tbl
 {
 public:                 
+  using AllocFunc = void* (*)(u64 bytes);
   using fields  =  TblFields;
 
   using    u8   =   uint8_t;
@@ -631,6 +632,12 @@ private:
     reserve(lst.size(),0,0);
     for(auto&& n : lst){ emplace(n); }
   }
+  void      init_cstr(const char* s)
+  {
+    auto len = strlen(s) + 1;
+    init(len);
+    memcpy(data(), s, len);
+  }
   void        destroy()
   { 
     if( m_mem && owned() ){
@@ -722,6 +729,7 @@ public:
   }
   tbl(std::initializer_list<KV> lst){ initKV(lst); }
   tbl(std::initializer_list<T>  lst){   init(lst); }
+  tbl(const char* s){ init_cstr(s); }
   ~tbl(){ destroy(); }
 
   tbl           (tbl const& l){ cp(l);                          }
@@ -730,6 +738,7 @@ public:
   tbl& operator=(tbl&&      r){ mv(std::move(r)); return *this; }
   tbl& operator=(std::initializer_list<KV> lst){ initKV(lst); return *this; }
   tbl& operator=(std::initializer_list<T>  lst){   init(lst); return *this; }
+  tbl& operator=(const char* s){ init_cstr(s); return *this; }
 
   T&      operator[](u64 i)
   {
@@ -1224,6 +1233,19 @@ public:
     }
 
     return ret;
+  }
+  static tbl  make_borrowed(AllocFunc alloc, u64 count)
+  {
+    using namespace std;
+    
+    tbl ret;
+    auto bytes = size_bytes(count);
+    ret.m_mem  = (u8*)alloc( bytes );
+    ret.init(bytes);
+    ret.owned(false);
+
+    return move(ret);
+    //auto st = ret.memStart();
   }
 };
 

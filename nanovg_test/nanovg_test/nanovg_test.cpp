@@ -274,7 +274,9 @@
 // -todo: take out slot saving from graphToStr()
 // -todo: fix flow to msg bug when loading then creating a new msg node - setting the id to maxId() was un-neccesary 
 // -todo: put a mutex lock around the packet queue writing
+// -todo: make a function to create a table into a memory buffer - static make_borrowed
 
+// todo: fix connection not being deleted when deleting a node downstream
 // todo: make chained flow nodes pass packets down the line
 // todo: make LavaGraph store LavaInst structs instead of just nodes pointers with an id
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
