@@ -149,6 +149,7 @@ struct       LavaNode
   const char**     out_types;
   uint64_t           version;
   uint64_t                id;
+
   //uint16_t            inputs;       // cache after counting inputs 
   //uint16_t           outputs;       // cache after counting output
 };
@@ -156,6 +157,8 @@ struct       LavaInst
 {
   LavaId         id;
   LavaNode*    node;
+  u32        inputs;
+  u32       outputs;
 };
 struct   LavaFlowSlot
 { 
@@ -283,14 +286,16 @@ template <class T> void    ThreadAllocator<T>::deallocate(T*& p, size_t) const
 class       LavaGraph
 {
 public:
-  struct NodeInstance { uint64_t id; LavaNode* nd; };              // a struct used for returning an instance of a node - the Nodes map of ids and LavaFlowNode pointers  
+  struct NodeInstance { uint64_t id; LavaNode* nd; };                  // a struct used for returning an instance of a node - the Nodes map of ids and LavaFlowNode pointers  
 
-  using NodeInsts     =  std::unordered_map<uint64_t, LavaNode*>;  // maps an id to a LavaFlowNode struct
+  //using NodeInsts     =  std::unordered_map<uint64_t, LavaNode*>;      // maps an id to a LavaFlowNode struct
+  using NodeInsts     =  std::unordered_map<uint64_t, LavaInst>;       // maps an id to a LavaFlowNode struct
   using Slots         =  std::multimap<LavaId, LavaFlowSlot>;          // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
   using CnctMap       =  std::unordered_map<LavaId, LavaId, LavaId>;   // maps connections from their single destination slot to their single source slot - Id is the hash function object in the third template argument
   using SrcMap        =  std::multimap<LavaId, LavaId>;                // maps connections from their single source slot to their one or more destination slots
-  using vec_insts     =  std::vector<NodeInstance>;                    // list of node instances - Id and pointer pairs
-  using vec_nptrs     =  std::vector<LavaNode*>;                   // lists used for returning from reloading functions
+  //using vec_insts     =  std::vector<NodeInstance>;                    // list of node instances - Id and pointer pairs
+  using vec_insts     =  std::vector<LavaInst>;                        // list of node instances - Id and pointer pairs
+  using vec_nptrs     =  std::vector<LavaNode*>;                       // lists used for returning from reloading functions
   using vec_cnptrs    =  std::vector<LavaNode const*>;
   using vec_ids       =  std::vector<LavaId>;
   using NormalizeMap  =  std::unordered_map<uint64_t, uint64_t>;
@@ -349,14 +354,14 @@ private:
     }
     return sidxs;                                        // RVO
   }
-  auto       errorInst() -> NodeInstance&
-  { // default contrutor sets the type to Node::NODE_ERROR
-    static NodeInstance ERR_INST;
+  auto       errorInst() -> LavaInst&
+  { 
+    static LavaInst ERR_INST = { LavaId(LavaNode::NODE_ERROR, LavaFlowSlot::SLOT_ERROR), nullptr, 0, 0 };
     return ERR_INST;
   }
-  auto       errorInst() const -> NodeInstance const&
-  { // default contrutor sets the type to Node::NODE_ERROR
-    static NodeInstance ERR_INST;
+  auto       errorInst() const -> LavaInst const&
+  { 
+    static LavaInst ERR_INST = { LavaId(LavaNode::NODE_ERROR, LavaFlowSlot::SLOT_ERROR), nullptr, 0, 0 };
     return ERR_INST;
   }
   u64          nxtSlot(u64 nid)
@@ -373,6 +378,35 @@ private:
 
     return cur + 1;
   }
+  u32       countSlots(const char** typeList)
+  {
+    u32 cnt=0;
+    for(; typeList  &&  *typeList; ++typeList){ 
+      ++cnt; 
+    }
+    return cnt;
+  }
+  LavaInst    makeInst(u64 nid, LavaNode* ln)
+  {
+    LavaInst li;                                       // li is Lava Instance
+    li.id      = nid;
+    li.node    = ln;
+    li.inputs  = countSlots(ln->in_types);
+    li.outputs = countSlots(ln->out_types);
+
+    return li;
+  }
+
+  //auto       errorInst() -> NodeInstance&
+  //{ // default contrutor sets the type to Node::NODE_ERROR
+  //  static NodeInstance ERR_INST;
+  //  return ERR_INST;
+  //}
+  //auto       errorInst() const -> NodeInstance const&
+  //{ // default contrutor sets the type to Node::NODE_ERROR
+  //  static NodeInstance ERR_INST;
+  //  return ERR_INST;
+  //}
 
 public:
   LavaGraph() { init(); }
@@ -442,9 +476,10 @@ public:
     // node ids 
     NodeInsts nxtNds;
     for(auto& kv : m_nodes){
-      u64 nxtId = nids[kv.first];
-      LavaNode* nd = m_nodes[kv.first];
-      nxtNds.insert({nxtId, nd});
+      u64     nxtId = nids[kv.first];
+      //LavaNode* nd = m_nodes[kv.first].node;
+      LavaInst inst = m_nodes[kv.first];
+      nxtNds.insert({nxtId, inst});
     }
     m_nodes = move(nxtNds);
     //u64 nxtOrdr = ordrs[kv.second];
@@ -483,50 +518,81 @@ public:
   void      setNextNodeId(u64 nxt){ m_nxtId = nxt; }
 
   // nodes
-  uint64_t    addNode(LavaNode* n, bool newId=true)
+  uint64_t    addNode(LavaNode* ln, bool newId=true)
   {
-    if(newId) n->id = nxt();
+    if(newId) ln->id = nxt();
 
-    if(n->node_type == LavaNode::MSG)
-      m_msgNodes.push_back(n->id);
+    if(ln->node_type == LavaNode::MSG)
+      m_msgNodes.push_back(ln->id);
 
-    return m_nodes.insert({n->id, n}).first->first;                         // returns a pair that contains the key-value pair
+    LavaInst li = makeInst(ln->id, ln);
+    return m_nodes.insert({ln->id, li}).first->first;                         // returns a pair that contains the key-value pair
+
+    //return m_nodes.insert({ln->id, ln}).first->first;                         // returns a pair that contains the key-value pair
   }
-  auto           node(u64 id)  -> NodeInstance
-  {
-    auto nIter = m_nodes.find(id);                                          // nIter is node iterator
-    //if(nIter == end(m_nodes)) return errorNode();
-    if(nIter == end(m_nodes)) return errorInst();
-
-    NodeInstance ret;
-    ret.id = nIter->first;
-    ret.nd = nIter->second;
-    return ret;
-
-    //return nIter->second;
-  }
-  auto           node(u64 id) const -> NodeInstance
+  auto           node(u64 id)  -> LavaInst
   {
     auto nIter = m_nodes.find(id);                                          // nIter is node iterator
-                                                                            //if(nIter == end(m_nodes)) return errorNode();
     if(nIter == end(m_nodes)) return errorInst();
 
-    NodeInstance ret;
-    ret.id = nIter->first;
-    ret.nd = nIter->second;
-    return ret;
+    //LavaInst ret;
+    //ret.id   = nIter->first;
+    //ret.node = nIter->second;
+    //return ret;
 
-    //return nIter->second;
+    return nIter->second;
   }
+  auto           node(u64 id) const -> LavaInst
+  {
+    auto nIter = m_nodes.find(id);                                          // nIter is node iterator
+    if(nIter == end(m_nodes)) return errorInst();
+
+    //LavaInst ret;
+    //ret.id = nIter->first;
+    //ret.ln = nIter->second;
+    //return ret;
+
+    return nIter->second;
+  }
+
+  //auto           node(u64 id)  -> NodeInstance
+  //{
+  //  auto nIter = m_nodes.find(id);                                          // nIter is node iterator
+  //  //if(nIter == end(m_nodes)) return errorNode();
+  //  if(nIter == end(m_nodes)) return errorInst();
+  //
+  //  NodeInstance ret;
+  //  ret.id = nIter->first;
+  //  ret.nd = nIter->second;
+  //  return ret;
+  //
+  //  //return nIter->second;
+  //}
+  //auto           node(u64 id) const -> NodeInstance
+  //{
+  //  auto nIter = m_nodes.find(id);                                          // nIter is node iterator
+  //                                                                          //if(nIter == end(m_nodes)) return errorNode();
+  //  if(nIter == end(m_nodes)) return errorInst();
+  //
+  //  NodeInstance ret;
+  //  ret.id = nIter->first;
+  //  ret.nd = nIter->second;
+  //  return ret;
+  //
+  //  //return nIter->second;
+  //}
+
   auto          nodes() const -> vec_insts
   {
     vec_insts nds;
     nds.reserve(m_nodes.size());
-    for(auto& on : m_nodes){                                  // on is order and node - order is on.first    node is on.second
-      NodeInstance inst;
-      inst.id = on.first;
-      inst.nd = on.second;
-      nds.push_back(inst);
+    for(auto& on : m_nodes){                                  // on is order and node - order is on.first    LavaInst is on.second
+      nds.push_back(on.second);
+
+      //NodeInstance inst;
+      //inst.id = on.first;
+      //inst.nd = on.second;
+      //nds.push_back(inst);
     }
     return nds;
   }
@@ -535,10 +601,12 @@ public:
     vec_insts nds;
     nds.reserve(m_nodes.size());
     for(auto& on : m_nodes){                                  // on is order and node - order is on.first    node is on.second
-      NodeInstance inst;
-      inst.id = on.first;
-      inst.nd = on.second;
-      nds.push_back(inst);
+      nds.push_back(on.second);
+
+      //NodeInstance inst;
+      //inst.id = on.first;
+      //inst.nd = on.second;
+      //nds.push_back(inst);
     }
     return nds;
   }
@@ -562,7 +630,8 @@ public:
   {
     auto ni = m_nodes.find(nid);                            // ni is node iterator
     if(ni == end(m_nodes))
-      return ni->second->func;
+      return ni->second.node->func;
+      //return ni->second->func;
     else
       return nullptr;
   }
@@ -758,7 +827,7 @@ private:
   }
   bool            runFunc(uint64_t nid, LavaParams* lp, LavaVal* inArgs,  LavaOut* outArgs) // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
   {
-    FlowFunc msgFunc = graph[nid]->func;
+    FlowFunc msgFunc = graph[nid].node->func;
     if(msgFunc){
       LavaParams lp;
       SECTION(create arguments and call function)
@@ -1125,445 +1194,3 @@ auto       GetFlowNodeLists(lava_hndlvec  const& hndls) -> lava_ptrsvec
 
 
 
-
-
-
-
-
-
-
-
-
-//lava_flowPtrs ret; 
-//ret.reserve(hndls.size()); // nullptr);
-//ret.reserve(hndls.size());   // nullptr);
-
-//lava_libHndls hndls(paths.size(), 0);
-//
-//for(auto const& p : paths){
-//hndls.push_back(lib);
-
-//FlowFunc msgFunc = graph[id.nid]->func;
-//if(msgFunc){
-//  LavaParams lp;
-//  SECTION(create arguments and call function)
-//  {
-//    lp.frame       =   m_frame;
-//    lp.inputs      =     1;
-//    lp.outputs     =   512;
-//    lp.mem_alloc   =   malloc;  // LavaHeapAlloc;
-//    uint64_t ret   =   msgFunc(&lp, inArgs, outArgs);
-//
-//    tbl<u8> pth( (void*)outArgs[0].value );
-//    printf("\n out string %s \n", (char*)pth.data() );
-//  }
-//  SECTION(create packets and put them into packet queue)
-//  {
-//    auto sidx = outArgs[0].key.slot;
-//
-//    // create new value for the new packet
-//    LavaVal val;
-//    val.type  = outArgs[0].type;
-//    val.value = outArgs[0].value;
-//
-//    // create new packet 
-//    LavaPacket basePkt;
-//    basePkt.frame       =   m_frame;    // increment the frame on every major loop through both data and message nodes - how to know when a full cycle has passed? maybe purely by message nodes - only increment frame if data is created through a message node cycle
-//    basePkt.framed      =   false;      // would this go on the socket?
-//    basePkt.src_node    =   id.nid;
-//    basePkt.src_slot    =   sidx;
-//    basePkt.msg.id      =   nxtMsgId();
-//    basePkt.msg.val     =   val;
-//
-//    // route the packet using the graph - the packet may be copied multiple times and go to multiple destination slots
-//    LavaId   src  =  { id.nid, sidx };
-//    auto      di  =  graph.destCncts(src);                               // di is destination iterator
-//    auto   diCnt  =  di;                                                 // diCnt is destination iterator counter - used to count the number of destination slots this packet will be copied to so that the reference count can be set correctly
-//    auto    diEn  =  graph.destCnctEnd();
-//    u64   refCnt  =  0;
-//    for(; diCnt!=diEn && diCnt->first==src; ++diCnt){ ++refCnt; } 
-//    basePkt.ref_count = refCnt;                                          // reference count will ultimatly need to be handled very differently, not on a packet basis, since the packets are copied - it should probably be on the value somehow - maybe the allocator passed should allocate an extra 8 bytes for the reference count and that should be treated atomically 
-//
-//    for(; di!=diEn && di->first==src; ++di)
-//    {                                                                    // loop through the 1 or more destination slots connected to this source
-//      LavaId   pktId = di->second;
-//      LavaPacket pkt;                                                    // pkt is packet
-//      pkt.dest_node  = pktId.nid;
-//      pkt.dest_slot  = pktId.sidx;
-//
-//      // todo: use a mutex here initially
-//      // mutex lock
-//      q.push(pkt);
-//      // mutex unlock
-//    }
-//  } // SECTION(create packets and put them into packet queue)
-//}
-
-//
-//while(q.size() > 0)
-
-//FlowFunc ndfunc = graph[pckt.dest_node]->func;
-//if(ndfunc){
-//  SECTION(create arguments and call function)
-//  {
-//    lp.frame       =   m_frame;
-//    lp.inputs      =     1;
-//    lp.outputs     =   512;
-//    lp.mem_alloc   =   malloc;  // LavaHeapAlloc;
-//    uint64_t ret   =   ndfunc(&lp, inArgs, outArgs);
-//  }
-//}
-
-//SECTION(run function and route results)
-//{
-//}
-
-// set arguments               
-// make their last arg a special value as the end of the list
-
-//struct        LavaVal
-//{
-//  u64      type :  3;          // ArgType
-//  u64     value : 61;
-//};
-
-//LavaId src;
-//src.nid   =  id.nid;
-//src.sidx  =  sidx;
-//auto di = graph.destCncts(src);
-//
-//lpckt.dest_node   =   0;          // get from the graph
-//lpckt.dest_slot   =   0;          // get from the graph
-//
-// if type == MEMORY and value != nullptr
-//LavaHeapFree( (void*)outArgs[0].value );
-//free( (void*)outArgs[0].value );  // libc compiled in so that malloc isn't in the same heap
-
-//bool  frameCmp  =  frame    > r.frame;         // want lowest frame numbers to be done first 
-//bool     szCmp  =  sz_bytes < r.sz_bytes;      // want largest sizes to be done first
-//bool framedCmp  =  framed   < r.framed;        // want framed packets to be done first so that their dependencies can be resolved
-
-//TO(LAVA_ARG_COUNT,i){
-//  outArgs[i] = 
-//}
-
-//
-//enum class LavaNodeType { NONE=0, FLOW, MSG, NODE_ERROR };                             // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
-
-//struct      Lava
-//{
-//  using PacketQueue  =  std::priority_queue<LavaPacket>;
-//  using MsgNodeVec   =  std::vector<uint64_t>;
-//
-//  bool             m_running = false;
-//  MsgNodeVec      m_msgNodes;
-//  PacketQueue            m_q;
-//  LavaGraph          m_graph;
-//
-//  //void               init(){ m_running = false; }
-//
-//  // execution
-//  void              start(){ m_running =  true; }
-//  void               stop(){ m_running = false; }
-//  void          enterLoop()
-//  {
-//    LavaArg   inArgs[512];         // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
-//    LavaArg  outArgs[512];         // if the arguments are going to 
-//    while(m_running)
-//    {
-//      auto const& mnds = m_graph.msgNodes();
-//
-//      for(auto id : mnds){
-//        FlowFunc msgFunc = m_graph[id.nid]->func;
-//        if(msgFunc){
-//          SECTION(run function with stack array arguments)
-//          {
-//            // set arguments 
-//            // make their last arg being a special value as the end of the list
-//            uint64_t ret = msgFunc(inArgs, outArgs);
-//          }
-//        }
-//      }
-//    }
-//  }
-//  void          pauseLoop()
-//  {
-//
-//  }
-//
-//};
-
-//__declspec(noinline) void   LavaHeapDestroyCallback(void*);
-//__declspec(noinline) void*             LavaHeapInit(size_t initialSz = 0);
-//__declspec(noinline) void*                LavaAlloc(size_t sz);
-//__declspec(noinline) int                   LavaFree(void* memptr);
-
-//auto      errorNode() -> LavaFlowNode&
-//{ // default contrutor sets the type to Node::NODE_ERROR
-//  static LavaFlowNode ERR_NODE;
-//  return ERR_NODE; 
-//}
-//auto      errorNode() const -> LavaFlowNode const&
-//{ // default contrutor sets the type to Node::NODE_ERROR
-//  static LavaFlowNode ERR_NODE;
-//  return ERR_NODE; 
-//}
-
-//
-//auto          node(u64 id)  -> struct LavaFlowNode&
-
-//auto         nodes() -> vec_nptrs
-//{
-//  vec_nptrs nds;
-//  nds.reserve(m_nodes.size());
-//  for(auto& on : m_nodes){                            // on is order and node - order is on.first    node is on.second
-//    nds.push_back(&on.second);
-//  }
-//
-//  return nds;
-//}
-//auto         nodes() const -> vec_cnptrs                // these two versions could be done with a single template
-//{
-//  vec_cnptrs nds;
-//  nds.reserve(m_nodes.size());
-//  for(auto& on : m_nodes){                            // on is order and node - order is on.first    node is on.second
-//    nds.push_back(&on.second);
-//  }
-//
-//  return nds;
-//}
-
-//using lava_libHndls   =  std::vector<HMODULE>;                                        // todo: need to change this depending on OS
-//using lava_flowPtrs   =  std::unordered_map<uint64_t, LavaFlowNode*>;                 // maps ids to LavaFlowNode pointers
-//using lava_flowPtrs   =  std::vector<LavaFlowNode*>;
-
-//using NodeMap      = std::map<u64, LavaFlowNode>;         // maps an id to a LavaFlowNode struct
-//using NodeIdMap    = std::unordered_map<u64, u64>;        // maps a node id to its order, which can be used to find the node in the NodeMap
-
-//auto          node(u64 id)  -> struct LavaFlowNode&
-//{
-//  auto idIter = m_ids.find(id);                     // idIter is identification iterator
-//  if(idIter == end(m_ids)) return errorNode();
-//
-//  auto nIter = m_nodes.find(idIter->second);        // nIter is node iterator
-//  if(nIter == end(m_nodes)) return errorNode();
-//
-//  return nIter->second;
-//}
-//auto          node(u64 id) const -> struct LavaFlowNode const& 
-//{ 
-//  auto idIter = m_ids.find(id);                     // idIter is identification iterator
-//  if(idIter == end(m_ids)) return errorNode();      // ERR_NODE;
-//
-//  auto nIter = m_nodes.find(idIter->second);        // nIter is node iterator
-//  if(nIter == end(m_nodes)) return errorNode();     // ERR_NODE;
-//
-//  return nIter->second;
-//}
-
-//u64        nxtOrder()
-//{
-//  u64 order = 1;
-//  if(m_nodes.size() > 0)
-//    order = m_nodes.rbegin()->first + 1;
-//
-//  return order;
-//}
-
-//using NodeMap      = std::map<u64, LavaFlowNode>;         // maps an order to a LavaFlowNode struct
-//
-//NodeIdMap            m_ids;
-
-//auto  selectedNodes() -> vec_nptrs
-//{
-//  //vec<LavaFlowNode*> nds;                                     // nids is node ids
-//  vec_nptrs nds;                                     // nids is node ids
-//  for(auto& on : m_nodes){                            // on is order and node - order is on.first    node is on.second
-//    if(on.second.sel) nds.push_back(&on.second);
-//  }
-//
-//  return nds;                                         // counting on RVO (return value optimization) here
-//}
-
-//u64        delSelected()
-//{
-//  using namespace std;
-//
-//  u64    cnt = 0;
-//  auto   nds = selectedNodes();      // accumulate nodes
-//  auto sidxs = nodeSlots(nds);   // accumulate dest slots  // accumulate slots
-//
-//                                 // delete cncts with dest slots
-//  for(auto sidx : sidxs){ 
-//    auto s = slot(sidx);
-//    if(s->in)
-//      delDestCnct(sidx);  //){ ++cnt; }
-//    else
-//      delSrcCncts(sidx);
-//  }
-//
-//  // delete slots
-//  for(auto sidx : sidxs){ m_slots.erase(sidx); }
-//
-//  // delete nodes
-//  for(auto n : nds){
-//    m_ids.erase(n->id);
-//    m_nodes.erase(n->order);
-//  }
-//
-//  return cnt;
-//}
-//void         clearSels()
-//{
-//  for(auto& on : m_nodes) on.second.sel = false;
-//  for(auto& kv : m_slots) kv.second.state = LavaFlowSlot::NORMAL;
-//}
-//void     clearSlotSels()
-//{
-//  for(auto& kv : m_slots) kv.second.state = LavaFlowSlot::NORMAL;
-//}
-//
-// nodes
-//auto       addNode(LavaFlowNode n, bool newId=true) -> LavaFlowNode&
-//if(newId) n.id = nxt();
-//
-//n.order    = nxtOrder();
-//LavaFlowNode& nref = m_nodes.insert({n.order, n}).first->second;
-//
-//m_ids.insert({n.id, n.order});
-//
-//return nref;
-//}
-//auto   moveToFront(u64 id) -> LavaFlowNode&
-//{
-//  using namespace std;
-//
-//  LavaFlowNode  n = node(id);
-//  auto prevOrder = n.order;   // addNode will get the next order number
-//                              //n.order = nxtOrder();
-//
-//  if(n.node_type==LavaFlowNode::NODE_ERROR) return errorNode();
-//  m_nodes.erase(prevOrder); // todo: use a delNode here instead
-//  m_ids.erase(id);
-//
-//  return addNode(n, false);
-//}
-//u64          order(u64 id){ return node(id).order; }
-//auto           bnd(u64 id) -> Bnd& { return node(id).b; }
-
-//
-//Println("destroy called");
-
-//auto flsHnd = FlsAlloc(HeapDestroyCallback);
-//FlsSetValue(flsHnd, lava_thread_heap); // need to set the value to non-null so the callback will run
-//
-//return true;
-//}
-//else
-//return false;
-
-//static const string liveExt(".live.dll");
-//
-//path    root = libPath.root_directory();
-//path    root = libPath.root_path();        //root( libPath );
-//path       root("../x64/Debug/");
-//path       root("../x64/Release/");
-//
-//livepth.replace_extension(".live.dll");
-
-// std::unordered_map<std::string, HMODULE>;
-//using lava_nodeMap   =  std::unordered_map<std::string, HMODULE>;
-
-// array of structs of the contained nodes
-//LavaFlowNode LavaFlowNodes[] =
-//{
-//  {nullptr, nullptr, nullptr, 0, 0}
-//};
-
-//__declspec(dllexport) LavaFlowNode* GetLavaFlowNodes()
-//{
-//  return (LavaFlowNode*)LavaFlowNodes;
-//}
-
-//
-//using  Path      =   std::tr2::sys::path;
-
-//uint64_t  LoadSharedLibraries()
-//{
-//  using namespace std;
-//  using namespace  fs;
-//  
-//  static unordered_map<str, uint64_t> lastLoad;
-//  static uint64_t lastReload = 0;
-//
-//  static regex lavaRegex("lava_.*");
-//
-//  uint64_t  count = 0;
-//  path       root("../x64/Debug/");
-//  auto    dirIter = directory_iterator(root);
-//  for(auto& d : dirIter){
-//    auto   p = d.path();
-//    if(!p.has_filename()){ continue; }
-//    
-//    auto ext = p.extension().generic_string();
-//    if(ext != ".dll"){ continue; }
-//
-//    //auto pstr = p.generic_string();                   // pstr is path string
-//    str fstr = p.filename().generic_string();          // fstr is file string
-//    if( !regex_match(fstr, lavaRegex) ){ continue; }
-//
-//    //auto   ll = lastLoad[pstr];                // ll is last load
-//
-//    auto livepth = p;
-//    livepth.replace_extension(".live.dll");
-//
-//    bool doCopy = true;
-//    if( exists(livepth) ){
-//      auto liveWrite = last_write_time(livepth).time_since_epoch().count();     // liveWrite is live write time - the live shared library file's last write time 
-//      auto origWrite = last_write_time(p).time_since_epoch().count();     // origWrite is orginal write time - the original shared library file's last write time
-//      if( liveWrite > origWrite ) doCopy = false;
-//    }
-//      
-//    if( doCopy ){
-//      // shut down live file 
-//      // delete live file
-//      // copy old file to the live path
-//      if( copy_file(p, livepth) ){ ++count; }
-//    }
-//  }
-//
-//  return count;
-//}
-
-//using FlowFunc = u64 (*)(u8 types[512], u64 values[512]);
-//using FlowFunc = uint64_t(LavaFlowNode* in, LavaFlowNode* out);
-
-//File f;
-//exists();
-//
-//path p;
-//p.replace_extension();
-//remove();
-//  
-//m_livePath.replace_extension(".live.dll");
-
-//struct LavaNodeType
-//{
-//  enum { FLOW=0, MSG }; // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread?
-//};
-
-//
-//  //{nullptr, nullptr, nullptr, nullptr, 0, 0}
-
-//
-//u64 src_slot : 16;
-
-//struct Transform;
-//using  DoTransform      =  void*(*)(void* in); // void** out);
-//using  GetTransforms_t  =  Transform*(*)();
-
-//{"IndexedVerts", "IndexedVerts", "ImgFilter", 
-//IndexedVerts_IndexedVerts, 0, 0},
-
-//{"IndexedVerts", "IndexedVerts", "PcaProject", 
-//IndexedVerts_PCA, 0, 0},

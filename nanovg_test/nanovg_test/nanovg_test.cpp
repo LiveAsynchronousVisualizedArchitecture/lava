@@ -277,8 +277,9 @@
 // -todo: make a function to create a table into a memory buffer - static make_borrowed
 // -todo: fix connection not being deleted when deleting a node downstream - slots weren't being queried correctly
 // -todo: make chained flow nodes pass packets down the line
+// -todo: make LavaGraph store LavaInst structs instead of just nodes pointers with an id
 
-// todo: make LavaGraph store LavaInst structs instead of just nodes pointers with an id
+// todo: take out id from LavaNode
 // todo: put more lib loading in to LavaFlow implementation so that it is done correctly and slots are given the proper index when created in the LavaGraph
 // todo: give tbl memory constructor optional owned and init boolean arguemnts with a count - assert 't' and 'b' at the start if init is false - assert that if init is true, that size/count was also passed a non-default value? no because initializing with a count of 0 should be valid (the tbl can then be pushed into or the map can be used)
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
@@ -516,6 +517,9 @@ void    startFlowThreads(u64 num=1)
 
   TO(num,i){
     fd.flowThreads.emplace_back([](){
+      //printf("\n LavaInst size: %d \n", (i32)sizeof(LavaInst) );
+      //printf("\n LavaNode size: %d \n", (i32)sizeof(LavaNode) );
+      //
       //printf("\n running thread \n");
       //
       //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key) );
@@ -1105,7 +1109,7 @@ str           graphToStr(LavaGraph const& lg)
     //TO(sz,i) nd_func.add(lnds[i].nd->name);
 
     Jzon::Node  nd_func = Jzon::array();
-    TO(sz,i) nd_func.add( lg.node(nps[i]->id).nd->name );
+    TO(sz,i) nd_func.add( lg.node(nps[i]->id).node->name );
 
     Jzon::Node    nd_id = Jzon::array();
     TO(sz,i) nd_id.add(nps[i]->id);
@@ -1373,7 +1377,7 @@ void    reloadSharedLibs()
 
   // redo interface node buttons
   for(auto& kv : fd.flow.flow){
-    LavaNode* fn = kv.second;                      // fn is flow node
+    LavaNode*     fn = kv.second;                               // fn is flow node
     auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
     ndBtn->setCallback([fn](){ 
       node_add(fn->name, Node(fn->name, (Node::Type)((u64)fn->node_type), {100,100}) );
@@ -1637,11 +1641,11 @@ ENTRY_DECLARATION
     }
     SECTION(test data init)
     {
-      printf("Arg    size: %lld \n\n", sizeof(LavaVal));
-      printf("Msg    size: %lld \n\n", sizeof(LavaMsg));
-      printf("Packet size: %lld \n\n", sizeof(LavaPacket));
-
-      fd.ui.slot_rad = 15.f;
+      //printf("Arg    size: %lld \n\n", sizeof(LavaVal));
+      //printf("Msg    size: %lld \n\n", sizeof(LavaMsg));
+      //printf("Packet size: %lld \n\n", sizeof(LavaPacket));
+      //
+      //fd.ui.slot_rad = 15.f;
 
       reloadSharedLibs();
 
