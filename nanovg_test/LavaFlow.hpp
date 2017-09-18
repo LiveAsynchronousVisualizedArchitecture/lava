@@ -148,7 +148,7 @@ struct       LavaNode
   const char**      in_types;
   const char**     out_types;
   uint64_t           version;
-  uint64_t                id;
+  //uint64_t                id;
 
   //uint16_t            inputs;       // cache after counting inputs 
   //uint16_t           outputs;       // cache after counting output
@@ -295,7 +295,8 @@ public:
   using SrcMap        =  std::multimap<LavaId, LavaId>;                // maps connections from their single source slot to their one or more destination slots
   //using vec_insts     =  std::vector<NodeInstance>;                    // list of node instances - Id and pointer pairs
   using vec_insts     =  std::vector<LavaInst>;                        // list of node instances - Id and pointer pairs
-  using vec_nptrs     =  std::vector<LavaNode*>;                       // lists used for returning from reloading functions
+  //using vec_nptrs     =  std::vector<LavaNode*>;                       // lists used for returning from reloading functions
+  using vec_nptrs     =  std::vector<LavaInst>;                        // lists used for returning from reloading functions
   using vec_cnptrs    =  std::vector<LavaNode const*>;
   using vec_ids       =  std::vector<LavaId>;
   using NormalizeMap  =  std::unordered_map<uint64_t, uint64_t>;
@@ -331,23 +332,33 @@ private:
     using namespace std;
 
     vec_ids sidxs;                                            // sidxs is slot indexes
-    for(auto np : nds){                                       // np is node pointer and nds is nodes
-      auto si = lower_bound(ALL(m_slots), LavaId(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
-      if(si != end(m_slots)  &&  si->first.nid == np->id){
+    for(auto ni : nds){                                       // ni is Node Instance np is node pointer and nds is nodes
+      auto si = lower_bound(ALL(m_slots), LavaId(ni.id.nid), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
+      if(si != end(m_slots)  &&  si->first.nid == ni.id.nid){
         LavaFlowSlot& s = si->second;
         if(s.in) sidxs.push_back(si->first);
       }
     }
     return sidxs;                                        // RVO
+
+    //vec_ids sidxs;                                            // sidxs is slot indexes
+    //for(auto np : nds){                                       // np is node pointer and nds is nodes
+    //  auto si = lower_bound(ALL(m_slots), LavaId(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
+    //  if(si != end(m_slots)  &&  si->first.nid == np->id){
+    //    LavaFlowSlot& s = si->second;
+    //    if(s.in) sidxs.push_back(si->first);
+    //  }
+    //}
+    //return sidxs;                                        // RVO
   }
   auto       nodeSlots(vec_nptrs const& nds) -> vec_ids
   {
     using namespace std;
 
     vec_ids sidxs;                                            // sidxs is LavaFlowSlot indexes
-    for(auto np : nds){                                     // np is node pointer and nds is nodes
-      auto si = lower_bound(ALL(m_slots), LavaId(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
-      if(si != end(m_slots)  &&  si->first.nid == np->id){
+    for(auto ni : nds){                                       // np is node pointer and nds is nodes
+      auto si = lower_bound(ALL(m_slots), LavaId(ni.id.nid), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
+      if(si != end(m_slots)  &&  si->first.nid == ni.id.nid){
         LavaFlowSlot& s = si->second;
         sidxs.push_back(si->first);        
       }
@@ -520,15 +531,24 @@ public:
   // nodes
   uint64_t    addNode(LavaNode* ln, bool newId=true)
   {
-    if(newId) ln->id = nxt();
-
+    u64 id = nxt();
     if(ln->node_type == LavaNode::MSG)
-      m_msgNodes.push_back(ln->id);
+      m_msgNodes.push_back(id);
 
-    LavaInst li = makeInst(ln->id, ln);
-    return m_nodes.insert({ln->id, li}).first->first;                         // returns a pair that contains the key-value pair
+    LavaInst li = makeInst(id, ln);
+    return m_nodes.insert({id, li}).first->first;                             // returns a pair that contains the key-value pair
 
-    //return m_nodes.insert({ln->id, ln}).first->first;                         // returns a pair that contains the key-value pair
+                                                                              //return m_nodes.insert({ln->id, ln}).first->first;                         // returns a pair that contains the key-value pair
+
+    //if(newId) ln->id = nxt();
+
+    //if(ln->node_type == LavaNode::MSG)
+    //  m_msgNodes.push_back(ln->id);
+
+    //LavaInst li = makeInst(ln->id, ln);
+    //return m_nodes.insert({ln->id, li}).first->first;                       // returns a pair that contains the key-value pair
+
+    ////return m_nodes.insert({ln->id, ln}).first->first;                     // returns a pair that contains the key-value pair
   }
   auto           node(u64 id)  -> LavaInst
   {

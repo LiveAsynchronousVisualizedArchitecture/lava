@@ -278,8 +278,8 @@
 // -todo: fix connection not being deleted when deleting a node downstream - slots weren't being queried correctly
 // -todo: make chained flow nodes pass packets down the line
 // -todo: make LavaGraph store LavaInst structs instead of just nodes pointers with an id
+// -todo: take out id from LavaNode
 
-// todo: take out id from LavaNode
 // todo: put more lib loading in to LavaFlow implementation so that it is done correctly and slots are given the proper index when created in the LavaGraph
 // todo: give tbl memory constructor optional owned and init boolean arguemnts with a count - assert 't' and 'b' at the start if init is false - assert that if init is true, that size/count was also passed a non-default value? no because initializing with a count of 0 should be valid (the tbl can then be pushed into or the map can be used)
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only

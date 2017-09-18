@@ -52,11 +52,11 @@ extern "C"
       FileToStringOutNames,                          // out_names
       FileToStringInTypes,                           // in_types 
       FileToStringOutTypes,                          // out_types 
-      0,                                             // version 
-      0                                              // id
+      0                                              // version 
+      //0                                              // id
     },                                             
 
-    {nullptr, (uint64_t)LavaNode::NONE, nullptr, nullptr, nullptr, nullptr, nullptr, 0, 0}
+    {nullptr, (uint64_t)LavaNode::NONE, nullptr, nullptr, nullptr, nullptr, nullptr, 0}
   };
 
   __declspec(dllexport) LavaNode* GetLavaNodes()
@@ -65,6 +65,7 @@ extern "C"
   }
 
 }
+
 
 
 
