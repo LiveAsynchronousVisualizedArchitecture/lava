@@ -1694,8 +1694,12 @@ ENTRY_DECLARATION
       SECTION(lava graph visualization)
       {
         //fd.graph.curNode = fd.flow.q.top().dest_node;      // todo: race condition
-        //fd.graph.curNode  =  fd.flow.m_curId.nid;          // todo: make atomic, although this may just work since it is only reading 8 bytes
-        fd.graph.curNode  =  fd.flow.getNxtPacketId().nid;
+        //
+        //LavaId nxtPckt = fd.flow.getNxtPacketId();
+        //if(nxtPckt.nid != LavaId::NODE_NONE)
+        //  fd.graph.curNode = nxtPckt.nid;
+        
+        fd.graph.curNode  =  fd.flow.m_curId.nid;          // todo: make atomic, although this may just work since it is only reading 8 bytes
       }
       SECTION(selection)
       {

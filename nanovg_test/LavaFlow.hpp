@@ -152,7 +152,7 @@ struct       LavaNode
   //uint16_t            inputs;       // cache after counting inputs 
   //uint16_t           outputs;       // cache after counting output
 };
-struct LavaInst
+struct       LavaInst
 {
   LavaId         id;
   LavaNode*    node;
@@ -833,6 +833,7 @@ private:
         *outPkt = q.top();
         q.pop();
         packetWritten = true;
+        m_curId = outPkt->dest_node;
       }
     m_qLck.unlock();           // unlock mutex
 
@@ -851,8 +852,13 @@ public:
     
     LavaId ret;
     lock_guard<Mutex>  qLck(m_qLck);
-      ret.nid  = q.top().dest_node;
-      ret.sidx = q.top().dest_slot;
+      if(q.size() > 0){
+        ret.nid  = q.top().dest_node;
+        ret.sidx = q.top().dest_slot;
+      }else{
+        ret.nid  = LavaId::NODE_NONE;
+        ret.sidx = LavaId::SLOT_NONE;
+      }
       return ret;
     // implicit unlock
   }

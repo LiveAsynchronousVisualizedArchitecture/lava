@@ -22,8 +22,15 @@ extern "C"
   {
     using namespace std;
 
-    // output temp string here
     printf("\n File To String called \n");
+
+    // output temp string here
+    const char* tmp = "Temp out str";
+    auto        len = strlen(tmp) + 1;
+    void*       mem = inout_lp->mem_alloc(len);
+    memcpy_s(mem, len, tmp, len);
+    inout_lp->outputs = 1;
+
     this_thread::sleep_for( chrono::milliseconds(500) );
     return 85;
   }
