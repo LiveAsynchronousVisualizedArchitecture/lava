@@ -290,9 +290,8 @@
 //       | assert 't' and 'b' at the start if init is false 
 //       | assert that if init is true, that size/count was also passed a non-default value? no because initializing with a count of 0 should be valid (the tbl can then be pushed into or the map can be used)
 
-// todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
-// todo: fix selection again - figure out all information like the slot and node that's inside, box drag etc click up or down etc, and put it all together at the end 
-// todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array
+// todo: put loop into LavaFlow IMPL - put dependent functions into the anonymous namespace
+// todo: take out LavaId implicit cast from u64
 // todo: use combination of frame, node id and slot as key to simbdb
 //       |  how does that get in to the node, if all the data is in the packet struct? - through the output Args
 //       |  put the index information into the output array and use that 
@@ -301,6 +300,9 @@
 //       |  use a union of bytes that is filled with the frame, slot, list index?
 //       |  use malloc addresses initially
 // todo: put output in simdb
+// todo: break out the loop function?
+// todo: fix selection again - figure out all information like the slot and node that's inside, box drag etc click up or down etc, and put it all together at the end 
+// todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array
 // todo: make the lava allocator passed to a node allocate an extra 8 bytes for the reference count 
 //       |  make sure that extra data at the beggining is treated atomically
 //       |  make sure that memory is allocated aligned to a 64 byte cache line
@@ -310,14 +312,17 @@
 //       | initially just make them thread safe or make them lock with mutexes
 //       | do messages need some sort of 8 byte number to be able to do occasionally do without heap or simdb allocated values?
 // todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
-// todo: put in error checking for connecting dest to dest or src to src?
-// todo: somehow draw slot names and types when slots are moused over
 // todo: change project name to Fissure 
-// todo: transition to better json support to write formatted json/.lava files?
 // todo: make a thread number UI input box
 // todo: use a copy of the graph to clear and update the interface buttons
 // todo: make a function to get a copy of the graph - can check the version number every loop, and if it is higher, get a copy of all the data inside a mutex
+// todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
+//       |  does there need to be a function to copy the instances and connections? - should this ultimatly be used for drawing the graph?
 
+
+// todo: somehow draw slot names and types when slots are moused over
+// todo: transition to better json support to write formatted json/.lava files?
+// todo: put in error checking for connecting dest to dest or src to src?
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
 // todo: make a node to split text into lines and scatter the result
@@ -538,7 +543,8 @@ void    startFlowThreads(u64 num=1)
       //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.frame) );
       //printf("\n packet size: %d \n", (i32)sizeof(LavaPacket) );
 
-      fd.flow.loop();
+      //fd.flow.loop();
+      LavaLoop(fd.flow);
     });
   }
 }

@@ -80,3 +80,16 @@ Concurrency with data structures inside LavaFlow
 |  Look back at atomic vector / atomic array and make it double buffered so that it can be resized without locking
 
 
+Should the function passed be one that inserts a buffer instead of a simple allocation function?
+|  The decision to place the output in memory would then be done in the flow loop
+|  The output would then be placed directly into the db instead of copied to memory and copied to the db
+|  If the output function needs to copy straight from a buffer anyway, would that happen no matter what? 
+|  What happens with Cereal?
+|  |  Cereal uses an archive object so a custom archive object could concievably be created
+|  |  However it seems that likely there would be a serialization step and a copying step
+|  |  A function that could potentially copy straight into the db would still save a copy
+|  Should there be a tbl flatten function that 
+|  Should a lava alloc function and allocator always be used so that if the db isn't needed there is potentially no copy?
+|  |  does this take it back to the same place of always allocating memory and letting the loop store in the db if neccesary?
+
+

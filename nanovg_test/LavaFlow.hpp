@@ -19,7 +19,6 @@
 #include <map>
 #include <queue>
 #include "no_rt_util.h"
-//#include "simdb.hpp"
 #include "tbl.hpp" // temp
 
 #if defined(_WIN32)
@@ -64,12 +63,37 @@ union     LavaArgType{
   enum { NONE=0, END, DATA_ERROR, STORE, MEMORY, SEQUENCE, ENUMERATION };                // todo: does this need store sequence and memory sequence?
   u8 asInt;
 };
+union          LavaId                                                // this Id serves as both a nodeId and LavaFlowSlot index, since a LavaFlowSlot index will alway coordinate with only one node 
+{    
+  static  const u64 NODE_NONE = 0xFFFFFFFFFFFF;                  // 48 bits all set
+  static  const u64 SLOT_NONE = 0xFFFF;                          // 16 bits all set
+
+  struct { 
+    u64  nid : 48;                                       // id is the node id number - This is a unique number for each node that doesn't change. It can refer back to a node since it doesn't represent an ordering or an index into an array 
+    u64 sidx : 16;                                       // idx is the index of the LavaFlowSlot - for a node this is 0
+  };
+  u64 asInt;
+
+  LavaId() : nid(NODE_NONE), sidx(SLOT_NONE) {}
+  LavaId(u64 _id, u64 _idx=SLOT_NONE) : nid(_id), sidx(_idx) {}
+
+  bool   operator==(LavaId  r) const { return nid==r.nid && sidx==r.sidx; }
+  bool    operator<(LavaId const& r)   const {
+    if(nid==r.nid) return sidx < r.sidx;
+    else         return nid  < r.nid;
+  }
+  size_t operator()(LavaId const& _id) const {
+    return std::hash<u64>()(_id.nid) ^ std::hash<u64>()(_id.sidx);
+  }
+};
 struct     LavaParams
-{ // should be 24 bytes
-  u32           inputs;
-  u32          outputs;
-  u64            frame;
-  LavaAlloc  mem_alloc;
+{
+  u32            inputs;
+  u32           outputs;
+  u64             frame;
+  LavaId             id;
+  LavaAlloc   mem_alloc;
+  //LavaPut           put;
 };
 struct        LavaVal
 {
@@ -111,29 +135,6 @@ struct     LavaPacket
     if(framed   != r.framed)   return framed   < r.framed;              // want framed packets to be done first so that their dependencies can be resolved
 
     return msg.id > r.msg.id;
-  }
-};
-union          LavaId                                                // this Id serves as both a nodeId and LavaFlowSlot index, since a LavaFlowSlot index will alway coordinate with only one node 
-{    
- static  const u64 NODE_NONE = 0xFFFFFFFFFFFF;                  // 48 bits all set
- static  const u64 SLOT_NONE = 0xFFFF;                          // 16 bits all set
-
-  struct { 
-    u64  nid : 48;                                       // id is the node id number - This is a unique number for each node that doesn't change. It can refer back to a node since it doesn't represent an ordering or an index into an array 
-    u64 sidx : 16;                                       // idx is the index of the LavaFlowSlot - for a node this is 0
-  };
-  u64 asInt;
-
-  LavaId() : nid(NODE_NONE), sidx(SLOT_NONE) {}
-  LavaId(u64 _id, u64 _idx=SLOT_NONE) : nid(_id), sidx(_idx) {}
-
-  bool   operator==(LavaId  r) const { return nid==r.nid && sidx==r.sidx; }
-  bool    operator<(LavaId const& r)   const {
-    if(nid==r.nid) return sidx < r.sidx;
-    else         return nid  < r.nid;
-  }
-  size_t operator()(LavaId const& _id) const {
-    return std::hash<u64>()(_id.nid) ^ std::hash<u64>()(_id.sidx);
   }
 };
 struct       LavaNode
@@ -278,6 +279,12 @@ template <class T> void    ThreadAllocator<T>::deallocate(T*& p, size_t) const
   p = nullptr;
 }
 // end allocator definitions
+
+// Lava Helper Functions
+
+
+// End Lava Helper Functions
+
 
 class       LavaGraph
 {
@@ -798,12 +805,12 @@ public:
   using MsgNodeVec   =  std::vector<uint64_t>;
   using Mutex        =  std::mutex;
 
-  lava_pathHndlMap        libs;     // libs is libraries - this maps the live path of the shared libary with the OS specific handle that the OS loading function returns
-  lava_nidMap             nids;     // nids is node ids  - this maps the name of the node to all of the graph node ids that use it
-  lava_flowNodes          flow;
-  lava_flowPtrs           ptrs;     // ptrs are the LavaFlowNode pointers - each one needs a unique id so they can be referenced elsewhere 
-  lava_hndlNodeMap      ndptrs;     // ndptrs is node pointers - a map from each handle to the one (zero?) or more LavaFlowNode pointers the shared lib contains
-  lava_nameNodeMap   nameToPtr;     // maps node names to their pointers 
+  lava_pathHndlMap         libs;     // libs is libraries - this maps the live path of the shared libary with the OS specific handle that the OS loading function returns
+  lava_nidMap              nids;     // nids is node ids  - this maps the name of the node to all of the graph node ids that use it
+  lava_flowNodes           flow;
+  lava_flowPtrs            ptrs;     // ptrs are the LavaFlowNode pointers - each one needs a unique id so they can be referenced elsewhere 
+  lava_hndlNodeMap       ndptrs;     // ndptrs is node pointers - a map from each handle to the one (zero?) or more LavaFlowNode pointers the shared lib contains
+  lava_nameNodeMap    nameToPtr;     // maps node names to their pointers 
 
   mutable bool        m_running = false;      // todo: make this atomic
   mutable u64        m_curMsgId = 0;          // todo: make this atomic
@@ -817,7 +824,7 @@ public:
   PacketQueue                q;
   LavaGraph              graph;
 
-private:
+//private:
   u64      incThreadCount()
   {
     return std::atomic_fetch_add( (au64*)&m_threadCount,  1);
@@ -837,9 +844,10 @@ private:
       LavaParams lp;
       SECTION(create arguments and call function)
       {
-        lp.frame       =   m_frame;
         lp.inputs      =     1;
         lp.outputs     =   512;
+        lp.frame       =   m_frame;
+        lp.id          =   LavaId(nid);
         lp.mem_alloc   =   malloc;  // LavaHeapAlloc;
         uint64_t ret   =   msgFunc(&lp, inArgs, outArgs);
 
@@ -851,6 +859,8 @@ private:
         TO(lp.outputs,i)
         {
           if(outArgs[i].type == LavaArgType::NONE){ continue; }
+
+
 
           // create new value for the new packet
           LavaVal val;
@@ -946,60 +956,12 @@ public:
     //  t.join();
     //}
   }
-  void               loop()
-  {
-    using namespace std;
-    const LavaOut defOut = { LavaArgType::NONE, 0, 0, 0, 0 };
-
-    incThreadCount();
-
-    LavaVal    inArgs[LAVA_ARG_COUNT];         // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
-    LavaOut   outArgs[LAVA_ARG_COUNT];         // if the arguments are going to 
-    memset(inArgs,  0, sizeof(inArgs)  );
-    //memset(outArgs, 0, sizeof(outArgs) );
-    TO(LAVA_ARG_COUNT,i){ outArgs[i] = defOut; }
-
-    LavaHeapInit();
-
-    while(m_running)
-    {
-      SECTION(loop through message nodes)
-      {
-        printf("\n lava heap: %llu \n", (u64)lava_thread_heap);
-
-        auto const& mnds = graph.msgNodes();
-        for(auto id : mnds)
-        {
-          m_curId = id;
-
-          LavaParams lp;
-          runFunc(id.nid, &lp, inArgs, outArgs); 
-        }
-        ++m_frame; // todo: rething this and make sure it will work 
-      } // SECTION(loop through message nodes)
-      SECTION(loop through data packets)
-      {
-        LavaPacket pckt;
-        while( nxtPacket(&pckt) )
-        {
-          //this_thread::sleep_for( chrono::milliseconds(1000) );
-
-          m_curId.nid  = pckt.dest_node;
-          m_curId.sidx = pckt.dest_slot;
-
-          LavaParams lp;                                           // get the function from the dest node and put the packets into the dest LavaVal input array // run the function // use the LavaParams output struct to make the LavaOut list packets  // route the packets with the graph (set the dest node and slot)  // put them into the packet queue
-          runFunc(pckt.dest_node, &lp, inArgs, outArgs); 
-        }
-      } // SECTION(loop through data packets)
-    } // while(m_running)
-    decThreadCount();
-  }
   void          pauseLoop(){}
-
-
 };
 
 #if defined(__LAVAFLOW_IMPL__)
+
+#include "simdb.hpp"
 
 // function implementations
 BOOL WINAPI DllMain(
@@ -1027,6 +989,7 @@ BOOL WINAPI DllMain(
   return true;
 }
 
+namespace {
 auto       GetSharedLibPath() -> std::wstring
 {
   using namespace std;
@@ -1170,6 +1133,8 @@ auto       GetFlowNodeLists(lava_hndlvec  const& hndls) -> lava_ptrsvec
 
   return ret;
 }
+}
+
 bool        RefreshFlowLibs(LavaFlow& inout_flow)
 {
   bool     newlibs  =  false;
@@ -1223,6 +1188,55 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow)
   }
 
   return newlibs;
+}
+
+void               LavaLoop(LavaFlow& lf)
+{
+  using namespace std;
+  const LavaOut defOut = { LavaArgType::NONE, 0, 0, 0, 0 };
+
+  lf.incThreadCount();
+
+  LavaVal    inArgs[LAVA_ARG_COUNT];         // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
+  LavaOut   outArgs[LAVA_ARG_COUNT];         // if the arguments are going to 
+  memset(inArgs,  0, sizeof(inArgs)  );
+  //memset(outArgs, 0, sizeof(outArgs) );
+  TO(LAVA_ARG_COUNT,i){ outArgs[i] = defOut; }
+
+  LavaHeapInit();
+
+  while(lf.m_running)
+  {
+    SECTION(loop through message nodes)
+    {
+      printf("\n lava heap: %llu \n", (u64)lava_thread_heap);
+
+      auto const& mnds = lf.graph.msgNodes();
+      for(auto id : mnds)
+      {
+        lf.m_curId = id;
+
+        LavaParams lp;
+        lf.runFunc(id.nid, &lp, inArgs, outArgs); 
+      }
+      ++lf.m_frame; // todo: rething this and make sure it will work 
+    } // SECTION(loop through message nodes)
+    SECTION(loop through data packets)
+    {
+      LavaPacket pckt;
+      while( lf.nxtPacket(&pckt) )
+      {
+        //this_thread::sleep_for( chrono::milliseconds(1000) );
+
+        lf.m_curId.nid  = pckt.dest_node;
+        lf.m_curId.sidx = pckt.dest_slot;
+
+        LavaParams lp;                                           // get the function from the dest node and put the packets into the dest LavaVal input array // run the function // use the LavaParams output struct to make the LavaOut list packets  // route the packets with the graph (set the dest node and slot)  // put them into the packet queue
+        lf.runFunc(pckt.dest_node, &lp, inArgs, outArgs); 
+      }
+    } // SECTION(loop through data packets)
+  } // while(m_running)
+  lf.decThreadCount();
 }
 // end function implementations
 

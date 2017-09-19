@@ -1,8 +1,7 @@
 
 // -todo: try single file libc
 // -todo: make lava thread local allocation
-
-// todo: make FileToString output a test tbl
+// -todo: make FileToString output a test tbl
 
 //#include <cstdio>
 #include "../no_rt_util.h"
