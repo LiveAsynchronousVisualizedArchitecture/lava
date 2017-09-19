@@ -286,8 +286,10 @@
 //       |  should there be a function to run to see if the libs have been changed? a get time of last change? get change version?
 //       |  then would need a way to read the graph back after it has changed - yes, there needs to be a way to pause the execution so the graph can refresh, or at least pause individual nodes so they can be reloaded
 //       |  would just need to clear node buttons and remake them - likely with node_add taking a LavaInst
+// -todo: give tbl memory constructor optional owned and init boolean arguemnts with a count
+//       | assert 't' and 'b' at the start if init is false 
+//       | assert that if init is true, that size/count was also passed a non-default value? no because initializing with a count of 0 should be valid (the tbl can then be pushed into or the map can be used)
 
-// todo: give tbl memory constructor optional owned and init boolean arguemnts with a count - assert 't' and 'b' at the start if init is false - assert that if init is true, that size/count was also passed a non-default value? no because initializing with a count of 0 should be valid (the tbl can then be pushed into or the map can be used)
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
 // todo: fix selection again - figure out all information like the slot and node that's inside, box drag etc click up or down etc, and put it all together at the end 
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array

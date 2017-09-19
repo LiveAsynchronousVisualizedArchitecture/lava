@@ -24,12 +24,6 @@
 // -todo: transition indexed verts to use tbl
 // -todo: make initializer list syntax possible to create pairs of strings and lists of values
 
-// todo: make boolean argument to flatten() to destruct pointed to tables
-// todo: make flatten() recursive 
-// todo: make a const version of operator()
-// todo: should moving a table into a key flatten the tbl and automatically make that tbl a chld? - could work due to realloc - use a dedicated function that does its own realloc? 
-// todo: make sure moving a tmp tbl into a table works - will need to be destructed on flatten AND destructor - need to make moving a tbl in work - owned can still be set - will need a tbl type that isn't a pointer and isn't a child?
-// todo: make simdb convenience function to put in a tbl with a string key
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key
 //       | can casts to c_str() using a single 0 byte after the array work? 
 //       |   if there is a blank key or no map and a 0 byte at the beggining of childData() then the cast to c_str() could work 
@@ -37,6 +31,12 @@
 //       | other formats such as one child tbl containing packed strings and another array containing offsets could also be used 
 //       | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
 //       | does this imply that there should be a separate array type or is specializing string enough? 
+// todo: make boolean argument to flatten() to destruct pointed to tables
+// todo: make flatten() recursive 
+// todo: make a const version of operator()
+// todo: should moving a table into a key flatten the tbl and automatically make that tbl a chld? - could work due to realloc - use a dedicated function that does its own realloc? 
+// todo: make sure moving a tmp tbl into a table works - will need to be destructed on flatten AND destructor - need to make moving a tbl in work - owned can still be set - will need a tbl type that isn't a pointer and isn't a child?
+// todo: make simdb convenience function to put in a tbl with a string key
 
 // todo: break out memory allocation from template - keep template as a wrapper for casting a typeless tbl
 // todo: make resize() - should there be a resize()? only affects array?
@@ -603,9 +603,9 @@ private:
 
     return cnt;
   }
-  void           init(u64 size)
+  void           init(u64 count)
   {
-    u64    szBytes  =  tbl::size_bytes(size);
+    u64    szBytes  =  tbl::size_bytes(count);
     u8*      memst  =  (u8*)malloc(szBytes);                 // memst is memory start
     m_mem           =  memst + memberBytes();
 
@@ -614,8 +614,8 @@ private:
     f->b         = 'b';
     f->sizeBytes = szBytes;
     f->elems     = 0;
-    f->capacity  = size;
-    f->size      = size;
+    f->capacity  = count;
+    f->size      = count;
     f->mapcap    = 0;
     f->owned     = 1;
   }
@@ -716,16 +716,22 @@ public:
   u8*     m_mem;                                                                         // the only member variable - everything else is a contiguous block of memory
  
   tbl() : m_mem(nullptr) {}
-  tbl(void* memst) : m_mem( ((u8*)memst)+memberBytes() )
+  tbl(void* memst, bool _init=false, bool _owned=false, u64 _count=0) : m_mem( ((u8*)memst)+memberBytes() )
   {
-    assert( ((i8*)memStart())[0]=='t' );
-    assert( ((i8*)memStart())[1]=='b' );
+    if(_init){
+      //assert(count > 0);
+      this->init(_count);
+      this->owned(_owned);
+    }else{
+      assert( ((i8*)memStart())[0]=='t' );
+      assert( ((i8*)memStart())[1]=='b' );
+    }
   }
-  tbl(u64 size){ init(size); }                                                           // have to run default constructor here?
-  tbl(u64 size, T const& value)
+  tbl(u64 count){ init(count); }                                                           // have to run default constructor here?
+  tbl(u64 count, T const& value)
   {
-    init(size);
-    TO(size, i){ (*this)[i] = value; }
+    init(count);
+    TO(count, i){ (*this)[i] = value; }
   }
   tbl(std::initializer_list<KV> lst){ initKV(lst); }
   tbl(std::initializer_list<T>  lst){   init(lst); }
