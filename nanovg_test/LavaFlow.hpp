@@ -33,7 +33,7 @@
 // data types
 struct       LavaNode;
 struct     LavaParams;
-struct         LavaVal;
+struct        LavaVal;
 struct        LavaOut;
 union          LavaId;
 class       LavaGraph;
@@ -148,10 +148,6 @@ struct       LavaNode
   const char**      in_types;
   const char**     out_types;
   uint64_t           version;
-  //uint64_t                id;
-
-  //uint16_t            inputs;       // cache after counting inputs 
-  //uint16_t           outputs;       // cache after counting output
 };
 struct       LavaInst
 {
@@ -537,18 +533,6 @@ public:
 
     LavaInst li = makeInst(id, ln);
     return m_nodes.insert({id, li}).first->first;                             // returns a pair that contains the key-value pair
-
-                                                                              //return m_nodes.insert({ln->id, ln}).first->first;                         // returns a pair that contains the key-value pair
-
-    //if(newId) ln->id = nxt();
-
-    //if(ln->node_type == LavaNode::MSG)
-    //  m_msgNodes.push_back(ln->id);
-
-    //LavaInst li = makeInst(ln->id, ln);
-    //return m_nodes.insert({ln->id, li}).first->first;                       // returns a pair that contains the key-value pair
-
-    ////return m_nodes.insert({ln->id, ln}).first->first;                     // returns a pair that contains the key-value pair
   }
   auto           node(u64 id)  -> LavaInst
   {
@@ -935,7 +919,7 @@ private:
 
 public:
   // query 
-  auto getNxtPacketId() -> LavaId
+  auto     getNxtPacketId() -> LavaId
   {
     using namespace std;
     
@@ -1185,6 +1169,71 @@ auto       GetFlowNodeLists(lava_hndlvec  const& hndls) -> lava_ptrsvec
 
   return ret;
 }
+void        RefreshFlowLibs(LavaFlow& inout_flow)
+{
+  auto       paths  =  GetRefreshPaths();
+  auto   livePaths  =  GetLivePaths(paths);
+
+  // coordinate live paths to handles
+  auto liveHandles  =  GetLiveHandles(fd.flow.libs, livePaths);
+
+  // free the handles
+  auto   freeCount  =  FreeLibs(liveHandles); 
+
+  // delete the now unloaded live shared library files
+  auto    delCount  =  RemovePaths(livePaths);  // todo: use this to update the library set version number
+
+  // copy the refresh paths' files
+  auto   copyCount  =  CopyPathsToLive(paths); 
+
+  // load the handles
+  auto loadedHndls  =  LoadLibs(livePaths);
+
+  // put loaded handles into LavaFlow struct
+  TO(livePaths.size(), i){
+    auto h = loadedHndls[i];
+    if(h){
+      inout_flow.libs[livePaths[i]] = h;
+    }
+  }
+
+  // extract the flow node lists from the handles
+  auto flowNdLists = GetFlowNodeLists(loadedHndls);
+
+  // extract the flow nodes from the lists and put them into the multi-map
+  TO(livePaths.size(),i)
+  {
+    LavaNode* ndList = flowNdLists[i];
+    if(ndList){
+      auto const& p = livePaths[i]; 
+      inout_flow.flow.erase(p);                              // delete the current node list for the livePath
+      for(; ndList->func!=nullptr; ++ndList){             // insert each of the LavaFlowNodes in the ndList into the multi-map
+        inout_flow.nameToPtr.erase(ndList->name);
+        inout_flow.nameToPtr.insert( {ndList->name, ndList} );
+        inout_flow.flow.insert( {p, ndList} );
+      }
+    }
+  }
+}
+// end function implementations
+
+// priority queue of packets - sort by frame number, then dest node, then dest slot
+
+// lock free hash table of in flight packets?
+
+#endif // endif for implementation
+
+#endif
+
+
+
+
+
+
+
+
+
+
 //auto  FlattenNodeLists(lava_ptrsvec const& flowNdLists, lava_paths const& livePaths)
 //{
 //  TO(livePaths.size(),i)
@@ -1202,15 +1251,41 @@ auto       GetFlowNodeLists(lava_hndlvec  const& hndls) -> lava_ptrsvec
 //  }
 //}
 
-// end function implementations
+//auto const& p = livePaths[i]; 
+//fd.flow.flow.erase(p);                              // delete the current node list for the livePath
+//for(; ndList->func!=nullptr; ++ndList){             // insert each of the LavaFlowNodes in the ndList into the multi-map
+//  fd.flow.nameToPtr.erase(ndList->name);
+//  fd.flow.nameToPtr.insert( {ndList->name, ndList} );
+//  fd.flow.flow.insert( {p, ndList} );
+//}
+//
+//// delete interface buttons from the nanogui window
+//fd.ui.ndBtns.clear();
+//
+//// redo interface node buttons
+//for(auto& kv : fd.flow.flow){
+//  LavaNode*     fn = kv.second;                               // fn is flow node
+//  auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
+//  ndBtn->setCallback([fn](){ 
+//    node_add(fn->name, Node(fn->name, (Node::Type)((u64)fn->node_type), {100,100}) );
+//  });
+//}
+//fd.ui.screen.performLayout();
+//
+//TO(paths.size(),i) printf("\n %llu : %s \n", i, paths[i].c_str() );
 
-// priority queue of packets - sort by frame number, then dest node, then dest slot
+//return m_nodes.insert({ln->id, ln}).first->first;                         // returns a pair that contains the key-value pair
+//if(newId) ln->id = nxt();
+//
+//if(ln->node_type == LavaNode::MSG)
+//  m_msgNodes.push_back(ln->id);
+//
+//LavaInst li = makeInst(ln->id, ln);
+//return m_nodes.insert({ln->id, li}).first->first;                       // returns a pair that contains the key-value pair
+//
+////return m_nodes.insert({ln->id, ln}).first->first;                     // returns a pair that contains the key-value pair
 
-// lock free hash table of in flight packets?
-
-#endif // endif for implementation
-
-#endif
-
-
-
+//uint64_t                id;
+//
+//uint16_t            inputs;       // cache after counting inputs 
+//uint16_t           outputs;       // cache after counting output

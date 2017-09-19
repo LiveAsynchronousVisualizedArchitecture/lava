@@ -279,12 +279,19 @@
 // -todo: make chained flow nodes pass packets down the line
 // -todo: make LavaGraph store LavaInst structs instead of just nodes pointers with an id
 // -todo: take out id from LavaNode
+// -todo: build in const char* constructor to tbl
 
-// todo: put more lib loading in to LavaFlow implementation so that it is done correctly and slots are given the proper index when created in the LavaGraph
+// todo: make the lib refresh update a library set version number if anything changed - will need to be atomic? - maybe not if there is just one 32 bit writer and one 32 bit reader
+// todo: make a function to get a copy of the graph - can check the version number every loop, and if it is higher, get a copy of all the data inside a mutex
+// todo: use a copy of the graph to clear and update the interface buttons
+// todo: put more lib loading in to LavaFlow implementation so that it is done correctly and slots are given the proper index when created in the LavaGraph - change node_add to take in a LavaInst ?
+//       |  does LavaFlow ultimatly need to load libraries automatically and report back when they've changed?
+//       |  should there be a function to run to see if the libs have been changed? a get time of last change? get change version?
+//       |  then would need a way to read the graph back after it has changed
+//       |  would just need to clear node buttons and remake them - likely with node_add taking a LavaInst
 // todo: give tbl memory constructor optional owned and init boolean arguemnts with a count - assert 't' and 'b' at the start if init is false - assert that if init is true, that size/count was also passed a non-default value? no because initializing with a count of 0 should be valid (the tbl can then be pushed into or the map can be used)
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
 // todo: fix selection again - figure out all information like the slot and node that's inside, box drag etc click up or down etc, and put it all together at the end 
-// todo: build in const char* constructor to tbl
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array
 // todo: use combination of frame, node id and slot as key to simbdb
 //       |  how does that get in to the node, if all the data is in the packet struct? - through the output Args
@@ -1327,7 +1334,6 @@ bool            loadFile(str path, LavaGraph* out_g)
 }
 void    reloadSharedLibs()
 {
-#ifdef _WIN32
   auto       paths  =  GetRefreshPaths();
   auto   livePaths  =  GetLivePaths(paths);
 
@@ -1386,7 +1392,6 @@ void    reloadSharedLibs()
   fd.ui.screen.performLayout();
 
   TO(paths.size(),i) printf("\n %llu : %s \n", i, paths[i].c_str() );
-#endif
 }
 
 void               keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
