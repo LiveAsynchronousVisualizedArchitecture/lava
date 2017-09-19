@@ -810,6 +810,7 @@ public:
   mutable u64           m_frame = 0;          // todo: make this atomic
   mutable LavaId        m_curId = 0;          // todo: make this atomic - won't be used as a single variable anyway
   mutable u64     m_threadCount = 0;          // todo: make this atomic
+  mutable u32           version = 0;
   mutable Mutex          m_qLck;
 
   MsgNodeVec        m_msgNodes;
@@ -1169,19 +1170,25 @@ auto       GetFlowNodeLists(lava_hndlvec  const& hndls) -> lava_ptrsvec
 
   return ret;
 }
-void        RefreshFlowLibs(LavaFlow& inout_flow)
+bool        RefreshFlowLibs(LavaFlow& inout_flow)
 {
+  bool     newlibs  =  false;
   auto       paths  =  GetRefreshPaths();
+  if(paths.size() > 0){
+    newlibs = true;
+    ++inout_flow.version;
+  }
+
   auto   livePaths  =  GetLivePaths(paths);
 
   // coordinate live paths to handles
-  auto liveHandles  =  GetLiveHandles(fd.flow.libs, livePaths);
+  auto liveHandles  =  GetLiveHandles(inout_flow.libs, livePaths);
 
   // free the handles
   auto   freeCount  =  FreeLibs(liveHandles); 
 
   // delete the now unloaded live shared library files
-  auto    delCount  =  RemovePaths(livePaths);  // todo: use this to update the library set version number
+  auto    delCount  =  RemovePaths(livePaths);
 
   // copy the refresh paths' files
   auto   copyCount  =  CopyPathsToLive(paths); 
@@ -1207,13 +1214,15 @@ void        RefreshFlowLibs(LavaFlow& inout_flow)
     if(ndList){
       auto const& p = livePaths[i]; 
       inout_flow.flow.erase(p);                              // delete the current node list for the livePath
-      for(; ndList->func!=nullptr; ++ndList){             // insert each of the LavaFlowNodes in the ndList into the multi-map
+      for(; ndList->func!=nullptr; ++ndList){                // insert each of the LavaFlowNodes in the ndList into the multi-map
         inout_flow.nameToPtr.erase(ndList->name);
         inout_flow.nameToPtr.insert( {ndList->name, ndList} );
         inout_flow.flow.insert( {p, ndList} );
       }
     }
   }
+
+  return newlibs;
 }
 // end function implementations
 

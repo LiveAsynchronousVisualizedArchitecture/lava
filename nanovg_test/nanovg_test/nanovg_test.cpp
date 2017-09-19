@@ -280,15 +280,13 @@
 // -todo: make LavaGraph store LavaInst structs instead of just nodes pointers with an id
 // -todo: take out id from LavaNode
 // -todo: build in const char* constructor to tbl
-
-// todo: make the lib refresh update a library set version number if anything changed - will need to be atomic? - maybe not if there is just one 32 bit writer and one 32 bit reader
-// todo: make a function to get a copy of the graph - can check the version number every loop, and if it is higher, get a copy of all the data inside a mutex
-// todo: use a copy of the graph to clear and update the interface buttons
-// todo: put more lib loading in to LavaFlow implementation so that it is done correctly and slots are given the proper index when created in the LavaGraph - change node_add to take in a LavaInst ?
-//       |  does LavaFlow ultimatly need to load libraries automatically and report back when they've changed?
+// -todo: make the lib refresh update a library set version number if anything changed - will need to be atomic? - maybe not if there is just one 32 bit writer and one 32 bit reader
+// -todo: put more lib loading in to LavaFlow implementation so that it is done correctly and slots are given the proper index when created in the LavaGraph - change node_add to take in a LavaInst ?
+//       |  does LavaFlow ultimatly need to load libraries automatically and report back when they've changed? - can compare .live files with regular libs but ultimatly the controlling program will need to fire the Refresh function
 //       |  should there be a function to run to see if the libs have been changed? a get time of last change? get change version?
-//       |  then would need a way to read the graph back after it has changed
+//       |  then would need a way to read the graph back after it has changed - yes, there needs to be a way to pause the execution so the graph can refresh, or at least pause individual nodes so they can be reloaded
 //       |  would just need to clear node buttons and remake them - likely with node_add taking a LavaInst
+
 // todo: give tbl memory constructor optional owned and init boolean arguemnts with a count - assert 't' and 'b' at the start if init is false - assert that if init is true, that size/count was also passed a non-default value? no because initializing with a count of 0 should be valid (the tbl can then be pushed into or the map can be used)
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
 // todo: fix selection again - figure out all information like the slot and node that's inside, box drag etc click up or down etc, and put it all together at the end 
@@ -315,6 +313,8 @@
 // todo: change project name to Fissure 
 // todo: transition to better json support to write formatted json/.lava files?
 // todo: make a thread number UI input box
+// todo: use a copy of the graph to clear and update the interface buttons
+// todo: make a function to get a copy of the graph - can check the version number every loop, and if it is higher, get a copy of all the data inside a mutex
 
 // todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
@@ -1332,58 +1332,17 @@ bool            loadFile(str path, LavaGraph* out_g)
 
   return true;
 }
-void    reloadSharedLibs()
+bool    reloadSharedLibs()
 {
-  auto       paths  =  GetRefreshPaths();
-  auto   livePaths  =  GetLivePaths(paths);
+  bool newlibs = RefreshFlowLibs(fd.flow);
 
-  // coordinate live paths to handles
-  auto liveHandles  =  GetLiveHandles(fd.flow.libs, livePaths);
+  if(!newlibs) return false;
 
-  // free the handles
-  auto   freeCount  =  FreeLibs(liveHandles); 
-
-  // delete the now unloaded live shared library files
-  auto    delCount  =  RemovePaths(livePaths);
-
-  // copy the refresh paths' files
-  auto   copyCount  =  CopyPathsToLive(paths); 
-
-  // load the handles
-  auto loadedHndls  =  LoadLibs(livePaths);
-
-  // put loaded handles into LavaFlow struct
-  TO(livePaths.size(), i){
-    auto h = loadedHndls[i];
-    if(h){
-      fd.flow.libs[livePaths[i]] = h;
-    }
-  }
-
-  // extract the flow node lists from the handles
-  auto flowNdLists = GetFlowNodeLists(loadedHndls);
-
-  // extract the flow nodes from the lists and put them into the multi-map
-  TO(livePaths.size(),i)
-  {
-    LavaNode* ndList = flowNdLists[i];
-    if(ndList){
-      auto const& p = livePaths[i]; 
-      fd.flow.flow.erase(p);                              // delete the current node list for the livePath
-      for(; ndList->func!=nullptr; ++ndList){             // insert each of the LavaFlowNodes in the ndList into the multi-map
-        fd.flow.nameToPtr.erase(ndList->name);
-        fd.flow.nameToPtr.insert( {ndList->name, ndList} );
-        fd.flow.flow.insert( {p, ndList} );
-      }
-    }
-  }
-
-  // delete interface buttons from the nanogui window
-  fd.ui.ndBtns.clear();
+  fd.ui.ndBtns.clear();                                          // delete interface buttons from the nanogui window
 
   // redo interface node buttons
   for(auto& kv : fd.flow.flow){
-    LavaNode*     fn = kv.second;                               // fn is flow node
+    LavaNode*     fn = kv.second;                                // fn is flow node
     auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
     ndBtn->setCallback([fn](){ 
       node_add(fn->name, Node(fn->name, (Node::Type)((u64)fn->node_type), {100,100}) );
@@ -1391,7 +1350,7 @@ void    reloadSharedLibs()
   }
   fd.ui.screen.performLayout();
 
-  TO(paths.size(),i) printf("\n %llu : %s \n", i, paths[i].c_str() );
+  return true;
 }
 
 void               keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
@@ -2201,6 +2160,56 @@ ENTRY_DECLARATION
 
 
 
+
+
+
+
+//
+//TO(paths.size(),i) printf("\n %llu : %s \n", i, paths[i].c_str() );
+
+//auto       paths  =  GetRefreshPaths();
+//auto   livePaths  =  GetLivePaths(paths);
+//
+//// coordinate live paths to handles
+//auto liveHandles  =  GetLiveHandles(fd.flow.libs, livePaths);
+//
+//// free the handles
+//auto   freeCount  =  FreeLibs(liveHandles); 
+//
+//// delete the now unloaded live shared library files
+//auto    delCount  =  RemovePaths(livePaths);
+//
+//// copy the refresh paths' files
+//auto   copyCount  =  CopyPathsToLive(paths); 
+//
+//// load the handles
+//auto loadedHndls  =  LoadLibs(livePaths);
+//
+//// put loaded handles into LavaFlow struct
+//TO(livePaths.size(), i){
+//  auto h = loadedHndls[i];
+//  if(h){
+//    fd.flow.libs[livePaths[i]] = h;
+//  }
+//}
+//
+//// extract the flow node lists from the handles
+//auto flowNdLists = GetFlowNodeLists(loadedHndls);
+//
+//// extract the flow nodes from the lists and put them into the multi-map
+//TO(livePaths.size(),i)
+//{
+//  LavaNode* ndList = flowNdLists[i];
+//  if(ndList){
+//    auto const& p = livePaths[i]; 
+//    fd.flow.flow.erase(p);                              // delete the current node list for the livePath
+//    for(; ndList->func!=nullptr; ++ndList){             // insert each of the LavaFlowNodes in the ndList into the multi-map
+//      fd.flow.nameToPtr.erase(ndList->name);
+//      fd.flow.nameToPtr.insert( {ndList->name, ndList} );
+//      fd.flow.flow.insert( {p, ndList} );
+//    }
+//  }
+//}
 
 //for(auto& t : fd.flowThreads)
 //{
