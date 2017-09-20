@@ -10,6 +10,7 @@
 //       |  make sure that extra data at the beggining is treated atomically
 //       |  make sure that memory is allocated aligned to a 64 byte cache line
 
+// todo: does the input arg need a slot number? do the slot numbers just need to be used to place it in the array?
 // todo: put packet arguments into the InArgs array and use it to decrement references after the the function has ran
 // todo: make owned memory vector use the thread local allocation
 // todo: use combination of frame, node id and slot as key to simbdb
@@ -101,6 +102,10 @@
 // idea: make drawing order of slots dictated by node order
 // idea: make connection class that keeps two connection arrays, each sorted by src or dest for fast searching
 // idea: keep covariance statistics of input size, output size and time taken
+
+// q: does each node need it's own memory to create a full frame?
+// q: does each node slot need it's own priority queue to put frames together? 
+// q: how is it possible to determine when to run a node with a full frame?
 
 // glew might include windows.h
 #define  WIN32_LEAN_AND_MEAN

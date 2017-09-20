@@ -10,6 +10,12 @@
 //#define LIBC_HPP_IMPL
 //#include "../libc.hpp"
 
+void PrintLavaMem(LavaMem lm)
+{
+  printf("\n addr: %llu  data addr: %llu  ref count: %llu   size bytes: %llu \n", 
+    (u64)(lm.ptr), (u64)(lm.data()), (u64)lm.refCount(), (u64)lm.sizeBytes() );
+}
+
 extern "C"
 {
   const char* FileToStringInNames[]   = {"File Path",    nullptr};
@@ -30,11 +36,20 @@ extern "C"
     //memcpy_s(mem, len, tmp, len);
 
     //tbl<i8> fileStr("Temp out str");
-    auto strTbl  =  tbl<i8>::make_borrowed(inout_lp->mem_alloc, len);
-    inout_lp->outputs = 1;    
-    out[0].type   =  LavaArgType::MEMORY;
-    out[0].value  =  (u64)strTbl.memStart();
+    //auto strTbl  =  tbl<i8>::make_borrowed(inout_lp->mem_alloc, len);
+    //inout_lp->outputs = 1;    
+    //out[0].type   =  LavaArgType::MEMORY;
+    //out[0].value  =  (u64)strTbl.memStart();
 
+    void* p       =  inout_lp->mem_alloc(16);
+    memset(p, 0xcc, 16);
+    inout_lp->outputs = 1;
+    out[0].type   =  LavaArgType::MEMORY;
+    out[0].value  =  (u64)p;
+
+    LavaMem lm = LavaMem::fromDataAddr(out[0].value);
+
+    PrintLavaMem(lm);
     //out[0].value = (u64)mem;
 
     this_thread::sleep_for( chrono::milliseconds(500) );

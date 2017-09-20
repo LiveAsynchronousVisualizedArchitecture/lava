@@ -184,6 +184,13 @@ struct        LavaMem
 
   uint64_t      incRef()     { return ((au64*)ptr)->fetch_add( 1); }
   uint64_t      decRef()     { return ((au64*)ptr)->fetch_add(-1); }
+
+  static LavaMem fromDataAddr(uint64_t addr)                                       // create a LavaMem struct from the address of the start of the data (after the reference count and sizeBytes at the start of the allocation)
+  {
+    LavaMem lm;
+    lm.ptr =  (void*)(addr - sizeof(uint64_t)*2);
+    return lm;
+  }
 };
 // end data types
 
@@ -892,6 +899,12 @@ BOOL WINAPI DllMain(
 
 namespace {
 
+  void PrintLavaMem(LavaMem lm)
+  {
+    printf("\n addr: %llu  data addr: %llu  ref count: %llu   size bytes: %llu \n", 
+      (u64)(lm.ptr), (u64)(lm.data()), (u64)lm.refCount(), (u64)lm.sizeBytes() );
+  }
+
 auto       GetSharedLibPath() -> std::wstring
 {
   using namespace std;
@@ -1079,8 +1092,10 @@ bool                runFunc(LavaFlow& lf, lava_memvec& ownedMem, uint64_t nid, L
         val.value = outArgs[i].value;
         auto sidx = outArgs[i].key.slot;
 
-        LavaMem mem;
-        mem.ptr = (void*)outArgs[i].value;
+        //LavaMem mem;
+        //mem.ptr = (void*)outArgs[i].value;
+        LavaMem mem = LavaMem::fromDataAddr(outArgs[i].value);
+        PrintLavaMem(mem);
         auto szBytes = mem.sizeBytes();
 
         // create new packet 
@@ -1098,13 +1113,13 @@ bool                runFunc(LavaFlow& lf, lava_memvec& ownedMem, uint64_t nid, L
         auto   diCnt  =  di;                                                 // diCnt is destination iterator counter - used to count the number of destination slots this packet will be copied to so that the reference count can be set correctly
         auto    diEn  =  lf.graph.destCnctEnd();
         u64   refCnt  =  0;                                                  // todo: make this part of the allocation
-        for(; diCnt!=diEn && diCnt->first==src; ++diCnt){ ++refCnt; } 
-        basePkt.ref_count = refCnt;                                          // reference count will ultimatly need to be handled very differently, not on a packet basis, since the packets are copied - it should probably be on the value somehow - maybe the allocator passed should allocate an extra 8 bytes for the reference count and that should be treated atomically 
+        //for(; diCnt!=diEn && diCnt->first==src; ++diCnt){ ++refCnt; } 
+        //basePkt.ref_count = refCnt;                                          // reference count will ultimatly need to be handled very differently, not on a packet basis, since the packets are copied - it should probably be on the value somehow - maybe the allocator passed should allocate an extra 8 bytes for the reference count and that should be treated atomically 
 
         for(; di!=diEn && di->first==src; ++di)
         {                                                                    // loop through the 1 or more destination slots connected to this source
           LavaId   pktId = di->second;
-          LavaPacket pkt;                                                    // pkt is packet
+          LavaPacket pkt = basePkt;                                                    // pkt is packet
           pkt.dest_node  = pktId.nid;
           pkt.dest_slot  = pktId.sidx;
 
@@ -1234,22 +1249,42 @@ void               LavaLoop(LavaFlow& lf)
     SECTION(loop through data packets)
     {
       LavaPacket pckt;
-      while( lf.nxtPacket(&pckt) )               // todo: will need to figure out how to get a full frame of packets here instead of simply taking on packet at a time
+      while( lf.nxtPacket(&pckt) )                                        // todo: will need to figure out how to get a full frame of packets here instead of simply taking on packet at a time
       {
         lf.m_curId.nid  = pckt.dest_node;
         lf.m_curId.sidx = pckt.dest_slot;
 
-        LavaParams lp;                                           // get the function from the dest node and put the packets into the dest LavaVal input array // run the function // use the LavaParams output struct to make the LavaOut list packets  // route the packets with the graph (set the dest node and slot)  // put them into the packet queue
+        inArgs[pckt.dest_slot] = pckt.msg.val;
+        LavaParams lp;                                                    // get the function from the dest node and put the packets into the dest LavaVal input array 
+        lp.inputs = 1;
+        
         runFunc(lf, ownedMem, pckt.dest_node, &lp, inArgs, outArgs); 
+        
+        //LavaMem lm;
+        //lm.ptr = (void*)(inArgs[pckt.dest_slot].value - 16);
+        LavaMem lm = LavaMem::fromDataAddr(inArgs[pckt.dest_slot].value);
+        PrintLavaMem(lm);
+        //printf("\n reference count: %llu \n", (u64)lm.refCount() );
+        lm.decRef();
+        //LavaFree((u64)lm.data());
+
+        //inArgs[0].type  = LavaArgType::MEMORY;
+        //TO(lp.inputs,i){
+        //}
       }
     } // SECTION(loop through data packets)
 
     SECTION(partition owned allocations and free those with their reference count at 0)
     {
-      auto zeroRef = partition(ALL(ownedMem), [](auto a){return a.refCount() > 0;} );                          // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
+      for(auto const& lm : ownedMem){
+        PrintLavaMem(lm);
+        //printf("\n reference count: %llu \n", (u64)lm.refCount() );
+      }
 
-      for(; zeroRef != end(ownedMem); ++zeroRef){                                                              // loop through the memory with zero references and free them
-        LavaFree( (uint64_t)zeroRef->ptr );
+      auto zeroRef  = partition(ALL(ownedMem), [](auto a){return a.refCount() > 0;} );                          // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
+      auto freeIter = zeroRef;
+      for(; freeIter != end(ownedMem); ++freeIter){                                                              // loop through the memory with zero references and free them
+        LavaFree( (uint64_t)freeIter->data() );
       }
 
       ownedMem.erase(zeroRef, end(ownedMem));                                                                  // erase the now freed memory
@@ -1281,6 +1316,10 @@ void               LavaLoop(LavaFlow& lf)
 
 
 
+// run the function 
+// use the LavaParams output struct to make the LavaOut list packets  
+// route the packets with the graph (set the dest node and slot)  
+// put them into the packet queue
 
 //tbl<u8> pth( (void*)outArgs[0].value );
 //printf("\n out string %s \n", (char*)pth.data() );

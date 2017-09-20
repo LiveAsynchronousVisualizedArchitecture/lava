@@ -1244,10 +1244,13 @@ public:
   {
     using namespace std;
     
+    
+    auto bytes = tbl::size_bytes(count);
+    //ret.m_mem  = (u8*)alloc( bytes );
+    u8* memSt = (u8*)alloc( bytes );
     tbl ret;
-    auto bytes = size_bytes(count);
-    ret.m_mem  = (u8*)alloc( bytes );
-    ret.init(bytes);
+    ret.m_mem = memSt + tbl::memberBytes();
+    ret.init(count); 
     ret.owned(false);
 
     return move(ret);
