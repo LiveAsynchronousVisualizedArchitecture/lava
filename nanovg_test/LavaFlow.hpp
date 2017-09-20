@@ -29,6 +29,10 @@
 
 #define LAVA_ARG_COUNT 512
 
+#if defined(_WIN32) // todo: actually needs to be done by compiler and not OS
+  namespace fs = std::tr2::sys;                                                             // todo: different compiler versions would need different filesystem paths
+#endif
+
 // data types
 struct       LavaNode;
 struct     LavaParams;
@@ -36,11 +40,7 @@ struct        LavaVal;
 struct        LavaOut;
 union          LavaId;
 class       LavaGraph;
-//union   LavaGraph::Id;
-
-#if defined(_WIN32) // todo: actually needs to be done by compiler
-  namespace fs = std::tr2::sys;                                                             // todo: different compiler versions would need different filesystem paths
-#endif
+struct        LavaMem;
 
 using str                =  std::string;
 using lava_handle        =  HMODULE;                                                      // maps handles to the LavaFlowNode pointers contained in the shared libraries
@@ -54,6 +54,7 @@ using lava_nidMap        =  std::unordered_multimap<std::string, uint64_t>;     
 using lava_flowPtrs      =  std::unordered_set<LavaNode*>;                                // LavaFlowNode pointers referenced uniquely by address instead of using an id
 using lava_ptrsvec       =  std::vector<LavaNode*>;
 using lava_nameNodeMap   =  std::unordered_map<std::string, LavaNode*>;                   // maps the node names to their pointers
+using lava_memvec        =  std::vector<LavaMem>;
 
 extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaVal*, LavaOut*);   // data flow node function
 extern "C" using           LavaAlloc  =  void* (*)(uint64_t);                             // custom allocation function passed in to each node call
@@ -169,6 +170,21 @@ struct   LavaFlowSlot
   //u64 nid; bool in=false; State state=NORMAL;
   //LavaFlowSlot(u64 nId, bool In=false) : nid(nId), in(In), state(NORMAL) {}
 };
+struct        LavaMem
+{
+  using au64 = std::atomic<uint64_t>;
+
+  void* ptr = nullptr;
+
+  uint64_t    refCount()const{ return ((uint64_t*)ptr)[0]; }
+  uint64_t   sizeBytes()const{ return ((uint64_t*)ptr)[1]; }
+  uint64_t&   refCount()     { return ((uint64_t*)ptr)[0]; }
+  uint64_t&  sizeBytes()     { return ((uint64_t*)ptr)[1]; }
+  void*           data()     { return ((uint64_t*)ptr)+2;  }
+
+  uint64_t      incRef()     { return ((au64*)ptr)->fetch_add( 1); }
+  uint64_t      decRef()     { return ((au64*)ptr)->fetch_add(-1); }
+};
 // end data types
 
 // static data segment data
@@ -281,10 +297,7 @@ template <class T> void    ThreadAllocator<T>::deallocate(T*& p, size_t) const
 // end allocator definitions
 
 // Lava Helper Functions
-
-
 // End Lava Helper Functions
-
 
 class       LavaGraph
 {
@@ -410,17 +423,6 @@ private:
 
     return li;
   }
-
-  //auto       errorInst() -> NodeInstance&
-  //{ // default contrutor sets the type to Node::NODE_ERROR
-  //  static NodeInstance ERR_INST;
-  //  return ERR_INST;
-  //}
-  //auto       errorInst() const -> NodeInstance const&
-  //{ // default contrutor sets the type to Node::NODE_ERROR
-  //  static NodeInstance ERR_INST;
-  //  return ERR_INST;
-  //}
 
 public:
   LavaGraph() { init(); }
@@ -558,41 +560,8 @@ public:
     auto nIter = m_nodes.find(id);                                          // nIter is node iterator
     if(nIter == end(m_nodes)) return errorInst();
 
-    //LavaInst ret;
-    //ret.id = nIter->first;
-    //ret.ln = nIter->second;
-    //return ret;
-
     return nIter->second;
   }
-
-  //auto           node(u64 id)  -> NodeInstance
-  //{
-  //  auto nIter = m_nodes.find(id);                                          // nIter is node iterator
-  //  //if(nIter == end(m_nodes)) return errorNode();
-  //  if(nIter == end(m_nodes)) return errorInst();
-  //
-  //  NodeInstance ret;
-  //  ret.id = nIter->first;
-  //  ret.nd = nIter->second;
-  //  return ret;
-  //
-  //  //return nIter->second;
-  //}
-  //auto           node(u64 id) const -> NodeInstance
-  //{
-  //  auto nIter = m_nodes.find(id);                                          // nIter is node iterator
-  //                                                                          //if(nIter == end(m_nodes)) return errorNode();
-  //  if(nIter == end(m_nodes)) return errorInst();
-  //
-  //  NodeInstance ret;
-  //  ret.id = nIter->first;
-  //  ret.nd = nIter->second;
-  //  return ret;
-  //
-  //  //return nIter->second;
-  //}
-
   auto          nodes() const -> vec_insts
   {
     vec_insts nds;
@@ -796,7 +765,6 @@ public:
     return m_destCncts;
   }
 };
-
 struct       LavaFlow
 {
 public:
@@ -824,7 +792,6 @@ public:
   PacketQueue                q;
   LavaGraph              graph;
 
-//private:
   u64      incThreadCount()
   {
     return std::atomic_fetch_add( (au64*)&m_threadCount,  1);
@@ -836,73 +803,6 @@ public:
   uint64_t       nxtMsgId()
   {
     return ++m_curMsgId;
-  }
-  bool            runFunc(uint64_t nid, LavaParams* lp, LavaVal* inArgs,  LavaOut* outArgs) // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
-  {
-    FlowFunc msgFunc = graph[nid].node->func;
-    if(msgFunc){
-      LavaParams lp;
-      SECTION(create arguments and call function)
-      {
-        lp.inputs      =     1;
-        lp.outputs     =   512;
-        lp.frame       =   m_frame;
-        lp.id          =   LavaId(nid);
-        lp.mem_alloc   =   malloc;  // LavaHeapAlloc;
-        uint64_t ret   =   msgFunc(&lp, inArgs, outArgs);
-
-        tbl<u8> pth( (void*)outArgs[0].value );
-        printf("\n out string %s \n", (char*)pth.data() );
-      }
-      SECTION(create packets and put them into packet queue)
-      {
-        TO(lp.outputs,i)
-        {
-          if(outArgs[i].type == LavaArgType::NONE){ continue; }
-
-
-
-          // create new value for the new packet
-          LavaVal val;
-          val.type  = outArgs[i].type;
-          val.value = outArgs[i].value;
-
-          auto sidx = outArgs[i].key.slot;
-
-          // create new packet 
-          LavaPacket basePkt;
-          basePkt.frame       =   m_frame;    // increment the frame on every major loop through both data and message nodes - how to know when a full cycle has passed? maybe purely by message nodes - only increment frame if data is created through a message node cycle
-          basePkt.framed      =   false;      // would this go on the socket?
-          basePkt.src_node    =   nid;
-          basePkt.src_slot    =   sidx;
-          basePkt.msg.id      =   nxtMsgId();
-          basePkt.msg.val     =   val;
-
-          // route the packet using the graph - the packet may be copied multiple times and go to multiple destination slots
-          LavaId   src  =  { nid, sidx };
-          auto      di  =  graph.destCncts(src);                               // di is destination iterator
-          auto   diCnt  =  di;                                                 // diCnt is destination iterator counter - used to count the number of destination slots this packet will be copied to so that the reference count can be set correctly
-          auto    diEn  =  graph.destCnctEnd();
-          u64   refCnt  =  0;                                                  // todo: make this part of the allocation
-          for(; diCnt!=diEn && diCnt->first==src; ++diCnt){ ++refCnt; } 
-          basePkt.ref_count = refCnt;                                          // reference count will ultimatly need to be handled very differently, not on a packet basis, since the packets are copied - it should probably be on the value somehow - maybe the allocator passed should allocate an extra 8 bytes for the reference count and that should be treated atomically 
-
-          for(; di!=diEn && di->first==src; ++di)
-          {                                                                    // loop through the 1 or more destination slots connected to this source
-            LavaId   pktId = di->second;
-            LavaPacket pkt;                                                    // pkt is packet
-            pkt.dest_node  = pktId.nid;
-            pkt.dest_slot  = pktId.sidx;
-
-            m_qLck.lock();            // mutex lock
-              q.push(pkt);            // todo: use a mutex here initially
-            m_qLck.unlock();          // mutex unlock
-          }
-        }
-      } // SECTION(create packets and put them into packet queue)
-      return true;
-    }
-    return false;
   }
   bool          nxtPacket(LavaPacket* outPkt)
   {
@@ -927,8 +827,6 @@ public:
     //LavaPacket pckt = q.top();
   }
 
-
-public:
   // query 
   auto     getNxtPacketId() -> LavaId
   {
@@ -963,6 +861,9 @@ public:
 
 #include "simdb.hpp"
 
+static simdb      db;
+static simdb   vizdb;
+
 // function implementations
 BOOL WINAPI DllMain(
   _In_ HINSTANCE    hinstDLL,
@@ -990,6 +891,7 @@ BOOL WINAPI DllMain(
 }
 
 namespace {
+
 auto       GetSharedLibPath() -> std::wstring
 {
   using namespace std;
@@ -1043,7 +945,7 @@ auto        GetRefreshPaths() -> lava_paths
 
   return paths;
 }
-uint64_t    CopyPathsToLive(lava_paths    const& paths)
+uint64_t    CopyPathsToLive(lava_paths       const& paths)
 {
   using namespace std;
   using namespace  fs;
@@ -1066,7 +968,7 @@ uint64_t    CopyPathsToLive(lava_paths    const& paths)
 
   return count;
 }
-uint64_t        RemovePaths(lava_paths    const& paths)
+uint64_t        RemovePaths(lava_paths       const& paths)
 {
   using namespace std;
   using namespace  fs;
@@ -1078,7 +980,7 @@ uint64_t        RemovePaths(lava_paths    const& paths)
 
   return count;
 }
-auto               LoadLibs(lava_paths    const& paths) -> lava_hndlvec
+auto               LoadLibs(lava_paths       const& paths) -> lava_hndlvec
 {
   lava_hndlvec hndls(paths.size(), 0);
 
@@ -1089,7 +991,7 @@ auto               LoadLibs(lava_paths    const& paths) -> lava_hndlvec
 
   return hndls;
 }
-uint64_t           FreeLibs(lava_hndlvec  const& hndls)
+uint64_t           FreeLibs(lava_hndlvec     const& hndls)
 {
   uint64_t count = 0;
   for(auto const& h : hndls){
@@ -1097,7 +999,7 @@ uint64_t           FreeLibs(lava_hndlvec  const& hndls)
   }
   return count;
 }
-auto           GetLivePaths(lava_paths    const& paths) -> lava_paths 
+auto           GetLivePaths(lava_paths       const& paths) -> lava_paths 
 {
   using namespace std;
   using namespace  fs;
@@ -1109,7 +1011,7 @@ auto           GetLivePaths(lava_paths    const& paths) -> lava_paths
 
   return ret;
 }
-auto         GetLiveHandles(lava_pathHndlMap  const& hndls, lava_paths const& paths) -> lava_hndlvec
+auto         GetLiveHandles(lava_pathHndlMap const& hndls, lava_paths const& paths) -> lava_hndlvec
 {
   lava_hndlvec ret;
   for(auto const& p : paths){
@@ -1119,7 +1021,7 @@ auto         GetLiveHandles(lava_pathHndlMap  const& hndls, lava_paths const& pa
 
   return ret;
 }
-auto       GetFlowNodeLists(lava_hndlvec  const& hndls) -> lava_ptrsvec
+auto       GetFlowNodeLists(lava_hndlvec     const& hndls) -> lava_ptrsvec
 {
   lava_ptrsvec ret(hndls.size(), nullptr);
   TO(hndls.size(),i){
@@ -1133,8 +1035,115 @@ auto       GetFlowNodeLists(lava_hndlvec  const& hndls) -> lava_ptrsvec
 
   return ret;
 }
+
+void*             LavaAlloc(uint64_t sizeBytes)
+{
+  uint64_t* mem = (uint64_t*)malloc(sizeBytes + sizeof(uint64_t)*2);
+  mem[0]  =  0;              // reference count
+  mem[1]  =  sizeBytes;      // number of bytes of main allocation
+
+  return (void*)(mem + 2);  // sizeof(uint64_t)*2);
+}
+void               LavaFree(uint64_t addr)
+{
+  void* p = (void*)(addr - sizeof(uint64_t)*2);
+  free(p);
+  //LavaHeapFree(p);
 }
 
+bool                runFunc(LavaFlow& lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaVal* inArgs,  LavaOut* outArgs) // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
+{
+  FlowFunc msgFunc = lf.graph[nid].node->func;
+  if(msgFunc){
+    LavaParams lp;
+    SECTION(create arguments and call function)
+    {
+      lp.inputs      =     1;
+      lp.outputs     =   512;
+      lp.frame       =   lf.m_frame;
+      lp.id          =   LavaId(nid);
+      lp.mem_alloc   =   LavaAlloc;                             //lp.mem_alloc   =   malloc;  // LavaHeapAlloc;
+
+      uint64_t ret   =   msgFunc(&lp, inArgs, outArgs);
+
+    }
+    SECTION(create packets and put them into packet queue)
+    {
+      TO(lp.outputs,i)
+      {
+        if(outArgs[i].type == LavaArgType::NONE){ continue; }
+
+        // create new value for the new packet
+        LavaVal val;
+        val.type  = outArgs[i].type;
+        val.value = outArgs[i].value;
+        auto sidx = outArgs[i].key.slot;
+
+        LavaMem mem;
+        mem.ptr = (void*)outArgs[i].value;
+        auto szBytes = mem.sizeBytes();
+
+        // create new packet 
+        LavaPacket basePkt;
+        basePkt.frame       =   lf.m_frame;            // increment the frame on every major loop through both data and message nodes - how to know when a full cycle has passed? maybe purely by message nodes - only increment frame if data is created through a message node cycle
+        basePkt.framed      =   false;                 // would this go on the socket?
+        basePkt.src_node    =   nid;
+        basePkt.src_slot    =   sidx;
+        basePkt.msg.id      =   lf.nxtMsgId();
+        basePkt.msg.val     =   val;
+
+        // route the packet using the graph - the packet may be copied multiple times and go to multiple destination slots
+        LavaId   src  =  { nid, sidx };
+        auto      di  =  lf.graph.destCncts(src);                            // di is destination iterator
+        auto   diCnt  =  di;                                                 // diCnt is destination iterator counter - used to count the number of destination slots this packet will be copied to so that the reference count can be set correctly
+        auto    diEn  =  lf.graph.destCnctEnd();
+        u64   refCnt  =  0;                                                  // todo: make this part of the allocation
+        for(; diCnt!=diEn && diCnt->first==src; ++diCnt){ ++refCnt; } 
+        basePkt.ref_count = refCnt;                                          // reference count will ultimatly need to be handled very differently, not on a packet basis, since the packets are copied - it should probably be on the value somehow - maybe the allocator passed should allocate an extra 8 bytes for the reference count and that should be treated atomically 
+
+        for(; di!=diEn && di->first==src; ++di)
+        {                                                                    // loop through the 1 or more destination slots connected to this source
+          LavaId   pktId = di->second;
+          LavaPacket pkt;                                                    // pkt is packet
+          pkt.dest_node  = pktId.nid;
+          pkt.dest_slot  = pktId.sidx;
+
+          mem.incRef();
+
+          lf.m_qLck.lock();              // mutex lock
+            lf.q.push(pkt);              // todo: use a mutex here initially
+          lf.m_qLck.unlock();            // mutex unlock
+        }
+
+        ownedMem.push_back(mem);
+
+        //tbl<u8> pth( (void*)outArgs[0].value, false);
+        //pth.owned(false);
+        //
+        //auto szBytes = pth.sizeBytes();
+        //
+        //auto szBytes = ((uint64_t*)outArgs[i].value)[-1];
+        //
+        //db.put(outArgs[i].key.bytes, sizeof(LavaOut::key), (void*)outArgs[i].value, (u32)szBytes);
+        //
+        //LavaFree( outArgs[i].value );
+      }
+    } // SECTION(create packets and put them into packet queue)
+    SECTION(loop through inputs and decrement their references now that the function is done)
+    {
+    }
+    return true;
+  }
+  return false;
+}
+
+}
+
+void               LavaInit()
+{
+  new (&db)     simdb("lava_db", 4096, 65536);
+  new (&vizdb)  simdb("viz_db",  4096, 65536);
+}
 bool        RefreshFlowLibs(LavaFlow& inout_flow)
 {
   bool     newlibs  =  false;
@@ -1189,11 +1198,12 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow)
 
   return newlibs;
 }
-
 void               LavaLoop(LavaFlow& lf)
 {
   using namespace std;
   const LavaOut defOut = { LavaArgType::NONE, 0, 0, 0, 0 };
+
+  lava_memvec ownedMem;                           // todo: make this a thread local memory allocation 
 
   lf.incThreadCount();
 
@@ -1217,31 +1227,47 @@ void               LavaLoop(LavaFlow& lf)
         lf.m_curId = id;
 
         LavaParams lp;
-        lf.runFunc(id.nid, &lp, inArgs, outArgs); 
+        runFunc(lf, ownedMem, id.nid, &lp, inArgs, outArgs); 
       }
-      ++lf.m_frame; // todo: rething this and make sure it will work 
+      ++lf.m_frame; // todo: rethink this and make sure it will work 
     } // SECTION(loop through message nodes)
     SECTION(loop through data packets)
     {
       LavaPacket pckt;
-      while( lf.nxtPacket(&pckt) )
+      while( lf.nxtPacket(&pckt) )               // todo: will need to figure out how to get a full frame of packets here instead of simply taking on packet at a time
       {
-        //this_thread::sleep_for( chrono::milliseconds(1000) );
-
         lf.m_curId.nid  = pckt.dest_node;
         lf.m_curId.sidx = pckt.dest_slot;
 
         LavaParams lp;                                           // get the function from the dest node and put the packets into the dest LavaVal input array // run the function // use the LavaParams output struct to make the LavaOut list packets  // route the packets with the graph (set the dest node and slot)  // put them into the packet queue
-        lf.runFunc(pckt.dest_node, &lp, inArgs, outArgs); 
+        runFunc(lf, ownedMem, pckt.dest_node, &lp, inArgs, outArgs); 
       }
     } // SECTION(loop through data packets)
+
+    SECTION(partition owned allocations and free those with their reference count at 0)
+    {
+      auto zeroRef = partition(ALL(ownedMem), [](auto a){return a.refCount() > 0;} );                          // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
+
+      for(; zeroRef != end(ownedMem); ++zeroRef){                                                              // loop through the memory with zero references and free them
+        LavaFree( (uint64_t)zeroRef->ptr );
+      }
+
+      ownedMem.erase(zeroRef, end(ownedMem));                                                                  // erase the now freed memory
+    }
   } // while(m_running)
+
+  SECTION(loop through allocations and wait for their ref counts to be zero before exiting the loop)
+  {
+    // will the allocations need to be freed here like the normal deallocation loop?
+  }
+
   lf.decThreadCount();
 }
 // end function implementations
 
-// priority queue of packets - sort by frame number, then dest node, then dest slot
 
+// priority queue of packets - sort by frame number, then dest node, then dest slot
+//
 // lock free hash table of in flight packets?
 
 #endif // endif for implementation
@@ -1256,6 +1282,67 @@ void               LavaLoop(LavaFlow& lf)
 
 
 
+//tbl<u8> pth( (void*)outArgs[0].value );
+//printf("\n out string %s \n", (char*)pth.data() );
+
+//auto i = mem.size() - 1;
+//while( mem[i].refCount() < 1 ){ --i; }
+//
+//sort(ALL(mem), [](auto a,auto b){return a.refCount() > b.refCount();} );
+//auto sz = mem.size();
+//TO(sz,i){
+//  if( mem[i].refCount() < 1 ){
+//  }
+//}
+
+//
+//union   LavaGraph::Id;
+
+//auto       errorInst() -> NodeInstance&
+//{ // default contrutor sets the type to Node::NODE_ERROR
+//  static NodeInstance ERR_INST;
+//  return ERR_INST;
+//}
+//auto       errorInst() const -> NodeInstance const&
+//{ // default contrutor sets the type to Node::NODE_ERROR
+//  static NodeInstance ERR_INST;
+//  return ERR_INST;
+//}
+
+//LavaInst ret;
+//ret.id = nIter->first;
+//ret.ln = nIter->second;
+//return ret;
+
+//auto           node(u64 id)  -> NodeInstance
+//{
+//  auto nIter = m_nodes.find(id);                                          // nIter is node iterator
+//  //if(nIter == end(m_nodes)) return errorNode();
+//  if(nIter == end(m_nodes)) return errorInst();
+//
+//  NodeInstance ret;
+//  ret.id = nIter->first;
+//  ret.nd = nIter->second;
+//  return ret;
+//
+//  //return nIter->second;
+//}
+//auto           node(u64 id) const -> NodeInstance
+//{
+//  auto nIter = m_nodes.find(id);                                          // nIter is node iterator
+//                                                                          //if(nIter == end(m_nodes)) return errorNode();
+//  if(nIter == end(m_nodes)) return errorInst();
+//
+//  NodeInstance ret;
+//  ret.id = nIter->first;
+//  ret.nd = nIter->second;
+//  return ret;
+//
+//  //return nIter->second;
+//}
+
+//
+//this_thread::sleep_for( chrono::milliseconds(1000) );
 
 //auto  FlattenNodeLists(lava_ptrsvec const& flowNdLists, lava_paths const& livePaths)
 //{

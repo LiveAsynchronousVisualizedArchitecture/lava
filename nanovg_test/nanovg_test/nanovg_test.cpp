@@ -1,297 +1,17 @@
 
-// -todo: fix selection of slots
-// -todo: make a deselect all function that clears globals and calls fd.grph.clearSels()
-// -todo: fix deselection of slots
-// -todo: organized graphdb functions according to which part they operate on
-// -todo: change graphdb private variables to use m_
-// -todo: try renaming types with upper case first letter
-// -todo: fix slots not staying selected - slots clicked need to turn off clearSelection - clearSelection turned off on left click up when inside a slot
-// -todo: solve assert(win==NULL) on window resize - was using void* attached to glfw instead of static state
-// -todo: fix in/dest connections when not connected
-// -todo: make selection of one dest and one src slot trigger connection create 
-// -todo: make a GraphDB function that toggles a selection on or off
-// -todo: make drawing of one src to multiple connections draw first to the average of all the slots, then draw to all the dest slots - works and works well
-// -todo: use previous drawing technique for connection to one in/dest slot
-// -todo: make bnd also work for message passing nodes
-// -todo: debug toggle killing all connection drawing - just needed to only delete the outCncts that had the same dest
-// -todo: make graphToStr and saveFile use graphdb
-// -todo: make strToGraph and loadFile use graphdb
-// -todo: make box selection stick - needed to check if the box was being dragged before drgBox gets set to false for the left mouse button not being down 
-// -todo: make slots part of file writing 
-// -todo: make slots part of file reading
-// -todo: make node type part of file writing
-// -todo: make node type part of file reading
-// -todo: put node type into written file
-// -todo: change m_inCncts to unordered_map instead of multi-map
-// -todo: make a delete node function - will need to find the slots on the node and the connections on the slots, then delete the connection, then delete the slot then delete the node
-// -todo: make 'delete' and 'backspace' delete selected nodes
-// -todo: make 'delete' and 'backspace' delete selected connections
-// -todo: add data to node for inputs - slots not done with per node data
-// -todo: add data to connection for input and output indices - connections done with maps
-// -todo: print to console with ReadFile.cpp function - not sure what this was about
-// -todo: make a node Id map that maps ids on to the ordered node set
-// -todo: change nodes to be a set or ordered set that counts from 1 on on every node creation
-// -todo: make bnd part of Node struct
-// -todo: take out bnd array
-// -todo: figure out node creation in main loop - was deleting with new order, which didn't delete anything
-// -todo: fix selection turning off on click and drag of node
-// -todo: fix node movement and drawing 
-// -todo: make main loop use an array of node pointers
-// -todo: make bounds be properly set in main loop
-// -todo: fix srcSlot() function to fix slot movement so that in/dest slot ends up on the node - actual problem was that the node id was being compared to nsz() so ever increasing node IDs quickly go out of the bounds of the size of the node structure
-// -todo: test saving 
-// -todo: test connection drawing 
-// -todo: test multiple nodes
-// -todo: make sure NodeSlotMap is a map from a node Id to a slot index and not from a node index to a slot index - if Slot::id is a node id then the NodeSlotMap will be a node.id -> slotIdx map
-// -todo: debug file save not writing node four text and writing an empty string - needed to use the node pointer vector or iterate over nodes - using an index won't get all the nodes because they are looked up by ID now
-// -todo: test loading - seems to work
-// -todo: make selected a boolean in the Node struct since there is no linear ordering with the node being a map based on order with access based on an unordered_map based on id
-// -todo: test node deletions again - slot deletion is problematic due to linear indexing
-// -todo: investigate making slots into an unordered set - is this neccesary for proper slot deletion?  what data and access is needed ?
-//       |- a slot struct has a node id associated with it - a node can have multiple slots - slots are going to be accessed by the node id they are attached to - slots can not exist without a node - a node.id to slot multi-map should hold all the slots?
-//       |- how do connections access the slots? they have a slot index - should slots have a unique Id also? - if slots are deleted in the linear indexed vector, all their positions change and their indices are invalidated 
-//       |- slots don't need to be ordered - need to be accessed by their own id and by their node id - if slots are always part of a particular node, should their id be a subset of the nodeID? should there only be one id between them? - should one struct hold a 48 bit integer and a 16 bit integer for slots?
-//       |- when drawing slots, use a ranged lookup (lower_bound) to find all slots that have that the same node? 
-//       |- lookup slots when drawing by a multi-map of slotId -> to nodeOrder - look up actual slots with an Id to slot unordered_map
-// -todo: debug slots not drawing - needed lower bound instead of exact search for node id
-// -todo: debug slot movement - needed to use a reference to the iterator so that the internal slot could be modified and wouldn't be copied
-// -todo: redo clearSelected loop over slots
-// -todo: put fps in the upper right corner
-// -todo: try gui button layout horizontal across the top
-// -todo: fix slot disappearing after normalization - find() with only a node id doesn't find the exact slot - need lower_bound through a call to nodeSlots()
-// -todo: make saving normalize the node id numbers - make normalize function
-// -todo: correct unconnected src slot drawing
-// -todo: change global selection variables to be Id
-// -todo: test and fix connection creation - crashes - NaNs fixed and infinite loop fixed
-// -todo: test node deletion
-// -todo: fix deletion of src node hanging connection
-// -todo: fix crashing on deletion of node with src slot and connection - for loop was incrementing iterator after it had been invalidated by m_destCncts.erase()
-// -todo: fix crash on node deletion when src node has 2 connections - deleting from destCncts multi-map only needs to happen once since it will match all the connections to that src slot
-// -todo: fix crash on deletion of dest node when connected to a multi-connected node - delDestCnct needed to be redone after underlying data structure changes
-// -todo: try multiple nodes and connections
-// -todo: redo delNode() - delSelection works for now
-// -todo: fix and put back yellow highlighting of slots that are selected - for loop needed to use auto& so that the slot state could be altered
-// -todo: make click in blank space clear selections - needed to do more than just test drgbox boolean - made a hasLen() function of bound that makes sure there is positive length of the bounding box
-// -todo: retest saving
-// -todo: fix in/dest slots pointing the wrong way - negated normal in case of no connection
-// -todo: fix slots not moving around borders - in/dest slot finding was done in the src case
-// -todo: put back intermediate position with multiple connections
-// -todo: fix node becoming deselected after drag - inAny was being combined with clicks
-// -todo: make sure normalization also normalizes ordering
-// -todo: fix connections disappearing on saving/normalization - need to use an unordered_map to associate Ids
-// -todo: figure out why src slot stops pointing toward dest after normalization - m_destCncts loop was switching src and dest
-// -todo: fix high numbers in connection saving - Id struct being cast to an integer? - yes, but it is intentional serialization
-// -todo: make loading find the highest node id and set the current id of the GraphDB
-// -todo: fix drag selection from clearing selections - put back check for drgbox == true to clear selections with addition of drgbox && lftClkUp
-// -todo: clean comments to graveyard
-// -todo: separate connection node ids and slot indices - have to do the same thing for slots?
-// -todo: investigate crash on drawing after file load - possibly doesn't work due to javascript having double as a number limitation
-// -todo: write node index to json file
-// -todo: write order array with nodes - is the order in the file good enough - should be since add node will increment the order
-// -todo: add idx to addSlot()
-// -todo: figure out why slot types get flipped when loading file - addNode() needed newId to have false passed to it
-// -todo: write slot indices into json file
-// -todo: test saving and loading with normalization back on
-// -todo: debug flashing connections - possibly due to numeric error handling - have to repeat first - can't repeat
-// -todo: fix duplicate connections being created - delCnct needed to be redone after switching cncts and destCncts
-// -todo: make clear_selections clear selected slots - clear_selections not triggering right, split out clearing slots into separate function
-// -todo: draw bg grid
-// -todo: make function to modularize drawing a bezier from one slot to another with normals
-// -todo: make addSlot check for current slots to make its slot index sequential
-// -todo: clean comments out of main functions
-// -todo: profile - all time coming from nvg drawing functions
-// -todo: test two slots - two connections can be made to one dest
-// -todo: fix multiple connections to a single dest - made toggleCnct delete any connections to the dest Id
-// -todo: group ui state variables together - priSel, secSel, slot selections
-// -todo: fix warnings
-// -todo: make io_rad into slot_rad in FisData
-// -todo: put color and border size drawing constants into FisData as variables
-// -todo: put mouse state and prev mouse state variable into FisData
-// -todo: group global input state variables into FisData
-// -todo: take out unused functions
-// -todo: fix connections not getting deleted - toggle was doing delCnt twice instead of once and checking the return value
-// -todo: put message node colors into FisData
-// -todo: make selected color for message passing nodes
-// -todo: take color argument out of node_draw
-// -todo: make node size draw using node bnds
-// -todo: put up screen shot on github
-// -todo: try without libc - linking in opengl32.lib works for openGL symbols - some C++ like operator new and possibly vtables, vector constructor, basic_ostream 
-// -todo: try a smaller font for buttons - works
-// -todo: change slot movement to follow node bnds
-// -todo: make nodes smaller 
-// -todo: take out NODE_SZ
-// -todo: get message passing nodes to draw correctly after no longer using NODE_SZ - node bounds cycles down for some reason
-// -todo: put slots on message passing node
-// -todo: make slot on message node be correct - works automatically
-// -todo: make connection creation destroy current connection to dest and create new connection
-// -todo: make a LavaFlow struct be part of FissureData
-// -todo: make shared libarary loading copy file to lava_ .live.dll 
-// -todo: test library freeing and loading 
-// -todo: put loaded lib handles into LavaFlow struct
-// -todo: make function to extract the flow nodes lists from the handles
-// -todo: make loop to extract the individual LavaFlowNodes from the lists and put them into the multi-map
-// -todo: replace the LavaFlowNode structs of the loaded libs
-// -todo: make shared libraries with lava_ be automatically loaded
-// -todo: test shared lib loading speed in release mode - faster but still slow
-// -todo: make loaded dll add a button to the gui
-// -todo: build in data structure to hold node buttons - holds button pointers
-// -todo: build in data structure to hold function states - will the C++ function object will hold state from a lamda object, making the Button class own the memory?
-// -todo: organize the LavaFlow.hpp file
-// -todo: make LoadSharedLibraries into:
-//       -a function to say which libraries need to be refreshed
-//       -a function copy the libraries 
-//       -a function to unload the libraries 
-//       -a function to load them again
-// -todo: make GetRefreshPaths() avoid .live files
-// -todo: use path of binary for the root path
-// -todo: reorganize LavaFlow to group all similar declarations and implementations together
-// -todo: make functions that will need to be used by nodes inline and part of the declarations (like the per thread allocators)
-// -todo: separate drawing and node bounds calculation
-// -todo: fix all nodes being drawn as message nodes - bounds not being set right
-// -todo: take out all UI from LavaFlowGraph
-//       -| node order is UI only
-//       -| node position and bnd are UI only
-//       -| slots position and normal are UI only
-//       -| node selected bool is UI only 
-//       -| slot selection is UI only
-// -todo: move LavaNodeType global enum class into LavaNode - not used in many places
-// -todo: make NodeMap into Nodes type and unordered_map
-// -todo: merge LavaNode with graph node - LavaFlowNode used in separate LavaFlowGraph
-// -todo: make a data structure for the graph UI
-//       | node order is UI only
-//       | node position and bnd are UI only
-//       | slots position and normal are UI only
-//       | node selected bool is UI only 
-//       | slot selection is UI only
-//       | node txt label needs to be created
-// -todo: separate node into a NodeUi struct - make a Node struct - node struct almost unchanged
-// -todo: put minimized graphdb into LavaFlow.hpp
-// -todo: transition lava_nodePtrs to be a set with handles referenced by their node's address
-// -todo: make a LavaNode instance struct
-//       | what data does it need?  LavaFlowNode pointer?, id?, index into the map of the lava flow node pointers? 
-//       | NodeInstance struct as part of LavaFlowGraph - just used for returning a pair of id and LavaFlowNode pointer  - these are store as key value pairs in the Nodes map
-// -todo: make sure LavaFlowNode is only used as a pointer in LavaFlowGraph - need to separate LavaFlowNode pointers from instances
-// -todo: abstract OS specific handle into lava_handle
-// -todo: make sure to store the LavaNodePointers in a multi-map indexed by handles
-// -todo: merge node and LavaFlowNode
-// -todo: figure out why button is not created on load - does the UI need to be set up before the reloadSharedLibs() function is called and ultimatly the test data is set up? - seems to be the case
-// -todo: put shared lib reloading into a function
-// -todo: draw a single node using the LavaGraph
-// -todo: make dynamic FileToString button work
-// -todo: make clear_selections clear the node map
-// -todo: need to re-implement a function to get nodes
-// -todo: build ordering back in 
-// -todo: re-implement moveToFront()
-// -todo: figure out why dragging moves all nodes - node.id may be out of sync with actual map id - yes
-// -todo: fix nodes becoming unselected on left click up while still in the node - need to clear primary selection on lftClkUp
-// -todo: transition to using a UI only slot structure to draw slots - can't draw src slots correctly until connections are transitioned
-// -todo: make a separate class to hold UI information about nodes - position, bounds, UI name (node text) - inside FisData in graph
-// -todo: fix cnct_draw function to use LavaFlow graph - actually the setup and arguments before calling cnct_draw
-// -todo: transition to using the LavaFlowGraph for drawing connections
-// -todo: make a get_slot() function
-// -todo: get slot movements to use LavaGraph for connections
-// -todo: fix multiple selection on click
-// -todo: fix selections - some fixed 
-// -todo: change LavaId id and idx to nid and sidx
-// -todo: transition to using the LavaGraph for connections 
-//       -| mirror node instances to the LavaGraph
-//       -| add connections to both graphs
-// -todo: make types to deal with what the UI needs for drawing 
-//       -| only needs the graph to find the slots that are attached to each node
-//       -| can this be cached ? - not neccesary yet or ever - remember that there will only be a dozen to a couple hundred nodes at most
-// -todo: fix dual selections
-// -todo: clean up comments
-// -todo: make node_add add ordr
-// -todo: take out GraphDB completely
-// -todo: make drawing use node ordering - does get nodes need to use the order array? - yes, along with node_nxtOrder being corrected
-// -todo: make sel_clear()
-// -todo: make delSelected again - make sel_delete() - fix sel_delete() - needed to erase from order set and node map
-// -todo: make slot_add only take a slot as argument
-// -todo: put back multiple slots
-// -todo: put back test connections
-// -todo: fix slot selections not becoming unselected 
-// -todo: port slot finding node over - slot_findAll
-// -todo: fix slot drawing - needed to use lower_bound in some form to just compare the node id 
-// -todo: figure out why toggleCnct is called twice - sel_clearSlots was not setting slot selections to SLOT_NONE
-// -todo: fix connection creation
-// -todo: test multiple nodes and connections - seems to work 
-// -todo: fix message node bounds - simple MSG check in Node constructor
-// -todo: convert strToGraph() and saveFile()
-// -todo: convert graphToStr()
-// -todo: build function name in to file saving
-// -todo: test loading and saving
-// -todo: fix LavaGraph normalizeIndices() - slot idx was not being passed through and was SLOT_NONE after remap
-// -todo: fix duplicate LavaGraph slot indices - nxtSlotIdx needed a node index as an argument
-// -todo: fix normalizeIndices() - actually need to implement normalizeIndices for ui graph
-// -todo: fix dest slots not moving - only after save? yes - all slots get turned to be src/out ?  - normalize indices sets all slots.in to false
-// -todo: make node text smaller
-// -todo: make text size a variable in the graph struct
-// -todo: make a button to designate the entry point
-// -todo: make entry button check that the selection is not negative and that it is a MSG node - check for node selection and not primary selection
-// -todo: ignore node clicks when clicking on a slot
-// -todo: figure out why click down outside a node clears the selection - drag box was deciding selections immediatly
-// -todo: make node selection stay when lftClkDn is not inside a node
-// -todo: make dragbox unselect all only on lftClkUp and no drag selects
-// -todo: make a message node designated as an entry point in LavaGraph - is this neccesary? do the message nodes just need to be in another vector that can be looped through? - for now just loop through message nodes then data 
-// -todo: make a message node vector that can be looped through 
-// -todo: make shared lib name pass through to button creation of node
-// -todo: create a message node shared library
-// -todo: take out GraphDB
-// -todo: take out Lava and put into LavaFlow
-// -todo: shut down threads gracefully with stop() so that program doesn't crash on exit
-// -todo: change LavaFlowNode to LavaNode
-// -todo: prototype an entry function that loops through message nodes then loops through data packets
-// -todo: make node selection an unsigned integer that uses a special value like NODE_NONE for unselected
-// -todo: fix box selection becoming unselected on mouse up - need to possibly keep some sort of state for box selections being turned on - box bnds shifted after box selection, drgbnd moved to be a consistent state variable
-// -todo: make frame input to lava func
-// -todo: make lava function input for max outputs?
-// -todo: work out memory allocation passing the dll boundary - thread local heap init in loop function but outside of loop - allocation function passed to node function in the LavaParams struct
-// -todo: change ArgType to LavaArgType
-// -todo: populate output struct with table, print the result, then free the memory
-// -todo: test saving and loading again - have to stop the LavaFlow loop because of graphs being changed around
-// -todo: fix selection clearing on node click
-// -todo: figure out why loading has no slots or connections - needed to clear the graph and not move an empty graph into the global one
-// -todo: change LavaIn to LavaVal
-// -todo: use malloc for passed in memory allocator
-// -todo: make a priority queue for packets of data
-// -todo: make a packet from memory passed back from a node and put it into the packet queue
-// -todo: pass output to another node
-// -todo: fix crash on close - stopFlowThreads() wasn't being called 
-// -todo: have the draw loop check the top of the graph packet queue and visualize the next node 
-// -todo: keep track of the current number of threads
-// -todo: make init wire up a message node to a flow node
-// -todo: change input counts and output counts to be the const char* names of the slots
-// -todo: make sure that the flow node lists are getting flattened - they are, just need to put the function into the header that maps handles to a multi-map - already flattened, don't need to be dealt with
-// -todo: make dynamic lib nodes load with the proper slots - need to call slot_add in node_add
-// -todo: expand node text bounding box by the diameter of the slots so that they don't overlap - need to expand bounds by text in the first place
-// -todo: put mutex locks around the flow queue
-// -todo: enable restarting after loading or saving - need to stop at the top of the loop - does each thread also need it's own mutex? - could use an atomic boolean that dictates whether to check a mutex
-// -todo: fix node types being flipped when loading - function and name are switched 
-// -todo: make play button 
-// -todo: make stop button
-// -todo: fix msg node being loaded with an input slot - nodes load their own slots now, they don't need them to come from the save file
-// -todo: take out slot loading from strToGraph()
-// -todo: take out slot saving from graphToStr()
-// -todo: fix flow to msg bug when loading then creating a new msg node - setting the id to maxId() was un-neccesary 
-// -todo: put a mutex lock around the packet queue writing
-// -todo: make a function to create a table into a memory buffer - static make_borrowed
-// -todo: fix connection not being deleted when deleting a node downstream - slots weren't being queried correctly
-// -todo: make chained flow nodes pass packets down the line
-// -todo: make LavaGraph store LavaInst structs instead of just nodes pointers with an id
-// -todo: take out id from LavaNode
-// -todo: build in const char* constructor to tbl
-// -todo: make the lib refresh update a library set version number if anything changed - will need to be atomic? - maybe not if there is just one 32 bit writer and one 32 bit reader
-// -todo: put more lib loading in to LavaFlow implementation so that it is done correctly and slots are given the proper index when created in the LavaGraph - change node_add to take in a LavaInst ?
-//       |  does LavaFlow ultimatly need to load libraries automatically and report back when they've changed? - can compare .live files with regular libs but ultimatly the controlling program will need to fire the Refresh function
-//       |  should there be a function to run to see if the libs have been changed? a get time of last change? get change version?
-//       |  then would need a way to read the graph back after it has changed - yes, there needs to be a way to pause the execution so the graph can refresh, or at least pause individual nodes so they can be reloaded
-//       |  would just need to clear node buttons and remake them - likely with node_add taking a LavaInst
-// -todo: give tbl memory constructor optional owned and init boolean arguemnts with a count
-//       | assert 't' and 'b' at the start if init is false 
-//       | assert that if init is true, that size/count was also passed a non-default value? no because initializing with a count of 0 should be valid (the tbl can then be pushed into or the map can be used)
+// -todo: put loop into LavaFlow IMPL 
+// -todo: put loop dependent functions into the anonymous namespace
+// -todo: take out LavaId implicit cast from u64 - already done earlier
+// -todo: break out the loop function
+// -todo: work out getting size of out of a node - make room for both reference counts and the size in bytes in the allocation
+// -todo: make helper LavaMem struct
+// -todo: partition owned memory with a zero reference count, free them and finally erase them from the vector
+// -todo: make the lava allocator passed to a node allocate an extra 8 bytes for the reference count 
+//       |  make sure that extra data at the beggining is treated atomically
+//       |  make sure that memory is allocated aligned to a 64 byte cache line
 
-// todo: put loop into LavaFlow IMPL - put dependent functions into the anonymous namespace
-// todo: take out LavaId implicit cast from u64
+// todo: put packet arguments into the InArgs array and use it to decrement references after the the function has ran
+// todo: make owned memory vector use the thread local allocation
 // todo: use combination of frame, node id and slot as key to simbdb
 //       |  how does that get in to the node, if all the data is in the packet struct? - through the output Args
 //       |  put the index information into the output array and use that 
@@ -300,26 +20,22 @@
 //       |  use a union of bytes that is filled with the frame, slot, list index?
 //       |  use malloc addresses initially
 // todo: put output in simdb
-// todo: break out the loop function?
 // todo: fix selection again - figure out all information like the slot and node that's inside, box drag etc click up or down etc, and put it all together at the end 
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array
-// todo: make the lava allocator passed to a node allocate an extra 8 bytes for the reference count 
-//       |  make sure that extra data at the beggining is treated atomically
-//       |  make sure that memory is allocated aligned to a 64 byte cache line
+// todo: make lava memory allocation aligned to 64 byte boundaries
 // todo: come up with locking system so that message nodes have their own threads that are only run when a looping thread visits them - how should memory allocation be done? passing the thread's allocator in the exact same way?
-// todo: prototype API for message nodes
-//       | do message nodes need some extra way to hold their state? will there ever be more than a single instance of a message node?
-//       | initially just make them thread safe or make them lock with mutexes
-//       | do messages need some sort of 8 byte number to be able to do occasionally do without heap or simdb allocated values?
 // todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
 // todo: change project name to Fissure 
-// todo: make a thread number UI input box
 // todo: use a copy of the graph to clear and update the interface buttons
 // todo: make a function to get a copy of the graph - can check the version number every loop, and if it is higher, get a copy of all the data inside a mutex
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
 //       |  does there need to be a function to copy the instances and connections? - should this ultimatly be used for drawing the graph?
+// todo: prototype API for message nodes
+//       | do message nodes need some extra way to hold their state? will there ever be more than a single instance of a message node?
+//       | initially just make them thread safe or make them lock with mutexes
+//       | do messages need some sort of 8 byte number to be able to do occasionally do without heap or simdb allocated values?
 
-
+// todo: make a thread number UI input box
 // todo: somehow draw slot names and types when slots are moused over
 // todo: transition to better json support to write formatted json/.lava files?
 // todo: put in error checking for connecting dest to dest or src to src?
@@ -1640,6 +1356,7 @@ ENTRY_DECLARATION
       //fd.lgrph.toggleCnct(s0, s3);
     }
 
+    LavaInit();
     //startFlowThreads(1);
   }
 

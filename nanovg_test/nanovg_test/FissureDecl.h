@@ -169,7 +169,6 @@ struct FisData
   LavaFlow             flow;
   LavaGraph&          lgrph = flow.graph;
   vec_thrd      flowThreads;
-  //Lava               lava;
 
   struct Graph
   {
@@ -251,3 +250,6 @@ struct FisData
 
 
 
+
+//
+//Lava               lava;
