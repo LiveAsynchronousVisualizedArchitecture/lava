@@ -14,6 +14,7 @@
 // -todo: make owned memory vector use the thread local allocation
 // -todo: make LavaAlloc use LavaHeapAlloc 
 
+// todo: 
 // todo: use a copy of the graph to clear and update the interface buttons
 // todo: fix selection again - figure out all information like the slot and node that's inside, box drag etc click up or down etc, and put it all together at the end 
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array
@@ -104,9 +105,25 @@
 // idea: make connection class that keeps two connection arrays, each sorted by src or dest for fast searching
 // idea: keep covariance statistics of input size, output size and time taken
 
+// q: do nodes just need to be tagged for visualization so that they put their outputs in the viz db? - should this just be a function hook so that the LavaGraph doesn't have to deal with it? 
+//    | put it in the packet queue first, then run the function callback on the LavaMem from the same frame
+//    | how should it be identified?
 // q: does each node need it's own memory to create a full frame?
 // q: does each node slot need it's own priority queue to put frames together? 
 // q: how is it possible to determine when to run a node with a full frame?
+// q: should there be a section of memory for packets to be copied to? 
+//    |  when a packet is pulled from the queue it could be copied to slot memory for the node
+//    |  if a thread completes a frame, then it runs the node with that frame
+//    |  this would possibly imply multiple frame buffers in a ring
+// q: what to do about a scenario where multiple packets for a single frame are being generated, but there are non-optional arguments that will keep them from running
+// q: is there any value in a queue for each node?
+// q: is there any value in a multi-stage queue that takes packets out and organizes them into frames to create a frame queue?
+//    | there would need to be a packet queue, a packet combining stage, then a frame queue
+//    | can it be guaranteed that frames will run sequentially on a node basis? - if the queue is sorted by frame first, then node, then slot, without accounting for multiple packets to one slot, they should be roughly in order and a frame should exist in the queue roughly sequentially
+//    | does there need to be a limitation that says nodes that splits can't feed into a node with framed slots?
+//    | structurally does this mean that nodes would have attributes instead of one type? 
+//    |  |  main issues are gather and split
+//    |  |  if a node wants to gather packets but not output a single packet, would it be both a gather and a split?
 
 // glew might include windows.h
 #define  WIN32_LEAN_AND_MEAN
