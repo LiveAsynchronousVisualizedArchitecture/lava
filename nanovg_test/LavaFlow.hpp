@@ -1055,7 +1055,8 @@ auto       GetFlowNodeLists(lava_hndlvec     const& hndls) -> lava_ptrsvec
 
 void*             LavaAlloc(uint64_t sizeBytes)
 {
-  uint64_t* mem = (uint64_t*)malloc(sizeBytes + sizeof(uint64_t)*2);
+  //uint64_t* mem = (uint64_t*)malloc(sizeBytes + sizeof(uint64_t)*2);
+  uint64_t* mem = (uint64_t*)LavaHeapAlloc(sizeBytes + sizeof(uint64_t)*2);
   mem[0]  =  0;              // reference count
   mem[1]  =  sizeBytes;      // number of bytes of main allocation
 
@@ -1064,8 +1065,8 @@ void*             LavaAlloc(uint64_t sizeBytes)
 void               LavaFree(uint64_t addr)
 {
   void* p = (void*)(addr - sizeof(uint64_t)*2);
-  free(p);
-  //LavaHeapFree(p);
+  //free(p);
+  LavaHeapFree(p);
 }
 
 bool                runFunc(LavaFlow& lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaVal* inArgs,  LavaOut* outArgs) // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
@@ -1267,11 +1268,12 @@ void               LavaLoop(LavaFlow& lf)
         
         //LavaMem lm;
         //lm.ptr = (void*)(inArgs[pckt.dest_slot].value - 16);
+        //printf("\n reference count: %llu \n", (u64)lm.refCount() );
+        //LavaFree((u64)lm.data());
+
         LavaMem lm = LavaMem::fromDataAddr(inArgs[pckt.dest_slot].value);
         PrintLavaMem(lm);
-        //printf("\n reference count: %llu \n", (u64)lm.refCount() );
         lm.decRef();
-        //LavaFree((u64)lm.data());
 
         //inArgs[0].type  = LavaArgType::MEMORY;
         //TO(lp.inputs,i){
