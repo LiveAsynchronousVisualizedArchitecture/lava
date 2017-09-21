@@ -308,6 +308,22 @@ template <class T> void    ThreadAllocator<T>::deallocate(T*& p, size_t) const
 using lava_memvec        =  std::vector<LavaMem, ThreadAllocator<LavaMem> >;
 
 // Lava Helper Functions
+
+// todo: once tbl is switched to not be an array, this might not need to be a template
+// todo: allocation template parameters might mean that a template is still neccesary
+// todo: A table type that has empty allocation parameters could mean an unowned type
+//       | the unowned type could have a constructor that takes any tbl and makes it unowned, treating it effectivly as a reference
+template<class T> LavaOut  LavaTblToOut(LavaParams const* lp, tbl<T> const& t)
+{
+  void* outmem  =  lp->mem_alloc(t.sizeBytes());
+  memcpy(outmem, t.memStart(), t.sizeBytes());
+
+  LavaOut o;
+  o.value = (u64)outmem;
+  o.type  = LavaArgType::MEMORY;
+
+  return o;
+}
 // End Lava Helper Functions
 
 class       LavaGraph
@@ -903,11 +919,23 @@ BOOL WINAPI DllMain(
 
 namespace {
 
-  void PrintLavaMem(LavaMem lm)
-  {
-    printf("\n addr: %llu  data addr: %llu  ref count: %llu   size bytes: %llu \n", 
-      (u64)(lm.ptr), (u64)(lm.data()), (u64)lm.refCount(), (u64)lm.sizeBytes() );
-  }
+void           PrintLavaMem(LavaMem lm)
+{
+  printf("\n addr: %llu  data addr: %llu  ref count: %llu   size bytes: %llu \n", 
+    (u64)(lm.ptr), (u64)(lm.data()), (u64)lm.refCount(), (u64)lm.sizeBytes() );
+}
+
+bool                 PutMem(LavaId id, LavaMem lm)
+{
+  char label[256];
+  sprintf(label, "%d:%d", (u32)id.nid, (u32)id.sidx);
+
+  uint32_t stblk=0;
+  bool ok = db.put(label, lm.data(), (u32)lm.sizeBytes(), &stblk);
+
+  return ok;
+  //str label = str(id.nid) + ":" + str(id.sidx);
+}
 
 auto       GetSharedLibPath() -> std::wstring
 {
@@ -1131,23 +1159,7 @@ bool                runFunc(LavaFlow& lf, lava_memvec& ownedMem, uint64_t nid, L
 
         ownedMem.push_back(mem);
 
-        //LavaMem mem;
-        //mem.ptr = (void*)outArgs[i].value;
-
-        //u64   refCnt  =  0;                                                  // todo: make this part of the allocation
-        //for(; diCnt!=diEn && diCnt->first==src; ++diCnt){ ++refCnt; } 
-        //basePkt.ref_count = refCnt;                                        // reference count will ultimatly need to be handled very differently, not on a packet basis, since the packets are copied - it should probably be on the value somehow - maybe the allocator passed should allocate an extra 8 bytes for the reference count and that should be treated atomically 
-        //
-        //tbl<u8> pth( (void*)outArgs[0].value, false);
-        //pth.owned(false);
-        //
-        //auto szBytes = pth.sizeBytes();
-        //
-        //auto szBytes = ((uint64_t*)outArgs[i].value)[-1];
-        //
-        //db.put(outArgs[i].key.bytes, sizeof(LavaOut::key), (void*)outArgs[i].value, (u32)szBytes);
-        //
-        //LavaFree( outArgs[i].value );
+        PutMem(LavaId(basePkt.src_node, basePkt.src_slot) , mem);
       }
     } // SECTION(create packets and put them into packet queue)
     SECTION(loop through inputs and decrement their references now that the function is done)
@@ -1224,15 +1236,14 @@ void               LavaLoop(LavaFlow& lf)
   using namespace std;
   const LavaOut defOut = { LavaArgType::NONE, 0, 0, 0, 0 };
 
-  lava_memvec ownedMem;                           // todo: make this a thread local memory allocation 
+  lava_memvec ownedMem;
 
   lf.incThreadCount();
 
-  LavaVal    inArgs[LAVA_ARG_COUNT];         // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
-  LavaOut   outArgs[LAVA_ARG_COUNT];         // if the arguments are going to 
+  LavaVal    inArgs[LAVA_ARG_COUNT];              // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
+  LavaOut   outArgs[LAVA_ARG_COUNT];              // if the arguments are going to 
   memset(inArgs,  0, sizeof(inArgs)  );
-  //memset(outArgs, 0, sizeof(outArgs) );
-  TO(LAVA_ARG_COUNT,i){ outArgs[i] = defOut; }
+  TO(LAVA_ARG_COUNT,i){ outArgs[i] = defOut; }    // memset(outArgs, 0, sizeof(outArgs) );
 
   LavaHeapInit();
 
@@ -1322,6 +1333,23 @@ void               LavaLoop(LavaFlow& lf)
 
 
 
+//LavaMem mem;
+//mem.ptr = (void*)outArgs[i].value;
+
+//u64   refCnt  =  0;                                                  // todo: make this part of the allocation
+//for(; diCnt!=diEn && diCnt->first==src; ++diCnt){ ++refCnt; } 
+//basePkt.ref_count = refCnt;                                        // reference count will ultimatly need to be handled very differently, not on a packet basis, since the packets are copied - it should probably be on the value somehow - maybe the allocator passed should allocate an extra 8 bytes for the reference count and that should be treated atomically 
+//
+//tbl<u8> pth( (void*)outArgs[0].value, false);
+//pth.owned(false);
+//
+//auto szBytes = pth.sizeBytes();
+//
+//auto szBytes = ((uint64_t*)outArgs[i].value)[-1];
+//
+//db.put(outArgs[i].key.bytes, sizeof(LavaOut::key), (void*)outArgs[i].value, (u32)szBytes);
+//
+//LavaFree( outArgs[i].value );
 
 // run the function 
 // use the LavaParams output struct to make the LavaOut list packets  

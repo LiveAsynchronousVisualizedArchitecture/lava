@@ -14,7 +14,8 @@
 // -todo: make owned memory vector use the thread local allocation
 // -todo: make LavaAlloc use LavaHeapAlloc 
 
-// todo: 
+// todo: put some output in simdb
+// todo: either visualize strings, or put an indexed verts object into the db - probably easier to make another node that outputs an indexed verts table
 // todo: use a copy of the graph to clear and update the interface buttons
 // todo: fix selection again - figure out all information like the slot and node that's inside, box drag etc click up or down etc, and put it all together at the end 
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array
@@ -26,7 +27,6 @@
 //       |  the full key is needed because robin hood hashing could shift the other keys' indices around - the index into the key value slots in the db can't be used, but the starting block index can since that won't change until the data goes away
 //       |  use a union of bytes that is filled with the frame, slot, list index?
 //       |  use malloc addresses initially
-// todo: put output in simdb
 // todo: come up with locking system so that message nodes have their own threads that are only run when a looping thread visits them - how should memory allocation be done? passing the thread's allocator in the exact same way?
 // todo: change project name to Fissure 
 // todo: make a function to get a copy of the graph - can check the version number every loop, and if it is higher, get a copy of all the data inside a mutex

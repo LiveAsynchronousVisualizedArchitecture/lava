@@ -24,6 +24,11 @@
 // -todo: transition indexed verts to use tbl
 // -todo: make initializer list syntax possible to create pairs of strings and lists of values
 
+// todo: once tbl is switched to not be an array, this might not need to be a template
+// todo: allocation template parameters might mean that a template is still neccesary
+// todo: A table type that has empty allocation parameters could mean an unowned type
+//       | the unowned type could have a constructor that takes any tbl and makes it unowned, treating it effectivly as a reference
+//
 // todo: make a string type using the 8 bytes in the value and the extra bytes of the key
 //       | can casts to c_str() using a single 0 byte after the array work? 
 //       |   if there is a blank key or no map and a 0 byte at the beggining of childData() then the cast to c_str() could work 
@@ -72,6 +77,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <cassert>
+
 //#include "../no_rt_util.h"
 
 #ifndef TO
@@ -454,7 +460,7 @@ struct  TblFields
 template<class T> class tbl
 {
 public:                 
-  using AllocFunc = void* (*)(u64 bytes);
+  using AllocFunc = void* (*)(uint64_t bytes);
   using fields  =  TblFields;
 
   using    u8   =   uint8_t;
@@ -1257,7 +1263,6 @@ public:
     //auto st = ret.memStart();
   }
 };
-
 
 template<class T> KVOfst::operator tbl<T>() 
 {   

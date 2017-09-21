@@ -436,20 +436,15 @@ vec_vs         shapesFromKeys(simdb const& db, vec_vs dbKeys, VizData* vd)  // v
       auto     len = db.len(vs.str.data(), (u32)vs.str.length(), &vlen, &version);          // todo: make ui64 as the input length
       vs.ver = version;
 
-      //vec<i8> ivbuf(vlen);
-      //db.get(vs.str.data(), (u32)vs.str.length(), ivbuf.data(), (u32)ivbuf.size());
-      //Shape  s      = ivbuf_to_shape(ivbuf.data(), len);      PRINT_GL_ERRORS
-
       auto ivbuf = (u8*)malloc(vlen);   // todo: check to make sure this succeeds 
       db.get(vs.str.data(), (u32)vs.str.length(),  ivbuf, vlen);
       IvTbl iv(ivbuf);
-      //iv.m_mem   = ivbuf;
       auto     f = iv.memStart();
 
       Shape  s   = tbl_to_shape(iv);      PRINT_GL_ERRORS
       s.shader   = vd->shaderId;
       s.active   = vd->shapes[vs.str].active;
-      s.version  = version; //vs.v; // version;
+      s.version  = version;
       vd->shapes[vs.str] = move(s);
     };
 
@@ -820,7 +815,7 @@ ENTRY_DECLARATION
   using namespace std;
   using namespace nanogui;
 
-  genTestGeo(&db);
+  //genTestGeo(&db);
 
   //tbl<u8> pears<std::initializer_list<std::pair<char*,tbl<u8>::KV> >( { std::make_pair("wat",85) } );
   tbl<u8> pears = { {"wat",85} };
@@ -1246,6 +1241,13 @@ ENTRY_DECLARATION
 
 
 
+//vec<i8> ivbuf(vlen);
+//db.get(vs.str.data(), (u32)vs.str.length(), ivbuf.data(), (u32)ivbuf.size());
+//Shape  s      = ivbuf_to_shape(ivbuf.data(), len);      PRINT_GL_ERRORS
+//
+//iv.m_mem   = ivbuf;
+//
+//vs.v; // version;
 
 //nvgBeginPath(nvg);
 //  nvgRect(nvg, b.xmn, b.ymn, b.xmx-b.xmn, b.ymx-b.ymn);
