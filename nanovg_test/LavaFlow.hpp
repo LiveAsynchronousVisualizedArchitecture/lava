@@ -54,7 +54,6 @@ using lava_nidMap        =  std::unordered_multimap<std::string, uint64_t>;     
 using lava_flowPtrs      =  std::unordered_set<LavaNode*>;                                // LavaFlowNode pointers referenced uniquely by address instead of using an id
 using lava_ptrsvec       =  std::vector<LavaNode*>;
 using lava_nameNodeMap   =  std::unordered_map<std::string, LavaNode*>;                   // maps the node names to their pointers
-using lava_memvec        =  std::vector<LavaMem>;
 
 extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaVal*, LavaOut*);   // data flow node function
 extern "C" using           LavaAlloc  =  void* (*)(uint64_t);                             // custom allocation function passed in to each node call
@@ -289,7 +288,8 @@ template <class T> T*      ThreadAllocator<T>::allocate(const size_t n)  const
     throw std::bad_array_new_length();
   }
 
-  void* p = ThreadAlloc( n * sizeof(T) );
+  //void* p = ThreadAlloc( n * sizeof(T) );
+  void* p = LavaHeapAlloc( n * sizeof(T) );
   if(!p) { throw std::bad_alloc(); }
 
   return static_cast<T*>(p);
@@ -297,11 +297,15 @@ template <class T> T*      ThreadAllocator<T>::allocate(const size_t n)  const
 template <class T> void    ThreadAllocator<T>::deallocate(T*& p, size_t) const
 {
   //if(n==0) return;
+  //
+  //ThreadFree(p);
 
-  ThreadFree(p);
+  LavaHeapFree(p);
   p = nullptr;
 }
 // end allocator definitions
+
+using lava_memvec        =  std::vector<LavaMem, ThreadAllocator<LavaMem> >;
 
 // Lava Helper Functions
 // End Lava Helper Functions
@@ -1066,8 +1070,8 @@ void               LavaFree(uint64_t addr)
 
 bool                runFunc(LavaFlow& lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaVal* inArgs,  LavaOut* outArgs) // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
 {
-  FlowFunc msgFunc = lf.graph[nid].node->func;
-  if(msgFunc){
+  FlowFunc func = lf.graph[nid].node->func;
+  if(func){
     LavaParams lp;
     SECTION(create arguments and call function)
     {
@@ -1077,8 +1081,7 @@ bool                runFunc(LavaFlow& lf, lava_memvec& ownedMem, uint64_t nid, L
       lp.id          =   LavaId(nid);
       lp.mem_alloc   =   LavaAlloc;                             //lp.mem_alloc   =   malloc;  // LavaHeapAlloc;
 
-      uint64_t ret   =   msgFunc(&lp, inArgs, outArgs);
-
+      uint64_t ret   =   func(&lp, inArgs, outArgs);
     }
     SECTION(create packets and put them into packet queue)
     {
@@ -1092,8 +1095,6 @@ bool                runFunc(LavaFlow& lf, lava_memvec& ownedMem, uint64_t nid, L
         val.value = outArgs[i].value;
         auto sidx = outArgs[i].key.slot;
 
-        //LavaMem mem;
-        //mem.ptr = (void*)outArgs[i].value;
         LavaMem mem = LavaMem::fromDataAddr(outArgs[i].value);
         PrintLavaMem(mem);
         auto szBytes = mem.sizeBytes();
@@ -1112,9 +1113,6 @@ bool                runFunc(LavaFlow& lf, lava_memvec& ownedMem, uint64_t nid, L
         auto      di  =  lf.graph.destCncts(src);                            // di is destination iterator
         auto   diCnt  =  di;                                                 // diCnt is destination iterator counter - used to count the number of destination slots this packet will be copied to so that the reference count can be set correctly
         auto    diEn  =  lf.graph.destCnctEnd();
-        u64   refCnt  =  0;                                                  // todo: make this part of the allocation
-        //for(; diCnt!=diEn && diCnt->first==src; ++diCnt){ ++refCnt; } 
-        //basePkt.ref_count = refCnt;                                          // reference count will ultimatly need to be handled very differently, not on a packet basis, since the packets are copied - it should probably be on the value somehow - maybe the allocator passed should allocate an extra 8 bytes for the reference count and that should be treated atomically 
 
         for(; di!=diEn && di->first==src; ++di)
         {                                                                    // loop through the 1 or more destination slots connected to this source
@@ -1132,6 +1130,13 @@ bool                runFunc(LavaFlow& lf, lava_memvec& ownedMem, uint64_t nid, L
 
         ownedMem.push_back(mem);
 
+        //LavaMem mem;
+        //mem.ptr = (void*)outArgs[i].value;
+
+        //u64   refCnt  =  0;                                                  // todo: make this part of the allocation
+        //for(; diCnt!=diEn && diCnt->first==src; ++diCnt){ ++refCnt; } 
+        //basePkt.ref_count = refCnt;                                        // reference count will ultimatly need to be handled very differently, not on a packet basis, since the packets are copied - it should probably be on the value somehow - maybe the allocator passed should allocate an extra 8 bytes for the reference count and that should be treated atomically 
+        //
         //tbl<u8> pth( (void*)outArgs[0].value, false);
         //pth.owned(false);
         //

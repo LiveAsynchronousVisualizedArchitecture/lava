@@ -9,10 +9,11 @@
 // -todo: make the lava allocator passed to a node allocate an extra 8 bytes for the reference count 
 //       |  make sure that extra data at the beggining is treated atomically
 //       |  make sure that memory is allocated aligned to a 64 byte cache line
+// -todo: put packet arguments into the InArgs array and use it to decrement references after the the function has ran
+// -todo: does the input arg need a slot number? do the slot numbers just need to be used to place it in the array - put in slot for now 
+// -todo: make owned memory vector use the thread local allocation
 
-// todo: does the input arg need a slot number? do the slot numbers just need to be used to place it in the array?
-// todo: put packet arguments into the InArgs array and use it to decrement references after the the function has ran
-// todo: make owned memory vector use the thread local allocation
+// todo: make LavaAlloc use LavaHeapAlloc 
 // todo: use combination of frame, node id and slot as key to simbdb
 //       |  how does that get in to the node, if all the data is in the packet struct? - through the output Args
 //       |  put the index information into the output array and use that 
