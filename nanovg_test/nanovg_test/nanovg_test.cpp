@@ -12,8 +12,12 @@
 // -todo: put packet arguments into the InArgs array and use it to decrement references after the the function has ran
 // -todo: does the input arg need a slot number? do the slot numbers just need to be used to place it in the array - put in slot for now 
 // -todo: make owned memory vector use the thread local allocation
+// -todo: make LavaAlloc use LavaHeapAlloc 
 
-// todo: make LavaAlloc use LavaHeapAlloc 
+// todo: use a copy of the graph to clear and update the interface buttons
+// todo: fix selection again - figure out all information like the slot and node that's inside, box drag etc click up or down etc, and put it all together at the end 
+// todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array
+// todo: make lava memory allocation aligned to 64 byte boundaries
 // todo: use combination of frame, node id and slot as key to simbdb
 //       |  how does that get in to the node, if all the data is in the packet struct? - through the output Args
 //       |  put the index information into the output array and use that 
@@ -22,13 +26,8 @@
 //       |  use a union of bytes that is filled with the frame, slot, list index?
 //       |  use malloc addresses initially
 // todo: put output in simdb
-// todo: fix selection again - figure out all information like the slot and node that's inside, box drag etc click up or down etc, and put it all together at the end 
-// todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array
-// todo: make lava memory allocation aligned to 64 byte boundaries
 // todo: come up with locking system so that message nodes have their own threads that are only run when a looping thread visits them - how should memory allocation be done? passing the thread's allocator in the exact same way?
-// todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
 // todo: change project name to Fissure 
-// todo: use a copy of the graph to clear and update the interface buttons
 // todo: make a function to get a copy of the graph - can check the version number every loop, and if it is higher, get a copy of all the data inside a mutex
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
 //       |  does there need to be a function to copy the instances and connections? - should this ultimatly be used for drawing the graph?
@@ -36,6 +35,7 @@
 //       | do message nodes need some extra way to hold their state? will there ever be more than a single instance of a message node?
 //       | initially just make them thread safe or make them lock with mutexes
 //       | do messages need some sort of 8 byte number to be able to do occasionally do without heap or simdb allocated values?
+// todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
 
 // todo: make a thread number UI input box
 // todo: somehow draw slot names and types when slots are moused over
