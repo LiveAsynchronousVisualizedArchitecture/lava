@@ -48,6 +48,7 @@ extern "C"
 
     inout_lp->outputs = 1;
     out[0] = LavaTblToOut(inout_lp, lftTri);
+    out[0].key.slot = 0;
 
     //void* outmem = inout_lp->mem_alloc(lftTri.sizeBytes());
     //memcpy(outmem, lftTri.memStart(), lftTri.sizeBytes());

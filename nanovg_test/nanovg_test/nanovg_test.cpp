@@ -13,7 +13,11 @@
 // -todo: does the input arg need a slot number? do the slot numbers just need to be used to place it in the array - put in slot for now 
 // -todo: make owned memory vector use the thread local allocation
 // -todo: make LavaAlloc use LavaHeapAlloc 
+// -todo: make message passing nodes a set instead of a vector 
 
+// todo: figure out why delNode is passed a wrong node id - is it LavaNode::NONE ? 
+// todo: make sel_delete delete from the message passing nodes set
+// todo: figure out why a deleted node id shows up - is it not being deleted from the msg passing nodes? 
 // todo: put some output in simdb
 // todo: either visualize strings, or put an indexed verts object into the db - probably easier to make another node that outputs an indexed verts table
 // todo: use a copy of the graph to clear and update the interface buttons
@@ -174,6 +178,8 @@ using vec_ids = std::vector<Id>;
 static FisData fd;
 
 namespace{
+
+
 
 float               lerp(float p, float lo, float hi)
 {
@@ -754,15 +760,6 @@ u64           sel_delete()
   u64    cnt = 0;
   auto   nds = sel_nodes();           // accumulate nodes
   auto   ids = node_slots(nds);       // accumulate dest slots  // accumulate slots
-
-  //auto sidxs = node_slots(nds);       // accumulate dest slots  // accumulate slots
-  //
-  //for(auto sidx : sidxs){             // delete cncts with dest slots
-  //
-  //auto s = slot_get(sidx);
-  //
-  //if(s->in) fd.lgrph.delDestCnct(sidx);  //){ ++cnt; }
-  //else      fd.lgrph.delSrcCncts(sidx);
   
   for(auto id : ids){             // delete cncts with dest slots
     auto s = slot_get(id);
@@ -773,7 +770,6 @@ u64           sel_delete()
   }
 
   // delete slots
-  //for(auto sidx : sidxs){ fd.graph.slots.erase(sidx); }
   for(auto id : ids){                  // are LavaGraph slots deleted when deleting their node?
     fd.graph.slots.erase(id);
   }
@@ -781,12 +777,26 @@ u64           sel_delete()
   // delete nodes
   for(auto n : nds){  // does deleting from the graph.nds unordered map invalidate the pointers? - standard says no - how is memory reclaimed? - rehash()
     //m_ids.erase(n->id);
-    fd.graph.ordr.erase({n->id, n->order});
-    fd.graph.nds.erase(n->id);
+    auto  nid = n->id;
+    auto ordr = n->order;
+    fd.graph.ordr.erase({nid, ordr});
+    fd.graph.nds.erase(nid);
+    fd.lgrph.delNode(nid);
   }
   fd.graph.nds.reserve( fd.graph.nds.size() * 2 );
 
   return cnt;
+
+  //for(auto sidx : sidxs){ fd.graph.slots.erase(sidx); }
+  //
+  //auto sidxs = node_slots(nds);       // accumulate dest slots  // accumulate slots
+  //
+  //for(auto sidx : sidxs){             // delete cncts with dest slots
+  //
+  //auto s = slot_get(sidx);
+  //
+  //if(s->in) fd.lgrph.delDestCnct(sidx);  //){ ++cnt; }
+  //else      fd.lgrph.delSrcCncts(sidx);
 }
 void           sel_clear()
 {

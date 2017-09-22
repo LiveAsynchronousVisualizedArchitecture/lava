@@ -246,14 +246,8 @@ void printdb(simdb const& db)
 {
   Println("size: ", db.size());
 
-  //str memstr;
-  //memstr.resize(db.size()+1);
-
   vec<i8> memv(db.memsize(), 0);
   memcpy( (void*)memv.data(), db.mem(), db.memsize() );
-
-  //str memstr( (const char*)db.data(), (const char*)db.data() + db.size());
-  //Println("\nmem: ", memstr, "\n" );
 
   Println("\n");
 
@@ -323,20 +317,20 @@ int main()
 {
   using namespace std;
 
-  //Println("size of simdb on the stack: ", sizeof(simdb));
-
   simdb db("test", 2<<6, 2<<4);
 
+  //Println("size of simdb on the stack: ", sizeof(simdb));
+  //
   //simdb db("H:\\projects\\lava\\test.simdb", 32, 64, true);
   //simdb db("test.simdb", 32, 64, true);
-
+  //
   //printhsh(db);
+  //
+  //int sz = (int)thrds.size(); 
 
   str numkey[] = {"0", "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11"};
   str  label[] = {"zero","one","two","three","four","five","six","seven","eight","nine","ten","eleven"};
   
-  //int sz = (int)thrds.size(); 
-
   int sz = 12;
   vec<thread>            thrds;
   vec<RngInt<u32>> rngSwitches;
@@ -545,6 +539,11 @@ int main()
 
 
 
+//str memstr;
+//memstr.resize(db.size()+1);
+//
+//str memstr( (const char*)db.data(), (const char*)db.data() + db.size());
+//Println("\nmem: ", memstr, "\n" );
 
 //      template<class T, class _Alloc=std::allocator<T> > 
 //using vec        =  std::vector<T, _Alloc>;

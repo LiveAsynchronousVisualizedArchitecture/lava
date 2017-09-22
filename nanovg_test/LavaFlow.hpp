@@ -342,6 +342,7 @@ public:
   using vec_nptrs     =  std::vector<LavaInst>;                        // lists used for returning from reloading functions
   using vec_cnptrs    =  std::vector<LavaNode const*>;
   using vec_ids       =  std::vector<LavaId>;
+  using MsgIds        =  std::unordered_set<LavaId, LavaId>;
   using NormalizeMap  =  std::unordered_map<uint64_t, uint64_t>;
 
 private:
@@ -350,7 +351,8 @@ private:
   Slots              m_slots;
   CnctMap            m_cncts;
   SrcMap         m_destCncts;
-  vec_ids         m_msgNodes;
+  MsgIds          m_msgNodes;
+  //vec_ids         m_msgNodes;
 
   void            init()
   { 
@@ -565,7 +567,8 @@ public:
   {
     u64 id = nxt();
     if(ln->node_type == LavaNode::MSG)
-      m_msgNodes.push_back(id);
+      m_msgNodes.insert(id);
+      //m_msgNodes.push_back(id);
 
     LavaInst li = makeInst(id, ln);
     return m_nodes.insert({id, li}).first->first;                             // returns a pair that contains the key-value pair
@@ -629,7 +632,7 @@ public:
     //for(auto kv : m_ids){ mx = max(mx, kv.first); }
   }
   u64             nsz() const { return m_nodes.size(); }
-  auto       msgNodes() const -> vec_ids const&
+  auto       msgNodes() const -> MsgIds const&
   {
     return m_msgNodes;
   }
@@ -641,6 +644,22 @@ public:
       //return ni->second->func;
     else
       return nullptr;
+  }
+  bool        delNode(uint64_t nid)
+  {
+    // erase any connects that go with the slots here
+    auto     si = this->nodeSlots(nid);                       // si is slot iterator
+    auto siCnct = si; 
+    for(; siCnct!=end(m_slots)  &&  siCnct->first.nid==nid; ++siCnct ){
+      if(siCnct->second.in) this->delDestCnct(nid);
+      else                  this->delSrcCncts(nid);
+    }
+
+    auto slcnt = m_slots.erase(nid);                         // slcnt is slot count
+    auto   cnt = m_nodes.erase(nid);
+    m_msgNodes.erase(nid);
+    
+    return (cnt+slcnt) > 0;                                  // return true if 1 or more elements were erased, return false if no elements were erasedm
   }
 
   // slots
@@ -919,6 +938,58 @@ BOOL WINAPI DllMain(
 
 namespace {
 
+template<class T> inline std::string 
+  toString(T const& x)
+{
+  std::ostringstream convert;
+  convert << x;
+  return convert.str();
+}
+template<class T1, class... T> inline std::string
+  toString(const T1& a, const T&... args)
+{
+  return toString(a) + toString(args...) ;
+}
+inline std::ostream&  Print(std::ostream& o) { return o; }
+template<class... T> inline std::ostream&
+  Print(std::ostream& o, const T&... args)
+{
+  o << toString(args ...);
+  o.flush();
+  return o;
+}
+template<class... T> inline std::ostream&
+  Println(std::ostream& o, const T&... args)
+{
+  Print(o, args..., "\n");
+  return o;
+}
+template<class... T> inline void
+  Println(const T&... args)
+{
+  Println(std::cout, args...);
+}
+
+void printdb(simdb const& db)
+{
+  using namespace std;
+  
+  Println("size: ", db.size());
+
+  std::vector<i8> memv(db.memsize(), 0);
+  memcpy( (void*)memv.data(), db.mem(), db.memsize() );
+
+  Println("\n");
+
+  u64 blksz = db.blockSize();
+  TO(memv.size(),i){ 
+    if(i % blksz == 0){
+      putc('|', stdout);
+    }
+    putc(memv[i] ,stdout);
+  }
+}
+
 void           PrintLavaMem(LavaMem lm)
 {
   printf("\n addr: %llu  data addr: %llu  ref count: %llu   size bytes: %llu \n", 
@@ -1160,6 +1231,7 @@ bool                runFunc(LavaFlow& lf, lava_memvec& ownedMem, uint64_t nid, L
         ownedMem.push_back(mem);
 
         PutMem(LavaId(basePkt.src_node, basePkt.src_slot) , mem);
+        auto keys = db.getKeyStrs();
       }
     } // SECTION(create packets and put them into packet queue)
     SECTION(loop through inputs and decrement their references now that the function is done)
@@ -1174,8 +1246,8 @@ bool                runFunc(LavaFlow& lf, lava_memvec& ownedMem, uint64_t nid, L
 
 void               LavaInit()
 {
-  new (&db)     simdb("lava_db", 4096, 65536);
-  new (&vizdb)  simdb("viz_db",  4096, 65536);
+  new (&db)     simdb("lava_db", 128, 2<<10);
+  new (&vizdb)  simdb("viz_db",  128, 2<<10);
 }
 bool        RefreshFlowLibs(LavaFlow& inout_flow)
 {
@@ -1332,6 +1404,10 @@ void               LavaLoop(LavaFlow& lf)
 
 
 
+//auto       msgNodes() const -> vec_ids const&
+//{
+//  return m_msgNodes;
+//}
 
 //LavaMem mem;
 //mem.ptr = (void*)outArgs[i].value;
