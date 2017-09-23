@@ -1562,7 +1562,8 @@ public:
       m_mem.size = MemSize(s_blockSize->load(), s_blockCount->load());
     }
 
-    auto cncrHashSize = CncrHsh::sizeBytes(blockCount);
+    //auto cncrHashSize = CncrHsh::sizeBytes(blockCount);
+    auto cncrHashSize = CncrHsh::sizeBytes(s_blockCount->load());
     new (&s_cs) CncrStr( ((u8*)m_mem.data())+cncrHashSize+OffsetBytes(), 
                                  (u32)s_blockSize->load(), 
                                  (u32)s_blockCount->load(), 

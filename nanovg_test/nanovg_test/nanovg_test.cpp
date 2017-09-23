@@ -14,10 +14,10 @@
 // -todo: make owned memory vector use the thread local allocation
 // -todo: make LavaAlloc use LavaHeapAlloc 
 // -todo: make message passing nodes a set instead of a vector 
+// -todo: figure out why delNode is passed a wrong node id - is it LavaNode::NONE ?  - pointer / iterator was being invalidated by deletion
+// -todo: make sel_delete delete from the message passing nodes set - nothing was deleting from the LavaGraph
+// -todo: figure out why a deleted node id shows up - is it not being deleted from the msg passing nodes? 
 
-// todo: figure out why delNode is passed a wrong node id - is it LavaNode::NONE ? 
-// todo: make sel_delete delete from the message passing nodes set
-// todo: figure out why a deleted node id shows up - is it not being deleted from the msg passing nodes? 
 // todo: put some output in simdb
 // todo: either visualize strings, or put an indexed verts object into the db - probably easier to make another node that outputs an indexed verts table
 // todo: use a copy of the graph to clear and update the interface buttons

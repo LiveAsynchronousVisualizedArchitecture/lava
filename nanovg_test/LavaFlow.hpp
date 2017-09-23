@@ -938,38 +938,7 @@ BOOL WINAPI DllMain(
 
 namespace {
 
-template<class T> inline std::string 
-  toString(T const& x)
-{
-  std::ostringstream convert;
-  convert << x;
-  return convert.str();
-}
-template<class T1, class... T> inline std::string
-  toString(const T1& a, const T&... args)
-{
-  return toString(a) + toString(args...) ;
-}
-inline std::ostream&  Print(std::ostream& o) { return o; }
-template<class... T> inline std::ostream&
-  Print(std::ostream& o, const T&... args)
-{
-  o << toString(args ...);
-  o.flush();
-  return o;
-}
-template<class... T> inline std::ostream&
-  Println(std::ostream& o, const T&... args)
-{
-  Print(o, args..., "\n");
-  return o;
-}
-template<class... T> inline void
-  Println(const T&... args)
-{
-  Println(std::cout, args...);
-}
-
+#include "str_util.hpp"
 void printdb(simdb const& db)
 {
   using namespace std;
@@ -1002,7 +971,7 @@ bool                 PutMem(LavaId id, LavaMem lm)
   sprintf(label, "%d:%d", (u32)id.nid, (u32)id.sidx);
 
   uint32_t stblk=0;
-  bool ok = db.put(label, lm.data(), (u32)lm.sizeBytes(), &stblk);
+  bool ok = vizdb.put(label, lm.data(), (u32)lm.sizeBytes(), &stblk);
 
   return ok;
   //str label = str(id.nid) + ":" + str(id.sidx);
@@ -1231,7 +1200,8 @@ bool                runFunc(LavaFlow& lf, lava_memvec& ownedMem, uint64_t nid, L
         ownedMem.push_back(mem);
 
         PutMem(LavaId(basePkt.src_node, basePkt.src_slot) , mem);
-        auto keys = db.getKeyStrs();
+        //auto keys = vizdb.getKeyStrs();
+        //printdb(vizdb);
       }
     } // SECTION(create packets and put them into packet queue)
     SECTION(loop through inputs and decrement their references now that the function is done)
@@ -1246,8 +1216,8 @@ bool                runFunc(LavaFlow& lf, lava_memvec& ownedMem, uint64_t nid, L
 
 void               LavaInit()
 {
-  new (&db)     simdb("lava_db", 128, 2<<10);
-  new (&vizdb)  simdb("viz_db",  128, 2<<10);
+  new (&db)     simdb("lava_db", 128, 2<<4);
+  new (&vizdb)  simdb("viz_db",  128, 2<<4);
 }
 bool        RefreshFlowLibs(LavaFlow& inout_flow)
 {

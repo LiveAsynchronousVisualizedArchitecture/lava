@@ -919,7 +919,10 @@ public:
 
     return sizeBytes() - memberBytes() - capacity()*sizeof(T) - map_capacity()*sizeof(KV);
   }
-  bool          owned() const  { return m_mem? memStart()->owned : true; }
+  bool          owned() const  
+  {
+    return m_mem? memStart()->owned : true; 
+  }
   void          owned(bool own){ memStart()->owned = own;  }
   auto       memStart() -> fields* { return m_mem? (fields*)(m_mem - memberBytes())  :  nullptr; }
   auto       memStart() const -> fields const* { return (fields*)(m_mem - memberBytes()); }

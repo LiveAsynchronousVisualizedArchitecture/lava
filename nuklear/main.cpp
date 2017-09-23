@@ -126,18 +126,40 @@ using v4f  =  Eigen::Vector4f;
 
 const u32 TITLE_MAX_LEN = 256;
 
-template<class T> inline std::string
-toString(T const& x)
+//template<class T> inline std::string
+//toString(T const& x)
+//{
+//  std::ostringstream convert;
+//  convert << x;
+//  return convert.str();
+//}
+//template<class T1, class... T> inline std::string
+//toString(const T1& a, const T&... args)
+//{
+//  return toString(a) + toString(args...);
+//}
+
+#include "../nanovg_test/str_util.hpp"
+void printdb(simdb const& db)
 {
-  std::ostringstream convert;
-  convert << x;
-  return convert.str();
+  using namespace std;
+
+  Println("size: ", db.size());
+
+  std::vector<i8> memv(db.memsize(), 0);
+  memcpy( (void*)memv.data(), db.mem(), db.memsize() );
+
+  Println("\n");
+
+  u64 blksz = db.blockSize();
+  TO(memv.size(),i){ 
+    if(i % blksz == 0){
+      putc('|', stdout);
+    }
+    putc(memv[i] ,stdout);
+  }
 }
-template<class T1, class... T> inline std::string
-toString(const T1& a, const T&... args)
-{
-  return toString(a) + toString(args...);
-}
+
 
 vec3                      pos(mat4 const& m)
 { return m[3];                      }
@@ -438,7 +460,7 @@ vec_vs         shapesFromKeys(simdb const& db, vec_vs dbKeys, VizData* vd)  // v
 
       auto ivbuf = (u8*)malloc(vlen);   // todo: check to make sure this succeeds 
       db.get(vs.str.data(), (u32)vs.str.length(),  ivbuf, vlen);
-      IvTbl iv(ivbuf);
+      IvTbl iv(ivbuf, false, false);
       auto     f = iv.memStart();
 
       Shape  s   = tbl_to_shape(iv);      PRINT_GL_ERRORS
@@ -508,6 +530,9 @@ double                   nowd()
 }
 void                refreshDB(VizData* vd)
 {
+  //if(db.mem() != nullptr)
+  //  printdb(db);
+  
   auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
   dbKeys      = shapesFromKeys(db, move(dbKeys), vd);
   dbKeys      = eraseMissingKeys(move(dbKeys), &vd->shapes);
@@ -1043,6 +1068,9 @@ ENTRY_DECLARATION
     //sort(ALL(tst2));
     //TO(tst2.size(),i){ tst.push( tst2[i] ); }
 
+
+    //simdb lavadb("lava_db", 128, 2<<6);
+    //printdb(lavadb);
   }
 
   while(!glfwWindowShouldClose(vd.win))
