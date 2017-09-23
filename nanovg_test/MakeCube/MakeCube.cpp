@@ -4,14 +4,53 @@
 #include "../no_rt_util.h"
 #include "../LavaFlow.hpp"
 #include "../tbl.hpp"
+#include "../str_util.hpp"
 
 struct vert { f32 p[3],n[3],c[4],tx[2]; };
 using IvTbl = tbl<vert>;
 
+void PrintVert(vert const& v)
+{
+  Print("p: ",    v.p[0],  " ", v.p[1], " ", v.p[2]);
+  Print("  n: ",  v.n[0],  " ", v.n[1], " ", v.n[2]);
+  Print("  c: ",  v.c[0],  " ", v.c[1], " ", v.c[2], " ", v.c[3]);
+  Print("  tx: ", v.tx[0], " ", v.tx[1]);
+  Println();
+}
+
+void PrintIvTbl(IvTbl const& iv)
+{
+  Println();
+  i8* memst = (i8*)iv.memStart();
+  Println("tbl check: ", memst[0]," ",memst[1]); 
+  Println("owned: ",            iv.owned(),
+          " sizeBytes: ",       iv.sizeBytes(),
+          " capacity: ",        iv.capacity(), 
+          " size: ",            iv.size(),  "\n",
+          " map_capacity: ",    iv.map_capacity(),
+          " elems: ",           iv.elems(), "\n",
+          " child_capacity: ",  iv.child_capacity(),
+          " childData: ",       iv.childData() );
+
+  Println();
+  Println("-map-");
+  auto e = iv.elemStart();
+  TO(iv.map_capacity(),i) if( !e[i].isEmpty() ){
+    Println("k: ", e[i].key, "   v: ", e[i].val, "  type: ", e[i].hsh.type, "  hash: ", e[i].hsh.hash);
+  }
+  Println();
+
+  Println("-array-");
+  TO(iv.size(),i){
+    PrintVert(iv[i]);
+  }
+  Println();
+}
+
 extern "C"
 {
   const char* OutNames[]  = {"Cube Indexed Verts", nullptr};
-  const char* OutTypes[]  = {"IdxVerts",      nullptr};
+  const char* OutTypes[]  = {"IdxVerts",           nullptr};
 
   uint64_t MakeCube(LavaParams* inout_lp, LavaVal* in, LavaOut* out)
   {
@@ -39,12 +78,16 @@ extern "C"
       {0.0f, 0.0f}}               //texCoord
     };
 
+    PrintIvTbl(lftTri);
+
     auto typenum    =  "IdxVerts";
     lftTri("type")  =  *((u64*)typenum);
     lftTri("mode")  =  (u64)0x0004; // (u64)GL_TRIANGLES;  // #define GL_TRIANGLES 0x0004
     tu32 ind        =  {0, 1, 2};
     lftTri("IND")   =  &ind; 
     lftTri.flatten();
+
+    PrintIvTbl(lftTri);
 
     inout_lp->outputs = 1;
     out[0] = LavaTblToOut(inout_lp, lftTri);

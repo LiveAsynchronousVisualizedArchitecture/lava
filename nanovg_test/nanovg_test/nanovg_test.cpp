@@ -17,8 +17,10 @@
 // -todo: figure out why delNode is passed a wrong node id - is it LavaNode::NONE ?  - pointer / iterator was being invalidated by deletion
 // -todo: make sel_delete delete from the message passing nodes set - nothing was deleting from the LavaGraph
 // -todo: figure out why a deleted node id shows up - is it not being deleted from the msg passing nodes? 
+// -todo: put some output in simdb
 
-// todo: put some output in simdb
+// todo: make initializer list run the main init function in tbl - actually need to split the fields initialization from any alloction 
+// todo: figure out why flattening the tbl is not working
 // todo: either visualize strings, or put an indexed verts object into the db - probably easier to make another node that outputs an indexed verts table
 // todo: use a copy of the graph to clear and update the interface buttons
 // todo: fix selection again - figure out all information like the slot and node that's inside, box drag etc click up or down etc, and put it all together at the end 
@@ -178,8 +180,6 @@ using vec_ids = std::vector<Id>;
 static FisData fd;
 
 namespace{
-
-
 
 float               lerp(float p, float lo, float hi)
 {
@@ -1374,7 +1374,8 @@ ENTRY_DECLARATION
       //auto   inst1 = node_add("FileToString", Node("two",   Node::Type::FLOW, {200.f,500.f}) );
       //auto   inst2 = node_add("FileToString", Node("three", Node::Type::FLOW, {700.f,500.f}) );
       //auto   inst3 = node_add("FileToString", Node("four",  Node::Type::FLOW, {700.f,700.f}) );
-      auto   inst4 = node_add("FilePathMsg",  Node("five",  Node::Type::MSG,  {200.f,200.f}) );
+      //auto   inst4 = node_add("FilePathMsg",  Node("five",  Node::Type::MSG,  {200.f,200.f}) );
+      auto   inst5 = node_add("MakeCube",  Node("six",  Node::Type::MSG,  {200.f,200.f}) );
 
       //LavaId s0 = slot_add( Slot(inst0, false)  );
       //LavaId s1 = slot_add( Slot(inst1,  true)  );

@@ -609,21 +609,37 @@ private:
 
     return cnt;
   }
+  
+  void     initFields(u64 sizeBytes, u64 count)
+  {
+    auto   memst  =  this->memStart();
+    fields*    f  =  (fields*)memst;
+    f->t          =  't';
+    f->b          =  'b';
+    f->sizeBytes  =  sizeBytes;
+    f->elems      =  0;
+    f->capacity   =  count;
+    f->size       =  0;  // count;
+    f->mapcap     =  0;
+    f->owned      =  1;
+  }
   void           init(u64 count)
   {
     u64    szBytes  =  tbl::size_bytes(count);
     u8*      memst  =  (u8*)malloc(szBytes);                 // memst is memory start
     m_mem           =  memst + memberBytes();
 
-    fields*    f = (fields*)memst;
-    f->t         = 't';
-    f->b         = 'b';
-    f->sizeBytes = szBytes;
-    f->elems     = 0;
-    f->capacity  = count;
-    f->size      = count;
-    f->mapcap    = 0;
-    f->owned     = 1;
+    initFields(szBytes, count);
+
+    //fields*    f = (fields*)memst;
+    //f->t         = 't';
+    //f->b         = 'b';
+    //f->sizeBytes = szBytes;
+    //f->elems     = 0;
+    //f->capacity  = count;
+    //f->size      = count;
+    //f->mapcap    = 0;
+    //f->owned     = 1;
   }
   void         initKV(std::initializer_list<KV> lst)
   {
@@ -633,9 +649,12 @@ private:
       kv.hsh.type = n.hsh.type;
     }
   }
-  void           init(std::initializer_list<T> lst)
+  void           init(std::initializer_list<T>  lst)
   {
     reserve(lst.size(),0,0);
+
+    initFields( sizeBytes(), lst.size() ); 
+
     for(auto&& n : lst){ emplace(n); }
   }
   void      init_cstr(const char* s)
@@ -740,7 +759,11 @@ public:
     TO(count, i){ (*this)[i] = value; }
   }
   tbl(std::initializer_list<KV> lst){ initKV(lst); }
-  tbl(std::initializer_list<T>  lst){   init(lst); }
+  tbl(std::initializer_list<T>  lst)
+  {
+    //init(lst.size()); 
+    init(lst); 
+  }
   tbl(const char* s){ init_cstr(s); }
   ~tbl(){ destroy(); }
 
