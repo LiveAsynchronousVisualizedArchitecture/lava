@@ -680,7 +680,7 @@ private:
   }
   void             cp(tbl const& l)
   {    
-    if(l.owned()){
+    //if(l.owned()){
       //tbl_PRNT("\n full copy \n");
       tbl<T> prev;
       prev.m_mem = m_mem;                                                                // make a tbl for the old memory - this will be destructed at the end of this scope, which will free up the old memory. the old memory is not freed up first, since we could be copying from a child of this very same tbl 
@@ -695,10 +695,10 @@ private:
       }
 
       memcpy(childData(), l.childData(), l.child_capacity() );                           // since this is a straight copy of the child memory, the values/offsets in the map's child table can stay the same
-    }else{
-      //tbl_PRNT("\n shallow copy \n");
-      m_mem = l.m_mem;
-    } 
+    //}else{
+    //  //tbl_PRNT("\n shallow copy \n");
+    //  m_mem = l.m_mem;
+    //} 
   }
   void             mv(tbl&& r)
   {

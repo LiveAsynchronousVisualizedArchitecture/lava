@@ -9,7 +9,7 @@
 struct vert { f32 p[3],n[3],c[4],tx[2]; };
 using IvTbl = tbl<vert>;
 
-void PrintVert(vert const& v)
+void Print(vert const& v)
 {
   Print("p: ",    v.p[0],  " ", v.p[1], " ", v.p[2]);
   Print("  n: ",  v.n[0],  " ", v.n[1], " ", v.n[2]);
@@ -18,31 +18,36 @@ void PrintVert(vert const& v)
   Println();
 }
 
-void PrintIvTbl(IvTbl const& iv)
+template<class T> void PrintTbl(tbl<T> t)
 {
   Println();
-  i8* memst = (i8*)iv.memStart();
+  i8* memst = (i8*)t.memStart();
   Println("tbl check: ", memst[0]," ",memst[1]); 
-  Println("owned: ",            iv.owned(),
-          " sizeBytes: ",       iv.sizeBytes(),
-          " capacity: ",        iv.capacity(), 
-          " size: ",            iv.size(),  "\n",
-          " map_capacity: ",    iv.map_capacity(),
-          " elems: ",           iv.elems(), "\n",
-          " child_capacity: ",  iv.child_capacity(),
-          " childData: ",       iv.childData() );
+  Println("owned: ",      t.owned(),
+    " sizeBytes: ",       t.sizeBytes(),
+    " capacity: ",        t.capacity(), 
+    " size: ",            t.size(),  "\n",
+    " map_capacity: ",    t.map_capacity(),
+    " elems: ",           t.elems(), "\n",
+    " child_capacity: ",  t.child_capacity(),
+    " childData: ",       t.childData() );
 
   Println();
   Println("-map-");
-  auto e = iv.elemStart();
-  TO(iv.map_capacity(),i) if( !e[i].isEmpty() ){
+  auto e = t.elemStart();
+  TO(t.map_capacity(),i) if( !e[i].isEmpty() ){
     Println("k: ", e[i].key, "   v: ", e[i].val, "  type: ", e[i].hsh.type, "  hash: ", e[i].hsh.hash);
   }
   Println();
+}
+
+void Print(IvTbl const& iv)
+{
+  PrintTbl(iv);
 
   Println("-array-");
   TO(iv.size(),i){
-    PrintVert(iv[i]);
+    Print(iv[i]);
   }
   Println();
 }
@@ -78,7 +83,7 @@ extern "C"
       {0.0f, 0.0f}}               //texCoord
     };
 
-    PrintIvTbl(lftTri);
+    Print(lftTri);
 
     auto typenum    =  "IdxVerts";
     lftTri("type")  =  *((u64*)typenum);
@@ -87,7 +92,8 @@ extern "C"
     lftTri("IND")   =  &ind; 
     lftTri.flatten();
 
-    PrintIvTbl(lftTri);
+    PrintTbl(ind);
+    Print(lftTri);
 
     inout_lp->outputs = 1;
     out[0] = LavaTblToOut(inout_lp, lftTri);

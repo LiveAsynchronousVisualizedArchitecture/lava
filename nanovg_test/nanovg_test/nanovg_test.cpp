@@ -18,8 +18,10 @@
 // -todo: make sel_delete delete from the message passing nodes set - nothing was deleting from the LavaGraph
 // -todo: figure out why a deleted node id shows up - is it not being deleted from the msg passing nodes? 
 // -todo: put some output in simdb
+// -todo: make initializer list run the main init function in tbl - actually need to split the fields initialization from any alloction 
+// -todo: split table printing into multiple functions
+// -todo: take owned() query out of internal cp() function? - done, but crash still happens, possibly on destroy() during copy
 
-// todo: make initializer list run the main init function in tbl - actually need to split the fields initialization from any alloction 
 // todo: figure out why flattening the tbl is not working
 // todo: either visualize strings, or put an indexed verts object into the db - probably easier to make another node that outputs an indexed verts table
 // todo: use a copy of the graph to clear and update the interface buttons
