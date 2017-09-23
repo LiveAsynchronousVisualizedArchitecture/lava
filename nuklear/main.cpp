@@ -54,7 +54,9 @@
 // -todo: make tbl to Shape function in VizTfm.hpp
 // -todo: use tbl for IndexedVerts after adding sub-tables
 // -todo: convert makeTriangle and makeCube to return IdxVerts tbls
+// -todo: make sure currently selected db is initialized - how does the initial name become set? - needed to reorganize to make sure that listing the dbs was done at first and the dbs were opened on a menu list if there is no current db open, even if the index hasn't changed
 
+// todo: fix crash while turning on second button 
 // todo: fix tbl visualization cells going outside the bounds of bounding box - need to wrap sooner, possibly based on more margins
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
@@ -160,6 +162,7 @@ void printdb(simdb const& db)
   }
 }
 
+void           buttonCallback(str key, bool pushed);
 
 vec3                      pos(mat4 const& m)
 { return m[3];                      }
@@ -385,31 +388,6 @@ GLFWwindow*          initGLFW(VizData* vd)
   return win;
 }
 
-void           buttonCallback(str key, bool pushed)
-{
-  vd.shapes[key].active = pushed;
-}
-void            dbLstCallback(bool pressed)
-{
-  if(pressed){
-    str  name;
-    if(vd.ui.dbNameIdx>=0 && vd.ui.dbNameIdx<vd.ui.dbNames.size()){
-      name = vd.ui.dbNames[vd.ui.dbNameIdx];
-    }
-
-    vd.ui.dbNames = simdb_listDBs();                            // all of these are globals
-    auto     iter = find( ALL(vd.ui.dbNames), name);
-    if(iter != vd.ui.dbNames.end()){
-      vd.ui.dbNameIdx = iter - vd.ui.dbNames.begin();
-    }else{ vd.ui.dbNameIdx = 0; }                                                        // if the name isn't found in the new listing, then just reset to the first in the list of db names
-
-    if(vd.ui.dbLst){
-      vd.ui.dbLst->setItems(vd.ui.dbNames);
-      vd.ui.dbLst->setSelectedIndex(vd.ui.dbNameIdx);
-    }
-    vd.ui.screen.performLayout();
-  }
-}
 
 void              RenderShape(Shape const& shp, mat4 const& m) // GLuint shaderId)
 {
@@ -558,6 +536,47 @@ void                refreshDB(VizData* vd)
 
   if(vd->keyRefreshClock > vd->keyRefresh){                           // if there is already enough time saved up for another update make sure that less that two updates worth of time is kept 
     vd->keyRefreshClock = vd->keyRefresh + fmod(vd->keyRefreshClock, vd->keyRefresh);
+  }
+}
+
+void           buttonCallback(str key, bool pushed)
+{
+  vd.shapes[key].active = pushed;
+}
+void       dbLstPressCallback(int i)
+{
+  if(i < vd.ui.dbNames.size() ){ // && i!=vd.ui.dbNameIdx){
+    vd.ui.dbNameIdx = i;
+    vd.ui.dbName = vd.ui.dbNames[i];
+    initSimDB(vd.ui.dbName);
+    refreshDB(&vd);
+    vd.ui.dbLst->setSelectedIndex(i);
+  }
+  vd.ui.screen.performLayout();
+}
+void      dbLstChangeCallback(bool pressed)
+{
+  if(pressed){
+    vd.ui.dbNames = simdb_listDBs();                            // all of these are globals
+
+    str  name;
+    if(vd.ui.dbNameIdx>=0 && vd.ui.dbNameIdx<vd.ui.dbNames.size()){
+      name = vd.ui.dbNames[vd.ui.dbNameIdx];
+    }
+
+    auto iter = find( ALL(vd.ui.dbNames), name);
+    if(iter != vd.ui.dbNames.end()){
+      vd.ui.dbNameIdx = iter - vd.ui.dbNames.begin();
+    }else{ vd.ui.dbNameIdx = 0; }                                                        // if the name isn't found in the new listing, then just reset to the first in the list of db names
+
+    if(vd.ui.dbLst){
+      vd.ui.dbLst->setItems(vd.ui.dbNames);
+      vd.ui.dbLst->setSelectedIndex(vd.ui.dbNameIdx);
+      if(db.mem() == nullptr){
+        dbLstPressCallback(vd.ui.dbNameIdx);
+      }
+    }
+    vd.ui.screen.performLayout();
   }
 }
 
@@ -913,18 +932,20 @@ ENTRY_DECLARATION
         auto spcr2   = new Label(vd.ui.keyWin,    "");
         auto spcr3   = new Label(vd.ui.keyWin,    "");
         vd.ui.dbLst  = new ComboBox(vd.ui.keyWin, {"None"} );
-        vd.ui.dbLst->setChangeCallback( dbLstCallback );
-        dbLstCallback(true);
-        vd.ui.dbLst->setCallback([](int i){                                          // callback for the actual selection
-          if(i < vd.ui.dbNames.size() && i!=vd.ui.dbNameIdx){
-            vd.ui.dbNameIdx = i;
-            vd.ui.dbName = vd.ui.dbNames[i];
-            initSimDB(vd.ui.dbName);
-            refreshDB(&vd);
-            vd.ui.dbLst->setSelectedIndex(i);
-          }
-          vd.ui.screen.performLayout();
-        });
+        vd.ui.dbLst->setChangeCallback( dbLstChangeCallback );
+        dbLstChangeCallback(true);
+        vd.ui.dbLst->setCallback( dbLstPressCallback );
+
+        //vd.ui.dbLst->setCallback([](int i){                                          // callback for the actual selection
+        //  if(i < vd.ui.dbNames.size() && i!=vd.ui.dbNameIdx){
+        //    vd.ui.dbNameIdx = i;
+        //    vd.ui.dbName = vd.ui.dbNames[i];
+        //    initSimDB(vd.ui.dbName);
+        //    refreshDB(&vd);
+        //    vd.ui.dbLst->setSelectedIndex(i);
+        //  }
+        //  vd.ui.screen.performLayout();
+        //});
         auto spcr4   = new Label(vd.ui.keyWin, "");
         auto spcr5   = new Label(vd.ui.keyWin, "");
         auto spcr6   = new Label(vd.ui.keyWin, "");
@@ -1268,6 +1289,13 @@ ENTRY_DECLARATION
 
 
 
+
+
+//auto prevSz = vd.ui.dbNames.size();
+//if(vd.ui.dbNames.size()==0){
+//}
+//else{
+//}
 
 //vec<i8> ivbuf(vlen);
 //db.get(vs.str.data(), (u32)vs.str.length(), ivbuf.data(), (u32)ivbuf.size());

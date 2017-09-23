@@ -971,7 +971,7 @@ bool                 PutMem(LavaId id, LavaMem lm)
   sprintf(label, "%d:%d", (u32)id.nid, (u32)id.sidx);
 
   uint32_t stblk=0;
-  bool ok = vizdb.put(label, lm.data(), (u32)lm.sizeBytes(), &stblk);
+  bool ok = db.put(label, lm.data(), (u32)lm.sizeBytes(), &stblk);
 
   return ok;
   //str label = str(id.nid) + ":" + str(id.sidx);

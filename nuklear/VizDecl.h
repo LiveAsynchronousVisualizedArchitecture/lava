@@ -177,7 +177,7 @@ struct VizData
     Window*         dbWin = nullptr;
     BoxLayout*     keyLay = nullptr;
     ComboBox*       dbLst = nullptr;
-    int          dbLstIdx = -1;
+    int          dbLstIdx = 0;
     NVGcontext*       nvg = nullptr;
     veci           dbIdxs;
     vecstr        dbNames;
