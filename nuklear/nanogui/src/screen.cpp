@@ -489,9 +489,13 @@ bool Screen::cursorPosCallbackEvent(double x, double y) {
                 glfwSetCursor(mGLFWWindow, mCursors[(int) mCursor]);
             }
         } else {
-            ret = mDragWidget->mouseDragEvent(
-                p - mDragWidget->parent()->absolutePosition(), p - mMousePos,
-                mMouseState, mModifiers);
+          ret = (mDragWidget && mDragWidget->parent())?  mDragWidget->mouseDragEvent(
+              p - mDragWidget->parent()->absolutePosition(), p - mMousePos,
+              mMouseState, mModifiers)  :  ret; // sbassett 9.23.2017
+
+            //ret = mDragWidget->mouseDragEvent(
+            //    p - mDragWidget->parent()->absolutePosition(), p - mMousePos,
+            //    mMouseState, mModifiers);
         }
 
         if (!ret)
