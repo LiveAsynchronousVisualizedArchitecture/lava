@@ -619,7 +619,7 @@ private:
     f->sizeBytes  =  sizeBytes;
     f->elems      =  0;
     f->capacity   =  count;
-    f->size       =  0;  // count;
+    f->size       =  count;
     f->mapcap     =  0;
     f->owned      =  1;
   }
@@ -630,16 +630,6 @@ private:
     m_mem           =  memst + memberBytes();
 
     initFields(szBytes, count);
-
-    //fields*    f = (fields*)memst;
-    //f->t         = 't';
-    //f->b         = 'b';
-    //f->sizeBytes = szBytes;
-    //f->elems     = 0;
-    //f->capacity  = count;
-    //f->size      = count;
-    //f->mapcap    = 0;
-    //f->owned     = 1;
   }
   void         initKV(std::initializer_list<KV> lst)
   {
@@ -651,11 +641,15 @@ private:
   }
   void           init(std::initializer_list<T>  lst)
   {
+    using namespace std;
+    
     reserve(lst.size(),0,0);
-
     initFields( sizeBytes(), lst.size() ); 
 
-    for(auto&& n : lst){ emplace(n); }
+    auto i = 0;
+    for(auto&& n : lst){ (*this)[i++] = move(n); }
+
+    //for(auto&& n : lst){ emplace(n); }
   }
   void      init_cstr(const char* s)
   {
@@ -937,7 +931,7 @@ public:
   void*     childData() const { return (void*)(elemStart() + map_capacity()); }                                                      // elemStart return a KV* so map_capacity will increment that pointer by the map_capacity * sizeof(KV)
   u64  child_capacity() const
   {
-    auto szb = 0;
+    u64 szb = 0;
     if(!m_mem || (szb=sizeBytes())==0 ) return 0;
 
     return sizeBytes() - memberBytes() - capacity()*sizeof(T) - map_capacity()*sizeof(KV);
@@ -1043,7 +1037,7 @@ public:
       auto   ff = (fields*)nxtp;
       KV* nxtel = (KV*)(nxtp+vecsz);                                                         // nxtel is next element
       u64   cur = 0;
-      TO(map_capacity(),i)
+      TO(map_capacity(),i)                                                                // todo: don't these need to be rehashed instead of simply copied?
         if(el[i].hsh.type!= HshType::EMPTY){
           nxtel[cur++] = el[i];
         }
@@ -1161,24 +1155,36 @@ public:
         newcap  +=  t->sizeBytes();
     }
     reserve(0,0, prevCap + newcap);
-    u64   chldst = (u64)childData();
-    u8* curChild = (u8*)chldst + prevCap;
-    TO(mapcap,i)
+    e             =  elemStart();
+    u64   chldst  =  (u64)childData();
+    u8* curChild  =  (u8*)chldst + prevCap;
+    TO(mapcap,i){
       if(  (e[i].hsh.type & HshType::TABLE) && 
           !(e[i].hsh.type & HshType::CHILD) ){                                 // if the table bit is set but the child bit is not set
-        tbl<T>*       t  =  (tbl<T>*)e[i].val;
+        tbl<T>*    t  =  (tbl<T>*)e[i].val;
         auto szbytes  =  t->sizeBytes();
 
         memcpy(curChild, t->memStart(), szbytes);
         auto   f = (fields*)curChild;
         f->owned = 0;
 
-        e[i].hsh.type  |=  HshType::CHILD;
+        //e[i].hsh.type  |=  HshType::CHILD;
+        e[i].hsh.type  |=  HshType::CHILD;                                     // turn on CHILD in this element's type by using a logical OR to always turn the bit on
         e[i].val        =  (u64)curChild - chldst;                             // the memory start will likely have changed due to reallocation
         curChild       +=  szbytes;
       }
+    }
 
-    shrink_to_fit();                                                           // todo: do it all at once to avoid extra copying and allocations 
+    //shrink_to_fit();                                                           // todo: do it all at once to avoid extra copying and allocations 
+
+    TO(mapcap,i){
+      e[i].hsh.type;
+      // assert that either both child and table are set or neither of them are set
+      //assert(  ((e[i].hsh.type & HshType::CHILD) &&  (e[i].hsh.type & HshType::TABLE)) ||
+      //        (!(e[i].hsh.type & HshType::CHILD) && !(e[i].hsh.type & HshType::TABLE)) );
+      //if( e[i].hsh.type & HshType::TABLE )
+      //  assert( e[i].hsh.type & HshType::CHILD );
+    }
 
     return *this;
   }
@@ -1364,3 +1370,15 @@ auto HshType::type_str(Type t) -> char const* const
 
 #endif
 
+
+
+
+//fields*    f = (fields*)memst;
+//f->t         = 't';
+//f->b         = 'b';
+//f->sizeBytes = szBytes;
+//f->elems     = 0;
+//f->capacity  = count;
+//f->size      = count;
+//f->mapcap    = 0;
+//f->owned     = 1;

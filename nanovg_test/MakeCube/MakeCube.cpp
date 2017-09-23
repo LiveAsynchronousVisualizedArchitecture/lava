@@ -18,7 +18,7 @@ void Print(vert const& v)
   Println();
 }
 
-template<class T> void PrintTbl(tbl<T> t)
+template<class T> void PrintTbl(tbl<T> const& t)
 {
   Println();
   i8* memst = (i8*)t.memStart();
@@ -36,7 +36,24 @@ template<class T> void PrintTbl(tbl<T> t)
   Println("-map-");
   auto e = t.elemStart();
   TO(t.map_capacity(),i) if( !e[i].isEmpty() ){
-    Println("k: ", e[i].key, "   v: ", e[i].val, "  type: ", e[i].hsh.type, "  hash: ", e[i].hsh.hash);
+    Print("hash: ", e[i].hsh.hash);
+    Print("  k: ", e[i].key, "   v: ", e[i].val);
+    Print("  type: ", e[i].hsh.type, "  ");
+    if(e[i].hsh.type & HshType::TABLE)   Print("TABLE ");
+    if(e[i].hsh.type & HshType::CHILD)   Print("CHILD ");
+    if(e[i].hsh.type & HshType::INTEGER) Print("INTEGER ");
+    Println();
+  }
+  Println();
+}
+
+void Print(tbl<u32> const& t)
+{
+  PrintTbl(t);
+
+  Println("-array-");
+  TO(t.size(),i){
+    Print(t[i], " ");
   }
   Println();
 }
@@ -90,9 +107,16 @@ extern "C"
     lftTri("mode")  =  (u64)0x0004; // (u64)GL_TRIANGLES;  // #define GL_TRIANGLES 0x0004
     tu32 ind        =  {0, 1, 2};
     lftTri("IND")   =  &ind; 
+
+    Println("before flatten");
+    Print(lftTri);
+
     lftTri.flatten();
 
-    PrintTbl(ind);
+    Println("IND tbl"); 
+    Print(ind);
+    Println();
+    
     Print(lftTri);
 
     inout_lp->outputs = 1;

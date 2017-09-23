@@ -21,8 +21,9 @@
 // -todo: make initializer list run the main init function in tbl - actually need to split the fields initialization from any alloction 
 // -todo: split table printing into multiple functions
 // -todo: take owned() query out of internal cp() function? - done, but crash still happens, possibly on destroy() during copy
+// -todo: make initializer list not use emplace, but copy to indices, since the array elements already exist
+// -todo: figure out why flattening the tbl is not working - is the type of the child table not the same on each run? - is flatten not making a child table into a child table type when it is internal? - possible problems with shrink_to_fit()
 
-// todo: figure out why flattening the tbl is not working
 // todo: either visualize strings, or put an indexed verts object into the db - probably easier to make another node that outputs an indexed verts table
 // todo: use a copy of the graph to clear and update the interface buttons
 // todo: fix selection again - figure out all information like the slot and node that's inside, box drag etc click up or down etc, and put it all together at the end 
@@ -45,6 +46,8 @@
 //       | initially just make them thread safe or make them lock with mutexes
 //       | do messages need some sort of 8 byte number to be able to do occasionally do without heap or simdb allocated values?
 // todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
+// todo: print child tables
+
 
 // todo: make a thread number UI input box
 // todo: somehow draw slot names and types when slots are moused over
