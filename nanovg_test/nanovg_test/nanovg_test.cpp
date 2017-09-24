@@ -29,11 +29,13 @@
 //       -| redo connection creation
 //       -| redo primary node selection with reordering
 //       -| put it all together at the end 
+// -todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments  - not neccesary with selection refactoring
+// -todo: take out clear node selections
+// -todo: take out node state selection on primary selection
 
 // todo: fix title changing on node deletion
 // todo: use a copy of the graph to clear and update the interface buttons
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array
-// todo: make lava memory allocation aligned to 64 byte boundaries
 // todo: use combination of frame, node id and slot as key to simbdb
 //       |  how does that get in to the node, if all the data is in the packet struct? - through the output Args
 //       |  put the index information into the output array and use that 
@@ -41,18 +43,18 @@
 //       |  the full key is needed because robin hood hashing could shift the other keys' indices around - the index into the key value slots in the db can't be used, but the starting block index can since that won't change until the data goes away
 //       |  use a union of bytes that is filled with the frame, slot, list index?
 //       |  use malloc addresses initially
-// todo: come up with locking system so that message nodes have their own threads that are only run when a looping thread visits them - how should memory allocation be done? passing the thread's allocator in the exact same way?
 // todo: change project name to Fissure 
 // todo: make a function to get a copy of the graph - can check the version number every loop, and if it is higher, get a copy of all the data inside a mutex
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
 //       |  does there need to be a function to copy the instances and connections? - should this ultimatly be used for drawing the graph?
+
+// todo: print child tables in table printing functions
+// todo: make lava memory allocation aligned to 64 byte boundaries
+// todo: come up with locking system so that message nodes have their own threads that are only run when a looping thread visits them - how should memory allocation be done? passing the thread's allocator in the exact same way?
 // todo: prototype API for message nodes
 //       | do message nodes need some extra way to hold their state? will there ever be more than a single instance of a message node?
 //       | initially just make them thread safe or make them lock with mutexes
 //       | do messages need some sort of 8 byte number to be able to do occasionally do without heap or simdb allocated values?
-// todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments 
-// todo: print child tables in table printing functions
-
 // todo: make a thread number UI input box
 // todo: somehow draw slot names and types when slots are moused over
 // todo: transition to better json support to write formatted json/.lava files?
@@ -1123,10 +1125,10 @@ void               keyCallback(GLFWwindow* win, int key, int scancode, int actio
 {
   if(action==GLFW_RELEASE) return;
 
-  char sngl[256]; // = {'\0', '\0'};
-  memset(sngl, 0, 256);
-  sngl[0] = key;
-  glfwSetWindowTitle(win, sngl);
+  //char sngl[256]; // = {'\0', '\0'};
+  //memset(sngl, 0, 256);
+  //sngl[0] = key;
+  //glfwSetWindowTitle(win, sngl);
 
   switch(key){
   case 'J':{
@@ -1530,7 +1532,6 @@ ENTRY_DECLARATION
         }
         SECTION(node primary select and move to top)
         {
-          //if(lftClkDn && (fd.sel.pri==LavaNode::NODE_ERROR || fd.sel.pri!=n->id) )
           if(nodeClk)
           {
             Node* n     =  &(node_moveToFront(nid.nid));
@@ -1538,8 +1539,8 @@ ENTRY_DECLARATION
             fd.sel.pri  =  n->id;
             ms.drgP     =  pntr;
 
-            TO(sz,j){ nds[j]->sel = false; }                  // never O^2 due to no longer being inside an outer loop of nodes  todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
-            n->sel = true;
+            //TO(sz,j){ nds[j]->sel = false; }                // why do this?   // never O^2 due to no longer being inside an outer loop of nodes  todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
+            //n->sel = true;
             //break;                                          // without breaking from the loop, a node could be moved down and hit again
           }
         }
@@ -1575,180 +1576,6 @@ ENTRY_DECLARATION
              sel_clear();
            }
         }
-
-        //  LavaId  inClk(LavaId::NODE_NONE, LavaId::SLOT_NONE);
-        //  LavaId outClk(LavaId::NODE_NONE, LavaId::SLOT_NONE);
-        //  for(auto& kv : fd.graph.slots)
-        //  {
-        //    LavaId sid = kv.first;                       // sid is slot id
-        //    Slot&    s = kv.second;
-        //    if(lftClkDn)
-        //    {  
-        //      bool inSlt = len(pntr - s.P) < fd.ui.slot_rad;
-        //      if(inSlt){
-        //        outClk  = sid;
-        //        s.state = Slot::SELECTED;
-        //        if(s.in) fd.sel.slotInSel  = sid;
-        //        else     fd.sel.slotOutSel = sid;
-        //      }
-        //    }else if(lftClkUp){
-        //      bool inSlt = len(pntr - s.P) < fd.ui.slot_rad;
-        //    }
-        //  }
-        //}
-
-        //LavaId sidClk;
-        //
-        //LavaId nidClk;
-        //bool  nodeClk = false;
-        //
-        //bool dragging = false;
-        //
-        //SECTION(drag pointer)
-        //{
-        //  if(!ms.lftDn) ms.drgP = pntr;
-        //}
-        //if(!isInSlot && !isInNode)
-
-        //bool clearSelections = true;
-        //ms.prevDrgbox = ms.drgbox;
-        //SECTION(select from selection box)
-        //{
-        //  bool anyInside = false; 
-        //  if(lftClkUp || ms.drgbox){    // put this above the box settings?
-        //    TO(sz,i){
-        //      Node& n       =  *(nds[i]);
-        //      bool inside   =  isIn(n.b, ms.drgbnd);
-        //      n.sel        |=  inside;
-        //      anyInside    |=  inside;
-        //    }
-        //    //if(drgbnd.hasLen() && fd.mouse.lftDn)
-        //    if(ms.drgbnd.area()>1.f && fd.mouse.lftDn)
-        //      clearSelections = false;
-        //  }
-        //
-        //  if(!anyInside && lftClkUp){
-        //    clearSelections = true;
-        //  }
-        //
-        //  if(!fd.mouse.lftDn){
-        //    fd.sel.pri = LavaNode::NODE_ERROR;
-        //  }
-        //}
-
-        //SECTION(selection box create)
-        //{
-        //  //if(ms.drgbox || drgbnd.hasLen()){    // && lftClkUp
-        //  if(ms.drgbox || ms.drgbnd.area() > 1.f){
-        //    clearSelections=false;
-        //  }
-        //
-        //  if(!ms.lftDn){ ms.drgP=pntr; ms.drgbox=false; }
-        //
-        //  if(ms.drgbox)
-        //    ms.drgbnd = Bnd( min(ms.drgP.x, pntr.x),
-        //                  min(ms.drgP.y, pntr.y),
-        //                  max(ms.drgP.x, pntr.x),
-        //                  max(ms.drgP.y, pntr.y) );
-        //  else
-        //    ms.drgbnd = Bnd();
-        //}
-        
-        //bool inAnySlt = false;
-        //SECTION(slot selection and connection creation)
-        //{
-        //  LavaId  inClk(LavaId::NODE_NONE, LavaId::SLOT_NONE);
-        //  LavaId outClk(LavaId::NODE_NONE, LavaId::SLOT_NONE);
-        //  for(auto& kv : fd.graph.slots)
-        //  {
-        //    LavaId sid = kv.first;                       // sid is slot id
-        //    Slot&    s = kv.second;
-        //    if(lftClkDn)
-        //    {  
-        //      bool inSlt = len(pntr - s.P) < fd.ui.slot_rad;
-        //      if(inSlt){
-        //        outClk  = sid;
-        //        s.state = Slot::SELECTED;
-        //        if(s.in) fd.sel.slotInSel  = sid;
-        //        else     fd.sel.slotOutSel = sid;
-        //        clearSelections = false;
-        //        inAnySlt = true;
-        //      }
-        //    }else if(lftClkUp){
-        //      bool inSlt = len(pntr - s.P) < fd.ui.slot_rad;
-        //      if(inSlt){
-        //        clearSelections = false;
-        //        inAnySlt = true;
-        //      }
-        //    }
-        //  }
-        //
-        //  if(!inAnySlt && lftClkUp){
-        //    fd.sel.slotOutSel = fd.sel.slotInSel = LavaId(0,0);
-        //    sel_clearSlots();
-        //  }
-        //  
-        //  if(fd.sel.slotInSel.sidx  != LavaId::SLOT_NONE && 
-        //     fd.sel.slotOutSel.sidx != LavaId::SLOT_NONE)
-        //  {
-        //    fd.lgrph.toggleCnct(fd.sel.slotOutSel, fd.sel.slotInSel);
-        //    fd.sel.slotOutSel = fd.sel.slotInSel = LavaId(0,0);
-        //
-        //    sel_clearSlots();
-        //  }
-        //}
-       
-        //if(!inAnySlt) SECTION(node selection)
-        //{
-        //  bool inAny = false;
-        //  FROM(sz,i)                                                // loop backwards so that the top nodes are dealt with first
-        //  {
-        //    Node*     n = nds[i];
-        //    bool inNode = isIn(pntr.x,pntr.y, n->b);
-        //    inAny      |= inNode;
-        //
-        //    SECTION(primary selection and group selection effects)
-        //    {
-        //      if(inNode)
-        //      {
-        //        if(lftClkDn && (fd.sel.pri==LavaNode::NODE_ERROR || fd.sel.pri!=n->id) )
-        //        {
-        //          n    =  &(node_moveToFront(n->id));
-        //          nds  =  node_getPtrs();                  // move to the front will invalidate some pointers in the nds array so it needs to be remade
-        //          fd.sel.pri = n->id;
-        //          ms.drgP    = pntr;
-        //
-        //          TO(sz,j){ nds[j]->sel = false; }        // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
-        //          n->sel = true;
-        //          break;                                  // without breaking from the loop, a node could be moved down and hit again
-        //        }
-        //        else if(lftClkUp)
-        //        {
-        //          TO(sz,j){ nds[j]->sel = false; }        // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
-        //          n->sel          = true;
-        //          clearSelections = false;
-        //          break;                
-        //        }
-        //      }
-        //    }
-        //  }
-        //
-        //  if(!inAny)
-        //  {
-        //    if(fd.mouse.lftDn){ 
-        //      clearSelections = false;
-        //    }
-        //
-        //    if(lftClkDn && fd.sel.pri==LavaNode::NODE_ERROR ){ ms.drgbox=true; }
-        //    if(fd.mouse.rtDn && !fd.mouse.prevRtDn){ fd.sel.sec = LavaNode::NODE_ERROR; }
-        //  }else{
-        //    clearSelections = false;
-        //  }
-        //}
-        //
-        //if(clearSelections && lftClkUp){ 
-        //  sel_clear();
-        //}
       }
       SECTION(movement)
       {
@@ -2227,6 +2054,182 @@ ENTRY_DECLARATION
 
 
 
+//  LavaId  inClk(LavaId::NODE_NONE, LavaId::SLOT_NONE);
+//  LavaId outClk(LavaId::NODE_NONE, LavaId::SLOT_NONE);
+//  for(auto& kv : fd.graph.slots)
+//  {
+//    LavaId sid = kv.first;                       // sid is slot id
+//    Slot&    s = kv.second;
+//    if(lftClkDn)
+//    {  
+//      bool inSlt = len(pntr - s.P) < fd.ui.slot_rad;
+//      if(inSlt){
+//        outClk  = sid;
+//        s.state = Slot::SELECTED;
+//        if(s.in) fd.sel.slotInSel  = sid;
+//        else     fd.sel.slotOutSel = sid;
+//      }
+//    }else if(lftClkUp){
+//      bool inSlt = len(pntr - s.P) < fd.ui.slot_rad;
+//    }
+//  }
+//}
+
+//LavaId sidClk;
+//
+//LavaId nidClk;
+//bool  nodeClk = false;
+//
+//bool dragging = false;
+//
+//SECTION(drag pointer)
+//{
+//  if(!ms.lftDn) ms.drgP = pntr;
+//}
+//if(!isInSlot && !isInNode)
+
+//bool clearSelections = true;
+//ms.prevDrgbox = ms.drgbox;
+//SECTION(select from selection box)
+//{
+//  bool anyInside = false; 
+//  if(lftClkUp || ms.drgbox){    // put this above the box settings?
+//    TO(sz,i){
+//      Node& n       =  *(nds[i]);
+//      bool inside   =  isIn(n.b, ms.drgbnd);
+//      n.sel        |=  inside;
+//      anyInside    |=  inside;
+//    }
+//    //if(drgbnd.hasLen() && fd.mouse.lftDn)
+//    if(ms.drgbnd.area()>1.f && fd.mouse.lftDn)
+//      clearSelections = false;
+//  }
+//
+//  if(!anyInside && lftClkUp){
+//    clearSelections = true;
+//  }
+//
+//  if(!fd.mouse.lftDn){
+//    fd.sel.pri = LavaNode::NODE_ERROR;
+//  }
+//}
+
+//SECTION(selection box create)
+//{
+//  //if(ms.drgbox || drgbnd.hasLen()){    // && lftClkUp
+//  if(ms.drgbox || ms.drgbnd.area() > 1.f){
+//    clearSelections=false;
+//  }
+//
+//  if(!ms.lftDn){ ms.drgP=pntr; ms.drgbox=false; }
+//
+//  if(ms.drgbox)
+//    ms.drgbnd = Bnd( min(ms.drgP.x, pntr.x),
+//                  min(ms.drgP.y, pntr.y),
+//                  max(ms.drgP.x, pntr.x),
+//                  max(ms.drgP.y, pntr.y) );
+//  else
+//    ms.drgbnd = Bnd();
+//}
+
+//bool inAnySlt = false;
+//SECTION(slot selection and connection creation)
+//{
+//  LavaId  inClk(LavaId::NODE_NONE, LavaId::SLOT_NONE);
+//  LavaId outClk(LavaId::NODE_NONE, LavaId::SLOT_NONE);
+//  for(auto& kv : fd.graph.slots)
+//  {
+//    LavaId sid = kv.first;                       // sid is slot id
+//    Slot&    s = kv.second;
+//    if(lftClkDn)
+//    {  
+//      bool inSlt = len(pntr - s.P) < fd.ui.slot_rad;
+//      if(inSlt){
+//        outClk  = sid;
+//        s.state = Slot::SELECTED;
+//        if(s.in) fd.sel.slotInSel  = sid;
+//        else     fd.sel.slotOutSel = sid;
+//        clearSelections = false;
+//        inAnySlt = true;
+//      }
+//    }else if(lftClkUp){
+//      bool inSlt = len(pntr - s.P) < fd.ui.slot_rad;
+//      if(inSlt){
+//        clearSelections = false;
+//        inAnySlt = true;
+//      }
+//    }
+//  }
+//
+//  if(!inAnySlt && lftClkUp){
+//    fd.sel.slotOutSel = fd.sel.slotInSel = LavaId(0,0);
+//    sel_clearSlots();
+//  }
+//  
+//  if(fd.sel.slotInSel.sidx  != LavaId::SLOT_NONE && 
+//     fd.sel.slotOutSel.sidx != LavaId::SLOT_NONE)
+//  {
+//    fd.lgrph.toggleCnct(fd.sel.slotOutSel, fd.sel.slotInSel);
+//    fd.sel.slotOutSel = fd.sel.slotInSel = LavaId(0,0);
+//
+//    sel_clearSlots();
+//  }
+//}
+
+//if(!inAnySlt) SECTION(node selection)
+//{
+//  bool inAny = false;
+//  FROM(sz,i)                                                // loop backwards so that the top nodes are dealt with first
+//  {
+//    Node*     n = nds[i];
+//    bool inNode = isIn(pntr.x,pntr.y, n->b);
+//    inAny      |= inNode;
+//
+//    SECTION(primary selection and group selection effects)
+//    {
+//      if(inNode)
+//      {
+//        if(lftClkDn && (fd.sel.pri==LavaNode::NODE_ERROR || fd.sel.pri!=n->id) )
+//        {
+//          n    =  &(node_moveToFront(n->id));
+//          nds  =  node_getPtrs();                  // move to the front will invalidate some pointers in the nds array so it needs to be remade
+//          fd.sel.pri = n->id;
+//          ms.drgP    = pntr;
+//
+//          TO(sz,j){ nds[j]->sel = false; }        // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
+//          n->sel = true;
+//          break;                                  // without breaking from the loop, a node could be moved down and hit again
+//        }
+//        else if(lftClkUp)
+//        {
+//          TO(sz,j){ nds[j]->sel = false; }        // todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
+//          n->sel          = true;
+//          clearSelections = false;
+//          break;                
+//        }
+//      }
+//    }
+//  }
+//
+//  if(!inAny)
+//  {
+//    if(fd.mouse.lftDn){ 
+//      clearSelections = false;
+//    }
+//
+//    if(lftClkDn && fd.sel.pri==LavaNode::NODE_ERROR ){ ms.drgbox=true; }
+//    if(fd.mouse.rtDn && !fd.mouse.prevRtDn){ fd.sel.sec = LavaNode::NODE_ERROR; }
+//  }else{
+//    clearSelections = false;
+//  }
+//}
+//
+//if(clearSelections && lftClkUp){ 
+//  sel_clear();
+//}
+
+//
+//if(lftClkDn && (fd.sel.pri==LavaNode::NODE_ERROR || fd.sel.pri!=n->id) )
 
 //Bnd  drgbnd;
 //
