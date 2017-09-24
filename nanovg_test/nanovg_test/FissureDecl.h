@@ -34,6 +34,7 @@ template<class T> using vec = std::vector<T>;
 using str  =  std::string;
 
 using e2i  =  Eigen::Vector2i;
+using e2f  =  Eigen::Vector2f;
 using e4f  =  Eigen::Vector4f;
 
 using      veci    =    vec<i32>;
@@ -194,11 +195,15 @@ struct FisData
   struct
   {
     int w=0, h=0;
-    Screen         screen;
-    Window*        keyWin = nullptr;
-    Window*         dbWin = nullptr;
-    BoxLayout*     keyLay = nullptr;
-    vec_btn        ndBtns;
+    Screen          screen;
+    Window*         keyWin = nullptr;
+    Window*          dbWin = nullptr;
+    BoxLayout*      keyLay = nullptr;
+    Window*      statusWin = nullptr;
+    BoxLayout*   statusLay = nullptr;
+    TextBox*     statusTxt = nullptr;
+    vec_btn         ndBtns;
+
 
     // mouse
     v2                prevPntr;

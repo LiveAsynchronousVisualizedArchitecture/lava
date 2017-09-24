@@ -32,10 +32,17 @@
 // -todo: make basic command queue - enum for command, priority number - use std::pri_queue - use u32 for command, use two u64s for the arguments  - not neccesary with selection refactoring
 // -todo: take out clear node selections
 // -todo: take out node state selection on primary selection
+// -todo: fix title changing on node deletion - title was changed to the last key pressed 
 
-// todo: fix title changing on node deletion
+// todo: fix current node in top right corner
 // todo: use a copy of the graph to clear and update the interface buttons
-// todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array
+// todo: convert tbl to use arrays of the data types smaller than 64 bits
+// todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array - can any heirarchy of initializer_lists be brought down to an array of the same types?
+// todo: put timer into each node instance
+// todo: make popup over each node that shows statistics and information like the node number
+// todo: make nanogui message bar at the bottom
+// todo: compile visualizer in release mode
+// todo: make right clicking on slot visualize that slot with a combination of the text label, node id and slot id  as the db key
 // todo: use combination of frame, node id and slot as key to simbdb
 //       |  how does that get in to the node, if all the data is in the packet struct? - through the output Args
 //       |  put the index information into the output array and use that 
@@ -1278,11 +1285,6 @@ ENTRY_DECLARATION
       auto pauseBtn  = new Button(fd.ui.keyWin,  "Pause ||");
       auto stopBtn   = new Button(fd.ui.keyWin,  "Stop |_|");
 
-      //auto entryBtn  = new Button(fd.ui.keyWin,    "Set Entry Node");
-
-      //auto msgBtn    = new Button(fd.ui.keyWin,    "Message Node");
-      //auto flowBtn   = new Button(fd.ui.keyWin,    "Flow Node");
-
       loadBtn->setCallback([](){ 
         //stopFlowThreads();
 
@@ -1322,31 +1324,6 @@ ENTRY_DECLARATION
         stopFlowThreads();
       });
 
-      //entryBtn->setCallback([](){        
-      //  u64 selId = Node::Type::NODE_ERROR;
-      //  auto  nds = node_getPtrs();
-      //  for(auto n : nds) if(n->sel  &&  n->type==Node::Type::MSG){
-      //    selId = n->id;
-      //    break;
-      //  }
-      //  if(selId==Node::Type::NODE_ERROR){ printf("\nno message nodes selected\n"); }
-      //
-      //  printf("\ntodo: primary selection node to be the entry point - selected: %d \n", (i32)selId );
-      //
-      //  //TO(nds.size(),i){
-      //  //  if(nds[i]->sel && nds[i]->type == Node::MSG)
-      //  //}
-      //  //
-      //  //if(fd.sel.pri < 0) printf("no nodes selected\n\n");
-      //});
-
-      //msgBtn->setCallback([](){
-      //  node_add("FileToString", Node("message node", Node::Type::MSG) );
-      //});
-      //flowBtn->setCallback([](){
-      //  node_add("FileToString", Node("new node", Node::Type::FLOW) );
-      //});
-
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
 
       Theme* thm = fd.ui.keyWin->theme();
@@ -1354,6 +1331,15 @@ ENTRY_DECLARATION
       thm->mTransparent         = e4f( .0f,  .0f,  .0f,    .0f );
       thm->mWindowFillUnfocused = e4f( .2f,  .2f,  .225f,  .3f );
       thm->mWindowFillFocused   = e4f( .3f,  .28f, .275f,  .3f );
+
+      fd.ui.statusWin = new  Window(&fd.ui.screen,    "");
+      fd.ui.statusTxt = new TextBox(fd.ui.statusWin,  "");
+      fd.ui.statusTxt->setEditable(false);
+      fd.ui.statusTxt->setDefaultValue("");
+      fd.ui.statusTxt->setValue("");
+      fd.ui.statusLay = new BoxLayout(Orientation::Horizontal, Alignment::Fill, 0,0);
+
+      fd.ui.statusWin->setLayout(fd.ui.statusLay);
 
       fd.ui.screen.setVisible(true);
       fd.ui.screen.performLayout();
@@ -1574,7 +1560,18 @@ ENTRY_DECLARATION
         {
            if(lftClkDn && !slotClk && !nodeClk){
              sel_clear();
+             fd.ui.statusTxt->setValue("");
            }
+        }
+        SECTION(nanogui status bar)
+        {
+          if(slotClk){
+            auto status = toString("Slot [",sid.nid,":",sid.sidx,"]");
+            fd.ui.statusTxt->setValue( status );
+          }else if(nodeClk){
+            auto status =  toString("Node [",nid.nid,"]  ", nds[nIdx]->txt);
+            fd.ui.statusTxt->setValue( status );
+          }
         }
       }
       SECTION(movement)
@@ -1876,6 +1873,13 @@ ENTRY_DECLARATION
         }
         SECTION(nanogui)
         {
+          fd.ui.screen.performLayout();
+
+          e2i statusSz = fd.ui.statusWin->size();
+          fd.ui.statusWin->setPosition( e2i(0, fd.ui.h - statusSz[1]) );
+          fd.ui.statusWin->setSize( e2i(fd.ui.w, statusSz[1]) );
+          fd.ui.statusTxt->setWidth( fd.ui.w - fd.ui.statusLay->margin() );
+
           fd.ui.screen.drawContents();
           fd.ui.screen.drawWidgets();
         }
@@ -1903,7 +1907,38 @@ ENTRY_DECLARATION
 
 
 
+//
+//fd.ui.statusWin->setPosition( e2i(statusSz[0], fd.ui.h - statusSz[1]) );
 
+//auto entryBtn  = new Button(fd.ui.keyWin,    "Set Entry Node");
+//
+//auto msgBtn    = new Button(fd.ui.keyWin,    "Message Node");
+//auto flowBtn   = new Button(fd.ui.keyWin,    "Flow Node");
+
+//entryBtn->setCallback([](){        
+//  u64 selId = Node::Type::NODE_ERROR;
+//  auto  nds = node_getPtrs();
+//  for(auto n : nds) if(n->sel  &&  n->type==Node::Type::MSG){
+//    selId = n->id;
+//    break;
+//  }
+//  if(selId==Node::Type::NODE_ERROR){ printf("\nno message nodes selected\n"); }
+//
+//  printf("\ntodo: primary selection node to be the entry point - selected: %d \n", (i32)selId );
+//
+//  //TO(nds.size(),i){
+//  //  if(nds[i]->sel && nds[i]->type == Node::MSG)
+//  //}
+//  //
+//  //if(fd.sel.pri < 0) printf("no nodes selected\n\n");
+//});
+
+//msgBtn->setCallback([](){
+//  node_add("FileToString", Node("message node", Node::Type::MSG) );
+//});
+//flowBtn->setCallback([](){
+//  node_add("FileToString", Node("new node", Node::Type::FLOW) );
+//});
 
 //SECTION(selection)
 //{
@@ -2050,9 +2085,6 @@ ENTRY_DECLARATION
 //    sel_clear();
 //  }
 //}
-
-
-
 
 //  LavaId  inClk(LavaId::NODE_NONE, LavaId::SLOT_NONE);
 //  LavaId outClk(LavaId::NODE_NONE, LavaId::SLOT_NONE);
