@@ -43,11 +43,11 @@
 // -todo: make 64 bit atomic ring buffer to know if a Node / slot should be put into the db - just a Set with linear comparisions, not a ring buffer, not hash based
 // -todo: make packet callback check if a node-slot combination is in the array of Ids that need to be written - if the node-slot Id is in the vizualize array, then put it into the db
 // -todo: separate out slot key creation for deletion
+// -todo: fix AtmSet del - compare and swap called with argument order flipped
+// -todo: delete a buffer from the visualization DB using the main GUI thread when deleting from the atomic set of visualized slots
+// -todo: when turning off a slot, delete the entry from the database 
 
-// todo: fix AtmSet del
-// todo: make play execute stop first, or be greyed out while running
-// todo: delete from a buffer from the main GUI thread when deleting from the atomic set of visualized slots
-// todo: when turning off a slot, delete the entry from the database - could also take it out, delete it, and put it back under a name with 'OFF: ' as a prefix
+// todo: make play execute a stop() first, or be greyed out while running
 // todo: put highlights on visualized slots
 // todo: make button that creates a project for a node - would it need to pop up a modal dialog?
 // todo: make right clicking on slot visualize that slot with a combination of the text label, node id and slot id  as the db key
@@ -94,6 +94,7 @@
 // todo: keep the time in microseconds of the execution of every node instance in a LavaNodeInst struct
 //       | use the execution time to draw the saturation of the node color a long with a background indicator to see the nodes with the most execution time
 
+// idea: when turning off a slot, take it out, delete it, and put it back under a name with 'OFF: ' as a prefix
 // idea: keep track of covariance matrix for time vs size of data 
 //       | keep track of multiple moments and detect if a node has a quadratic / O(n^2) time
 //       | keep track of the covariance of input data, time, and other parameters to show how they affect the running time of that node?
@@ -160,6 +161,12 @@
 //    | structurally does this mean that nodes would have attributes instead of one type? 
 //    |  |  main issues are gather and split
 //    |  |  if a node wants to gather packets but not output a single packet, would it be both a gather and a split?
+
+// Major Features: 
+//   | Freezing data while playing
+//   | Reloading of shared libs while running 
+//   | Packet syncing through use of frames
+//
 
 // glew might include windows.h
 #define  WIN32_LEAN_AND_MEAN
