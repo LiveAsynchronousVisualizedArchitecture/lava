@@ -807,7 +807,7 @@ public:
         kv->hsh.type = HshType::NONE;
         new (&ret) KVOfst(kv);
       }else if( (type&HshType::TABLE) && (type&HshType::CHILD) )
-        new (&ret) KVOfst(kv, childData()); // (void*)memStart());
+        new (&ret) KVOfst(kv, this->childData());                           // (void*)memStart());
       else
         new (&ret) KVOfst(kv);
     }else 

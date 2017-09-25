@@ -826,11 +826,11 @@ public:
   lava_hndlNodeMap       ndptrs;     // ndptrs is node pointers - a map from each handle to the one (zero?) or more LavaFlowNode pointers the shared lib contains
   lava_nameNodeMap    nameToPtr;     // maps node names to their pointers 
 
-  mutable bool        m_running = false;      // todo: make this atomic
-  mutable u64        m_curMsgId = 0;          // todo: make this atomic
-  mutable u64           m_frame = 0;          // todo: make this atomic
-  mutable LavaId        m_curId = 0;          // todo: make this atomic - won't be used as a single variable anyway
-  mutable u64     m_threadCount = 0;          // todo: make this atomic
+  mutable bool        m_running = false;            // todo: make this atomic
+  mutable u64        m_curMsgId = 0;                // todo: make this atomic
+  mutable u64           m_frame = 0;                // todo: make this atomic
+  mutable LavaId        m_curId = LavaNode::NONE;   // todo: make this atomic - won't be used as a single variable anyway
+  mutable u64     m_threadCount = 0;                // todo: make this atomic
   mutable u32           version = 0;
   mutable Mutex          m_qLck;
 

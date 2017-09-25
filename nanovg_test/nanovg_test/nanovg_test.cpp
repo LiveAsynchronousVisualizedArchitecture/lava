@@ -33,16 +33,20 @@
 // -todo: take out clear node selections
 // -todo: take out node state selection on primary selection
 // -todo: fix title changing on node deletion - title was changed to the last key pressed 
+// -todo: make nanogui message bar at the bottom
+// -todo: make status bar show information about the selection 
+// -todo: make popup over each node that shows statistics and information like the node number - status bar will take care of this for now
+// -todo: fix current node in top right corner - m_curId initialized to LavaNode::NONE instead of 0
+// -todo: compile visualizer in release mode - doesn't work the same as debug mode - even debug seemingly calls into eigen at unrelated times while stepping through
 
-// todo: fix current node in top right corner
+// todo: make right clicking on slot visualize that slot with a combination of the text label, node id and slot id  as the db key
+// todo: put timer into each node instance
+// todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
+//       |  does there need to be a function to copy the instances and connections? - should this ultimatly be used for drawing the graph?
 // todo: use a copy of the graph to clear and update the interface buttons
+// todo: make a function to get a copy of the graph - can check the version number every loop, and if it is higher, get a copy of all the data inside a mutex
 // todo: convert tbl to use arrays of the data types smaller than 64 bits
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array - can any heirarchy of initializer_lists be brought down to an array of the same types?
-// todo: put timer into each node instance
-// todo: make popup over each node that shows statistics and information like the node number
-// todo: make nanogui message bar at the bottom
-// todo: compile visualizer in release mode
-// todo: make right clicking on slot visualize that slot with a combination of the text label, node id and slot id  as the db key
 // todo: use combination of frame, node id and slot as key to simbdb
 //       |  how does that get in to the node, if all the data is in the packet struct? - through the output Args
 //       |  put the index information into the output array and use that 
@@ -51,9 +55,6 @@
 //       |  use a union of bytes that is filled with the frame, slot, list index?
 //       |  use malloc addresses initially
 // todo: change project name to Fissure 
-// todo: make a function to get a copy of the graph - can check the version number every loop, and if it is higher, get a copy of all the data inside a mutex
-// todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
-//       |  does there need to be a function to copy the instances and connections? - should this ultimatly be used for drawing the graph?
 
 // todo: print child tables in table printing functions
 // todo: make lava memory allocation aligned to 64 byte boundaries
@@ -1721,7 +1722,7 @@ ENTRY_DECLARATION
           SECTION(draw current node highlights)
           {
             auto nid = fd.graph.curNode;
-            if(nid != LavaNode::NODE_ERROR  &&
+            if(nid != LavaNode::NONE  &&
                fd.graph.nds.count(nid) > 0)
             {
               auto const& n = fd.graph.nds[nid];
