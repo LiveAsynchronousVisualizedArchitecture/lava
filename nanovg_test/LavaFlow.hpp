@@ -331,14 +331,11 @@ class       LavaGraph
 public:
   struct NodeInstance { uint64_t id; LavaNode* nd; };                  // a struct used for returning an instance of a node - the Nodes map of ids and LavaFlowNode pointers  
 
-  //using NodeInsts     =  std::unordered_map<uint64_t, LavaNode*>;      // maps an id to a LavaFlowNode struct
   using NodeInsts     =  std::unordered_map<uint64_t, LavaInst>;       // maps an id to a LavaFlowNode struct
   using Slots         =  std::multimap<LavaId, LavaFlowSlot>;          // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
   using CnctMap       =  std::unordered_map<LavaId, LavaId, LavaId>;   // maps connections from their single destination slot to their single source slot - Id is the hash function object in the third template argument
   using SrcMap        =  std::multimap<LavaId, LavaId>;                // maps connections from their single source slot to their one or more destination slots
-  //using vec_insts     =  std::vector<NodeInstance>;                    // list of node instances - Id and pointer pairs
   using vec_insts     =  std::vector<LavaInst>;                        // list of node instances - Id and pointer pairs
-  //using vec_nptrs     =  std::vector<LavaNode*>;                       // lists used for returning from reloading functions
   using vec_nptrs     =  std::vector<LavaInst>;                        // lists used for returning from reloading functions
   using vec_cnptrs    =  std::vector<LavaNode const*>;
   using vec_ids       =  std::vector<LavaId>;
@@ -352,7 +349,6 @@ private:
   CnctMap            m_cncts;
   SrcMap         m_destCncts;
   MsgIds          m_msgNodes;
-  //vec_ids         m_msgNodes;
 
   void            init()
   { 
@@ -814,10 +810,11 @@ public:
 struct       LavaFlow
 {
 public:
-  using au64         =  std::atomic<uint64_t>;
-  using PacketQueue  =  std::priority_queue<LavaPacket>;
-  using MsgNodeVec   =  std::vector<uint64_t>;
-  using Mutex        =  std::mutex;
+  using au64            =  std::atomic<uint64_t>;
+  using PacketQueue     =  std::priority_queue<LavaPacket>;
+  using MsgNodeVec      =  std::vector<uint64_t>;
+  using Mutex           =  std::mutex;
+  using PacketCallback  =  void (*)(LavaPacket pkt);
 
   lava_pathHndlMap         libs;     // libs is libraries - this maps the live path of the shared libary with the OS specific handle that the OS loading function returns
   lava_nidMap              nids;     // nids is node ids  - this maps the name of the node to all of the graph node ids that use it
@@ -831,8 +828,10 @@ public:
   mutable u64           m_frame = 0;                // todo: make this atomic
   mutable LavaId        m_curId = LavaNode::NONE;   // todo: make this atomic - won't be used as a single variable anyway
   mutable u64     m_threadCount = 0;                // todo: make this atomic
-  mutable u32           version = 0;
+  mutable u32           version = 0;                // todo: make this atomic
   mutable Mutex          m_qLck;
+  mutable PacketCallback packetCallback;            // todo: make this an atomic version of the function pointer
+  //mutable u64    packetCallback;                  // todo: make this an atomic version of the function pointer
 
   MsgNodeVec        m_msgNodes;
   PacketQueue                q;
@@ -905,10 +904,10 @@ public:
 
 #if defined(__LAVAFLOW_IMPL__)
 
-#include "simdb.hpp"
-
-static simdb      db;
-static simdb   vizdb;
+//#include "simdb.hpp"
+//
+//static simdb      db;
+//static simdb   vizdb;
 
 // function implementations
 BOOL WINAPI DllMain(
@@ -965,17 +964,17 @@ void           PrintLavaMem(LavaMem lm)
     (u64)(lm.ptr), (u64)(lm.data()), (u64)lm.refCount(), (u64)lm.sizeBytes() );
 }
 
-bool                 PutMem(LavaId id, LavaMem lm)
-{
-  char label[256];
-  sprintf(label, "%d:%d", (u32)id.nid, (u32)id.sidx);
-
-  uint32_t stblk=0;
-  bool ok = db.put(label, lm.data(), (u32)lm.sizeBytes(), &stblk);
-
-  return ok;
-  //str label = str(id.nid) + ":" + str(id.sidx);
-}
+//bool                 PutMem(LavaId id, LavaMem lm)
+//{
+//  char label[256];
+//  sprintf(label, "%d:%d", (u32)id.nid, (u32)id.sidx);
+//
+//  uint32_t stblk=0;
+//  bool ok = db.put(label, lm.data(), (u32)lm.sizeBytes(), &stblk);
+//
+//  return ok;
+//  //str label = str(id.nid) + ":" + str(id.sidx);
+//}
 
 auto       GetSharedLibPath() -> std::wstring
 {
@@ -1199,14 +1198,16 @@ bool                runFunc(LavaFlow& lf, lava_memvec& ownedMem, uint64_t nid, L
 
         ownedMem.push_back(mem);
 
-        PutMem(LavaId(basePkt.src_node, basePkt.src_slot) , mem);
+        lf.packetCallback(basePkt);
+
+        //PutMem(LavaId(basePkt.src_node, basePkt.src_slot) , mem);
         //auto keys = vizdb.getKeyStrs();
         //printdb(vizdb);
       }
     } // SECTION(create packets and put them into packet queue)
-    SECTION(loop through inputs and decrement their references now that the function is done)
-    {
-    }
+
+    //SECTION(loop through inputs and decrement their references now that the function is done)
+    //{ //}
     return true;
   }
   return false;
@@ -1216,8 +1217,8 @@ bool                runFunc(LavaFlow& lf, lava_memvec& ownedMem, uint64_t nid, L
 
 void               LavaInit()
 {
-  new (&db)     simdb("lava_db", 128, 2<<4);
-  new (&vizdb)  simdb("viz_db",  128, 2<<4);
+  //new (&db)     simdb("lava_db", 128, 2<<4);
+  //new (&vizdb)  simdb("viz_db",  128, 2<<4);
 }
 bool        RefreshFlowLibs(LavaFlow& inout_flow)
 {
@@ -1319,21 +1320,11 @@ void               LavaLoop(LavaFlow& lf)
         
         runFunc(lf, ownedMem, pckt.dest_node, &lp, inArgs, outArgs); 
         
-        //LavaMem lm;
-        //lm.ptr = (void*)(inArgs[pckt.dest_slot].value - 16);
-        //printf("\n reference count: %llu \n", (u64)lm.refCount() );
-        //LavaFree((u64)lm.data());
-
         LavaMem lm = LavaMem::fromDataAddr(inArgs[pckt.dest_slot].value);
         PrintLavaMem(lm);
         lm.decRef();
-
-        //inArgs[0].type  = LavaArgType::MEMORY;
-        //TO(lp.inputs,i){
-        //}
       }
     } // SECTION(loop through data packets)
-
     SECTION(partition owned allocations and free those with their reference count at 0)
     {
       for(auto const& lm : ownedMem){
@@ -1373,6 +1364,27 @@ void               LavaLoop(LavaFlow& lf)
 
 
 
+
+
+
+
+
+
+//LavaMem lm;
+//lm.ptr = (void*)(inArgs[pckt.dest_slot].value - 16);
+//printf("\n reference count: %llu \n", (u64)lm.refCount() );
+//LavaFree((u64)lm.data());
+
+//inArgs[0].type  = LavaArgType::MEMORY;
+//TO(lp.inputs,i){
+//}
+
+//
+//vec_ids         m_msgNodes;
+
+//using NodeInsts     =  std::unordered_map<uint64_t, LavaNode*>;      // maps an id to a LavaFlowNode struct
+//using vec_insts     =  std::vector<NodeInstance>;                    // list of node instances - Id and pointer pairs
+//using vec_nptrs     =  std::vector<LavaNode*>;                       // lists used for returning from reloading functions
 
 //auto       msgNodes() const -> vec_ids const&
 //{

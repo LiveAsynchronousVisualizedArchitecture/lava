@@ -38,7 +38,13 @@
 // -todo: make popup over each node that shows statistics and information like the node number - status bar will take care of this for now
 // -todo: fix current node in top right corner - m_curId initialized to LavaNode::NONE instead of 0
 // -todo: compile visualizer in release mode - doesn't work the same as debug mode - even debug seemingly calls into eigen at unrelated times while stepping through
+// -todo: put in right button mouse states and right mouse clicks
+// -todo: make a hook function for LavaFlow to call after every packet
 
+// todo: make 64 bit atomic ring buffer to know if a Node / slot should be put into the db
+// todo: make packet callback check if a node-slot combination is in the array of Ids that need to be written - if the node-slot Id is in the vizualize array, then put it into the db
+// todo: when turning off a slot, delete the entry from the database - could also take it out, delete it, and put it back under a name with 'OFF: ' as a prefix
+// todo: put highlights on visualized slots
 // todo: make right clicking on slot visualize that slot with a combination of the text label, node id and slot id  as the db key
 // todo: put timer into each node instance
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
@@ -196,7 +202,8 @@
 using Id      = LavaId;
 using vec_ids = std::vector<Id>;
 
-static FisData fd;
+static FisData    fd;
+static simdb   fisdb;
 
 namespace{
 
@@ -1171,8 +1178,8 @@ void          mouseBtnCallback(GLFWwindow* window, int button, int action, int m
   }
 
   if(button==GLFW_MOUSE_BUTTON_RIGHT){
-    if(action==GLFW_PRESS) fd.mouse.rtDn = true;
-    else if(action==GLFW_RELEASE) fd.mouse.rtDn = false;
+    if(action==GLFW_PRESS){ fd.mouse.rtDn = true; }
+    else if(action==GLFW_RELEASE){ fd.mouse.rtDn = false; }
   }
 
   fd.ui.screen.mouseButtonCallbackEvent(button, action, mods);
@@ -1206,6 +1213,19 @@ void   framebufferSizeCallback(GLFWwindow* window, int w, int h)
   fd.ui.screen.resizeCallbackEvent(w, h);
 }
 
+void        lavaPacketCallback(LavaPacket pkt)
+{
+  LavaId id(pkt.src_node, pkt.src_slot);
+  if( fd.vizIds.has(id.asInt) ){
+    auto    ni = fd.graph.nds.find(pkt.src_node); // todo: this is called from the lava looping threads and would need to be thread safe - it is also only used for getting text labels, which may make things easier
+    if(ni == end(fd.graph.nds)) return; 
+
+    auto label  =  toString("[",pkt.src_node,":",pkt.src_slot,"] ",ni->second.txt);
+    auto    lm  =  LavaMem::fromDataAddr(pkt.msg.val.value);
+    bool    ok  =  fisdb.put(label.data(), label.size(), lm.data(), lm.sizeBytes() );
+  }
+}
+
 void              debug_coords(v2 a)
 {
   char  winTitle[TITLE_MAX_LEN];  // does glfw copy this string or just use the pointer? looks like it converts to a different character format which copies it / transforms it
@@ -1216,7 +1236,7 @@ void              debug_coords(v2 a)
 
 } // end namespace
 
-ENTRY_DECLARATION
+ENTRY_DECLARATION // main or winmain
 {
   using namespace std;
   
@@ -1387,9 +1407,14 @@ ENTRY_DECLARATION
       //fd.lgrph.toggleCnct(s0, s2);
       //fd.lgrph.toggleCnct(s0, s3);
     }
-
-    LavaInit();
-    //startFlowThreads(1);
+    SECTION(lava and db)
+    {
+      new (&fisdb) simdb("Fissure", 256, 2<<10);
+      //fd.vizIds.null_val     = LavaId().asInt;
+      new (&fd.vizIds) AtmSet( LavaId().asInt );
+      fd.flow.packetCallback = lavaPacketCallback;
+      LavaInit();
+    }
   }
 
   glfwSetTime(0);
@@ -1404,7 +1429,7 @@ ENTRY_DECLARATION
     while(!glfwWindowShouldClose(fd.win))
     {
       auto&    ms = fd.mouse;
-      bool  rtClk = (ms.rtDn  && !ms.prevRtDn);
+      bool  rtClk = (ms.rtDn  && !ms.prevRtDn);  // todo: take this out
       auto    nds = node_getPtrs();
       auto     sz = nds.size();
 
@@ -1421,9 +1446,6 @@ ENTRY_DECLARATION
 
         fd.ui.prevPntr = pntr;
         pntr=Vec2((float)cx, (float)cy);
-
-        //sprintf(winTitle, "%.4f  %.4f", px, py);
-        //glfwSetWindowTitle(win, winTitle);
 
 		    glfwGetWindowSize(fd.win, &fd.ui.w, &fd.ui.h);
 		    glfwGetFramebufferSize(fd.win, &fbWidth, &fbHeight);
@@ -1451,9 +1473,10 @@ ENTRY_DECLARATION
         // figure out all the information that needs to be known before figuring what to do with it
         bool lftClkDn  =   ms.lftDn && !ms.prevLftDn;      // lftClkDn is left click down
         bool lftClkUp  =  !ms.lftDn &&  ms.prevLftDn;      // lftClkDn is left click up
+        bool rtClkDn   =   ms.rtDn  && !ms.prevRtDn;       // rtClkDn is right click down
 
         LavaId    sid;                                     // sid is slot id
-        bool isInSlot  =   false;
+        bool isInSlot = false;
         SECTION(slot inside check: if inside a slot, early exit on the first found) // todo: does this need to loop through in the node ordr ? 
         {
           for(auto& kv : fd.graph.slots){
@@ -1469,7 +1492,7 @@ ENTRY_DECLARATION
 
         LavaId    nid;
         u64      nIdx;
-        bool isInNode  =   false;
+        bool isInNode = false;
         if(!isInSlot) SECTION(node inside check: if inside a node in node ordr from top to bottom)
         {
           FROM(sz,i)                                                // loop backwards so that the top nodes are dealt with first
@@ -1484,8 +1507,9 @@ ENTRY_DECLARATION
           }
         }
 
-        bool   slotClk  =  isInSlot && lftClkDn;
-        bool   nodeClk  =  isInNode && lftClkDn;
+        bool    slotClk  =  isInSlot && lftClkDn;
+        bool    nodeClk  =  isInNode && lftClkDn;
+        bool  slotRtClk  =  isInSlot &&  rtClkDn;
         // end per loop data
 
         SECTION(mouse ui state)
@@ -1564,9 +1588,20 @@ ENTRY_DECLARATION
              fd.ui.statusTxt->setValue("");
            }
         }
+        SECTION(visualization)
+        {
+          if(slotRtClk){
+            if( fd.vizIds.has(sid.asInt) )
+              fd.vizIds.del(sid.asInt);
+            else 
+              fd.vizIds.put( sid.asInt );
+          }
+        }
         SECTION(nanogui status bar)
         {
-          if(slotClk){
+          if(slotRtClk){
+            fd.ui.statusTxt->setValue( toString(" right click on slot ") );
+          }else if(slotClk){
             auto status = toString("Slot [",sid.nid,":",sid.sidx,"]");
             fd.ui.statusTxt->setValue( status );
           }else if(nodeClk){
@@ -1907,6 +1942,14 @@ ENTRY_DECLARATION
 
 
 
+
+
+
+//
+//startFlowThreads(1);
+
+//sprintf(winTitle, "%.4f  %.4f", px, py);
+//glfwSetWindowTitle(win, winTitle);
 
 //
 //fd.ui.statusWin->setPosition( e2i(statusSz[0], fd.ui.h - statusSz[1]) );

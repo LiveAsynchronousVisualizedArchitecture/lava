@@ -10,6 +10,7 @@
 #include <queue>
 #include <nanogui/nanogui.h>
 #include "../no_rt_util.h"
+#include "../simdb.hpp"
 #include "vec.hpp"
 
 #define __LAVAFLOW_IMPL__
@@ -152,6 +153,54 @@ struct    Slot
 };
 using vec_slot     =    vec<Slot>;
 
+struct AtmSet
+{
+  using au64 = std::atomic<u64>;
+
+  static const u64 sz = 16;
+  u64    null_val;
+  u64     buf[sz];
+
+  AtmSet(){}
+  AtmSet(u64 nullVal) : null_val(nullVal)
+  {
+    TO(sz,i){ store(i,null_val); }
+  }
+
+  void   store(u64 i, u64 val){ ((au64*)(buf+i))->store(val); }
+  bool  cmpSwp(u64 i, u64 val, u64 prev)
+  {
+    return ((au64*)(buf+i))->compare_exchange_strong(prev, val);
+  }
+  u64     load(u64 i){ return ((au64*)(buf+i))->load(); }
+  bool     has(u64 val)
+  {
+    TO(sz,i){ if(load(i)==val){ return true; } }
+    return false;
+  }
+  bool     put(u64 val)
+  {
+    TO(sz,i){
+      auto cur = load(i);
+      if( cur == val ){ return true; }
+      if( cur == null_val ){
+        if(cmpSwp(i, val, null_val)) return true;
+      }
+    }
+    return false;
+  }
+  bool     del(u64 val)
+  {
+    TO(sz,i){
+      u64 cur;
+      while( (cur=load(i)) == null_val ){
+        if(cmpSwp(i, val, null_val)){ return true; }
+      }
+    }
+    return false;
+  }
+};
+
 struct FisData
 {
   struct IdOrder {
@@ -170,6 +219,7 @@ struct FisData
   LavaFlow             flow;
   LavaGraph&          lgrph = flow.graph;
   vec_thrd      flowThreads;
+  AtmSet             vizIds;
 
   struct Graph
   {
@@ -249,6 +299,7 @@ struct FisData
     Id    slotOutSel;
   }         sel;
 };
+
 
 #endif
 
