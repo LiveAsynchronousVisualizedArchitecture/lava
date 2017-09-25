@@ -157,7 +157,7 @@ struct AtmSet
 {
   using au64 = std::atomic<u64>;
 
-  static const u64 sz = 16;
+  static const u64 sz = 8;
   u64    null_val;
   u64     buf[sz];
 
@@ -193,8 +193,8 @@ struct AtmSet
   {
     TO(sz,i){
       u64 cur;
-      while( (cur=load(i)) == null_val ){
-        if(cmpSwp(i, val, null_val)){ return true; }
+      while( (cur=load(i)) == val ){
+        if(cmpSwp(i, null_val, val)){ return true; }
       }
     }
     return false;

@@ -40,11 +40,16 @@
 // -todo: compile visualizer in release mode - doesn't work the same as debug mode - even debug seemingly calls into eigen at unrelated times while stepping through
 // -todo: put in right button mouse states and right mouse clicks
 // -todo: make a hook function for LavaFlow to call after every packet
+// -todo: make 64 bit atomic ring buffer to know if a Node / slot should be put into the db - just a Set with linear comparisions, not a ring buffer, not hash based
+// -todo: make packet callback check if a node-slot combination is in the array of Ids that need to be written - if the node-slot Id is in the vizualize array, then put it into the db
+// -todo: separate out slot key creation for deletion
 
-// todo: make 64 bit atomic ring buffer to know if a Node / slot should be put into the db
-// todo: make packet callback check if a node-slot combination is in the array of Ids that need to be written - if the node-slot Id is in the vizualize array, then put it into the db
+// todo: fix AtmSet del
+// todo: make play execute stop first, or be greyed out while running
+// todo: delete from a buffer from the main GUI thread when deleting from the atomic set of visualized slots
 // todo: when turning off a slot, delete the entry from the database - could also take it out, delete it, and put it back under a name with 'OFF: ' as a prefix
 // todo: put highlights on visualized slots
+// todo: make button that creates a project for a node - would it need to pop up a modal dialog?
 // todo: make right clicking on slot visualize that slot with a combination of the text label, node id and slot id  as the db key
 // todo: put timer into each node instance
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
@@ -1213,17 +1218,30 @@ void   framebufferSizeCallback(GLFWwindow* window, int w, int h)
   fd.ui.screen.resizeCallbackEvent(w, h);
 }
 
+str                   genDbKey(LavaId sid)            // genDbKey is generate database key, sid is slot Id
+{
+  auto ni = fd.graph.nds.find(sid.nid); // todo: this is called from the lava looping threads and would need to be thread safe - it is also only used for getting text labels, which may make things easier
+  if(ni == end(fd.graph.nds)) return ""; 
+
+  auto label  =  toString("[",sid.nid,":",sid.sidx,"] ",ni->second.txt);
+
+  return label;
+}
 void        lavaPacketCallback(LavaPacket pkt)
 {
   LavaId id(pkt.src_node, pkt.src_slot);
   if( fd.vizIds.has(id.asInt) ){
-    auto    ni = fd.graph.nds.find(pkt.src_node); // todo: this is called from the lava looping threads and would need to be thread safe - it is also only used for getting text labels, which may make things easier
-    if(ni == end(fd.graph.nds)) return; 
-
-    auto label  =  toString("[",pkt.src_node,":",pkt.src_slot,"] ",ni->second.txt);
+    auto label  =  genDbKey(id);
     auto    lm  =  LavaMem::fromDataAddr(pkt.msg.val.value);
     bool    ok  =  fisdb.put(label.data(), label.size(), lm.data(), lm.sizeBytes() );
   }
+
+  //LavaId sid(pkt.src_node, pkt.src_slot);
+  //
+  //auto    ni = fd.graph.nds.find(pkt.src_node); // todo: this is called from the lava looping threads and would need to be thread safe - it is also only used for getting text labels, which may make things easier
+  //if(ni == end(fd.graph.nds)) return; 
+  //
+  //auto label  =  toString("[",pkt.src_node,":",pkt.src_slot,"] ",ni->second.txt);
 }
 
 void              debug_coords(v2 a)
@@ -1410,7 +1428,6 @@ ENTRY_DECLARATION // main or winmain
     SECTION(lava and db)
     {
       new (&fisdb) simdb("Fissure", 256, 2<<10);
-      //fd.vizIds.null_val     = LavaId().asInt;
       new (&fd.vizIds) AtmSet( LavaId().asInt );
       fd.flow.packetCallback = lavaPacketCallback;
       LavaInit();
@@ -1591,10 +1608,12 @@ ENTRY_DECLARATION // main or winmain
         SECTION(visualization)
         {
           if(slotRtClk){
-            if( fd.vizIds.has(sid.asInt) )
+            if( fd.vizIds.has(sid.asInt) ){
               fd.vizIds.del(sid.asInt);
-            else 
+              fisdb.del( genDbKey(sid) );
+            }else{
               fd.vizIds.put( sid.asInt );
+            }
           }
         }
         SECTION(nanogui status bar)

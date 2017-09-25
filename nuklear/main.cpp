@@ -888,7 +888,7 @@ ENTRY_DECLARATION
       vd.prev             =  vd.now;
       vd.verRefresh       =  1.0/144.0;
       vd.verRefreshClock  =  0.0;
-      vd.keyRefresh       =  2.0;
+      vd.keyRefresh       =  0.5;
       vd.keyRefreshClock  =  vd.keyRefresh;
       vd.camera           =  initCamera();
 
