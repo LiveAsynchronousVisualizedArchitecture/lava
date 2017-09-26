@@ -46,12 +46,16 @@
 // -todo: fix AtmSet del - compare and swap called with argument order flipped
 // -todo: delete a buffer from the visualization DB using the main GUI thread when deleting from the atomic set of visualized slots
 // -todo: when turning off a slot, delete the entry from the database 
+// -todo: make right clicking on slot visualize that slot with a combination of the text label, node id and slot id  as the db key
+// -todo: make play execute a stop() first
+// -todo: make play be greyed out while running
+// -todo: make play, pause and stop have different colors
 
-// todo: make play execute a stop() first, or be greyed out while running
 // todo: put highlights on visualized slots
-// todo: make button that creates a project for a node - would it need to pop up a modal dialog?
-// todo: make right clicking on slot visualize that slot with a combination of the text label, node id and slot id  as the db key
+// todo: change status bar on mouse over instead of click
 // todo: put timer into each node instance
+// todo: make status bar show the timing data for each node
+// todo: make button that creates a project for a node - would it need to pop up a modal dialog?
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
 //       |  does there need to be a function to copy the instances and connections? - should this ultimatly be used for drawing the graph?
 // todo: use a copy of the graph to clear and update the interface buttons
@@ -308,8 +312,20 @@ v2         angleToNormal(f32 angle)
 }
 
 // state manipulation
+void     stopFlowThreads()
+{
+  fd.flow.stop();
+  for(auto& t : fd.flowThreads){
+    if(t.joinable()){
+      t.join();
+    }
+  }
+  fd.flowThreads.clear();
+  fd.flowThreads.shrink_to_fit();
+}
 void    startFlowThreads(u64 num=1)
 {
+  stopFlowThreads();
   fd.flow.start();
 
   TO(num,i){
@@ -330,17 +346,6 @@ void    startFlowThreads(u64 num=1)
       LavaLoop(fd.flow);
     });
   }
-}
-void     stopFlowThreads()
-{
-  fd.flow.stop();
-  for(auto& t : fd.flowThreads){
-    if(t.joinable()){
-      t.join();
-    }
-  }
-  fd.flowThreads.clear();
-  fd.flowThreads.shrink_to_fit();
 }
 
 void         graph_clear()
@@ -1242,13 +1247,6 @@ void        lavaPacketCallback(LavaPacket pkt)
     auto    lm  =  LavaMem::fromDataAddr(pkt.msg.val.value);
     bool    ok  =  fisdb.put(label.data(), label.size(), lm.data(), lm.sizeBytes() );
   }
-
-  //LavaId sid(pkt.src_node, pkt.src_slot);
-  //
-  //auto    ni = fd.graph.nds.find(pkt.src_node); // todo: this is called from the lava looping threads and would need to be thread safe - it is also only used for getting text labels, which may make things easier
-  //if(ni == end(fd.graph.nds)) return; 
-  //
-  //auto label  =  toString("[",pkt.src_node,":",pkt.src_slot,"] ",ni->second.txt);
 }
 
 void              debug_coords(v2 a)
@@ -1331,6 +1329,10 @@ ENTRY_DECLARATION // main or winmain
       auto pauseBtn  = new Button(fd.ui.keyWin,  "Pause ||");
       auto stopBtn   = new Button(fd.ui.keyWin,  "Stop |_|");
 
+      playBtn->setBackgroundColor(  Color(e3f(.15f, .2f,  .15f)) ); 
+      pauseBtn->setBackgroundColor( Color(e3f(.2f,  .2f,  .15f)) ); 
+      stopBtn->setBackgroundColor(  Color(e3f(.19f, .16f, .17f)) ); 
+
       loadBtn->setCallback([](){ 
         //stopFlowThreads();
 
@@ -1360,14 +1362,16 @@ ENTRY_DECLARATION // main or winmain
           else   printf("\nSave did not write successfully to %s\n", outPath);
         }
       });
-      playBtn->setCallback([](){
+      playBtn->setCallback([playBtn](){
+        playBtn->setEnabled(false);
         startFlowThreads(1);
       });
       pauseBtn->setCallback([](){
         stopFlowThreads();
       });
-      stopBtn->setCallback([](){
+      stopBtn->setCallback([playBtn](){
         stopFlowThreads();
+        playBtn->setEnabled(true);
       });
 
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
@@ -1970,6 +1974,14 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+//LavaId sid(pkt.src_node, pkt.src_slot);
+//
+//auto    ni = fd.graph.nds.find(pkt.src_node); // todo: this is called from the lava looping threads and would need to be thread safe - it is also only used for getting text labels, which may make things easier
+//if(ni == end(fd.graph.nds)) return; 
+//
+//auto label  =  toString("[",pkt.src_node,":",pkt.src_slot,"] ",ni->second.txt);
 
 //
 //startFlowThreads(1);

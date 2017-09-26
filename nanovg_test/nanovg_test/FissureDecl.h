@@ -36,6 +36,7 @@ using str  =  std::string;
 
 using e2i  =  Eigen::Vector2i;
 using e2f  =  Eigen::Vector2f;
+using e3f  =  Eigen::Vector3f;
 using e4f  =  Eigen::Vector4f;
 
 using      veci    =    vec<i32>;
@@ -153,7 +154,7 @@ struct    Slot
 };
 using vec_slot     =    vec<Slot>;
 
-struct AtmSet
+struct  AtmSet
 {
   using au64 = std::atomic<u64>;
 
