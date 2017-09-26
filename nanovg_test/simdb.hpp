@@ -1132,7 +1132,7 @@ public:
 
     u32  i = hash % m_sz;
     u32 en = prevIdx(i); 
-    for(;; i=nxtIdx(i) )
+    for(; i!=en ; i=nxtIdx(i) )
     {
       VerIdx vi = load(i);
       if(vi.idx>=DELETED){continue;}
@@ -1152,7 +1152,8 @@ public:
 
       if(m==MATCH_REMOVED || i==en){ return empty; }
     }
-    //return empty;   // unreachable
+    
+    return empty;   // not unreachable
   }
 
   bool          init(u32    sz, CncrStr* cs)

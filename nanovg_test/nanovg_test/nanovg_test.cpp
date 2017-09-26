@@ -52,9 +52,11 @@
 // -todo: make play, pause and stop have different colors
 // -todo: change status bar on mouse over instead of click
 // -todo: try wrapping 'structured exception handling' - just needed to wrap the structured exception handling in a dedicated function
+// -todo: fix infinite loop when deleting from the db when the key is not found - needed to end the loop after looping through all the keys - when ending the loop, needed to return empty
 
 // todo: put background highlights on visualized slots
 // todo: use exceptions to flag node instances 
+// todo: make exceptions in the shared library functions put the packet back into the queue
 // todo: create red background highlights on nodes that generate exceptions
 // todo: make nodes highlight on mouse over
 // todo: put timer into each node instance
@@ -1621,7 +1623,7 @@ ENTRY_DECLARATION // main or winmain
              fd.ui.statusTxt->setValue("");
            }
         }
-        SECTION(visualization)
+        SECTION(slot output simdb writing)
         {
           if(slotRtClk){
             if( fd.vizIds.has(sid.asInt) ){
@@ -1636,15 +1638,15 @@ ENTRY_DECLARATION // main or winmain
         {
           if(slotRtClk){
             fd.ui.statusTxt->setValue( toString(" right click on slot ") );
-          //}else if(slotClk){
           }else if(isInSlot){
             auto status = toString("Slot [",sid.nid,":",sid.sidx,"]");
             fd.ui.statusTxt->setValue( status );
-          //}else if(nodeClk){
           }else if(isInNode){
             auto status =  toString("Node [",nid.nid,"]  ", nds[nIdx]->txt);
             fd.ui.statusTxt->setValue( status );
           }
+          //}else if(slotClk){
+          //}else if(nodeClk){
         }
       }
       SECTION(movement)
@@ -1811,6 +1813,36 @@ ENTRY_DECLARATION // main or winmain
               auto radial = nvgRadialGradient(vg,
                 cx, cy, 0, hlfw*1.25f,
                 nvgRGBA(0,255,128,48),
+                nvgRGBA(0,0,0,0)  );
+              nvgFillPaint(vg, radial);
+              nvgFill(vg);
+            }
+          }
+          SECTION(draw highlights behind visualized slots)
+          {
+
+            TO(fd.vizIds.sz,i)
+            {
+              LavaId id = fd.vizIds.load(i);
+              Slot*   s = nullptr;
+              if(id.asInt == fd.vizIds.null_val){ continue; }
+              s = slot_get(id);
+              if(!s){ continue; }
+
+              //auto    h = fd.ui.slot_rad;
+              //auto hlfw = w / 2;
+              //auto hlfh = h / 2;
+              auto    w = fd.ui.slot_rad, h = w;
+              auto hlfw = w / 2, hlfh = hlfw;
+              auto   cx = s->P.x + hlfw;
+              auto   cy = s->P.y + hlfh;
+
+              nvgFillColor(vg, nvgRGBA(0,255,255,255));
+              nvgBeginPath(vg);
+              nvgCircle(vg, cx, cy, w*1.25f );
+              auto radial = nvgRadialGradient(vg,
+                cx, cy, 0, hlfw*1.25f,
+                nvgRGBA(0,255,128,255),
                 nvgRGBA(0,0,0,0)  );
               nvgFillPaint(vg, radial);
               nvgFill(vg);
