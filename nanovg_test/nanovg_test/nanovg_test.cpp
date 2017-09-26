@@ -51,8 +51,10 @@
 // -todo: make play be greyed out while running
 // -todo: make play, pause and stop have different colors
 // -todo: change status bar on mouse over instead of click
+// -todo: try wrapping 'structured exception handling' - just needed to wrap the structured exception handling in a dedicated function
 
-// todo: put highlights on visualized slots
+// todo: make nodes highlight on mouse over
+// todo: put background highlights on visualized slots
 // todo: put timer into each node instance
 // todo: make status bar show the timing data for each node
 // todo: make button that creates a project for a node - would it need to pop up a modal dialog?
@@ -170,7 +172,8 @@
 //   | Freezing data while playing
 //   | Reloading of shared libs while running 
 //   | Packet syncing through use of frames
-//   |
+//   | Catch low level exceptions on each node
+//
 
 // glew might include windows.h
 #define  WIN32_LEAN_AND_MEAN

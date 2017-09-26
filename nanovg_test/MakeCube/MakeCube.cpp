@@ -1,6 +1,6 @@
 
 
-#include <thread>
+//#include <thread>
 #include "../no_rt_util.h"
 #include "../LavaFlow.hpp"
 #include "../tbl.hpp"
@@ -74,11 +74,11 @@ extern "C"
   const char* OutNames[]  = {"Cube Indexed Verts", nullptr};
   const char* OutTypes[]  = {"IdxVerts",           nullptr};
 
-  uint64_t MakeCube(LavaParams* inout_lp, LavaVal* in, LavaOut* out)
+  uint64_t MakeCube(LavaParams* inout_lp, LavaVal* in, LavaOut* out) noexcept
   {
     using namespace std;
 
-    printf("\n MakeCube run \n");
+    //printf("\n MakeCube run \n");
 
     //tbl<f32> idxVerts = tbl<f32>::make_borrowed(inout_lp->mem_alloc, 
     
@@ -100,7 +100,7 @@ extern "C"
       {0.0f, 0.0f}}               //texCoord
     };
 
-    Print(lftTri);
+    //Print(lftTri);
 
     auto typenum    =  "IdxVerts";
     lftTri("type")  =  *((u64*)typenum);
@@ -108,29 +108,27 @@ extern "C"
     tu32 ind        =  {0, 1, 2};
     lftTri("IND")   =  &ind; 
 
-    Println("before flatten");
-    Print(lftTri);
+    //Println("before flatten");
+    //Print(lftTri);
 
     lftTri.flatten();
 
-    Println("IND tbl"); 
-    Print(ind);
-    Println();
-    
-    Print(lftTri);
+    //Println("IND tbl"); 
+    //Print(ind);
+    //Println();
+    //
+    //Print(lftTri);
 
     inout_lp->outputs = 1;
     out[0] = LavaTblToOut(inout_lp, lftTri);
     out[0].key.slot = 0;
 
-    //void* outmem = inout_lp->mem_alloc(lftTri.sizeBytes());
-    //memcpy(outmem, lftTri.memStart(), lftTri.sizeBytes());
-    //
-    //inout_lp->outputs = 1;
-    //out[0].value = (u64)outmem;
-    //out[0].type  = LavaArgType::MEMORY;
+    //printf("\n\n dropping null dereference bomb \n\n");
+    int*  bomb  =  nullptr;
+    int    wat  =  *bomb;
+    //printf("\n\n bomb dropped \n\n");
 
-    this_thread::sleep_for( chrono::milliseconds(500) );
+    //this_thread::sleep_for( chrono::milliseconds(500) );
 
     return 1;
   }
@@ -163,6 +161,12 @@ extern "C"
 
 
 
+//void* outmem = inout_lp->mem_alloc(lftTri.sizeBytes());
+//memcpy(outmem, lftTri.memStart(), lftTri.sizeBytes());
+//
+//inout_lp->outputs = 1;
+//out[0].value = (u64)outmem;
+//out[0].type  = LavaArgType::MEMORY;
 
 //printf("\n lava heap: %llu \n", (u64)lava_thread_heap);
 //LavaHeapInit();

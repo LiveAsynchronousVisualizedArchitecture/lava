@@ -938,7 +938,7 @@ BOOL WINAPI DllMain(
 namespace {
 
 #include "str_util.hpp"
-void printdb(simdb const& db)
+void           printdb(simdb const& db)
 {
   using namespace std;
   
@@ -1136,7 +1136,21 @@ void               LavaFree(uint64_t addr)
   LavaHeapFree(p);
 }
 
-bool                runFunc(LavaFlow& lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaVal* inArgs,  LavaOut* outArgs) // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
+uint64_t      exceptWrapper(FlowFunc f, LavaParams* lp, LavaVal* inArgs, LavaOut* outArgs)
+{
+  uint64_t        ret = 0;
+  uint64_t  winExcept = 0;
+  __try{
+    printf("\n try \n");
+    ret = f(lp, inArgs, outArgs);
+  //}__except(EXCEPTION_EXECUTE_HANDLER)
+  }__except( (winExcept=GetExceptionCode()) || EXCEPTION_EXECUTE_HANDLER ){
+    printf("\n windows exception code: %llu \n", winExcept);
+  }
+
+  return ret;
+}
+bool                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaVal* inArgs,  LavaOut* outArgs) noexcept   // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
 {
   FlowFunc func = lf.graph[nid].node->func;
   if(func){
@@ -1149,7 +1163,8 @@ bool                runFunc(LavaFlow& lf, lava_memvec& ownedMem, uint64_t nid, L
       lp.id          =   LavaId(nid);
       lp.mem_alloc   =   LavaAlloc;                             //lp.mem_alloc   =   malloc;  // LavaHeapAlloc;
 
-      uint64_t ret   =   func(&lp, inArgs, outArgs);
+      //uint64_t ret   =   func(&lp, inArgs, outArgs);
+      uint64_t ret   =   exceptWrapper(func, &lp, inArgs, outArgs);
     }
     SECTION(create packets and put them into packet queue)
     {
@@ -1274,7 +1289,7 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow)
 
   return newlibs;
 }
-void               LavaLoop(LavaFlow& lf)
+void               LavaLoop(LavaFlow& lf) noexcept
 {
   using namespace std;
   const LavaOut defOut = { LavaArgType::NONE, 0, 0, 0, 0 };
@@ -1318,8 +1333,14 @@ void               LavaLoop(LavaFlow& lf)
         LavaParams lp;                                                    // get the function from the dest node and put the packets into the dest LavaVal input array 
         lp.inputs = 1;
         
-        runFunc(lf, ownedMem, pckt.dest_node, &lp, inArgs, outArgs); 
-        
+        //__try{
+          //printf("\n try \n");
+          runFunc(lf, ownedMem, pckt.dest_node, &lp, inArgs, outArgs); 
+        //}__except( (winExcept=GetExceptionCode())  ){
+        //}__except(EXCEPTION_EXECUTE_HANDLER){
+          //printf("windows exception code: %llu", winExcept);
+        //}
+
         LavaMem lm = LavaMem::fromDataAddr(inArgs[pckt.dest_slot].value);
         PrintLavaMem(lm);
         lm.decRef();
