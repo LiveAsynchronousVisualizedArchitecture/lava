@@ -50,9 +50,9 @@
 // -todo: make play execute a stop() first
 // -todo: make play be greyed out while running
 // -todo: make play, pause and stop have different colors
+// -todo: change status bar on mouse over instead of click
 
 // todo: put highlights on visualized slots
-// todo: change status bar on mouse over instead of click
 // todo: put timer into each node instance
 // todo: make status bar show the timing data for each node
 // todo: make button that creates a project for a node - would it need to pop up a modal dialog?
@@ -170,7 +170,7 @@
 //   | Freezing data while playing
 //   | Reloading of shared libs while running 
 //   | Packet syncing through use of frames
-//
+//   |
 
 // glew might include windows.h
 #define  WIN32_LEAN_AND_MEAN
@@ -1631,10 +1631,12 @@ ENTRY_DECLARATION // main or winmain
         {
           if(slotRtClk){
             fd.ui.statusTxt->setValue( toString(" right click on slot ") );
-          }else if(slotClk){
+          //}else if(slotClk){
+          }else if(isInSlot){
             auto status = toString("Slot [",sid.nid,":",sid.sidx,"]");
             fd.ui.statusTxt->setValue( status );
-          }else if(nodeClk){
+          //}else if(nodeClk){
+          }else if(isInNode){
             auto status =  toString("Node [",nid.nid,"]  ", nds[nIdx]->txt);
             fd.ui.statusTxt->setValue( status );
           }
