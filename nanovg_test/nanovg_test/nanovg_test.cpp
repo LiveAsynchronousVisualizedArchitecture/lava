@@ -54,6 +54,8 @@
 // -todo: try wrapping 'structured exception handling' - just needed to wrap the structured exception handling in a dedicated function
 // -todo: fix infinite loop when deleting from the db when the key is not found - needed to end the loop after looping through all the keys - when ending the loop, needed to return empty
 // -todo: put background highlights on visualized slots
+// -todo: take out Id type alias
+// -todo: fix deletion - make delete and backspace delete selected nodes - might need to check the primary selection as well as selection states - sel_nodes now includes the primary selection as well
 
 // todo: use exceptions to flag node instances 
 // todo: make exceptions in the shared library functions put the packet back into the queue
@@ -222,8 +224,8 @@
 #include "../Transform.h"
 #include "FissureDecl.h"
 
-using Id      = LavaId;
-using vec_ids = std::vector<Id>;
+//using Id      = LavaId;
+using vec_ids = std::vector<LavaId>;
 
 static FisData    fd;
 static simdb   fisdb;
@@ -465,11 +467,9 @@ auto        node_getPtrs() -> vec_ndptrs
   auto& nodes = fd.graph.nds;
   auto     sz = fd.graph.nds.size();  // nds.nsz();
   u64       i = 0;
-  //vec_ndptrs nds(sz,nullptr);
   vec_ndptrs nds; 
   nds.reserve(sz);
   for(auto& ido : fd.graph.ordr){                     // ido is id order - an IdOrdr struct
-    //nds[i++] = &fd.graph.nds[ido.id];
     if(nodes.find(ido.id) != end(nodes)){
       nds.push_back( &fd.graph.nds[ido.id] );
       ++i;
@@ -477,6 +477,10 @@ auto        node_getPtrs() -> vec_ndptrs
   }
 
   return nds;
+
+  //vec_ndptrs nds(sz,nullptr);
+  //
+  //nds[i++] = &fd.graph.nds[ido.id];
 
   //for(auto& kv : fd.graph.nds){
   //  nds[i++] = &kv.second;
@@ -800,6 +804,14 @@ auto           sel_nodes() -> vec_ndptrs
     if(on.second.sel) nds.push_back(&on.second);
   }
 
+  auto& nodes = fd.graph.nds;
+  if(fd.sel.pri != LavaNode::NODE_ERROR && 
+    fd.sel.pri != LavaId::NODE_NONE)
+  { 
+    if(nodes.find(fd.sel.pri) != end(nodes))
+      nds.push_back( &fd.graph.nds[fd.sel.pri] );
+  }
+
   return nds;                                          // counting on RVO (return value optimization) here
 }
 u64           sel_delete()
@@ -810,7 +822,7 @@ u64           sel_delete()
   auto   nds = sel_nodes();           // accumulate nodes
   auto   ids = node_slots(nds);       // accumulate dest slots  // accumulate slots
   
-  for(auto id : ids){             // delete cncts with dest slots
+  for(auto id : ids){                 // delete cncts with dest slots
     auto s = slot_get(id);
     if(s){
       if(s->in) fd.lgrph.delDestCnct(id);  //){ ++cnt; }
@@ -849,8 +861,8 @@ u64           sel_delete()
 }
 void           sel_clear()
 {
-  fd.sel.slotOutSel = Id(0,0);
-  fd.sel.slotInSel  = Id(0,0);
+  fd.sel.slotOutSel = LavaId(0,0);
+  fd.sel.slotInSel  = LavaId(0,0);
   fd.sel.pri        = LavaNode::NODE_ERROR;
   fd.sel.sec        = LavaNode::NODE_ERROR;
 
@@ -1671,7 +1683,7 @@ ENTRY_DECLARATION // main or winmain
           for(auto& kv : fd.graph.slots)
           {
             //u64       nid = kv.first;              // s.nid;
-            Id        nid = kv.first;
+            LavaId    nid = kv.first;
             Slot&       s = kv.second;
             //LavaSlot&  ls = fd.lgrph.slots();
             Node const& n = fd.graph.nds[nid.nid];
@@ -2006,6 +2018,8 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//
+//nds.push_back(LavaId(fd.sel.pri));
 
 //}else if(slotClk){
 //}else if(nodeClk){
