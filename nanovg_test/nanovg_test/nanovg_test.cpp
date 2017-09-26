@@ -53,8 +53,8 @@
 // -todo: change status bar on mouse over instead of click
 // -todo: try wrapping 'structured exception handling' - just needed to wrap the structured exception handling in a dedicated function
 // -todo: fix infinite loop when deleting from the db when the key is not found - needed to end the loop after looping through all the keys - when ending the loop, needed to return empty
+// -todo: put background highlights on visualized slots
 
-// todo: put background highlights on visualized slots
 // todo: use exceptions to flag node instances 
 // todo: make exceptions in the shared library functions put the packet back into the queue
 // todo: create red background highlights on nodes that generate exceptions
@@ -414,8 +414,8 @@ void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState, f
   nvgFillColor(vg, fillClr);
 
   nvgBeginPath(vg);
-  nvgCircle(vg, out.x, out.y, slot_rad);  //io_rad);
-  nvgFill(vg);
+    nvgCircle(vg, out.x, out.y, slot_rad);  //io_rad);
+    nvgFill(vg);
   nvgStroke(vg);
 
   // slot triangle drawing
@@ -427,14 +427,13 @@ void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState, f
   nvgFillColor(vg, inrClr);
 
   nvgBeginPath(vg);
-  nvgResetTransform(vg);
-  nvgTranslate(vg, out.x, out.y);             // translate comes before rotate here because nanovg 'premultiplies' transformations instead of multiplying them in for some reason. this reverses the order of transformations and can be seen in the source for nanovg
-  nvgRotate(vg, normalToAngle(N) + (s.in? PIf/2.f : -PIf/2) );
+    nvgResetTransform(vg);
+    nvgTranslate(vg, out.x, out.y);             // translate comes before rotate here because nanovg 'premultiplies' transformations instead of multiplying them in for some reason. this reverses the order of transformations and can be seen in the source for nanovg
+    nvgRotate(vg, normalToAngle(N) + (s.in? PIf/2.f : -PIf/2) );
 
-  nvgMoveTo(vg, -0.707f*triRad, -0.707f*triRad);
-  nvgLineTo(vg,  0.707f*triRad, -0.707f*triRad);
-  nvgLineTo(vg,  0, triRad);
-
+    nvgMoveTo(vg, -0.707f*triRad, -0.707f*triRad);
+    nvgLineTo(vg,  0.707f*triRad, -0.707f*triRad);
+    nvgLineTo(vg,  0, triRad);
   nvgClosePath(vg);
   nvgFill(vg);
   nvgResetTransform(vg);
@@ -1645,8 +1644,6 @@ ENTRY_DECLARATION // main or winmain
             auto status =  toString("Node [",nid.nid,"]  ", nds[nIdx]->txt);
             fd.ui.statusTxt->setValue( status );
           }
-          //}else if(slotClk){
-          //}else if(nodeClk){
         }
       }
       SECTION(movement)
@@ -1809,42 +1806,39 @@ ENTRY_DECLARATION // main or winmain
               auto   cy = n.P.y + hlfh;
               nvgFillColor(vg, nvgRGBA(0,255,255,255));
               nvgBeginPath(vg);
-              nvgCircle(vg, cx, cy, n.b.w()*1.25f );
-              auto radial = nvgRadialGradient(vg,
-                cx, cy, 0, hlfw*1.25f,
-                nvgRGBA(0,255,128,48),
-                nvgRGBA(0,0,0,0)  );
+                nvgCircle(vg, cx, cy, n.b.w()*1.25f );
+                auto radial = nvgRadialGradient(vg,
+                  cx, cy, 0, hlfw*1.25f,
+                  nvgRGBA(0,255,128,48),
+                  nvgRGBA(0,0,0,0)  );
               nvgFillPaint(vg, radial);
               nvgFill(vg);
             }
           }
           SECTION(draw highlights behind visualized slots)
           {
-
             TO(fd.vizIds.sz,i)
             {
-              LavaId id = fd.vizIds.load(i);
+              LavaId id;
+              id.asInt  = fd.vizIds.load(i);
               Slot*   s = nullptr;
               if(id.asInt == fd.vizIds.null_val){ continue; }
               s = slot_get(id);
               if(!s){ continue; }
 
-              //auto    h = fd.ui.slot_rad;
-              //auto hlfw = w / 2;
-              //auto hlfh = h / 2;
               auto    w = fd.ui.slot_rad, h = w;
-              auto hlfw = w / 2, hlfh = hlfw;
-              auto   cx = s->P.x + hlfw;
-              auto   cy = s->P.y + hlfh;
+              auto hlfw = w/2, hlfh = hlfw;
+              auto   cx = s->P.x;
+              auto   cy = s->P.y;
 
               nvgFillColor(vg, nvgRGBA(0,255,255,255));
               nvgBeginPath(vg);
-              nvgCircle(vg, cx, cy, w*1.25f );
-              auto radial = nvgRadialGradient(vg,
-                cx, cy, 0, hlfw*1.25f,
-                nvgRGBA(0,255,128,255),
-                nvgRGBA(0,0,0,0)  );
-              nvgFillPaint(vg, radial);
+                nvgCircle(vg, cx, cy, w*4.25f );
+                auto radial = nvgRadialGradient(vg,
+                  cx, cy, 0, hlfw*4.25f,
+                  nvgRGBA(0,128,228,255),
+                  nvgRGBA(0,0,0,0)  );
+                nvgFillPaint(vg, radial);
               nvgFill(vg);
             }
           }
@@ -1924,8 +1918,6 @@ ENTRY_DECLARATION // main or winmain
                 nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
                 nvgStrokeWidth(vg, fd.ui.slot_border);
                 
-                //auto sIter = fd.graph.slots.find(n.id);                             // sIter is slot iterator
-                //auto sIter = lower_bound( ALL(slots), n.id);                      // sIter is slot iterator
                 auto sIter = node_slots(n.id);
                 for(; sIter!=end(slots) && sIter->first.nid==n.id; ++sIter)
                 {
@@ -2014,6 +2006,16 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+//}else if(slotClk){
+//}else if(nodeClk){
+
+//auto    h = fd.ui.slot_rad;
+//auto hlfw = w / 2;
+//auto hlfh = h / 2;
+
+//auto sIter = fd.graph.slots.find(n.id);                             // sIter is slot iterator
+//auto sIter = lower_bound( ALL(slots), n.id);                      // sIter is slot iterator
 
 //LavaId sid(pkt.src_node, pkt.src_slot);
 //
