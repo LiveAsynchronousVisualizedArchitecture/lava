@@ -53,8 +53,10 @@
 // -todo: change status bar on mouse over instead of click
 // -todo: try wrapping 'structured exception handling' - just needed to wrap the structured exception handling in a dedicated function
 
-// todo: make nodes highlight on mouse over
 // todo: put background highlights on visualized slots
+// todo: use exceptions to flag node instances 
+// todo: create red background highlights on nodes that generate exceptions
+// todo: make nodes highlight on mouse over
 // todo: put timer into each node instance
 // todo: make status bar show the timing data for each node
 // todo: make button that creates a project for a node - would it need to pop up a modal dialog?
