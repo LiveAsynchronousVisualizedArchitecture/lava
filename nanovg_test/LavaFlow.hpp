@@ -166,12 +166,12 @@ struct       LavaInst
     u32    stateU32;
   };
 
-  auto       setState(u64 nid, LavaInst::State state) -> LavaInst::State
+  void       setState(LavaInst::State s) // -> LavaInst::State
   {
-    stateU32 = ((au32*)(&stateU32))->exchange(state);
-    return state;
+    ((au32*)(&state))->store(s);
+    //return this->state;
   }
-  auto       getState(u64 nid) -> LavaInst::State
+  auto       getState() -> LavaInst::State
   {
     stateU32 = ((au32*)(&stateU32))->load();
     return state;
@@ -678,13 +678,17 @@ public:
     
     return (cnt+slcnt) > 0;                                  // return true if 1 or more elements were erased, return false if no elements were erasedm
   }
-  auto       setState(u64 nid, LavaInst::State state) -> LavaInst::State
+  void       setState(u64 nid, LavaInst::State state) // -> LavaInst::State
   {
-    return this->node(nid).setState(nid, state);
+    //return this->node(nid).setState(nid, state);
+    LavaInst& li = this->node(nid);
+    li.setState(state);
   }
   auto       getState(u64 nid) -> LavaInst::State
   {
-    return this->node(nid).getState(nid);
+    //return this->node(nid).getState();
+    LavaInst& li = this->node(nid);
+    return li.getState();
   }
 
 
@@ -846,6 +850,8 @@ public:
   using Mutex           =  std::mutex;
   using PacketCallback  =  void (*)(LavaPacket pkt);
 
+  enum FlowErr { NONE=0, RUN_ERR=0xFFFFFFFFFFFFFFFF };
+
   lava_pathHndlMap         libs;     // libs is libraries - this maps the live path of the shared libary with the OS specific handle that the OS loading function returns
   lava_nidMap              nids;     // nids is node ids  - this maps the name of the node to all of the graph node ids that use it
   lava_flowNodes           flow;
@@ -853,15 +859,14 @@ public:
   lava_hndlNodeMap       ndptrs;     // ndptrs is node pointers - a map from each handle to the one (zero?) or more LavaFlowNode pointers the shared lib contains
   lava_nameNodeMap    nameToPtr;     // maps node names to their pointers 
 
-  mutable bool        m_running = false;            // todo: make this atomic
-  mutable u64        m_curMsgId = 0;                // todo: make this atomic
-  mutable u64           m_frame = 0;                // todo: make this atomic
-  mutable LavaId        m_curId = LavaNode::NONE;   // todo: make this atomic - won't be used as a single variable anyway
-  mutable u64     m_threadCount = 0;                // todo: make this atomic
-  mutable u32           version = 0;                // todo: make this atomic
-  mutable Mutex          m_qLck;
-  mutable PacketCallback packetCallback;            // todo: make this an atomic version of the function pointer
-  //mutable u64    packetCallback;                  // todo: make this an atomic version of the function pointer
+  mutable bool         m_running = false;            // todo: make this atomic
+  mutable u64         m_curMsgId = 0;                // todo: make this atomic
+  mutable u64            m_frame = 0;                // todo: make this atomic
+  mutable LavaId         m_curId = LavaNode::NONE;   // todo: make this atomic - won't be used as a single variable anyway
+  mutable u64      m_threadCount = 0;                // todo: make this atomic
+  mutable u32            version = 0;                // todo: make this atomic
+  mutable Mutex           m_qLck;
+  mutable PacketCallback  packetCallback;            // todo: make this an atomic version of the function pointer
 
   MsgNodeVec        m_msgNodes;
   PacketQueue                q;
@@ -900,6 +905,12 @@ public:
 
     //lock_guard<Mutex> qLck(m_qLck);
     //LavaPacket pckt = q.top();
+  }
+  void          putPacket(LavaPacket pkt)
+  {
+    m_qLck.lock();              // mutex lock
+      q.push(pkt);              // todo: use a mutex here initially
+    m_qLck.unlock();            // mutex unlock
   }
 
   // query 
@@ -1168,21 +1179,20 @@ void               LavaFree(uint64_t addr)
 
 uint64_t      exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaVal* inArgs, LavaOut* outArgs)
 {
-  uint64_t        ret = 0;
+  uint64_t        ret = LavaFlow::NONE;
   uint64_t  winExcept = 0;
   __try{
-    //printf("\n try \n");
     ret = f(lp, inArgs, outArgs);
   }__except( (winExcept=GetExceptionCode()) || EXCEPTION_EXECUTE_HANDLER ){
-    lf.graph.setState(lp->id.nid, LavaInst::RUN_ERROR);
+    ret = LavaFlow::RUN_ERR;
+    //lf.graph.setState(lp->id.nid, LavaInst::RUN_ERROR);
+
     printf("\n windows exception code: %llu \n", winExcept);
   }
 
   return ret;
-
-  //}__except(EXCEPTION_EXECUTE_HANDLER)
 }
-bool                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaVal* inArgs,  LavaOut* outArgs) noexcept   // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
+uint64_t                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaVal* inArgs,  LavaOut* outArgs) noexcept   // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
 {
   FlowFunc func = lf.graph[nid].node->func;
   if(func){
@@ -1193,10 +1203,10 @@ bool                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid,
       lp.outputs     =   512;
       lp.frame       =   lf.m_frame;
       lp.id          =   LavaId(nid);
-      lp.mem_alloc   =   LavaAlloc;                             //lp.mem_alloc   =   malloc;  // LavaHeapAlloc;
+      lp.mem_alloc   =   LavaAlloc;             //lp.mem_alloc   =   malloc;  // LavaHeapAlloc;
 
-      //uint64_t ret   =   func(&lp, inArgs, outArgs);
       uint64_t ret   =   exceptWrapper(func, lf, &lp, inArgs, outArgs);
+      if(ret != LavaFlow::NONE){ return ret; }
     }
     SECTION(create packets and put them into packet queue)
     {
@@ -1238,9 +1248,11 @@ bool                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid,
 
           mem.incRef();
 
-          lf.m_qLck.lock();              // mutex lock
-            lf.q.push(pkt);              // todo: use a mutex here initially
-          lf.m_qLck.unlock();            // mutex unlock
+          lf.putPacket(pkt);
+
+          //lf.m_qLck.lock();              // mutex lock
+          //  lf.q.push(pkt);              // todo: use a mutex here initially
+          //lf.m_qLck.unlock();            // mutex unlock
         }
 
         ownedMem.push_back(mem);
@@ -1253,8 +1265,6 @@ bool                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid,
       }
     } // SECTION(create packets and put them into packet queue)
 
-    //SECTION(loop through inputs and decrement their references now that the function is done)
-    //{ //}
     return true;
   }
   return false;
@@ -1349,7 +1359,19 @@ void               LavaLoop(LavaFlow& lf) noexcept
         lf.m_curId = id;
 
         LavaParams lp;
-        runFunc(lf, ownedMem, id.nid, &lp, inArgs, outArgs); 
+        uint64_t err = runFunc(lf, ownedMem, id.nid, &lp, inArgs, outArgs); 
+        switch(err)
+        {
+        case LavaFlow::RUN_ERR:{
+          lf.graph.setState(id.nid, LavaInst::RUN_ERROR);
+          //lf.putPacket(pckt);               // if there was an error, put the packet back into the queue
+        }break;
+
+        case LavaFlow::NONE:
+        default: 
+          break;
+        }
+
       }
       ++lf.m_frame; // todo: rethink this and make sure it will work 
     } // SECTION(loop through message nodes)
@@ -1365,13 +1387,18 @@ void               LavaLoop(LavaFlow& lf) noexcept
         LavaParams lp;                                                    // get the function from the dest node and put the packets into the dest LavaVal input array 
         lp.inputs = 1;
         
-        //__try{
-          //printf("\n try \n");
-          runFunc(lf, ownedMem, pckt.dest_node, &lp, inArgs, outArgs); 
-        //}__except( (winExcept=GetExceptionCode())  ){
-        //}__except(EXCEPTION_EXECUTE_HANDLER){
-          //printf("windows exception code: %llu", winExcept);
-        //}
+        uint64_t err = runFunc(lf, ownedMem, pckt.dest_node, &lp, inArgs, outArgs); 
+        switch(err)
+        {
+          case LavaFlow::RUN_ERR:{
+            lf.graph.setState(pckt.dest_node, LavaInst::RUN_ERROR);
+            lf.putPacket(pckt);               // if there was an error, put the packet back into the queue
+          }break;
+
+          case LavaFlow::NONE:
+          default: 
+            break;
+        }
 
         LavaMem lm = LavaMem::fromDataAddr(inArgs[pckt.dest_slot].value);
         PrintLavaMem(lm);
@@ -1421,6 +1448,24 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//__try{
+//printf("\n try \n");
+//
+//}__except( (winExcept=GetExceptionCode())  ){
+//}__except(EXCEPTION_EXECUTE_HANDLER){
+//printf("windows exception code: %llu", winExcept);
+//}
+
+//printf("\n try \n");
+//}__except(EXCEPTION_EXECUTE_HANDLER)
+
+//uint64_t ret   =   func(&lp, inArgs, outArgs);
+//
+//SECTION(loop through inputs and decrement their references now that the function is done)
+//{ //}
+
+//
+//mutable u64    packetCallback;                  // todo: make this an atomic version of the function pointer
 
 //LavaInst li = this->node(nid).setState
 //stateU32 = ((au32*)(&stateU32))->exchange(state);

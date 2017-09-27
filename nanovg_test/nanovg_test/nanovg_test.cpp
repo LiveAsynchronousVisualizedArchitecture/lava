@@ -332,11 +332,6 @@ void         draw_radial(NVGcontext* vg, NVGcolor clr, f32 x, f32 y, f32 rad)
     auto radial = nvgRadialGradient(vg,x,y,0,hlf,clr,nvgRGBA(0,0,0,0));
   nvgFillPaint(vg, radial);
   nvgFill(vg);
-
-  //auto    w = rad h = w;
-  // hlfh = hlfw;
-  //auto   cx = s->P.x;
-  //auto   cy = s->P.y;
 }
 
 // state manipulation
@@ -804,9 +799,6 @@ void    node_draw_radial(Node const& n, NVGcontext* vg, NVGcolor clr)
   auto   cy = n.P.y + h/2;
 
   draw_radial(vg, clr, cx, cy, w*1.25f);
-
-  //auto hlfw = w / 2;
-  //auto hlfh = h / 2;
 }
 
 void           cnct_draw(NVGcontext* vg, v2 srcP, v2 destP, v2 srcN, v2 destN, f32 minCenterDist=INFf)
@@ -1841,24 +1833,6 @@ ENTRY_DECLARATION // main or winmain
             {
               auto const& n = fd.graph.nds[nid];
               node_draw_radial(n, vg, nvgRGBA(0,255,128,48));
-
-              //auto    w = n.b.w();
-              //auto hlfw = w / 2;
-              //auto    h = n.b.h();
-              //auto hlfh = h / 2;
-              //auto   cx = n.P.x + hlfw;
-              //auto   cy = n.P.y + hlfh;
-              //draw_radial(vg, nvgRGBA(0,255,128,48), cx, cy, w*1.25f);
-
-              //nvgFillColor(vg, nvgRGBA(0,255,255,255));
-              //nvgBeginPath(vg);
-              //  nvgCircle(vg, cx, cy, n.b.w()*1.25f );
-              //  auto radial = nvgRadialGradient(vg,
-              //    cx, cy, 0, hlfw*1.25f,
-              //    nvgRGBA(0,255,128,48),
-              //    nvgRGBA(0,0,0,0)  );
-              //nvgFillPaint(vg, radial);
-              //nvgFill(vg);
             }
           }
           SECTION(draw highlights behind visualized slots)
@@ -2057,6 +2031,32 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+//auto hlfw = w / 2;
+//auto hlfh = h / 2;
+
+//auto    w = n.b.w();
+//auto hlfw = w / 2;
+//auto    h = n.b.h();
+//auto hlfh = h / 2;
+//auto   cx = n.P.x + hlfw;
+//auto   cy = n.P.y + hlfh;
+//draw_radial(vg, nvgRGBA(0,255,128,48), cx, cy, w*1.25f);
+
+//nvgFillColor(vg, nvgRGBA(0,255,255,255));
+//nvgBeginPath(vg);
+//  nvgCircle(vg, cx, cy, n.b.w()*1.25f );
+//  auto radial = nvgRadialGradient(vg,
+//    cx, cy, 0, hlfw*1.25f,
+//    nvgRGBA(0,255,128,48),
+//    nvgRGBA(0,0,0,0)  );
+//nvgFillPaint(vg, radial);
+//nvgFill(vg);
+
+//auto    w = rad h = w;
+// hlfh = hlfw;
+//auto   cx = s->P.x;
+//auto   cy = s->P.y;
 
 //
 //nds.push_back(LavaId(fd.sel.pri));
