@@ -152,10 +152,17 @@ struct       LavaNode
 };
 struct       LavaInst
 {
+  enum State { NORMAL=0, RUN_ERROR, LOAD_ERROR, COMPILE_ERROR };
+
   LavaId         id;
   LavaNode*    node;
   u32        inputs;
   u32       outputs;
+
+  union{
+    State     state;
+    u32    stateU32;
+  };
 };
 struct   LavaFlowSlot
 { 
@@ -331,6 +338,7 @@ class       LavaGraph
 public:
   struct NodeInstance { uint64_t id; LavaNode* nd; };                  // a struct used for returning an instance of a node - the Nodes map of ids and LavaFlowNode pointers  
 
+  using au32          =  std::atomic<uint32_t>;
   using NodeInsts     =  std::unordered_map<uint64_t, LavaInst>;       // maps an id to a LavaFlowNode struct
   using Slots         =  std::multimap<LavaId, LavaFlowSlot>;          // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
   using CnctMap       =  std::unordered_map<LavaId, LavaId, LavaId>;   // maps connections from their single destination slot to their single source slot - Id is the hash function object in the third template argument
@@ -569,7 +577,7 @@ public:
     LavaInst li = makeInst(id, ln);
     return m_nodes.insert({id, li}).first->first;                             // returns a pair that contains the key-value pair
   }
-  auto           node(u64 id)  -> LavaInst
+  auto           node(u64 id)  -> LavaInst&
   {
     auto nIter = m_nodes.find(id);                                          // nIter is node iterator
     if(nIter == end(m_nodes)) return errorInst();
@@ -656,6 +664,22 @@ public:
     m_msgNodes.erase(nid);
     
     return (cnt+slcnt) > 0;                                  // return true if 1 or more elements were erased, return false if no elements were erasedm
+  }
+  auto       setState(u64 nid, LavaInst::State state) -> LavaInst::State
+  {
+    LavaInst& li = this->node(nid);
+    LavaInst ret;
+    ret.stateU32 = ((au32*)(&li.stateU32))->exchange(state);
+
+    return ret.state;
+  }
+  auto getState(u64 nid) -> LavaInst::State
+  {
+    LavaInst& li = this->node(nid);
+    LavaInst ret;
+    ret.stateU32 = ((au32*)(&li.stateU32))->load();
+
+    return ret.state;
   }
 
   // slots
@@ -1136,7 +1160,7 @@ void               LavaFree(uint64_t addr)
   LavaHeapFree(p);
 }
 
-uint64_t      exceptWrapper(FlowFunc f, LavaParams* lp, LavaVal* inArgs, LavaOut* outArgs)
+uint64_t      exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaVal* inArgs, LavaOut* outArgs)
 {
   uint64_t        ret = 0;
   uint64_t  winExcept = 0;
@@ -1144,6 +1168,7 @@ uint64_t      exceptWrapper(FlowFunc f, LavaParams* lp, LavaVal* inArgs, LavaOut
     //printf("\n try \n");
     ret = f(lp, inArgs, outArgs);
   }__except( (winExcept=GetExceptionCode()) || EXCEPTION_EXECUTE_HANDLER ){
+    lf.graph.setState(lp->id.nid, LavaInst::RUN_ERROR);
     printf("\n windows exception code: %llu \n", winExcept);
   }
 
@@ -1165,7 +1190,7 @@ bool                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid,
       lp.mem_alloc   =   LavaAlloc;                             //lp.mem_alloc   =   malloc;  // LavaHeapAlloc;
 
       //uint64_t ret   =   func(&lp, inArgs, outArgs);
-      uint64_t ret   =   exceptWrapper(func, &lp, inArgs, outArgs);
+      uint64_t ret   =   exceptWrapper(func, lf, &lp, inArgs, outArgs);
     }
     SECTION(create packets and put them into packet queue)
     {

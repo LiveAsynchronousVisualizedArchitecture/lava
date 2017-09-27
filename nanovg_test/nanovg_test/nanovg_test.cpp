@@ -56,10 +56,12 @@
 // -todo: put background highlights on visualized slots
 // -todo: take out Id type alias
 // -todo: fix deletion - make delete and backspace delete selected nodes - might need to check the primary selection as well as selection states - sel_nodes now includes the primary selection as well
+// -todo: use exceptions to flag node instances 
+// -todo: build in a state variable to the LavaInst struct
+// -todo: create red background highlights on nodes that generate exceptions
 
-// todo: use exceptions to flag node instances 
+// todo: build in the atomic store and load functions into the LavaInst struct
 // todo: make exceptions in the shared library functions put the packet back into the queue
-// todo: create red background highlights on nodes that generate exceptions
 // todo: make nodes highlight on mouse over
 // todo: put timer into each node instance
 // todo: make status bar show the timing data for each node
@@ -318,6 +320,23 @@ f32        normalToAngle(v2 N)
 v2         angleToNormal(f32 angle)
 {
   return { cos(angle), sin(angle) };
+}
+
+void         draw_radial(NVGcontext* vg, NVGcolor clr, f32 x, f32 y, f32 rad)
+{
+  auto  hlf = rad/2; 
+
+  nvgFillColor(vg, nvgRGBA(0,255,255,255));
+  nvgBeginPath(vg);
+    nvgCircle(vg, x, y, rad);
+    auto radial = nvgRadialGradient(vg,x,y,0,hlf,clr,nvgRGBA(0,0,0,0));
+  nvgFillPaint(vg, radial);
+  nvgFill(vg);
+
+  //auto    w = rad h = w;
+  // hlfh = hlfw;
+  //auto   cx = s->P.x;
+  //auto   cy = s->P.y;
 }
 
 // state manipulation
@@ -776,6 +795,18 @@ auto          node_slots(vec_ndptrs const& nds) -> vec_ids
 void         node_delete()
 {
   
+}
+void    node_draw_radial(Node const& n, NVGcontext* vg, NVGcolor clr)
+{
+  auto    w = n.b.w();
+  auto    h = n.b.h();
+  auto   cx = n.P.x + w/2;
+  auto   cy = n.P.y + h/2;
+
+  draw_radial(vg, clr, cx, cy, w*1.25f);
+
+  //auto hlfw = w / 2;
+  //auto hlfh = h / 2;
 }
 
 void           cnct_draw(NVGcontext* vg, v2 srcP, v2 destP, v2 srcN, v2 destN, f32 minCenterDist=INFf)
@@ -1809,22 +1840,25 @@ ENTRY_DECLARATION // main or winmain
                fd.graph.nds.count(nid) > 0)
             {
               auto const& n = fd.graph.nds[nid];
+              node_draw_radial(n, vg, nvgRGBA(0,255,128,48));
 
-              auto    w = n.b.w();
-              auto hlfw = w / 2;
-              auto    h = n.b.h();
-              auto hlfh = h / 2;
-              auto   cx = n.P.x + hlfw;
-              auto   cy = n.P.y + hlfh;
-              nvgFillColor(vg, nvgRGBA(0,255,255,255));
-              nvgBeginPath(vg);
-                nvgCircle(vg, cx, cy, n.b.w()*1.25f );
-                auto radial = nvgRadialGradient(vg,
-                  cx, cy, 0, hlfw*1.25f,
-                  nvgRGBA(0,255,128,48),
-                  nvgRGBA(0,0,0,0)  );
-              nvgFillPaint(vg, radial);
-              nvgFill(vg);
+              //auto    w = n.b.w();
+              //auto hlfw = w / 2;
+              //auto    h = n.b.h();
+              //auto hlfh = h / 2;
+              //auto   cx = n.P.x + hlfw;
+              //auto   cy = n.P.y + hlfh;
+              //draw_radial(vg, nvgRGBA(0,255,128,48), cx, cy, w*1.25f);
+
+              //nvgFillColor(vg, nvgRGBA(0,255,255,255));
+              //nvgBeginPath(vg);
+              //  nvgCircle(vg, cx, cy, n.b.w()*1.25f );
+              //  auto radial = nvgRadialGradient(vg,
+              //    cx, cy, 0, hlfw*1.25f,
+              //    nvgRGBA(0,255,128,48),
+              //    nvgRGBA(0,0,0,0)  );
+              //nvgFillPaint(vg, radial);
+              //nvgFill(vg);
             }
           }
           SECTION(draw highlights behind visualized slots)
@@ -1838,20 +1872,22 @@ ENTRY_DECLARATION // main or winmain
               s = slot_get(id);
               if(!s){ continue; }
 
-              auto    w = fd.ui.slot_rad, h = w;
-              auto hlfw = w/2, hlfh = hlfw;
-              auto   cx = s->P.x;
-              auto   cy = s->P.y;
+              draw_radial(vg, nvgRGBA(0,128,228,255), 
+                s->P.x, s->P.y, fd.ui.slot_rad*5); 
 
-              nvgFillColor(vg, nvgRGBA(0,255,255,255));
-              nvgBeginPath(vg);
-                nvgCircle(vg, cx, cy, w*4.25f );
-                auto radial = nvgRadialGradient(vg,
-                  cx, cy, 0, hlfw*4.25f,
-                  nvgRGBA(0,128,228,255),
-                  nvgRGBA(0,0,0,0)  );
-                nvgFillPaint(vg, radial);
-              nvgFill(vg);
+              //auto    w = fd.ui.slot_rad, h = w;
+              //auto hlfw = w/2, hlfh = hlfw;
+              //auto   cx = s->P.x;
+              //auto   cy = s->P.y;
+              //nvgFillColor(vg, nvgRGBA(0,255,255,255));
+              //nvgBeginPath(vg);
+              //  nvgCircle(vg, cx, cy, w*4.25f );
+              //  auto radial = nvgRadialGradient(vg,
+              //    cx, cy, 0, hlfw*4.25f,
+              //    nvgRGBA(0,128,228,255),
+              //    nvgRGBA(0,0,0,0)  );
+              //  nvgFillPaint(vg, radial);
+              //nvgFill(vg);
             }
           }
           SECTION(draw connections)
@@ -1923,6 +1959,10 @@ ENTRY_DECLARATION // main or winmain
               Node&     n = *(nds[i]);
               bool selctd = n.id==fd.sel.pri || n.sel;
 
+              LavaInst::State state = fd.lgrph.getState(n.id);
+              if(state == LavaInst::RUN_ERROR){
+                node_draw_radial(n, vg, nvgRGBA(255,48,0,255));
+              }
               node_draw(vg, 0, n, 1.f, selctd, fd.ui.nd_border);
 
               SECTION(draw node slots)

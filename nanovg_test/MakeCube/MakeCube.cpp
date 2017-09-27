@@ -124,8 +124,8 @@ extern "C"
     out[0].key.slot = 0;
 
     //printf("\n\n dropping null dereference bomb \n\n");
-    //int*  bomb  =  nullptr;
-    //int    wat  =  *bomb;
+    int*  bomb  =  nullptr;
+    int    wat  =  *bomb;
     //printf("\n\n bomb dropped \n\n");
 
     this_thread::sleep_for( chrono::milliseconds(500) );
