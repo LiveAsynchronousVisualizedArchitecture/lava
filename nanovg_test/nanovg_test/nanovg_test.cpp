@@ -60,10 +60,10 @@
 // -todo: build in a state variable to the LavaInst struct
 // -todo: create red background highlights on nodes that generate exceptions
 // -todo: build in the atomic store and load functions into the LavaInst struct
+// -todo: make exceptions in the shared library functions put the packet back into the queue
+// -todo: make nodes highlight on mouse over - white with 0.025 opacity seems to work well to be able to see when a node is moused over
+// -todo: put timer into each node instance - try C++11 high resolution clock now() with doubles
 
-// todo: make exceptions in the shared library functions put the packet back into the queue
-// todo: make nodes highlight on mouse over
-// todo: put timer into each node instance
 // todo: make status bar show the timing data for each node
 // todo: make button that creates a project for a node - would it need to pop up a modal dialog?
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
@@ -108,6 +108,8 @@
 // todo: keep the time in microseconds of the execution of every node instance in a LavaNodeInst struct
 //       | use the execution time to draw the saturation of the node color a long with a background indicator to see the nodes with the most execution time
 
+// idea: make a table creation and editing GUI
+// idea: make a dialog to set a compilation command for each node - think about debug and release modes, different OSs - set the current working directory to the node directory path
 // idea: when turning off a slot, take it out, delete it, and put it back under a name with 'OFF: ' as a prefix
 // idea: keep track of covariance matrix for time vs size of data 
 //       | keep track of multiple moments and detect if a node has a quadratic / O(n^2) time
@@ -177,11 +179,12 @@
 //    |  |  if a node wants to gather packets but not output a single packet, would it be both a gather and a split?
 
 // Major Features: 
+//   | -Catch low level exceptions on each node
 //   | Freezing data while playing
 //   | Reloading of shared libs while running 
 //   | Packet syncing through use of frames
-//   | Catch low level exceptions on each node
-//
+//   | Live editing of input tables 
+//   | Constant input tables to configure a node? - can constant input tables just be a live table that gets frozen into the binary? would it be memory mapped and a specially tagged pointer passed around?
 
 // glew might include windows.h
 #define  WIN32_LEAN_AND_MEAN
@@ -567,7 +570,8 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
                           Node const& n,
                          float      rnd,      // rnd is corner rounding
                          bool  forceSel=false,
-                         f32     border=3.5f)
+                         f32     border=3.5f,
+                         bool highlight=false)
 {
   const float   rthk = 8.f;    // rw is rail thickness
 
@@ -632,8 +636,6 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
           cntrX, cntrY-msgRad, x, y+msgRad,
           sel? fd.ui.msgnd_selclr : fd.ui.msgnd_gradst,
           sel? fd.ui.msgnd_selclr : fd.ui.msgnd_graden );
-          //n.sel? fd.ui.msgnd_selclr : fd.ui.msgnd_gradst,
-          //n.sel? fd.ui.msgnd_selclr : fd.ui.msgnd_graden );
         nvgFillPaint(vg, lin);
         nvgFill(vg);
       }
@@ -647,6 +649,18 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
           fd.ui.msgnd_graden  );
         nvgFillPaint(vg, radial);
         nvgFill(vg);
+
+        if(highlight){
+          nvgBeginPath(vg);
+          nvgCircle(vg, cntrX, cntrY, msgRad);
+          auto radial = nvgRadialGradient(vg,
+            cntrX, cntrY, msgRad*.5f, msgRad,
+            fd.ui.msgnd_gradst,
+            fd.ui.nd_hilgt );
+            //fd.ui.msgnd_graden  );
+          nvgFillPaint(vg, radial);
+          nvgFill(vg);
+        }
       }
       SECTION(circle outline)
       {
@@ -655,7 +669,6 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
         nvgStroke(vg);
       }
 
-      //b = { x, y, x+w, y+w };
     }
   } break;
   }
@@ -1497,10 +1510,13 @@ ENTRY_DECLARATION // main or winmain
 
     while(!glfwWindowShouldClose(fd.win))
     {
-      auto&    ms = fd.mouse;
-      bool  rtClk = (ms.rtDn  && !ms.prevRtDn);  // todo: take this out
-      auto    nds = node_getPtrs();
-      auto     sz = nds.size();
+      auto&      ms = fd.mouse;
+      bool    rtClk = (ms.rtDn  && !ms.prevRtDn);  // todo: take this out
+      auto      nds = node_getPtrs();
+      auto       sz = nds.size();
+      bool isInNode = false;
+      LavaId    nid;
+      u64      nIdx;
 
       SECTION(time)
       {
@@ -1559,9 +1575,6 @@ ENTRY_DECLARATION // main or winmain
           }
         }
 
-        LavaId    nid;
-        u64      nIdx;
-        bool isInNode = false;
         if(!isInSlot) SECTION(node inside check: if inside a node in node ordr from top to bottom)
         {
           FROM(sz,i)                                                // loop backwards so that the top nodes are dealt with first
@@ -1937,7 +1950,9 @@ ENTRY_DECLARATION // main or winmain
               if(state == LavaInst::RUN_ERROR){
                 node_draw_radial(n, vg, nvgRGBA(255,48,0,255));
               }
-              node_draw(vg, 0, n, 1.f, selctd, fd.ui.nd_border);
+
+              bool highlight = isInNode && nIdx==i;
+              node_draw(vg, 0, n, 1.f, selctd, fd.ui.nd_border, highlight);
 
               SECTION(draw node slots)
               {
@@ -2031,6 +2046,10 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//n.sel? fd.ui.msgnd_selclr : fd.ui.msgnd_gradst,
+//n.sel? fd.ui.msgnd_selclr : fd.ui.msgnd_graden );
+//
+//b = { x, y, x+w, y+w };
 
 //auto hlfw = w / 2;
 //auto hlfh = h / 2;

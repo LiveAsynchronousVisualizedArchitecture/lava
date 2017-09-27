@@ -18,6 +18,7 @@
 #include <unordered_set>
 #include <map>
 #include <queue>
+#include <chrono>
 #include "no_rt_util.h"
 #include "tbl.hpp" // temp
 
@@ -160,11 +161,8 @@ struct       LavaInst
   LavaNode*    node;
   u32        inputs;
   u32       outputs;
-
-  union{
-    State     state;
-    u32    stateU32;
-  };
+  u64          time = 0;  // todo: make this atomic / make functions to add time and get the current time
+  union{ State state = NORMAL; u32 stateU32; };
 
   void       setState(LavaInst::State s) // -> LavaInst::State
   {
@@ -940,7 +938,7 @@ public:
     //  t.join();
     //}
   }
-  void          pauseLoop(){}
+  //void          pauseLoop(){}
 };
 
 #if defined(__LAVAFLOW_IMPL__)
@@ -1182,7 +1180,7 @@ uint64_t      exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaVal* i
   uint64_t        ret = LavaFlow::NONE;
   uint64_t  winExcept = 0;
   __try{
-    ret = f(lp, inArgs, outArgs);
+    f(lp, inArgs, outArgs);
   }__except( (winExcept=GetExceptionCode()) || EXCEPTION_EXECUTE_HANDLER ){
     ret = LavaFlow::RUN_ERR;
     //lf.graph.setState(lp->id.nid, LavaInst::RUN_ERROR);
@@ -1194,8 +1192,13 @@ uint64_t      exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaVal* i
 }
 uint64_t                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaVal* inArgs,  LavaOut* outArgs) noexcept   // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
 {
-  FlowFunc func = lf.graph[nid].node->func;
-  if(func){
+  using namespace std;
+  using namespace std::chrono;
+
+  LavaInst&  li = lf.graph[nid];
+  FlowFunc func = li.node->func; //lf.graph[nid].node->func;
+  if(func)
+  {
     LavaParams lp;
     SECTION(create arguments and call function)
     {
@@ -1205,8 +1208,12 @@ uint64_t                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t 
       lp.id          =   LavaId(nid);
       lp.mem_alloc   =   LavaAlloc;             //lp.mem_alloc   =   malloc;  // LavaHeapAlloc;
 
-      uint64_t ret   =   exceptWrapper(func, lf, &lp, inArgs, outArgs);
-      if(ret != LavaFlow::NONE){ return ret; }
+      auto  stTime = high_resolution_clock::now();
+        uint64_t ret = exceptWrapper(func, lf, &lp, inArgs, outArgs);
+        if(ret != LavaFlow::NONE){ return ret; }
+      auto endTime = high_resolution_clock::now();
+      duration<double,nano> diff = (endTime - stTime);
+      li.time += diff.count();
     }
     SECTION(create packets and put them into packet queue)
     {
