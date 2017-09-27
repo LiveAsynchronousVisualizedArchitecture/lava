@@ -152,6 +152,8 @@ struct       LavaNode
 };
 struct       LavaInst
 {
+  using au32  =  std::atomic<uint32_t>;
+
   enum State { NORMAL=0, RUN_ERROR, LOAD_ERROR, COMPILE_ERROR };
 
   LavaId         id;
@@ -163,6 +165,17 @@ struct       LavaInst
     State     state;
     u32    stateU32;
   };
+
+  auto       setState(u64 nid, LavaInst::State state) -> LavaInst::State
+  {
+    stateU32 = ((au32*)(&stateU32))->exchange(state);
+    return state;
+  }
+  auto       getState(u64 nid) -> LavaInst::State
+  {
+    stateU32 = ((au32*)(&stateU32))->load();
+    return state;
+  }
 };
 struct   LavaFlowSlot
 { 
@@ -667,20 +680,13 @@ public:
   }
   auto       setState(u64 nid, LavaInst::State state) -> LavaInst::State
   {
-    LavaInst& li = this->node(nid);
-    LavaInst ret;
-    ret.stateU32 = ((au32*)(&li.stateU32))->exchange(state);
-
-    return ret.state;
+    return this->node(nid).setState(nid, state);
   }
-  auto getState(u64 nid) -> LavaInst::State
+  auto       getState(u64 nid) -> LavaInst::State
   {
-    LavaInst& li = this->node(nid);
-    LavaInst ret;
-    ret.stateU32 = ((au32*)(&li.stateU32))->load();
-
-    return ret.state;
+    return this->node(nid).getState(nid);
   }
+
 
   // slots
   LavaId      addSlot(LavaFlowSlot  s, u64 sidx=0)
@@ -1416,6 +1422,12 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//LavaInst li = this->node(nid).setState
+//stateU32 = ((au32*)(&stateU32))->exchange(state);
+//return state;
+//
+//stateU32 = ((au32*)(&stateU32))->load();
+//return state;
 
 //LavaMem lm;
 //lm.ptr = (void*)(inArgs[pckt.dest_slot].value - 16);

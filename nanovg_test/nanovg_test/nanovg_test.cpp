@@ -59,8 +59,8 @@
 // -todo: use exceptions to flag node instances 
 // -todo: build in a state variable to the LavaInst struct
 // -todo: create red background highlights on nodes that generate exceptions
+// -todo: build in the atomic store and load functions into the LavaInst struct
 
-// todo: build in the atomic store and load functions into the LavaInst struct
 // todo: make exceptions in the shared library functions put the packet back into the queue
 // todo: make nodes highlight on mouse over
 // todo: put timer into each node instance
