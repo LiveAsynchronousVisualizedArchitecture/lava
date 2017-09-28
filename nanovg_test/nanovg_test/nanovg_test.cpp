@@ -69,7 +69,9 @@
 // -todo: make time totaling function for the LavaGraph
 // -todo: make the status bar update continuously even for the last moused over node? - need to keep the last node in the global state - just use the primary selection
 // -todo: make command queue for LavaGraph so that changes to the graph can be stored and queued
+// -todo: finish using cur() functions
 
+// todo: fix slot movement
 // todo: put mutexes around LavaFlow command queue? - no, just use it to batch commands, execute them, and switch the data structures 
 // todo: make LavaFlow loop always use the right buffer
 // todo: convert lava graph changes to use the command queue
