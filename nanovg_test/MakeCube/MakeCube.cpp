@@ -128,7 +128,7 @@ extern "C"
     //int    wat  =  *bomb;
     //printf("\n\n bomb dropped \n\n");
 
-    this_thread::sleep_for( chrono::milliseconds(500) );
+    //this_thread::sleep_for( chrono::milliseconds(500) );
 
     return 1;
   }

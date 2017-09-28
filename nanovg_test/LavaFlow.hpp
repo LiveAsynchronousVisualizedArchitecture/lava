@@ -154,6 +154,7 @@ struct       LavaNode
 struct       LavaInst
 {
   using au32  =  std::atomic<uint32_t>;
+  using au64  =  std::atomic<uint64_t>;
 
   enum State { NORMAL=0, RUN_ERROR, LOAD_ERROR, COMPILE_ERROR };
 
@@ -173,6 +174,10 @@ struct       LavaInst
   {
     stateU32 = ((au32*)(&stateU32))->load();
     return state;
+  }
+  u64         addTime(u64 t)
+  {
+    return ((au64*)(&time))->fetch_add(t);
   }
 };
 struct   LavaFlowSlot
@@ -1213,7 +1218,7 @@ uint64_t                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t 
         if(ret != LavaFlow::NONE){ return ret; }
       auto endTime = high_resolution_clock::now();
       duration<double,nano> diff = (endTime - stTime);
-      li.time += diff.count();
+      li.addTime( diff.count() );   //li.time += diff.count();
     }
     SECTION(create packets and put them into packet queue)
     {

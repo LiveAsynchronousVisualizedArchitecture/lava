@@ -63,24 +63,23 @@
 // -todo: make exceptions in the shared library functions put the packet back into the queue
 // -todo: make nodes highlight on mouse over - white with 0.025 opacity seems to work well to be able to see when a node is moused over
 // -todo: put timer into each node instance - try C++11 high resolution clock now() with doubles
+// -todo: make status bar show the timing data for each node
 
-// todo: make status bar show the timing data for each node
-// todo: make button that creates a project for a node - would it need to pop up a modal dialog?
+// todo: make time reset on stop
+// todo: make time adding atomic
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
 //       |  does there need to be a function to copy the instances and connections? - should this ultimatly be used for drawing the graph?
+//       |  can the graph be condensed into a tbl ? 
 // todo: use a copy of the graph to clear and update the interface buttons
 // todo: make a function to get a copy of the graph - can check the version number every loop, and if it is higher, get a copy of all the data inside a mutex
+// todo: make button that creates a project for a node - would it need to pop up a modal dialog?
 // todo: convert tbl to use arrays of the data types smaller than 64 bits
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array - can any heirarchy of initializer_lists be brought down to an array of the same types?
-// todo: use combination of frame, node id and slot as key to simbdb
-//       |  how does that get in to the node, if all the data is in the packet struct? - through the output Args
-//       |  put the index information into the output array and use that 
-//       |  leave room for the hash in the output struct? - not now
-//       |  the full key is needed because robin hood hashing could shift the other keys' indices around - the index into the key value slots in the db can't be used, but the starting block index can since that won't change until the data goes away
-//       |  use a union of bytes that is filled with the frame, slot, list index?
-//       |  use malloc addresses initially
 // todo: change project name to Fissure 
+// todo: make popup text box that avoids the bounding box of the moused over node? - put graph of node times in the box? put graph of covariance data of data in, time spent, data out, and time ?   
+// todo: make right click or space bar open up a text box that can contain the build command, stats and/or hotbox
 
+// todo: profile
 // todo: print child tables in table printing functions
 // todo: make lava memory allocation aligned to 64 byte boundaries
 // todo: come up with locking system so that message nodes have their own threads that are only run when a looping thread visits them - how should memory allocation be done? passing the thread's allocator in the exact same way?
@@ -107,6 +106,13 @@
 // todo: change NODE_ERROR to NODE_NONE 
 // todo: keep the time in microseconds of the execution of every node instance in a LavaNodeInst struct
 //       | use the execution time to draw the saturation of the node color a long with a background indicator to see the nodes with the most execution time
+// todo: use combination of frame, node id and slot as key to simbdb - visualization can be done with a different key for now and node communication is through thread local memory
+//       |  how does that get in to the node, if all the data is in the packet struct? - through the output Args
+//       |  put the index information into the output array and use that 
+//       |  leave room for the hash in the output struct? - not now
+//       |  the full key is needed because robin hood hashing could shift the other keys' indices around - the index into the key value slots in the db can't be used, but the starting block index can since that won't change until the data goes away
+//       |  use a union of bytes that is filled with the frame, slot, list index?
+//       |  use malloc addresses initially
 
 // idea: make a table creation and editing GUI
 // idea: make a dialog to set a compilation command for each node - think about debug and release modes, different OSs - set the current working directory to the node directory path
@@ -1689,7 +1695,8 @@ ENTRY_DECLARATION // main or winmain
             auto status = toString("Slot [",sid.nid,":",sid.sidx,"]");
             fd.ui.statusTxt->setValue( status );
           }else if(isInNode){
-            auto status =  toString("Node [",nid.nid,"]  ", nds[nIdx]->txt);
+            f64 seconds = fd.lgrph.node(nid.nid).time / 1000000000.0;
+            auto status =  toString("Node [",nid.nid,"]  ", nds[nIdx]->txt," | ",seconds," seconds");
             fd.ui.statusTxt->setValue( status );
           }
         }
