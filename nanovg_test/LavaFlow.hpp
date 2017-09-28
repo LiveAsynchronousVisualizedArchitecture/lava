@@ -179,6 +179,10 @@ struct       LavaInst
   {
     return ((au64*)(&time))->fetch_add(t);
   }
+  u64       clearTime()
+  {
+    return ((au64*)(&time))->exchange(0);
+  }
 };
 struct   LavaFlowSlot
 { 
@@ -569,6 +573,23 @@ public:
     //}
     //m_nodes = move(nxtOrdrs);
   }
+  void      setNextNodeId(u64 nxt){ m_nxtId = nxt; }
+  u64           totalTime()
+  {
+    u64 total = 0;
+    for(auto& kv : m_nodes){ 
+      total += kv.second.time;
+    }
+    return total;
+  }
+  u64           clearTime()
+  {
+    u64 total = 0;
+    for(auto& kv : m_nodes){ 
+      total += kv.second.clearTime();
+    }
+    return total;
+  }
   void              clear()
   {
     m_nodes.clear();
@@ -580,7 +601,6 @@ public:
     init();
     //m_ids.clear();
   }
-  void      setNextNodeId(u64 nxt){ m_nxtId = nxt; }
 
   // nodes
   uint64_t    addNode(LavaNode* ln, bool newId=true)

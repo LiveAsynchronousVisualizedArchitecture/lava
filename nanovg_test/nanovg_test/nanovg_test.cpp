@@ -64,9 +64,11 @@
 // -todo: make nodes highlight on mouse over - white with 0.025 opacity seems to work well to be able to see when a node is moused over
 // -todo: put timer into each node instance - try C++11 high resolution clock now() with doubles
 // -todo: make status bar show the timing data for each node
+// -todo: make time adding atomic
+// -todo: make time reset on stop
+// -todo: make time totaling function for the LavaGraph
 
-// todo: make time reset on stop
-// todo: make time adding atomic
+// todo: make the status bar update continuously even for the last moused over node? - need to keep the last node in the global state
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
 //       |  does there need to be a function to copy the instances and connections? - should this ultimatly be used for drawing the graph?
 //       |  can the graph be condensed into a tbl ? 
@@ -354,6 +356,8 @@ void     stopFlowThreads()
   }
   fd.flowThreads.clear();
   fd.flowThreads.shrink_to_fit();
+
+  fd.lgrph.clearTime();
 }
 void    startFlowThreads(u64 num=1)
 {
