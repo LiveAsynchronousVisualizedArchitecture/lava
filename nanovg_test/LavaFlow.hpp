@@ -366,6 +366,7 @@ class       LavaGraph
 public:
   struct NodeInstance { uint64_t id; LavaNode* nd; };                  // a struct used for returning an instance of a node - the Nodes map of ids and LavaFlowNode pointers  
 
+  using abool         =  std::atomic<bool>;
   using au32          =  std::atomic<uint32_t>;
   using NodeInsts     =  std::unordered_map<uint64_t, LavaInst>;       // maps an id to a LavaFlowNode struct
   using Slots         =  std::multimap<LavaId, LavaFlowSlot>;          // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
@@ -381,23 +382,39 @@ public:
   //using CmdQ          =  std::priority_queue<LavaCommand>;
 
 private:
-  uint64_t           m_nxtId;               // nxtId is next id - a counter for every node created that only increases, giving each node a unique id
-  NodeInsts          m_nodes;
-  Slots              m_slots;
-  CnctMap            m_cncts;
-  SrcMap         m_destCncts;
-  MsgIds          m_msgNodes;
-  CmdQ                m_cmdq;
+  mutable abool        m_useA;
+
+  uint64_t            m_nxtId;               // nxtId is next id - a counter for every node created that only increases, giving each node a unique id
+  CmdQ                 m_cmdq;
+
+  //NodeInsts          m_nodesA;
+  //Slots              m_slotsA;
+  //CnctMap            m_cnctsA;
+  //SrcMap         m_destCnctsA;
+  //MsgIds          m_msgNodesA;
+
+  NodeInsts          m_nodesB;
+  Slots              m_slotsB;
+  CnctMap            m_cnctsB;
+  SrcMap         m_destCnctsB;
+  MsgIds          m_msgNodesB;
+
+  NodeInsts           m_nodesA;
+  Slots               m_slots;
+  CnctMap             m_cncts;
+  SrcMap          m_destCncts;
+  MsgIds           m_msgNodes;
 
   void            init()
   { 
+    m_useA.store(true);
     m_nxtId = 1;
   }
   void              mv(LavaGraph&& rval)
   {
     using namespace std;
 
-    m_nodes     = move(rval.m_nodes); 
+    m_nodesA     = move(rval.m_nodesA); 
     m_slots     = move(rval.m_slots); 
     m_cncts     = move(rval.m_cncts); 
     m_destCncts = move(rval.m_destCncts);
@@ -493,9 +510,9 @@ public:
   LavaGraph(LavaGraph&& rval){ mv(std::move(rval)); }
   LavaGraph& operator=(LavaGraph&& rval){ mv(std::move(rval)); return *this; }
 
-  auto      operator[](uint64_t nid) -> decltype(m_nodes[0])
+  auto      operator[](uint64_t nid) -> decltype(m_nodesA[0])
   {
-    return m_nodes[nid];
+    return m_nodesA[nid];
   }
 
   // global
@@ -505,9 +522,9 @@ public:
 
     // create a mapping of old node Ids to new ones, new ones will be their position + 1
     NormalizeMap nids;
-    nids.reserve(m_nodes.size());
+    nids.reserve(m_nodesA.size());
     u64 cur = 1;
-    for(auto& kv : m_nodes){
+    for(auto& kv : m_nodesA){
       nids[kv.first] = cur++;
     }
     //unordered_map<u64,u64> nids;
@@ -555,13 +572,13 @@ public:
 
     // node ids 
     NodeInsts nxtNds;
-    for(auto& kv : m_nodes){
+    for(auto& kv : m_nodesA){
       u64     nxtId = nids[kv.first];
       //LavaNode* nd = m_nodes[kv.first].node;
-      LavaInst inst = m_nodes[kv.first];
+      LavaInst inst = m_nodesA[kv.first];
       nxtNds.insert({nxtId, inst});
     }
-    m_nodes = move(nxtNds);
+    m_nodesA = move(nxtNds);
     //u64 nxtOrdr = ordrs[kv.second];
 
     return nids;
@@ -588,7 +605,7 @@ public:
   u64           totalTime()
   {
     u64 total = 0;
-    for(auto& kv : m_nodes){ 
+    for(auto& kv : m_nodesA){ 
       total += kv.second.time;
     }
     return total;
@@ -596,14 +613,14 @@ public:
   u64           clearTime()
   {
     u64 total = 0;
-    for(auto& kv : m_nodes){ 
+    for(auto& kv : m_nodesA){ 
       total += kv.second.clearTime();
     }
     return total;
   }
   void              clear()
   {
-    m_nodes.clear();
+    m_nodesA.clear();
     m_slots.clear();
     m_cncts.clear();
     m_destCncts.clear();
@@ -662,12 +679,12 @@ public:
       //m_msgNodes.push_back(id);
 
     LavaInst li = makeInst(id, ln);
-    return m_nodes.insert({id, li}).first->first;                             // returns a pair that contains the key-value pair
+    return m_nodesA.insert({id, li}).first->first;                             // returns a pair that contains the key-value pair
   }
   auto           node(u64 id)  -> LavaInst&
   {
-    auto nIter = m_nodes.find(id);                                          // nIter is node iterator
-    if(nIter == end(m_nodes)) return errorInst();
+    auto nIter = m_nodesA.find(id);                                          // nIter is node iterator
+    if(nIter == end(m_nodesA)) return errorInst();
 
     //LavaInst ret;
     //ret.id   = nIter->first;
@@ -678,16 +695,16 @@ public:
   }
   auto           node(u64 id) const -> LavaInst
   {
-    auto nIter = m_nodes.find(id);                                          // nIter is node iterator
-    if(nIter == end(m_nodes)) return errorInst();
+    auto nIter = m_nodesA.find(id);                                          // nIter is node iterator
+    if(nIter == end(m_nodesA)) return errorInst();
 
     return nIter->second;
   }
   auto          nodes() const -> vec_insts
   {
     vec_insts nds;
-    nds.reserve(m_nodes.size());
-    for(auto& on : m_nodes){                                  // on is order and node - order is on.first    LavaInst is on.second
+    nds.reserve(m_nodesA.size());
+    for(auto& on : m_nodesA){                                  // on is order and node - order is on.first    LavaInst is on.second
       nds.push_back(on.second);
 
       //NodeInstance inst;
@@ -700,8 +717,8 @@ public:
   auto          nodes() -> vec_insts
   {
     vec_insts nds;
-    nds.reserve(m_nodes.size());
-    for(auto& on : m_nodes){                                  // on is order and node - order is on.first    node is on.second
+    nds.reserve(m_nodesA.size());
+    for(auto& on : m_nodesA){                                  // on is order and node - order is on.first    node is on.second
       nds.push_back(on.second);
 
       //NodeInstance inst;
@@ -716,21 +733,21 @@ public:
     using namespace std;
 
     u64 mx = 0;
-    for(auto kv : m_nodes){ mx = max(mx, kv.first); }
+    for(auto kv : m_nodesA){ mx = max(mx, kv.first); }
 
     return mx;
 
     //for(auto kv : m_ids){ mx = max(mx, kv.first); }
   }
-  u64             nsz() const { return m_nodes.size(); }
+  u64             nsz() const { return m_nodesA.size(); }
   auto       msgNodes() const -> MsgIds const&
   {
     return m_msgNodes;
   }
   auto       nodeFunc(uint64_t nid) const -> FlowFunc
   {
-    auto ni = m_nodes.find(nid);                            // ni is node iterator
-    if(ni == end(m_nodes))
+    auto ni = m_nodesA.find(nid);                            // ni is node iterator
+    if(ni == end(m_nodesA))
       return ni->second.node->func;
       //return ni->second->func;
     else
@@ -747,7 +764,7 @@ public:
     }
 
     auto slcnt = m_slots.erase(nid);                         // slcnt is slot count
-    auto   cnt = m_nodes.erase(nid);
+    auto   cnt = m_nodesA.erase(nid);
     m_msgNodes.erase(nid);
     
     return (cnt+slcnt) > 0;                                  // return true if 1 or more elements were erased, return false if no elements were erasedm

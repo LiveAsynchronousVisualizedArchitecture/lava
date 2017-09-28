@@ -70,10 +70,12 @@
 // -todo: make the status bar update continuously even for the last moused over node? - need to keep the last node in the global state - just use the primary selection
 // -todo: make command queue for LavaGraph so that changes to the graph can be stored and queued
 
+// todo: put mutexes around LavaFlow command queue? - no, just use it to batch commands, execute them, and switch the data structures 
+// todo: make LavaFlow loop always use the right buffer
 // todo: convert lava graph changes to use the command queue
 // todo: make two graphs and switch back and forth with an atomic bool
 //       | should there be two graphs, one read and one write 
-//       | make sure that the write has a mutex or some sort of locking
+//       | make sure that the write has a mutex or some sort of locking - don't need a mutex if there is a bool that switches buffers and the commands are sent and executed from a single thread
 //       | do commands only need two arguments? one or two LavaIds with a command enum
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
 //       |  does there need to be a function to copy the instances and connections? - should this ultimatly be used for drawing the graph?
@@ -1564,13 +1566,7 @@ ENTRY_DECLARATION // main or winmain
 		    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
       }
       SECTION(lava graph visualization)
-      {
-        //fd.graph.curNode = fd.flow.q.top().dest_node;      // todo: race condition
-        //
-        //LavaId nxtPckt = fd.flow.getNxtPacketId();
-        //if(nxtPckt.nid != LavaId::NODE_NONE)
-        //  fd.graph.curNode = nxtPckt.nid;
-        
+      {        
         fd.graph.curNode  =  fd.flow.m_curId.nid;          // todo: make atomic, although this may just work since it is only reading 8 bytes
       }
       SECTION(selection)
@@ -1651,10 +1647,6 @@ ENTRY_DECLARATION // main or winmain
             nds         =  node_getPtrs();                    // move to the front will invalidate some pointers in the nds array so it needs to be remade
             fd.sel.pri  =  n->id;
             ms.drgP     =  pntr;
-
-            //TO(sz,j){ nds[j]->sel = false; }                // why do this?   // never O^2 due to no longer being inside an outer loop of nodes  todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
-            //n->sel = true;
-            //break;                                          // without breaking from the loop, a node could be moved down and hit again
           }
         }
         SECTION(select from drg box)
@@ -1669,15 +1661,10 @@ ENTRY_DECLARATION // main or winmain
         }
         SECTION(connection creation)
         {
-          //if(!inAnySlt && lftClkUp){
-          //  fd.sel.slotOutSel = fd.sel.slotInSel = LavaId(0,0);
-          //  sel_clearSlots();
-          //}
-
           if(fd.sel.slotInSel.sidx  != LavaId::SLOT_NONE && 
              fd.sel.slotOutSel.sidx != LavaId::SLOT_NONE)
           {
-            fd.lgrph.toggleCnct(fd.sel.slotOutSel, fd.sel.slotInSel);
+            fd.lgrph.put(LavaCommand::TGL_CNCT, fd.sel.slotOutSel, fd.sel.slotInSel);
             fd.sel.slotOutSel = fd.sel.slotInSel = LavaId(0,0);
 
             sel_clearSlots();
@@ -1853,20 +1840,6 @@ ENTRY_DECLARATION // main or winmain
 
               draw_radial(vg, nvgRGBA(0,128,228,255), 
                 s->P.x, s->P.y, fd.ui.slot_rad*5); 
-
-              //auto    w = fd.ui.slot_rad, h = w;
-              //auto hlfw = w/2, hlfh = hlfw;
-              //auto   cx = s->P.x;
-              //auto   cy = s->P.y;
-              //nvgFillColor(vg, nvgRGBA(0,255,255,255));
-              //nvgBeginPath(vg);
-              //  nvgCircle(vg, cx, cy, w*4.25f );
-              //  auto radial = nvgRadialGradient(vg,
-              //    cx, cy, 0, hlfw*4.25f,
-              //    nvgRGBA(0,128,228,255),
-              //    nvgRGBA(0,0,0,0)  );
-              //  nvgFillPaint(vg, radial);
-              //nvgFill(vg);
             }
           }
           SECTION(draw connections)
@@ -2015,11 +1988,12 @@ ENTRY_DECLARATION // main or winmain
         }
       }
 
-      fd.mouse.prevRtDn  =  fd.mouse.rtDn;
-      fd.mouse.prevLftDn =  fd.mouse.lftDn;
+      fd.mouse.prevRtDn  = fd.mouse.rtDn;
+      fd.mouse.prevLftDn = fd.mouse.lftDn;
 
       glfwSwapBuffers(fd.win);
       glfwPollEvents();
+      fd.lgrph.exec();
     }
   }
   SECTION(shutdown)
@@ -2041,7 +2015,36 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//fd.graph.curNode = fd.flow.q.top().dest_node;      // todo: race condition
+//
+//LavaId nxtPckt = fd.flow.getNxtPacketId();
+//if(nxtPckt.nid != LavaId::NODE_NONE)
+//  fd.graph.curNode = nxtPckt.nid;
 
+//TO(sz,j){ nds[j]->sel = false; }                // why do this?   // never O^2 due to no longer being inside an outer loop of nodes  todo: move this out of the outer loop due to being O(n^2) - actually not O(n^2) due to the break
+//n->sel = true;
+//break;                                          // without breaking from the loop, a node could be moved down and hit again
+
+//if(!inAnySlt && lftClkUp){
+//  fd.sel.slotOutSel = fd.sel.slotInSel = LavaId(0,0);
+//  sel_clearSlots();
+//}
+//
+//fd.lgrph.toggleCnct(fd.sel.slotOutSel, fd.sel.slotInSel);
+
+//auto    w = fd.ui.slot_rad, h = w;
+//auto hlfw = w/2, hlfh = hlfw;
+//auto   cx = s->P.x;
+//auto   cy = s->P.y;
+//nvgFillColor(vg, nvgRGBA(0,255,255,255));
+//nvgBeginPath(vg);
+//  nvgCircle(vg, cx, cy, w*4.25f );
+//  auto radial = nvgRadialGradient(vg,
+//    cx, cy, 0, hlfw*4.25f,
+//    nvgRGBA(0,128,228,255),
+//    nvgRGBA(0,0,0,0)  );
+//  nvgFillPaint(vg, radial);
+//nvgFill(vg);
 
 //f64 seconds  =  fd.lgrph.node(fd.sel.pri).time / 1000000000.0;
 //f64 seconds  =  fd.lgrph.node(nid.nid).time / 1000000000.0;
