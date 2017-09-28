@@ -68,10 +68,13 @@
 // -todo: make time reset on stop
 // -todo: make time totaling function for the LavaGraph
 // -todo: make the status bar update continuously even for the last moused over node? - need to keep the last node in the global state - just use the primary selection
+// -todo: make command queue for LavaGraph so that changes to the graph can be stored and queued
 
-// todo: make command queue for LavaGraph so that changes to the graph can be stored and queued
+// todo: convert lava graph changes to use the command queue
+// todo: make two graphs and switch back and forth with an atomic bool
 //       | should there be two graphs, one read and one write 
 //       | make sure that the write has a mutex or some sort of locking
+//       | do commands only need two arguments? one or two LavaIds with a command enum
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
 //       |  does there need to be a function to copy the instances and connections? - should this ultimatly be used for drawing the graph?
 //       |  can the graph be condensed into a tbl ? 

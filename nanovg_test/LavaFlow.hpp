@@ -218,6 +218,14 @@ struct        LavaMem
     return lm;
   }
 };
+struct    LavaCommand
+{
+  enum Command { ADD_NODE=0, ADD_SLOT, TGL_CNCT, DEL_NODE, DEL_CNCT };
+
+  Command cmd; 
+  union { LavaId A; LavaId dest; LavaNode* ndptr; }; 
+  union { LavaId B; LavaId  src; };
+};
 // end data types
 
 // static data segment data
@@ -369,6 +377,8 @@ public:
   using vec_ids       =  std::vector<LavaId>;
   using MsgIds        =  std::unordered_set<LavaId, LavaId>;
   using NormalizeMap  =  std::unordered_map<uint64_t, uint64_t>;
+  using CmdQ          =  std::queue<LavaCommand>;
+  //using CmdQ          =  std::priority_queue<LavaCommand>;
 
 private:
   uint64_t           m_nxtId;               // nxtId is next id - a counter for every node created that only increases, giving each node a unique id
@@ -377,6 +387,7 @@ private:
   CnctMap            m_cncts;
   SrcMap         m_destCncts;
   MsgIds          m_msgNodes;
+  CmdQ                m_cmdq;
 
   void            init()
   { 
@@ -600,6 +611,46 @@ public:
 
     init();
     //m_ids.clear();
+  }
+  u64                 put(LavaCommand::Command cmd, LavaId A, LavaId B=LavaId())
+  {
+    m_cmdq.push({cmd, A, B});
+    return m_cmdq.size();
+  }
+  u64                exec()
+  {
+    auto sz = m_cmdq.size();
+    while(m_cmdq.size() > 0)
+    {
+      auto lc = m_cmdq.front();                 // lc is LavaCommand
+      m_cmdq.pop();
+      switch(lc.cmd)
+      {
+        case LavaCommand::TGL_CNCT:{
+          this->toggleCnct(lc.B, lc.A);
+        }break;
+
+        case LavaCommand::DEL_CNCT:{
+          this->delCnct(lc.A);
+        }break;
+
+        case LavaCommand::ADD_NODE:{
+          this->addNode(lc.ndptr);
+        }break;
+
+        case LavaCommand::DEL_NODE:{
+          this->delNode(lc.A.nid);
+        }break;
+
+        default: break;
+      };
+    }
+
+    return sz;
+
+    //case LavaCommand::ADD_SLOT:{
+    //  this->addSlot( , lc.A.sidx);
+    //}break;
   }
 
   // nodes
@@ -968,11 +1019,6 @@ public:
 
 #if defined(__LAVAFLOW_IMPL__)
 
-//#include "simdb.hpp"
-//
-//static simdb      db;
-//static simdb   vizdb;
-
 // function implementations
 BOOL WINAPI DllMain(
   _In_ HINSTANCE    hinstDLL,
@@ -1002,7 +1048,7 @@ BOOL WINAPI DllMain(
 namespace {
 
 #include "str_util.hpp"
-void           printdb(simdb const& db)
+void                printdb(simdb const& db)
 {
   using namespace std;
   
@@ -1027,18 +1073,6 @@ void           PrintLavaMem(LavaMem lm)
   printf("\n addr: %llu  data addr: %llu  ref count: %llu   size bytes: %llu \n", 
     (u64)(lm.ptr), (u64)(lm.data()), (u64)lm.refCount(), (u64)lm.sizeBytes() );
 }
-
-//bool                 PutMem(LavaId id, LavaMem lm)
-//{
-//  char label[256];
-//  sprintf(label, "%d:%d", (u32)id.nid, (u32)id.sidx);
-//
-//  uint32_t stblk=0;
-//  bool ok = db.put(label, lm.data(), (u32)lm.sizeBytes(), &stblk);
-//
-//  return ok;
-//  //str label = str(id.nid) + ":" + str(id.sidx);
-//}
 
 auto       GetSharedLibPath() -> std::wstring
 {
@@ -1478,7 +1512,22 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//#include "simdb.hpp"
+//
+//static simdb      db;
+//static simdb   vizdb;
 
+//bool                 PutMem(LavaId id, LavaMem lm)
+//{
+//  char label[256];
+//  sprintf(label, "%d:%d", (u32)id.nid, (u32)id.sidx);
+//
+//  uint32_t stblk=0;
+//  bool ok = db.put(label, lm.data(), (u32)lm.sizeBytes(), &stblk);
+//
+//  return ok;
+//  //str label = str(id.nid) + ":" + str(id.sidx);
+//}
 
 //__try{
 //printf("\n try \n");
