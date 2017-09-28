@@ -407,7 +407,11 @@ private:
 
   NodeInsts&            curNodes(){ return m_useA.load()?  m_nodesA     : m_nodesB;     }
   Slots&                curSlots(){ return m_useA.load()?  m_slotsA     : m_slotsB;     }
-  CnctMap&              curCncts(){ return m_useA.load()?  m_cnctsA     : m_cnctsB;     }
+  CnctMap&              curCncts(){ 
+    if(m_useA.load()) 
+      return m_cnctsA; 
+    else 
+      return m_cnctsB;     }
   SrcMap&           curDestCncts(){ return m_useA.load()?  m_destCnctsA : m_destCnctsB; }
   MsgIds&            curMsgNodes(){ return m_useA.load()?  m_msgNodesA  : m_msgNodesB;  }
   NodeInsts const&      curNodes()const{ return m_useA.load()?  m_nodesA     : m_nodesB;     }
@@ -530,7 +534,7 @@ public:
   LavaGraph(LavaGraph&& rval){ mv(std::move(rval)); }
   LavaGraph& operator=(LavaGraph&& rval){ mv(std::move(rval)); return *this; }
 
-  auto      operator[](uint64_t nid) -> decltype(curNodes()[0])
+  auto         operator[](uint64_t nid) -> decltype(curNodes()[0])
   {
     return curNodes()[nid];
   }
@@ -636,7 +640,7 @@ public:
       switch(lc.cmd)
       {
         case LavaCommand::TGL_CNCT:{
-          this->toggleCnct(lc.B, lc.A);
+          this->toggleCnct(lc.src, lc.dest);
         }break;
 
         case LavaCommand::DEL_CNCT:{
@@ -769,7 +773,6 @@ public:
     LavaInst& li = this->node(nid);
     return li.getState();
   }
-
 
   // slots
   LavaId      addSlot(LavaFlowSlot  s, u64 sidx=0)

@@ -70,9 +70,9 @@
 // -todo: make the status bar update continuously even for the last moused over node? - need to keep the last node in the global state - just use the primary selection
 // -todo: make command queue for LavaGraph so that changes to the graph can be stored and queued
 // -todo: finish using cur() functions
+// -todo: fix slot movement - src and destination were flipped in the toggle command
 
-// todo: fix slot movement
-// todo: put mutexes around LavaFlow command queue? - no, just use it to batch commands, execute them, and switch the data structures 
+// todo: use command queue to batch commands, execute them, and switch the data structures 
 // todo: make LavaFlow loop always use the right buffer
 // todo: convert lava graph changes to use the command queue
 // todo: make two graphs and switch back and forth with an atomic bool
@@ -1666,7 +1666,7 @@ ENTRY_DECLARATION // main or winmain
           if(fd.sel.slotInSel.sidx  != LavaId::SLOT_NONE && 
              fd.sel.slotOutSel.sidx != LavaId::SLOT_NONE)
           {
-            fd.lgrph.put(LavaCommand::TGL_CNCT, fd.sel.slotOutSel, fd.sel.slotInSel);
+            fd.lgrph.put(LavaCommand::TGL_CNCT, fd.sel.slotInSel, fd.sel.slotOutSel);
             fd.sel.slotOutSel = fd.sel.slotInSel = LavaId(0,0);
 
             sel_clearSlots();
@@ -1768,7 +1768,7 @@ ENTRY_DECLARATION // main or winmain
                 {
                   if(!fd.lgrph.slot(ci->second)){ cnt -= 1; continue; }   // todo: does this need to subtract 1 from count?
                           
-                  auto si  = fd.graph.slots.find(ci->second);
+                  auto si = fd.graph.slots.find(ci->second);
                   if(si != fd.graph.slots.end()){
                     auto curP  =  si->second.P;
                     destP     +=  curP; 
