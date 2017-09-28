@@ -67,8 +67,11 @@
 // -todo: make time adding atomic
 // -todo: make time reset on stop
 // -todo: make time totaling function for the LavaGraph
+// -todo: make the status bar update continuously even for the last moused over node? - need to keep the last node in the global state - just use the primary selection
 
-// todo: make the status bar update continuously even for the last moused over node? - need to keep the last node in the global state
+// todo: make command queue for LavaGraph so that changes to the graph can be stored and queued
+//       | should there be two graphs, one read and one write 
+//       | make sure that the write has a mutex or some sort of locking
 // todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
 //       |  does there need to be a function to copy the instances and connections? - should this ultimatly be used for drawing the graph?
 //       |  can the graph be condensed into a tbl ? 
@@ -294,17 +297,17 @@ static char*    cpToUTF8(int cp, char* str)
 	}
 	return str;
 }
-bool              hasInf(v2 v)
+bool              hasInf(v2   v)
 {
   TO(2,i) if(v[i]==INFf || v[i]==-INFf) return true;
   return false;
 }
-bool              hasNaN(v2 v)
+bool              hasNaN(v2   v)
 {
   TO(2,i) if(v[i]==SIG_NANf || v[i]==-SIG_NANf) return true;
   return false;
 }
-v2      lineCircleIntsct(v2 P, v2 dir, v2 crcl, f32 r)  // only works for circles to the sides
+v2      lineCircleIntsct(v2   P, v2 dir, v2 crcl, f32 r)  // only works for circles to the sides
 {
   if(dir.x==0) return {INFf, INFf};
 
@@ -324,13 +327,17 @@ v2      lineCircleIntsct(v2 P, v2 dir, v2 crcl, f32 r)  // only works for circle
 
   return intrsct;
 }
-f32        normalToAngle(v2 N)
+f32        normalToAngle(v2   N)
 {
   return atan2(N.y, N.x);
 }
 v2         angleToNormal(f32 angle)
 {
   return { cos(angle), sin(angle) };
+}
+f64        timeToSeconds(u64 t)
+{
+  return t / 1000000000.0;
 }
 
 void         draw_radial(NVGcontext* vg, NVGcolor clr, f32 x, f32 y, f32 rad)
@@ -1693,15 +1700,25 @@ ENTRY_DECLARATION // main or winmain
         }
         SECTION(nanogui status bar)
         {
+          f64 totalTime = timeToSeconds(fd.lgrph.totalTime());
+
           if(slotRtClk){
             fd.ui.statusTxt->setValue( toString(" right click on slot ") );
           }else if(isInSlot){
-            auto status = toString("Slot [",sid.nid,":",sid.sidx,"]");
+            auto status  =  toString("Slot [",sid.nid,":",sid.sidx,"]");
             fd.ui.statusTxt->setValue( status );
           }else if(isInNode){
-            f64 seconds = fd.lgrph.node(nid.nid).time / 1000000000.0;
-            auto status =  toString("Node [",nid.nid,"]  ", nds[nIdx]->txt," | ",seconds," seconds");
+            f64 seconds  =  timeToSeconds(fd.lgrph.node(nid.nid).time);
+            f64 percent  =  totalTime>0?  (seconds/totalTime)*100  :  0;
+            auto status  =  toString("Node [",nid.nid,"]  ",nds[nIdx]->txt," | ",seconds," seconds  %",percent);
             fd.ui.statusTxt->setValue( status );
+          }else if(fd.sel.pri != LavaNode::NODE_ERROR){
+            f64 seconds  =  timeToSeconds(fd.lgrph.node(fd.sel.pri).time);
+            f64 percent  =  totalTime>0?  (seconds/totalTime)*100  :  0;
+            auto status  =  toString("Node [",fd.sel.pri,"]  ",fd.graph.nds[fd.sel.pri].txt," | ",seconds," seconds  %",percent);
+            fd.ui.statusTxt->setValue( status );
+          }else{
+            fd.ui.statusTxt->setValue("");
           }
         }
       }
@@ -1723,16 +1740,10 @@ ENTRY_DECLARATION // main or winmain
         }
         SECTION(slot movement)
         {
-          //for(auto& kv : grph.slots())
-          //Id     nid = kv.first;            // s.nid;
-          //Node const& n = grph.node(nid.id);
-
           for(auto& kv : fd.graph.slots)
           {
-            //u64       nid = kv.first;              // s.nid;
             LavaId    nid = kv.first;
             Slot&       s = kv.second;
-            //LavaSlot&  ls = fd.lgrph.slots();
             Node const& n = fd.graph.nds[nid.nid];
             v2 wh = n.b.wh();
             v2 nP = n.P + wh/2; //NODE_SZ/2; // n.b.mx; // w()/2; // NODE_SZ/2;
@@ -1740,17 +1751,8 @@ ENTRY_DECLARATION // main or winmain
 
             if(s.in)
             {                                                 // dest / in / blue slots
-              //Slot* src = grph.srcSlot(kv.first);
-              //Slot* src = &s;     // srcSlot(kv.first);
-              //Slot* src = nullptr;
-              //auto srcNdId = g.srcSlot(nid)->nid;
               LavaFlowSlot* src = g.srcSlot(nid);
               if(src){
-                //auto srcNdP = grph.node(src->nid).P + wh/2;  //NODE_SZ/2; // n.b.mx; // NODE_SZ/2;
-                //auto srcNdP = n.P + wh/2;
-
-                //auto srcIter = fd.graph.slots.find(src->id);
-
                 auto srcIter = fd.graph.slots.find(src->id);
                 if(srcIter != fd.graph.slots.end() ){
                   auto  srcNdP = fd.graph.nds[src->id.nid].P;
@@ -1774,9 +1776,6 @@ ENTRY_DECLARATION // main or winmain
                 {
                   if(!fd.lgrph.slot(ci->second)){ cnt -= 1; continue; }   // todo: does this need to subtract 1 from count?
                           
-                  //v2 curP = fd.lgrph.slot(ci->second)->P;
-                  //v2 curP = fd.graph.slot.find(ci->second)->P;
-                  //fd.lgrph.srcSlot(ci->second);
                   auto si  = fd.graph.slots.find(ci->second);
                   if(si != fd.graph.slots.end()){
                     auto curP  =  si->second.P;
@@ -1790,27 +1789,6 @@ ENTRY_DECLARATION // main or winmain
                 s.N = norm(destN);
                 s.P = node_border(n, s.N);
               }
-
-              //auto ci = grph.destSlots(kv.first);
-              //if(ci==grph.destCnctEnd()){
-              //  s.P = node_border(n, v2(0,1.f), &nrml);
-              //  s.N = nrml;
-              //}else{
-              //  v2  destP={0,0}, destN={0,0};
-              //  int   cnt = 0;
-              //  for(; ci != grph.destCnctEnd() && ci->first==nid; ++cnt, ++ci)
-              //  {
-              //    if(!grph.slot(ci->second)){ cnt -= 1; continue; }   // todo: does this need to subtract 1 from count?
-              //            
-              //    v2 curP = grph.slot(ci->second)->P;
-              //    destP  += curP; 
-              //    destN  += norm(curP - nP);
-              //  }
-              //  destP /= (f32)cnt;
-              //  destN /= (f32)cnt;
-              //  s.N = norm(destN);
-              //  s.P = node_border(n, s.N);
-              //}
             }
           }
         }
@@ -2056,6 +2034,56 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+
+
+
+
+//f64 seconds  =  fd.lgrph.node(fd.sel.pri).time / 1000000000.0;
+//f64 seconds  =  fd.lgrph.node(nid.nid).time / 1000000000.0;
+
+//for(auto& kv : grph.slots())
+//Id     nid = kv.first;            // s.nid;
+//Node const& n = grph.node(nid.id);
+//
+//u64       nid = kv.first;              // s.nid;
+//LavaSlot&  ls = fd.lgrph.slots();
+
+//Slot* src = grph.srcSlot(kv.first);
+//Slot* src = &s;     // srcSlot(kv.first);
+//Slot* src = nullptr;
+//auto srcNdId = g.srcSlot(nid)->nid;
+
+//auto srcNdP = grph.node(src->nid).P + wh/2;  //NODE_SZ/2; // n.b.mx; // NODE_SZ/2;
+//auto srcNdP = n.P + wh/2;
+//
+//auto srcIter = fd.graph.slots.find(src->id);
+
+//v2 curP = fd.lgrph.slot(ci->second)->P;
+//v2 curP = fd.graph.slot.find(ci->second)->P;
+//fd.lgrph.srcSlot(ci->second);
+
+//auto ci = grph.destSlots(kv.first);
+//if(ci==grph.destCnctEnd()){
+//  s.P = node_border(n, v2(0,1.f), &nrml);
+//  s.N = nrml;
+//}else{
+//  v2  destP={0,0}, destN={0,0};
+//  int   cnt = 0;
+//  for(; ci != grph.destCnctEnd() && ci->first==nid; ++cnt, ++ci)
+//  {
+//    if(!grph.slot(ci->second)){ cnt -= 1; continue; }   // todo: does this need to subtract 1 from count?
+//            
+//    v2 curP = grph.slot(ci->second)->P;
+//    destP  += curP; 
+//    destN  += norm(curP - nP);
+//  }
+//  destP /= (f32)cnt;
+//  destN /= (f32)cnt;
+//  s.N = norm(destN);
+//  s.P = node_border(n, s.N);
+//}
 
 //n.sel? fd.ui.msgnd_selclr : fd.ui.msgnd_gradst,
 //n.sel? fd.ui.msgnd_selclr : fd.ui.msgnd_graden );

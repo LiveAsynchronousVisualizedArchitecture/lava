@@ -1237,7 +1237,7 @@ uint64_t                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t 
         uint64_t ret = exceptWrapper(func, lf, &lp, inArgs, outArgs);
         if(ret != LavaFlow::NONE){ return ret; }
       auto endTime = high_resolution_clock::now();
-      duration<double,nano> diff = (endTime - stTime);
+      duration<u64,nano> diff = (endTime - stTime);
       li.addTime( diff.count() );   //li.time += diff.count();
     }
     SECTION(create packets and put them into packet queue)
