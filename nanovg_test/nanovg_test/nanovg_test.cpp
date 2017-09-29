@@ -82,16 +82,16 @@
 //       | -should there be two graphs, one read and one write 
 //       | -make sure that the write has a mutex or some sort of locking - don't need a mutex if there is a bool that switches buffers and the commands are sent and executed from a single thread
 //       | -do commands only need two arguments? one or two LavaIds with a command enum
+// -todo: fix slots not showing up - nodeSlots() needed a const and non-const version, each of which uses a different buffer
+// -todo: fix node selection being inverted
+// -todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only - similiar approach using dual buffers taken
+//       | -does there need to be a function to copy the instances and connections? - should this ultimatly be used for drawing the graph? - this is done in the exec() function befoe executing the command queue
+//       |  can the graph be condensed into a tbl ? 
 
-// todo: fix slots not showing up
-// todo: fix node selection being inverted
-// todo: put in read count and write count for both A and B buffers
-// todo: have exec() spinlock until readers of the opposite buffer drops to 0 - could also just skip the command buffer in the rare case that it catches readers as more than 0
 // todo: change cur() functions to const and rename to read()
 // todo: change opp() functions to non-const only and rename to write()
-// todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only
-//       |  does there need to be a function to copy the instances and connections? - should this ultimatly be used for drawing the graph?
-//       |  can the graph be condensed into a tbl ? 
+// todo: put in read count and write count for both A and B buffers
+// todo: have exec() spinlock until readers of the opposite buffer drops to 0 - could also just skip the command buffer in the rare case that it catches readers as more than 0
 // todo: use a copy of the graph to clear and update the interface buttons
 // todo: make a function to get a copy of the graph - can check the version number every loop, and if it is higher, get a copy of all the data inside a mutex
 // todo: make button that creates a project for a node - would it need to pop up a modal dialog?
@@ -370,6 +370,10 @@ void         draw_radial(NVGcontext* vg, NVGcolor clr, f32 x, f32 y, f32 rad)
 }
 
 // state manipulation
+u64                nxtId()
+{
+  return fd.nxtId++;
+}
 void     stopFlowThreads()
 {
   fd.flow.stop();
@@ -550,53 +554,51 @@ Node&   node_moveToFront(u64 idx)
 
   return n;
 }
-//auto            node_add(str node_name, Node n) -> uint64_t
-void            node_add(str node_name, Node n)
+
+auto            node_add(str node_name, Node n) -> uint64_t
 {
+  // this effectivly adds a node to the ui graph, adds a add_node command to the LavaGraph, adds slot commands, then on exec adds the slots to the ui graph - far from ideal
   using namespace std;
 
   auto          pi = fd.flow.nameToPtr.find( node_name );                               // pi is pointer iterator
   uint64_t instIdx = LavaNode::NODE_ERROR;
   LavaNode*     ln = nullptr;
-  if( pi != end(fd.flow.nameToPtr) ){
-    ln      = pi->second;
-    LavaCommand::Arg nodeArg;
-    nodeArg.ndptr = ln;
-    fd.lgrph.put(LavaCommand::ADD_NODE, nodeArg);
-  }
-
-  if(ln)
+  if( pi != end(fd.flow.nameToPtr) )
   {
-    auto out_types = ln->out_types;                    // do these first so that the output slots start at 0
-    for(; out_types  &&  *out_types; ++out_types){ 
-      slot_add(false);                                 // this will put a slot command into the LavaGraph command queue - the graph_apply() function will actually end up creating the slots in the ui graph
+    ln = pi->second;
+    if(ln)
+    {
+      instIdx = nxtId();
+
+      FisData::IdOrder ido;                                                          //ido is id order
+      ido.id    = instIdx;
+      ido.order = node_nxtOrder();
+      fd.graph.ordr.insert(ido);
+      
+      n.txt   = "New: " +  node_name;
+      n.id    = instIdx;
+      n.order = ido.order;
+      fd.graph.nds[instIdx] = move(n);
+
+      LavaCommand::Arg A,B;
+      A.ndptr = ln;
+      B.val   = instIdx;
+      fd.lgrph.put(LavaCommand::ADD_NODE, A, B);
+
+      auto out_types = ln->out_types;                    // do these first so that the output slots start at 0
+      for(; out_types  &&  *out_types; ++out_types){ 
+        slot_add(false);                                 // this will put a slot command into the LavaGraph command queue - the graph_apply() function will actually end up creating the slots in the ui graph
+      }
+
+      auto in_types = ln->in_types;
+      for(; in_types  &&  *in_types; ++in_types){
+        slot_add(true);
+      }
     }
 
-    auto in_types = ln->in_types;
-    for(; in_types  &&  *in_types; ++in_types){
-      slot_add(true);
-    }
-
-    //instIdx = fd.lgrph.addNode(ln, true);
-    //
-    //if(instIdx != LavaNode::NODE_ERROR)
-    //
-    //slot_add( Slot(instIdx, true) );
-    //
-    //slot_add( Slot(instIdx, false) );
-
-    //FisData::IdOrder ido;                                                          //ido is id order
-    //ido.id    = instIdx;
-    //ido.order = node_nxtOrder();
-    //fd.graph.ordr.insert(ido);
-    //
-    //n.txt   = "New: " +  node_name;
-    //n.id    = instIdx;
-    //n.order = ido.order;
-    //fd.graph.nds[instIdx] = move(n);
   }
 
-  //return instIdx;
+  return instIdx;
 }
 Bnd             node_bnd(NVGcontext* vg, Node const&  n)
 {
@@ -981,29 +983,32 @@ void         graph_apply(LavaGraph::ArgVec args)
   for(auto& a : args){
     if(a.id.sidx == LavaId::SLOT_NONE && a.id.nid != LavaId::NODE_NONE)
     {
-      LavaInst li = fd.lgrph.node(a.id.nid);
-
-      FisData::IdOrder ido;                                                          //ido is id order
-      ido.id    = a.id.nid;
-      ido.order = node_nxtOrder();
-      fd.graph.ordr.insert(ido);
-
-      Node n = move(fd.graph.nds[a.id.nid]);
-
-      if(n.txt=="") { n.txt = "New: " + str(li.node->name); }
-      n.id    = a.id.nid;
-      n.order = ido.order;
-
-      fd.graph.nds[a.id.nid] = move(n);
+      //LavaInst li = fd.lgrph.node(a.id.nid);
+      //
+      //FisData::IdOrder ido;                                                          //ido is id order
+      //ido.id    = a.id.nid;
+      //ido.order = node_nxtOrder();
+      //fd.graph.ordr.insert(ido);
+      //
+      //Node n = move(fd.graph.nds[a.id.nid]);
+      //
+      //if(n.txt=="") { n.txt = "New: " + str(li.node->name); }
+      //n.id    = a.id.nid;
+      //n.order = ido.order;
+      //
+      //fd.graph.nds[a.id.nid] = move(n);
 
       //n.txt   = "New: " +  node_name;
       //n.id    = instIdx;
       //n.order = ido.order;
       //fd.graph.nds[instIdx] = move(n);
     }else if(a.id.sidx != LavaId::SLOT_NONE){
-      LavaFlowSlot* ls = fd.lgrph.slot(a.id.nid);
-      if(ls)
-        fd.graph.slots.insert({a.id.sidx, Slot(a.id.nid,ls->in) });
+      LavaFlowSlot* ls = fd.lgrph.slot(a.id);
+      if(ls){
+        Slot s(a.id.nid,ls->in);
+        //LavaId sid = a.id;
+        fd.graph.slots.insert({a.id, s});
+      }
     }
   }
 }
@@ -2087,6 +2092,76 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+
+//void            node_add(str node_name, Node n)
+//void            node_add(str node_name, Node n)
+//{
+//  using namespace std;
+//
+//  auto          pi = fd.flow.nameToPtr.find( node_name );                               // pi is pointer iterator
+//  uint64_t instIdx = LavaNode::NODE_ERROR;
+//  LavaNode*     ln = nullptr;
+//  if( pi != end(fd.flow.nameToPtr) ){
+//    ln      = pi->second;
+//    LavaCommand::Arg nodeArg;
+//    nodeArg.ndptr = ln;
+//    fd.lgrph.put(LavaCommand::ADD_NODE, nodeArg);
+//  }
+//
+//  if(ln)
+//  {
+//    auto out_types = ln->out_types;                    // do these first so that the output slots start at 0
+//    for(; out_types  &&  *out_types; ++out_types){ 
+//      slot_add(false);                                 // this will put a slot command into the LavaGraph command queue - the graph_apply() function will actually end up creating the slots in the ui graph
+//    }
+//
+//    auto in_types = ln->in_types;
+//    for(; in_types  &&  *in_types; ++in_types){
+//      slot_add(true);
+//    }
+//  }
+//}
+
+//instIdx = fd.lgrph.addNode(ln, true);
+//
+//if(instIdx != LavaNode::NODE_ERROR)
+//
+//slot_add( Slot(instIdx, true) );
+//
+//slot_add( Slot(instIdx, false) );
+
+//FisData::IdOrder ido;                                                          //ido is id order
+//ido.id    = instIdx;
+//ido.order = node_nxtOrder();
+//fd.graph.ordr.insert(ido);
+//
+//n.txt   = "New: " +  node_name;
+//n.id    = instIdx;
+//n.order = ido.order;
+//fd.graph.nds[instIdx] = move(n);
+
+//instIdx = fd.lgrph.addNode(ln, true);
+//
+//if(instIdx != LavaNode::NODE_ERROR)
+//
+//slot_add( Slot(instIdx, true) );
+//
+//slot_add( Slot(instIdx, false) );
+//
+//FisData::IdOrder ido;                                                          //ido is id order
+//ido.id    = instIdx;
+//ido.order = node_nxtOrder();
+//fd.graph.ordr.insert(ido);
+//
+//n.txt   = "New: " +  node_name;
+//n.id    = instIdx;
+//n.order = ido.order;
+//fd.graph.nds[instIdx] = move(n);
+//
+//}
+//return instIdx;
 
 //fd.graph.curNode = fd.flow.q.top().dest_node;      // todo: race condition
 //

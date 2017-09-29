@@ -108,13 +108,15 @@ struct    Node
   {
     using namespace std;
 
-    id    = move(r.id);
-    order = move(r.order);
-    P     = move(r.P);
-    type  = move(r.type);
-    sel   = move(r.sel);
-    b     = move(r.b);
-    txt   = move(r.txt);
+    id     = move(r.id);
+    order  = move(r.order);
+    P      = move(r.P);
+    type   = move(r.type);
+    sel    = move(r.sel);
+    b      = move(r.b);
+    txt    = move(r.txt);
+    incnt  = r.incnt;
+    outcnt = r.outcnt;
   }
 
   Node(){}
@@ -216,11 +218,13 @@ struct FisData
   using       Slots  =  std::multimap<LavaId, Slot>;              // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
   using    vec_thrd  =  std::vector<std::thread>;
 
+  u64                 nxtId = 1;
   GLFWwindow*           win = nullptr;                            // Platform 
   LavaFlow             flow;
   LavaGraph&          lgrph = flow.graph;
   vec_thrd      flowThreads;
   AtmSet             vizIds;
+
 
   struct Graph
   {

@@ -520,11 +520,12 @@ private:
     static LavaInst ERR_INST = { LavaId(LavaNode::NODE_ERROR, LavaFlowSlot::SLOT_ERROR), nullptr, 0, 0 };
     return ERR_INST;
   }
-  u64          nxtSlot(u64 nid)
+  
+  u64          nxtSlot(u64 nid) // non-const, part of writing, and needs to use the opposite buffer
   {
     auto si = nodeSlots(nid);                   // si is slot iterator
     i64 cur = -1;
-    while(si != end(curSlots())   && 
+    while(si != end(oppSlots())   && 
       si->first.nid  == nid && 
       si->first.sidx <= (u64)(cur+1) ){
       //cur = si->first.idx;
@@ -690,7 +691,7 @@ public:
           }break;
 
           case LavaCommand::ADD_NODE:{
-            u64 nid = this->addNode(lc.A.ndptr);
+            u64 nid = this->addNode(lc.A.ndptr, lc.B.val);
             LavaCommand::Arg ret;
             ret.id.nid = nid;
             m_stk.push(ret);
@@ -702,9 +703,9 @@ public:
           }break;
 
           case LavaCommand::ADD_SLOT:{
-            LavaFlowSlot s(m_stk.top().id.nid, lc.B.slotDest);
+            LavaFlowSlot s(m_stk.top().id.nid, lc.A.slotDest);
             m_stk.pop();
-            LavaId sid = this->addSlot(s, lc.A.id.sidx);
+            LavaId sid = this->addSlot(s); // lc.A.id.sidx);
             LavaCommand::Arg ret;
             ret.id = sid;
             m_stk.push(ret);
@@ -716,6 +717,7 @@ public:
       }
 
       while(m_stk.size()>0){ m_stk.pop(); }
+      
       m_useA.store( !m_useA.load() );                                             // this should be the only place where it is flipped, so the store is all that matters
     }
 
@@ -723,6 +725,15 @@ public:
   }
 
   // opposite buffer changes
+  uint64_t    addNode(LavaNode* ln, uint64_t nid)
+  {
+    //u64 id = nxt();
+    if(ln->node_type == LavaNode::MSG)
+      oppMsgNodes().insert(nid);
+
+    LavaInst li = makeInst(nid, ln);
+    return oppNodes().insert({nid, li}).first->first;                             // returns a pair that contains the key-value pair
+  }
   uint64_t    addNode(LavaNode* ln, bool newId=true)
   {
     u64 id = nxt();
@@ -888,10 +899,13 @@ public:
 
     return &si->second;
   }
-  auto      nodeSlots(u64     nid) -> decltype(curSlots().begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
+  auto      nodeSlots(u64     nid) const -> decltype(curSlots().cbegin())
   {
-    //return lower_bound(ALL(m_slots), LavaId(nid), [](auto a,auto b){ return a.first < b; } );
     return lower_bound(ALL(curSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
+  }
+  auto      nodeSlots(u64     nid) -> decltype(oppSlots().begin())
+  {
+    return lower_bound(ALL(oppSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
   }
   auto          slots() -> Slots& { return curSlots(); }
   auto          slots() const -> Slots const& { return curSlots();  }
@@ -1590,6 +1604,9 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+// C++14 -> decltype(m_slots.find(Id(nid)))
+//return lower_bound(ALL(m_slots), LavaId(nid), [](auto a,auto b){ return a.first < b; } );
 
 //if(delcnt==0 || !matchSrc ){
 //delCnct(src,dest)==0 
