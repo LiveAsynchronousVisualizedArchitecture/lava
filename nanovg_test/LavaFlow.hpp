@@ -393,6 +393,7 @@ public:
   using NormalizeMap  =  std::unordered_map<uint64_t, uint64_t>;
   using CmdQ          =  std::queue<LavaCommand>;
   using RetStk        =  std::stack<LavaCommand::Arg>;
+  using ArgVec        =  std::vector<LavaCommand::Arg>;
   //using CmdQ          =  std::priority_queue<LavaCommand>;
 
 private:
@@ -654,10 +655,11 @@ public:
     m_cmdq.push({cmd, A, B});
     return m_cmdq.size();
   }
-  u64                exec()
+  auto                exec() -> ArgVec
   {
     using namespace std;
     
+    ArgVec returned;
     auto sz = m_cmdq.size();
     if(sz > 0)
     {
@@ -692,6 +694,7 @@ public:
             LavaCommand::Arg ret;
             ret.id.nid = nid;
             m_stk.push(ret);
+            returned.push_back(ret);
           }break;
 
           case LavaCommand::DEL_NODE:{
@@ -705,6 +708,7 @@ public:
             LavaCommand::Arg ret;
             ret.id = sid;
             m_stk.push(ret);
+            returned.push_back(ret);
           }break;
 
           default: break;
@@ -715,7 +719,7 @@ public:
       m_useA.store( !m_useA.load() );                                             // this should be the only place where it is flipped, so the store is all that matters
     }
 
-    return sz;
+    return returned;
   }
 
   // opposite buffer changes

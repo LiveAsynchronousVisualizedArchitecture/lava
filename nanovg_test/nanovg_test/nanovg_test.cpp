@@ -74,13 +74,16 @@
 // -todo: make LavaFlow loop always use the right buffer
 // -todo: make LavaGraph edit functions use the opposite buffer
 // -todo: fix LavaGraph - figure out why there are slots that are [0:0] - sel_clear() was setting current slots to LavaId(0,0)
+// -todo: figure out how to create slots from commands when the slots need the Node Id - use a stack of return values
+// -todo: change node_add to use commands - how can slots get the sid back from the commands being run? - return stack args from exec() in a vector()?
+// -todo: use command queue to batch commands, execute them, and switch the data structures 
 
-// todo: figure out how to create slots from commands when the slots need the Node Id - use a stack of return values? 
+// todo: fix slots not showing up
+// todo: fix node selection being inverted
 // todo: put in read count and write count for both A and B buffers
-// todo: have exec() spinlock until readers of the opposite buffer drops to 0
+// todo: have exec() spinlock until readers of the opposite buffer drops to 0 - could also just skip the command buffer in the rare case that it catches readers as more than 0
 // todo: change cur() functions to const and rename to read()
 // todo: change opp() functions to non-const only and rename to write()
-// todo: use command queue to batch commands, execute them, and switch the data structures 
 // todo: convert lava graph changes to use the command queue
 // todo: make two graphs and switch back and forth with an atomic bool
 //       | should there be two graphs, one read and one write 
@@ -414,6 +417,22 @@ void         graph_clear()
   fd.lgrph.clear();
 }
 
+void         graph_apply(LavaGraph::ArgVec args)
+{
+  //auto ni = fd.graph.nds.find(a.id.nid);
+
+  for(auto& a : args){
+    if(a.id.sidx == LavaId::SLOT_NONE && a.id.nid != LavaId::NODE_NONE){
+      LavaInst li = fd.lgrph.node(a.id.nid);
+      fd.graph.nds[a.id.nid] = Node(li.node->name);
+    }else if(a.id.sidx != LavaId::SLOT_NONE){
+      LavaFlowSlot* ls = fd.lgrph.slot(a.id.nid);
+      if(ls)
+        fd.graph.slots.insert({a.id.sidx, Slot(a.id.nid,ls->in) });
+    }
+  }
+}
+
 v2               in_cntr(Node const& n, f32 r)
 {
   //return v2(n.P.x + NODE_SZ.x/2, n.P.y-r);
@@ -425,17 +444,26 @@ v2              out_cntr(Node const& n, f32 r)
   return v2(n.P.x + n.b.w()/2, n.P.y + n.b.h() + r);
 }
 
-LavaId          slot_add(Slot s)
-{
-  LavaFlowSlot ls;
-  ls.id      = s.nid;
-  ls.in      = s.in;
-  ls.state   = (LavaFlowSlot::State)(s.state);
-  LavaId sid = fd.lgrph.addSlot(ls);
-  fd.graph.slots.insert( {sid, s} );
+//LavaId          slot_add(Slot s)
+//{
+  //LavaId sid = fd.lgrph.addSlot(ls);
+  //
+  //fd.graph.slots.insert( {sid, s} );
+  //
+  //ls.id = sid;
+  //return sid;
+//}
 
-  ls.id = sid;
-  return sid;
+void            slot_add(bool isDest)
+{
+  //LavaFlowSlot ls;
+  //ls.id      = s.nid;
+  //ls.in      = s.in;
+  //ls.state   = (LavaFlowSlot::State)(s.state);
+
+  LavaCommand::Arg arg;
+  arg.slotDest = isDest;
+  fd.lgrph.put(LavaCommand::ADD_SLOT, arg);
 }
 void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState, f32 slot_rad=10.f)
 {
@@ -556,19 +584,25 @@ auto            node_add(str node_name, Node n) -> uint64_t
   LavaNode*     ln = nullptr;
   if( pi != end(fd.flow.nameToPtr) ){
     ln      = pi->second;
-    instIdx = fd.lgrph.addNode(ln, true);
+    //instIdx = fd.lgrph.addNode(ln, true);
+    LavaCommand::Arg nodeArg;
+    nodeArg.ndptr = ln;
+    fd.lgrph.put(LavaCommand::ADD_NODE, nodeArg);
   }
 
-  if(instIdx != LavaNode::NODE_ERROR)
+  //if(instIdx != LavaNode::NODE_ERROR)
+  if(ln)
   {
     auto out_types = ln->out_types;                    // do these first so that the output slots start at 0
     for(; out_types  &&  *out_types; ++out_types){ 
-      slot_add( Slot(instIdx, false) );
+      //slot_add( Slot(instIdx, false) );
+      slot_add(false);                                 // this will put a slot command into the LavaGraph command queue - the graph_apply() function will actually end up creating the slots in the ui graph
     }
 
     auto in_types = ln->in_types;
     for(; in_types  &&  *in_types; ++in_types){
-      slot_add( Slot(instIdx, true) );
+      //slot_add( Slot(instIdx, true) );
+      slot_add(true);
     }
 
     FisData::IdOrder ido;                                                          //ido is id order
@@ -1238,7 +1272,7 @@ bool    reloadSharedLibs()
   return true;
 }
 
-void               keyCallback(GLFWwindow* win, int key, int scancode, int action, int modbits)
+void               keyCallback(GLFWwindow* win,    int key, int scancode, int action, int modbits)
 {
   if(action==GLFW_RELEASE) return;
 
@@ -1315,7 +1349,7 @@ void   framebufferSizeCallback(GLFWwindow* window, int w, int h)
   fd.ui.screen.resizeCallbackEvent(w, h);
 }
 
-str                   genDbKey(LavaId sid)            // genDbKey is generate database key, sid is slot Id
+str                   genDbKey(LavaId     sid)            // genDbKey is generate database key, sid is slot Id
 {
   auto ni = fd.graph.nds.find(sid.nid); // todo: this is called from the lava looping threads and would need to be thread safe - it is also only used for getting text labels, which may make things easier
   if(ni == end(fd.graph.nds)) return ""; 
@@ -1404,10 +1438,10 @@ ENTRY_DECLARATION // main or winmain
       fd.ui.screen.initialize(fd.win, false);
 
       fd.ui.keyLay   = new BoxLayout(Orientation::Horizontal, Alignment::Fill, 0,10);      //fd.ui.keyLay   = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
-      fd.ui.keyWin   = new Window(&fd.ui.screen,   "");
-      auto spcr1     = new Label(fd.ui.keyWin,     "");
-      auto spcr2     = new Label(fd.ui.keyWin,     "");
-      auto spcr3     = new Label(fd.ui.keyWin,     "");
+      fd.ui.keyWin   = new Window(&fd.ui.screen,    "");
+      auto spcr1     = new  Label(fd.ui.keyWin,     "");
+      auto spcr2     = new  Label(fd.ui.keyWin,     "");
+      auto spcr3     = new  Label(fd.ui.keyWin,     "");
       auto loadBtn   = new Button(fd.ui.keyWin,      "Load");
       auto saveBtn   = new Button(fd.ui.keyWin,      "Save");
       auto playBtn   = new Button(fd.ui.keyWin,    "Play >");
@@ -2006,7 +2040,8 @@ ENTRY_DECLARATION // main or winmain
 
       glfwSwapBuffers(fd.win);
       glfwPollEvents();
-      fd.lgrph.exec();
+      LavaGraph::ArgVec av = fd.lgrph.exec();
+      graph_apply(move(av));
     }
   }
   SECTION(shutdown)
