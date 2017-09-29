@@ -71,9 +71,16 @@
 // -todo: make command queue for LavaGraph so that changes to the graph can be stored and queued
 // -todo: finish using cur() functions
 // -todo: fix slot movement - src and destination were flipped in the toggle command
+// -todo: make LavaFlow loop always use the right buffer
+// -todo: make LavaGraph edit functions use the opposite buffer
+// -todo: fix LavaGraph - figure out why there are slots that are [0:0] - sel_clear() was setting current slots to LavaId(0,0)
 
+// todo: figure out how to create slots from commands when the slots need the Node Id - use a stack of return values? 
+// todo: put in read count and write count for both A and B buffers
+// todo: have exec() spinlock until readers of the opposite buffer drops to 0
+// todo: change cur() functions to const and rename to read()
+// todo: change opp() functions to non-const only and rename to write()
 // todo: use command queue to batch commands, execute them, and switch the data structures 
-// todo: make LavaFlow loop always use the right buffer
 // todo: convert lava graph changes to use the command queue
 // todo: make two graphs and switch back and forth with an atomic bool
 //       | should there be two graphs, one read and one write 
@@ -921,8 +928,8 @@ u64           sel_delete()
 }
 void           sel_clear()
 {
-  fd.sel.slotOutSel = LavaId(0,0);
-  fd.sel.slotInSel  = LavaId(0,0);
+  fd.sel.slotOutSel = LavaId();
+  fd.sel.slotInSel  = LavaId();
   fd.sel.pri        = LavaNode::NODE_ERROR;
   fd.sel.sec        = LavaNode::NODE_ERROR;
 
@@ -1666,7 +1673,11 @@ ENTRY_DECLARATION // main or winmain
           if(fd.sel.slotInSel.sidx  != LavaId::SLOT_NONE && 
              fd.sel.slotOutSel.sidx != LavaId::SLOT_NONE)
           {
-            fd.lgrph.put(LavaCommand::TGL_CNCT, fd.sel.slotInSel, fd.sel.slotOutSel);
+            LavaCommand::Arg dest;
+            LavaCommand::Arg  src;
+            dest.id = fd.sel.slotInSel;
+            src.id  = fd.sel.slotOutSel;
+            fd.lgrph.put(LavaCommand::TGL_CNCT, dest, src);
             fd.sel.slotOutSel = fd.sel.slotInSel = LavaId(0,0);
 
             sel_clearSlots();

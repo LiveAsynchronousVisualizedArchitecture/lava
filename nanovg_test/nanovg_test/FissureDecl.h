@@ -295,10 +295,10 @@ struct FisData
   }       mouse;
   struct 
   {
-    u64          pri = LavaNode::NODE_ERROR;
-    u64          sec = LavaNode::NODE_ERROR;
-    Id     slotInSel;
-    Id    slotOutSel;
+    u64              pri = LavaNode::NODE_ERROR;
+    u64              sec = LavaNode::NODE_ERROR;
+    LavaId     slotInSel;
+    LavaId    slotOutSel;
   }         sel;
 };
 

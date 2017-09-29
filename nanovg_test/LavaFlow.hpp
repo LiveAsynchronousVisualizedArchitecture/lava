@@ -8,17 +8,18 @@
 #define __LAVAFLOW_HEADERGUARD_HPP__
 
 #include <cstdint>
+#include <chrono>
 #include <atomic>
 #include <thread>
 #include <mutex>
 #include <string>
+#include <queue>
+#include <stack>
 #include <unordered_map>
-#include <regex>
-#include <filesystem>
 #include <unordered_set>
 #include <map>
-#include <queue>
-#include <chrono>
+#include <regex>
+#include <filesystem>
 #include "no_rt_util.h"
 #include "tbl.hpp" // temp
 
@@ -222,9 +223,17 @@ struct    LavaCommand
 {
   enum Command { ADD_NODE=0, ADD_SLOT, TGL_CNCT, DEL_NODE, DEL_CNCT };
 
+  union Arg { 
+    Arg() : id() {} 
+    LavaId id; u64 val; LavaNode* ndptr; bool slotDest;
+  };
+
   Command cmd; 
-  union { LavaId A; LavaId dest; LavaNode* ndptr; }; 
-  union { LavaId B; LavaId  src; };
+  union { Arg A; Arg dest; Arg nd; };
+  union { Arg B; Arg  src; };
+
+  //union { LavaId A; LavaId dest; LavaNode* ndptr; }; 
+  //union { LavaId B; LavaId  src; };
 };
 // end data types
 
@@ -364,6 +373,10 @@ template<class T> LavaOut  LavaTblToOut(LavaParams const* lp, tbl<T> const& t)
 class       LavaGraph
 {
 public:
+  enum       Cmd { ADD_NODE=0, ADD_SLOT, TGL_CNCT, DEL_NODE, DEL_CNCT };
+  union      Arg { LavaId id; u64 val; LavaNode* ndptr; };
+  struct Command { Cmd cmd; Arg A; Arg B; };
+
   struct NodeInstance { uint64_t id; LavaNode* nd; };                  // a struct used for returning an instance of a node - the Nodes map of ids and LavaFlowNode pointers  
 
   using abool         =  std::atomic<bool>;
@@ -379,6 +392,7 @@ public:
   using MsgIds        =  std::unordered_set<LavaId, LavaId>;
   using NormalizeMap  =  std::unordered_map<uint64_t, uint64_t>;
   using CmdQ          =  std::queue<LavaCommand>;
+  using RetStk        =  std::stack<LavaCommand::Arg>;
   //using CmdQ          =  std::priority_queue<LavaCommand>;
 
 private:
@@ -386,6 +400,7 @@ private:
 
   uint64_t             m_nxtId;               // nxtId is next id - a counter for every node created that only increases, giving each node a unique id
   CmdQ                  m_cmdq;
+  RetStk                 m_stk;
 
   //NodeInsts          m_nodesA;
   //Slots              m_slotsA;
@@ -393,25 +408,21 @@ private:
   //SrcMap         m_destCnctsA;
   //MsgIds          m_msgNodesA;
 
-  NodeInsts           m_nodesB;
-  Slots               m_slotsB;
-  CnctMap             m_cnctsB;
-  SrcMap          m_destCnctsB;
-  MsgIds           m_msgNodesB;
-
   NodeInsts           m_nodesA;
   Slots               m_slotsA;
   CnctMap             m_cnctsA;
   SrcMap          m_destCnctsA;
   MsgIds           m_msgNodesA;
 
+  NodeInsts           m_nodesB;
+  Slots               m_slotsB;
+  CnctMap             m_cnctsB;
+  SrcMap          m_destCnctsB;
+  MsgIds           m_msgNodesB;
+
   NodeInsts&            curNodes(){ return m_useA.load()?  m_nodesA     : m_nodesB;     }
   Slots&                curSlots(){ return m_useA.load()?  m_slotsA     : m_slotsB;     }
-  CnctMap&              curCncts(){ 
-    if(m_useA.load()) 
-      return m_cnctsA; 
-    else 
-      return m_cnctsB;     }
+  CnctMap&              curCncts(){ if(m_useA.load()) return m_cnctsA; else return m_cnctsB; }
   SrcMap&           curDestCncts(){ return m_useA.load()?  m_destCnctsA : m_destCnctsB; }
   MsgIds&            curMsgNodes(){ return m_useA.load()?  m_msgNodesA  : m_msgNodesB;  }
   NodeInsts const&      curNodes()const{ return m_useA.load()?  m_nodesA     : m_nodesB;     }
@@ -419,6 +430,18 @@ private:
   CnctMap   const&      curCncts()const{ return m_useA.load()?  m_cnctsA     : m_cnctsB;     }
   SrcMap    const&  curDestCncts()const{ return m_useA.load()?  m_destCnctsA : m_destCnctsB; }
   MsgIds    const&   curMsgNodes()const{ return m_useA.load()?  m_msgNodesA  : m_msgNodesB;  }
+
+  NodeInsts&            oppNodes(){ return !m_useA.load()?  m_nodesA     : m_nodesB;     }
+  Slots&                oppSlots(){ return !m_useA.load()?  m_slotsA     : m_slotsB;     }
+  CnctMap&              oppCncts(){ if(!m_useA.load()) return m_cnctsA; else return m_cnctsB; }
+  SrcMap&           oppDestCncts(){ return !m_useA.load()?  m_destCnctsA : m_destCnctsB; }
+  MsgIds&            oppMsgNodes(){ return !m_useA.load()?  m_msgNodesA  : m_msgNodesB;  }
+  NodeInsts const&      oppNodes()const{ return !m_useA.load()?  m_nodesA     : m_nodesB;     }
+  Slots     const&      oppSlots()const{ return !m_useA.load()?  m_slotsA     : m_slotsB;     }
+  CnctMap   const&      oppCncts()const{ return !m_useA.load()?  m_cnctsA     : m_cnctsB;     }
+  SrcMap    const&  oppDestCncts()const{ return !m_useA.load()?  m_destCnctsA : m_destCnctsB; }
+  MsgIds    const&   oppMsgNodes()const{ return !m_useA.load()?  m_msgNodesA  : m_msgNodesB;  }
+
 
   void            init()
   { 
@@ -625,54 +648,148 @@ public:
     init();
     //m_ids.clear();
   }
-  u64                 put(LavaCommand::Command cmd, LavaId A, LavaId B=LavaId())
+  //u64                 put(LavaCommand::Command cmd, LavaId A, LavaId B=LavaId())
+  u64                 put(LavaCommand::Command cmd, LavaCommand::Arg A, LavaCommand::Arg B = LavaCommand::Arg() )
   {
     m_cmdq.push({cmd, A, B});
     return m_cmdq.size();
   }
   u64                exec()
   {
+    using namespace std;
+    
     auto sz = m_cmdq.size();
-    while(m_cmdq.size() > 0)
+    if(sz > 0)
     {
-      auto lc = m_cmdq.front();                 // lc is LavaCommand
-      m_cmdq.pop();
-      switch(lc.cmd)
+      if(m_useA.load()){
+        m_nodesB     = m_nodesA;
+        m_slotsB     = m_slotsA; 
+        m_cnctsB     = m_cnctsA; 
+        m_destCnctsB = m_destCnctsA;
+      }else{
+        m_nodesA     = m_nodesB;
+        m_slotsA     = m_slotsB; 
+        m_cnctsA     = m_cnctsB; 
+        m_destCnctsA = m_destCnctsB;
+      }
+
+      while(m_cmdq.size() > 0)
       {
-        case LavaCommand::TGL_CNCT:{
-          this->toggleCnct(lc.src, lc.dest);
-        }break;
+        auto lc = m_cmdq.front();                 // lc is LavaCommand
+        m_cmdq.pop();
+        switch(lc.cmd)
+        {
+          case LavaCommand::TGL_CNCT:{
+            this->toggleCnct(lc.src.id, lc.dest.id);
+          }break;
 
-        case LavaCommand::DEL_CNCT:{
-          this->delCnct(lc.A);
-        }break;
+          case LavaCommand::DEL_CNCT:{
+            this->delCnct(lc.A.id);
+          }break;
 
-        case LavaCommand::ADD_NODE:{
-          this->addNode(lc.ndptr);
-        }break;
+          case LavaCommand::ADD_NODE:{
+            u64 nid = this->addNode(lc.A.ndptr);
+            LavaCommand::Arg ret;
+            ret.id.nid = nid;
+            m_stk.push(ret);
+          }break;
 
-        case LavaCommand::DEL_NODE:{
-          this->delNode(lc.A.nid);
-        }break;
+          case LavaCommand::DEL_NODE:{
+            this->delNode(lc.A.id.nid);
+          }break;
 
-        default: break;
-      };
+          case LavaCommand::ADD_SLOT:{
+            LavaFlowSlot s(m_stk.top().id.nid, lc.B.slotDest);
+            m_stk.pop();
+            LavaId sid = this->addSlot(s, lc.A.id.sidx);
+            LavaCommand::Arg ret;
+            ret.id = sid;
+            m_stk.push(ret);
+          }break;
+
+          default: break;
+        };
+      }
+
+      while(m_stk.size()>0){ m_stk.pop(); }
+      m_useA.store( !m_useA.load() );                                             // this should be the only place where it is flipped, so the store is all that matters
     }
 
     return sz;
   }
 
-  // nodes
+  // opposite buffer changes
   uint64_t    addNode(LavaNode* ln, bool newId=true)
   {
     u64 id = nxt();
     if(ln->node_type == LavaNode::MSG)
-      curMsgNodes().insert(id);
-      //m_msgNodes.push_back(id);
+      oppMsgNodes().insert(id);
 
     LavaInst li = makeInst(id, ln);
-    return curNodes().insert({id, li}).first->first;                             // returns a pair that contains the key-value pair
+    return oppNodes().insert({id, li}).first->first;                             // returns a pair that contains the key-value pair
   }
+  bool        delNode(uint64_t nid)
+  {
+    // erase any connects that go with the slots here
+    auto     si = this->nodeSlots(nid);                       // si is slot iterator
+    auto siCnct = si; 
+    for(; siCnct!=end(oppSlots())  &&  siCnct->first.nid==nid; ++siCnct ){
+      if(siCnct->second.in) this->delDestCnct(nid);
+      else                  this->delSrcCncts(nid);
+    }
+
+    auto slcnt = oppSlots().erase(nid);                         // slcnt is slot count
+    auto   cnt = oppNodes().erase(nid);
+    oppMsgNodes().erase(nid);
+
+    return (cnt+slcnt) > 0;                                  // return true if 1 or more elements were erased, return false if no elements were erasedm
+  }
+  LavaId      addSlot(LavaFlowSlot  s, u64 sidx=0)
+  {
+    LavaId id(s.id.nid, sidx);
+    id.sidx = sidx? sidx  :  nxtSlot(s.id.nid);
+    s.id    = id;
+    oppSlots().insert({id, s});
+
+    return id;
+  }
+  u32         delCnct(LavaId  src, LavaId  dest)
+  {
+    u32      cnt = 0;
+    auto srcIter = oppCncts().find(dest);
+    if(srcIter != oppCncts().end())
+    {
+      auto iter = oppDestCncts().find(src);
+      for(; iter != oppDestCncts().end() && iter->first == src; ){
+        auto cpy = iter++;          // ++iter;
+        if(cpy->second == dest){
+          oppDestCncts().erase(cpy);
+          ++cnt;
+        }
+      }
+      oppCncts().erase(dest);
+    }
+
+    return cnt;
+  }
+  void     toggleCnct(LavaId  src, LavaId  dest)
+  {
+    u32    delcnt = 0;
+    auto       di = oppCncts().find(dest);
+    bool matchSrc = false;
+    if( di != end(oppCncts()) ){
+      matchSrc = src == di->second;
+      delcnt   = delCnct(di->second,dest);
+    }
+
+    if( !(matchSrc && delcnt>0) ){
+      oppCncts().insert({dest, src});
+      oppDestCncts().insert({src, dest});
+    }
+  }
+
+
+  // nodes
   auto           node(u64 id)  -> LavaInst&
   {
     auto nIter = curNodes().find(id);                                          // nIter is node iterator
@@ -745,22 +862,6 @@ public:
     else
       return nullptr;
   }
-  bool        delNode(uint64_t nid)
-  {
-    // erase any connects that go with the slots here
-    auto     si = this->nodeSlots(nid);                       // si is slot iterator
-    auto siCnct = si; 
-    for(; siCnct!=end(curSlots())  &&  siCnct->first.nid==nid; ++siCnct ){
-      if(siCnct->second.in) this->delDestCnct(nid);
-      else                  this->delSrcCncts(nid);
-    }
-
-    auto slcnt = curSlots().erase(nid);                         // slcnt is slot count
-    auto   cnt = curNodes().erase(nid);
-    curMsgNodes().erase(nid);
-    
-    return (cnt+slcnt) > 0;                                  // return true if 1 or more elements were erased, return false if no elements were erasedm
-  }
   void       setState(u64 nid, LavaInst::State state) // -> LavaInst::State
   {
     //return this->node(nid).setState(nid, state);
@@ -775,16 +876,6 @@ public:
   }
 
   // slots
-  LavaId      addSlot(LavaFlowSlot  s, u64 sidx=0)
-  {
-    LavaId id(s.id.nid, sidx);
-    //LavaId id;
-    id.sidx = sidx? sidx  :  nxtSlot(s.id.nid);
-    s.id    = id;
-    curSlots().insert({id, s});
-
-    return id;
-  }
   auto           slot(LavaId   id) -> LavaFlowSlot*
   {
     auto si = curSlots().find(id);
@@ -854,42 +945,6 @@ public:
     }
 
     return true;
-  }
-  u32         delCnct(LavaId  src, LavaId  dest)
-  {
-    u32      cnt = 0;
-    auto srcIter = curCncts().find(dest);
-    if(srcIter != curCncts().end())
-    {
-      auto iter = curDestCncts().find(src);
-      for(; iter != curDestCncts().end() && iter->first == src; ){
-        auto cpy = iter++;          // ++iter;
-        if(cpy->second == dest){
-          curDestCncts().erase(cpy);
-          ++cnt;
-        }
-      }
-      curCncts().erase(dest);
-    }
-
-    return cnt;
-  }
-  void     toggleCnct(LavaId  src, LavaId  dest)
-  {
-    u32    delcnt = 0;
-    auto       di = curCncts().find(dest);
-    bool matchSrc = false;
-    if( di != end(curCncts()) ){
-      matchSrc = src == di->second;
-      delcnt   = delCnct(di->second,dest);
-    }
-
-    //if(delcnt==0 || !matchSrc ){
-    if( !(matchSrc && delcnt>0) ){
-      curCncts().insert({dest, src});
-      curDestCncts().insert({src, dest});
-    }
-    //delCnct(src,dest)==0 
   }
   auto    destCnctEnd() -> decltype(curDestCncts().end()) { return curDestCncts().end(); }
   auto        cnctEnd() -> decltype(curCncts().end())     { return curCncts().end(); }
@@ -1532,6 +1587,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//if(delcnt==0 || !matchSrc ){
+//delCnct(src,dest)==0 
 
 //vec_ids sidxs;                                            // sidxs is slot indexes
 //for(auto np : nds){                                       // np is node pointer and nds is nodes
