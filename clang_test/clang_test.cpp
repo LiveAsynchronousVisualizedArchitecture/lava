@@ -1,5 +1,5 @@
 
-//#include <stdio.h>
+#include <stdio.h>
 //#include <iostream>
 
 extern "C" int first()
@@ -7,13 +7,13 @@ extern "C" int first()
   return 85;
 }
 
-//int main(int argc, char** argv)
+//extern "C" void entry()
 
-extern "C" void entry()
+int main(int argc, char** argv)
 {
   auto f = first();
 
-  //printf("\nclang test %d\n", f);
+  printf("\nclang test %d\n", f);
 
   //return 0;
 }
