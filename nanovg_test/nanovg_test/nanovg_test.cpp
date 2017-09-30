@@ -87,13 +87,13 @@
 // -todo: convert LavaFlow to class with const LavaGraph const& function to access the graph as read only - similiar approach using dual buffers taken
 //       | -does there need to be a function to copy the instances and connections? - should this ultimatly be used for drawing the graph? - this is done in the exec() function befoe executing the command queue
 //       |  can the graph be condensed into a tbl ? 
+// -todo: use a copy of the graph to clear and update the interface buttons - not neccesary due to the LavaGraph dual buffers? 
+// -todo: make a function to get a copy of the graph - can check the version number every loop, and if it is higher, get a copy of all the data inside a mutex - not neccesary from the dual buffers
 
 // todo: change cur() functions to const and rename to read()
 // todo: change opp() functions to non-const only and rename to write()
 // todo: put in read count and write count for both A and B buffers
 // todo: have exec() spinlock until readers of the opposite buffer drops to 0 - could also just skip the command buffer in the rare case that it catches readers as more than 0
-// todo: use a copy of the graph to clear and update the interface buttons
-// todo: make a function to get a copy of the graph - can check the version number every loop, and if it is higher, get a copy of all the data inside a mutex
 // todo: make button that creates a project for a node - would it need to pop up a modal dialog?
 // todo: convert tbl to use arrays of the data types smaller than 64 bits
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array - can any heirarchy of initializer_lists be brought down to an array of the same types?
