@@ -1,8 +1,8 @@
 
 //#include "no_rt_util.h"
 
-//#define LIBC_HPP_IMPL
-//#include "libc.hpp"
+#define LIBC_HPP_IMPL
+#include "libc.hpp"
 
 //extern "C" void  _entry()
 //{ }
