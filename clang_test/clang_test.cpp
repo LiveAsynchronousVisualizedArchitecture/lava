@@ -9,7 +9,7 @@ extern "C" int first()
 
 //extern "C" void entry()
 
-int main(int argc, char** argv)
+extern "C" int main(int argc, char** argv)
 {
   auto f = first();
 
