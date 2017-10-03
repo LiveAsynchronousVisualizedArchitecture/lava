@@ -158,10 +158,19 @@ inline int __cdecl Printf(const char * format, ...)
 
     auto len=strlen(szBuf);
 
-    WriteFile(  GetStdHandle(STD_OUTPUT_HANDLE), szBuf, (DWORD)len,
-                &cbWritten, 0 );
+    OutputDebugString(szBuf);
+    //WriteFile(  GetStdHandle(STD_OUTPUT_HANDLE), szBuf, (DWORD)len, &cbWritten, 0 );
 
     return retValue;
+}
+
+void Print(const char* s)
+{
+  AllocConsole();
+  auto hndl = GetStdHandle(STD_OUTPUT_HANDLE);
+  DWORD cbWritten;
+  WriteFile(hndl, s, strlen(s), &cbWritten, 0);
+  //OutputDebugString(s);
 }
       
 

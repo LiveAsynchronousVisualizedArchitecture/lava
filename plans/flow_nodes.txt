@@ -93,3 +93,22 @@ Should the function passed be one that inserts a buffer instead of a simple allo
 |  |  does this take it back to the same place of always allocating memory and letting the loop store in the db if neccesary?
 
 
+
+Dealing with frames of packets
+|  Does every framed instance need an atomic frame array that contains packets? 
+|  |  Thread gets a packet - doesn't increment it's reference since that has already been done 
+|  |  Checks the node to see if this packet completes a frame
+|  |  |  If not, atomically copy the packet into the instance's frame array 
+|  |  |  If it does complete the frame, then run this thread is the one to run the node with the current frame 
+|  |  |  Have to make sure that frames run sequentially and a later frame doesn't run before a younger frame
+|  |  Take a packet out of the queue, if it can't be run due to being a frame that's too new, take the next packet out and put the previous blocked packet back in
+|  Should there be a packet frame queue whose size is a minimum of the number of threads and the number of nodes?
+|  Should the packet queue be the size (or roughly the size) of the number of nodes?
+|  Instead of packet queue have a simple ring buffer?  Or concurrent hash of packet frames? Can they be combined?
+|  Linear search for node + frame combination, then put the packet in the frame
+|  
+
+
+
+
+
