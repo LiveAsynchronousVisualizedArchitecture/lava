@@ -91,7 +91,23 @@ Should the function passed be one that inserts a buffer instead of a simple allo
 |  Should there be a tbl flatten function that 
 |  Should a lava alloc function and allocator always be used so that if the db isn't needed there is potentially no copy?
 |  |  does this take it back to the same place of always allocating memory and letting the loop store in the db if neccesary?
+|  Make sure that references start at 0 for memory allocated with the lava_alloc function 
+|  |  this will mean that memory allocated with it will be thread local and 'garbage collected' at the end of the loop, right after the node is done executing 
+|  |  this should also mean that even nodes written in C don't need to worry about manual memory deallocation
+|  |  could be used for C or ISPC
 
+
+Visualization and internal allocations
+|  Add the ability to visualize all the lava_alloc allocations that happened in a node 
+|  |  Create the option to visualize a node instead of just slots
+|  |  Initially check the lava allocations for 't' and 'b' magic numbers at the start
+|  Eventually look for "IdxVerts" in the type, along with "Spread" and or string points / labels points
+|  Register shared libraries as conversions from user made types to the types that can be visualized
+|  |  Show graphically that slots can or can't be visualized (determined by their type being one of the visualizer types or a conversion to a visualizer type being known)
+|  |  Register in the json file?
+|  |  Register in the plugin struct as a converter? 
+|  |  Should there be explicit nodes to convert to a visualizable type, or will that end up ultimatly being too many nodes that create visual clutter, since ideally every slot would be visualizable
+|
 
 
 Dealing with frames of packets
@@ -105,8 +121,22 @@ Dealing with frames of packets
 |  Should there be a packet frame queue whose size is a minimum of the number of threads and the number of nodes?
 |  Should the packet queue be the size (or roughly the size) of the number of nodes?
 |  Instead of packet queue have a simple ring buffer?  Or concurrent hash of packet frames? Can they be combined?
-|  Linear search for node + frame combination, then put the packet in the frame
-|  
+|  Linear search or hash search for node + frame combination, then put the packet in the frame
+|  Make a priority queue that contains frames 
+|  |  sort by inverse of number of slots left
+|  |  Sorted by frame numbers
+|  |  Then sorted by nodes
+|  |  Linear search the frames for a match
+|  |  Insert packet into the frame
+|  |  Have to re-sort somehow - either take the frame out and put it back in, or resort the queue in place - maybe not if frames aren't sorted by how many free packet slots they have
+|  |  Does unframed data have to be handled somehow?  A frame number constant that represents any frame?
+|  Does each node need to take a pointer to a single frame instead of an array of packets?
+
+
+Errors:
+|  Does a packet or frame need to have a special error mode? 
+|  |  A frame could have an error type and contain what node and frame number it errored on
+|  |  Should an error frame, be a copy of the frame that was used for input?
 
 
 
