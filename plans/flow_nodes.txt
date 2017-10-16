@@ -139,6 +139,14 @@ Errors:
 |  |  Should an error frame, be a copy of the frame that was used for input?
 
 
+Range:
+|  Should each packet contain a start and end range
+|  Should there be a flag that says whether the range is used or should the ranges have high value constants to indicate they are not used?
+|  Is just one range enough to let the next node interpret the range however it needs to ?
+|
+
+
+
 
 
 
