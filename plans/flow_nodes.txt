@@ -146,7 +146,33 @@ Range:
 |
 
 
+Packet Queue by cache and memory heirarchy:
+|  Does this imply setting thread affinities to specific cores?
+|  Packet queueing based on cache and memory heirarchies 
+|  |  look in a queue for the physical core, then whatever shares the L2 cache, L3 cache, and finally the same NUMA node 
+|  |  special queue structure needed that will automatically use this heirarchy by being specifically structured around it 
+|  Need to weigh importance of having the absolute correct ordering versus using the memory heirarchy as effectivly as possible 
+|  |  maybe the memory heirarchy is the most important, but would out of order frames cause problems? 
+|  |  possibly only if message passing nodes did not make sure to process the frames they recieve in order 
+|  Would this end up being a tree structure of queues?
+|  |  Could it even be a 2 dimensional tree structure? 
+|  |  |  One dimension is the memory heirarchy, one dimension is the priority of packets
+|  |  |  Top level in X - buckets representing NUMA nodes (if there are more than one)
+|  |  |  Second level in X - buckets representing different L3 caches (if there are more than one) 
+|  |  |  Third level in X - buckets reprsenting different L2 caches
+|  |  |  Fourth level in X - buckets reprsenting different physical cores (which should share L1 cache, maybe other resources as well)
+|  |  Does splitting up the packets in Y like a kd-tree even make sense? 
+|  |  |  While it may be easier to think about packets bubbling up the memory heirarchy, but it is probably a much better fit to think of a thread with no more packets in its queue to go up the memory heirarchy 
+|  |  |  While 'going up the memory heirarchy' a thread looking for a packet is actually going to end up searching into many small queues of the lowest level in the heirarchy
+|  |  |  Is there an elegant solution to be to looking into higher levels of the memory heirarchy? 
+|  |  |  |  When a thread searches up in the memory heirarchy, should it dequeue packets from each of the sub-queues into a higher level queue?
+|  |  |  |  Does this imply that the higher level packets should come first since they would have been taken from the top of the lower level queues as well as being sorted against each other? - seems reasonable to treat it that way
+|  |  |  |  This implies that higher level packets will be processed only after some thread finishes all its most memory local work 
+|  |  |  |  Is the fundamental principle a stack of queues? Is there anything novel about thinking of it like that or is it simply an inverted version of a tree?
 
 
-
+2 CPU NUMA with 2 cores 4 threads hypothetical: 
+   ___________        Main memory
+   _____|_____        NUMA nodes
+   __|__|__|__        L3 slices or L2 caches per physical core - both hyper threads should share the same cache and thus don't need individual queues
 

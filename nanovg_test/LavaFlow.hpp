@@ -78,6 +78,8 @@ static inline u64 popcount64(u64 x)
 
   return (x * h01) >> 56;
 }
+
+// GCC built in intrinsic - int  __builtin_popcount(unsigned int)
 // End libpopcnt
 
 // data types
@@ -194,10 +196,14 @@ struct      LavaFrame
   u16         slotsNeeded = 0;                             // The number of slots needed for this frame to be complete 
   LavaPacket  packets[16];
 
-  void          putSlot(u64 sIdx, LavaPacket const& pkt)
+  bool          putSlot(u64 sIdx, LavaPacket const& pkt)
   {
+    if( getSlot(sIdx) ) return false;
+
     setSlot(sIdx, true);
     packets[sIdx] = pkt;
+
+    return true;
   }
   void          setSlot(u64 sIdx, bool val)
   {
