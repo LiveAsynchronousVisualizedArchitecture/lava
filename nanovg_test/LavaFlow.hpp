@@ -139,6 +139,30 @@ struct     LavaPacket
     return msg.id > r.msg.id;
   }
 };
+struct      LavaFrame
+{
+  enum FRAME { ERR_FRAME = 0xFFFFFFFFFFFFFFFE, NO_FRAME = 0xFFFFFFFFFFFFFFFF };
+
+  u64            dest = LavaId::NODE_NONE;
+  u64           frame = 0;
+  u64           slots = 0;
+  u8             size = 0;
+  LavaPacket  packets[16];
+
+  bool getSlot(u8 sIdx)
+  {
+    return (slots >> sIdx) & 0x0000000000000001;
+  }
+  void setSlot(i8 sIdx, bool val)
+  {
+    //using namespace std;
+    //if(val) slots |=  (u64)0x1 << max(0,sIdx-1);            // or with the proper bit set to 1
+    //else    slots &= ~( (u64)(0x1) << max(0,sIdx-1) );      // and with the proper bit set to 0 and everything else set to 1
+
+    if(val) slots |=  (u64)0x1 << sIdx;            // or with the proper bit set to 1
+    else    slots &= ~( (u64)(0x1) << sIdx);       // and with the proper bit set to 0 and everything else set to 1
+  }
+};
 struct       LavaNode
 {
   enum Type { NONE=0, FLOW, MSG, NODE_ERROR=0xFFFFFFFFFFFFFFFF };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
@@ -1001,6 +1025,8 @@ struct       LavaFlow
 public:
   using au64            =  std::atomic<uint64_t>;
   using PacketQueue     =  std::priority_queue<LavaPacket>;
+  //using FrameQueue      =  std::priority_queue<LavaFrame>;
+  using FrameQueue      =  std::vector<LavaFrame>;
   using MsgNodeVec      =  std::vector<uint64_t>;
   using Mutex           =  std::mutex;
   using PacketCallback  =  void (*)(LavaPacket pkt);
@@ -1021,10 +1047,12 @@ public:
   mutable u64      m_threadCount = 0;                // todo: make this atomic
   mutable u32            version = 0;                // todo: make this atomic
   mutable Mutex           m_qLck;
+  mutable Mutex      m_frameQLck;
   mutable PacketCallback  packetCallback;            // todo: make this an atomic version of the function pointer
+  mutable PacketQueue          q;
+  mutable FrameQueue      frameQ;
 
   MsgNodeVec        m_msgNodesA;
-  PacketQueue                q;
   LavaGraph              graph;
 
   u64      incThreadCount()
@@ -1522,6 +1550,25 @@ void               LavaLoop(LavaFlow& lf) noexcept
       }
       ++lf.m_frame; // todo: rethink this and make sure it will work 
     } // SECTION(loop through message nodes)
+    SECTION(take a packet from the packet queue and put it into a slot in the frame queue)
+    {
+      LavaPacket pckt;
+      bool ok = lf.nxtPacket(&pckt);
+      if(ok){
+        lf.m_frameQLck.lock();             // lock mutex
+        
+        // loop through the current frames looking for one with the same frame number and destination slot id
+        TO(lf.frameQ.size(), i){
+          if(lf.frameQ[i].frame != pckt.frame) continue;
+          if(lf.frameQ[i].dest != pckt.dest_node) continue;     // todo: unify dest_node and dest_id etc. as one LavaId LavaPacket
+          //if(lf.frameQ[i].dest.sidx != pckt.dest_slot) continue;
+
+          //lf.frameQ[i].
+        }
+
+        lf.m_frameQLck.unlock();           // unlock mutex
+      }
+    }
     SECTION(loop through data packets)
     {
       LavaPacket pckt;

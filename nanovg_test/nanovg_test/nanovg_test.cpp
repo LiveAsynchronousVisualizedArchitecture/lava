@@ -90,6 +90,7 @@
 // -todo: use a copy of the graph to clear and update the interface buttons - not neccesary due to the LavaGraph dual buffers? 
 // -todo: make a function to get a copy of the graph - can check the version number every loop, and if it is higher, get a copy of all the data inside a mutex - not neccesary from the dual buffers
 
+// todo: make frame queue
 // todo: change cur() functions to const and rename to read()
 // todo: change opp() functions to non-const only and rename to write()
 // todo: put in read count and write count for both A and B buffers
@@ -99,6 +100,7 @@
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array - can any heirarchy of initializer_lists be brought down to an array of the same types?
 // todo: change project name to Fissure 
 // todo: make popup text box that avoids the bounding box of the moused over node? - put graph of node times in the box? put graph of covariance data of data in, time spent, data out, and time ?   
+// todo: make segmented vertical bar that shows packets building up on certain node
 // todo: make right click or space bar open up a text box that can contain the build command, stats and/or hotbox
 
 // todo: profile
@@ -1591,6 +1593,29 @@ ENTRY_DECLARATION // main or winmain
       new (&fd.vizIds) AtmSet( LavaId().asInt );
       fd.flow.packetCallback = lavaPacketCallback;
       LavaInit();
+    }
+
+    Println("size of frame: ", sizeof(LavaFrame));
+    LavaFrame tstFrame;
+    Println("  slot 0: ", tstFrame.getSlot(0), " : ", tstFrame.slots);
+    tstFrame.setSlot(0,1);
+    Println("  slot 0: ", tstFrame.getSlot(0), " : ", tstFrame.slots);
+    tstFrame.setSlot(0,0);
+    Println("  slot 0: ", tstFrame.getSlot(0), " : ", tstFrame.slots);
+
+    tstFrame.setSlot(16,1);
+    Println("  slot 16: ", tstFrame.getSlot(16), " : ", tstFrame.slots);
+    tstFrame.setSlot(0,1);
+    Println("  slot 16: ", tstFrame.getSlot(16), " : ", tstFrame.slots);
+    tstFrame.setSlot(63,1);
+    Println("  slot 63: ", tstFrame.getSlot(63), " : ", tstFrame.slots);
+    
+    Println("\n");
+    tstFrame.slots = 0;
+    TO(64,i){
+      tstFrame.setSlot(i,1);
+      Println("  slot ",i,": ", tstFrame.getSlot(i), " : ", tstFrame.slots);
+      tstFrame.setSlot(i,0);
     }
   }
 
