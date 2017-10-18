@@ -1614,7 +1614,7 @@ ENTRY_DECLARATION // main or winmain
     tstFrame.slots = 0;
     TO(64,i){
       tstFrame.setSlot(i,1);
-      Println("  slot ",i,": ", tstFrame.getSlot(i), " : ", tstFrame.slots);
+      Println("slot cout: ",tstFrame.slotCount(),"  slot ",i,": ", tstFrame.getSlot(i), " : ", tstFrame.slots);
       tstFrame.setSlot(i,0);
     }
   }

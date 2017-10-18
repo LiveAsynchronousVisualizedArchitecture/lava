@@ -35,6 +35,51 @@
   namespace fs = std::tr2::sys;                                                             // todo: different compiler versions would need different filesystem paths
 #endif
 
+/*
+* libpopcnt.h - C/C++ library for counting the number of 1 bits (bit
+* population count) in an array as quickly as possible using
+* specialized CPU instructions e.g. POPCNT, AVX2.
+*
+* Copyright (c) 2016 - 2017, Kim Walisch
+* Copyright (c) 2016 - 2017, Wojciech Mula
+*
+* All rights reserved.
+*
+* Redistribution and use in source and binary forms, with or without
+* modification, are permitted provided that the following conditions are met:
+*
+* 1. Redistributions of source code must retain the above copyright notice, this
+*    list of conditions and the following disclaimer.
+* 2. Redistributions in binary form must reproduce the above copyright notice,
+*    this list of conditions and the following disclaimer in the documentation
+*    and/or other materials provided with the distribution.
+*
+* THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+* ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+* WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+* DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR
+* ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+* (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+* LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+* ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+* (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+* SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+*/
+static inline u64 popcount64(u64 x)
+{
+  u64 m1 = 0x5555555555555555ll;
+  u64 m2 = 0x3333333333333333ll;
+  u64 m4 = 0x0F0F0F0F0F0F0F0Fll;
+  u64 h01 = 0x0101010101010101ll;
+
+  x -= (x >> 1) & m1;
+  x = (x & m2) + ((x >> 2) & m2);
+  x = (x + (x >> 4)) & m4;
+
+  return (x * h01) >> 56;
+}
+// End libpopcnt
+
 // data types
 struct       LavaNode;
 struct     LavaParams;
@@ -143,24 +188,30 @@ struct      LavaFrame
 {
   enum FRAME { ERR_FRAME = 0xFFFFFFFFFFFFFFFE, NO_FRAME = 0xFFFFFFFFFFFFFFFF };
 
-  u64            dest = LavaId::NODE_NONE;
-  u64           frame = 0;
-  u64           slots = 0;
-  u8             size = 0;
+  u64            dest = LavaId::NODE_NONE;             // The destination node this frame will be run with
+  u64           frame = 0;                             // The numer of this frame - lowest frame needs to be run first
+  u64        slotMask = 0;                             // The bit mask respresenting which slots already have packets in them
+  //u16       slotCount = 0;                             // The number of slots - should this be obsoleted from counting the bits in slotMask?
+  u16           slots = 0;
   LavaPacket  packets[16];
 
-  bool getSlot(u8 sIdx)
+  bool        getSlot(u8 sIdx) const
   {
-    return (slots >> sIdx) & 0x0000000000000001;
+    return (slotMask >> sIdx) & 0x0000000000000001;
   }
-  void setSlot(i8 sIdx, bool val)
+  void        setSlot(i8 sIdx, bool val)
   {
-    //using namespace std;
-    //if(val) slots |=  (u64)0x1 << max(0,sIdx-1);            // or with the proper bit set to 1
-    //else    slots &= ~( (u64)(0x1) << max(0,sIdx-1) );      // and with the proper bit set to 0 and everything else set to 1
-
-    if(val) slots |=  (u64)0x1 << sIdx;            // or with the proper bit set to 1
-    else    slots &= ~( (u64)(0x1) << sIdx);       // and with the proper bit set to 0 and everything else set to 1
+    if(val) slotMask |=  (u64)0x1 << sIdx;            // or with the proper bit set to 1
+    else    slotMask &= ~( (u64)(0x1) << sIdx);       // and with the proper bit set to 0 and everything else set to 1
+  }
+  u64       slotCount() const
+  {
+    return popcount64(slotMask);
+  }
+  bool allSlotsFilled() const
+  {
+    if( slotCount() >= slots ) return true;
+    return false;
   }
 };
 struct       LavaNode
@@ -1559,11 +1610,18 @@ void               LavaLoop(LavaFlow& lf) noexcept
         
         // loop through the current frames looking for one with the same frame number and destination slot id
         TO(lf.frameQ.size(), i){
-          if(lf.frameQ[i].frame != pckt.frame) continue;
-          if(lf.frameQ[i].dest != pckt.dest_node) continue;     // todo: unify dest_node and dest_id etc. as one LavaId LavaPacket
+          if(lf.frameQ[i].frame != pckt.frame){ continue; }
+          if(lf.frameQ[i].dest != pckt.dest_node){ continue; }         // todo: unify dest_node and dest_id etc. as one LavaId LavaPacket
           //if(lf.frameQ[i].dest.sidx != pckt.dest_slot) continue;
 
-          //lf.frameQ[i].
+          auto      sIdx = pckt.dest_slot;
+          bool slotTaken = lf.frameQ[i].getSlot(sIdx);
+          if(!slotTaken){
+            lf.frameQ[i].packets[sIdx] = pckt;
+          }
+
+          //if(
+
         }
 
         lf.m_frameQLck.unlock();           // unlock mutex
@@ -1651,6 +1709,9 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//using namespace std;
+//if(val) slots |=  (u64)0x1 << max(0,sIdx-1);            // or with the proper bit set to 1
+//else    slots &= ~( (u64)(0x1) << max(0,sIdx-1) );      // and with the proper bit set to 0 and everything else set to 1
 
 // C++14 -> decltype(m_slots.find(Id(nid)))
 //return lower_bound(ALL(m_slots), LavaId(nid), [](auto a,auto b){ return a.first < b; } );
