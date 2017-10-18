@@ -188,28 +188,31 @@ struct      LavaFrame
 {
   enum FRAME { ERR_FRAME = 0xFFFFFFFFFFFFFFFE, NO_FRAME = 0xFFFFFFFFFFFFFFFF };
 
-  u64            dest = LavaId::NODE_NONE;             // The destination node this frame will be run with
-  u64           frame = 0;                             // The numer of this frame - lowest frame needs to be run first
-  u64        slotMask = 0;                             // The bit mask respresenting which slots already have packets in them
-  u16     slotsNeeded = 0;                             // The number of slots needed for this frame to be complete 
+  u64                dest = LavaId::NODE_NONE;             // The destination node this frame will be run with
+  u64               frame = 0;                             // The numer of this frame - lowest frame needs to be run first
+  u64            slotMask = 0;                             // The bit mask respresenting which slots already have packets in them
+  u16         slotsNeeded = 0;                             // The number of slots needed for this frame to be complete 
   LavaPacket  packets[16];
 
-  //u16       slotCount = 0;                           // The number of slots - should this be obsoleted from counting the bits in slotMask?
-
-  bool        getSlot(u64 sIdx) const
+  void          putSlot(u64 sIdx, LavaPacket const& pkt)
   {
-    return (bool)(slotMask >> sIdx) & 0x0000000000000001;
+    setSlot(sIdx, true);
+    packets[sIdx] = pkt;
   }
-  void        setSlot(u64 sIdx, bool val)
+  void          setSlot(u64 sIdx, bool val)
   {
     if(val) slotMask |=  (u64)0x1 << sIdx;            // or with the proper bit set to 1
     else    slotMask &= ~( (u64)(0x1) << sIdx);       // and with the proper bit set to 0 and everything else set to 1
   }
-  u64       slotCount() const
+  bool          getSlot(u64 sIdx) const
+  {
+    return (bool)(slotMask >> sIdx) & 0x0000000000000001;
+  }
+  u64         slotCount()         const
   {
     return popcount64(slotMask);
   }
-  bool allSlotsFilled() const
+  bool        allFilled()         const
   {
     if( slotCount() >= slotsNeeded ) return true;
     return false;
@@ -1077,7 +1080,6 @@ struct       LavaFlow
 public:
   using au64            =  std::atomic<uint64_t>;
   using PacketQueue     =  std::priority_queue<LavaPacket>;
-  //using FrameQueue      =  std::priority_queue<LavaFrame>;
   using FrameQueue      =  std::vector<LavaFrame>;
   using MsgNodeVec      =  std::vector<uint64_t>;
   using Mutex           =  std::mutex;
@@ -1604,28 +1606,35 @@ void               LavaLoop(LavaFlow& lf) noexcept
     } // SECTION(loop through message nodes)
     SECTION(take a packet from the packet queue and put it into a slot in the frame queue)
     {
-      LavaPacket pckt;
+      LavaFrame   runFrm;
+      LavaPacket    pckt;
       bool ok = lf.nxtPacket(&pckt);
-      if(ok){
-        lf.m_frameQLck.lock();             // lock mutex
-        
-        // loop through the current frames looking for one with the same frame number and destination slot id
-        TO(lf.frameQ.size(), i){
-          if(lf.frameQ[i].frame != pckt.frame){ continue; }
-          if(lf.frameQ[i].dest != pckt.dest_node){ continue; }         // todo: unify dest_node and dest_id etc. as one LavaId LavaPacket
-          //if(lf.frameQ[i].dest.sidx != pckt.dest_slot) continue;
+      if(ok)
+      {
+        u16 sIdx  =  pckt.dest_slot;
+        lf.m_frameQLck.lock();                                      // lock mutex        
+          TO(lf.frameQ.size(), i)                                   // loop through the current frames looking for one with the same frame number and destination slot id - if no frame is found to put the packet into, make a new one - keep track of the lowest full frame while looping and use that if no full frame is found?
+          {
+            auto& frm = lf.frameQ[i];
+            if(frm.frame != pckt.frame){ continue; }
+            if(frm.dest != pckt.dest_node){ continue; }             // todo: unify dest_node and dest_id etc. as one LavaId LavaPacket
+            //if(frm.dest.sidx != pckt.dest_slot) continue;
 
-          u16       sIdx = pckt.dest_slot;
-          bool slotTaken = lf.frameQ[i].getSlot(sIdx);
-          if(!slotTaken){
-            lf.frameQ[i].packets[sIdx] = pckt;
+            bool slotTaken = frm.getSlot(sIdx);
+            if(!slotTaken){
+              frm.packets[sIdx] = pckt;
+            }
+
+            if( frm.allFilled() ){                                  // If all the slots are filled, copy the frame out and erase it
+              runFrm = frm;
+              lf.frameQ.erase(lf.frameQ.begin()+i);                 // can't use an index, have to use an iterator for some reason
+              break;                                                // break out of the loop since a frame was found
+            }
           }
 
-          //if(
-
-        }
-
-        lf.m_frameQLck.unlock();           // unlock mutex
+          runFrm.putSlot(sIdx, pckt);
+          lf.frameQ.push_back(runFrm);                              // New frame that starts with the current packet put into it 
+        lf.m_frameQLck.unlock();                                    // unlock mutex
       }
     }
     SECTION(loop through data packets)
@@ -1708,7 +1717,11 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//
+//using FrameQueue      =  std::priority_queue<LavaFrame>;
 
+//
+//u16       slotCount = 0;                           // The number of slots - should this be obsoleted from counting the bits in slotMask?
 
 //using namespace std;
 //if(val) slots |=  (u64)0x1 << max(0,sIdx-1);            // or with the proper bit set to 1

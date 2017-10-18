@@ -91,6 +91,7 @@
 // -todo: make a function to get a copy of the graph - can check the version number every loop, and if it is higher, get a copy of all the data inside a mutex - not neccesary from the dual buffers
 // -todo: make frame queue
 // -todo: make LavaFrame struct
+// -todo: make slotCount() count the number of bits in the slotMask
 
 // todo: make a putSlot function for LavaFrame
 // todo: make LavaFrame operations atomic
@@ -218,7 +219,8 @@
 //   | Packet syncing through use of frames
 //   | Live editing of input tables 
 //   | Constant input tables to configure a node? - can constant input tables just be a live table that gets frozen into the binary? would it be memory mapped and a specially tagged pointer passed around?
-//   | Packet queueing based on cache and memory heirarchies - look in a queue for the physical core, then whatever shares the L2 cache, L3 cache, and finally the same NUMA node
+//   | Node graph visualizations, tests and notes treated specially with the ability to be hidden
+//   | Packet queueing based on cache and memory heirarchies - look in a queue for the physical core, then whatever shares the L2 cache, L3 cache, and finally the same NUMA node - special queue structure needed that will automatically use this heirarchy by being specifically structured around it - need to weigh importance of having the absolute correct ordering versus using the memory heirarchy as effectivly as possible - maybe the memory heirarchy is the most important, but would out of order frames cause problems? possibly only if message passing nodes did not make sure to process the frames they recieve in order
 
 // glew might include windows.h
 #define  WIN32_LEAN_AND_MEAN
