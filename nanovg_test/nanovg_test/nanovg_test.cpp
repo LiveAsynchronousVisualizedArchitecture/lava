@@ -93,6 +93,10 @@
 // -todo: make LavaFrame struct
 // -todo: make slotCount() count the number of bits in the slotMask
 
+// todo: make an atomic frame number part of LavaNodeInst and a method to fetch_add to it
+// todo: find a single message node and run that
+// todo: make sure to run a single packet on each increment through the main loop
+// todo: make sure to only run message nodes when there are no more outstanding packets
 // todo: make a putSlot function for LavaFrame
 // todo: make LavaFrame operations atomic
 // todo: change cur() functions to const and rename to read()

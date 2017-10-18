@@ -176,3 +176,22 @@ Packet Queue by cache and memory heirarchy:
    _____|_____        NUMA nodes
    __|__|__|__        L3 slices or L2 caches per physical core - both hyper threads should share the same cache and thus don't need individual queues
 
+
+
+Message Nodes and frame incrementing:
+|  Need to find a single message node and run that on each loop
+|  Make this mechanism integrate with the frame number so that all message nodes get a chance to run on a specific frame number before advancing to a new frame number?
+|  How to resolve the fact that message nodes will get data packets with the idea that they should all be in sync with respect to each other's frame numbers?
+|  |  Should each message node have it's own frame number that has no bearing on the other message node's frame numbers?
+|  |  Should there be local frame numbers as well as a global frame number? 
+|  |  How can two message nodes hook their outputs into a single flow node's two inputs? 
+|  |  Should this even be allowed? - if it isn't it would introduce a potentially awkward situation where data has to be passed through a message node so that that message node can output two packets as two arguments to a data flow node
+|  |  Very likely should be allowed, but what does that imply in terms of the underlying structure of syncing arguments with frames? 
+|  |  |  Does this imply that every node that needs it's own frame number?  
+|  |  |  Are there really 3 levels of heirarchy to a LavaId? frame number, node id, slot index 
+|  |  |  The node instance's current frame number would need to be atomic and incremented when creating a LavaFrame
+|  Does a frame number per node instance imply that frames should be sorted so that the lowest frame number runs first? (Which was already the case)
+|  |  Would this mean that it prioritizes packets that are further down the pipeline? - that seems ideal to minimize the number of packets in flight
+|  |  Does this imply that node instances that are more rarely run are prioritized? If so, is that good, bad or a double edged sword?  
+|
+

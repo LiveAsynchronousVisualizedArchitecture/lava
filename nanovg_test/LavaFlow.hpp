@@ -193,7 +193,7 @@ struct      LavaFrame
   u64                dest = LavaId::NODE_NONE;             // The destination node this frame will be run with
   u64               frame = 0;                             // The numer of this frame - lowest frame needs to be run first
   u64            slotMask = 0;                             // The bit mask respresenting which slots already have packets in them
-  u16         slotsNeeded = 0;                             // The number of slots needed for this frame to be complete 
+  u16         slotsNeeded = 0;                             // The total number of slots needed for this frame to be complete 
   LavaPacket  packets[16];
 
   bool          putSlot(u64 sIdx, LavaPacket const& pkt)
@@ -1584,7 +1584,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
   while(lf.m_running)
   {
-    SECTION(loop through message nodes)
+    SECTION(loop through message nodes) // todo: find a single message node and run that, remembering the place
     {
       printf("\n lava heap: %llu \n", (u64)lava_thread_heap);
 
@@ -1624,7 +1624,6 @@ void               LavaLoop(LavaFlow& lf) noexcept
             auto& frm = lf.frameQ[i];
             if(frm.frame != pckt.frame){ continue; }
             if(frm.dest != pckt.dest_node){ continue; }             // todo: unify dest_node and dest_id etc. as one LavaId LavaPacket
-            //if(frm.dest.sidx != pckt.dest_slot) continue;
 
             bool slotTaken = frm.getSlot(sIdx);
             if(!slotTaken){
@@ -1638,6 +1637,9 @@ void               LavaLoop(LavaFlow& lf) noexcept
             }
           }
 
+          runFrm.slotsNeeded  =  lf.graph.node(pckt.dest_node).inputs;           // find the number of input slots for the dest node
+          runFrm.dest         =  pckt.dest_node;
+          runFrm.frame        =  pckt.frame;
           runFrm.putSlot(sIdx, pckt);
           lf.frameQ.push_back(runFrm);                              // New frame that starts with the current packet put into it 
         lf.m_frameQLck.unlock();                                    // unlock mutex
@@ -1722,6 +1724,12 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//auto        ndInst = lf.graph.node(pckt.dest_node);
+//u16     frmSlotCnt = ndInst.inputs;
+//runFrm.slotsNeeded = frmSlotCnt;
+
+//
+//if(frm.dest.sidx != pckt.dest_slot) continue;
 
 //
 //using FrameQueue      =  std::priority_queue<LavaFrame>;
