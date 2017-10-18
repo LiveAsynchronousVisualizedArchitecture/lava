@@ -89,8 +89,11 @@
 //       |  can the graph be condensed into a tbl ? 
 // -todo: use a copy of the graph to clear and update the interface buttons - not neccesary due to the LavaGraph dual buffers? 
 // -todo: make a function to get a copy of the graph - can check the version number every loop, and if it is higher, get a copy of all the data inside a mutex - not neccesary from the dual buffers
+// -todo: make frame queue
+// -todo: make LavaFrame struct
 
-// todo: make frame queue
+// todo: make a putSlot function for LavaFrame
+// todo: make LavaFrame operations atomic
 // todo: change cur() functions to const and rename to read()
 // todo: change opp() functions to non-const only and rename to write()
 // todo: put in read count and write count for both A and B buffers
@@ -215,6 +218,7 @@
 //   | Packet syncing through use of frames
 //   | Live editing of input tables 
 //   | Constant input tables to configure a node? - can constant input tables just be a live table that gets frozen into the binary? would it be memory mapped and a specially tagged pointer passed around?
+//   | Packet queueing based on cache and memory heirarchies - look in a queue for the physical core, then whatever shares the L2 cache, L3 cache, and finally the same NUMA node
 
 // glew might include windows.h
 #define  WIN32_LEAN_AND_MEAN
@@ -1597,25 +1601,26 @@ ENTRY_DECLARATION // main or winmain
 
     Println("size of frame: ", sizeof(LavaFrame));
     LavaFrame tstFrame;
-    Println("  slot 0: ", tstFrame.getSlot(0), " : ", tstFrame.slots);
+    Println("  slot 0: ", tstFrame.getSlot(0), " : ", tstFrame.slotMask);
     tstFrame.setSlot(0,1);
-    Println("  slot 0: ", tstFrame.getSlot(0), " : ", tstFrame.slots);
+    Println("  slot 0: ", tstFrame.getSlot(0), " : ", tstFrame.slotMask);
     tstFrame.setSlot(0,0);
-    Println("  slot 0: ", tstFrame.getSlot(0), " : ", tstFrame.slots);
+    Println("  slot 0: ", tstFrame.getSlot(0), " : ", tstFrame.slotMask);
 
     tstFrame.setSlot(16,1);
-    Println("  slot 16: ", tstFrame.getSlot(16), " : ", tstFrame.slots);
+    Println("  slot 16: ", tstFrame.getSlot(16), " : ", tstFrame.slotMask);
     tstFrame.setSlot(0,1);
-    Println("  slot 16: ", tstFrame.getSlot(16), " : ", tstFrame.slots);
+    Println("  slot 16: ", tstFrame.getSlot(16), " : ", tstFrame.slotMask);
     tstFrame.setSlot(63,1);
-    Println("  slot 63: ", tstFrame.getSlot(63), " : ", tstFrame.slots);
+    Println("  slot 63: ", tstFrame.getSlot(63), " : ", tstFrame.slotMask);
     
     Println("\n");
-    tstFrame.slots = 0;
+    tstFrame.slotMask = 0;
+    Println("slot cout: ",tstFrame.slotCount(),"  slot ",0,": ", tstFrame.getSlot(0), " : ", tstFrame.slotMask);
     TO(64,i){
       tstFrame.setSlot(i,1);
-      Println("slot cout: ",tstFrame.slotCount(),"  slot ",i,": ", tstFrame.getSlot(i), " : ", tstFrame.slots);
-      tstFrame.setSlot(i,0);
+      Println("slot cout: ",tstFrame.slotCount(),"  slot ",i,": ", tstFrame.getSlot(i), " : ", tstFrame.slotMask);
+      //tstFrame.setSlot(i,0);
     }
   }
 

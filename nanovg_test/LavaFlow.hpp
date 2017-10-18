@@ -191,15 +191,16 @@ struct      LavaFrame
   u64            dest = LavaId::NODE_NONE;             // The destination node this frame will be run with
   u64           frame = 0;                             // The numer of this frame - lowest frame needs to be run first
   u64        slotMask = 0;                             // The bit mask respresenting which slots already have packets in them
-  //u16       slotCount = 0;                             // The number of slots - should this be obsoleted from counting the bits in slotMask?
-  u16           slots = 0;
+  u16     slotsNeeded = 0;                             // The number of slots needed for this frame to be complete 
   LavaPacket  packets[16];
 
-  bool        getSlot(u8 sIdx) const
+  //u16       slotCount = 0;                           // The number of slots - should this be obsoleted from counting the bits in slotMask?
+
+  bool        getSlot(u64 sIdx) const
   {
-    return (slotMask >> sIdx) & 0x0000000000000001;
+    return (bool)(slotMask >> sIdx) & 0x0000000000000001;
   }
-  void        setSlot(i8 sIdx, bool val)
+  void        setSlot(u64 sIdx, bool val)
   {
     if(val) slotMask |=  (u64)0x1 << sIdx;            // or with the proper bit set to 1
     else    slotMask &= ~( (u64)(0x1) << sIdx);       // and with the proper bit set to 0 and everything else set to 1
@@ -210,7 +211,7 @@ struct      LavaFrame
   }
   bool allSlotsFilled() const
   {
-    if( slotCount() >= slots ) return true;
+    if( slotCount() >= slotsNeeded ) return true;
     return false;
   }
 };
@@ -1614,7 +1615,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
           if(lf.frameQ[i].dest != pckt.dest_node){ continue; }         // todo: unify dest_node and dest_id etc. as one LavaId LavaPacket
           //if(lf.frameQ[i].dest.sidx != pckt.dest_slot) continue;
 
-          auto      sIdx = pckt.dest_slot;
+          u16       sIdx = pckt.dest_slot;
           bool slotTaken = lf.frameQ[i].getSlot(sIdx);
           if(!slotTaken){
             lf.frameQ[i].packets[sIdx] = pckt;
