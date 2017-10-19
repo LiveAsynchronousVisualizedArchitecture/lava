@@ -193,5 +193,11 @@ Message Nodes and frame incrementing:
 |  Does a frame number per node instance imply that frames should be sorted so that the lowest frame number runs first? (Which was already the case)
 |  |  Would this mean that it prioritizes packets that are further down the pipeline? - that seems ideal to minimize the number of packets in flight
 |  |  Does this imply that node instances that are more rarely run are prioritized? If so, is that good, bad or a double edged sword?  
-|
+|  Does a packet still need a frame number? 
+|  |  Probably yes, since it represents the frame number of the source node
+|  |  Does this pose any sort of synchronization problems? Can a packet from a later frame get ahead in the queue? 
+|  |  |  Probably depends on how the the queue is built
+|  |  |  If the queue is based on atomic actions, it may be possible to make sure that the head of the queue/heap is always correctly sorted even if other parts are only eventually consistent 
+|  |  |  Might bring back the idea of some sort of b-tree or a heap that feeds into a small insertion sorted list 
+|  
 

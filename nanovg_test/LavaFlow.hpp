@@ -248,9 +248,15 @@ struct       LavaInst
   LavaNode*    node;
   u32        inputs;
   u32       outputs;
-  u64          time = 0;  // todo: make this atomic / make functions to add time and get the current time
   union{ State state = NORMAL; u32 stateU32; };
 
+  mutable u64   frame = 0;  // todo: make this atomic 
+  mutable u64    time = 0;  // todo: make this atomic / make functions to add time and get the current time
+
+  u64   fetchIncFrame() const
+  {
+    return std::atomic_fetch_add( (au64*)(&frame), 1);
+  }
   void       setState(LavaInst::State s) // -> LavaInst::State
   {
     ((au32*)(&state))->store(s);
@@ -1619,33 +1625,39 @@ void               LavaLoop(LavaFlow& lf) noexcept
       {
         u16 sIdx  =  pckt.dest_slot;
         lf.m_frameQLck.lock();                                      // lock mutex        
-          TO(lf.frameQ.size(), i)                                   // loop through the current frames looking for one with the same frame number and destination slot id - if no frame is found to put the packet into, make a new one - keep track of the lowest full frame while looping and use that if no full frame is found?
+          SECTION(loop through the outstanding frames to find the match for this packet)
           {
-            auto& frm = lf.frameQ[i];
-            if(frm.frame != pckt.frame){ continue; }
-            if(frm.dest != pckt.dest_node){ continue; }             // todo: unify dest_node and dest_id etc. as one LavaId LavaPacket
+            TO(lf.frameQ.size(), i)                                   // loop through the current frames looking for one with the same frame number and destination slot id - if no frame is found to put the packet into, make a new one - keep track of the lowest full frame while looping and use that if no full frame is found?
+              {
+                auto& frm = lf.frameQ[i];
+                if(frm.frame != pckt.frame){ continue; }
+                if(frm.dest != pckt.dest_node){ continue; }             // todo: unify dest_node and dest_id etc. as one LavaId LavaPacket
 
-            bool slotTaken = frm.getSlot(sIdx);
-            if(!slotTaken){
-              frm.packets[sIdx] = pckt;
-            }
+                bool slotTaken = frm.getSlot(sIdx);
+                if(!slotTaken){
+                  frm.packets[sIdx] = pckt;
+                }
 
-            if( frm.allFilled() ){                                  // If all the slots are filled, copy the frame out and erase it
-              runFrm = frm;
-              lf.frameQ.erase(lf.frameQ.begin()+i);                 // can't use an index, have to use an iterator for some reason
-              break;                                                // break out of the loop since a frame was found
-            }
+                if( frm.allFilled() ){                                  // If all the slots are filled, copy the frame out and erase it
+                  runFrm = frm;
+                  lf.frameQ.erase(lf.frameQ.begin()+i);                 // can't use an index, have to use an iterator for some reason
+                  break;                                                // break out of the loop since a frame was found
+                }
+              }
           }
-
-          runFrm.slotsNeeded  =  lf.graph.node(pckt.dest_node).inputs;           // find the number of input slots for the dest node
-          runFrm.dest         =  pckt.dest_node;
-          runFrm.frame        =  pckt.frame;
-          runFrm.putSlot(sIdx, pckt);
-          lf.frameQ.push_back(runFrm);                              // New frame that starts with the current packet put into it 
-        lf.m_frameQLck.unlock();                                    // unlock mutex
+          SECTION(if a frame was not found for this packet, create one)
+          {
+            LavaInst&  ndInst   =  lf.graph.node(pckt.dest_node);
+            runFrm.slotsNeeded  =  ndInst.inputs;                     // find the number of input slots for the dest node
+            runFrm.dest         =  pckt.dest_node;
+            runFrm.frame        =  ndInst.fetchIncFrame();
+            runFrm.putSlot(sIdx, pckt);
+            lf.frameQ.push_back(runFrm);                              // New frame that starts with the current packet put into it 
+          }
+        lf.m_frameQLck.unlock();                                      // unlock mutex
       }
     }
-    SECTION(loop through data packets)
+    SECTION(loop through data packets)                              // todo: need to take one packet from this and go back through the normal loop
     {
       LavaPacket pckt;
       while( lf.nxtPacket(&pckt) )                                        // todo: will need to figure out how to get a full frame of packets here instead of simply taking on packet at a time
