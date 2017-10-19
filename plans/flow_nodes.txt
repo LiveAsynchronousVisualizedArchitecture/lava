@@ -200,6 +200,10 @@ Message Nodes and frame incrementing:
 |  |  |  Probably depends on how the the queue is built
 |  |  |  If the queue is based on atomic actions, it may be possible to make sure that the head of the queue/heap is always correctly sorted even if other parts are only eventually consistent 
 |  |  |  Might bring back the idea of some sort of b-tree or a heap that feeds into a small insertion sorted list 
+|  How to distribute fair scheduling of message passing nodes with minimum synchronization?
+|  |  First approach can be to simply have a global next message node index
+|  |  Maybe that is enough, especially if it is padded to its own 64 byte cache line so that any contention doesn't produce false sharing to other atomic variables
+|
 
 
 

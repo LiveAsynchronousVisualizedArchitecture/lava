@@ -463,7 +463,7 @@ template<class T> LavaOut  LavaTblToOut(LavaParams const* lp, tbl<T> const& t)
 }
 // End Lava Helper Functions
 
-class       LavaGraph
+class       LavaGraph                  // LavaGraph should specifically be about the connections between nodes
 {
 public:
   enum       Cmd { ADD_NODE=0, ADD_SLOT, TGL_CNCT, DEL_NODE, DEL_CNCT };
@@ -482,7 +482,7 @@ public:
   using vec_nptrs     =  std::vector<LavaInst>;                        // lists used for returning from reloading functions
   using vec_cnptrs    =  std::vector<LavaNode const*>;
   using vec_ids       =  std::vector<LavaId>;
-  using MsgIds        =  std::unordered_set<LavaId, LavaId>;
+  using MsgIds        =  std::unordered_set<LavaId, LavaId>;           // LavaId has an operator() to hash itself
   using NormalizeMap  =  std::unordered_map<uint64_t, uint64_t>;
   using CmdQ          =  std::queue<LavaCommand>;
   using RetStk        =  std::stack<LavaCommand::Arg>;
@@ -744,7 +744,7 @@ public:
     //m_ids.clear();
   }
   //u64                 put(LavaCommand::Command cmd, LavaId A, LavaId B=LavaId())
-  u64                 put(LavaCommand::Command cmd, LavaCommand::Arg A, LavaCommand::Arg B = LavaCommand::Arg() )
+  u64                  put(LavaCommand::Command cmd, LavaCommand::Arg A, LavaCommand::Arg B = LavaCommand::Arg() )
   {
     m_cmdq.push({cmd, A, B});
     return m_cmdq.size();
@@ -895,7 +895,6 @@ public:
       oppDestCncts().insert({src, dest});
     }
   }
-
 
   // nodes
   auto           node(u64 id)  -> LavaInst&
@@ -1097,7 +1096,8 @@ public:
   using FrameQueue      =  std::vector<LavaFrame>;
   using MsgNodeVec      =  std::vector<uint64_t>;
   using Mutex           =  std::mutex;
-  using PacketCallback  =  void (*)(LavaPacket pkt);
+  using PktCalbk        =  void (*)(LavaPacket pkt);
+  //using PacketCallback  =  void (*)(LavaPacket pkt);
 
   enum FlowErr { NONE=0, RUN_ERR=0xFFFFFFFFFFFFFFFF };
 
@@ -1116,12 +1116,14 @@ public:
   mutable u32            version = 0;                // todo: make this atomic
   mutable Mutex           m_qLck;
   mutable Mutex      m_frameQLck;
-  mutable PacketCallback  packetCallback;            // todo: make this an atomic version of the function pointer
+  //mutable PacketCallback  packetCallback;            // todo: make this an atomic version of the function pointer
+  mutable PktCalbk packetCallback;
   mutable PacketQueue          q;
   mutable FrameQueue      frameQ;
+  mutable au64        m_nxtMsgNd = 0;
 
   MsgNodeVec        m_msgNodesA;
-  LavaGraph              graph;
+  LavaGraph               graph;
 
   u64      incThreadCount()
   {
@@ -1131,10 +1133,22 @@ public:
   {
     return std::atomic_fetch_add( (au64*)&m_threadCount, -1);
   }
-  uint64_t       nxtMsgId()
+  u64      fetchIncNxtMsg() const                    // fetchIncNxtMsg is fetch increment next message (node index)
   {
-    return ++m_curMsgId;
+    return m_nxtMsgNd.fetch_add(1) % m_msgNodesA.size();
   }
+  u64         nxtMsgId()
+  {
+    u64 idx = fetchIncNxtMsg();
+    u64  id = m_msgNodesA[idx]; 
+    return id;
+    //auto& curMsgNdMap = graph.msgNodes();
+    //return curMsgNdMap[LavaId(id)];
+  }
+  //uint64_t       nxtMsgId() // todo: take out
+  //{
+  //  return ++m_curMsgId;
+  //}
   bool          nxtPacket(LavaPacket* outPkt)
   {
     using namespace std;
@@ -1435,7 +1449,7 @@ uint64_t                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t 
   using namespace std::chrono;
 
   LavaInst&  li = lf.graph[nid];
-  FlowFunc func = li.node->func; //lf.graph[nid].node->func;
+  FlowFunc func = li.node->func;                      //lf.graph[nid].node->func;
   if(func)
   {
     LavaParams lp;
@@ -1595,41 +1609,14 @@ void               LavaLoop(LavaFlow& lf) noexcept
   LavaHeapInit();
 
   while(lf.m_running)
-  {
-    SECTION(loop through message nodes) // todo: find a single message node and run that, remembering the place
-    {
-      printf("\n lava heap: %llu \n", (u64)lava_thread_heap);
-
-      auto const& mnds = lf.graph.msgNodes();
-      for(auto id : mnds)
-      {
-        lf.m_curId = id;
-
-        LavaParams lp;
-        //uint64_t err = runFunc(lf, ownedMem, id.nid, &lp, inArgs, outArgs); 
-        uint64_t err = runFunc(lf, ownedMem, id.nid, &lp, &inFrame, outArgs); 
-        switch(err)
-        {
-        case LavaFlow::RUN_ERR:{
-          lf.graph.setState(id.nid, LavaInst::RUN_ERROR);
-          //lf.putPacket(pckt);               // if there was an error, put the packet back into the queue
-        }break;
-
-        case LavaFlow::NONE:
-        default: 
-          break;
-        }
-
-      }
-      ++lf.m_frame; // todo: rethink this and make sure it will work 
-    } // SECTION(loop through message nodes)
-    
+  {    
     LavaFrame   runFrm;
-    SECTION(take a packet from the packet queue and put it into a slot in the frame queue)
+    SECTION(make a frame from a packet or run a message node)
     {
       LavaPacket    pckt;
       bool ok = lf.nxtPacket(&pckt);
-      if(ok)
+      if(ok) 
+        SECTION(if there is a packet available, fit it into a existing frame or create a new frame)
       {
         u16 sIdx  =  pckt.dest_slot;
         lf.m_frameQLck.lock();                                      // lock mutex        
@@ -1662,40 +1649,60 @@ void               LavaLoop(LavaFlow& lf) noexcept
             runFrm.putSlot(sIdx, pckt);
             lf.frameQ.push_back(runFrm);                              // New frame that starts with the current packet put into it 
           }
-        lf.m_frameQLck.unlock();                                      // unlock mutex
+        lf.m_frameQLck.unlock();                                    // unlock mutex
       }
-    }
-    SECTION(loop through data packets)                              // todo: need to take one packet from this and go back through the normal loop
-    {
-      LavaPacket pckt;
-      while( lf.nxtPacket(&pckt) )                                        // todo: will need to figure out how to get a full frame of packets here instead of simply taking on packet at a time
-      {
-        lf.m_curId.nid  = pckt.dest_node;
-        lf.m_curId.sidx = pckt.dest_slot;
-
-        inArgs[pckt.dest_slot] = pckt.msg.val;
-        LavaParams lp;                                                    // get the function from the dest node and put the packets into the dest LavaVal input array 
-        lp.inputs = 1;
-        
-        //uint64_t err = runFunc(lf, ownedMem, pckt.dest_node, &lp, inArgs, outArgs); 
-        uint64_t err = runFunc(lf, ownedMem, pckt.dest_node, &lp, &runFrm, outArgs); 
-        switch(err)
+      else   
+        SECTION(try to run a single message node if there was no packet found)       // todo: find a single message node and run that, remembering the place
         {
+          printf("\n lava heap: %llu \n", (u64)lava_thread_heap);
+
+          u64 msgNdId = lf.nxtMsgId();                                               // msgNdId is message node id
+          LavaParams lp;
+          uint64_t err = runFunc(lf, ownedMem, msgNdId, &lp, &inFrame, outArgs); 
+          switch(err)
+          {
           case LavaFlow::RUN_ERR:{
-            lf.graph.setState(pckt.dest_node, LavaInst::RUN_ERROR);
-            lf.putPacket(pckt);               // if there was an error, put the packet back into the queue
+            lf.graph.setState(msgNdId, LavaInst::RUN_ERROR);
+            //lf.putPacket(pckt);               // if there was an error, put the packet back into the queue
           }break;
 
           case LavaFlow::NONE:
           default: 
             break;
-        }
-
-        LavaMem lm = LavaMem::fromDataAddr(inArgs[pckt.dest_slot].value);
-        PrintLavaMem(lm);
-        lm.decRef();
-      }
-    } // SECTION(loop through data packets)
+          }
+        } // SECTION(loop through message nodes)
+    }
+    //SECTION(loop through data packets)                                    // todo: need to take one packet from this and go back through the normal loop
+    //{
+    //  LavaPacket pckt;
+    //  while( lf.nxtPacket(&pckt) )                                        // todo: will need to figure out how to get a full frame of packets here instead of simply taking on packet at a time
+    //  {
+    //    lf.m_curId.nid  = pckt.dest_node;
+    //    lf.m_curId.sidx = pckt.dest_slot;
+    //
+    //    inArgs[pckt.dest_slot] = pckt.msg.val;
+    //    LavaParams lp;                                                    // get the function from the dest node and put the packets into the dest LavaVal input array 
+    //    lp.inputs = 1;
+    //    
+    //    //uint64_t err = runFunc(lf, ownedMem, pckt.dest_node, &lp, inArgs, outArgs); 
+    //    uint64_t err = runFunc(lf, ownedMem, pckt.dest_node, &lp, &runFrm, outArgs); 
+    //    switch(err)
+    //    {
+    //      case LavaFlow::RUN_ERR:{
+    //        lf.graph.setState(pckt.dest_node, LavaInst::RUN_ERROR);
+    //        lf.putPacket(pckt);               // if there was an error, put the packet back into the queue
+    //      }break;
+    //
+    //      case LavaFlow::NONE:
+    //      default: 
+    //        break;
+    //    }
+    //
+    //    LavaMem lm = LavaMem::fromDataAddr(inArgs[pckt.dest_slot].value);
+    //    PrintLavaMem(lm);
+    //    lm.decRef();
+    //  }
+    //} // SECTION(loop through data packets)
     SECTION(partition owned allocations and free those with their reference count at 0)
     {
       for(auto const& lm : ownedMem){
@@ -1744,6 +1751,27 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//auto const& mnds = lf.graph.msgNodes();
+//for(auto id : mnds)
+//{
+//  lf.m_curId = id;
+//
+//  LavaParams lp;
+//  //uint64_t err = runFunc(lf, ownedMem, id.nid, &lp, inArgs, outArgs); 
+//  uint64_t err = runFunc(lf, ownedMem, id.nid, &lp, &inFrame, outArgs); 
+//  switch(err)
+//  {
+//  case LavaFlow::RUN_ERR:{
+//    lf.graph.setState(id.nid, LavaInst::RUN_ERROR);
+//    //lf.putPacket(pckt);               // if there was an error, put the packet back into the queue
+//  }break;
+//
+//  case LavaFlow::NONE:
+//  default: 
+//    break;
+//  }
+//}
+//++lf.m_frame; // todo: rethink this and make sure it will work 
 
 //auto        ndInst = lf.graph.node(pckt.dest_node);
 //u16     frmSlotCnt = ndInst.inputs;

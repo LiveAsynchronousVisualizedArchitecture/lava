@@ -94,11 +94,12 @@
 // -todo: make slotCount() count the number of bits in the slotMask
 // -todo: make an atomic frame number part of LavaNodeInst and a method to fetch_add to it
 // -todo: make LavaFlowFunc take a LavaFrame as input 
+// -todo: make a putSlot function for LavaFrame
+// -todo: find a single message node and run that - should there be a global next message node index or should there be a next message node per thread? - single global atomic is simplest and possibly still very good solution - message nodes are not in an array, they are in a ahash
 
-// todo: find a single message node and run that
 // todo: make sure to run a single packet on each increment through the main loop
 // todo: make sure to only run message nodes when there are no more outstanding packets
-// todo: make a putSlot function for LavaFrame
+// todo: change decrementing references to look into the LavaFrame pass in instead of LavaArgs
 // todo: make LavaFrame operations atomic
 // todo: change cur() functions to const and rename to read()
 // todo: change opp() functions to non-const only and rename to write()
@@ -1630,6 +1631,10 @@ ENTRY_DECLARATION // main or winmain
       Println("slot cout: ",tstFrame.slotCount(),"  slot ",i,": ", tstFrame.getSlot(i), " : ", tstFrame.slotMask);
       //tstFrame.setSlot(i,0);
     }
+    Println();
+
+    //decltype(std::unordered_map<int,int>::begin()) 
+    Println("sizeof( std::unordered_map<int,int>::iterator ) ): ",  sizeof( std::unordered_map<int,int>::iterator ) );
   }
 
   glfwSetTime(0);
