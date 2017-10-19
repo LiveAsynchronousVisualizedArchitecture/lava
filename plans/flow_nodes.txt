@@ -137,6 +137,7 @@ Errors:
 |  Does a packet or frame need to have a special error mode? 
 |  |  A frame could have an error type and contain what node and frame number it errored on
 |  |  Should an error frame, be a copy of the frame that was used for input?
+|  Erlang has a Outcome type that is a union of return type and error
 
 
 Range:
@@ -199,5 +200,19 @@ Message Nodes and frame incrementing:
 |  |  |  Probably depends on how the the queue is built
 |  |  |  If the queue is based on atomic actions, it may be possible to make sure that the head of the queue/heap is always correctly sorted even if other parts are only eventually consistent 
 |  |  |  Might bring back the idea of some sort of b-tree or a heap that feeds into a small insertion sorted list 
-|  
+
+
+
+Gather Nodes:
+|  Ideally, would there be a mechanic where multiple packets of the same frame, node and socket create a list that is passed instead of a single packet? 
+|  |  Would this decrease concurrency? 
+|  |  Could be treated normally as separate packets unless encoutering a gather node, which could be passed as many packets of a frame as possible
+|  Need as many examples of gather nodes as possible to understand the problems it would offer solutions to
+|  |  Accumulating tiles together while rendering 
+|  |  |  A gather node takes as many packets of tiles as it can
+|  |  |  Accumulates them into one packet per tile
+|  |  |  Passes those through to a frame buffer message passing node that keeps the state
+|
+
+
 

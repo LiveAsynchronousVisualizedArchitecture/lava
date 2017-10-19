@@ -85,6 +85,7 @@ static inline u64 popcount64(u64 x)
 // data types
 struct       LavaNode;
 struct     LavaParams;
+struct      LavaFrame;
 struct        LavaVal;
 struct        LavaOut;
 union          LavaId;
@@ -104,9 +105,10 @@ using lava_flowPtrs      =  std::unordered_set<LavaNode*>;                      
 using lava_ptrsvec       =  std::vector<LavaNode*>;
 using lava_nameNodeMap   =  std::unordered_map<std::string, LavaNode*>;                   // maps the node names to their pointers
 
-extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaVal*, LavaOut*);   // data flow node function
-extern "C" using           LavaAlloc  =  void* (*)(uint64_t);                             // custom allocation function passed in to each node call
-extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                                  // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
+//extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaVal*, LavaOut*);   // data flow node function
+extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaFrame*, LavaOut*);   // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
+extern "C" using           LavaAlloc  =  void* (*)(uint64_t);                               // custom allocation function passed in to each node call
+extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                                    // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
 
 union     LavaArgType{ 
   enum { NONE=0, END, DATA_ERROR, STORE, MEMORY, SEQUENCE, ENUMERATION };                // todo: does this need store sequence and memory sequence?
@@ -1409,12 +1411,14 @@ void               LavaFree(uint64_t addr)
   LavaHeapFree(p);
 }
 
-uint64_t      exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaVal* inArgs, LavaOut* outArgs)
+//uint64_t      exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaVal* inArgs, LavaOut* outArgs)
+uint64_t      exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaFrame* inFrame, LavaOut* outArgs)
 {
   uint64_t        ret = LavaFlow::NONE;
   uint64_t  winExcept = 0;
   __try{
-    f(lp, inArgs, outArgs);
+    //f(lp, inArgs, outArgs);
+    f(lp, inFrame, outArgs);
   }__except( (winExcept=GetExceptionCode()) || EXCEPTION_EXECUTE_HANDLER ){
     ret = LavaFlow::RUN_ERR;
     //lf.graph.setState(lp->id.nid, LavaInst::RUN_ERROR);
@@ -1424,7 +1428,8 @@ uint64_t      exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaVal* i
 
   return ret;
 }
-uint64_t                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaVal* inArgs,  LavaOut* outArgs) noexcept   // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
+//uint64_t                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaVal* inArgs,  LavaOut* outArgs) noexcept   // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
+uint64_t                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaFrame* inFrame,  LavaOut* outArgs) noexcept   // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
 {
   using namespace std;
   using namespace std::chrono;
@@ -1443,7 +1448,7 @@ uint64_t                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t 
       lp.mem_alloc   =   LavaAlloc;             //lp.mem_alloc   =   malloc;  // LavaHeapAlloc;
 
       auto  stTime = high_resolution_clock::now();
-        uint64_t ret = exceptWrapper(func, lf, &lp, inArgs, outArgs);
+        uint64_t ret = exceptWrapper(func, lf, &lp, inFrame, outArgs);
         if(ret != LavaFlow::NONE){ return ret; }
       auto endTime = high_resolution_clock::now();
       duration<u64,nano> diff = (endTime - stTime);
@@ -1581,9 +1586,10 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
   lf.incThreadCount();
 
-  LavaVal    inArgs[LAVA_ARG_COUNT];              // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
-  LavaOut   outArgs[LAVA_ARG_COUNT];              // if the arguments are going to 
-  memset(inArgs,  0, sizeof(inArgs)  );
+  LavaVal      inArgs[LAVA_ARG_COUNT];              // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
+  LavaFrame   inFrame;
+  LavaOut     outArgs[LAVA_ARG_COUNT];              // if the arguments are going to 
+  memset(inArgs, 0, sizeof(inArgs) );
   TO(LAVA_ARG_COUNT,i){ outArgs[i] = defOut; }    // memset(outArgs, 0, sizeof(outArgs) );
 
   LavaHeapInit();
@@ -1600,7 +1606,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
         lf.m_curId = id;
 
         LavaParams lp;
-        uint64_t err = runFunc(lf, ownedMem, id.nid, &lp, inArgs, outArgs); 
+        //uint64_t err = runFunc(lf, ownedMem, id.nid, &lp, inArgs, outArgs); 
+        uint64_t err = runFunc(lf, ownedMem, id.nid, &lp, &inFrame, outArgs); 
         switch(err)
         {
         case LavaFlow::RUN_ERR:{
@@ -1616,9 +1623,10 @@ void               LavaLoop(LavaFlow& lf) noexcept
       }
       ++lf.m_frame; // todo: rethink this and make sure it will work 
     } // SECTION(loop through message nodes)
+    
+    LavaFrame   runFrm;
     SECTION(take a packet from the packet queue and put it into a slot in the frame queue)
     {
-      LavaFrame   runFrm;
       LavaPacket    pckt;
       bool ok = lf.nxtPacket(&pckt);
       if(ok)
@@ -1669,7 +1677,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
         LavaParams lp;                                                    // get the function from the dest node and put the packets into the dest LavaVal input array 
         lp.inputs = 1;
         
-        uint64_t err = runFunc(lf, ownedMem, pckt.dest_node, &lp, inArgs, outArgs); 
+        //uint64_t err = runFunc(lf, ownedMem, pckt.dest_node, &lp, inArgs, outArgs); 
+        uint64_t err = runFunc(lf, ownedMem, pckt.dest_node, &lp, &runFrm, outArgs); 
         switch(err)
         {
           case LavaFlow::RUN_ERR:{

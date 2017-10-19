@@ -74,7 +74,8 @@ extern "C"
   const char* OutNames[]  = {"Cube Indexed Verts", nullptr};
   const char* OutTypes[]  = {"IdxVerts",           nullptr};
 
-  uint64_t MakeCube(LavaParams* inout_lp, LavaVal* in, LavaOut* out) noexcept
+  //uint64_t MakeCube(LavaParams* inout_lp, LavaVal* in, LavaOut* out) noexcept
+  uint64_t MakeCube(LavaParams* inout_lp, LavaFrame* in, LavaOut* out) noexcept
   {
     using namespace std;
 
