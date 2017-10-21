@@ -483,6 +483,7 @@ public:
   using vec_cnptrs    =  std::vector<LavaNode const*>;
   using vec_ids       =  std::vector<LavaId>;
   using MsgIds        =  std::unordered_set<LavaId, LavaId>;           // LavaId has an operator() to hash itself
+  using MsgCache      =  std::vector<LavaId>;                          // LavaId has an operator() to hash itself
   using NormalizeMap  =  std::unordered_map<uint64_t, uint64_t>;
   using CmdQ          =  std::queue<LavaCommand>;
   using RetStk        =  std::stack<LavaCommand::Arg>;
@@ -507,18 +508,22 @@ private:
   CnctMap             m_cnctsA;
   SrcMap          m_destCnctsA;
   MsgIds           m_msgNodesA;
+  MsgCache         m_msgCacheA;
 
   NodeInsts           m_nodesB;
   Slots               m_slotsB;
   CnctMap             m_cnctsB;
   SrcMap          m_destCnctsB;
   MsgIds           m_msgNodesB;
+  MsgCache         m_msgCacheB;
 
+public:
   NodeInsts&            curNodes(){ return m_useA.load()?  m_nodesA     : m_nodesB;     }
   Slots&                curSlots(){ return m_useA.load()?  m_slotsA     : m_slotsB;     }
   CnctMap&              curCncts(){ if(m_useA.load()) return m_cnctsA; else return m_cnctsB; }
   SrcMap&           curDestCncts(){ return m_useA.load()?  m_destCnctsA : m_destCnctsB; }
   MsgIds&            curMsgNodes(){ return m_useA.load()?  m_msgNodesA  : m_msgNodesB;  }
+  MsgCache&          curMsgCache(){ return m_useA.load()?  m_msgCacheA  : m_msgCacheB;  }
   NodeInsts const&      curNodes()const{ return m_useA.load()?  m_nodesA     : m_nodesB;     }
   Slots     const&      curSlots()const{ return m_useA.load()?  m_slotsA     : m_slotsB;     }
   CnctMap   const&      curCncts()const{ return m_useA.load()?  m_cnctsA     : m_cnctsB;     }
@@ -530,6 +535,7 @@ private:
   CnctMap&              oppCncts(){ if(!m_useA.load()) return m_cnctsA; else return m_cnctsB; }
   SrcMap&           oppDestCncts(){ return !m_useA.load()?  m_destCnctsA : m_destCnctsB; }
   MsgIds&            oppMsgNodes(){ return !m_useA.load()?  m_msgNodesA  : m_msgNodesB;  }
+  MsgCache&          oppMsgCache(){ return !m_useA.load()?  m_msgCacheA  : m_msgCacheB;  }
   NodeInsts const&      oppNodes()const{ return !m_useA.load()?  m_nodesA     : m_nodesB;     }
   Slots     const&      oppSlots()const{ return !m_useA.load()?  m_slotsA     : m_slotsB;     }
   CnctMap   const&      oppCncts()const{ return !m_useA.load()?  m_cnctsA     : m_cnctsB;     }
@@ -762,11 +768,15 @@ public:
         m_slotsB     = m_slotsA; 
         m_cnctsB     = m_cnctsA; 
         m_destCnctsB = m_destCnctsA;
+        m_msgNodesB  = m_msgNodesA;
+        m_msgCacheB  = m_msgCacheA;
       }else{
         m_nodesA     = m_nodesB;
         m_slotsA     = m_slotsB; 
         m_cnctsA     = m_cnctsB; 
         m_destCnctsA = m_destCnctsB;
+        m_msgNodesA  = m_msgNodesB;
+        m_msgCacheA  = m_msgCacheB;
       }
 
       while(m_cmdq.size() > 0)
@@ -811,7 +821,16 @@ public:
 
       while(m_stk.size()>0){ m_stk.pop(); }
       
-      m_useA.store( !m_useA.load() );                                             // this should be the only place where it is flipped, so the store is all that matters
+      auto& mcache = oppMsgCache();                                        // mcache is message cache
+      auto&    cur = oppMsgNodes();
+      mcache.clear();
+      mcache.reserve( cur.size() );
+
+      for(auto const& lid : cur){
+        mcache.push_back(lid.nid);
+      }
+
+      m_useA.store( !m_useA.load() );                                      // this should be the only place where it is flipped, so the store is all that matters
     }
 
     return returned;
@@ -1101,29 +1120,66 @@ public:
 
   enum FlowErr { NONE=0, RUN_ERR=0xFFFFFFFFFFFFFFFF };
 
-  lava_pathHndlMap         libs;     // libs is libraries - this maps the live path of the shared libary with the OS specific handle that the OS loading function returns
-  lava_nidMap              nids;     // nids is node ids  - this maps the name of the node to all of the graph node ids that use it
-  lava_flowNodes           flow;
-  lava_flowPtrs            ptrs;     // ptrs are the LavaFlowNode pointers - each one needs a unique id so they can be referenced elsewhere 
-  lava_hndlNodeMap       ndptrs;     // ndptrs is node pointers - a map from each handle to the one (zero?) or more LavaFlowNode pointers the shared lib contains
-  lava_nameNodeMap    nameToPtr;     // maps node names to their pointers 
+  lava_pathHndlMap           libs;     // libs is libraries - this maps the live path of the shared libary with the OS specific handle that the OS loading function returns
+  lava_nidMap                nids;     // nids is node ids  - this maps the name of the node to all of the graph node ids that use it
+  lava_flowNodes             flow;
+  lava_flowPtrs              ptrs;     // ptrs are the LavaFlowNode pointers - each one needs a unique id so they can be referenced elsewhere 
+  lava_hndlNodeMap         ndptrs;     // ndptrs is node pointers - a map from each handle to the one (zero?) or more LavaFlowNode pointers the shared lib contains
+  lava_nameNodeMap      nameToPtr;     // maps node names to their pointers 
 
-  mutable bool         m_running = false;            // todo: make this atomic
-  mutable u64         m_curMsgId = 0;                // todo: make this atomic
-  mutable u64            m_frame = 0;                // todo: make this atomic
-  mutable LavaId         m_curId = LavaNode::NONE;   // todo: make this atomic - won't be used as a single variable anyway
-  mutable u64      m_threadCount = 0;                // todo: make this atomic
-  mutable u32            version = 0;                // todo: make this atomic
-  mutable Mutex           m_qLck;
-  mutable Mutex      m_frameQLck;
-  //mutable PacketCallback  packetCallback;            // todo: make this an atomic version of the function pointer
+  mutable bool          m_running = false;            // todo: make this atomic
+  mutable u64          m_curMsgId = 0;                // todo: make this atomic
+  mutable u64             m_frame = 0;                // todo: make this atomic
+  mutable LavaId          m_curId = LavaNode::NONE;   // todo: make this atomic - won't be used as a single variable anyway
+  mutable u64       m_threadCount = 0;                // todo: make this atomic
+  mutable u32             version = 0;                // todo: make this atomic
+  mutable Mutex            m_qLck;
+  mutable Mutex       m_frameQLck;
   mutable PktCalbk packetCallback;
-  mutable PacketQueue          q;
-  mutable FrameQueue      frameQ;
-  mutable au64        m_nxtMsgNd = 0;
+  mutable PacketQueue           q;
+  mutable FrameQueue       frameQ;
+  mutable au64         m_nxtMsgNd = 0;
+  //mutable PacketCallback  packetCallback;            // todo: make this an atomic version of the function pointer
 
-  MsgNodeVec        m_msgNodesA;
-  LavaGraph               graph;
+  MsgNodeVec          m_msgNodesA;
+  LavaGraph                 graph;
+
+
+  void  udpateMsgIdxCache() // todo: not thread safe - this takes the current hash map of message nodes 
+  {
+    auto& cur = graph.curMsgNodes();
+    m_msgNodesA.clear();
+    m_msgNodesA.reserve( cur.size() );
+
+    for(auto const& lid : cur){
+      m_msgNodesA.push_back(lid.nid);
+    }
+    //new (&m_msgNodesA) MsgNodeVec( ALL(graph.curMsgNodes()) );
+  }
+  u64      fetchIncNxtMsg() const                    // fetchIncNxtMsg is fetch increment next message (node index)
+  {
+    //auto sz = m_msgNodesA.size();
+    //return sz? m_nxtMsgNd.fetch_add(1) % sz  :   LavaId::NODE_NONE;
+    return m_nxtMsgNd.fetch_add(1);
+  }
+  u64            nxtMsgId()
+  {
+    auto&  cur = graph.curMsgCache();
+    u64     id = LavaId::NODE_NONE;
+    if(cur.size()>0){
+      u64 idx = fetchIncNxtMsg() % cur.size();
+      return m_msgNodesA[idx];
+    }
+    return LavaId::NODE_NONE;
+
+    //u64   idx = cur.size()>0? fetchIncNxtMsg()%cur.size();
+    //u64    id = LavaId::NODE_NONE;
+    //if(idx != LavaId::NODE_NONE){ 
+    //  id = m_msgNodesA[idx];
+    //}
+    //
+    //return LavaId::NODE_NONE;
+  }
 
   u64      incThreadCount()
   {
@@ -1133,22 +1189,6 @@ public:
   {
     return std::atomic_fetch_add( (au64*)&m_threadCount, -1);
   }
-  u64      fetchIncNxtMsg() const                    // fetchIncNxtMsg is fetch increment next message (node index)
-  {
-    return m_nxtMsgNd.fetch_add(1) % m_msgNodesA.size();
-  }
-  u64         nxtMsgId()
-  {
-    u64 idx = fetchIncNxtMsg();
-    u64  id = m_msgNodesA[idx]; 
-    return id;
-    //auto& curMsgNdMap = graph.msgNodes();
-    //return curMsgNdMap[LavaId(id)];
-  }
-  //uint64_t       nxtMsgId() // todo: take out
-  //{
-  //  return ++m_curMsgId;
-  //}
   bool          nxtPacket(LavaPacket* outPkt)
   {
     using namespace std;
@@ -1171,7 +1211,7 @@ public:
     //lock_guard<Mutex> qLck(m_qLck);
     //LavaPacket pckt = q.top();
   }
-  void          putPacket(LavaPacket pkt)
+  void          putPacket(LavaPacket     pkt)
   {
     m_qLck.lock();              // mutex lock
       q.push(pkt);              // todo: use a mutex here initially
@@ -1649,60 +1689,28 @@ void               LavaLoop(LavaFlow& lf) noexcept
             runFrm.putSlot(sIdx, pckt);
             lf.frameQ.push_back(runFrm);                              // New frame that starts with the current packet put into it 
           }
-        lf.m_frameQLck.unlock();                                    // unlock mutex
+        lf.m_frameQLck.unlock();                                      // unlock mutex
       }
       else   
-        SECTION(try to run a single message node if there was no packet found)       // todo: find a single message node and run that, remembering the place
+        SECTION(try to run a single message node if there was no packet found)           // todo: find a single message node and run that, remembering the place
         {
-          printf("\n lava heap: %llu \n", (u64)lava_thread_heap);
+          //printf("\n lava heap: %llu \n", (u64)lava_thread_heap);
 
-          u64 msgNdId = lf.nxtMsgId();                                               // msgNdId is message node id
-          LavaParams lp;
-          uint64_t err = runFunc(lf, ownedMem, msgNdId, &lp, &inFrame, outArgs); 
+          LavaParams   lp;
+          u64     msgNdId = lf.nxtMsgId();                                               // msgNdId is message node id
+          uint64_t    err = msgNdId!=LavaId::NODE_NONE? runFunc(lf, ownedMem, msgNdId, &lp, &inFrame, outArgs)  :  LavaFlow::RUN_ERR; 
           switch(err)
           {
           case LavaFlow::RUN_ERR:{
             lf.graph.setState(msgNdId, LavaInst::RUN_ERROR);
             //lf.putPacket(pckt);               // if there was an error, put the packet back into the queue
           }break;
-
           case LavaFlow::NONE:
           default: 
             break;
           }
         } // SECTION(loop through message nodes)
     }
-    //SECTION(loop through data packets)                                    // todo: need to take one packet from this and go back through the normal loop
-    //{
-    //  LavaPacket pckt;
-    //  while( lf.nxtPacket(&pckt) )                                        // todo: will need to figure out how to get a full frame of packets here instead of simply taking on packet at a time
-    //  {
-    //    lf.m_curId.nid  = pckt.dest_node;
-    //    lf.m_curId.sidx = pckt.dest_slot;
-    //
-    //    inArgs[pckt.dest_slot] = pckt.msg.val;
-    //    LavaParams lp;                                                    // get the function from the dest node and put the packets into the dest LavaVal input array 
-    //    lp.inputs = 1;
-    //    
-    //    //uint64_t err = runFunc(lf, ownedMem, pckt.dest_node, &lp, inArgs, outArgs); 
-    //    uint64_t err = runFunc(lf, ownedMem, pckt.dest_node, &lp, &runFrm, outArgs); 
-    //    switch(err)
-    //    {
-    //      case LavaFlow::RUN_ERR:{
-    //        lf.graph.setState(pckt.dest_node, LavaInst::RUN_ERROR);
-    //        lf.putPacket(pckt);               // if there was an error, put the packet back into the queue
-    //      }break;
-    //
-    //      case LavaFlow::NONE:
-    //      default: 
-    //        break;
-    //    }
-    //
-    //    LavaMem lm = LavaMem::fromDataAddr(inArgs[pckt.dest_slot].value);
-    //    PrintLavaMem(lm);
-    //    lm.decRef();
-    //  }
-    //} // SECTION(loop through data packets)
     SECTION(partition owned allocations and free those with their reference count at 0)
     {
       for(auto const& lm : ownedMem){
@@ -1750,6 +1758,45 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//auto& curMsgNdMap = graph.msgNodes();
+//return curMsgNdMap[LavaId(id)];
+
+//uint64_t       nxtMsgId() // todo: take out
+//{
+//  return ++m_curMsgId;
+//}
+
+//SECTION(loop through data packets)                                    // todo: need to take one packet from this and go back through the normal loop
+//{
+//  LavaPacket pckt;
+//  while( lf.nxtPacket(&pckt) )                                        // todo: will need to figure out how to get a full frame of packets here instead of simply taking on packet at a time
+//  {
+//    lf.m_curId.nid  = pckt.dest_node;
+//    lf.m_curId.sidx = pckt.dest_slot;
+//
+//    inArgs[pckt.dest_slot] = pckt.msg.val;
+//    LavaParams lp;                                                    // get the function from the dest node and put the packets into the dest LavaVal input array 
+//    lp.inputs = 1;
+//    
+//    //uint64_t err = runFunc(lf, ownedMem, pckt.dest_node, &lp, inArgs, outArgs); 
+//    uint64_t err = runFunc(lf, ownedMem, pckt.dest_node, &lp, &runFrm, outArgs); 
+//    switch(err)
+//    {
+//      case LavaFlow::RUN_ERR:{
+//        lf.graph.setState(pckt.dest_node, LavaInst::RUN_ERROR);
+//        lf.putPacket(pckt);               // if there was an error, put the packet back into the queue
+//      }break;
+//
+//      case LavaFlow::NONE:
+//      default: 
+//        break;
+//    }
+//
+//    LavaMem lm = LavaMem::fromDataAddr(inArgs[pckt.dest_slot].value);
+//    PrintLavaMem(lm);
+//    lm.decRef();
+//  }
+//} // SECTION(loop through data packets)
 
 //auto const& mnds = lf.graph.msgNodes();
 //for(auto id : mnds)

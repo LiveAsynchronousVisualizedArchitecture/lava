@@ -96,9 +96,11 @@
 // -todo: make LavaFlowFunc take a LavaFrame as input 
 // -todo: make a putSlot function for LavaFrame
 // -todo: find a single message node and run that - should there be a global next message node index or should there be a next message node per thread? - single global atomic is simplest and possibly still very good solution - message nodes are not in an array, they are in a ahash
+// -todo: make sure to only run message nodes when there are no more outstanding packets
 
+// todo: fix probable race condition of updating the cache of indices - make a cache as another A/B member of 
+// todo: set a node's state to error if the loading doesn't work
 // todo: make sure to run a single packet on each increment through the main loop
-// todo: make sure to only run message nodes when there are no more outstanding packets
 // todo: change decrementing references to look into the LavaFrame pass in instead of LavaArgs
 // todo: make LavaFrame operations atomic
 // todo: change cur() functions to const and rename to read()
@@ -2115,6 +2117,7 @@ ENTRY_DECLARATION // main or winmain
       glfwPollEvents();
       LavaGraph::ArgVec av = fd.lgrph.exec();
       graph_apply(move(av));
+      fd.flow.udpateMsgIdxCache();
     }
   }
   SECTION(shutdown)

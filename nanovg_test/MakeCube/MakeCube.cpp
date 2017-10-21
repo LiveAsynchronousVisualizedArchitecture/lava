@@ -79,7 +79,7 @@ extern "C"
   {
     using namespace std;
 
-    //printf("\n MakeCube run \n");
+    printf("\n MakeCube run \n");
 
     //tbl<f32> idxVerts = tbl<f32>::make_borrowed(inout_lp->mem_alloc, 
     
