@@ -124,7 +124,7 @@ extern "C"
     out[0] = LavaTblToOut(inout_lp, lftTri);
     out[0].key.slot = 0;
 
-    printf("\n\n dropping null dereference bomb \n\n");
+    //printf("\n\n dropping null dereference bomb \n\n");
     //int*  bomb  =  nullptr;
     //int    wat  =  *bomb;
     //printf("\n\n bomb dropped \n\n");

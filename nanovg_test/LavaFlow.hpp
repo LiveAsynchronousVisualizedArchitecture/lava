@@ -1168,7 +1168,7 @@ public:
     u64     id = LavaId::NODE_NONE;
     if(cur.size()>0){
       u64 idx = fetchIncNxtMsg() % cur.size();
-      return m_msgNodesA[idx];
+      return cur[idx].nid;
     }
     return LavaId::NODE_NONE;
 
