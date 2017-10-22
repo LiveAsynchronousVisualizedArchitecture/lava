@@ -1503,7 +1503,8 @@ LavaInst::State     runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid,
 
       auto  stTime = high_resolution_clock::now();
         LavaInst::State ret = exceptWrapper(func, lf, &lp, inFrame, outArgs);
-        if(ret != LavaFlow::NONE){ return ret; }
+        //if(ret != LavaFlow::NONE){ return ret; }
+        if(ret != LavaInst::NORMAL){ return ret; }
       auto endTime = high_resolution_clock::now();
       duration<u64,nano> diff = (endTime - stTime);
       li.addTime( diff.count() );   //li.time += diff.count();
@@ -1645,6 +1646,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
   LavaVal      inArgs[LAVA_ARG_COUNT];              // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
   LavaFrame   inFrame;
+  LavaFrame    runFrm;
   LavaOut     outArgs[LAVA_ARG_COUNT];              // if the arguments are going to 
   memset(inArgs, 0, sizeof(inArgs) );
   TO(LAVA_ARG_COUNT,i){ outArgs[i] = defOut; }      // memset(outArgs, 0, sizeof(outArgs) );
@@ -1653,7 +1655,6 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
   while(lf.m_running)
   {    
-    LavaFrame   runFrm;
     SECTION(make a frame from a packet or run a message node)
     {
       LavaPacket    pckt;
@@ -1696,7 +1697,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
             }
           lf.m_frameQLck.unlock();                                      // unlock mutex
 
-          
+          nodeId = runFrm.dest;
         }
       else   
         SECTION(try to run a single message node if there was no packet found)           // todo: find a single message node and run that, remembering the place
@@ -1708,7 +1709,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
       SECTION(run the node with the id and frame)
       {
-        LavaInst::State ret = (nodeId!=LavaId::NODE_NONE)? runFunc(lf, ownedMem, nodeId, &lp, &inFrame, outArgs)  :  LavaInst::LOAD_ERROR;  // LavaFlow::RUN_ERR; 
+        LavaInst::State ret = (nodeId!=LavaId::NODE_NONE)? runFunc(lf, ownedMem, nodeId, &lp, &runFrm, outArgs)  :  LavaInst::LOAD_ERROR;  // LavaFlow::RUN_ERR; 
         switch(ret)
         {
         case LavaInst::RUN_ERROR: {

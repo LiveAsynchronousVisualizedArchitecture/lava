@@ -106,8 +106,8 @@
 // -todo: clamp status text at 100% of time per node
 // -todo: figure out why frame rate seems clamped to 144 - does having two monitors with the same refresh rate, turn vsync for windows back on and vsync glfw? - not sure, but a glfw swap interval of 0 and 1 seem to do the same thing - 24hz desktop means 24fps GUI even with a swap interval of 0
 // -todo: test message node to flow node - doesn't crash, but message node is also not highlighted
+// -todo: make sure LavaFrame path actually runs the node - is the packet making it out of the message node?
 
-// todo: make sure LavaFrame path actually runs the node
 // todo: change the decrementing of references to look into the LavaFrame passed in instead of LavaArgs, right now it will not have an effect
 // todo: make LavaFrame operations atomic
 // todo: change cur() functions to const and rename to read()
