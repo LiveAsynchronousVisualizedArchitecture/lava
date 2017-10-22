@@ -1449,7 +1449,7 @@ auto       GetFlowNodeLists(lava_hndlvec     const& hndls) -> lava_ptrsvec
   return ret;
 }
 
-void*             LavaAlloc(uint64_t sizeBytes)
+void*               LavaAlloc(uint64_t sizeBytes)
 {
   //uint64_t* mem = (uint64_t*)malloc(sizeBytes + sizeof(uint64_t)*2);
   uint64_t* mem = (uint64_t*)LavaHeapAlloc(sizeBytes + sizeof(uint64_t)*2);
@@ -1458,7 +1458,7 @@ void*             LavaAlloc(uint64_t sizeBytes)
 
   return (void*)(mem + 2);  // sizeof(uint64_t)*2);
 }
-void               LavaFree(uint64_t addr)
+void                 LavaFree(uint64_t addr)
 {
   void* p = (void*)(addr - sizeof(uint64_t)*2);
   //free(p);
@@ -1466,15 +1466,15 @@ void               LavaFree(uint64_t addr)
 }
 
 //uint64_t      exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaVal* inArgs, LavaOut* outArgs)
-uint64_t      exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaFrame* inFrame, LavaOut* outArgs)
+LavaInst::State exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaFrame* inFrame, LavaOut* outArgs)
 {
-  uint64_t        ret = LavaFlow::NONE;
-  uint64_t  winExcept = 0;
+  LavaInst::State        ret = LavaInst::NORMAL;  // LavaFlow::NONE;
+  uint64_t         winExcept = 0;
   __try{
     //f(lp, inArgs, outArgs);
     f(lp, inFrame, outArgs);
   }__except( (winExcept=GetExceptionCode()) || EXCEPTION_EXECUTE_HANDLER ){
-    ret = LavaFlow::RUN_ERR;
+    ret =  LavaInst::RUN_ERROR; // LavaFlow::RUN_ERR;
     //lf.graph.setState(lp->id.nid, LavaInst::RUN_ERROR);
 
     printf("\n windows exception code: %llu \n", winExcept);
@@ -1483,7 +1483,7 @@ uint64_t      exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaFrame*
   return ret;
 }
 //uint64_t                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaVal* inArgs,  LavaOut* outArgs) noexcept   // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
-uint64_t                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaFrame* inFrame,  LavaOut* outArgs) noexcept   // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
+LavaInst::State     runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaFrame* inFrame,  LavaOut* outArgs) noexcept   // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
 {
   using namespace std;
   using namespace std::chrono;
@@ -1502,7 +1502,7 @@ uint64_t                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t 
       lp.mem_alloc   =   LavaAlloc;             //lp.mem_alloc   =   malloc;  // LavaHeapAlloc;
 
       auto  stTime = high_resolution_clock::now();
-        uint64_t ret = exceptWrapper(func, lf, &lp, inFrame, outArgs);
+        LavaInst::State ret = exceptWrapper(func, lf, &lp, inFrame, outArgs);
         if(ret != LavaFlow::NONE){ return ret; }
       auto endTime = high_resolution_clock::now();
       duration<u64,nano> diff = (endTime - stTime);
@@ -1565,9 +1565,10 @@ uint64_t                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t 
       }
     } // SECTION(create packets and put them into packet queue)
 
-    return true;
+    return LavaInst::NORMAL;
   }
-  return false;
+
+  return LavaInst::LOAD_ERROR;
 }
 
 }
@@ -1626,6 +1627,8 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow)
         inout_flow.nameToPtr.insert( {ndList->name, ndList} );
         inout_flow.flow.insert( {p, ndList} );
       }
+    }else{
+      // set the node's state to an error
     }
   }
 
@@ -1644,7 +1647,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
   LavaFrame   inFrame;
   LavaOut     outArgs[LAVA_ARG_COUNT];              // if the arguments are going to 
   memset(inArgs, 0, sizeof(inArgs) );
-  TO(LAVA_ARG_COUNT,i){ outArgs[i] = defOut; }    // memset(outArgs, 0, sizeof(outArgs) );
+  TO(LAVA_ARG_COUNT,i){ outArgs[i] = defOut; }      // memset(outArgs, 0, sizeof(outArgs) );
 
   LavaHeapInit();
 
@@ -1696,16 +1699,19 @@ void               LavaLoop(LavaFlow& lf) noexcept
         {
           //printf("\n lava heap: %llu \n", (u64)lava_thread_heap);
 
-          LavaParams   lp;
-          u64     msgNdId = lf.nxtMsgId();                                               // msgNdId is message node id
-          uint64_t    err = msgNdId!=LavaId::NODE_NONE? runFunc(lf, ownedMem, msgNdId, &lp, &inFrame, outArgs)  :  LavaFlow::RUN_ERR; 
-          switch(err)
+          LavaParams       lp;
+          u64         msgNdId = lf.nxtMsgId();                                               // msgNdId is message node id
+          LavaInst::State ret = (msgNdId!=LavaId::NODE_NONE)? runFunc(lf, ownedMem, msgNdId, &lp, &inFrame, outArgs)  :  LavaInst::LOAD_ERROR;  // LavaFlow::RUN_ERR; 
+          switch(ret)
           {
-          case LavaFlow::RUN_ERR:{
+          case LavaInst::RUN_ERROR: {
             lf.graph.setState(msgNdId, LavaInst::RUN_ERROR);
             //lf.putPacket(pckt);               // if there was an error, put the packet back into the queue
           }break;
-          case LavaFlow::NONE:
+          case LavaInst::LOAD_ERROR:{
+            lf.graph.setState(msgNdId, LavaInst::RUN_ERROR);
+          }break;
+          case LavaInst::NORMAL:
           default: 
             break;
           }
@@ -1718,13 +1724,13 @@ void               LavaLoop(LavaFlow& lf) noexcept
         //printf("\n reference count: %llu \n", (u64)lm.refCount() );
       }
 
-      auto zeroRef  = partition(ALL(ownedMem), [](auto a){return a.refCount() > 0;} );                          // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
+      auto zeroRef  = partition(ALL(ownedMem), [](auto a){return a.refCount() > 0;} );                           // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
       auto freeIter = zeroRef;
       for(; freeIter != end(ownedMem); ++freeIter){                                                              // loop through the memory with zero references and free them
         LavaFree( (uint64_t)freeIter->data() );
       }
 
-      ownedMem.erase(zeroRef, end(ownedMem));                                                                  // erase the now freed memory
+      ownedMem.erase(zeroRef, end(ownedMem));                                                                    // erase the now freed memory
     }
   } // while(m_running)
 

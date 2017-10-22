@@ -100,22 +100,24 @@
 // -todo: fix probable race condition of updating the cache of indices - make a cache as another A/B member of 
 // -todo: fix crash on msg node - didn't switch the flow loop to use the graph's id cache
 // -todo: make sure to run a single packet on each increment through the main loop - done with the single nxtPacket call that switches to trying a message node if none are found
+// -todo: set a node's state to error if the loading doesn't work
+// -todo: figure out a way to query the next message node directly, since an index from the index cache to a query to the msg node could have a change in the middle
 
-// todo: set a node's state to error if the loading doesn't work
-// todo: change decrementing references to look into the LavaFrame pass in instead of LavaArgs
+// todo: change the decrementing of references to look into the LavaFrame passed in instead of LavaArgs, right now it will not have an effect
 // todo: make LavaFrame operations atomic
 // todo: change cur() functions to const and rename to read()
 // todo: change opp() functions to non-const only and rename to write()
 // todo: put in read count and write count for both A and B buffers
+// todo: make each variable individually double buffered?
 // todo: have exec() spinlock until readers of the opposite buffer drops to 0 - could also just skip the command buffer in the rare case that it catches readers as more than 0
 // todo: make button that creates a project for a node - would it need to pop up a modal dialog?
-// todo: convert tbl to use arrays of the data types smaller than 64 bits
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array - can any heirarchy of initializer_lists be brought down to an array of the same types?
 // todo: change project name to Fissure 
 // todo: make popup text box that avoids the bounding box of the moused over node? - put graph of node times in the box? put graph of covariance data of data in, time spent, data out, and time ?   
 // todo: make segmented vertical bar that shows packets building up on certain node
 // todo: make right click or space bar open up a text box that can contain the build command, stats and/or hotbox
 
+// todo: convert tbl to use arrays of the data types smaller than 64 bits
 // todo: profile
 // todo: print child tables in table printing functions
 // todo: make lava memory allocation aligned to 64 byte boundaries
@@ -2118,7 +2120,7 @@ ENTRY_DECLARATION // main or winmain
       glfwPollEvents();
       LavaGraph::ArgVec av = fd.lgrph.exec();
       graph_apply(move(av));
-      fd.flow.udpateMsgIdxCache();
+      //fd.flow.udpateMsgIdxCache();
     }
   }
   SECTION(shutdown)
