@@ -43,3 +43,5 @@ Different types of message nodes:
 |  |  |  Could be a control on the message node
 |  |  |  Reminicent of the idea of being able to peek into any allocation done with lavaAlloc inside of a flow node
 |
+
+

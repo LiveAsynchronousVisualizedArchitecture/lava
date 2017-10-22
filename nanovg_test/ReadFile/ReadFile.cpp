@@ -23,7 +23,8 @@ extern "C"
   const char* FileToStringInTypes[]   = {"tbl_str",      nullptr};
   const char* FileToStringOutTypes[]  = {"tbl_str",      nullptr};
 
-  uint64_t FileToString(LavaParams* inout_lp, LavaVal* in, LavaOut* out)
+  //uint64_t FileToString(LavaParams* inout_lp, LavaVal* in, LavaOut* out)
+  uint64_t FileToString(LavaParams* inout_lp, LavaFrame* in, LavaOut* out)
   {
     using namespace std;
 
@@ -32,6 +33,7 @@ extern "C"
     // output temp string here
     const char* tmp = "Temp out str";
     auto        len = strlen(tmp) + 1;
+
     //void*       mem = inout_lp->mem_alloc(len);
     //memcpy_s(mem, len, tmp, len);
 
@@ -52,7 +54,7 @@ extern "C"
     PrintLavaMem(lm);
     //out[0].value = (u64)mem;
 
-    this_thread::sleep_for( chrono::milliseconds(500) );
+    //this_thread::sleep_for( chrono::milliseconds(500) );
     return 85;
   }
 

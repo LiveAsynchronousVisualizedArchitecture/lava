@@ -102,8 +102,11 @@
 // -todo: make sure to run a single packet on each increment through the main loop - done with the single nxtPacket call that switches to trying a message node if none are found
 // -todo: set a node's state to error if the loading doesn't work
 // -todo: figure out a way to query the next message node directly, since an index from the index cache to a query to the msg node could have a change in the middle
+// -todo: break out status text creation into separate function
+// -todo: clamp status text at 100% of time per node
+// -todo: figure out why frame rate seems clamped to 144 - does having two monitors with the same refresh rate, turn vsync for windows back on and vsync glfw? - not sure, but a glfw swap interval of 0 and 1 seem to do the same thing - 24hz desktop means 24fps GUI even with a swap interval of 0
+// -todo: test message node to flow node - doesn't crash, but message node is also not highlighted
 
-// todo: test message node to flow node
 // todo: make sure LavaFrame path actually runs the node
 // todo: change the decrementing of references to look into the LavaFrame passed in instead of LavaArgs, right now it will not have an effect
 // todo: make LavaFrame operations atomic
@@ -112,12 +115,16 @@
 // todo: put in read count and write count for both A and B buffers
 // todo: make each variable in the graph individually double buffered or even multi-buffered according to readers?
 // todo: have exec() spinlock until readers of the opposite buffer drops to 0 - could also just skip the command buffer in the rare case that it catches readers as more than 0
+// todo: fix type warnings in simdb
 // todo: make button that creates a project for a node - would it need to pop up a modal dialog?
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array - can any heirarchy of initializer_lists be brought down to an array of the same types?
 // todo: change project name to Fissure 
 // todo: make popup text box that avoids the bounding box of the moused over node? - put graph of node times in the box? put graph of covariance data of data in, time spent, data out, and time ?   
 // todo: make segmented vertical bar that shows packets building up on certain node
 // todo: make right click or space bar open up a text box that can contain the build command, stats and/or hotbox
+// todo: make shared libraries loaded after the GUI
+// todo: make shared libraries only try to load one per frame
+// todo: make nodes a little fatter or slots offset a little more from the edge
 
 // todo: convert tbl to use arrays of the data types smaller than 64 bits
 // todo: profile
@@ -379,6 +386,19 @@ f64        timeToSeconds(u64 t)
   return t / 1000000000.0;
 }
 
+str       makeStatusText(u64 nid, f64 totalTime, vec_ndptrs const& nds, u64 nIdx)
+{
+  using namespace std;
+
+  f64 seconds  =  timeToSeconds(fd.lgrph.node(nid).time);
+  f64 percent  =  totalTime>0?  (seconds/totalTime)*100  :  0;
+  percent      =  max(100.0, percent);
+  seconds      =  (int)(seconds*1000) / 1000.0;    // should clamp the seconds to 3 decimal places 
+  auto status  =  toString("Node [",nid,"]  ",nds[nIdx]->txt," | ",seconds," seconds  %",percent);
+
+  return status;
+}
+
 void         draw_radial(NVGcontext* vg, NVGcolor clr, f32 x, f32 y, f32 rad)
 {
   auto  hlf = rad/2; 
@@ -444,16 +464,6 @@ v2              out_cntr(Node const& n, f32 r)
   //return v2(n.P.x + NODE_SZ.x/2, n.P.y + NODE_SZ.y + r);
   return v2(n.P.x + n.b.w()/2, n.P.y + n.b.h() + r);
 }
-
-//LavaId          slot_add(Slot s)
-//{
-  //LavaId sid = fd.lgrph.addSlot(ls);
-  //
-  //fd.graph.slots.insert( {sid, s} );
-  //
-  //ls.id = sid;
-  //return sid;
-//}
 
 void            slot_add(bool isDest)
 {
@@ -1819,20 +1829,26 @@ ENTRY_DECLARATION // main or winmain
         {
           f64 totalTime = timeToSeconds(fd.lgrph.totalTime());
 
-          if(slotRtClk){
+          if(nid.nid == LavaId::NODE_NONE){
+            fd.ui.statusTxt->setValue("");
+          }else if(slotRtClk){
             fd.ui.statusTxt->setValue( toString(" right click on slot ") );
           }else if(isInSlot){
             auto status  =  toString("Slot [",sid.nid,":",sid.sidx,"]");
             fd.ui.statusTxt->setValue( status );
           }else if(isInNode){
-            f64 seconds  =  timeToSeconds(fd.lgrph.node(nid.nid).time);
-            f64 percent  =  totalTime>0?  (seconds/totalTime)*100  :  0;
-            auto status  =  toString("Node [",nid.nid,"]  ",nds[nIdx]->txt," | ",seconds," seconds  %",percent);
+            //f64 seconds  =  timeToSeconds(fd.lgrph.node(nid.nid).time);
+            //f64 percent  =  totalTime>0?  (seconds/totalTime)*100  :  0;
+            //auto status  =  toString("Node [",nid.nid,"]  ",nds[nIdx]->txt," | ",seconds," seconds  %",percent);
+
+            auto status = makeStatusText(nid.nid, totalTime, nds, nIdx);
             fd.ui.statusTxt->setValue( status );
           }else if(fd.sel.pri != LavaNode::NODE_ERROR){
-            f64 seconds  =  timeToSeconds(fd.lgrph.node(fd.sel.pri).time);
-            f64 percent  =  totalTime>0?  (seconds/totalTime)*100  :  0;
-            auto status  =  toString("Node [",fd.sel.pri,"]  ",fd.graph.nds[fd.sel.pri].txt," | ",seconds," seconds  %",percent);
+            //f64 seconds  =  timeToSeconds(fd.lgrph.node(fd.sel.pri).time);
+            //f64 percent  =  totalTime>0?  (seconds/totalTime)*100  :  0;
+            //auto status  =  toString("Node [",fd.sel.pri,"]  ",fd.graph.nds[fd.sel.pri].txt," | ",seconds," seconds  %",percent);
+
+            auto status = makeStatusText(nid.nid, totalTime, nds, nIdx);
             fd.ui.statusTxt->setValue( status );
           }else{
             fd.ui.statusTxt->setValue("");
@@ -2145,6 +2161,15 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//LavaId          slot_add(Slot s)
+//{
+//LavaId sid = fd.lgrph.addSlot(ls);
+//
+//fd.graph.slots.insert( {sid, s} );
+//
+//ls.id = sid;
+//return sid;
+//}
 
 //void            node_add(str node_name, Node n)
 //void            node_add(str node_name, Node n)

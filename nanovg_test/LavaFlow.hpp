@@ -1702,27 +1702,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
         SECTION(try to run a single message node if there was no packet found)           // todo: find a single message node and run that, remembering the place
         {
           nodeId  =  lf.nxtMsgId();
+          // todo: need to work out here if the message node is available - locking and lock free message nodes would come in to play
 
-          // todo: need to work out here if the message node is available
-
-          //printf("\n lava heap: %llu \n", (u64)lava_thread_heap);
-          //
-          //LavaParams       lp;
-          //u64         msgNdId = lf.nxtMsgId();                                               // msgNdId is message node id
-          //LavaInst::State ret = (msgNdId!=LavaId::NODE_NONE)? runFunc(lf, ownedMem, msgNdId, &lp, &inFrame, outArgs)  :  LavaInst::LOAD_ERROR;  // LavaFlow::RUN_ERR; 
-          //switch(ret)
-          //{
-          //case LavaInst::RUN_ERROR: {
-          //  lf.graph.setState(msgNdId, LavaInst::RUN_ERROR);
-          //  //lf.putPacket(pckt);               // if there was an error, put the packet back into the queue
-          //}break;
-          //case LavaInst::LOAD_ERROR:{
-          //  lf.graph.setState(msgNdId, LavaInst::RUN_ERROR);
-          //}break;
-          //case LavaInst::NORMAL:
-          //default: 
-          //  break;
-          //}
         } // SECTION(loop through message nodes)
 
       SECTION(run the node with the id and frame)
@@ -1789,6 +1770,24 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//printf("\n lava heap: %llu \n", (u64)lava_thread_heap);
+//
+//LavaParams       lp;
+//u64         msgNdId = lf.nxtMsgId();                                               // msgNdId is message node id
+//LavaInst::State ret = (msgNdId!=LavaId::NODE_NONE)? runFunc(lf, ownedMem, msgNdId, &lp, &inFrame, outArgs)  :  LavaInst::LOAD_ERROR;  // LavaFlow::RUN_ERR; 
+//switch(ret)
+//{
+//case LavaInst::RUN_ERROR: {
+//  lf.graph.setState(msgNdId, LavaInst::RUN_ERROR);
+//  //lf.putPacket(pckt);               // if there was an error, put the packet back into the queue
+//}break;
+//case LavaInst::LOAD_ERROR:{
+//  lf.graph.setState(msgNdId, LavaInst::RUN_ERROR);
+//}break;
+//case LavaInst::NORMAL:
+//default: 
+//  break;
+//}
 
 //auto& curMsgNdMap = graph.msgNodes();
 //return curMsgNdMap[LavaId(id)];
