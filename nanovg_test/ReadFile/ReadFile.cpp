@@ -51,7 +51,7 @@ extern "C"
 
     LavaMem lm = LavaMem::fromDataAddr(out[0].value);
 
-    PrintLavaMem(lm);
+    //PrintLavaMem(lm);
     //out[0].value = (u64)mem;
 
     //this_thread::sleep_for( chrono::milliseconds(500) );

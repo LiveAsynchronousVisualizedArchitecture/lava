@@ -107,6 +107,7 @@
 // -todo: figure out why frame rate seems clamped to 144 - does having two monitors with the same refresh rate, turn vsync for windows back on and vsync glfw? - not sure, but a glfw swap interval of 0 and 1 seem to do the same thing - 24hz desktop means 24fps GUI even with a swap interval of 0
 // -todo: test message node to flow node - doesn't crash, but message node is also not highlighted
 // -todo: make sure LavaFrame path actually runs the node - is the packet making it out of the message node?
+// -todo: make LavaFrame have a source frame number and a dest frame number - not used right now - LavaFrame frame number comes from the first packet, which should also be looking for packets of the same frame number
 
 // todo: change the decrementing of references to look into the LavaFrame passed in instead of LavaArgs, right now it will not have an effect
 // todo: make LavaFrame operations atomic
@@ -125,6 +126,7 @@
 // todo: make shared libraries loaded after the GUI
 // todo: make shared libraries only try to load one per frame
 // todo: make nodes a little fatter or slots offset a little more from the edge
+// todo: integrate type into LavaMem instead of as part of the LavaMem struct so that it can be queried externally
 
 // todo: convert tbl to use arrays of the data types smaller than 64 bits
 // todo: profile
