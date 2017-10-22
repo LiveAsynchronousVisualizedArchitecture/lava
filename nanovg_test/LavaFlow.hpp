@@ -1657,65 +1657,91 @@ void               LavaLoop(LavaFlow& lf) noexcept
     SECTION(make a frame from a packet or run a message node)
     {
       LavaPacket    pckt;
+      LavaParams      lp;
+      u64         nodeId;
       bool ok = lf.nxtPacket(&pckt);
       if(ok) 
         SECTION(if there is a packet available, fit it into a existing frame or create a new frame)
-      {
-        u16 sIdx  =  pckt.dest_slot;
-        lf.m_frameQLck.lock();                                      // lock mutex        
-          SECTION(loop through the outstanding frames to find the match for this packet)
-          {
-            TO(lf.frameQ.size(), i)                                   // loop through the current frames looking for one with the same frame number and destination slot id - if no frame is found to put the packet into, make a new one - keep track of the lowest full frame while looping and use that if no full frame is found?
-              {
-                auto& frm = lf.frameQ[i];
-                if(frm.frame != pckt.frame){ continue; }
-                if(frm.dest != pckt.dest_node){ continue; }             // todo: unify dest_node and dest_id etc. as one LavaId LavaPacket
+        {
+          u16 sIdx  =  pckt.dest_slot;
+          lf.m_frameQLck.lock();                                      // lock mutex        
+            SECTION(loop through the outstanding frames to find the match for this packet)
+            {
+              TO(lf.frameQ.size(), i)                                   // loop through the current frames looking for one with the same frame number and destination slot id - if no frame is found to put the packet into, make a new one - keep track of the lowest full frame while looping and use that if no full frame is found?
+                {
+                  auto& frm = lf.frameQ[i];
+                  if(frm.frame != pckt.frame){ continue; }
+                  if(frm.dest != pckt.dest_node){ continue; }             // todo: unify dest_node and dest_id etc. as one LavaId LavaPacket
 
-                bool slotTaken = frm.getSlot(sIdx);
-                if(!slotTaken){
-                  frm.packets[sIdx] = pckt;
-                }
+                  bool slotTaken = frm.getSlot(sIdx);
+                  if(!slotTaken){
+                    frm.packets[sIdx] = pckt;
+                  }
 
-                if( frm.allFilled() ){                                  // If all the slots are filled, copy the frame out and erase it
-                  runFrm = frm;
-                  lf.frameQ.erase(lf.frameQ.begin()+i);                 // can't use an index, have to use an iterator for some reason
-                  break;                                                // break out of the loop since a frame was found
+                  if( frm.allFilled() ){                                  // If all the slots are filled, copy the frame out and erase it
+                    runFrm = frm;
+                    lf.frameQ.erase(lf.frameQ.begin()+i);                 // can't use an index, have to use an iterator for some reason
+                    break;                                                // break out of the loop since a frame was found
+                  }
                 }
-              }
-          }
-          SECTION(if a frame was not found for this packet, create one)
-          {
-            LavaInst&  ndInst   =  lf.graph.node(pckt.dest_node);
-            runFrm.slotsNeeded  =  ndInst.inputs;                     // find the number of input slots for the dest node
-            runFrm.dest         =  pckt.dest_node;
-            runFrm.frame        =  ndInst.fetchIncFrame();
-            runFrm.putSlot(sIdx, pckt);
-            lf.frameQ.push_back(runFrm);                              // New frame that starts with the current packet put into it 
-          }
-        lf.m_frameQLck.unlock();                                      // unlock mutex
-      }
+            }
+            SECTION(if a frame was not found for this packet, create one)
+            {
+              LavaInst&  ndInst   =  lf.graph.node(pckt.dest_node);
+              runFrm.slotsNeeded  =  ndInst.inputs;                     // find the number of input slots for the dest node
+              runFrm.dest         =  pckt.dest_node;
+              runFrm.frame        =  ndInst.fetchIncFrame();
+              runFrm.putSlot(sIdx, pckt);
+              lf.frameQ.push_back(runFrm);                              // New frame that starts with the current packet put into it 
+            }
+          lf.m_frameQLck.unlock();                                      // unlock mutex
+
+          
+        }
       else   
         SECTION(try to run a single message node if there was no packet found)           // todo: find a single message node and run that, remembering the place
         {
-          //printf("\n lava heap: %llu \n", (u64)lava_thread_heap);
+          nodeId  =  lf.nxtMsgId();
 
-          LavaParams       lp;
-          u64         msgNdId = lf.nxtMsgId();                                               // msgNdId is message node id
-          LavaInst::State ret = (msgNdId!=LavaId::NODE_NONE)? runFunc(lf, ownedMem, msgNdId, &lp, &inFrame, outArgs)  :  LavaInst::LOAD_ERROR;  // LavaFlow::RUN_ERR; 
-          switch(ret)
-          {
-          case LavaInst::RUN_ERROR: {
-            lf.graph.setState(msgNdId, LavaInst::RUN_ERROR);
-            //lf.putPacket(pckt);               // if there was an error, put the packet back into the queue
-          }break;
-          case LavaInst::LOAD_ERROR:{
-            lf.graph.setState(msgNdId, LavaInst::RUN_ERROR);
-          }break;
-          case LavaInst::NORMAL:
-          default: 
-            break;
-          }
+          // todo: need to work out here if the message node is available
+
+          //printf("\n lava heap: %llu \n", (u64)lava_thread_heap);
+          //
+          //LavaParams       lp;
+          //u64         msgNdId = lf.nxtMsgId();                                               // msgNdId is message node id
+          //LavaInst::State ret = (msgNdId!=LavaId::NODE_NONE)? runFunc(lf, ownedMem, msgNdId, &lp, &inFrame, outArgs)  :  LavaInst::LOAD_ERROR;  // LavaFlow::RUN_ERR; 
+          //switch(ret)
+          //{
+          //case LavaInst::RUN_ERROR: {
+          //  lf.graph.setState(msgNdId, LavaInst::RUN_ERROR);
+          //  //lf.putPacket(pckt);               // if there was an error, put the packet back into the queue
+          //}break;
+          //case LavaInst::LOAD_ERROR:{
+          //  lf.graph.setState(msgNdId, LavaInst::RUN_ERROR);
+          //}break;
+          //case LavaInst::NORMAL:
+          //default: 
+          //  break;
+          //}
         } // SECTION(loop through message nodes)
+
+      SECTION(run the node with the id and frame)
+      {
+        LavaInst::State ret = (nodeId!=LavaId::NODE_NONE)? runFunc(lf, ownedMem, nodeId, &lp, &inFrame, outArgs)  :  LavaInst::LOAD_ERROR;  // LavaFlow::RUN_ERR; 
+        switch(ret)
+        {
+        case LavaInst::RUN_ERROR: {
+          lf.graph.setState(nodeId, LavaInst::RUN_ERROR);
+          //lf.putPacket(pckt);               // if there was an error, put the packet back into the queue
+        }break;
+        case LavaInst::LOAD_ERROR:{
+          lf.graph.setState(nodeId, LavaInst::RUN_ERROR);
+        }break;
+        case LavaInst::NORMAL:
+        default: 
+          break;
+        }
+      }
     }
     SECTION(partition owned allocations and free those with their reference count at 0)
     {

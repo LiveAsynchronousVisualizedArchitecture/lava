@@ -103,12 +103,14 @@
 // -todo: set a node's state to error if the loading doesn't work
 // -todo: figure out a way to query the next message node directly, since an index from the index cache to a query to the msg node could have a change in the middle
 
+// todo: test message node to flow node
+// todo: make sure LavaFrame path actually runs the node
 // todo: change the decrementing of references to look into the LavaFrame passed in instead of LavaArgs, right now it will not have an effect
 // todo: make LavaFrame operations atomic
 // todo: change cur() functions to const and rename to read()
 // todo: change opp() functions to non-const only and rename to write()
 // todo: put in read count and write count for both A and B buffers
-// todo: make each variable individually double buffered?
+// todo: make each variable in the graph individually double buffered or even multi-buffered according to readers?
 // todo: have exec() spinlock until readers of the opposite buffer drops to 0 - could also just skip the command buffer in the rare case that it catches readers as more than 0
 // todo: make button that creates a project for a node - would it need to pop up a modal dialog?
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array - can any heirarchy of initializer_lists be brought down to an array of the same types?

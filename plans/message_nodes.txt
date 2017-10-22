@@ -20,3 +20,26 @@ is there value in a message passing node optionally being a state machine
 |  more checks
 
 
+Different types of message nodes:
+|  First is a message node that has an atomic bool that lets the Lava loop skip it while another thread is executing it
+|  Second is a message node that has its own thread, and the running thread hands off to that thread using a mutex
+|  |  Should this be combined with the first node type?
+|  |  What would be the implications? 
+|  |  If this was the default type, things like a dedicated openGL message node would be easy 
+|  |  Since every message node would have it's own thread, all openGL commands would be run from that thread
+|  Third type is a message node that is thread safe and can be executed by multiple threads concurrently   
+|  |  The main building block would be having a state made out of thread safe data structures 
+|  |  Writes shouldn't block reads 
+|  |  Reads shoudln't block writes from happening - multi-buffered copy on write structures could work in a general sense
+|  |  Might need some dedicated lock-free structures to make this practical for most people
+|  |  Single header file and flat memory respresentation would be ideal
+|  |  |  Robin Hood Hash map?
+|  |  |  lock-free tbl?
+|  |  |  Copy on write vector?
+|  |  Simdb could be used as a general data store 
+|  |  |  Does this open up another can of worms such as a simdb file per state?
+|  |  |  If types stored in a message node's state are a visualizable type, then maybe the visualizer could be used to peek into the state
+|  |  |  Types that are only convertable to a visualized type would need to be explicitly converted by the Lava interface / Fissure GUI
+|  |  |  Could be a control on the message node
+|  |  |  Reminicent of the idea of being able to peek into any allocation done with lavaAlloc inside of a flow node
+|
