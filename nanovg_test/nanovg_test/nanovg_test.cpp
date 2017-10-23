@@ -108,8 +108,10 @@
 // -todo: test message node to flow node - doesn't crash, but message node is also not highlighted
 // -todo: make sure LavaFrame path actually runs the node - is the packet making it out of the message node?
 // -todo: make LavaFrame have a source frame number and a dest frame number - not used right now - LavaFrame frame number comes from the first packet, which should also be looking for packets of the same frame number
+// -todo: change the decrementing of references to look into the LavaFrame passed in instead of LavaArgs, right now it will not have an effect
 
-// todo: change the decrementing of references to look into the LavaFrame passed in instead of LavaArgs, right now it will not have an effect
+// todo: make slot loop only check if they are taken or not
+// todo: make input slots start at 0 - does there need to be a separation between slots?
 // todo: make LavaFrame operations atomic
 // todo: change cur() functions to const and rename to read()
 // todo: change opp() functions to non-const only and rename to write()

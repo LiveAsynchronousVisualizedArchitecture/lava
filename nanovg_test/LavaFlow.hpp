@@ -192,13 +192,15 @@ struct      LavaFrame
 {
   enum FRAME { ERR_FRAME = 0xFFFFFFFFFFFFFFFE, NO_FRAME = 0xFFFFFFFFFFFFFFFF };
 
+  static const u64  PACKET_SLOTS = 16;
+
   u64                dest = LavaId::NODE_NONE;             // The destination node this frame will be run with
   u64               frame = 0;                             // The numer of this frame - lowest frame needs to be run first
   u64           src_frame = 0;                             // Does this need to come from the message node?
   u64          dest_frame = 0;                             // should this come from the node instance?
   u64            slotMask = 0;                             // The bit mask respresenting which slots already have packets in them
   u16               slots = 0;                             // The total number of slots needed for this frame to be complete 
-  LavaPacket  packets[16];
+  LavaPacket  packets[PACKET_SLOTS];
 
   bool          putSlot(u64 sIdx, LavaPacket const& pkt)
   {
@@ -632,7 +634,7 @@ public:
       si->first.nid  == nid && 
       si->first.sidx <= (u64)(cur+1) ){
       //cur = si->first.idx;
-      ++cur; ++si;
+      ++cur; ++si; 
     }
     //return cur;
 
@@ -1536,7 +1538,7 @@ LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t ni
         basePkt.framed      =   false;                 // would this go on the socket?
         basePkt.src_node    =   nid;
         basePkt.src_slot    =   sidx;
-        basePkt.msg.id      =   lf.nxtMsgId(); // todo: rethink this, since nxtMsgId might not be neccesary
+        basePkt.msg.id      =   lf.nxtMsgId();         // todo: rethink this, since nxtMsgId might not be neccesary
         basePkt.msg.val     =   val;
 
         // route the packet using the graph - the packet may be copied multiple times and go to multiple destination slots
@@ -1695,7 +1697,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
             {
               LavaInst& ndInst   =  lf.graph.node(pckt.dest_node);
               LavaFrame    frm;
-              frm.slots  =  ndInst.inputs;                     // find the number of input slots for the dest node
+              frm.slots  =  ndInst.inputs;                               // find the number of input slots for the dest node
               frm.dest   =  pckt.dest_node;
               frm.frame  =  pckt.frame;
               //runFrm.frame        =  ndInst.fetchIncFrame();
@@ -1706,7 +1708,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
               else
                 runFrm = frm;
             }
-          lf.m_frameQLck.unlock();                                      // unlock mutex
+          lf.m_frameQLck.unlock();                                       // unlock mutex
 
           nodeId = runFrm.dest;
         }
@@ -1723,7 +1725,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
         LavaInst::State ret = (nodeId!=LavaId::NODE_NONE)? runFunc(lf, ownedMem, nodeId, &lp, &runFrm, outArgs)  :  LavaInst::LOAD_ERROR;  // LavaFlow::RUN_ERR; 
         switch(ret)
         {
-          case LavaInst::RUN_ERROR: {
+          case LavaInst::RUN_ERROR:{
             lf.graph.setState(nodeId, LavaInst::RUN_ERROR);
             //lf.putPacket(pckt);               // if there was an error, put the packet back into the queue
           }break;
@@ -1733,7 +1735,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
           case LavaInst::NORMAL:
           default:{ // if everything worked, decrement the references of all the packets in the frame
             if(doFlow){
-              TO(runFrm.slots,i) if(runFrm.getSlot(i)){
+              TO(LavaFrame::PACKET_SLOTS,i) if(runFrm.getSlot(i)){ 
                 LavaMem mem = LavaMem::fromDataAddr(runFrm.packets[i].msg.val.value);
                 mem.decRef();
               }
