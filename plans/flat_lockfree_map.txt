@@ -1,0 +1,62 @@
+
+flat_lockfree_map
+
+Flat:
+|  Use only contiguous memory so that the serialized version is the normal version
+
+Concurrent:
+|  Lock free except when resizing
+|  Do copy on write so that the reads don't stop 
+|  Make mutex wait time for writes minimized
+|
+
+Hashing Insights:
+|  With robin hood hashing multiple entries from the same key will be next to each other in memory
+|  |  One data structure can be used for an unordered multi-map
+|  Something about the fact that Ids are unique due to a reader keeping blocks from deletion, so versions aren't needed 
+|  |  32 bit block indices can be used, they can be atomically swapped, and thus robin hood hashed
+
+
+Reader Count:
+|  Reader count needs to be incremented on two numbers before they are swapped
+|  Use a deleted flag in an atomic struct and u32 : 31 for reader count
+|  |  No, deleted doesn't need a flag, it just needs a special value
+
+
+Template Arguments:
+|  Use a variable template argument so that a arbitrary tuple can be returned?
+|  |  How does a template allocator argument work if variable template arguments are used for values?
+|  |  The problem is that you would mostly want the allocator to be an argument with a default value of the default allocator
+|  |  Could the template argument be layed out as <key, value, allocator=default, values...>
+|  |  Could the template arguments be side stepped by using a static make_ function instead of constructors
+|
+
+
+Return Values:
+|  Use std::optional<> with operator[] ?
+|  Use a custom struct that has operator bool() ?
+|  |  Could have extra information such as how many values are in this key
+|  Use operator() to get a specific value out of a key + tuple
+
+
+Make untyped container with void* so that template bloat is minimal
+|  Variable holds size in bytes
+Use std::hash() ?
+Save hash near reader count and pack them all together
+Use power of 2 sizing
+
+
+Does the number of readers need to be part of the block index in the new atomic lookup array?
+|  If you lookup a block index, how do you know you haven't had it deleted from you?
+|  Use 8 bits for readers, 24 bits for the index, and two special values for EMPTY and DELETED
+|  Make START_SPECIALS = DELETED
+|  Last thread out frees the block
+|  |  Thread that sees readers == 1 && DELETED frees the block by setting the readers to 0 and the index to EMPTY 
+|  |  thread should see readers == 0 and DELETED
+
+
+
+
+
+
+

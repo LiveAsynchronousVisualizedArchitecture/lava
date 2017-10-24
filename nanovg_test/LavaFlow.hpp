@@ -8,6 +8,7 @@
 #define __LAVAFLOW_HEADERGUARD_HPP__
 
 #include <cstdint>
+#include <bitset>
 #include <chrono>
 #include <atomic>
 #include <thread>
@@ -191,46 +192,53 @@ struct     LavaPacket
 struct      LavaFrame
 {
   enum FRAME { ERR_FRAME = 0xFFFFFFFFFFFFFFFE, NO_FRAME = 0xFFFFFFFFFFFFFFFF };
-
-  static const u64  PACKET_SLOTS = 16;
+  static const u64 PACKET_SLOTS = 16;
+  //using Slots = std::atomic<std::bitset<PACKET_SLOTS>>;
+  using Slots = std::bitset<PACKET_SLOTS>;
 
   u64                dest = LavaId::NODE_NONE;             // The destination node this frame will be run with
   u64               frame = 0;                             // The numer of this frame - lowest frame needs to be run first
   u64           src_frame = 0;                             // Does this need to come from the message node?
   u64          dest_frame = 0;                             // should this come from the node instance?
-  u64            slotMask = 0;                             // The bit mask respresenting which slots already have packets in them
-  u16               slots = 0;                             // The total number of slots needed for this frame to be complete 
+  Slots          slotMask = 0;                             // The bit mask respresenting which slots already have packets in them
+
+  u16               slots = 0;                           // The total number of slots needed for this frame to be complete 
   LavaPacket  packets[PACKET_SLOTS];
 
   bool          putSlot(u64 sIdx, LavaPacket const& pkt)
   {
-    if( getSlot(sIdx) ) return false;
+    if( slotMask[sIdx] ) return false;
 
-    setSlot(sIdx, true);
+    slotMask[sIdx] = true;
     packets[sIdx] = pkt;
 
     return true;
   }
-  void          setSlot(u64 sIdx, bool val)
-  {
-    if(val) slotMask |=  (u64)0x1 << sIdx;            // or with the proper bit set to 1
-    else    slotMask &= ~( (u64)(0x1) << sIdx);       // and with the proper bit set to 0 and everything else set to 1
-  }
-  bool          getSlot(u64 sIdx) const
-  {
-    return (bool) ((slotMask >> sIdx) & 0x1);
-    //return (bool) ((slotMask >> sIdx) & 0x1);
-    //return (bool) ((slotMask >> sIdx) & 0x0000000000000001);
-  }
   u64         slotCount()         const
   {
-    return popcount64(slotMask);
+    //return popcount64(slotMask.to_ulong());
+    return slotMask.count();
   }
   bool        allFilled()         const
   {
     if( slotCount() >= slots ) return true;
     return false;
   }
+
+  //void          setSlot(u64 sIdx, bool val)
+  //{
+  //  if(val) slotMask |=  (u64)0x1 << sIdx;            // or with the proper bit set to 1
+  //  else    slotMask &= ~( (u64)(0x1) << sIdx);       // and with the proper bit set to 0 and everything else set to 1
+  //}
+  //bool          getSlot(u64 sIdx) const
+  //{
+  //  return (bool) ((slotMask >> sIdx) & 0x1);
+  //  //return (bool) ((slotMask >> sIdx) & 0x1);
+  //  //return (bool) ((slotMask >> sIdx) & 0x0000000000000001);
+  //}
+  //
+  //if( getSlot(sIdx) ) return false;
+  //setSlot(sIdx, true);
 };
 struct       LavaNode
 {
@@ -1681,7 +1689,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
                 if(frm.dest != pckt.dest_node){ continue; }               // todo: unify dest_node and dest_id etc. as one LavaId LavaPacket
                 if(frm.frame != pckt.frame){ continue; }
 
-                bool slotTaken = frm.getSlot(sIdx);
+                //bool slotTaken = frm.getSlot(sIdx);
+                bool slotTaken = frm.slotMask[sIdx];
                 if(!slotTaken){
                   frm.packets[sIdx] = pckt;
                 }
@@ -1735,7 +1744,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
           case LavaInst::NORMAL:
           default:{ // if everything worked, decrement the references of all the packets in the frame
             if(doFlow){
-              TO(LavaFrame::PACKET_SLOTS,i) if(runFrm.getSlot(i)){ 
+              //TO(LavaFrame::PACKET_SLOTS,i) if(runFrm.getSlot(i)){ 
+              TO(LavaFrame::PACKET_SLOTS,i) if(runFrm.slotMask[i]){ 
                 LavaMem mem = LavaMem::fromDataAddr(runFrm.packets[i].msg.val.value);
                 mem.decRef();
               }

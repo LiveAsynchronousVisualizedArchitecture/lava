@@ -109,12 +109,17 @@
 // -todo: make sure LavaFrame path actually runs the node - is the packet making it out of the message node?
 // -todo: make LavaFrame have a source frame number and a dest frame number - not used right now - LavaFrame frame number comes from the first packet, which should also be looking for packets of the same frame number
 // -todo: change the decrementing of references to look into the LavaFrame passed in instead of LavaArgs, right now it will not have an effect
+// -todo: make slot loop only check if they are taken or not
+// -todo: separate out bitset - use std::bitset instead
+// -todo: change LavaFrame bitset names - taken out due to bitset
 
-// todo: make slot loop only check if they are taken or not
-// todo: make input slots start at 0 - does there need to be a separation between slots?
-// todo: make LavaFrame operations atomic
+// todo: type notes for flat_lockfree_map
+// todo: make an atomic bitset
+// todo: make LavaFrame slots start from the beggining
+// todo: make LavaFrame operations atomic - need an atomic bitset 
 // todo: change cur() functions to const and rename to read()
 // todo: change opp() functions to non-const only and rename to write()
+// todo: figure out a way to have a reader count with lava.graph - is an atomic hash map inevitable? 
 // todo: put in read count and write count for both A and B buffers
 // todo: make each variable in the graph individually double buffered or even multi-buffered according to readers?
 // todo: have exec() spinlock until readers of the opposite buffer drops to 0 - could also just skip the command buffer in the rare case that it catches readers as more than 0
@@ -130,6 +135,7 @@
 // todo: make nodes a little fatter or slots offset a little more from the edge
 // todo: integrate type into LavaMem instead of as part of the LavaMem struct so that it can be queried externally
 
+// todo: make input slots start at 0 - does there need to be a separation between input and out slots or does there need to be an offset so that the input frame starts at 0 
 // todo: convert tbl to use arrays of the data types smaller than 64 bits
 // todo: profile
 // todo: print child tables in table printing functions
@@ -1631,26 +1637,26 @@ ENTRY_DECLARATION // main or winmain
 
     Println("size of frame: ", sizeof(LavaFrame));
     LavaFrame tstFrame;
-    Println("  slot 0: ", tstFrame.getSlot(0), " : ", tstFrame.slotMask);
-    tstFrame.setSlot(0,1);
-    Println("  slot 0: ", tstFrame.getSlot(0), " : ", tstFrame.slotMask);
-    tstFrame.setSlot(0,0);
-    Println("  slot 0: ", tstFrame.getSlot(0), " : ", tstFrame.slotMask);
+    Println("  slot 0: ", tstFrame.slotMask[0], " : ", tstFrame.slotMask);
+    tstFrame.slotMask[0] = 1;
+    Println("  slot 0: ", tstFrame.slotMask[0], " : ", tstFrame.slotMask);
+    tstFrame.slotMask[0] = 0;
+    Println("  slot 0: ", tstFrame.slotMask[0], " : ", tstFrame.slotMask);
 
-    tstFrame.setSlot(16,1);
-    Println("  slot 16: ", tstFrame.getSlot(16), " : ", tstFrame.slotMask);
-    tstFrame.setSlot(0,1);
-    Println("  slot 16: ", tstFrame.getSlot(16), " : ", tstFrame.slotMask);
-    tstFrame.setSlot(63,1);
-    Println("  slot 63: ", tstFrame.getSlot(63), " : ", tstFrame.slotMask);
+    //tstFrame.slotMask[16] = 1;
+    //Println("  slot 16: ", tstFrame.slotMask[16], " : ", tstFrame.slotMask);
+    //tstFrame.slotMask[0] = 1;
+    //Println("  slot 16: ", tstFrame.slotMask[16], " : ", tstFrame.slotMask);
+    //tstFrame.slotMask[63] = 1;
+    //Println("  slot 63: ", tstFrame.slotMask[63], " : ", tstFrame.slotMask);
     
     Println("\n");
     tstFrame.slotMask = 0;
-    Println("slot cout: ",tstFrame.slotCount(),"  slot ",0,": ", tstFrame.getSlot(0), " : ", tstFrame.slotMask);
-    TO(64,i){
-      tstFrame.setSlot(i,1);
-      Println("slot cout: ",tstFrame.slotCount(),"  slot ",i,": ", tstFrame.getSlot(i), " : ", tstFrame.slotMask);
-      //tstFrame.setSlot(i,0);
+    Println("slot cout: ",tstFrame.slotCount(),"  slot ",0,": ", tstFrame.slotMask[0], " : ", tstFrame.slotMask);
+    TO(LavaFrame::PACKET_SLOTS,i){
+      tstFrame.slotMask[i] = 1;
+      Println("slot cout: ",tstFrame.slotCount(),"  slot ",i,": ", tstFrame.slotMask[i], " : ", tstFrame.slotMask);
+      //tstFrame.slotMask[i,0);
     }
     Println();
 
