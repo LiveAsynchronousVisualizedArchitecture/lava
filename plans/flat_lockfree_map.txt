@@ -87,4 +87,11 @@ What happens if an index is deleted, cleaned up, then the same index is used aga
 |  If the hash can't change, you can start from the natural/ideal slot position and search forward until you find the index you are looking for
 |
 
+Possibly need to make sure that when deleting a Idx in a slot, DELETED is set atomically, then separately the readers are decremented, and only if the deleting thread gets back readers == 1 and DELETED is it responsible for freeing the block
+|  If readers == 1 and DELETED the Idx needs to be successfully compare and swapped for readers == 0 and DELETED before freeing the block
+|  Need to increment the readers before marking for deletion, so that there isn't confusion about what thread needs to delete 
+|  |  This sets up the case where a thread can get be the only one to comapre and swap from readers==1 && DELETED to readers==0 && DELETED
+|
+
+
 

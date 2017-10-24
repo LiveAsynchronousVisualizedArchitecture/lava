@@ -38,24 +38,26 @@ struct flf_map
 
   u8* m_mem;  // single pointer is all that ends up on the stack
 
-  bool incTwoIdxReaders(u64 idx, IdxPair* newIp = nullptr)
+  //bool incTwoIdxReaders(u64 idx, IdxPair* newIp = nullptr)
+  //bool incIdxPairReaders(u64 idx, IdxPair* newIp = nullptr)
+  //
+  // u8*   firstIdxPtr  =  
+  // Idx*       idxPtr  =  (Idx*)(m_mem + idx*sizeof(Idx));     // it is crucial and fundamental that sizeof(Idx) needs to be 4 bytes so that two of them can be swapped even if unaligned, but this should be more correct and clear
+  //au64*   atmIncPtr  =  (au64*)(m_mem + idx*sizeof(Idx));       // it is crucial and fundamental that sizeof(Idx) needs to be 4 bytes so that two of them can be swapped even if unaligned, but this should be more correct and clear
+
+  bool incIdxPairReaders(void* oldIp, IdxPair* newIp = nullptr)
   {
-    // u8*   firstIdxPtr  =  
-    // Idx*       idxPtr  =  (Idx*)(m_mem + idx*sizeof(Idx));     // it is crucial and fundamental that sizeof(Idx) needs to be 4 bytes so that two of them can be swapped even if unaligned, but this should be more correct and clear
-    au64*   atmIncPtr  =  (au64*)(m_mem + idx*sizeof(Idx));       // it is crucial and fundamental that sizeof(Idx) needs to be 4 bytes so that two of them can be swapped even if unaligned, but this should be more correct and clear
+    au64*   atmIncPtr  =  (au64*)(oldIp);
 
     Idx idxs[2];
-    u64 oldVal;
-    u64 newVal;
+    u64 oldVal, newVal;
     do{
-      // get the value of both Idx structs atomically
-      oldVal          = atmIncPtr->load(std::memory_order::memory_order_seq_cst);
+      oldVal          = atmIncPtr->load(std::memory_order::memory_order_seq_cst);        // get the value of both Idx structs atomically
       *((u64*)(idxs)) = oldVal;   // default memory order for now
  
-      // increment the reader values
       if(idxs[0].val_idx < SPECIAL_VALUE_START &&
          idxs[1].val_idx < SPECIAL_VALUE_START ){
-        idxs[0].readers  +=  1;
+        idxs[0].readers  +=  1;        // increment the reader values if neithe of the indices have special values like EMPTY or DELETED
         idxs[1].readers  +=  1;
       }else{
         return false;
