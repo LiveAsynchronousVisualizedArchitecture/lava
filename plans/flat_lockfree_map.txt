@@ -56,7 +56,35 @@ Does the number of readers need to be part of the block index in the new atomic 
 
 
 
+If two indices are being swapped atomically, do they need the readers attached to them?
+|  They couldn't be changed to DELETED or EMPTY underneath
+|  They could however be changed to be completely different values with the same indices
+|  While the swap could be done atomically, you don't know if that is what you want to do
+|  |  Maybe there is a way for eventual consistency by checking before and after two indices are swapped
+|  |  However this introduces the possibility of an inserted value blinking out of existence due to another thread seeing an EMPTY or DELETED slot too early
+|  This means that the actual sequence is:
+|  |  Readers need to be incremented
+|  |  The hashes need to be checked to make sure that their positions need to be swapped
+|  |  Swap the indices
+|  |  Decrement the readers
+|  This is all neccesary because an insertion needs to start from the first free slot and swap backwards until:
+|  |  The hash lines up with it's natural slot (hash % slots) or ...
+|  |  The element at one index less has the same hash
+|  |  |  What if they have the same hash but not the same key? 
+|  |  |  Whole other can of worms, maybe they should be compared with operator< etc.
+|  
 
 
+Value meta data:
+|  Store the hash
+|  Store the index in the meta data? - no need since you are literally reading from the index when you read the meta data - you have to have it saved as a variable on the stack locally already
+
+
+What happens if an index is deleted, cleaned up, then the same index is used again and moved to a different slot while another thread is reading?
+|  If a Idx is moved around, it can still be searched for
+|  If the readers is incremented, that val_idx can't be used again, so you know it is unique
+|  Even if it is moved, you know that the key it contains can't change and thus the hash can't change
+|  If the hash can't change, you can start from the natural/ideal slot position and search forward until you find the index you are looking for
+|
 
 
