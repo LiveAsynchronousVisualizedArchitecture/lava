@@ -122,3 +122,9 @@ Capacity and the concurrent list
 |  Keeping track of capacity is important so that a resize can be done before reaching the end of the list
 
 
+Freeing a linked list of indices all at once
+|  There might not be an oportunity to free a linked list of indices instead of a single index
+|  If there is a small thread local cache of indices, using a bulk free could become more plausible
+|  
+
+

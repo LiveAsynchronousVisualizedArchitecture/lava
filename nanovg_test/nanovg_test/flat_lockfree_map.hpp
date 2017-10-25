@@ -154,7 +154,33 @@ struct flf_map
   static const u32         DELETED  =  0x00FFFFFE;              // one less than the max value above
   static const u32 SPECIAL_VALUE_START  =  DELETED;             // comparing to this is more clear than comparing to DELETED
   static const u32        LIST_END  =  0xFFFFFFFF;
-  static const u32 NXT_VER_SPECIAL  =  0xFFFFFFFF;
+  //static const u32 NXT_VER_SPECIAL  =  0xFFFFFFFF;
+
+  struct       Idx {
+    u32 readers :  8;
+    u32 val_idx : 24;
+  };
+  union    IdxPair {
+    struct { Idx first; Idx second; };
+    u64 asInt;
+  };
+  struct    Header {
+    // first 8 bytes - two 1 bytes characters that should equal 'lm' for lockless map
+    u64     typeChar1  :  8;
+    u64     typeChar2  :  8;
+    u64     sizeBytes  : 48;
+    
+    // next 8 bytes keep track of the size of the values and number inserted - from that and the sizeBytes, capacity can be inferred
+    u64          size :  32;      // this could be only 24 bits since that is the max index
+    u64  valSizeBytes :  32;
+
+    // next 4 bytes is the current block list
+    u32        curBlk;
+  };
+  struct   BlkMeta {
+  };
+
+  u8*     m_mem = nullptr;  // single pointer is all that ends up on the stack
 
   void   make_list(void* addr, u32* head, u32 size)               // this constructor is for when the memory is owned an needs to be initialized
   {                                                             // separate out initialization and let it be done explicitly in the simdb constructor?    
@@ -184,33 +210,18 @@ struct flf_map
 
     return retIdx;
   }
+  u32         free(au32* head, u32* lst, u32 st, u32 en)                                            // not thread safe when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway, since the CncrHsh will already have the index taken out and the free will only be triggered after the last reader has read from it 
+  { // todo: possibly take this out, there might not be an oportunity to free a linked list of indices instead of a single index 
+    u32 curHead, nxtHead, retIdx;
+    curHead = head->load();
+    do{
+      retIdx  = lst[en] = curHead;
+      nxtHead = st;
+    }while( !head->compare_exchange_strong(curHead, nxtHead) );
 
-
-  struct       Idx {
-    u32 readers :  8;
-    u32 val_idx : 24;
-  };
-  union    IdxPair {
-    struct { Idx first; Idx second; };
-    u64 asInt;
-  };
-  struct    Header {
-    // first 8 bytes - two 1 bytes characters that should equal 'lm' for lockless map
-    u64     typeChar1  :  8;
-    u64     typeChar2  :  8;
-    u64     sizeBytes  : 48;
-    
-    // next 8 bytes keep track of the size of the values and number inserted - from that and the sizeBytes, capacity can be inferred
-    u64          size : 32;      // this could be only 24 bits since that is the max index
-    u64  valSizeBytes : 32;
-
-    // next 4 bytes is the current block list
-    u32        curBlk;
-  };
-  struct   BlkMeta {
-  };
-
-  u8*     m_mem = nullptr;  // single pointer is all that ends up on the stack
+    return retIdx;
+  }
+  //u32        count(au32* head) const { return ((Header*)head)->cap; }
 
   u64   slotByteOffset(u64 idx){ return sizeof(Header) + idx*sizeof(IdxPair); }
   Idx*         slotPtr(u64 idx){ return (Idx*)(m_mem + slotByteOffset(idx)); }
