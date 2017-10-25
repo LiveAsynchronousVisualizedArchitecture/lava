@@ -1,4 +1,10 @@
 
+// -todo: make sizeBytes() static function
+
+// todo: make swapIdxPair function
+// todo: make allocation function
+// todo: fill out BlkMeta struct - hash and what else since the size is constant
+
 #pragma once
 
 #if !defined(__FLAT_LOCKFREE_MAP_HEADER_GUARD_HPP__)
@@ -12,20 +18,23 @@ struct flf_map
   using  u32   =   uint32_t;
   using  u64   =   uint64_t;
   using au64   =   std::atomic<uint64_t>;
+  using Key    =   u64;
+  using Value  =   u64;
+  using Hash   =   std::hash<Key>;
 
   static const u32   EMPTY  =  0x00FFFFFF;              // max value of 2^24 to set all 24 bits of the value index
   static const u32 DELETED  =  0x00FFFFFE;              // one less than the max value above
   static const u32 SPECIAL_VALUE_START  =  DELETED;     // comparing to this is more clear than comparing to DELETED
 
-  struct     Idx {
+  struct       Idx {
     u32 readers :  8;
     u32 val_idx : 24;
   };
-  union  IdxPair {
+  union    IdxPair {
     struct { Idx first; Idx second; };
     u64 asInt;
   };
-  struct  Header {
+  struct    Header {
     // first 8 bytes - two 1 bytes characters that should equal 'lm' for lockless map
     u64 typeChar1  :  8;
     u64 typeChar2  :  8;
@@ -35,12 +44,14 @@ struct flf_map
     u64           size : 32;      // this could be only 24 bits since that is the max index
     u64   valSizeBytes : 32;
   };
+  struct   BlkMeta {
+  };
 
   u8*     m_mem = nullptr;  // single pointer is all that ends up on the stack
 
-  u64  slotByteOffset(u64 idx){ return sizeof(Header) + idx*sizeof(IdxPair); }
-  Idx*        slotPtr(u64 idx){ return (Idx*)(m_mem + slotByteOffset(idx)); }
-  bool     incReaders(void* oldIp, IdxPair* newIp = nullptr) 
+  u64   slotByteOffset(u64 idx){ return sizeof(Header) + idx*sizeof(IdxPair); }
+  Idx*         slotPtr(u64 idx){ return (Idx*)(m_mem + slotByteOffset(idx)); }
+  bool      incReaders(void* oldIp, IdxPair*  newIp = nullptr) 
   {
     au64*   atmIncPtr  =  (au64*)(oldIp);
 
@@ -64,7 +75,37 @@ struct flf_map
     if(newIp) newIp->asInt = newVal;
     return true; // the readers were successfully incremented, but we need to return the indices that were swapped since we read them atomically
   }
+  bool     swapIdxPair(IdxPair* ip, IdxPair* prevIp = nullptr)
+  {
+    using namespace std;
+    
+    au64*     aip  =  (au64*)ip;
+    IdxPair oldIp;
+    oldIp.asInt    =  aip->load();
 
+    //nxtIp.asInt    =  aip->load();
+    //Idx      tmp = nxtIp.first;
+    
+    IdxPair nxtIp;
+    nxtIp.first  = oldIp.second;
+    nxtIp.second = oldIp.first;
+
+    bool ok = aip->compare_exchange_strong( oldIp.asInt, nxtIp.asInt, std::memory_order_seq_cst);
+
+    if(prevIp){ *prevIp = oldIp; }
+    return ok;
+  }
+  u64          hashKey(Key const& k)
+  {
+    return Hash()(k);  // instances a hash function object and calls operator()
+  }
+
+
+  static u64 sizeBytes(u64 capacity)
+  {
+    u64 szPerCap = sizeof(BlkMeta) + sizeof(Idx) + sizeof(Key) + sizeof(Value);
+    return sizeof(Header) + capacity*szPerCap;
+  }
 };
 
 #endif
