@@ -2,9 +2,12 @@
 // -todo: make sizeBytes() static function
 // -todo: make swapIdxPair function
 // -todo: copy in CncrBlkLst from simdb
+// -todo: take out version from CncrLst
+// -todo: put back version into ListHead
+// -todo: transition CncrLst to be without any stack variables - just use the functions and pass them addresses?
+// -todo: put version increment back into nxt and free functions
 
-// todo: take out version from CncrLst
-// todo: transition CncrLst to be without any stack variables - just use the functions and pass them addresses?
+// todo: put version into list free function
 // todo: make default constructor
 // todo: make constructor that takes a capacity
 // todo: make allocation function
@@ -23,7 +26,6 @@
 
 struct flf_map
 {
-
   using   u8    =    uint8_t;
   using  u32    =   uint32_t;
   using  u64    =   uint64_t;
@@ -34,10 +36,10 @@ struct flf_map
   using Hash    =   std::hash<Key>;
   using LstIdx  =   u32;
 
-  static const u32           EMPTY  =  0x00FFFFFF;              // max value of 2^24 to set all 24 bits of the value index
-  static const u32         DELETED  =  0x00FFFFFE;              // one less than the max value above
-  static const u32 SPECIAL_VALUE_START  =  DELETED;             // comparing to this is more clear than comparing to DELETED
-  static const u32        LIST_END  =  0xFFFFFFFF;
+  static const u32               EMPTY  =  0x00FFFFFF;              // max value of 2^24 to set all 24 bits of the value index
+  static const u32             DELETED  =  0x00FFFFFE;              // one less than the max value above
+  static const u32 SPECIAL_VALUE_START  =  DELETED;                 // comparing to this is more clear than comparing to DELETED
+  static const u32            LIST_END  =  0xFFFFFFFF;
   //static const u32 NXT_VER_SPECIAL  =  0xFFFFFFFF;
 
   struct       Idx {
@@ -78,25 +80,28 @@ struct flf_map
     for(u32 i=0; i<(size-1); ++i){ lstAddr[i] = i+1; }
     lstAddr[size-1] = LIST_END;
   }
-  u32          nxt(au32* head, u32* lst)                                      // moves forward in the list and return the previous index
+  u32          nxt(au64* head, u32* lst)                                      // moves forward in the list and return the previous index
   {
-    u32  curHead, nxtHead;
-    curHead = head->load();
+    ListHead curHead, nxtHead;
+    curHead.asInt = head->load();
     do{
-      if(curHead==LIST_END){return LIST_END;}
-      nxtHead = lst[curHead];
-    }while( !head->compare_exchange_strong(curHead, nxtHead) );
+      if(curHead.idx==LIST_END){return LIST_END;}
+      nxtHead.idx = lst[curHead.idx];
+      nxtHead.ver = curHead.ver + 1;
+    }while( !head->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
 
-    return curHead;
+    return curHead.idx;
   }
-  u32         free(au32* head, u32* lst, u32 idx)                             // not thread safe when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway, since the CncrHsh will already have the index taken out and the free will only be triggered after the last reader has read from it 
+  u32         free(au64* head, u32* lst, u32 idx)                             // not thread safe when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway, since the CncrHsh will already have the index taken out and the free will only be triggered after the last reader has read from it 
   {
-    u32 curHead, nxtHead, retIdx;
-    curHead = head->load();
+    ListHead curHead, nxtHead;
+    u32 retIdx;
+    curHead.asInt = head->load();
     do{
-      retIdx  = lst[idx] = curHead;
-      nxtHead = idx;
-    }while( !head->compare_exchange_strong(curHead, nxtHead) );
+      retIdx  = lst[idx] = curHead.idx;
+      nxtHead.idx = idx;
+      nxtHead.ver = curHead.ver + 1;
+    }while( !head->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
 
     return retIdx;
   }
