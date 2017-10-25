@@ -13,19 +13,19 @@ struct flf_map
   using  u64   =   uint64_t;
   using au64   =   std::atomic<uint64_t>;
 
-  static const u32   EMPTY  =  0x00FFFFFF;     // max value of 2^24 to set all 24 bits of the value index
-  static const u32 DELETED  =  0x00FFFFFE;     // one less than the max value above
-  static const u32 SPECIAL_VALUE_START  =  DELETED;  // comparing to this is more clear than comparing to DELETED
+  static const u32   EMPTY  =  0x00FFFFFF;              // max value of 2^24 to set all 24 bits of the value index
+  static const u32 DELETED  =  0x00FFFFFE;              // one less than the max value above
+  static const u32 SPECIAL_VALUE_START  =  DELETED;     // comparing to this is more clear than comparing to DELETED
 
-  struct Idx {
+  struct     Idx {
     u32 readers :  8;
     u32 val_idx : 24;
   };
-  union IdxPair {
+  union  IdxPair {
     struct { Idx first; Idx second; };
     u64 asInt;
   };
-  struct Header {
+  struct  Header {
     // first 8 bytes - two 1 bytes characters that should equal 'lm' for lockless map
     u64 typeChar1  :  8;
     u64 typeChar2  :  8;
@@ -36,16 +36,11 @@ struct flf_map
     u64   valSizeBytes : 32;
   };
 
-  u8* m_mem;  // single pointer is all that ends up on the stack
+  u8*     m_mem = nullptr;  // single pointer is all that ends up on the stack
 
-  //bool incTwoIdxReaders(u64 idx, IdxPair* newIp = nullptr)
-  //bool incIdxPairReaders(u64 idx, IdxPair* newIp = nullptr)
-  //
-  // u8*   firstIdxPtr  =  
-  // Idx*       idxPtr  =  (Idx*)(m_mem + idx*sizeof(Idx));     // it is crucial and fundamental that sizeof(Idx) needs to be 4 bytes so that two of them can be swapped even if unaligned, but this should be more correct and clear
-  //au64*   atmIncPtr  =  (au64*)(m_mem + idx*sizeof(Idx));       // it is crucial and fundamental that sizeof(Idx) needs to be 4 bytes so that two of them can be swapped even if unaligned, but this should be more correct and clear
-
-  bool incIdxPairReaders(void* oldIp, IdxPair* newIp = nullptr)
+  u64  slotByteOffset(u64 idx){ return sizeof(Header) + idx*sizeof(IdxPair); }
+  Idx*        slotPtr(u64 idx){ return (Idx*)(m_mem + slotByteOffset(idx)); }
+  bool     incReaders(void* oldIp, IdxPair* newIp = nullptr) 
   {
     au64*   atmIncPtr  =  (au64*)(oldIp);
 
@@ -66,13 +61,28 @@ struct flf_map
       newVal = *((u64*)(idxs));
     }while( atmIncPtr->compare_exchange_strong(oldVal, newVal) );      // store it back if the pair of indices hasn't changed - this is not an ABA problem because we aren't relying on the values at these indices yet, we are just incrementing the readers so that 1. the data is not deleted at these indices and 2. the indices themselves can't be reused until we decrement the readers
 
-    //IdxPair ip;
-    //ip.asInt = newVal;
     if(newIp) newIp->asInt = newVal;
-
     return true; // the readers were successfully incremented, but we need to return the indices that were swapped since we read them atomically
   }
 
 };
 
 #endif
+
+
+
+
+
+
+
+
+//bool incTwoIdxReaders(u64 idx, IdxPair* newIp = nullptr)
+//bool incIdxPairReaders(u64 idx, IdxPair* newIp = nullptr)
+//
+// u8*   firstIdxPtr  =  
+// Idx*       idxPtr  =  (Idx*)(m_mem + idx*sizeof(Idx));     // it is crucial and fundamental that sizeof(Idx) needs to be 4 bytes so that two of them can be swapped even if unaligned, but this should be more correct and clear
+//au64*   atmIncPtr  =  (au64*)(m_mem + idx*sizeof(Idx));       // it is crucial and fundamental that sizeof(Idx) needs to be 4 bytes so that two of them can be swapped even if unaligned, but this should be more correct and clear
+
+//IdxPair ip;
+//ip.asInt = newVal;
+
