@@ -78,7 +78,12 @@ If two indices are being swapped atomically, do they need the readers attached t
 Value meta data:
 |  Store the hash
 |  Store the index in the meta data? - no need since you are literally reading from the index when you read the meta data - you have to have it saved as a variable on the stack locally already
-
+|  Hash and what else since the size is constant?  
+|  Does the hash need to be stored? 
+|  |  Storing the hash could save time since robin hood hashing will be doing comparisons with the neighbor slots
+|  Does the meta data need to be saved in a separate place?
+|  Why was it done like that previously? Cache locality?
+|  Should the hash and the key be stored together with the value stored separatly?
 
 What happens if an index is deleted, cleaned up, then the same index is used again and moved to a different slot while another thread is reading?
 |  If a Idx is moved around, it can still be searched for
@@ -93,5 +98,21 @@ Possibly need to make sure that when deleting a Idx in a slot, DELETED is set at
 |  |  This sets up the case where a thread can get be the only one to comapre and swap from readers==1 && DELETED to readers==0 && DELETED
 |
 
+
+How to iterate through multiple values for a single key?
+|  On step forward do multiple steps
+|  |  Increment the reader count
+|  |  Read the key and value into the iterator
+|  |  Decrement the reader count
+|  |  On dereference, return the value that was already read
+|  |  If no value is found, set the iterator to == end()
+|
+
+
+Have to make room for the block list
+|  A block list header
+|  A u32 for each index
+|  Should the current list index eventually be padded to be on its own cache line to negate false sharing?
+| 
 
 

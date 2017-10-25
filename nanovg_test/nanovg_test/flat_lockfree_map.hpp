@@ -1,9 +1,18 @@
 
 // -todo: make sizeBytes() static function
+// -todo: make swapIdxPair function
+// -todo: copy in CncrBlkLst from simdb
 
-// todo: make swapIdxPair function
+// todo: take out version from CncrLst
+// todo: transition CncrLst to be without any stack variables - just use the functions and pass them addresses?
+// todo: make default constructor
+// todo: make constructor that takes a capacity
 // todo: make allocation function
-// todo: fill out BlkMeta struct - hash and what else since the size is constant
+// todo: fill out BlkMeta struct
+// todo: make put()
+// todo: make operator[]
+// todo: make operator()
+// todo: make del()
 
 #pragma once
 
@@ -14,13 +23,129 @@
 
 struct flf_map
 {
-  using   u8   =    uint8_t;
-  using  u32   =   uint32_t;
-  using  u64   =   uint64_t;
-  using au64   =   std::atomic<uint64_t>;
-  using Key    =   u64;
-  using Value  =   u64;
-  using Hash   =   std::hash<Key>;
+  class     CncrLst
+  {
+    // Copied from simdb 2017.10.25
+    // Internally this is an array of indices that makes a linked list
+    // Externally indices can be gotten atomically and given back atomically
+    // | This is used to get free indices one at a time, and give back in-use indices one at a time
+    // Uses the first 8 bytes that would normally store sizeBytes as the 64 bits of memory for the Head structure
+    // Aligns the head on a 64 bytes boundary with the rest of the memory on a separate 64 byte boudary. This puts them on separate cache lines which should eliminate false sharing between cores when atomicallyaccessing the Head union (which will happen quite a bit) 
+  public:
+    //using     u32  =  uint32_t;
+    //using     u64  =  uint64_t;
+    //using    au64  =  std::atomic<u64>;
+    using ListVec  =  lava_vec<u32>;
+
+    //union Head
+    //{
+    //  struct { u32 ver; u32 idx; };                           // ver is version, idx is index
+    //  u64 asInt;
+    //};
+    union Head
+    {
+      u8  dblCachePad[128];
+      u32         idx;                                         // idx is index
+    };
+
+
+    static const u32        LIST_END = 0xFFFFFFFF;
+    static const u32 NXT_VER_SPECIAL = 0xFFFFFFFF;
+
+  private:
+    //ListVec     s_lv;
+    //au64*        s_h;
+
+  public:
+    static u64   sizeBytes(u32 size) { return ListVec::sizeBytes(size) + 128; }         // an extra 128 bytes so that Head can be placed
+    static u32  incVersion(u32    v) { return v==NXT_VER_SPECIAL?  1  :  v+1; }
+
+    CncrLst(){}
+    CncrLst(void* addr, u32 size, bool owner=true)             // this constructor is for when the memory is owned an needs to be initialized
+    {                                                          // separate out initialization and let it be done explicitly in the simdb constructor?    
+      u64   addrRem  =  (u64)addr % 64;
+      u64 alignAddr  =  (u64)addr + (64-addrRem);
+      assert( alignAddr % 64 == 0 );
+      s_h = (au64*)alignAddr;
+
+      u32* listAddr = (u32*)((u64)alignAddr+64);
+      new (&s_lv) ListVec(listAddr, size, owner);
+
+      if(owner){
+        for(u32 i=0; i<(size-1); ++i) s_lv[i] = i+1;
+        s_lv[size-1] = LIST_END;
+
+        ((Head*)s_h)->idx = 0;
+        ((Head*)s_h)->ver = 0;
+      }
+    }
+
+    u32         nxt()                                                             // moves forward in the list and return the previous index
+    {
+      Head  curHead, nxtHead;
+      curHead.asInt  =  s_h->load();
+      do{
+        if(curHead.idx==LIST_END){return LIST_END;}
+
+        nxtHead.idx  =  s_lv[curHead.idx];
+        nxtHead.ver  =  curHead.ver==NXT_VER_SPECIAL? 1  :  curHead.ver+1;
+      }while( !s_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
+
+      return curHead.idx;
+    }
+    u32        free(u32 idx)                                                    // not thread safe when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway, since the CncrHsh will already have the index taken out and the free will only be triggered after the last reader has read from it 
+    {
+      Head curHead, nxtHead; u32 retIdx;
+      curHead.asInt = s_h->load();
+      do{
+        retIdx = s_lv[idx] = curHead.idx;
+        nxtHead.idx  =  idx;
+        nxtHead.ver  =  curHead.ver + 1;
+      }while( !s_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
+
+      return retIdx;
+    }
+    u32        free(u32 st, u32 en)                                            // not thread safe when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway, since the CncrHsh will already have the index taken out and the free will only be triggered after the last reader has read from it 
+    {
+      Head curHead, nxtHead; u32 retIdx;
+      curHead.asInt = s_h->load();
+      do{
+        retIdx = s_lv[en] = curHead.idx;
+        nxtHead.idx  =  st;
+        nxtHead.ver  =  curHead.ver + 1;
+      }while( !s_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
+
+      return retIdx;
+    }
+    auto      count() const -> u32 { return ((Head*)s_h)->ver; }
+    auto        idx() const -> u32
+    {
+      Head h; 
+      h.asInt = s_h->load();
+      return h.idx;
+    }
+    auto       list() -> ListVec const* { return &s_lv; }                      // not thread safe
+    u32      lnkCnt()                                                          // not thread safe
+    {
+      u32    cnt = 0;
+      u32 curIdx = idx();
+      while( curIdx != LIST_END ){
+        curIdx = s_lv[curIdx];
+        ++cnt;
+      }
+      return cnt;
+    }
+    auto       head() -> Head* { return (Head*)s_h; }
+  };
+
+  using   u8    =    uint8_t;
+  using  u32    =   uint32_t;
+  using  u64    =   uint64_t;
+  using au64    =   std::atomic<uint64_t>;
+  using Key     =   u64;
+  using Value   =   u64;
+  using Hash    =   std::hash<Key>;
+  using LstIdx  =   u32;
 
   static const u32   EMPTY  =  0x00FFFFFF;              // max value of 2^24 to set all 24 bits of the value index
   static const u32 DELETED  =  0x00FFFFFE;              // one less than the max value above
@@ -36,13 +161,16 @@ struct flf_map
   };
   struct    Header {
     // first 8 bytes - two 1 bytes characters that should equal 'lm' for lockless map
-    u64 typeChar1  :  8;
-    u64 typeChar2  :  8;
-    u64 sizeBytes  : 48;
+    u64     typeChar1  :  8;
+    u64     typeChar2  :  8;
+    u64     sizeBytes  : 48;
     
     // next 8 bytes keep track of the size of the values and number inserted - from that and the sizeBytes, capacity can be inferred
-    u64           size : 32;      // this could be only 24 bits since that is the max index
-    u64   valSizeBytes : 32;
+    u64          size : 32;      // this could be only 24 bits since that is the max index
+    u64  valSizeBytes : 32;
+
+    // next 4 bytes is the current block list
+    u32        curBlk;
   };
   struct   BlkMeta {
   };
@@ -82,9 +210,6 @@ struct flf_map
     au64*     aip  =  (au64*)ip;
     IdxPair oldIp;
     oldIp.asInt    =  aip->load();
-
-    //nxtIp.asInt    =  aip->load();
-    //Idx      tmp = nxtIp.first;
     
     IdxPair nxtIp;
     nxtIp.first  = oldIp.second;
@@ -103,7 +228,7 @@ struct flf_map
 
   static u64 sizeBytes(u64 capacity)
   {
-    u64 szPerCap = sizeof(BlkMeta) + sizeof(Idx) + sizeof(Key) + sizeof(Value);
+    u64 szPerCap = sizeof(BlkMeta) + sizeof(Idx) + sizeof(Key) + sizeof(Value) + sizeof(LstIdx);
     return sizeof(Header) + capacity*szPerCap;
   }
 };
@@ -116,6 +241,10 @@ struct flf_map
 
 
 
+
+
+//nxtIp.asInt    =  aip->load();
+//Idx      tmp = nxtIp.first;
 
 //bool incTwoIdxReaders(u64 idx, IdxPair* newIp = nullptr)
 //bool incIdxPairReaders(u64 idx, IdxPair* newIp = nullptr)
