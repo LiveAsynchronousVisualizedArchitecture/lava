@@ -48,10 +48,10 @@ struct flf_map
     struct { Idx first; Idx second; };
     u64 asInt;
   };
-  union    LstHead
+  union   ListHead
   {
-    u32   idx;
-    u32 count;
+    struct { u64 idx : 24; u64 ver : 40; };
+    u64 asInt;
   };
   struct    Header {
     // first 8 bytes - two 1 bytes characters that should equal 'lm' for lockless map
@@ -60,12 +60,12 @@ struct flf_map
     u64     sizeBytes  : 48;
     
     // next 8 bytes keep track of the size of the values and number inserted - from that and the sizeBytes, capacity can be inferred
-    u64          size :  32;                                    // this could be only 24 bits since that is the max index
+    u64          size :  32;                                    // part of the header so that it can be atomic - this could be only 24 bits since that is the max index
     u64  valSizeBytes :  32;
 
-    // next 4 bytes is the current block list
-    u32         lstHd;                                          // lstHd is list head
-  };
+    // next 8 bytes is the block list head - the next index to use and the number of elements combined into one struct
+    ListHead    lstHd;                                         // lstHd is list head
+   };
   struct   BlkMeta {
   };
 
@@ -112,7 +112,7 @@ struct flf_map
     return retIdx;
   }
   u32          idx(au32* head) const { return head->load(); }
-  u32*       head(){ return &(((Header*)m_mem)->lstHd); }
+  auto        head() const -> ListHead* { return &(((Header*)m_mem)->lstHd); }
   //u32        count(au32* head) const { return ((Header*)head)->cap; }
 
   u64   slotByteOffset(u64 idx){ return sizeof(Header) + idx*sizeof(IdxPair); }

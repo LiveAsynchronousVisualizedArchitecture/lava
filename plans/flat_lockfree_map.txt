@@ -121,10 +121,17 @@ Capacity and the concurrent list
 |  Instead of version in the head, a u32 can be used for capacity 
 |  Keeping track of capacity is important so that a resize can be done before reaching the end of the list
 
-
 Freeing a linked list of indices all at once
 |  There might not be an oportunity to free a linked list of indices instead of a single index
 |  If there is a small thread local cache of indices, using a bulk free could become more plausible
 |  
 
+
+Concurrent List
+|  Does the concurrent list need to keep the version number 
+|  ABA problem exists in the form of the index under the compare and swap being the same, but the index in the cell/slot it references has changed
+|  If 24 bits are all that is needed for the indices, at least the versions can have 8 more bits
+|  24 bits for idx, 40 bits for version
+|  40 bits gives a little over 1 trillion versions
+|
 
