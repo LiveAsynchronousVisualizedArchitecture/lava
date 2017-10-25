@@ -116,3 +116,9 @@ Have to make room for the block list
 | 
 
 
+Capacity and the concurrent list
+|  Might need to keep track of capacity atomically with the concurrent list
+|  Instead of version in the head, a u32 can be used for capacity 
+|  Keeping track of capacity is important so that a resize can be done before reaching the end of the list
+
+

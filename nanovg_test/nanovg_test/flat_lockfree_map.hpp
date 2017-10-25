@@ -57,27 +57,29 @@ struct flf_map
     //au64*        s_h;
 
   public:
-    static u64   sizeBytes(u32 size) { return ListVec::sizeBytes(size) + 128; }         // an extra 128 bytes so that Head can be placed
+    //static u64   sizeBytes(u32 size) { return ListVec::sizeBytes(size) + 128; }         // an extra 128 bytes so that Head can be placed
+    static u64   sizeBytes(u32 size) { return sizeof(u32) + 128; }         // an extra 128 bytes so that Head can be placed
     static u32  incVersion(u32    v) { return v==NXT_VER_SPECIAL?  1  :  v+1; }
 
     CncrLst(){}
-    CncrLst(void* addr, u32 size, bool owner=true)             // this constructor is for when the memory is owned an needs to be initialized
-    {                                                          // separate out initialization and let it be done explicitly in the simdb constructor?    
-      u64   addrRem  =  (u64)addr % 64;
-      u64 alignAddr  =  (u64)addr + (64-addrRem);
+    CncrLst(void* addr, void* headAddr, u32 size, bool owner=true)             // this constructor is for when the memory is owned an needs to be initialized
+    {                                                                          // separate out initialization and let it be done explicitly in the simdb constructor?    
+      u64    addrRem  =  (u64)headAddr % 64;
+      u64  alignAddr  =  (u64)headAddr + (64-addrRem);
       assert( alignAddr % 64 == 0 );
-      s_h = (au64*)alignAddr;
+      au64*       hd  =  (au64*)alignAddr;
+      u32*   lstAddr  =  (u32*)((u64)alignAddr+64);
+      //new (&s_lv) ListVec(listAddr, size, owner);
+      
+      // give the list initial values here
+      //u32* lstAddr = 
+      //if(owner){
+      for(u32 i=0; i<(size-1); ++i){ lstAddr[i] = i+1; }
+      lstAddr[size-1] = LIST_END;
 
-      u32* listAddr = (u32*)((u64)alignAddr+64);
-      new (&s_lv) ListVec(listAddr, size, owner);
-
-      if(owner){
-        for(u32 i=0; i<(size-1); ++i) s_lv[i] = i+1;
-        s_lv[size-1] = LIST_END;
-
-        ((Head*)s_h)->idx = 0;
-        ((Head*)s_h)->ver = 0;
-      }
+      //((Head*)s_h)->idx = 0;
+      //((Head*)s_h)->ver = 0;
+      //}
     }
 
     u32         nxt()                                                             // moves forward in the list and return the previous index
@@ -141,15 +143,48 @@ struct flf_map
   using   u8    =    uint8_t;
   using  u32    =   uint32_t;
   using  u64    =   uint64_t;
+  using au32    =   std::atomic<uint32_t>;
   using au64    =   std::atomic<uint64_t>;
   using Key     =   u64;
   using Value   =   u64;
   using Hash    =   std::hash<Key>;
   using LstIdx  =   u32;
 
-  static const u32   EMPTY  =  0x00FFFFFF;              // max value of 2^24 to set all 24 bits of the value index
-  static const u32 DELETED  =  0x00FFFFFE;              // one less than the max value above
-  static const u32 SPECIAL_VALUE_START  =  DELETED;     // comparing to this is more clear than comparing to DELETED
+  static const u32           EMPTY  =  0x00FFFFFF;              // max value of 2^24 to set all 24 bits of the value index
+  static const u32         DELETED  =  0x00FFFFFE;              // one less than the max value above
+  static const u32 SPECIAL_VALUE_START  =  DELETED;             // comparing to this is more clear than comparing to DELETED
+  static const u32        LIST_END  =  0xFFFFFFFF;
+  static const u32 NXT_VER_SPECIAL  =  0xFFFFFFFF;
+
+  void   make_list(void* addr, u32* head, u32 size)               // this constructor is for when the memory is owned an needs to be initialized
+  {                                                             // separate out initialization and let it be done explicitly in the simdb constructor?    
+    u32*  lstAddr  =  (u32*)addr;
+    for(u32 i=0; i<(size-1); ++i){ lstAddr[i] = i+1; }
+    lstAddr[size-1] = LIST_END;
+  }
+  u32          nxt(au32* head, u32* lst)                                      // moves forward in the list and return the previous index
+  {
+    u32  curHead, nxtHead;
+    curHead = head->load();
+    do{
+      if(curHead==LIST_END){return LIST_END;}
+      nxtHead = lst[curHead];
+    }while( !head->compare_exchange_strong(curHead, nxtHead) );
+
+    return curHead;
+  }
+  u32         free(au32* head, u32* lst, u32 idx)                             // not thread safe when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway, since the CncrHsh will already have the index taken out and the free will only be triggered after the last reader has read from it 
+  {
+    u32 curHead, nxtHead, retIdx;
+    curHead = head->load();
+    do{
+      retIdx  = lst[idx] = curHead;
+      nxtHead = idx;
+    }while( !head->compare_exchange_strong(curHead, nxtHead) );
+
+    return retIdx;
+  }
+
 
   struct       Idx {
     u32 readers :  8;
@@ -242,6 +277,11 @@ struct flf_map
 
 
 
+//
+//nxtHead.ver  =  curHead.ver + 1;
+
+//au32* head = 
+//nxtHead.ver  =  curHead.ver==NXT_VER_SPECIAL? 1  :  curHead.ver+1;
 
 //nxtIp.asInt    =  aip->load();
 //Idx      tmp = nxtIp.first;
