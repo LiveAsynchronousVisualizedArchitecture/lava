@@ -135,3 +135,24 @@ Concurrent List
 |  40 bits gives a little over 1 trillion versions
 |
 
+Using as unordered_set, unordered_map, and unordered_multimap
+|  Give values as a variadic template
+|  Let the variadic type arguments that make up values be zero or more values
+|  This will give a unified set, multi-set, map and multi-map
+|  All with a multiple types, creating a table
+|  Still not sorted so can't query ranges
+|  Can still only use 1 key
+|  |  Could this be changed using a variadic template for keys?
+|  |  How would construction work? Would it need to be compound?
+|  |  Ordering could get tricky - maybe the first key would need to be primary and other keys would jump to index that only contains the real index to jump to
+|  Does boost's nightmare multi-index map enable lookup using multiple different key types as keys?
+|  |  Yes, it enables one or more indices
+|  Simplifying construction
+|  |  Use tuples as lists of types?
+|  |  Make or copy a simple list of types 
+|
+
+Should 8 bytes be left after sizeBytes for a type number?
+|  Would this help, even in the case of LAVA?
+
+

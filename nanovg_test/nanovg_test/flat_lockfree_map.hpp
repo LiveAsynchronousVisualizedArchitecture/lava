@@ -76,8 +76,9 @@ struct flf_map
   u8*     m_mem = nullptr;  // single pointer is all that ends up on the stack
 
   // concurrent list functions
+  //void       make_list(void* addr, u32* head, u32 size)             // this constructor is for when the memory is owned an needs to be initialized
   void       make_list(void* addr, u32* head, u32 size)               // this constructor is for when the memory is owned an needs to be initialized
-  {                                                             // separate out initialization and let it be done explicitly in the simdb constructor?    
+  {                                                                   // separate out initialization and let it be done explicitly in the simdb constructor?    
     u32*  lstAddr  =  (u32*)addr;
     for(u32 i=0; i<(size-1); ++i){ lstAddr[i] = i+1; }
     lstAddr[size-1] = LIST_END;
@@ -210,7 +211,7 @@ struct flf_map
     return capacity * sizeof(Hash)+sizeof(Key)+sizeof(Value);
   }
 
-  static u64 sizeBytes(u64 capacity)
+  static u64   sizeBytes(u64 capacity)
   {
     u64 szPerCap = sizeof(BlkMeta) + sizeof(Idx) + sizeof(Key) + sizeof(Value) + sizeof(LstIdx);
     return sizeof(Header) + capacity*szPerCap;
