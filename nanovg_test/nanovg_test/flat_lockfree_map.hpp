@@ -6,12 +6,13 @@
 // -todo: put back version into ListHead
 // -todo: transition CncrLst to be without any stack variables - just use the functions and pass them addresses?
 // -todo: put version increment back into nxt and free functions
+// -todo: convert idx function to use 64 bit ListHead with version
+// -todo: put version into list free function
 
-// todo: put version into list free function
 // todo: make default constructor
 // todo: make constructor that takes a capacity
 // todo: make allocation function
-// todo: fill out BlkMeta struct
+// todo: fill out BlkMeta struct - should it even be used?
 // todo: make put()
 // todo: make operator[]
 // todo: make operator()
@@ -33,7 +34,8 @@ struct flf_map
   using au64    =   std::atomic<uint64_t>;
   using Key     =   u64;
   using Value   =   u64;
-  using Hash    =   std::hash<Key>;
+  using Hash    =   u64;
+  using Hasher  =   std::hash<Key>;
   using LstIdx  =   u32;
 
   static const u32               EMPTY  =  0x00FFFFFF;              // max value of 2^24 to set all 24 bits of the value index
@@ -74,13 +76,13 @@ struct flf_map
   u8*     m_mem = nullptr;  // single pointer is all that ends up on the stack
 
   // concurrent list functions
-  void   make_list(void* addr, u32* head, u32 size)               // this constructor is for when the memory is owned an needs to be initialized
+  void       make_list(void* addr, u32* head, u32 size)               // this constructor is for when the memory is owned an needs to be initialized
   {                                                             // separate out initialization and let it be done explicitly in the simdb constructor?    
     u32*  lstAddr  =  (u32*)addr;
     for(u32 i=0; i<(size-1); ++i){ lstAddr[i] = i+1; }
     lstAddr[size-1] = LIST_END;
   }
-  u32          nxt(au64* head, u32* lst)                                      // moves forward in the list and return the previous index
+  u32              nxt(au64* head, u32* lst)                                      // moves forward in the list and return the previous index
   {
     ListHead curHead, nxtHead;
     curHead.asInt = head->load();
@@ -92,7 +94,7 @@ struct flf_map
 
     return curHead.idx;
   }
-  u32         free(au64* head, u32* lst, u32 idx)                             // not thread safe when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway, since the CncrHsh will already have the index taken out and the free will only be triggered after the last reader has read from it 
+  u32             free(au64* head, u32* lst, u32 idx)                             // not thread safe when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway, since the CncrHsh will already have the index taken out and the free will only be triggered after the last reader has read from it 
   {
     ListHead curHead, nxtHead;
     u32 retIdx;
@@ -105,21 +107,24 @@ struct flf_map
 
     return retIdx;
   }
-  u32         free(au32* head, u32* lst, u32 st, u32 en)                                            // not thread safe when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway, since the CncrHsh will already have the index taken out and the free will only be triggered after the last reader has read from it 
+  u32             free(au64* head, u32* lst, u32 st, u32 en)                                            // not thread safe when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway, since the CncrHsh will already have the index taken out and the free will only be triggered after the last reader has read from it 
   { // todo: possibly take this out, there might not be an oportunity to free a linked list of indices instead of a single index 
-    u32 curHead, nxtHead, retIdx;
-    curHead = head->load();
+    ListHead curHead, nxtHead;
+    u32 retIdx;
+    curHead.asInt = head->load();
     do{
-      retIdx  = lst[en] = curHead;
-      nxtHead = st;
-    }while( !head->compare_exchange_strong(curHead, nxtHead) );
+      retIdx = lst[en] = curHead.idx;
+      nxtHead.idx = st;
+      nxtHead.ver = curHead.ver + 1;
+    }while( !head->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
 
     return retIdx;
   }
-  u32          idx(au32* head) const { return head->load(); }
-  auto        head() const -> ListHead* { return &(((Header*)m_mem)->lstHd); }
+  u32              idx(au64* head) const { return ((ListHead*)head->load())->idx; }
+  auto            head() const -> ListHead* { return &(((Header*)m_mem)->lstHd); }
   //u32        count(au32* head) const { return ((Header*)head)->cap; }
 
+  // utility functions
   u64   slotByteOffset(u64 idx){ return sizeof(Header) + idx*sizeof(IdxPair); }
   Idx*         slotPtr(u64 idx){ return (Idx*)(m_mem + slotByteOffset(idx)); }
   bool      incReaders(void* oldIp, IdxPair*  newIp = nullptr) 
@@ -165,9 +170,45 @@ struct flf_map
   }
   u64          hashKey(Key const& k)
   {
-    return Hash()(k);  // instances a hash function object and calls operator()
+    return Hasher()(k);  // instances a hash function object and calls operator()
   }
 
+  flf_map(){}
+  flf_map(u64 capacity)
+  {
+    u64 szBytes = flf_map::sizeBytes(capacity);
+    m_mem = nullptr;  //  allocation cast to u8* goes here
+
+    void* list_start_addr = nullptr;  // calculate the start address of the list here - sizeof(Head) + capacity*sizeof(Idx)
+    //make_list( list_start_addr, (au64*)list_head_addr, (u32)capacity ); 
+  }
+
+  // static functions for calculating the offset of each segment of the flat memory
+  // The flat memory is organized as:  | Header | 32 bit readers + idx slots | concurrent linked list (linked with indices) | hash + key + values |
+  static u64 offsetBytes_slots()
+  {
+    return sizeof(Header);
+  }
+  static u64   sizeBytes_slots(u64 capacity)
+  {
+    return capacity*sizeof(Idx);
+  }
+  static u64 offsetBytes_list(u64 capacity)
+  {
+    return offsetBytes_slots() + sizeBytes_slots(capacity);
+  }
+  static u64   sizeBytes_list(u64 capacity)
+  {
+    return capacity*sizeof(LstIdx);
+  }
+  static u64 offsetBytes_values(u64 capacity)
+  {
+    return offsetBytes_list(capacity) + sizeBytes_list(capacity);
+  }
+  static u64   sizeBytes_values(u64 capacity)
+  {
+    return capacity * sizeof(Hash)+sizeof(Key)+sizeof(Value);
+  }
 
   static u64 sizeBytes(u64 capacity)
   {
