@@ -114,6 +114,7 @@
 // -todo: change LavaFrame bitset names - taken out due to bitset
 // -todo: type notes for flat_lockfree_map
 
+// todo: work on flat lock free map
 // todo: make an atomic bitset
 // todo: make LavaFrame slots start from the beggining
 // todo: make LavaFrame operations atomic - need an atomic bitset 
@@ -1662,6 +1663,22 @@ ENTRY_DECLARATION // main or winmain
 
     //decltype(std::unordered_map<int,int>::begin()) 
     Println("sizeof( std::unordered_map<int,int>::iterator ) ): ",  sizeof( std::unordered_map<int,int>::iterator ) );
+
+    Println();
+    flf_map  defaultMap;
+    flf_map  tstMap(8);
+    flf_map::Header* hd = tstMap.header();
+    Println("Header | typechar1: ", (char)hd->typeChar1, 
+            " typechar2: ",         (char)hd->typeChar2, 
+            " sizeBytes: ",    hd->sizeBytes, 
+            " size: ",         hd->size, 
+            " valSizeBytes: ", hd->valSizeBytes );
+   Print("List: ");
+   u32* lst = tstMap.listStart(8);
+   TO(8,i) Print(lst[i]," ");
+   Println();
+
+   Println("size: ", tstMap.size(), " capacity: ", tstMap.capacity() );
   }
 
   glfwSetTime(0);

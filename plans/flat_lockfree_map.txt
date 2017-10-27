@@ -147,12 +147,24 @@ Using as unordered_set, unordered_map, and unordered_multimap
 |  |  Ordering could get tricky - maybe the first key would need to be primary and other keys would jump to index that only contains the real index to jump to
 |  Does boost's nightmare multi-index map enable lookup using multiple different key types as keys?
 |  |  Yes, it enables one or more indices
-|  Simplifying construction
-|  |  Use tuples as lists of types?
-|  |  Make or copy a simple list of types 
-|
+
+Simplifying construction
+|  Use tuples as lists of types?
+|  Make or copy a simple list of types 
+|  Should the choice of multiple values be left up to the user since they can use a tuple<> themselves?
+|  Would a make_flf_map function be more elegant for custom allocators?
+|  How should arbitrary memory like shared memory mapped files work? anothe make_ function?
+|  |  might need malloc and free 
+|  |  don't need realloc, because resizing will make a second buffer so that reading is always available
 
 Should 8 bytes be left after sizeBytes for a type number?
 |  Would this help, even in the case of LAVA?
+
+
+Keeping track of size:
+|  Can the size be incremented atomically but separatly from the ListHead ?
+|  It would be serial and eventually consistent, but not in lock step with the ListHead Index and version
+|  ListHead is isolated and could potentially be 128 bits instead of 64 bits
+|
 
 

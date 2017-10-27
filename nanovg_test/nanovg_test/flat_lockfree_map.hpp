@@ -8,11 +8,19 @@
 // -todo: put version increment back into nxt and free functions
 // -todo: convert idx function to use 64 bit ListHead with version
 // -todo: put version into list free function
+// -todo: make default constructor
+// -todo: make constructor that takes a capacity
+// -todo: copy in next power of 2 function from simdb
+// -todo: make allocation function - don't need much since the only trick is the size of the flat memory, which is given by the static sizeBytes() function
+// -todo: fill out BlkMeta struct - should it even be used? - won't use it for now
+// -todo: make atomic load and store for list head
+// -todo: fill out the rest of the constructor
+// -todo: print out header
+// -todo: print out list
+// -todo: make a size function
+// -todo: make a capacity function
+// -todo: test and print size and capacity
 
-// todo: make default constructor
-// todo: make constructor that takes a capacity
-// todo: make allocation function
-// todo: fill out BlkMeta struct - should it even be used?
 // todo: make put()
 // todo: make operator[]
 // todo: make operator()
@@ -23,6 +31,7 @@
 #if !defined(__FLAT_LOCKFREE_MAP_HEADER_GUARD_HPP__)
 
 #include <cstdint>
+#include <cstdlib>
 #include <atomic>
 
 struct flf_map
@@ -42,7 +51,6 @@ struct flf_map
   static const u32             DELETED  =  0x00FFFFFE;              // one less than the max value above
   static const u32 SPECIAL_VALUE_START  =  DELETED;                 // comparing to this is more clear than comparing to DELETED
   static const u32            LIST_END  =  0xFFFFFFFF;
-  //static const u32 NXT_VER_SPECIAL  =  0xFFFFFFFF;
 
   struct       Idx {
     u32 readers :  8;
@@ -56,6 +64,17 @@ struct flf_map
   {
     struct { u64 idx : 24; u64 ver : 40; };
     u64 asInt;
+
+    u32    loadIdx() const
+    {
+      ListHead ldHd;
+      ldHd.asInt = ((au64*)&asInt)->load();
+      return (u32)ldHd.idx;
+    }
+    void     store(ListHead lh)
+    {
+      ((au64*)&asInt)->store(lh.asInt);
+    }
   };
   struct    Header {
     // first 8 bytes - two 1 bytes characters that should equal 'lm' for lockless map
@@ -76,8 +95,7 @@ struct flf_map
   u8*     m_mem = nullptr;  // single pointer is all that ends up on the stack
 
   // concurrent list functions
-  //void       make_list(void* addr, u32* head, u32 size)             // this constructor is for when the memory is owned an needs to be initialized
-  void       make_list(void* addr, u32* head, u32 size)               // this constructor is for when the memory is owned an needs to be initialized
+  void       make_list(void* addr, u32 size)                          // this constructor is for when the memory is owned an needs to be initialized
   {                                                                   // separate out initialization and let it be done explicitly in the simdb constructor?    
     u32*  lstAddr  =  (u32*)addr;
     for(u32 i=0; i<(size-1); ++i){ lstAddr[i] = i+1; }
@@ -122,8 +140,9 @@ struct flf_map
     return retIdx;
   }
   u32              idx(au64* head) const { return ((ListHead*)head->load())->idx; }
-  auto            head() const -> ListHead* { return &(((Header*)m_mem)->lstHd); }
-  //u32        count(au32* head) const { return ((Header*)head)->cap; }
+  auto          header() const -> Header*   { return (Header*)m_mem; }
+  auto        listHead() const -> ListHead* { return &(((Header*)m_mem)->lstHd); }
+  u32*       listStart(u64 capacity) { return (u32*)(m_mem + offsetBytes_list(capacity)); }
 
   // utility functions
   u64   slotByteOffset(u64 idx){ return sizeof(Header) + idx*sizeof(IdxPair); }
@@ -174,18 +193,59 @@ struct flf_map
     return Hasher()(k);  // instances a hash function object and calls operator()
   }
 
+  // public interface functions
+  u32     size(){ return header()->size; }
+  u32 capacity()
+  {
+    auto hdr = header();
+    u32  cap = (hdr->sizeBytes - sizeof(Header)) / sizeBytes_perCap();
+    return cap;
+  }
+
   flf_map(){}
   flf_map(u64 capacity)
   {
-    u64 szBytes = flf_map::sizeBytes(capacity);
-    m_mem = nullptr;  //  allocation cast to u8* goes here
+    u64 szBytes = sizeBytes(capacity);
+    m_mem       = (u8*)malloc(szBytes);                 //nullptr;  //  allocation cast to u8* goes here
 
-    void* list_start_addr = nullptr;  // calculate the start address of the list here - sizeof(Head) + capacity*sizeof(Idx)
-    //make_list( list_start_addr, (au64*)list_head_addr, (u32)capacity ); 
+    void* list_start_addr = m_mem + offsetBytes_list(capacity);  // nullptr;  // calculate the start address of the list here - sizeof(Head) + capacity*sizeof(Idx)
+
+    Header*    h    = header();
+    h->typeChar1    = 'L';
+    h->typeChar2    = 'F';
+    h->sizeBytes    = szBytes;
+    h->size         = 0;
+    h->valSizeBytes = sizeof(Value);
+
+    ListHead initLH;
+    initLH.idx = 0;
+    initLH.ver = 0;
+    //listHead()->store(initLH);
+    h->lstHd.store(initLH);
+    make_list( list_start_addr, (u32)capacity );
+  }
+
+
+  // static utility functions
+  static u32        nextPowerOf2(u32  v)
+  {
+    v--;
+    v |= v >> 1;
+    v |= v >> 2;
+    v |= v >> 4;
+    v |= v >> 8;
+    v |= v >> 16;
+    v++;
+
+    return v;
   }
 
   // static functions for calculating the offset of each segment of the flat memory
   // The flat memory is organized as:  | Header | 32 bit readers + idx slots | concurrent linked list (linked with indices) | hash + key + values |
+  static u64  sizeBytes_perCap()
+  {
+    return sizeof(Idx) + sizeof(LstIdx) + sizeof(Hash)+sizeof(Key)+sizeof(Value);
+  }
   static u64 offsetBytes_slots()
   {
     return sizeof(Header);
@@ -213,7 +273,7 @@ struct flf_map
 
   static u64   sizeBytes(u64 capacity)
   {
-    u64 szPerCap = sizeof(BlkMeta) + sizeof(Idx) + sizeof(Key) + sizeof(Value) + sizeof(LstIdx);
+    u64 szPerCap = sizeBytes_perCap(); //sizeof(BlkMeta) + sizeof(Idx) + sizeof(Key) + sizeof(Value) + sizeof(LstIdx);
     return sizeof(Header) + capacity*szPerCap;
   }
 };
@@ -227,7 +287,16 @@ struct flf_map
 
 
 
+//
+//make_list( list_start_addr, (au64*)list_head_addr, (u32)capacity ); 
 
+//u32          headIdx() const
+//{
+//}
+//static const u32 NXT_VER_SPECIAL  =  0xFFFFFFFF;
+
+//void       make_list(void* addr, u32* head, u32 size)             // this constructor is for when the memory is owned an needs to be initialized
+//u32        count(au32* head) const { return ((Header*)head)->cap; }
 
 //class     CncrLst
 //{
