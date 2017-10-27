@@ -168,3 +168,40 @@ Keeping track of size:
 |
 
 
+operator[] and operator()
+|  Will these need to return a smaller struct / iterator that does the actual insert on operator= assignment?
+|  
+
+Robin Hood Insertion
+|  what if the span of ideal slots changes while inserting
+|  |  while inserting into a slot/cell, 
+|  |  probe forward and find an empty slot
+|  |  compare and swap sucessfully
+|  |  meanwhile the span of slots before it has changed, and now the slot being inserted ends a span of another key
+|  |  will need to check the previous slot at the same time as the current slot to make sure that it is in the correct key span
+|  |  |  this will mean incrementing the readers of both, 
+|  |  |  then checking their values
+|  |  |  then potentially swapping them
+|  |  |  then decrementing their values
+|  Can a deleted slot get swapped? 
+|  |  only after the thread owning deletion sets it to DELETED and readers to 0
+|  |  what is important is that the DELETED slot doesn't change to EMPTY until the readers are 0
+|  |  because of this, a DELETED slot can't be moved, because any reading thread needs to come back to that specific index to decrement its readers
+|  |  the thread that sets it to DELETED and readers==0 will then need to swap it forward until it finds an EMPTY slot
+|  |  when the deleting thread finds the EMPTY slot as the next slot, it will try to compare and swap them both to EMPTY
+|  Big win for robin hood hashing is that finding a key that is not in the table has a very early exit
+|  
+|
+
+Alignment
+|  Might need to make the header contain padding for alignment 
+|  There could be an offset parameter after the other parameters that says where the per element memory should start
+|  This could ensure that alignments such as cache line specific variables and 128 bit aligned atomic operations are in place  
+|
+
+Initial capacity
+|  Should the initial capacity be 8 or 16?
+|  It could be argued that there is no reason to use a hash table for fewer elements since they could be searched linearly
+|
+
+

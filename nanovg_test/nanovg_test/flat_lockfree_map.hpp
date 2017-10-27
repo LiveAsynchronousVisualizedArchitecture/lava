@@ -22,9 +22,10 @@
 // -todo: test and print size and capacity
 
 // todo: make put()
+// todo: make get()
+// todo: make del()
 // todo: make operator[]
 // todo: make operator()
-// todo: make del()
 
 #pragma once
 

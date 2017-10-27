@@ -113,8 +113,8 @@
 // -todo: separate out bitset - use std::bitset instead
 // -todo: change LavaFrame bitset names - taken out due to bitset
 // -todo: type notes for flat_lockfree_map
+// -todo: work on flat lock free map
 
-// todo: work on flat lock free map
 // todo: make an atomic bitset
 // todo: make LavaFrame slots start from the beggining
 // todo: make LavaFrame operations atomic - need an atomic bitset 
