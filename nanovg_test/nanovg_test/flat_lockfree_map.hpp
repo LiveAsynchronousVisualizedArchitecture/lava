@@ -20,6 +20,7 @@
 // -todo: make a size function
 // -todo: make a capacity function
 // -todo: test and print size and capacity
+// -todo: round capacity up to the nearest power of 2
 
 // todo: make put()
 // todo: make get()
@@ -34,6 +35,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <atomic>
+#include <optional>
 
 struct flf_map
 {
@@ -53,9 +55,9 @@ struct flf_map
   static const u32 SPECIAL_VALUE_START  =  DELETED;                 // comparing to this is more clear than comparing to DELETED
   static const u32            LIST_END  =  0xFFFFFFFF;
 
-  struct       Idx {
-    u32 readers :  8;
-    u32 val_idx : 24;
+  union        Idx {
+    struct { u32 readers :  8;  u32 val_idx : 24; };
+    u32 asInt;
   };
   union    IdxPair {
     struct { Idx first; Idx second; };
@@ -146,8 +148,14 @@ struct flf_map
   u32*       listStart(u64 capacity) { return (u32*)(m_mem + offsetBytes_list(capacity)); }
 
   // utility functions
-  u64   slotByteOffset(u64 idx){ return sizeof(Header) + idx*sizeof(IdxPair); }
-  Idx*         slotPtr(u64 idx){ return (Idx*)(m_mem + slotByteOffset(idx)); }
+  Idx*         slotPtr(){ return (Idx*)(m_mem + offsetBytes_slots()); }   // slotByteOffset(idx)); }
+  Idx          getSlot(Idx* idx, u64 offset)
+  {
+    Idx ret;
+    ret.asInt  =  ((au32*)(idx + offset))->load();
+    
+    return ret;
+  }
   bool      incReaders(void* oldIp, IdxPair*  newIp = nullptr) 
   {
     au64*   atmIncPtr  =  (au64*)(oldIp);
@@ -189,27 +197,88 @@ struct flf_map
     if(prevIp){ *prevIp = oldIp; }
     return ok;
   }
-  u64          hashKey(Key const& k)
+  Hash         hashKey(Key const& k)
   {
     return Hasher()(k);  // instances a hash function object and calls operator()
   }
 
   // public interface functions
+  auto            get(Key const& key) -> std::optional<Value>
+  {
+    //HshType hh;
+    //hh.hash   =  HashStr(key);
+    //u32  hsh  =  hh.hash;                                                 // make sure that the hash is being squeezed into the same bit depth as the hash in HshType
+    //if(out_hash){ *out_hash = hsh; }
+    Hash   hsh = hashKey(key);
+
+    //KV*   el  =  (KV*)elemStart();                                         // el is a pointer to the elements 
+    Idx* slots = slotPtr();
+
+    //u64  mod  =  map_capacity();
+    //if(mod==0) return nullptr;
+    u64 mod = capacity();  // todo: if(mod==0) return optional<false> or iterator/return struct equivilent
+
+    u64    i  =  hsh % mod;
+    u64   en  =  prev(i,mod);
+    u64 dist  =  0;
+    for(;;++i,++dist)
+    {
+      i %= mod;                                                                // get idx within capacity
+      //HshType eh = el[i].hsh;                                                // eh is element hash
+
+      Idx curIdx  =  getSlot(slots, i);
+      if(curIdx.val_idx==DELETED){
+        continue;
+      }else if(curIdx.val_idx==EMPTY){
+        break;
+        //return std::optional<Value>();
+        /* return something that will evaluate to false here */
+      }else if( /*check that hash then key are the same*/1==1 ){
+        /* return the value here */
+      }//else if(dist > wrapDist(el,i,mod) ){
+        // break; /* return false here? */
+
+      if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+    }
+
+    return std::optional<Value>(); // return a false value here since nothing was found
+
+                                     
+    //  if( eh.type == HshType::EMPTY || 
+    //    (hsh == eh.hash &&                                  // if the hashes aren't the same, the keys can't be the same
+    //      strncmp(el[i].key,key,sizeof(KV::Key)-1)==0) )
+    //  { 
+    //    return &el[i];
+    //  }else if(dist > wrapDist(el,i,mod) ){
+    //    //KV kv(key, hsh);
+    //    KV kv(key);
+    //    kv.hsh.hash = hsh;
+    //    elems( elems()+1 );
+    //    return &(place_rh(kv, el, i, dist, mod));
+    //  }
+    //
+    //  if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+    //}
+    //
+    //return nullptr; // no empty slots and key was not found
+  }
   u32     size(){ return header()->size; }
   u32 capacity()
   {
     auto hdr = header();
-    u32  cap = (hdr->sizeBytes - sizeof(Header)) / sizeBytes_perCap();
+    u32  cap = (u32)( (hdr->sizeBytes-sizeof(Header))/sizeBytes_perCap() );
     return cap;
   }
+
 
   flf_map(){}
   flf_map(u64 capacity)
   {
-    u64 szBytes = sizeBytes(capacity);
+    u64    cap2 = nextPowerOf2(capacity);
+    u64 szBytes = sizeBytes(cap2);
     m_mem       = (u8*)malloc(szBytes);                 //nullptr;  //  allocation cast to u8* goes here
 
-    void* list_start_addr = m_mem + offsetBytes_list(capacity);  // nullptr;  // calculate the start address of the list here - sizeof(Head) + capacity*sizeof(Idx)
+    void* list_start_addr = m_mem + offsetBytes_list(cap2);  // nullptr;  // calculate the start address of the list here - sizeof(Head) + capacity*sizeof(Idx)
 
     Header*    h    = header();
     h->typeChar1    = 'L';
@@ -223,12 +292,12 @@ struct flf_map
     initLH.ver = 0;
     //listHead()->store(initLH);
     h->lstHd.store(initLH);
-    make_list( list_start_addr, (u32)capacity );
+    make_list( list_start_addr, (u32)cap2 );
   }
 
 
   // static utility functions
-  static u32        nextPowerOf2(u32  v)
+  static u32      nextPowerOf2(u32  v)
   {
     v--;
     v |= v >> 1;
@@ -239,6 +308,11 @@ struct flf_map
     v++;
 
     return v;
+  }
+  static u64              prev(u64  i, u64 mod)
+  {
+    if(mod==0) return 0;
+    return i==0?  mod-1  :  i-1;
   }
 
   // static functions for calculating the offset of each segment of the flat memory
@@ -287,6 +361,11 @@ struct flf_map
 
 
 
+
+
+
+// not even correct
+//u64   slotByteOffset(u64 idx){ return sizeof(Header) + idx*sizeof(IdxPair); }
 
 //
 //make_list( list_start_addr, (au64*)list_head_addr, (u32)capacity ); 

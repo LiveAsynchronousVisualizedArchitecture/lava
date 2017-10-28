@@ -1666,7 +1666,7 @@ ENTRY_DECLARATION // main or winmain
 
     Println();
     flf_map  defaultMap;
-    flf_map  tstMap(8);
+    flf_map  tstMap(11);
     flf_map::Header* hd = tstMap.header();
     Println("Header | typechar1: ", (char)hd->typeChar1, 
             " typechar2: ",         (char)hd->typeChar2, 
@@ -1674,8 +1674,8 @@ ENTRY_DECLARATION // main or winmain
             " size: ",         hd->size, 
             " valSizeBytes: ", hd->valSizeBytes );
    Print("List: ");
-   u32* lst = tstMap.listStart(8);
-   TO(8,i) Print(lst[i]," ");
+   u32* lst = tstMap.listStart( tstMap.capacity() );
+   TO(tstMap.capacity(),i) Print(lst[i]," ");
    Println();
 
    Println("size: ", tstMap.size(), " capacity: ", tstMap.capacity() );
