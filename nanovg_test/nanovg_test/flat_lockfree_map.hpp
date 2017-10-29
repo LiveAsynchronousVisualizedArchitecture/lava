@@ -22,8 +22,8 @@
 // -todo: test and print size and capacity
 // -todo: round capacity up to the nearest power of 2
 
-// todo: make put()
 // todo: make get()
+// todo: make put()
 // todo: make del()
 // todo: make operator[]
 // todo: make operator()
@@ -35,7 +35,7 @@
 #include <cstdint>
 #include <cstdlib>
 #include <atomic>
-#include <optional>
+//#include <optional>
 
 struct flf_map
 {
@@ -55,6 +55,16 @@ struct flf_map
   static const u32 SPECIAL_VALUE_START  =  DELETED;                 // comparing to this is more clear than comparing to DELETED
   static const u32            LIST_END  =  0xFFFFFFFF;
 
+  struct       Ret
+  {
+    union { 
+      Value val;
+      u8 asBytes[sizeof(Value)]; 
+    };      
+    bool     ok;
+
+    operator bool() const { return ok; }
+  };
   union        Idx {
     struct { u32 readers :  8;  u32 val_idx : 24; };
     u32 asInt;
@@ -203,7 +213,7 @@ struct flf_map
   }
 
   // public interface functions
-  auto            get(Key const& key) -> std::optional<Value>
+  auto            get(Key const& key) -> Ret // std::optional<Value>
   {
     //HshType hh;
     //hh.hash   =  HashStr(key);
@@ -231,19 +241,21 @@ struct flf_map
         continue;
       }else if(curIdx.val_idx==EMPTY){
         break;
-        //return std::optional<Value>();
         /* return something that will evaluate to false here */
       }else if( /*check that hash then key are the same*/1==1 ){
-        /* return the value here */
+        /* return the value here */ // get the offset of the hash key value segment, offset by the index, the offset by the sizeof Hash and Key
       }//else if(dist > wrapDist(el,i,mod) ){
         // break; /* return false here? */
 
       if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
     }
 
-    return std::optional<Value>(); // return a false value here since nothing was found
+    Ret ret;
+    ret.ok = false;
+    return ret;        //std::optional<Value>(); // return a false value here since nothing was found
 
-                                     
+    //return std::optional<Value>();
+    //
     //  if( eh.type == HshType::EMPTY || 
     //    (hsh == eh.hash &&                                  // if the hashes aren't the same, the keys can't be the same
     //      strncmp(el[i].key,key,sizeof(KV::Key)-1)==0) )

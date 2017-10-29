@@ -205,3 +205,22 @@ Initial capacity
 |
 
 
+Insertion
+|  Need to figure out what will have to happen in insertion
+|  It is possible that the insertion start will be an EMPTY slot at the end of different span than the inserting key
+|  It is possible that other indices closer to the ideal position will be moved around
+|  Is it possible that the inserting Key will be moved by another thread before it is in its ideal position?
+|  |  Yes, because DELETED slots/cells will get bubbled forward until they find an EMPTY slot
+|  |  A thread can be inserting a key and find that the key is no longer where it put it
+|  |  It will have to loop towards the ideal position to find it 
+|  |  It can then keep trying to swap it towards it's ideal position, also stopping if it hits a Key that is further or the same distance from its ideal position
+|  What are the conditions for stopping a find?
+|  |  Can't stop on finding something further from its ideal position (further than what?)
+|  |  Can stop if hitting an EMPTY slot/cell
+|  |  Can stop if the current cell is closer to it's ideal position than the number of indices searched? 
+|  |  If the slot being checked has an ideal position forward from the ideal position of the Key being searched for, that should mean they Key isn't found
+|
+|
+
+
+
