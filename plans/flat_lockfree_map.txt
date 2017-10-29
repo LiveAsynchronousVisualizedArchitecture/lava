@@ -214,6 +214,8 @@ Insertion
 |  |  A thread can be inserting a key and find that the key is no longer where it put it
 |  |  It will have to loop towards the ideal position to find it 
 |  |  It can then keep trying to swap it towards it's ideal position, also stopping if it hits a Key that is further or the same distance from its ideal position
+
+Find / Get
 |  What are the conditions for stopping a find?
 |  |  Can't stop on finding something further from its ideal position (further than what?)
 |  |  Can stop if hitting an EMPTY slot/cell

@@ -21,7 +21,10 @@
 // -todo: make a capacity function
 // -todo: test and print size and capacity
 // -todo: round capacity up to the nearest power of 2
+// -todo: make decReaders
+// -todo: take out optional and make Ret struct that can be cast to bool
 
+// todo: make wrapDist - copy from tbl
 // todo: make get()
 // todo: make put()
 // todo: make del()
@@ -42,6 +45,7 @@ struct flf_map
   using   u8    =    uint8_t;
   using  u32    =   uint32_t;
   using  u64    =   uint64_t;
+  using  i64    =    int64_t;
   using au32    =   std::atomic<uint32_t>;
   using au64    =   std::atomic<uint64_t>;
   using Key     =   u64;
@@ -166,7 +170,7 @@ struct flf_map
     
     return ret;
   }
-  bool      incReaders(void* oldIp, IdxPair*  newIp = nullptr) 
+  bool      incReaders(void* oldIp, IdxPair*  newIp = nullptr, i64 increment=1) 
   {
     au64*   atmIncPtr  =  (au64*)(oldIp);
 
@@ -178,8 +182,8 @@ struct flf_map
  
       if(idxs[0].val_idx < SPECIAL_VALUE_START &&
          idxs[1].val_idx < SPECIAL_VALUE_START ){
-        idxs[0].readers  +=  1;        // increment the reader values if neithe of the indices have special values like EMPTY or DELETED
-        idxs[1].readers  +=  1;
+        idxs[0].readers  +=  increment;        // increment the reader values if neithe of the indices have special values like EMPTY or DELETED
+        idxs[1].readers  +=  increment;
       }else{
         return false;
       }
@@ -189,6 +193,10 @@ struct flf_map
 
     if(newIp) newIp->asInt = newVal;
     return true; // the readers were successfully incremented, but we need to return the indices that were swapped since we read them atomically
+  }
+  bool      decReaders(void* oldIp, IdxPair*  newIp = nullptr) 
+  {
+    return incReaders(oldIp, newIp, -1);
   }
   bool     swapIdxPair(IdxPair* ip, IdxPair* prevIp = nullptr)
   {
@@ -210,6 +218,11 @@ struct flf_map
   Hash         hashKey(Key const& k)
   {
     return Hasher()(k);  // instances a hash function object and calls operator()
+  }
+
+  // data reading that assumes readers has already been incremented by the calling thread
+  u64         wrapDist(u64 i, u64 mod)
+  {
   }
 
   // public interface functions
@@ -274,8 +287,8 @@ struct flf_map
     //
     //return nullptr; // no empty slots and key was not found
   }
-  u32     size(){ return header()->size; }
-  u32 capacity()
+  u32            size(){ return header()->size; }
+  u32        capacity()
   {
     auto hdr = header();
     u32  cap = (u32)( (hdr->sizeBytes-sizeof(Header))/sizeBytes_perCap() );
