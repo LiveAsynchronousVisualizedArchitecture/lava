@@ -23,8 +23,8 @@
 // -todo: round capacity up to the nearest power of 2
 // -todo: make decReaders
 // -todo: take out optional and make Ret struct that can be cast to bool
+// -todo: make wrapDist - copy from tbl
 
-// todo: make wrapDist - copy from tbl
 // todo: make get()
 // todo: make put()
 // todo: make del()
@@ -38,7 +38,6 @@
 #include <cstdint>
 #include <cstdlib>
 #include <atomic>
-//#include <optional>
 
 struct flf_map
 {
@@ -51,6 +50,7 @@ struct flf_map
   using Key     =   u64;
   using Value   =   u64;
   using Hash    =   u64;
+  //using HKV     =   std::tuple<Hash,Key,Value>;
   using Hasher  =   std::hash<Key>;
   using LstIdx  =   u32;
 
@@ -58,7 +58,13 @@ struct flf_map
   static const u32             DELETED  =  0x00FFFFFE;              // one less than the max value above
   static const u32 SPECIAL_VALUE_START  =  DELETED;                 // comparing to this is more clear than comparing to DELETED
   static const u32            LIST_END  =  0xFFFFFFFF;
-
+  
+  struct       HKV                                                  // HKV is hash key value
+  {
+    Hash    hash;
+    Key      key;
+    Value  value;
+  };
   struct       Ret
   {
     union { 
@@ -159,7 +165,8 @@ struct flf_map
   u32              idx(au64* head) const { return ((ListHead*)head->load())->idx; }
   auto          header() const -> Header*   { return (Header*)m_mem; }
   auto        listHead() const -> ListHead* { return &(((Header*)m_mem)->lstHd); }
-  u32*       listStart(u64 capacity) { return (u32*)(m_mem + offsetBytes_list(capacity)); }
+  u32*       listStart(u64 capacity){ return (u32*)(m_mem + offsetBytes_list(capacity)); }
+  HKV*        hkvStart(u64 capacity){ return (HKV*)(m_mem + offsetBytes_values(capacity)); }
 
   // utility functions
   Idx*         slotPtr(){ return (Idx*)(m_mem + offsetBytes_slots()); }   // slotByteOffset(idx)); }
@@ -182,8 +189,8 @@ struct flf_map
  
       if(idxs[0].val_idx < SPECIAL_VALUE_START &&
          idxs[1].val_idx < SPECIAL_VALUE_START ){
-        idxs[0].readers  +=  increment;        // increment the reader values if neithe of the indices have special values like EMPTY or DELETED
-        idxs[1].readers  +=  increment;
+        idxs[0].readers  =  idxs[0].readers + increment;        // increment the reader values if neithe of the indices have special values like EMPTY or DELETED
+        idxs[1].readers  =  idxs[1].readers + increment;
       }else{
         return false;
       }
@@ -221,29 +228,37 @@ struct flf_map
   }
 
   // data reading that assumes readers has already been incremented by the calling thread
-  u64         wrapDist(u64 i, u64 mod)
+  u64         wrapDist(HKV* hkv, u64 i, u64 mod)
   {
+    u64 ideal = hkv[i].hash % mod;
+
+    if(i >= ideal) return i - ideal;
+    else           return i + (mod-ideal);
+
+    //u64 ideal = elems[idx].hsh.hash % mod;
+    //return wrapDist(ideal,idx,mod);
   }
 
   // public interface functions
-  auto            get(Key const& key) -> Ret // std::optional<Value>
+  auto             get(Key const& key) -> Ret // std::optional<Value>
   {
     //HshType hh;
     //hh.hash   =  HashStr(key);
     //u32  hsh  =  hh.hash;                                                 // make sure that the hash is being squeezed into the same bit depth as the hash in HshType
     //if(out_hash){ *out_hash = hsh; }
-    Hash   hsh = hashKey(key);
+    Hash   hsh  =  hashKey(key);
 
     //KV*   el  =  (KV*)elemStart();                                         // el is a pointer to the elements 
-    Idx* slots = slotPtr();
+    Idx* slots  =  slotPtr();
 
     //u64  mod  =  map_capacity();
     //if(mod==0) return nullptr;
-    u64 mod = capacity();  // todo: if(mod==0) return optional<false> or iterator/return struct equivilent
-
-    u64    i  =  hsh % mod;
-    u64   en  =  prev(i,mod);
-    u64 dist  =  0;
+    u64    cap  =  capacity();  // todo: if(mod==0) return optional<false> or iterator/return struct equivilent
+    HKV*   hkv  =  hkvStart(cap);
+    u64    mod  =  cap;
+    u64      i  =  hsh % mod;
+    u64     en  =  prev(i,mod);
+    u64   dist  =  0;
     for(;;++i,++dist)
     {
       i %= mod;                                                                // get idx within capacity
@@ -257,10 +272,19 @@ struct flf_map
         /* return something that will evaluate to false here */
       }else if( /*check that hash then key are the same*/1==1 ){
         /* return the value here */ // get the offset of the hash key value segment, offset by the index, the offset by the sizeof Hash and Key
-      }//else if(dist > wrapDist(el,i,mod) ){
-        // break; /* return false here? */
+      }else {
+        bool      ok = true;
+        Idx* curSlot = slots + i;
+        ok = incReaders( curSlot );                                          // does the new index pair need to be checked after calling this ?
+        if(!ok) break;
+         ok &= dist > wrapDist(hkv,i,cap);
+        decReaders( curSlot );                       // todo: if this fails, it would need to find the current index again to make sure it decrements it
+        // if decReaders fails, find the slot again, maybe that should be part of decReaders, since it always needs to succeed
 
-      if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+        if(!ok) break;
+      }
+
+      if(i==en) break;                                                       // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
     }
 
     Ret ret;
@@ -287,19 +311,18 @@ struct flf_map
     //
     //return nullptr; // no empty slots and key was not found
   }
-  u32            size(){ return header()->size; }
-  u32        capacity()
+  u32             size(){ return header()->size; }
+  u32         capacity()
   {
     auto hdr = header();
     u32  cap = (u32)( (hdr->sizeBytes-sizeof(Header))/sizeBytes_perCap() );
     return cap;
   }
 
-
   flf_map(){}
   flf_map(u64 capacity)
   {
-    u64    cap2 = nextPowerOf2(capacity);
+    u64    cap2 = nextPowerOf2((u32)capacity);
     u64 szBytes = sizeBytes(cap2);
     m_mem       = (u8*)malloc(szBytes);                 //nullptr;  //  allocation cast to u8* goes here
 
@@ -319,7 +342,6 @@ struct flf_map
     h->lstHd.store(initLH);
     make_list( list_start_addr, (u32)cap2 );
   }
-
 
   // static utility functions
   static u32      nextPowerOf2(u32  v)
@@ -388,6 +410,8 @@ struct flf_map
 
 
 
+//
+//#include <optional>
 
 // not even correct
 //u64   slotByteOffset(u64 idx){ return sizeof(Header) + idx*sizeof(IdxPair); }
