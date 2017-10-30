@@ -224,5 +224,25 @@ Find / Get
 |
 |
 
+List versioning:
+|  Can the version be combined with the next index?
+|  If the version and next index are split into separate bit fields anyway can they be one number?
+|  Maybe the best solution is to simply increment the version only when the index be swapped in is less or equal to the previous index
+|  Since the ABA problem is really a problem of not knowing about wrap around, the version only needs to be there from wrap around
+|  Would caching 8 or so indices per thread help with versioning less?
+|  |  If reading from the 8 indices in the cache, would the versioning be avoided?
+|  |  Would need to also make sure to destruct the thread local array of 8 indices so that they are returned to the list on thread exit
+|  Are there other options to avoid versioning or version roll over?
+|  |  On version rollover should it be locked in the same way as whatever the re-allocation ends up being?
+|  |  Should a thread grabbing an index from the list check if the next index is going to move backwards?
+|  |  |  Try to grab that index repeating up to a set amount of times (somewhere in the range 4 - 128) 
+|  |  |  Grab indices while they are lower than the first index grabbed, up to set amount, or until you get to the 0 index
+|  |  |  Sort the now owned indices, take the lowest and insert the rest in one compare and swap
+|  |  |  With more indices ascending, the version should be needed less often
+|  |  |  This would also increment the version but reset the list index further back
+|  |  |  It would come at the expense of consistent insertion time 
+|  |  
+
+
 
 
