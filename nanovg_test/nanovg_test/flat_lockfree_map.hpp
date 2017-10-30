@@ -24,8 +24,12 @@
 // -todo: make decReaders
 // -todo: take out optional and make Ret struct that can be cast to bool
 // -todo: make wrapDist - copy from tbl
+// -todo: make wrap distance check for get() / find()
 
 // todo: make get()
+// todo: make hash comparison in get()
+// todo: make key comparison in get()
+// todo: return value in get()
 // todo: make put()
 // todo: make del()
 // todo: make operator[]
@@ -265,16 +269,19 @@ struct flf_map
       //HshType eh = el[i].hsh;                                                // eh is element hash
 
       Idx curIdx  =  getSlot(slots, i);
-      if(curIdx.val_idx==DELETED){
-        continue;
-      }else if(curIdx.val_idx==EMPTY){
-        break;
-        /* return something that will evaluate to false here */
-      }else if( /*check that hash then key are the same*/1==1 ){
+      if(curIdx.val_idx==DELETED){ continue; }
+      if(curIdx.val_idx==EMPTY){ break; }                               // return something that will evaluate to false here
+ 
+      //Idx* curSlot = slots + i;
+      Idx* curSlot = slots + i;
+      HKV*  curHKV = hkv + curIdx.val_idx;
+
+      if( curHKV->hash == hsh &&
+        /*check that hash then key are the same*/1==1 ){
         /* return the value here */ // get the offset of the hash key value segment, offset by the index, the offset by the sizeof Hash and Key
       }else {
         bool      ok = true;
-        Idx* curSlot = slots + i;
+        //Idx* curSlot = slots + i;
         ok = incReaders( curSlot );                                          // does the new index pair need to be checked after calling this ?
         if(!ok) break;
          ok &= dist > wrapDist(hkv,i,cap);
