@@ -25,13 +25,15 @@
 // -todo: take out optional and make Ret struct that can be cast to bool
 // -todo: make wrapDist - copy from tbl
 // -todo: make wrap distance check for get() / find()
+// -todo: convert inc and dec to static functions
+// -todo: make an incReaders and decReaders struct that decrements on destruction
+// -todo: clean up comments
+// -todo: make hash comparison in get()
+// -todo: make key comparison in get()
+// -todo: return value in get()
 
-// todo: convert inc and dec to static functions
-// todo: make an incReaders and decReaders struct that decrements on destruction
+// todo: test get()
 // todo: make get()
-// todo: make hash comparison in get()
-// todo: make key comparison in get()
-// todo: return value in get()
 // todo: make put()
 // todo: make del()
 // todo: make operator[]
@@ -58,9 +60,6 @@ struct flf_map
   using Hash    =   u64;
   using Hasher  =   std::hash<Key>;
   using LstIdx  =   u32;
-  //using HKV     =   std::tuple<Hash,Key,Value>;
-  //struct   BlkMeta {
-  //};
 
   static const u32               EMPTY  =  0x00FFFFFF;              // max value of 2^24 to set all 24 bits of the value index
   static const u32             DELETED  =  0x00FFFFFE;              // one less than the max value above
@@ -234,19 +233,10 @@ struct flf_map
   }
 
   // public interface functions
-  auto             get(Key const& key) -> Ret // std::optional<Value>
+  auto             get(Key const& key) -> Ret 
   {
-    //HshType hh;
-    //hh.hash   =  HashStr(key);
-    //u32  hsh  =  hh.hash;                                                 // make sure that the hash is being squeezed into the same bit depth as the hash in HshType
-    //if(out_hash){ *out_hash = hsh; }
     Hash   hsh  =  hashKey(key);
-
-    //KV*   el  =  (KV*)elemStart();                                         // el is a pointer to the elements 
     Idx* slots  =  slotPtr();
-
-    //u64  mod  =  map_capacity();
-    //if(mod==0) return nullptr;
     u64    cap  =  capacity();  // todo: if(mod==0) return optional<false> or iterator/return struct equivilent
     HKV*   hkv  =  hkvStart(cap);
     u64    mod  =  cap;
@@ -258,59 +248,27 @@ struct flf_map
     for(;;++i,++dist)
     {
       i %= mod;                                                                // get idx within capacity
-      //HshType eh = el[i].hsh;                                                // eh is element hash
 
       Idx curIdx  =  getSlot(slots, i);
       if(curIdx.val_idx==DELETED){ continue; }
       if(curIdx.val_idx==EMPTY){ break; }                               // return something that will evaluate to false here
  
-      //Idx* curSlot = slots + i;
       Idx* curSlot = slots + i;
       Read reader(curSlot);
-      if(!reader){ --i; --dist; continue; }   // need to loop until it succeeds
+      if(!reader){ --i; --dist; continue; }    // need to loop until it succeeds
       
       HKV*  curHKV = hkv + curIdx.val_idx;
-      if( curHKV->hash == hsh &&   // check that the hash is equal
-          curHKV->key  == key ){      // check that they key is equal
+      if(curHKV->hash==hsh && curHKV->key==key){               // check that they key is equal
          ret.value = curHKV->value;
          return ret;
-        /* return the value here */ // get the offset of the hash key value segment, offset by the index, the offset by the sizeof Hash and Key
       }else {
-        bool      ok = true;
-        //Idx* curSlot = slots + i;
-        //ok = incReaders( curSlot );                                          // does the new index pair need to be checked after calling this ?
-        if(!ok) break;
-         ok &= dist > wrapDist(hkv,i,cap);
-        //decReaders( curSlot );                       // todo: if this fails, it would need to find the current index again to make sure it decrements it
-        // if decReaders fails, find the slot again, maybe that should be part of decReaders, since it always needs to succeed
-
-        if(!ok) break;
+        if(dist > wrapDist(hkv,i,cap)){ break; }
       }
 
       if(i==en) break;                                                       // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
     }
 
-    return ret;        //std::optional<Value>(); // return a false value here since nothing was found
-
-    //return std::optional<Value>();
-    //
-    //  if( eh.type == HshType::EMPTY || 
-    //    (hsh == eh.hash &&                                  // if the hashes aren't the same, the keys can't be the same
-    //      strncmp(el[i].key,key,sizeof(KV::Key)-1)==0) )
-    //  { 
-    //    return &el[i];
-    //  }else if(dist > wrapDist(el,i,mod) ){
-    //    //KV kv(key, hsh);
-    //    KV kv(key);
-    //    kv.hsh.hash = hsh;
-    //    elems( elems()+1 );
-    //    return &(place_rh(kv, el, i, dist, mod));
-    //  }
-    //
-    //  if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
-    //}
-    //
-    //return nullptr; // no empty slots and key was not found
+    return ret;        // return a false value here since nothing was found
   }
   u32             size(){ return header()->size; }
   u32         capacity()
@@ -439,6 +397,59 @@ struct flf_map
 
 
 
+//using HKV     =   std::tuple<Hash,Key,Value>;
+//struct   BlkMeta {
+//};
+
+//
+// std::optional<Value>
+
+//return std::optional<Value>();
+//
+//  if( eh.type == HshType::EMPTY || 
+//    (hsh == eh.hash &&                                  // if the hashes aren't the same, the keys can't be the same
+//      strncmp(el[i].key,key,sizeof(KV::Key)-1)==0) )
+//  { 
+//    return &el[i];
+//  }else if(dist > wrapDist(el,i,mod) ){
+//    //KV kv(key, hsh);
+//    KV kv(key);
+//    kv.hsh.hash = hsh;
+//    elems( elems()+1 );
+//    return &(place_rh(kv, el, i, dist, mod));
+//  }
+//
+//  if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+//}
+//
+//return nullptr; // no empty slots and key was not found
+
+//bool      ok = true;
+//Idx* curSlot = slots + i;
+//ok = incReaders( curSlot );                                          // does the new index pair need to be checked after calling this ?
+//if(!ok) break;
+//ok &= dist > wrapDist(hkv,i,cap);
+//decReaders( curSlot );                       // todo: if this fails, it would need to find the current index again to make sure it decrements it
+// if decReaders fails, find the slot again, maybe that should be part of decReaders, since it always needs to succeed
+//
+//if(!ok) break;
+
+//
+// return the value here // get the offset of the hash key value segment, offset by the index, the offset by the sizeof Hash and Key
+
+//HshType eh = el[i].hsh;                                                // eh is element hash
+//
+//Idx* curSlot = slots + i;
+
+//HshType hh;
+//hh.hash   =  HashStr(key);
+//u32  hsh  =  hh.hash;                                                 // make sure that the hash is being squeezed into the same bit depth as the hash in HshType
+//if(out_hash){ *out_hash = hsh; }
+//
+//KV*   el  =  (KV*)elemStart();                                         // el is a pointer to the elements 
+//
+//u64  mod  =  map_capacity();
+//if(mod==0) return nullptr;
 
 //
 //#include <optional>
