@@ -1668,6 +1668,8 @@ ENTRY_DECLARATION // main or winmain
     flf_map  defaultMap;
     flf_map  tstMap(11);
     flf_map::Header* hd = tstMap.header();
+    Println("Idx: ", sizeof(flf_map::Idx) 
+             );
     Println("Header | typechar1: ", (char)hd->typeChar1, 
             " typechar2: ",         (char)hd->typeChar2, 
             " sizeBytes: ",    hd->sizeBytes, 
@@ -1679,6 +1681,9 @@ ENTRY_DECLARATION // main or winmain
    Println();
 
    Println("size: ", tstMap.size(), " capacity: ", tstMap.capacity() );
+   Println();
+   Println("get() as bool: ",  (bool)tstMap.get(0), "   ", tstMap.get(0).ok);
+   Println("get() as Value: ", (u64)tstMap.get(0),  "   ", tstMap.get(0).value);
   }
 
   glfwSetTime(0);

@@ -32,6 +32,7 @@
 // -todo: make key comparison in get()
 // -todo: return value in get()
 
+// todo: fix val_idx uninitialized bug
 // todo: test get()
 // todo: make get()
 // todo: make put()
@@ -190,8 +191,8 @@ struct flf_map
   HKV*        hkvStart(u64 capacity){ return (HKV*)(m_mem + offsetBytes_values(capacity)); }
 
   // utility functions
-  Idx*            slotPtr(){ return (Idx*)(m_mem + offsetBytes_slots()); }   // slotByteOffset(idx)); }
-  Idx             getSlot(Idx* idx, u64 offset)
+  Idx*         slotPtr(){ return (Idx*)(m_mem + offsetBytes_slots()); }   // slotByteOffset(idx)); }
+  Idx          getSlot(Idx* idx, u64 offset)
   {
     Idx ret;
     ret.asInt  =  ((au32*)(idx + offset))->load();
@@ -251,7 +252,7 @@ struct flf_map
 
       Idx curIdx  =  getSlot(slots, i);
       if(curIdx.val_idx==DELETED){ continue; }
-      if(curIdx.val_idx==EMPTY){ break; }                               // return something that will evaluate to false here
+      if(curIdx.val_idx==EMPTY){ break; }                                     // return something that will evaluate to false here
  
       Idx* curSlot = slots + i;
       Read reader(curSlot);
@@ -261,11 +262,11 @@ struct flf_map
       if(curHKV->hash==hsh && curHKV->key==key){               // check that they key is equal
          ret.value = curHKV->value;
          return ret;
-      }else {
-        if(dist > wrapDist(hkv,i,cap)){ break; }
+      }else if( (u64)dist > wrapDist(hkv,i,cap) ){                                    // dist should never be negative here, it is signed so that it can go negative and loop back around to be incremented back to 0
+        break;  
       }
 
-      if(i==en) break;                                                       // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+      if(i==en) break;                                                                // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
     }
 
     return ret;        // return a false value here since nothing was found
@@ -283,9 +284,9 @@ struct flf_map
   {
     u64    cap2 = nextPowerOf2((u32)capacity);
     u64 szBytes = sizeBytes(cap2);
-    m_mem       = (u8*)malloc(szBytes);                 //nullptr;  //  allocation cast to u8* goes here
+    m_mem       = (u8*)malloc(szBytes);                               //nullptr;  //  allocation cast to u8* goes here
 
-    void* list_start_addr = m_mem + offsetBytes_list(cap2);  // nullptr;  // calculate the start address of the list here - sizeof(Head) + capacity*sizeof(Idx)
+    void* list_start_addr = m_mem + offsetBytes_list(cap2);          // nullptr;  // calculate the start address of the list here - sizeof(Head) + capacity*sizeof(Idx)
 
     Header*    h    = header();
     h->typeChar1    = 'L';
@@ -297,9 +298,15 @@ struct flf_map
     ListHead initLH;
     initLH.idx = 0;
     initLH.ver = 0;
-    //listHead()->store(initLH);
     h->lstHd.store(initLH);
     make_list( list_start_addr, (u32)cap2 );
+
+    Idx initIdx;
+    initIdx.readers = 0;
+    initIdx.val_idx = 0;
+    Idx* slots = slotPtr();
+    for(u32 i=0; i < cap2; ++i){ slots[i] = initIdx; }
+    //listHead()->store(initLH);
   }
 
   // static utility functions
@@ -339,7 +346,7 @@ struct flf_map
       }
 
       newVal = *((u64*)(idxs));
-    }while( atmIncPtr->compare_exchange_strong(oldVal, newVal) );      // store it back if the pair of indices hasn't changed - this is not an ABA problem because we aren't relying on the values at these indices yet, we are just incrementing the readers so that 1. the data is not deleted at these indices and 2. the indices themselves can't be reused until we decrement the readers
+    }while( !atmIncPtr->compare_exchange_strong(oldVal, newVal) );      // store it back if the pair of indices hasn't changed - this is not an ABA problem because we aren't relying on the values at these indices yet, we are just incrementing the readers so that 1. the data is not deleted at these indices and 2. the indices themselves can't be reused until we decrement the readers
 
     if(newIp) newIp->asInt = newVal;
     return true; // the readers were successfully incremented, but we need to return the indices that were swapped since we read them atomically
@@ -350,8 +357,7 @@ struct flf_map
   }
 
 
-  // static functions for calculating the offset of each segment of the flat memory
-  // The flat memory is organized as:  | Header | 32 bit readers + idx slots | concurrent linked list (linked with indices) | hash + key + values |
+  // static functions for calculating the offset of each segment of the flat memory // The flat memory is organized as:  | Header | 32 bit readers + idx slots | concurrent linked list (linked with indices) | hash + key + values |
   static u64  sizeBytes_perCap()
   {
     return sizeof(Idx) + sizeof(LstIdx) + sizeof(Hash)+sizeof(Key)+sizeof(Value);
