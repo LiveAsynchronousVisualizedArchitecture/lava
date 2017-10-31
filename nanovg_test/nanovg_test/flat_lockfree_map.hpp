@@ -31,11 +31,17 @@
 // -todo: make hash comparison in get()
 // -todo: make key comparison in get()
 // -todo: return value in get()
+// -todo: fix val_idx uninitialized bug
+// -todo: test get()
+// -todo: make get()
+// -todo: make incReader() that increments the readers on only one index
+// -todo: make reader contain what was read so it can be checked for EMPTY and DELETE
+// -todo: make Read fail on EMPTY or DELETE
+// -todo: make put()
 
-// todo: fix val_idx uninitialized bug
-// todo: test get()
-// todo: make get()
-// todo: make put()
+// todo: write hash value and key before inserting index in put()
+// todo: insert index with readers as 1 to replace EMPTY in put()
+// todo: once a value has been written to the index in put() make sure to free it if no slot for it is found
 // todo: make del()
 // todo: make operator[]
 // todo: make operator()
@@ -123,11 +129,13 @@ struct flf_map
    };
   struct      Read
   {
-    Idx*    slot;
-    bool      ok;
+    bool      ok = false;
+    Idx      idx;
+    Idx*    slot = nullptr;
+
     Read(Idx* _slot) : slot(_slot)
     {
-      ok = incReaders(slot);                                          // does the new index pair need to be checked after calling this ?
+      ok = incReader(slot, &idx);                                          // does the new index pair need to be checked after calling this ?
     }
     ~Read()
     {
@@ -188,9 +196,16 @@ struct flf_map
   auto          header() const -> Header*   { return (Header*)m_mem; }
   auto        listHead() const -> ListHead* { return &(((Header*)m_mem)->lstHd); }
   u32*       listStart(u64 capacity){ return (u32*)(m_mem + offsetBytes_list(capacity)); }
-  HKV*        hkvStart(u64 capacity){ return (HKV*)(m_mem + offsetBytes_values(capacity)); }
+  u32         allocIdx(u64 capacity)
+  {
+    ListHead* lh = listHead();
+    u32     next = nxt( (au64*)lh, listStart(capacity) );
+    return next;
+  }
+
 
   // utility functions
+  HKV*        hkvStart(u64 capacity){ return (HKV*)(m_mem + offsetBytes_values(capacity)); }
   Idx*         slotPtr(){ return (Idx*)(m_mem + offsetBytes_slots()); }   // slotByteOffset(idx)); }
   Idx          getSlot(Idx* idx, u64 offset)
   {
@@ -220,6 +235,8 @@ struct flf_map
   {
     return Hasher()(k);  // instances a hash function object and calls operator()
   }
+  //Read          putIdx()
+  //{  }
 
   // data reading that assumes readers has already been incremented by the calling thread
   u64         wrapDist(HKV* hkv, u64 i, u64 mod)
@@ -267,6 +284,57 @@ struct flf_map
       }
 
       if(i==en) break;                                                                // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+    }
+
+    return ret;        // return a false value here since nothing was found
+  }
+  bool             put(Key const& key, Value const& value)
+  {
+    u64    cap  =  capacity();                // todo: if(mod==0) return false iterator/return struct equivilent
+    u32  nxtIdx =  allocIdx(cap);
+    if(nxtIdx==LIST_END){ return false; }
+
+    Hash    hsh  =  hashKey(key);
+    Idx*  slots  =  slotPtr();
+    HKV*    hkv  =  hkvStart(cap);
+    u64     mod  =  cap;
+    i64       i  =  hsh % mod;
+    u64      en  =  prev(i,mod);
+    i64    dist  =  0;
+    Ret     ret;
+    ret.ok = false;
+    for(;;++i,++dist)
+    {
+      i %= mod;                                                               // get idx within capacity
+      Read reader(slots+i);
+      u32  valIdx = reader.idx.val_idx;
+      if(valIdx==DELETED){ continue; }
+      if(valIdx==EMPTY )
+      { 
+        
+        Idx     swp = reader.idx;
+        swp.readers = 1;
+        au32*  slot = (au32*)reader.slot;
+        Idx   empty;
+        empty.val_idx = EMPTY;
+        empty.readers = 0;
+        bool ok = slot->compare_exchange_strong(empty.asInt, swp.asInt);
+
+        // try to insert it
+        // if insertion worked, return true, if not continue
+      }
+
+      Idx curIdx  =  getSlot(slots, i);
+
+      HKV* curHKV = hkv + curIdx.val_idx;
+      if(curHKV->hash==hsh && curHKV->key==key){                              // check that they key is equal
+        ret.value = curHKV->value;
+        return ret;
+      }else if( (u64)dist > wrapDist(hkv,i,cap) ){                            // dist should never be negative here, it is signed so that it can go negative and loop back around to be incremented back to 0
+        break;  
+      }
+
+      if(i==en) break;                                                        // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
     }
 
     return ret;        // return a false value here since nothing was found
@@ -326,6 +394,27 @@ struct flf_map
   {
     if(mod==0) return 0;
     return i==0?  mod-1  :  i-1;
+  }
+  static bool        incReader(Idx* slot, Idx* readIdx=nullptr, i64 increment=1)
+  {
+    au32*   atmIncPtr  =  (au32*)(slot);
+    Idx idx, newIdx;
+    do{
+      idx.asInt    = atmIncPtr->load(std::memory_order::memory_order_seq_cst);              // get the value of both Idx structs atomically
+      newIdx.asInt = idx.asInt;
+
+      if(idx.val_idx < SPECIAL_VALUE_START &&
+         idx.val_idx < SPECIAL_VALUE_START ){
+        newIdx.readers  =  idx.readers + increment;                                        // increment the reader values if neithe of the indices have special values like EMPTY or DELETED
+      }else{ return false; }
+    }while( !atmIncPtr->compare_exchange_strong(idx.asInt, newIdx.asInt) );                // store it back if the pair of indices hasn't changed - this is not an ABA problem because we aren't relying on the values at these indices yet, we are just incrementing the readers so that 1. the data is not deleted at these indices and 2. the indices themselves can't be reused until we decrement the readers
+
+    if(readIdx) readIdx->asInt = newIdx.asInt;
+    return true; // the readers were successfully incremented, but we need to return the indices that were swapped since we read them atomically
+  }
+  static bool        decReader(Idx* slot, Idx* readIdx=nullptr) 
+  {
+    return incReader(slot, readIdx, -1);
   }
   static bool       incReaders(void* oldIp, IdxPair*  newIp = nullptr, i64 increment=1) 
   {
@@ -402,6 +491,38 @@ struct flf_map
 
 
 
+
+
+
+
+
+
+
+
+
+// || 
+// (hkv[valIdx].hash==hsh && hkv[valIdx].key==key) ){
+//
+//HKV* curHKV = hkv + curIdx.val_idx;
+//if(curHKV->hash==hsh && curHKV->key==key){                              // check that they key is equal
+//  ret.value = curHKV->value;
+//  return ret;
+//}
+
+//if(curIdx.val_idx==DELETED){ continue; }
+//if(curIdx.val_idx==EMPTY){
+//}
+//
+//Idx* curSlot = slots + i;
+//Read reader(curSlot);
+//if(!reader){ --i; --dist; continue; }                                   // todo: need to check if reader failed because of EMPTY or DELETE and make a decision, possibly integrating with the above logic
+
+// -allocate an index (already allocated)
+// -if insertion didn't work, continue, since insertion should only happen on EMPTY (so that multiple keys are supported)
+
+//Idx idxs[2];
+//*((u32*)(idxs)) = oldVal;   // default memory order for now
+//newIdx = *((u32*)(idxs));
 
 //using HKV     =   std::tuple<Hash,Key,Value>;
 //struct   BlkMeta {
