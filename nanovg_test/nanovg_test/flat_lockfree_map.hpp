@@ -26,6 +26,8 @@
 // -todo: make wrapDist - copy from tbl
 // -todo: make wrap distance check for get() / find()
 
+// todo: convert inc and dec to static functions
+// todo: make an incReaders and decReaders struct that decrements on destruction
 // todo: make get()
 // todo: make hash comparison in get()
 // todo: make key comparison in get()
@@ -54,9 +56,11 @@ struct flf_map
   using Key     =   u64;
   using Value   =   u64;
   using Hash    =   u64;
-  //using HKV     =   std::tuple<Hash,Key,Value>;
   using Hasher  =   std::hash<Key>;
   using LstIdx  =   u32;
+  //using HKV     =   std::tuple<Hash,Key,Value>;
+  //struct   BlkMeta {
+  //};
 
   static const u32               EMPTY  =  0x00FFFFFF;              // max value of 2^24 to set all 24 bits of the value index
   static const u32             DELETED  =  0x00FFFFFE;              // one less than the max value above
@@ -72,12 +76,13 @@ struct flf_map
   struct       Ret
   {
     union { 
-      Value val;
-      u8 asBytes[sizeof(Value)]; 
+      Value value;
+      u8  asBytes[sizeof(Value)]; 
     };      
     bool     ok;
 
-    operator bool() const { return ok; }
+    operator Value() const { return value; }
+    operator  bool() const { return ok; }
   };
   union        Idx {
     struct { u32 readers :  8;  u32 val_idx : 24; };
@@ -116,7 +121,20 @@ struct flf_map
     // next 8 bytes is the block list head - the next index to use and the number of elements combined into one struct
     ListHead    lstHd;                                         // lstHd is list head
    };
-  struct   BlkMeta {
+  struct      Read
+  {
+    Idx*    slot;
+    bool      ok;
+    Read(Idx* _slot) : slot(_slot)
+    {
+      ok = incReaders(slot);                                          // does the new index pair need to be checked after calling this ?
+    }
+    ~Read()
+    {
+      if(ok) decReaders(slot);
+    }
+
+    operator bool(){ return ok; }
   };
 
   u8*     m_mem = nullptr;  // single pointer is all that ends up on the stack
@@ -173,41 +191,13 @@ struct flf_map
   HKV*        hkvStart(u64 capacity){ return (HKV*)(m_mem + offsetBytes_values(capacity)); }
 
   // utility functions
-  Idx*         slotPtr(){ return (Idx*)(m_mem + offsetBytes_slots()); }   // slotByteOffset(idx)); }
-  Idx          getSlot(Idx* idx, u64 offset)
+  Idx*            slotPtr(){ return (Idx*)(m_mem + offsetBytes_slots()); }   // slotByteOffset(idx)); }
+  Idx             getSlot(Idx* idx, u64 offset)
   {
     Idx ret;
     ret.asInt  =  ((au32*)(idx + offset))->load();
     
     return ret;
-  }
-  bool      incReaders(void* oldIp, IdxPair*  newIp = nullptr, i64 increment=1) 
-  {
-    au64*   atmIncPtr  =  (au64*)(oldIp);
-
-    Idx idxs[2];
-    u64 oldVal, newVal;
-    do{
-      oldVal          = atmIncPtr->load(std::memory_order::memory_order_seq_cst);        // get the value of both Idx structs atomically
-      *((u64*)(idxs)) = oldVal;   // default memory order for now
- 
-      if(idxs[0].val_idx < SPECIAL_VALUE_START &&
-         idxs[1].val_idx < SPECIAL_VALUE_START ){
-        idxs[0].readers  =  idxs[0].readers + increment;        // increment the reader values if neithe of the indices have special values like EMPTY or DELETED
-        idxs[1].readers  =  idxs[1].readers + increment;
-      }else{
-        return false;
-      }
-
-      newVal = *((u64*)(idxs));
-    }while( atmIncPtr->compare_exchange_strong(oldVal, newVal) );      // store it back if the pair of indices hasn't changed - this is not an ABA problem because we aren't relying on the values at these indices yet, we are just incrementing the readers so that 1. the data is not deleted at these indices and 2. the indices themselves can't be reused until we decrement the readers
-
-    if(newIp) newIp->asInt = newVal;
-    return true; // the readers were successfully incremented, but we need to return the indices that were swapped since we read them atomically
-  }
-  bool      decReaders(void* oldIp, IdxPair*  newIp = nullptr) 
-  {
-    return incReaders(oldIp, newIp, -1);
   }
   bool     swapIdxPair(IdxPair* ip, IdxPair* prevIp = nullptr)
   {
@@ -260,9 +250,11 @@ struct flf_map
     u64    cap  =  capacity();  // todo: if(mod==0) return optional<false> or iterator/return struct equivilent
     HKV*   hkv  =  hkvStart(cap);
     u64    mod  =  cap;
-    u64      i  =  hsh % mod;
+    i64      i  =  hsh % mod;
     u64     en  =  prev(i,mod);
-    u64   dist  =  0;
+    i64   dist  =  0;
+    Ret ret;
+    ret.ok = false;
     for(;;++i,++dist)
     {
       i %= mod;                                                                // get idx within capacity
@@ -274,18 +266,22 @@ struct flf_map
  
       //Idx* curSlot = slots + i;
       Idx* curSlot = slots + i;
+      Read reader(curSlot);
+      if(!reader){ --i; --dist; continue; }   // need to loop until it succeeds
+      
       HKV*  curHKV = hkv + curIdx.val_idx;
-
-      if( curHKV->hash == hsh &&
-        /*check that hash then key are the same*/1==1 ){
+      if( curHKV->hash == hsh &&   // check that the hash is equal
+          curHKV->key  == key ){      // check that they key is equal
+         ret.value = curHKV->value;
+         return ret;
         /* return the value here */ // get the offset of the hash key value segment, offset by the index, the offset by the sizeof Hash and Key
       }else {
         bool      ok = true;
         //Idx* curSlot = slots + i;
-        ok = incReaders( curSlot );                                          // does the new index pair need to be checked after calling this ?
+        //ok = incReaders( curSlot );                                          // does the new index pair need to be checked after calling this ?
         if(!ok) break;
          ok &= dist > wrapDist(hkv,i,cap);
-        decReaders( curSlot );                       // todo: if this fails, it would need to find the current index again to make sure it decrements it
+        //decReaders( curSlot );                       // todo: if this fails, it would need to find the current index again to make sure it decrements it
         // if decReaders fails, find the slot again, maybe that should be part of decReaders, since it always needs to succeed
 
         if(!ok) break;
@@ -294,8 +290,6 @@ struct flf_map
       if(i==en) break;                                                       // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
     }
 
-    Ret ret;
-    ret.ok = false;
     return ret;        //std::optional<Value>(); // return a false value here since nothing was found
 
     //return std::optional<Value>();
@@ -368,6 +362,35 @@ struct flf_map
     if(mod==0) return 0;
     return i==0?  mod-1  :  i-1;
   }
+  static bool       incReaders(void* oldIp, IdxPair*  newIp = nullptr, i64 increment=1) 
+  {
+    au64*   atmIncPtr  =  (au64*)(oldIp);
+
+    Idx idxs[2];
+    u64 oldVal, newVal;
+    do{
+      oldVal          = atmIncPtr->load(std::memory_order::memory_order_seq_cst);        // get the value of both Idx structs atomically
+      *((u64*)(idxs)) = oldVal;   // default memory order for now
+
+      if(idxs[0].val_idx < SPECIAL_VALUE_START &&
+        idxs[1].val_idx < SPECIAL_VALUE_START ){
+        idxs[0].readers  =  idxs[0].readers + increment;        // increment the reader values if neithe of the indices have special values like EMPTY or DELETED
+        idxs[1].readers  =  idxs[1].readers + increment;
+      }else{
+        return false;
+      }
+
+      newVal = *((u64*)(idxs));
+    }while( atmIncPtr->compare_exchange_strong(oldVal, newVal) );      // store it back if the pair of indices hasn't changed - this is not an ABA problem because we aren't relying on the values at these indices yet, we are just incrementing the readers so that 1. the data is not deleted at these indices and 2. the indices themselves can't be reused until we decrement the readers
+
+    if(newIp) newIp->asInt = newVal;
+    return true; // the readers were successfully incremented, but we need to return the indices that were swapped since we read them atomically
+  }
+  static bool       decReaders(void* oldIp, IdxPair*  newIp = nullptr) 
+  {
+    return incReaders(oldIp, newIp, -1);
+  }
+
 
   // static functions for calculating the offset of each segment of the flat memory
   // The flat memory is organized as:  | Header | 32 bit readers + idx slots | concurrent linked list (linked with indices) | hash + key + values |
