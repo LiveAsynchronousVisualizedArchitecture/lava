@@ -214,6 +214,9 @@ Insertion
 |  |  A thread can be inserting a key and find that the key is no longer where it put it
 |  |  It will have to loop towards the ideal position to find it 
 |  |  It can then keep trying to swap it towards it's ideal position, also stopping if it hits a Key that is further or the same distance from its ideal position
+|  What if a value is being inserted and ends up bumping up against another value when there is an EMPTY block breaking up the span
+|  |  Is it actually possible? Yes if they are written to an EMPTY slot and in between finding it and writing to it other slots are deleted 
+|  |  Does there need to be a special value
 
 Find / Get
 |  What are the conditions for stopping a find?

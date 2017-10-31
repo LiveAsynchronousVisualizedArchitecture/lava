@@ -203,7 +203,6 @@ struct flf_map
     return next;
   }
 
-
   // utility functions
   HKV*        hkvStart(u64 capacity){ return (HKV*)(m_mem + offsetBytes_values(capacity)); }
   Idx*         slotPtr(){ return (Idx*)(m_mem + offsetBytes_slots()); }   // slotByteOffset(idx)); }
@@ -294,6 +293,7 @@ struct flf_map
     u32  nxtIdx =  allocIdx(cap);
     if(nxtIdx==LIST_END){ return false; }
 
+    bool valIns  =  false;
     Hash    hsh  =  hashKey(key);
     Idx*  slots  =  slotPtr();
     HKV*    hkv  =  hkvStart(cap);
@@ -301,8 +301,8 @@ struct flf_map
     i64       i  =  hsh % mod;
     u64      en  =  prev(i,mod);
     i64    dist  =  0;
-    Ret     ret;
-    ret.ok = false;
+    //Ret     ret;
+    //ret.ok = false;
     for(;;++i,++dist)
     {
       i %= mod;                                                               // get idx within capacity
@@ -311,33 +311,40 @@ struct flf_map
       if(valIdx==DELETED){ continue; }
       if(valIdx==EMPTY )
       { 
-        
-        Idx     swp = reader.idx;
-        swp.readers = 1;
-        au32*  slot = (au32*)reader.slot;
-        Idx   empty;
-        empty.val_idx = EMPTY;
-        empty.readers = 0;
-        bool ok = slot->compare_exchange_strong(empty.asInt, swp.asInt);
+        // write hash key and value        
+        hkv[nxtIdx].hash  = hsh;
+        hkv[nxtIdx].key   = key;
+        hkv[nxtIdx].value = value;
 
         // try to insert it
-        // if insertion worked, return true, if not continue
+        Idx       swp = reader.idx;
+        swp.readers   = 1;
+        au32*    slot = (au32*)reader.slot;
+        Idx     empty;
+        empty.val_idx = EMPTY;
+        empty.readers = 0;
+        bool       ok = slot->compare_exchange_strong(empty.asInt, swp.asInt);
+        if(ok){ return true; }          // if insertion worked, return true, if not continue
+        
+        valIns = true;
+        continue;
       }
 
-      Idx curIdx  =  getSlot(slots, i);
+      //Idx curIdx  =  getSlot(slots, i);
 
-      HKV* curHKV = hkv + curIdx.val_idx;
-      if(curHKV->hash==hsh && curHKV->key==key){                              // check that they key is equal
-        ret.value = curHKV->value;
-        return ret;
-      }else if( (u64)dist > wrapDist(hkv,i,cap) ){                            // dist should never be negative here, it is signed so that it can go negative and loop back around to be incremented back to 0
+      //HKV* curHKV = hkv + curIdx.val_idx;
+      //if(curHKV->hash==hsh && curHKV->key==key){                              // check that they key is equal
+      //  ret.value = curHKV->value;
+      //  return ret;
+      //}else 
+      if( (u64)dist > wrapDist(hkv,i,cap) ){                            // dist should never be negative here, it is signed so that it can go negative and loop back around to be incremented back to 0
         break;  
       }
 
       if(i==en) break;                                                        // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
     }
 
-    return ret;        // return a false value here since nothing was found
+    return false;        // return a false value here since nothing was found
   }
   u32             size(){ return header()->size; }
   u32         capacity()
