@@ -45,10 +45,11 @@
 // -todo: test put()
 // -todo: debug why put returns false - incReaders doesn't return the old/read value when it finds EMPTY or DELETED
 // -todo: re-test get() - return false, but value is correct
+// -todo: figure out why get() returns false even though the value is correct - just forgot to set ret.ok to true
 
 // todo: make function to print map memory
-// todo: figure out why get() returns false even though the value is correct
 // todo: make del()
+// todo: make put() find EMPTY slot and swap backwards until its key's span is found
 // todo: make operator[]
 // todo: make operator()
 
@@ -245,8 +246,6 @@ struct flf_map
   {
     return Hasher()(k);  // instances a hash function object and calls operator()
   }
-  //Read          putIdx()
-  //{  }
 
   // data reading that assumes readers has already been incremented by the calling thread
   u64         wrapDist(HKV* hkv, u64 i, u64 mod)
@@ -288,6 +287,7 @@ struct flf_map
       HKV*  curHKV = hkv + curIdx.val_idx;
       if(curHKV->hash==hsh && curHKV->key==key){               // check that they key is equal
          ret.value = curHKV->value;
+         ret.ok    = true;
          return ret;
       }else if( (u64)dist > wrapDist(hkv,i,cap) ){                                    // dist should never be negative here, it is signed so that it can go negative and loop back around to be incremented back to 0
         break;  
@@ -511,6 +511,9 @@ struct flf_map
 
 
 
+
+//Read          putIdx()
+//{  }
 
 //Ret     ret;
 //ret.ok = false;
