@@ -38,15 +38,17 @@
 // -todo: make reader contain what was read so it can be checked for EMPTY and DELETE
 // -todo: make Read fail on EMPTY or DELETE
 // -todo: make put()
+// -todo: write hash value and key before inserting index in put()
+// -todo: insert index with readers as 1 to replace EMPTY in put() - not neccesary since the value has already been written
+// -todo: make freeIdx function
 
-// todo: write hash value and key before inserting index in put()
-// todo: insert index with readers as 1 to replace EMPTY in put()
 // todo: once a value has been written to the index in put() make sure to free it if no slot for it is found
+// todo: test put()
+// todo: make function to print map memory
+// todo: re-test get()
 // todo: make del()
 // todo: make operator[]
 // todo: make operator()
-
-#pragma once
 
 #if !defined(__FLAT_LOCKFREE_MAP_HEADER_GUARD_HPP__)
 
@@ -133,13 +135,14 @@ struct flf_map
     Idx      idx;
     Idx*    slot = nullptr;
 
+    Read(){}
     Read(Idx* _slot) : slot(_slot)
     {
       ok = incReader(slot, &idx);                                          // does the new index pair need to be checked after calling this ?
     }
     ~Read()
     {
-      if(ok) decReaders(slot);
+      if(ok && slot) decReaders(slot);
     }
 
     operator bool(){ return ok; }
@@ -201,6 +204,12 @@ struct flf_map
     ListHead* lh = listHead();
     u32     next = nxt( (au64*)lh, listStart(capacity) );
     return next;
+  }
+  u32          freeIdx(u32 idx, u64 capacity)
+  {
+    ListHead* lh = listHead();
+    u32     prev = free( (au64*)lh, listStart(capacity), idx );
+    return prev;
   }
 
   // utility functions
@@ -289,7 +298,7 @@ struct flf_map
   }
   bool             put(Key const& key, Value const& value)
   {
-    u64    cap  =  capacity();                // todo: if(mod==0) return false iterator/return struct equivilent
+    u64    cap  =  capacity();                                                // todo: if(mod==0) return false iterator/return struct equivilent
     u32  nxtIdx =  allocIdx(cap);
     if(nxtIdx==LIST_END){ return false; }
 
@@ -301,8 +310,6 @@ struct flf_map
     i64       i  =  hsh % mod;
     u64      en  =  prev(i,mod);
     i64    dist  =  0;
-    //Ret     ret;
-    //ret.ok = false;
     for(;;++i,++dist)
     {
       i %= mod;                                                               // get idx within capacity
@@ -311,39 +318,32 @@ struct flf_map
       if(valIdx==DELETED){ continue; }
       if(valIdx==EMPTY )
       { 
-        // write hash key and value        
-        hkv[nxtIdx].hash  = hsh;
-        hkv[nxtIdx].key   = key;
-        hkv[nxtIdx].value = value;
+        // write hash key and value  
+        if(!valIns){
+          hkv[nxtIdx].hash  = hsh;
+          hkv[nxtIdx].key   = key;
+          hkv[nxtIdx].value = value;
+          valIns = true;
+        }
 
         // try to insert it
         Idx       swp = reader.idx;
-        swp.readers   = 1;
+        swp.readers   = 0;
         au32*    slot = (au32*)reader.slot;
         Idx     empty;
         empty.val_idx = EMPTY;
         empty.readers = 0;
         bool       ok = slot->compare_exchange_strong(empty.asInt, swp.asInt);
-        if(ok){ return true; }          // if insertion worked, return true, if not continue
-        
-        valIns = true;
-        continue;
+        if(ok){ return true; }                                                         // if insertion worked, return true, if not continue
+        else{ continue; }
       }
 
-      //Idx curIdx  =  getSlot(slots, i);
+      if( (u64)dist > wrapDist(hkv,i,cap) ){ break; }                                  // dist should never be negative here, it is signed so that it can go negative and loop back around to be incremented back to 0
 
-      //HKV* curHKV = hkv + curIdx.val_idx;
-      //if(curHKV->hash==hsh && curHKV->key==key){                              // check that they key is equal
-      //  ret.value = curHKV->value;
-      //  return ret;
-      //}else 
-      if( (u64)dist > wrapDist(hkv,i,cap) ){                            // dist should never be negative here, it is signed so that it can go negative and loop back around to be incremented back to 0
-        break;  
-      }
-
-      if(i==en) break;                                                        // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+      if(i==en){ break; }                                                              // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
     }
 
+    freeIdx(nxtIdx, cap);
     return false;        // return a false value here since nothing was found
   }
   u32             size(){ return header()->size; }
@@ -506,6 +506,17 @@ struct flf_map
 
 
 
+
+//Ret     ret;
+//ret.ok = false;
+
+//Idx curIdx  =  getSlot(slots, i);
+//
+//HKV* curHKV = hkv + curIdx.val_idx;
+//if(curHKV->hash==hsh && curHKV->key==key){                              // check that they key is equal
+//  ret.value = curHKV->value;
+//  return ret;
+//}else 
 
 // || 
 // (hkv[valIdx].hash==hsh && hkv[valIdx].key==key) ){
