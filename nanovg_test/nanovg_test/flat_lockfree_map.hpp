@@ -48,10 +48,13 @@
 // -todo: figure out why get() returns false even though the value is correct - just forgot to set ret.ok to true
 // -todo: make function to print map memory
 // -todo: figure out why readers is set to 4 after put and get - seems to be only after get() - there are four get calls - Read destructor was calling decReaders instead of decReader
+// -todo: go over get() again
+// -todo: use Reader in get() for checking EMPTY and DELETED
 
-// todo: go over get() again
-// todo: make del()
+// todo: try putting in multiple values
+// todo: try putting in too many values
 // todo: make put() find EMPTY slot and swap backwards until its key's span is found
+// todo: make del()
 // todo: make operator[]
 // todo: make operator()
 
@@ -278,15 +281,12 @@ struct flf_map
     {
       i %= mod;                                                                // get idx within capacity
 
-      Idx curIdx  =  getSlot(slots, i);
-      if(curIdx.val_idx==DELETED){ continue; }
-      if(curIdx.val_idx==EMPTY){ break; }                                     // return something that will evaluate to false here
- 
-      Idx* curSlot = slots + i;
-      Read reader(curSlot);
-      if(!reader){ --i; --dist; continue; }    // need to loop until it succeeds
+      Read reader(slots+i);
+      u32  valIdx = reader.idx.val_idx;
+      if(valIdx==DELETED){ continue; }
+      if(valIdx==EMPTY){ break; }
       
-      HKV*  curHKV = hkv + curIdx.val_idx;
+      HKV*  curHKV = hkv + valIdx;
       if(curHKV->hash==hsh && curHKV->key==key){               // check that they key is equal
          ret.value = curHKV->value;
          ret.ok    = true;
@@ -513,6 +513,13 @@ struct flf_map
 
 
 
+//Idx curIdx  =  getSlot(slots, i);
+//if(curIdx.val_idx==DELETED){ continue; }
+//if(curIdx.val_idx==EMPTY){ break; }                                     // return something that will evaluate to false here
+//
+//Idx* curSlot = slots + i;
+//Read reader(curSlot);
+//if(!reader){ --i; --dist; continue; }    // this should never be hit because the read only fails on special values
 
 //Read          putIdx()
 //{  }
