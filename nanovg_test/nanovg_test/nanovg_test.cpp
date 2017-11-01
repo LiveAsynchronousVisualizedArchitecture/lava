@@ -1449,6 +1449,42 @@ void              debug_coords(v2 a)
 
 } // end namespace
 
+void print_flf_map(flf_map mp)
+{
+  flf_map::Header* hd = mp.header();
+
+  Println("Header | typechar1: ", (char)hd->typeChar1, 
+    " typechar2: ",         (char)hd->typeChar2, 
+    " sizeBytes: ",    hd->sizeBytes, 
+    " size: ",         hd->size, 
+    " valSizeBytes: ", hd->valSizeBytes );
+
+    u64    cap = mp.capacity();
+    
+    auto slots = mp.slotPtr();
+    Print("Slots: ");
+    TO(cap,i){
+      auto idx = slots[i];
+      Print(idx.readers, ",");
+      if(idx.val_idx==flf_map::DELETED)
+        Print("DELETED ");
+      else if(idx.val_idx==flf_map::EMPTY)
+        Print("EMPTY ");
+      else 
+        Print(idx.val_idx, " ");
+    }
+    Println("\n");
+
+    u32* lstSt = mp.listStart(cap);
+    Print("List: ");
+    TO(cap,i){ 
+      if(lstSt[i]==flf_map::LIST_END)
+        Print("LIST_END");
+      else 
+        Print(lstSt[i], " "); 
+    }
+}
+
 ENTRY_DECLARATION // main or winmain
 {
   using namespace std;
@@ -1667,19 +1703,12 @@ ENTRY_DECLARATION // main or winmain
     Println();
     flf_map  defaultMap;
     flf_map  tstMap(4);
-    flf_map::Header* hd = tstMap.header();
     Println("Idx: ", sizeof(flf_map::Idx) 
              );
-    Println("Header | typechar1: ", (char)hd->typeChar1, 
-            " typechar2: ",         (char)hd->typeChar2, 
-            " sizeBytes: ",    hd->sizeBytes, 
-            " size: ",         hd->size, 
-            " valSizeBytes: ", hd->valSizeBytes );
    Print("List: ");
    u32* lst = tstMap.listStart( tstMap.capacity() );
    TO(tstMap.capacity(),i) Print(lst[i]," ");
    Println();
-
    Println("size: ", tstMap.size(), " capacity: ", tstMap.capacity() );
    Println();
    Println("put: ", tstMap.put(85, 101) );
@@ -1687,6 +1716,9 @@ ENTRY_DECLARATION // main or winmain
    Println("get() as bool: ",  (bool)tstMap.get(85), "   ", tstMap.get(85).ok);
    Println("get() as Value: ", (u64)tstMap.get(85),  "   ", tstMap.get(85).value);
    Println();
+   print_flf_map(tstMap);
+
+
   }
 
   glfwSetTime(0);

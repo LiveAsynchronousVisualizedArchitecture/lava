@@ -222,7 +222,14 @@ Insertion
 |  |  When finding a value behind the slot a thread is trying to insert, it could use recursion to make sure that value does not have any behind it
 |  |  |  Does this situation need to be moot/impossible? 
 |  |  |  Does a thread just need to check if there is an EMPTY in the span after inserting and restart the insertion if it finds one closer?
-
+|  |  Recursive checking for EMPTY is one way, since once a span is created that contains the index being inserted, that span should not be broken by an EMPTY slot (DELETED should be swapped up until hitting an EMPTY)
+|  |  Can't start from the beggining of the span, because that would blink other indices out of existence as they are swapped
+|  |  Does deletion need to swap the DELETED with the EMPTY it finds so that it can move elements in the middle of insertion down? would this mean potentially looping through the whole array?
+|  |  Does insertion need to read a pair of indices so that it never starts with a stray EMPTY to the left?
+|  |  |  This might be the solution to spans breaking under multiple indices being inserted
+|  |  |  Does this imply that a recursive function needs to follow the DELETED index until it is set to EMPTY?
+|  |  |  While DELETED is going to always be part of a span, it might not always be part of the current index's span
+|  |  |  
 
 Find / Get
 |  What are the conditions for stopping a find?
