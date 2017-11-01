@@ -1666,7 +1666,7 @@ ENTRY_DECLARATION // main or winmain
 
     Println();
     flf_map  defaultMap;
-    flf_map  tstMap(11);
+    flf_map  tstMap(4);
     flf_map::Header* hd = tstMap.header();
     Println("Idx: ", sizeof(flf_map::Idx) 
              );
@@ -1682,8 +1682,11 @@ ENTRY_DECLARATION // main or winmain
 
    Println("size: ", tstMap.size(), " capacity: ", tstMap.capacity() );
    Println();
-   Println("get() as bool: ",  (bool)tstMap.get(0), "   ", tstMap.get(0).ok);
-   Println("get() as Value: ", (u64)tstMap.get(0),  "   ", tstMap.get(0).value);
+   Println("put: ", tstMap.put(85, 101) );
+   Println();
+   Println("get() as bool: ",  (bool)tstMap.get(85), "   ", tstMap.get(85).ok);
+   Println("get() as Value: ", (u64)tstMap.get(85),  "   ", tstMap.get(85).value);
+   Println();
   }
 
   glfwSetTime(0);

@@ -41,11 +41,13 @@
 // -todo: write hash value and key before inserting index in put()
 // -todo: insert index with readers as 1 to replace EMPTY in put() - not neccesary since the value has already been written
 // -todo: make freeIdx function
+// -todo: once a value has been written to the index in put() make sure to free it if no slot for it is found
+// -todo: test put()
+// -todo: debug why put returns false - incReaders doesn't return the old/read value when it finds EMPTY or DELETED
+// -todo: re-test get() - return false, but value is correct
 
-// todo: once a value has been written to the index in put() make sure to free it if no slot for it is found
-// todo: test put()
 // todo: make function to print map memory
-// todo: re-test get()
+// todo: figure out why get() returns false even though the value is correct
 // todo: make del()
 // todo: make operator[]
 // todo: make operator()
@@ -327,7 +329,8 @@ struct flf_map
         }
 
         // try to insert it
-        Idx       swp = reader.idx;
+        Idx swp;
+        swp.val_idx   = nxtIdx;
         swp.readers   = 0;
         au32*    slot = (au32*)reader.slot;
         Idx     empty;
@@ -378,7 +381,7 @@ struct flf_map
 
     Idx initIdx;
     initIdx.readers = 0;
-    initIdx.val_idx = 0;
+    initIdx.val_idx = EMPTY;
     Idx* slots = slotPtr();
     for(u32 i=0; i < cap2; ++i){ slots[i] = initIdx; }
     //listHead()->store(initLH);
@@ -410,10 +413,12 @@ struct flf_map
       idx.asInt    = atmIncPtr->load(std::memory_order::memory_order_seq_cst);              // get the value of both Idx structs atomically
       newIdx.asInt = idx.asInt;
 
-      if(idx.val_idx < SPECIAL_VALUE_START &&
-         idx.val_idx < SPECIAL_VALUE_START ){
+      if(idx.val_idx < SPECIAL_VALUE_START){
         newIdx.readers  =  idx.readers + increment;                                        // increment the reader values if neithe of the indices have special values like EMPTY or DELETED
-      }else{ return false; }
+      }else{
+        if(readIdx) readIdx->asInt = idx.asInt;
+        return false; 
+      }
     }while( !atmIncPtr->compare_exchange_strong(idx.asInt, newIdx.asInt) );                // store it back if the pair of indices hasn't changed - this is not an ABA problem because we aren't relying on the values at these indices yet, we are just incrementing the readers so that 1. the data is not deleted at these indices and 2. the indices themselves can't be reused until we decrement the readers
 
     if(readIdx) readIdx->asInt = newIdx.asInt;
