@@ -1713,12 +1713,11 @@ ENTRY_DECLARATION // main or winmain
    Println();
    Println("put: ", tstMap.put(85, 101) );
    Println();
+   print_flf_map(tstMap);
    Println("get() as bool: ",  (bool)tstMap.get(85), "   ", tstMap.get(85).ok);
    Println("get() as Value: ", (u64)tstMap.get(85),  "   ", tstMap.get(85).value);
    Println();
    print_flf_map(tstMap);
-
-
   }
 
   glfwSetTime(0);

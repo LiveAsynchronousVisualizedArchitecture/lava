@@ -46,8 +46,10 @@
 // -todo: debug why put returns false - incReaders doesn't return the old/read value when it finds EMPTY or DELETED
 // -todo: re-test get() - return false, but value is correct
 // -todo: figure out why get() returns false even though the value is correct - just forgot to set ret.ok to true
+// -todo: make function to print map memory
+// -todo: figure out why readers is set to 4 after put and get - seems to be only after get() - there are four get calls - Read destructor was calling decReaders instead of decReader
 
-// todo: make function to print map memory
+// todo: go over get() again
 // todo: make del()
 // todo: make put() find EMPTY slot and swap backwards until its key's span is found
 // todo: make operator[]
@@ -145,7 +147,7 @@ struct flf_map
     }
     ~Read()
     {
-      if(ok && slot) decReaders(slot);
+      if(ok && slot) decReader(slot);
     }
 
     operator bool(){ return ok; }
