@@ -54,12 +54,13 @@
 // -todo: try putting in too many values - just needed LIST_END to be 24 bits
 // -todo: make a special value for readers that signifies an index is still being inserted
 // -todo: make decReaders not decrement EMPTY - no incementing or decrementing of either special value
+// -todo: take loop out of insertAt()
+// -todo: change insert to tryInsert? - insertAt seems apt given that it will only insert at the position given or won't succeed
 
+// todo: add a check for the ideal distance before using insertAt
+// todo: make placeIdx find the index first, then swap it to it's destination, taking detours to place any LIVE indices in front of it
 // todo: make a distance comparison that compares wrapped ideal distances
 // todo: make readers find both indices on decrement, even if they have moved 
-// todo: take loop out of insertAt()
-// todo: change insert to tryInsert?
-// todo: add a check for the ideal distance before using insertAt
 // todo: figure out loop and how insertAt should handle a compare and swap failure
 // todo: change ReadPair to use an ENUM to keep track of FIRST, SECOND, BOTH, or NONE were incremented
 // todo: make put() find EMPTY slot and swap backwards until its key's span is found
@@ -296,28 +297,25 @@ struct flf_map
   bool        insertAt(u32 valIdx, Hash hash, u32 st, u64 capacity)
   {
     IdxPair  curPair, nxtPair;
-    Idx*  slots = slotPtr();
-    u32      en = (st+1) % capacity;
-    //for(u32 i=st; i!=en; )
-    //{
-      u32 i = prev(st, capacity);
-      IdxPair*  cur = (IdxPair*)(slots + i);
-      curPair       = loadPair(cur);
-      if( !halfEmpty(curPair) ){ return false; }
+    Idx*   slots = slotPtr();
+    u32       en = (st+1) % capacity;
+    auto       i = prev(st, capacity);
+    IdxPair* cur = (IdxPair*)(slots + i);
+    curPair      = loadPair(cur);
+    if( !halfEmpty(curPair) ){ return false; }
 
-      nxtPair.second.readers = 1;  // todo: won't work! any return without swap will potentially decrement the readers on an EMPTY cell or some thing else this will be decremented to 0 by the ReadPair class
-      nxtPair.second.val_idx = valIdx;
+    nxtPair.second.readers = 1;  // todo: won't work! any return without swap will potentially decrement the readers on an EMPTY cell or some thing else this will be decremented to 0 by the ReadPair class
+    nxtPair.second.val_idx = valIdx;
 
-      // increment readers on the first
-      ReadPair reader(cur);
-      IdxPair  rdPair = reader.idxs;
-      if( !halfEmpty(rdPair) ){ return false; }
-      if( rdPair.first.readers == LIVE ){ return false; }
+    // increment readers on the first
+    ReadPair reader(cur);
+    IdxPair  rdPair = reader.idxs;
+    if( !halfEmpty(rdPair) ){ return false; }
+    if( rdPair.first.readers == LIVE ){ return false; }
 
-      // try to compare exchange both, replacing the empty with index
-      bool ok = ((au64*)(cur))->compare_exchange_strong(rdPair.asInt, nxtPair.asInt);      // even though the reader count doesn't matter, it will need to be the same here  // either the new Idx reader needs to start at 1, or ReadPair needs to know which one it needs to decrement and pass that to inc and decReaders
-      if(ok){ return true; }
-    //}
+    // try to compare exchange both, replacing the empty with index
+    bool ok = ((au64*)(cur))->compare_exchange_strong(rdPair.asInt, nxtPair.asInt);      // even though the reader count doesn't matter, it will need to be the same here  // either the new Idx reader needs to start at 1, or ReadPair needs to know which one it needs to decrement and pass that to inc and decReaders
+    if(ok){ return true; }
 
     return false;
   }
@@ -416,20 +414,29 @@ struct flf_map
           valIns = true;
         }
 
-        // try to insert it - this needs to check for the end of the span by looking at two slots 
-        Idx swp;
-        swp.val_idx   = nxtIdx;
-        swp.readers   = 0;
-        au32*    slot = (au32*)reader.slot;
-        Idx     empty;
-        empty.val_idx = EMPTY;
-        empty.readers = 0;
-        bool       ok = slot->compare_exchange_strong(empty.asInt, swp.asInt);
-        if(ok){ return true; }                                                         // if insertion worked, return true, if not continue
-        else{ continue; }
-      }
+        if(dist==0){
+          Idx swp, empty;
+          swp.readers   = empty.readers = 0;
+          swp.val_idx   = nxtIdx;
+          au32*  slot   = (au32*)reader.slot;
+          empty.val_idx = EMPTY;
+          bool       ok = slot->compare_exchange_strong(empty.asInt, swp.asInt);
+          if(ok){ return true; }                                                           // if insertion worked, return true, if not continue
+          else{ continue; }
+        }
 
-      //if( (u64)dist > wrapDist(hkv,i,cap) ){ break; }                                  // dist should never be negative here, it is signed so that it can go negative and loop back around to be incremented back to 0
+        // more intricate insert if not in the ideal position - this needs to check for the end of the span by looking at two slots 
+        bool ok = insertAt(nxtIdx, hsh, (u32)i, cap);
+        if(ok){
+          placeIdx((u32)i, hsh, cap);
+          return true; 
+        }else{ 
+          // todo: need to know why insertAt failed
+          // if it was because the first is EMPTY 
+          continue;
+        }
+
+      }
 
       if(i==en){ break; }                                                              // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
     }
@@ -518,7 +525,7 @@ struct flf_map
   }
   static bool       incReaders(void* oldIp, IdxPair*  newIp = nullptr, i64 increment=1) 
   {
-    au64*   atmIncPtr  =  (au64*)(oldIp);
+    au64* atmIncPtr = (au64*)(oldIp);
 
     Idx idxs[2];
     u64 oldVal, newVal;
@@ -587,9 +594,26 @@ struct flf_map
 
 
 
+//Idx     empty;
+//empty.readers = 0;
 
+//Idx swp;
+//swp.val_idx   = nxtIdx;
+//swp.readers   = 0;
+//au32*    slot = (au32*)reader.slot;
+//Idx     empty;
+//empty.val_idx = EMPTY;
+//empty.readers = 0;
+//bool       ok = slot->compare_exchange_strong(empty.asInt, swp.asInt);
+//if(ok){ return true; }                                                         // if insertion worked, return true, if not continue
+//else{ continue; }
 
+//
+//if( (u64)dist > wrapDist(hkv,i,cap) ){ break; }                                  // dist should never be negative here, it is signed so that it can go negative and loop back around to be incremented back to 0
 
+//for(u32 i=st; i!=en; )
+//{
+//}
 
 //static bool              inc(Idx& idx, i64 increment)
 //{
