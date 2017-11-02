@@ -261,7 +261,13 @@ List versioning:
 |  |  |  This would also increment the version but reset the list index further back
 |  |  |  It would come at the expense of consistent insertion time 
 |  |  
+|  Does the value also need to contain the version before or after the hash?
+|  |  This would give the ability to know if an index is the same, but not atomically
 
 
-
+Decrementing Readers
+|  If underlying indices have moved, they will have to be found
+|  Indices can move backwards if an index before them is deleted
+|  Indices can move forward if they are bumped up by indices further from their ideal slot
+|
 

@@ -52,7 +52,16 @@
 // -todo: use Reader in get() for checking EMPTY and DELETED
 // -todo: try putting in multiple values - figure out why third put fails - put() had a wrapDist check which wasn't neccesary
 // -todo: try putting in too many values - just needed LIST_END to be 24 bits
+// -todo: make a special value for readers that signifies an index is still being inserted
+// -todo: make decReaders not decrement EMPTY - no incementing or decrementing of either special value
 
+// todo: make a distance comparison that compares wrapped ideal distances
+// todo: make readers find both indices on decrement, even if they have moved 
+// todo: take loop out of insertAt()
+// todo: change insert to tryInsert?
+// todo: add a check for the ideal distance before using insertAt
+// todo: figure out loop and how insertAt should handle a compare and swap failure
+// todo: change ReadPair to use an ENUM to keep track of FIRST, SECOND, BOTH, or NONE were incremented
 // todo: make put() find EMPTY slot and swap backwards until its key's span is found
 // todo: make del()
 // todo: make operator[]
@@ -69,6 +78,7 @@ struct flf_map
 {
   using   u8    =    uint8_t;
   using  u32    =   uint32_t;
+  using  i32    =    int32_t;
   using  u64    =   uint64_t;
   using  i64    =    int64_t;
   using au32    =   std::atomic<uint32_t>;
@@ -83,7 +93,8 @@ struct flf_map
   static const u32             DELETED  =  0x00FFFFFE;              // one less than the max value above
   static const u32 SPECIAL_VALUE_START  =  DELETED;                 // comparing to this is more clear than comparing to DELETED
   static const u32            LIST_END  =  0x00FFFFFF;              // needs to be 24 bits flipped because the list's indices are 24 bits
-  
+  static const  u8                LIVE  =  0xFF;                    // this is a value to set for Idx::readers to signify that an index is still being inserted
+
   struct       HKV                                                  // HKV is hash key value
   {
     Hash    hash;
@@ -104,6 +115,15 @@ struct flf_map
   union        Idx {
     struct { u32 readers :  8;  u32 val_idx : 24; };
     u32 asInt;
+
+    bool inc(i32 increment)
+    {
+      if(val_idx < SPECIAL_VALUE_START){
+        readers += increment;        // increment the reader values if neither of the indices have special values like EMPTY or DELETED
+        return true;
+      }else 
+        return false;
+    }
   };
   union    IdxPair {
     struct { Idx first; Idx second; };
@@ -151,7 +171,7 @@ struct flf_map
     ~Read(){ if(ok && slot) decReader(slot); }
     operator bool(){ return ok; }
   };
-  struct      ReadPair
+  struct  ReadPair
   {
     bool         ok = false;
     IdxPair   idxs;
@@ -164,7 +184,6 @@ struct flf_map
     ~ReadPair(){ if(ok && slots) decReaders(slots); }
     operator bool(){ return ok; }
   };
-
 
   u8*     m_mem = nullptr;  // single pointer is all that ends up on the stack
 
@@ -267,37 +286,51 @@ struct flf_map
     ret.asInt = ((au64*)(pair))->load();
     return ret;
   }
-  bool        insertAt(u32 valIdx, u32 st, u64 capacity)
+  bool       halfEmpty(IdxPair p)
+  {
+    if(p.second.val_idx != EMPTY) return false;
+    if(p.first.val_idx  >= SPECIAL_VALUE_START) return false;
+    
+    return true;
+  }
+  bool        insertAt(u32 valIdx, Hash hash, u32 st, u64 capacity)
   {
     IdxPair  curPair, nxtPair;
     Idx*  slots = slotPtr();
     u32      en = (st+1) % capacity;
-    for(u32 i=st; i!=en; )
-    {
-      i = prev(i, capacity);
+    //for(u32 i=st; i!=en; )
+    //{
+      u32 i = prev(st, capacity);
       IdxPair*  cur = (IdxPair*)(slots + i);
       curPair       = loadPair(cur);
-      bool   scndOk = curPair.second.val_idx == EMPTY;
-      bool   frstOk = curPair.first.val_idx < SPECIAL_VALUE_START;
+      if( !halfEmpty(curPair) ){ return false; }
 
-      nxtPair.second.readers = 0;
+      nxtPair.second.readers = 1;  // todo: won't work! any return without swap will potentially decrement the readers on an EMPTY cell or some thing else this will be decremented to 0 by the ReadPair class
       nxtPair.second.val_idx = valIdx;
 
       // increment readers on the first
       ReadPair reader(cur);
-      IdxPair rdPair = reader.idxs;
-      
-      // check that the first value's hash is the same
-      // try to compare exchange both, replacing the empty with index
-      bool ok = ((au64*)(cur))->compare_exchange_strong(curPair.asInt, nxtPair.asInt);
-      
-    }
+      IdxPair  rdPair = reader.idxs;
+      if( !halfEmpty(rdPair) ){ return false; }
+      if( rdPair.first.readers == LIVE ){ return false; }
 
-    // if(curVals.second.val_idx == EMPTY &&
-    //
-    //IdxPair*  cur = (IdxPair*)(slots + i);
-    //au64*    acur = (au64*)(cur);
-    //curPair.asInt = acur->load();
+      // try to compare exchange both, replacing the empty with index
+      bool ok = ((au64*)(cur))->compare_exchange_strong(rdPair.asInt, nxtPair.asInt);      // even though the reader count doesn't matter, it will need to be the same here  // either the new Idx reader needs to start at 1, or ReadPair needs to know which one it needs to decrement and pass that to inc and decReaders
+      if(ok){ return true; }
+    //}
+
+    return false;
+  }
+  void placeIdx(u32 i, Hash hash, u64 capacity)
+  {
+    // check that the first value's hash is the same - only need the hash because colliding keys might not be contiguous
+    HKV*     hkv = hkvStart(capacity);
+    Hash curHash = hkv[i].hash;
+
+    // if(hash != curHash){ return false; }
+
+    auto dist = wrapDist(hash,i,capacity);
+    if(hash != hkv[i].hash && wrapDist(curHash,i,capacity) >= dist){}
   }
 
   // data reading that assumes readers has already been incremented by the calling thread
@@ -307,10 +340,15 @@ struct flf_map
 
     if(i >= ideal) return i - ideal;
     else           return i + (mod-ideal);
-
-    //u64 ideal = elems[idx].hsh.hash % mod;
-    //return wrapDist(ideal,idx,mod);
   }
+  u64         wrapDist(Hash hash, u64 i, u64 mod)
+  {
+    u64 ideal = hash % mod;
+
+    if(i >= ideal) return i - ideal;
+    else           return i + (mod-ideal);
+  }
+
 
   // public interface functions
   auto             get(Key const& key) -> Ret 
@@ -488,13 +526,7 @@ struct flf_map
       oldVal          = atmIncPtr->load(std::memory_order::memory_order_seq_cst);        // get the value of both Idx structs atomically
       *((u64*)(idxs)) = oldVal;   // default memory order for now
 
-      if(idxs[0].val_idx < SPECIAL_VALUE_START &&
-        idxs[1].val_idx < SPECIAL_VALUE_START ){
-        idxs[0].readers  =  idxs[0].readers + increment;        // increment the reader values if neithe of the indices have special values like EMPTY or DELETED
-        idxs[1].readers  =  idxs[1].readers + increment;
-      }else{
-        return false;
-      }
+      if( !idxs[0].inc(1) && !idxs[1].inc(1) ) return false;                             // if neither could be incremented then they are both special values, so return false
 
       newVal = *((u64*)(idxs));
     }while( !atmIncPtr->compare_exchange_strong(oldVal, newVal) );      // store it back if the pair of indices hasn't changed - this is not an ABA problem because we aren't relying on the values at these indices yet, we are just incrementing the readers so that 1. the data is not deleted at these indices and 2. the indices themselves can't be reused until we decrement the readers
@@ -559,6 +591,46 @@ struct flf_map
 
 
 
+//static bool              inc(Idx& idx, i64 increment)
+//{
+//  if(idx.val_idx < SPECIAL_VALUE_START){
+//    idx.readers  =  idx.readers + increment;        // increment the reader values if neithe of the indices have special values like EMPTY or DELETED
+//    return true;
+//  }else{ return false; }
+//}
+
+//if(idxs[0].val_idx < SPECIAL_VALUE_START &&
+//  idxs[1].val_idx < SPECIAL_VALUE_START ){
+//  idxs[0].readers  =  idxs[0].readers + increment;        // increment the reader values if neithe of the indices have special values like EMPTY or DELETED
+//  idxs[1].readers  =  idxs[1].readers + increment;
+//}else{
+//  return false;
+//}
+
+//if(idxs[0].val_idx < SPECIAL_VALUE_START)
+//  idxs[0].readers  =  idxs[0].readers + increment;        // increment the reader values if neithe of the indices have special values like EMPTY or DELETED
+
+//if(idxs[1].val_idx < SPECIAL_VALUE_START )
+//  idxs[1].readers  =  idxs[1].readers + increment;
+
+//else{
+//  return false;
+//}
+
+//u64 ideal = elems[idx].hsh.hash % mod;
+//return wrapDist(ideal,idx,mod);
+
+// if(curVals.second.val_idx == EMPTY &&
+//
+//IdxPair*  cur = (IdxPair*)(slots + i);
+//au64*    acur = (au64*)(cur);
+//curPair.asInt = acur->load();
+//
+//bool   scndOk = curPair.second.val_idx == EMPTY;
+//bool   frstOk = curPair.first.val_idx < SPECIAL_VALUE_START;
+//
+//scndOk = curPair.second.val_idx == EMPTY;
+//frstOk = curPair.first.val_idx < SPECIAL_VALUE_START;
 
 //
 //static const u32            LIST_END  =  0xFFFFFFFF;
