@@ -56,8 +56,9 @@
 // -todo: make decReaders not decrement EMPTY - no incementing or decrementing of either special value
 // -todo: take loop out of insertAt()
 // -todo: change insert to tryInsert? - insertAt seems apt given that it will only insert at the position given or won't succeed
+// -todo: add a check for the ideal distance before using insertAt
+// -todo: figure out why put sets readers to 205 - nxtPair was unitialized and only set the second Idx
 
-// todo: add a check for the ideal distance before using insertAt
 // todo: make placeIdx find the index first, then swap it to it's destination, taking detours to place any LIVE indices in front of it
 // todo: make a distance comparison that compares wrapped ideal distances
 // todo: make readers find both indices on decrement, even if they have moved 
@@ -301,7 +302,7 @@ struct flf_map
     u32       en = (st+1) % capacity;
     auto       i = prev(st, capacity);
     IdxPair* cur = (IdxPair*)(slots + i);
-    curPair      = loadPair(cur);
+    nxtPair = curPair = loadPair(cur);
     if( !halfEmpty(curPair) ){ return false; }
 
     nxtPair.second.readers = 1;  // todo: won't work! any return without swap will potentially decrement the readers on an EMPTY cell or some thing else this will be decremented to 0 by the ReadPair class
