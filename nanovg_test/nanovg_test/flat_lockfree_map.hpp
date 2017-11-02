@@ -50,13 +50,14 @@
 // -todo: figure out why readers is set to 4 after put and get - seems to be only after get() - there are four get calls - Read destructor was calling decReaders instead of decReader
 // -todo: go over get() again
 // -todo: use Reader in get() for checking EMPTY and DELETED
+// -todo: try putting in multiple values - figure out why third put fails - put() had a wrapDist check which wasn't neccesary
+// -todo: try putting in too many values - just needed LIST_END to be 24 bits
 
-// todo: try putting in multiple values
-// todo: try putting in too many values
 // todo: make put() find EMPTY slot and swap backwards until its key's span is found
 // todo: make del()
 // todo: make operator[]
 // todo: make operator()
+// todo: make take() function that deletes the index and moves the value out
 
 #if !defined(__FLAT_LOCKFREE_MAP_HEADER_GUARD_HPP__)
 
@@ -81,7 +82,7 @@ struct flf_map
   static const u32               EMPTY  =  0x00FFFFFF;              // max value of 2^24 to set all 24 bits of the value index
   static const u32             DELETED  =  0x00FFFFFE;              // one less than the max value above
   static const u32 SPECIAL_VALUE_START  =  DELETED;                 // comparing to this is more clear than comparing to DELETED
-  static const u32            LIST_END  =  0xFFFFFFFF;
+  static const u32            LIST_END  =  0x00FFFFFF;              // needs to be 24 bits flipped because the list's indices are 24 bits
   
   struct       HKV                                                  // HKV is hash key value
   {
@@ -330,7 +331,7 @@ struct flf_map
           valIns = true;
         }
 
-        // try to insert it
+        // try to insert it - this needs to check for the end of the span by looking at two slots 
         Idx swp;
         swp.val_idx   = nxtIdx;
         swp.readers   = 0;
@@ -343,7 +344,7 @@ struct flf_map
         else{ continue; }
       }
 
-      if( (u64)dist > wrapDist(hkv,i,cap) ){ break; }                                  // dist should never be negative here, it is signed so that it can go negative and loop back around to be incremented back to 0
+      //if( (u64)dist > wrapDist(hkv,i,cap) ){ break; }                                  // dist should never be negative here, it is signed so that it can go negative and loop back around to be incremented back to 0
 
       if(i==en){ break; }                                                              // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
     }
@@ -512,6 +513,8 @@ struct flf_map
 
 
 
+//
+//static const u32            LIST_END  =  0xFFFFFFFF;
 
 //Idx curIdx  =  getSlot(slots, i);
 //if(curIdx.val_idx==DELETED){ continue; }

@@ -1712,6 +1712,10 @@ ENTRY_DECLARATION // main or winmain
    Println("size: ", tstMap.size(), " capacity: ", tstMap.capacity() );
    Println();
    Println("put: ", tstMap.put(85, 101) );
+   Println("put: ", tstMap.put(20, 40) );
+   Println("put: ", tstMap.put(5, 7) );
+   Println("put: ", tstMap.put(11, 13) );
+   Println("put: ", tstMap.put(17, 19) );
    Println();
    print_flf_map(tstMap);
    Println("get() as bool: ",  (bool)tstMap.get(85), "   ", tstMap.get(85).ok);
