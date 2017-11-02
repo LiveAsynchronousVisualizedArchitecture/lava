@@ -229,7 +229,10 @@ Insertion
 |  |  |  This might be the solution to spans breaking under multiple indices being inserted
 |  |  |  Does this imply that a recursive function needs to follow the DELETED index until it is set to EMPTY?
 |  |  |  While DELETED is going to always be part of a span, it might not always be part of the current index's span
-|  |  |  
+|  |  |  If inserting, does an EMPTY slot with a real slot before it need to be found?
+|  |  |  If a DELETED is in the way, try to be the thread that sets it to EMPTY 
+|  |  |  Thread that is doing the DELETING will find that it is not there and look forward for it since DELETED slots can only go forward
+|  |  |  The deleting thread will then find the empty slots and know that it has been taken over
 
 Find / Get
 |  What are the conditions for stopping a find?

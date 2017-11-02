@@ -145,17 +145,26 @@ struct flf_map
     Idx*    slot = nullptr;
 
     Read(){}
-    Read(Idx* _slot) : slot(_slot)
-    {
+    Read(Idx* _slot) : slot(_slot) {
       ok = incReader(slot, &idx);                                          // does the new index pair need to be checked after calling this ?
     }
-    ~Read()
-    {
-      if(ok && slot) decReader(slot);
-    }
-
+    ~Read(){ if(ok && slot) decReader(slot); }
     operator bool(){ return ok; }
   };
+  struct      ReadPair
+  {
+    bool         ok = false;
+    IdxPair   idxs;
+    IdxPair*  slots = nullptr;
+
+    ReadPair(){}
+    ReadPair(IdxPair* _slots) : slots(_slots) {
+      ok = incReaders(slots, &idxs);                                          // does the new index pair need to be checked after calling this ?
+    }
+    ~ReadPair(){ if(ok && slots) decReaders(slots); }
+    operator bool(){ return ok; }
+  };
+
 
   u8*     m_mem = nullptr;  // single pointer is all that ends up on the stack
 
@@ -251,6 +260,44 @@ struct flf_map
   Hash         hashKey(Key const& k)
   {
     return Hasher()(k);  // instances a hash function object and calls operator()
+  }
+  IdxPair     loadPair(void* pair)
+  {
+    IdxPair ret;
+    ret.asInt = ((au64*)(pair))->load();
+    return ret;
+  }
+  bool        insertAt(u32 valIdx, u32 st, u64 capacity)
+  {
+    IdxPair  curPair, nxtPair;
+    Idx*  slots = slotPtr();
+    u32      en = (st+1) % capacity;
+    for(u32 i=st; i!=en; )
+    {
+      i = prev(i, capacity);
+      IdxPair*  cur = (IdxPair*)(slots + i);
+      curPair       = loadPair(cur);
+      bool   scndOk = curPair.second.val_idx == EMPTY;
+      bool   frstOk = curPair.first.val_idx < SPECIAL_VALUE_START;
+
+      nxtPair.second.readers = 0;
+      nxtPair.second.val_idx = valIdx;
+
+      // increment readers on the first
+      ReadPair reader(cur);
+      IdxPair rdPair = reader.idxs;
+      
+      // check that the first value's hash is the same
+      // try to compare exchange both, replacing the empty with index
+      bool ok = ((au64*)(cur))->compare_exchange_strong(curPair.asInt, nxtPair.asInt);
+      
+    }
+
+    // if(curVals.second.val_idx == EMPTY &&
+    //
+    //IdxPair*  cur = (IdxPair*)(slots + i);
+    //au64*    acur = (au64*)(cur);
+    //curPair.asInt = acur->load();
   }
 
   // data reading that assumes readers has already been incremented by the calling thread
