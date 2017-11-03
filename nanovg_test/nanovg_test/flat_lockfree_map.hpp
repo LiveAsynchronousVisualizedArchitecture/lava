@@ -63,12 +63,13 @@
 // -todo: put swapping into sortPair - made swpPair more general
 // -todo: check for DELETED in swpPair - check will be in placeIdx
 // -todo: swpPair return an ENUM for why the swap could not be completed - will be handled in placeIdx
+// -todo: make placeIdx check that the Idx is in the slot being passed - will do this more through sortPair's return value
+// -todo: integrate finding the current value index with the atomic compare and swap loop
+// -todo: make placeIdx check that the previous Idx's readers is not live - leave this up to sortPair
+// -todo: make placeIdx check that the previous Idx's ideal position is further or the same - also leave to sortPair
 
-// todo: make a separate find function that can be used when decReaders or placeIdx
-// todo: make placeIdx check that the Idx is in the slot being passed
-// todo: integrate finding the current value index with the atomic compare and swap loop
-// todo: make placeIdx check that the previous Idx's readers is not live
-// todo: make placeIdx check that the previous Idx's ideal position is further or the same
+// todo: make a separate find function that can be used when decReaders or placeIdx don't find an index where they expect it
+// todo: make sortPair return the final Idx it sorted
 // todo: make a cleanDeleted() function that moves a DELETED value up until it can be set to EMPTY
 // todo: make readers find both indices on decrement, even if they have moved 
 // todo: change ReadPair to use an ENUM to keep track of FIRST, SECOND, BOTH, or NONE were incremented
@@ -336,9 +337,19 @@ struct flf_map
     IdxPair*   slotPair = (IdxPair*)(slotPtr() + rightSlot-1);    // todo: deal with first and last slot
     ReadPair   rp(slotPair);
     if(!rp) return false;
+
+    if(rp.idxs.first.val_idx  == DELETED && 
+       rp.idxs.second.val_idx == DELETED){
+      sortPair(rightSlot+1, capacity);
+      rp = ReadPair(slotPair);
+    }else if(rp.idxs.first.readers==LIVE && rp.idxs.second.readers==LIVE){
+      sortPair(rightSlot-1, capacity);
+      rp = ReadPair(slotPair);
+    }
+
     IdxPair  prev = rp.idxs;
-    u32   lValIdx = rp.idxs.first.val_idx;
-    u32   rValIdx = rp.idxs.second.val_idx;
+    u32   lValIdx = prev.first.val_idx;
+    u32   rValIdx = prev.second.val_idx;
 
     //u32     rdIdx = rp.idxs.second.val_idx;
     HKV*      hkv = hkvStart(capacity);
