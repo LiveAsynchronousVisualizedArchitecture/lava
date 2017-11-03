@@ -60,7 +60,13 @@
 // -todo: figure out why put sets readers to 205 - nxtPair was unitialized and only set the second Idx
 // -todo: figure out loop and how insertAt should handle a compare and swap failure - don't have insertAt loop - leave it to the calling function
 
+// todo: check for DELETED in swapIdxPair
 // todo: make a separate find function that can be used when decReaders or placeIdx
+// todo: make placeIdx check that the Idx is in the slot being passed
+// todo: integrate finding the current value index with the atomic compare and swap loop
+// todo: make placeIdx check that the previous Idx's readers is not live
+// todo: make placeIdx check that the previous Idx's ideal position is further or the same
+// todo: make a cleanDeleted() function that moves a DELETED value up until it can be set to EMPTY
 // todo: make readers find both indices on decrement, even if they have moved 
 // todo: change ReadPair to use an ENUM to keep track of FIRST, SECOND, BOTH, or NONE were incremented
 // todo: make placeIdx find the index first, then swap it to it's destination, taking detours to place any LIVE indices in front of it
@@ -94,7 +100,7 @@ struct flf_map
 
   static const u32               EMPTY  =  0x00FFFFFF;              // max value of 2^24 to set all 24 bits of the value index
   static const u32             DELETED  =  0x00FFFFFE;              // one less than the max value above
-  static const u32 SPECIAL_VALUE_START  =  DELETED;                 // comparing to this is more clear than comparing to DELETED
+  static const u32       SPECIAL_START  =  DELETED;                 // comparing to this is more clear than comparing to DELETED
   static const u32            LIST_END  =  0x00FFFFFF;              // needs to be 24 bits flipped because the list's indices are 24 bits
   static const  u8                LIVE  =  0xFF;                    // this is a value to set for Idx::readers to signify that an index is still being inserted
 
@@ -121,7 +127,7 @@ struct flf_map
 
     bool inc(i32 increment)
     {
-      if(val_idx < SPECIAL_VALUE_START){
+      if(val_idx < SPECIAL_START){
         readers += increment;        // increment the reader values if neither of the indices have special values like EMPTY or DELETED
         return true;
       }else 
@@ -262,7 +268,7 @@ struct flf_map
     
     return ret;
   }
-  bool     swapIdxPair(IdxPair* ip, IdxPair* prevIp = nullptr)
+  bool         swpPair(IdxPair* ip, IdxPair* prevIp = nullptr)
   {
     using namespace std;
     
@@ -292,7 +298,7 @@ struct flf_map
   bool       halfEmpty(IdxPair p)
   {
     if(p.second.val_idx != EMPTY) return false;
-    if(p.first.val_idx  >= SPECIAL_VALUE_START) return false;
+    if(p.first.val_idx  >= SPECIAL_START) return false;
     
     return true;
   }
@@ -321,11 +327,55 @@ struct flf_map
 
     return false;
   }
-  void placeIdx(u32 i, Hash hash, u64 capacity)
+  bool        sortPair(u32 rightSlot, u64 capacity)
   {
+    IdxPair*   slotPair = (IdxPair*)(slotPtr() + rightSlot-1);    // todo: deal with first and last slot
+    ReadPair   rp(slotPair);
+    if(!rp) return false;
+    u32   lValIdx = rp.idxs.first.val_idx;
+    u32   rValIdx = rp.idxs.second.val_idx;
+
+    //u32     rdIdx = rp.idxs.second.val_idx;
+    HKV*      hkv = hkvStart(capacity);
+    Hash     lHsh = hkv[lValIdx].hash;
+    Hash     rHsh = hkv[rValIdx].hash;
+    if(lHsh == rHsh) return false;
+    
+    auto    lDist = wrapDist(lHsh,rightSlot,capacity);
+    auto    rDist = wrapDist(rHsh,rightSlot,capacity);
+
+    if( rDist > lDist+1 ){
+      // do the swap
+      IdxPair prev, nxt;
+      au64*  aip = (au64*)(slotPair);
+            prev = rp.idxs;
+      nxt.first  = prev.second;
+      nxt.second = prev.first;
+      bool    ok = aip->compare_exchange_strong(prev.asInt, nxt.asInt);
+      if(ok) return true;
+    }
+
+    return false;
+  }
+  void        placeIdx(u32 i, u32 valIdx, Hash hash, u64 capacity)
+  {
+    IdxPair* slotPair = (IdxPair*)(slotPtr() + i-1);    // todo: deal with first and last slot
+    //IdxPair        ip = loadPair(slotPair);
+    ReadPair rp(slotPair);
+    if(rp.idxs.second.readers != LIVE){ return; }
+    u32 rdIdx = rp.idxs.second.val_idx;
+    if(rdIdx != valIdx){
+      // find the index again if it isn't there
+      // todo: will need to integrate this with an atomic compare and swap loop
+    }
+
     // check that the first value's hash is the same - only need the hash because colliding keys might not be contiguous
-    HKV*     hkv = hkvStart(capacity);
-    Hash curHash = hkv[i].hash;
+    HKV*      hkv = hkvStart(capacity);
+    Hash  curHash = hkv[rdIdx].hash;
+    auto     dist = wrapDist(hash,i,capacity);
+    //u32     ideal = curHash % capacity;
+    
+
 
     // if(hash != curHash){ return false; }
 
@@ -510,7 +560,7 @@ struct flf_map
       idx.asInt    = atmIncPtr->load(std::memory_order::memory_order_seq_cst);              // get the value of both Idx structs atomically
       newIdx.asInt = idx.asInt;
 
-      if(idx.val_idx < SPECIAL_VALUE_START){
+      if(idx.val_idx < SPECIAL_START){
         newIdx.readers  =  idx.readers + increment;                                        // increment the reader values if neithe of the indices have special values like EMPTY or DELETED
       }else{
         if(readIdx) readIdx->asInt = idx.asInt;

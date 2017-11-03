@@ -271,3 +271,28 @@ Decrementing Readers
 |  Indices can move forward if they are bumped up by indices further from their ideal slot
 |
 
+
+Dealing with the first and last slots:
+|  Can't swap the first and last slots atomically
+|  Review simdb notes
+|  Possibly make a " -1 " slot and a slot after the end 
+|  How can the extra slots be used?
+|  What are the problems that might be faced?  
+|  |  DELETED at the end might not know if it is up against EMPTY atomically
+|  |  placing an index at the first index can't atomically know that it has reached its native span
+|  Can the ends be versioned?
+|  Can the ends be AB swapped? 
+|  Should the ends be 128 bit aligned so that they can have versions integrated with two u32 Idx structs? 
+|  |  Then the versions could be synced between the two slots so they are known to be the same
+|  What if there is only one thread allowed to deal with the ends  
+|  |  Could be synced with a separate atomic variable
+|  |  Can one thread clean up the state of both ends?
+|  |  If one thread does not aquire the end slots boolean are there scenarios where other threads aren't going to be able to clean up the state? 
+|  If there are only 254 threads possible, shouldn't there be only 254 indices being inserted at one time ?
+|  |  If immediate availability is given up, a stack of 254 units could be used to queue up indices that still need to be inserted
+|  |  This could be used for only indices that need to be swapped around the ends AND don't get the atomic end point boolean
+|  Maybe a spinlock or mutex just for swapping the ends wouldn't be so bad 
+|  |  If there was a spinlock, it could also check the indices in both end slots while it spins
+
+
+
