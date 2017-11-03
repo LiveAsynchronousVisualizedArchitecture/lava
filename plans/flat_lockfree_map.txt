@@ -293,6 +293,26 @@ Dealing with the first and last slots:
 |  |  This could be used for only indices that need to be swapped around the ends AND don't get the atomic end point boolean
 |  Maybe a spinlock or mutex just for swapping the ends wouldn't be so bad 
 |  |  If there was a spinlock, it could also check the indices in both end slots while it spins
+|  Could the end slot be treated as a vector of elements? 
+|  |  The table memory could be expanded to accomodate elements off the end
+|  |  The end could be expanded by 2x each time
+|  |  If the end gets to a certain size relative to the rest of the table, the table can be resized
+|  |  This should place each of the spans leading into the end in different locations
 
+ 
+Re-allocating memory
+|  Should there be an 8 bytes slot for a previous table
+|  when atomically swapped, writes continue on the new table and failed reads can also check the old table
+|  once all members have been copied and deleted from the old table, atomically set it to nullptr/0 
+
+
+Clean Deleted Function
+|  Can't find a specific DELETED slot 
+|  Make function to recursivly move any DELETED slots from a span from a certain point forward 
+|  If two deleted slots are found in a row, needs to save the position of the first and try to remove the second by calling a recursive function
+|  Also could use a 254 u32 stack structure residing in stack memory to remember previous points to restart from?
+
+PlaceIdx Function
+|  Needs to act like DELETED function except it will try to move LIVE indices towards their ideal positions recursivly
 
 
