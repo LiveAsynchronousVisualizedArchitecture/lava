@@ -58,13 +58,14 @@
 // -todo: change insert to tryInsert? - insertAt seems apt given that it will only insert at the position given or won't succeed
 // -todo: add a check for the ideal distance before using insertAt
 // -todo: figure out why put sets readers to 205 - nxtPair was unitialized and only set the second Idx
+// -todo: figure out loop and how insertAt should handle a compare and swap failure - don't have insertAt loop - leave it to the calling function
 
-// todo: make placeIdx find the index first, then swap it to it's destination, taking detours to place any LIVE indices in front of it
-// todo: make a distance comparison that compares wrapped ideal distances
+// todo: make a separate find function that can be used when decReaders or placeIdx
 // todo: make readers find both indices on decrement, even if they have moved 
-// todo: figure out loop and how insertAt should handle a compare and swap failure
 // todo: change ReadPair to use an ENUM to keep track of FIRST, SECOND, BOTH, or NONE were incremented
+// todo: make placeIdx find the index first, then swap it to it's destination, taking detours to place any LIVE indices in front of it
 // todo: make put() find EMPTY slot and swap backwards until its key's span is found
+// todo: make a distance comparison that compares wrapped ideal distances
 // todo: make del()
 // todo: make operator[]
 // todo: make operator()
