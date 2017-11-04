@@ -67,11 +67,12 @@
 // -todo: integrate finding the current value index with the atomic compare and swap loop
 // -todo: make placeIdx check that the previous Idx's readers is not live - leave this up to sortPair
 // -todo: make placeIdx check that the previous Idx's ideal position is further or the same - also leave to sortPair
+// -todo: make a cleanDeleted() function that moves a DELETED value up until it can be set to EMPTY - will be done with sortPair
 
-// todo: make a separate find function that can be used when decReaders or placeIdx don't find an index where they expect it
+// todo: make start and end slot checks in sortPair
 // todo: make sortPair return the final Idx it sorted
-// todo: make a cleanDeleted() function that moves a DELETED value up until it can be set to EMPTY
-// todo: make readers find both indices on decrement, even if they have moved 
+// todo: make a separate find function that can be used when decReaders or placeIdx don't find an index where they expect it
+// todo: make readers find both indices on decrement, even if they have moved - does this imply that DELETED with readers can't be moved? do DELETED indices with readers need to be put in temp array? does readers need to be on the value as well?
 // todo: change ReadPair to use an ENUM to keep track of FIRST, SECOND, BOTH, or NONE were incremented
 // todo: make placeIdx find the index first, then swap it to it's destination, taking detours to place any LIVE indices in front of it
 // todo: make put() find EMPTY slot and swap backwards until its key's span is found
