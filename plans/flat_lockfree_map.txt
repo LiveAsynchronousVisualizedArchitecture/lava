@@ -315,4 +315,12 @@ Clean Deleted Function
 PlaceIdx Function
 |  Needs to act like DELETED function except it will try to move LIVE indices towards their ideal positions recursivly
 
+SortPair Function
+|  Can take a range of slots, usually from the slot an index was put in, to the it's ideal position
+|  If there is pair of two live or two deleted indices, do a recursive call with a smaller range
+|  resume from the blocked index on the recursive function return
+|  DELETED needs to go until it finds EMPTY or at least until it is moved to another span
+|  One pass should be enough to guarantee an inserted index is moved into its span since the index should only move closer to its ideal position
+|  Ends dealt with by having extra slots off the end 
+|
 
