@@ -112,6 +112,70 @@ extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaFrame*, L
 extern "C" using           LavaAlloc  =  void* (*)(uint64_t);                               // custom allocation function passed in to each node call
 extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                                    // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
 
+struct AtomicBitset
+{
+  using   u64 = uint64_t;
+  using  au64 = std::atomic<u64>;
+
+  struct Hndl
+  {
+    AtomicBitset*  p;
+    u8           bit;
+    
+    operator bool()
+    {
+      au64* abits = (au64*)(&p->bits);
+      u64    bits = abits->load();
+      return (bool) ((bits >> bit) & 0x1);
+    }
+
+    Hndl& operator=(bool b)
+    {
+      u64 prevBits, nxtBits;
+      au64*  abits = (au64*)(&p->bits);
+      do{
+        prevBits = nxtBits = abits->load();
+        if(b) nxtBits |=    (u64)0x1 << bit;            // or with the proper bit set to 1
+        else  nxtBits &= ~( (u64)0x1 << bit);           // and with the proper bit set to 0 and everything else set to 1
+      }while( !abits->compare_exchange_strong(prevBits, nxtBits) );
+      
+      return *this;
+
+      //  if(val) slotMask |=  (u64)0x1 << sIdx;            // or with the proper bit set to 1
+      //  else    slotMask &= ~( (u64)(0x1) << sIdx);       // and with the proper bit set to 0 and everything else set to 1
+    }
+  };
+  struct  Str
+  {
+    char bitstr[65];
+    operator char*()
+    {
+      return (char*)bitstr;
+    }
+  };
+
+  u64  bits = 0;
+
+  Hndl operator[](u64 bit)
+  {
+    Hndl h;
+    h.p   = this;
+    h.bit = (u8)bit;
+
+    return h;
+  }
+  Str       toStr()
+  {
+    Str ret;
+    for(i32 i=0; i<64; ++i){
+      ret.bitstr[63-i] = (*this)[i]?  '1'  :  '0';
+    }
+    ret.bitstr[64] = '\0';
+
+    return ret;
+  }
+};
+
 union     LavaArgType{ 
   enum { NONE=0, END, DATA_ERROR, STORE, MEMORY, SEQUENCE, ENUMERATION };                // todo: does this need store sequence and memory sequence?
   u8 asInt;

@@ -114,8 +114,9 @@
 // -todo: change LavaFrame bitset names - taken out due to bitset
 // -todo: type notes for flat_lockfree_map
 // -todo: work on flat lock free map
+// -todo: make an atomic bitset
+// -todo: test atomic bitset
 
-// todo: make an atomic bitset
 // todo: make LavaFrame slots start from the beggining
 // todo: make LavaFrame operations atomic - need an atomic bitset 
 // todo: change cur() functions to const and rename to read()
@@ -1700,28 +1701,42 @@ ENTRY_DECLARATION // main or winmain
     //decltype(std::unordered_map<int,int>::begin()) 
     Println("sizeof( std::unordered_map<int,int>::iterator ) ): ",  sizeof( std::unordered_map<int,int>::iterator ) );
 
-    Println();
-    flf_map  defaultMap;
-    flf_map  tstMap(4);
-    Println("Idx: ", sizeof(flf_map::Idx) 
-             );
-   Print("List: ");
-   u32* lst = tstMap.listStart( tstMap.capacity() );
-   TO(tstMap.capacity(),i) Print(lst[i]," ");
-   Println();
-   Println("size: ", tstMap.size(), " capacity: ", tstMap.capacity() );
-   Println();
-   Println("put: ", tstMap.put(85, 101) );
-   Println("put: ", tstMap.put(20, 40) );
-   Println("put: ", tstMap.put(5, 7) );
-   //Println("put: ", tstMap.put(11, 13) );
-   //Println("put: ", tstMap.put(17, 19) );
-   Println();
-   print_flf_map(tstMap);
-   Println("get() as bool: ",  (bool)tstMap.get(85), "   ", tstMap.get(85).ok);
-   Println("get() as Value: ", (u64)tstMap.get(85),  "   ", tstMap.get(85).value);
-   Println();
-   print_flf_map(tstMap);
+    AtomicBitset ab;
+    Println("  slot 0: ", (bool)ab[0], " : ", (char*)ab.toStr().bitstr );
+    ab[0] = 1;
+    Println("  slot 0: ", (bool)ab[0], " : ", (char*)ab.toStr().bitstr );
+    ab[0] = 1;
+    Println("  slot 7: ", (bool)ab[7], " : ", (char*)ab.toStr().bitstr );
+    ab[7] = 1;
+    Println("  slot 7: ", (bool)ab[7], " : ", (char*)ab.toStr().bitstr );
+    ab[7] = 1;
+    //Println("  slot 0: ", ab[0], " : ", ab.toStr().bitstr);
+    //ab[0] = 0;
+    //Println("  slot 0: ", ab[0], " : ", ab.toStr().bitstr);
+
+
+   // Println();
+   // flf_map  defaultMap;
+   // flf_map  tstMap(4);
+   // Println("Idx: ", sizeof(flf_map::Idx) 
+   //          );
+   //Print("List: ");
+   //u32* lst = tstMap.listStart( tstMap.capacity() );
+   //TO(tstMap.capacity(),i) Print(lst[i]," ");
+   //Println();
+   //Println("size: ", tstMap.size(), " capacity: ", tstMap.capacity() );
+   //Println();
+   //Println("put: ", tstMap.put(85, 101) );
+   //Println("put: ", tstMap.put(20, 40) );
+   //Println("put: ", tstMap.put(5, 7) );
+   ////Println("put: ", tstMap.put(11, 13) );
+   ////Println("put: ", tstMap.put(17, 19) );
+   //Println();
+   //print_flf_map(tstMap);
+   //Println("get() as bool: ",  (bool)tstMap.get(85), "   ", tstMap.get(85).ok);
+   //Println("get() as Value: ", (u64)tstMap.get(85),  "   ", tstMap.get(85).value);
+   //Println();
+   //print_flf_map(tstMap);
   }
 
   glfwSetTime(0);
