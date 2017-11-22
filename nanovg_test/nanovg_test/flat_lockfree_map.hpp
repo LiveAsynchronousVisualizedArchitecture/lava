@@ -69,6 +69,7 @@
 // -todo: make placeIdx check that the previous Idx's ideal position is further or the same - also leave to sortPair
 // -todo: make a cleanDeleted() function that moves a DELETED value up until it can be set to EMPTY - will be done with sortPair
 
+// todo: change readers to be part of the HKV struct
 // todo: make start and end slot checks in sortPair
 // todo: make sortPair return the final Idx it sorted
 // todo: make a separate find function that can be used when decReaders or placeIdx don't find an index where they expect it

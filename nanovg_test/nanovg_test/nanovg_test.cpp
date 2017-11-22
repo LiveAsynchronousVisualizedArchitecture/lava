@@ -116,9 +116,13 @@
 // -todo: work on flat lock free map
 // -todo: make an atomic bitset
 // -todo: test atomic bitset
+// -todo: use AtomicBitset in LavaFrame
+// -todo: make LavaFrame operations atomic - need an atomic bitset 
 
-// todo: make LavaFrame slots start from the beggining
-// todo: make LavaFrame operations atomic - need an atomic bitset 
+// todo: put priority into packets 
+// todo: put a range in a packet - does this imply the generation of multiple smaller packets from one bigger packet that then have to be synced together?
+// todo: figure out a way to emit multiple packets with different ranges
+// todo: make LavaFrame slots start from the begining
 // todo: change cur() functions to const and rename to read()
 // todo: change opp() functions to non-const only and rename to write()
 // todo: figure out a way to have a reader count with lava.graph - is an atomic hash map inevitable? 
@@ -1673,30 +1677,30 @@ ENTRY_DECLARATION // main or winmain
       LavaInit();
     }
 
-    Println("size of frame: ", sizeof(LavaFrame));
-    LavaFrame tstFrame;
-    Println("  slot 0: ", tstFrame.slotMask[0], " : ", tstFrame.slotMask);
-    tstFrame.slotMask[0] = 1;
-    Println("  slot 0: ", tstFrame.slotMask[0], " : ", tstFrame.slotMask);
-    tstFrame.slotMask[0] = 0;
-    Println("  slot 0: ", tstFrame.slotMask[0], " : ", tstFrame.slotMask);
-
-    //tstFrame.slotMask[16] = 1;
-    //Println("  slot 16: ", tstFrame.slotMask[16], " : ", tstFrame.slotMask);
+    //Println("size of frame: ", sizeof(LavaFrame));
+    //LavaFrame tstFrame;
+    //Println("  slot 0: ", tstFrame.slotMask[0], " : ", tstFrame.slotMask);
     //tstFrame.slotMask[0] = 1;
-    //Println("  slot 16: ", tstFrame.slotMask[16], " : ", tstFrame.slotMask);
-    //tstFrame.slotMask[63] = 1;
-    //Println("  slot 63: ", tstFrame.slotMask[63], " : ", tstFrame.slotMask);
-    
-    Println("\n");
-    tstFrame.slotMask = 0;
-    Println("slot cout: ",tstFrame.slotCount(),"  slot ",0,": ", tstFrame.slotMask[0], " : ", tstFrame.slotMask);
-    TO(LavaFrame::PACKET_SLOTS,i){
-      tstFrame.slotMask[i] = 1;
-      Println("slot cout: ",tstFrame.slotCount(),"  slot ",i,": ", tstFrame.slotMask[i], " : ", tstFrame.slotMask);
-      //tstFrame.slotMask[i,0);
-    }
-    Println();
+    //Println("  slot 0: ", tstFrame.slotMask[0], " : ", tstFrame.slotMask);
+    //tstFrame.slotMask[0] = 0;
+    //Println("  slot 0: ", tstFrame.slotMask[0], " : ", tstFrame.slotMask);
+    //
+    ////tstFrame.slotMask[16] = 1;
+    ////Println("  slot 16: ", tstFrame.slotMask[16], " : ", tstFrame.slotMask);
+    ////tstFrame.slotMask[0] = 1;
+    ////Println("  slot 16: ", tstFrame.slotMask[16], " : ", tstFrame.slotMask);
+    ////tstFrame.slotMask[63] = 1;
+    ////Println("  slot 63: ", tstFrame.slotMask[63], " : ", tstFrame.slotMask);
+    //
+    //Println("\n");
+    //// tstFrame.slotMask = 0;
+    //Println("slot cout: ",tstFrame.slotCount(),"  slot ",0,": ", tstFrame.slotMask[0], " : ", tstFrame.slotMask);
+    //TO(LavaFrame::PACKET_SLOTS,i){
+    //  tstFrame.slotMask[i] = 1;
+    //  Println("slot cout: ",tstFrame.slotCount(),"  slot ",i,": ", tstFrame.slotMask[i], " : ", tstFrame.slotMask);
+    //  //tstFrame.slotMask[i,0);
+    //}
+    //Println();
 
     //decltype(std::unordered_map<int,int>::begin()) 
     Println("sizeof( std::unordered_map<int,int>::iterator ) ): ",  sizeof( std::unordered_map<int,int>::iterator ) );

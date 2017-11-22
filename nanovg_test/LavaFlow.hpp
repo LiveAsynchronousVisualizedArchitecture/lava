@@ -128,7 +128,6 @@ struct AtomicBitset
       u64    bits = abits->load();
       return (bool) ((bits >> bit) & 0x1);
     }
-
     Hndl& operator=(bool b)
     {
       u64 prevBits, nxtBits;
@@ -140,21 +139,15 @@ struct AtomicBitset
       }while( !abits->compare_exchange_strong(prevBits, nxtBits) );
       
       return *this;
-
-      //  if(val) slotMask |=  (u64)0x1 << sIdx;            // or with the proper bit set to 1
-      //  else    slotMask &= ~( (u64)(0x1) << sIdx);       // and with the proper bit set to 0 and everything else set to 1
     }
   };
   struct  Str
   {
     char bitstr[65];
-    operator char*()
-    {
-      return (char*)bitstr;
-    }
+    operator char*(){ return (char*)bitstr; }
   };
 
-  u64  bits = 0;
+  u64   bits = 0;
 
   Hndl operator[](u64 bit)
   {
@@ -163,6 +156,21 @@ struct AtomicBitset
     h.bit = (u8)bit;
 
     return h;
+  }
+  u8        count() const  // make x an atomic load
+  {
+    auto x = bits;
+    u64 m1 = 0x5555555555555555ll;
+    u64 m2 = 0x3333333333333333ll;
+    u64 m4 = 0x0F0F0F0F0F0F0F0Fll;
+    u64 h01 = 0x0101010101010101ll;
+
+    x -= (x >> 1) & m1;
+    x = (x & m2) + ((x >> 2) & m2);
+    x = (x + (x >> 4)) & m4;
+
+    return (x * h01) >> 56;
+    // return popcount64(bits);
   }
   Str       toStr()
   {
@@ -259,16 +267,17 @@ struct      LavaFrame
   enum FRAME { ERR_FRAME = 0xFFFFFFFFFFFFFFFE, NO_FRAME = 0xFFFFFFFFFFFFFFFF };
   static const u64 PACKET_SLOTS = 16;
   //using Slots = std::atomic<std::bitset<PACKET_SLOTS>>;
-  using Slots = std::bitset<PACKET_SLOTS>;
+  //using Slots = std::bitset<PACKET_SLOTS>;
+  using Slots = AtomicBitset;
 
   u64                dest = LavaId::NODE_NONE;             // The destination node this frame will be run with
   u64               frame = 0;                             // The numer of this frame - lowest frame needs to be run first
   u64           src_frame = 0;                             // Does this need to come from the message node?
   u64          dest_frame = 0;                             // should this come from the node instance?
-  Slots          slotMask = 0;                             // The bit mask respresenting which slots already have packets in them
+  Slots          slotMask;// = 0;                             // The bit mask respresenting which slots already have packets in them
 
   u16               slots = 0;                           // The total number of slots needed for this frame to be complete 
-  LavaPacket  packets[PACKET_SLOTS];
+  LavaPacket      packets[PACKET_SLOTS];
 
   bool          putSlot(u64 sIdx, LavaPacket const& pkt)
   {
@@ -290,20 +299,6 @@ struct      LavaFrame
     return false;
   }
 
-  //void          setSlot(u64 sIdx, bool val)
-  //{
-  //  if(val) slotMask |=  (u64)0x1 << sIdx;            // or with the proper bit set to 1
-  //  else    slotMask &= ~( (u64)(0x1) << sIdx);       // and with the proper bit set to 0 and everything else set to 1
-  //}
-  //bool          getSlot(u64 sIdx) const
-  //{
-  //  return (bool) ((slotMask >> sIdx) & 0x1);
-  //  //return (bool) ((slotMask >> sIdx) & 0x1);
-  //  //return (bool) ((slotMask >> sIdx) & 0x0000000000000001);
-  //}
-  //
-  //if( getSlot(sIdx) ) return false;
-  //setSlot(sIdx, true);
 };
 struct       LavaNode
 {
@@ -1863,7 +1858,23 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//void          setSlot(u64 sIdx, bool val)
+//{
+//  if(val) slotMask |=  (u64)0x1 << sIdx;            // or with the proper bit set to 1
+//  else    slotMask &= ~( (u64)(0x1) << sIdx);       // and with the proper bit set to 0 and everything else set to 1
+//}
+//bool          getSlot(u64 sIdx) const
+//{
+//  return (bool) ((slotMask >> sIdx) & 0x1);
+//  //return (bool) ((slotMask >> sIdx) & 0x1);
+//  //return (bool) ((slotMask >> sIdx) & 0x0000000000000001);
+//}
+//
+//if( getSlot(sIdx) ) return false;
+//setSlot(sIdx, true);
 
+//  if(val) slotMask |=  (u64)0x1 << sIdx;            // or with the proper bit set to 1
+//  else    slotMask &= ~( (u64)(0x1) << sIdx);       // and with the proper bit set to 0 and everything else set to 1
 
 //printf("\n lava heap: %llu \n", (u64)lava_thread_heap);
 //

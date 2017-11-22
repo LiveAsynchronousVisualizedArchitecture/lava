@@ -143,3 +143,14 @@ main::{ stk pt=v2f(1,1); out("pt: " <- pt.x <- " " <- pt.y <- "\n"); 0; }   << a
 
 << code completion in an ide could be done in reverse, with arguments, then functions that would be valid with those arguments
 << tables can have vectors of structs by declaring the struct as the vector type?
+
+
+Use semicolons to clear the stack
+|  If arguments are returned to the stack, could functions be chained together easier?
+|  Would it be easier than just using '.' to pass the return value as the first argument?
+|  name = readline split(_, " ") capfirst(_)[0]
+|  name = readline split " " capfirst[0];
+|
+
+
+

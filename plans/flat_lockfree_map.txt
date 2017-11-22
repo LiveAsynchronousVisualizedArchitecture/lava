@@ -324,3 +324,22 @@ SortPair Function
 |  Ends dealt with by having extra slots off the end 
 |
 
+Moving Readers
+|  move reader count from the value index array to the actual value struct
+|  instead of a hash-key-value struct, now have a readers-hash-key-value struct 
+|  number of indices can change to 32 bit instead of 24 bit - 4 billion instead of 16 million
+|  when you jump back to the value index array after incrementing the read variable, you still know that the index is the same
+|  because you increment the readers and haven't yet decremented it, that index can't be deallocated, returned to the list, and ultimatly repurposed
+|  becaues the index can't be repurposed while readers is positive, if you find it again in the val_idx array, it must be pointing to the same key you just compared
+|  How does this effect sorting?
+|  |  DELETED should always be swapped to the right until it finds an EMPTY
+|  |  DELETED can be swapped without looking at readers, hashes, or keys
+|  |  value indices need an INSERTED flag so they will actually be 31 bits / 2 billion indices
+|  |  when sorting, indices will have their readers incremented, their hashes read to find ideal positions, and then be compare and swapped
+|  |  if the comapre and swap fails, check the current val_idxs and decrement the readers for either that are missing from the previous try
+|
+
+
+
+
+
