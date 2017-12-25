@@ -71,6 +71,14 @@ Security:
 Make loading priority for nodes, or load them when it is first known that they will be needed based on data flow and messaging?
 
 
+Emit Packets using a function instead of outputting into an array:
+ - Flexible number of packets can be emitted
+ - Decreased latency of emitted packets getting processed
+ - Possibly simpler API
+ - Lock free queue can be used 
+ - After emitting all packets, emitting thread can then sort them and put them into a cache or NUMA local lock free queue
+
+
 -------------------------------------------------------------------------------------------
 Simplicity does not precede complexity, but follows it.
 

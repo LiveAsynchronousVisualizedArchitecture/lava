@@ -20,8 +20,10 @@
 #include <unordered_set>
 #include <map>
 #include <regex>
-#include <filesystem>
-#include "flat_lockfree_map.hpp"
+
+#include <experimental/filesystem>
+
+//#include "flat_lockfree_map.hpp"
 #include "no_rt_util.h" // temp
 #include "tbl.hpp" // temp
 
@@ -33,8 +35,9 @@
 
 #define LAVA_ARG_COUNT 512
 
-#if defined(_WIN32) // todo: actually needs to be done by compiler and not OS
-  namespace fs = std::tr2::sys;                                                             // todo: different compiler versions would need different filesystem paths
+#if defined(_MSC_VER)
+  //namespace fs = std::tr2::sys;                                                             // todo: different compiler versions would need different filesystem paths
+  namespace fs = std::experimental::filesystem;
 #endif
 
 /*
@@ -81,6 +84,115 @@ static inline u64 popcount64(u64 x)
   return (x * h01) >> 56;
 }
 
+// static data segment data
+#if defined(_WIN32)
+  static const std::string  liveExt(".live.dll");
+#endif
+static __declspec(thread)       void*   lava_thread_heap = nullptr;       // thread local handle for thread local heap allocations
+// end data segment data
+
+// function declarations
+BOOL WINAPI DllMain(
+  _In_  HINSTANCE     hinstDLL,
+  _In_  DWORD        fdwReason,
+  _In_  LPVOID     lpvReserved
+);
+
+// allocator definitions
+inline void    LavaHeapDestroyCallback(void* heapHnd)
+{
+  if(heapHnd)
+    HeapDestroy(heapHnd);
+}
+inline void*   LavaHeapInit(size_t initialSz = 0)
+{
+  if(!lava_thread_heap) {
+    lava_thread_heap = HeapCreate(HEAP_NO_SERIALIZE, initialSz, 0);
+  }
+  return lava_thread_heap;
+}
+inline void*   LavaHeapAlloc(size_t sz)
+{
+  void* thread_heap = LavaHeapInit(sz);
+
+  void* ret = nullptr;
+  if(thread_heap)
+    ret = HeapAlloc(thread_heap, HEAP_NO_SERIALIZE, sz);
+
+  return ret;
+}
+inline int     LavaHeapFree(void* memptr)
+{
+  void* thread_heap = LavaHeapInit();
+
+  void* ret = nullptr;
+  if(thread_heap && memptr) {
+    auto ret = HeapFree(thread_heap, HEAP_NO_SERIALIZE, memptr);
+    return ret;
+  }else{ return 0; }
+}
+
+template <class T> struct  ThreadAllocator
+{
+  using value_type  =  T;
+
+  template<class U> 
+  struct rebind
+  {
+    using other = ThreadAllocator<U>;
+  };
+
+  ThreadAllocator() /*noexcept*/ {}   // default ctor not required by STL
+
+                                      // A converting copy constructor:
+  template<class U> __declspec(noinline) ThreadAllocator(const ThreadAllocator<U>&) /*noexcept*/ {}
+  template<class U> __declspec(noinline) bool operator==(const ThreadAllocator<U>&) const /*noexcept*/
+  {
+    return true;
+  }
+  template<class U> __declspec(noinline) bool operator!=(const ThreadAllocator<U>&) const /*noexcept*/
+  {
+    return false;
+  }
+  __declspec(noinline) T*    allocate(const size_t n)     const;
+  __declspec(noinline) void  deallocate(T* const& p, size_t)    const;
+
+  template<class U, class... ARGS>
+  __declspec(noinline) void construct(U* p, ARGS&&... args)
+  {
+    ::new ((void*)p) U(std::forward<ARGS>(args)...);
+  }
+  template<class U>
+  __declspec(noinline) void destroy(U* p)
+  {
+    p->~U();
+  }
+};
+template <class T> T*      ThreadAllocator<T>::allocate(const size_t n)  const
+{
+  if(n==0) return nullptr;
+
+  if( n > static_cast<size_t>(-1)/sizeof(T) ) {
+    throw std::bad_array_new_length();
+  }
+
+  //void* p = ThreadAlloc( n * sizeof(T) );
+  void* p = LavaHeapAlloc( n * sizeof(T) );
+  if(!p) { throw std::bad_alloc(); }
+
+  return static_cast<T*>(p);
+}
+template <class T> void    ThreadAllocator<T>::deallocate(T* const& p, size_t) const
+{
+  //if(n==0) return;
+  //
+  //ThreadFree(p);
+
+  LavaHeapFree(p);
+  //p = nullptr;
+}
+// end allocator definitions
+
 // GCC built in intrinsic - int  __builtin_popcount(unsigned int)
 // End libpopcnt
 
@@ -93,6 +205,7 @@ struct        LavaOut;
 union          LavaId;
 class       LavaGraph;
 struct        LavaMem;
+struct     LavaPacket;
 
 using str                =  std::string;
 using lava_handle        =  HMODULE;                                                      // maps handles to the LavaFlowNode pointers contained in the shared libraries
@@ -106,13 +219,18 @@ using lava_nidMap        =  std::unordered_multimap<std::string, uint64_t>;     
 using lava_flowPtrs      =  std::unordered_set<LavaNode*>;                                // LavaFlowNode pointers referenced uniquely by address instead of using an id
 using lava_ptrsvec       =  std::vector<LavaNode*>;
 using lava_nameNodeMap   =  std::unordered_map<std::string, LavaNode*>;                   // maps the node names to their pointers
+//using lava_threadQ       =  std::queue<LavaPacket, std::vector<LavaPacket,ThreadAllocator<LavaPacket>> >;
+//using lava_threadQ       =  std::queue<LavaOut, std::vector<LavaOut,ThreadAllocator<LavaOut>> >;
+//using lava_threadQ       =  std::queue<LavaOut, std::deque<LavaOut,ThreadAllocator<LavaOut>> >;
+using lava_threadQ       =  std::queue<LavaOut, std::deque<LavaOut> >;
 
 //extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaVal*, LavaOut*);   // data flow node function
-extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaFrame*, LavaOut*);   // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
-extern "C" using           LavaAlloc  =  void* (*)(uint64_t);                               // custom allocation function passed in to each node call
-extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                                    // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
+//extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaFrame*, LavaOut*);   // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
+extern "C" using           LavaAlloc  =  void* (*)(uint64_t);                                    // custom allocation function passed in to each node call
+extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                                         // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
+extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaFrame*, lava_threadQ*);   // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
 
-struct AtomicBitset
+struct   AtomicBitset
 {
   using   u64 = uint64_t;
   using  au64 = std::atomic<u64>;
@@ -244,18 +362,22 @@ struct        LavaMsg
 struct     LavaPacket
 {
   u64    ref_count;                               // todo: is this used? 
-  u64        frame : 63;
+  u64        frame : 55;
   u64       framed :  1;
+  u64     priority :  8;
   u64    dest_node : 48;
   u64    dest_slot : 16;
   u64     src_node : 48;
   u64     src_slot : 16;
+  u64   rangeStart;
+  u64     rangeEnd;
   u64     sz_bytes;                               // the size in bytes can be used to further sort the packets so that the largets are processed first, possibly resulting in less memory usage over time
   LavaMsg      msg;
 
   bool operator<(LavaPacket const& r) const
   {    
     if(frame    != r.frame)    return frame    > r.frame;               // want lowest frame numbers to be done first 
+    if(priority != r.priority) return priority < r.priority;            // want highest priority to be done first
     if(sz_bytes != r.sz_bytes) return sz_bytes < r.sz_bytes;            // want largest sizes to be done first
     if(framed   != r.framed)   return framed   < r.framed;              // want framed packets to be done first so that their dependencies can be resolved
 
@@ -404,119 +526,11 @@ struct    LavaCommand
 };
 // end data types
 
-// static data segment data
-#if defined(_WIN32)
-  static const std::string  liveExt(".live.dll");
-#endif
-static __declspec(thread)       void*   lava_thread_heap = nullptr;       // thread local handle for thread local heap allocations
-// end data segment data
-
-// function declarations
-BOOL WINAPI DllMain(
-  _In_  HINSTANCE     hinstDLL,
-  _In_  DWORD        fdwReason,
-  _In_  LPVOID     lpvReserved
-);
 
 extern "C" __declspec(dllexport) LavaNode* GetLavaFlowNodes();   // prototype of function to return static plugin loading struct
 // end function declarations
 
-// allocator definitions
-inline void    LavaHeapDestroyCallback(void* heapHnd)
-{
-  if(heapHnd)
-    HeapDestroy(heapHnd);
-}
-inline void*   LavaHeapInit(size_t initialSz = 0)
-{
-  if(!lava_thread_heap) {
-    lava_thread_heap = HeapCreate(HEAP_NO_SERIALIZE, initialSz, 0);
-  }
-  return lava_thread_heap;
-}
-inline void*   LavaHeapAlloc(size_t sz)
-{
-  void* thread_heap = LavaHeapInit(sz);
-
-  void* ret = nullptr;
-  if(thread_heap)
-    ret = HeapAlloc(thread_heap, HEAP_NO_SERIALIZE, sz);
-
-  return ret;
-}
-inline int     LavaHeapFree(void* memptr)
-{
-  void* thread_heap = LavaHeapInit();
-
-  void* ret = nullptr;
-  if(thread_heap && memptr) {
-    auto ret = HeapFree(thread_heap, HEAP_NO_SERIALIZE, memptr);
-    return ret;
-  }else{ return 0; }
-}
-
-template <class T> struct  ThreadAllocator
-{
-  using value_type  =  T;
-
-  template<class U> 
-  struct rebind
-  {
-    using other = ThreadAllocator<U>;
-  };
-
-  ThreadAllocator() /*noexcept*/ {}   // default ctor not required by STL
-
-                                      // A converting copy constructor:
-  template<class U> __declspec(noinline) ThreadAllocator(const ThreadAllocator<U>&) /*noexcept*/ {}
-  template<class U> __declspec(noinline) bool operator==(const ThreadAllocator<U>&) const /*noexcept*/
-  {
-    return true;
-  }
-  template<class U> __declspec(noinline) bool operator!=(const ThreadAllocator<U>&) const /*noexcept*/
-  {
-    return false;
-  }
-  __declspec(noinline) T*    allocate(const size_t n)     const;
-  __declspec(noinline) void  deallocate(T*& p, size_t)    const;
-
-  template<class U, class... ARGS>
-  __declspec(noinline) void construct(U* p, ARGS&&... args)
-  {
-    ::new ((void*)p) U(std::forward<ARGS>(args)...);
-  }
-  template<class U>
-  __declspec(noinline) void destroy(U* p)
-  {
-    p->~U();
-  }
-};
-template <class T> T*      ThreadAllocator<T>::allocate(const size_t n)  const
-{
-  if(n==0) return nullptr;
-
-  if( n > static_cast<size_t>(-1)/sizeof(T) ) {
-    throw std::bad_array_new_length();
-  }
-
-  //void* p = ThreadAlloc( n * sizeof(T) );
-  void* p = LavaHeapAlloc( n * sizeof(T) );
-  if(!p) { throw std::bad_alloc(); }
-
-  return static_cast<T*>(p);
-}
-template <class T> void    ThreadAllocator<T>::deallocate(T*& p, size_t) const
-{
-  //if(n==0) return;
-  //
-  //ThreadFree(p);
-
-  LavaHeapFree(p);
-  p = nullptr;
-}
-// end allocator definitions
-
-using lava_memvec        =  std::vector<LavaMem, ThreadAllocator<LavaMem> >;
+using lava_memvec          =  std::vector<LavaMem, ThreadAllocator<LavaMem> >;
 
 // Lava Helper Functions
 
@@ -1542,7 +1556,7 @@ void                 LavaFree(uint64_t addr)
 //uint64_t      exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaVal* inArgs, LavaOut* outArgs)
 //uint64_t                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaVal* inArgs,  LavaOut* outArgs) noexcept   // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
 
-LavaInst::State exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaFrame* inFrame, LavaOut* outArgs)
+LavaInst::State exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaFrame* inFrame, lava_threadQ* outArgs) // LavaOut* outArgs)
 {
   LavaInst::State        ret = LavaInst::NORMAL;  // LavaFlow::NONE;
   uint64_t         winExcept = 0;
@@ -1558,7 +1572,7 @@ LavaInst::State exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaFram
 
   return ret;
 }
-LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaFrame* inFrame,  LavaOut* outArgs) noexcept   // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
+LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaFrame* inFrame,  lava_threadQ* outArgs) noexcept // LavaOut* outArgs) noexcept   // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
 {
   using namespace std;
   using namespace std::chrono;
@@ -1586,18 +1600,25 @@ LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t ni
     }
     SECTION(create packets and put them into packet queue)
     {
-      TO(lp.outputs,i)
+      //TO(lp.outputs,i)
+      while(outArgs->size() > 0)
       {
-        if(outArgs[i].type == LavaArgType::NONE){ continue; }
+        LavaOut outArg = outArgs->front();
+        outArgs->pop();
+        //if(outArgs[i].type == LavaArgType::NONE){ continue; }
 
         // create new value for the new packet
         LavaVal val;
-        val.type  = outArgs[i].type;
-        val.value = outArgs[i].value;
-        auto sidx = outArgs[i].key.slot;
+        val.type  = outArg.type;
+        val.value = outArg.value;
+        auto sidx = outArg.key.slot;
+        //val.type  = outArgs[i].type;
+        //val.value = outArgs[i].value;
+        //auto sidx = outArgs[i].key.slot;
 
-        LavaMem mem = LavaMem::fromDataAddr(outArgs[i].value);
+        //LavaMem mem = LavaMem::fromDataAddr(outArgs[i].value);
         //PrintLavaMem(mem);
+        LavaMem  mem = LavaMem::fromDataAddr(outArg.value);
         auto szBytes = mem.sizeBytes();
 
         // create new packet 
@@ -1715,18 +1736,19 @@ void               LavaLoop(LavaFlow& lf) noexcept
   using namespace std;
   const LavaOut defOut = { LavaArgType::NONE, 0, 0, 0, 0 };
 
+  LavaHeapInit();
+
   lava_memvec ownedMem;
 
   lf.incThreadCount();
 
   LavaVal      inArgs[LAVA_ARG_COUNT];              // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
+  lava_threadQ   outQ;                              // queue of the output arguments
   LavaFrame   inFrame;
   LavaFrame    runFrm;
   LavaOut     outArgs[LAVA_ARG_COUNT];              // if the arguments are going to 
   memset(inArgs, 0, sizeof(inArgs) );
   TO(LAVA_ARG_COUNT,i){ outArgs[i] = defOut; }      // memset(outArgs, 0, sizeof(outArgs) );
-
-  LavaHeapInit();
 
   while(lf.m_running)
   {    
@@ -1791,7 +1813,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
       SECTION(run the node with the id and frame)
       {
-        LavaInst::State ret = (nodeId!=LavaId::NODE_NONE)? runFunc(lf, ownedMem, nodeId, &lp, &runFrm, outArgs)  :  LavaInst::LOAD_ERROR;  // LavaFlow::RUN_ERR; 
+        LavaInst::State ret = (nodeId!=LavaId::NODE_NONE)? runFunc(lf, ownedMem, nodeId, &lp, &runFrm, &outQ)  :  LavaInst::LOAD_ERROR;  // LavaFlow::RUN_ERR; 
         switch(ret)
         {
           case LavaInst::RUN_ERROR:{

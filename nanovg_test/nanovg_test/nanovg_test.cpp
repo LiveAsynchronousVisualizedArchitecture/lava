@@ -118,10 +118,15 @@
 // -todo: test atomic bitset
 // -todo: use AtomicBitset in LavaFrame
 // -todo: make LavaFrame operations atomic - need an atomic bitset 
+// -todo: put priority into packets 
+// -todo: put a range in a packet - does this imply the generation of multiple smaller packets from one bigger packet that then have to be synced together?
+// -todo: figure out a way to emit multiple packets with different ranges - with lava_emit() it should be possible to emit multiple packets that reference the same data and have different ranges - what happens if the first packet is emitted, then consumed, then the reference count is decremented to 0 before the next packet is emitteed? - nothing, because the memory won't be freed until the thread gets out of the node and loops around, so the reference count becoming 0 while the node is still running is not a problem
+// -todo: define filesystem namespace by compiler and not OS
+// -todo: make priority part of LavaPacket operator< 
+// -todo: make a queue for output arguments that uses the thread local heap
 
-// todo: put priority into packets 
-// todo: put a range in a packet - does this imply the generation of multiple smaller packets from one bigger packet that then have to be synced together?
-// todo: figure out a way to emit multiple packets with different ranges
+// todo: make a queue that carries its allocation and deallocation functions with it as pointers so that it can be passed to a .dll
+// todo: make packets be emitted (lava_send() ?) instead of simply returned
 // todo: make LavaFrame slots start from the begining
 // todo: change cur() functions to const and rename to read()
 // todo: change opp() functions to non-const only and rename to write()
@@ -1454,41 +1459,41 @@ void              debug_coords(v2 a)
 
 } // end namespace
 
-void print_flf_map(flf_map mp)
-{
-  flf_map::Header* hd = mp.header();
-
-  Println("Header | typechar1: ", (char)hd->typeChar1, 
-    " typechar2: ",         (char)hd->typeChar2, 
-    " sizeBytes: ",    hd->sizeBytes, 
-    " size: ",         hd->size, 
-    " valSizeBytes: ", hd->valSizeBytes );
-
-    u64    cap = mp.capacity();
-    
-    auto slots = mp.slotPtr();
-    Print("Slots: ");
-    TO(cap,i){
-      auto idx = slots[i];
-      Print(idx.readers, ",");
-      if(idx.val_idx==flf_map::DELETED)
-        Print("DELETED ");
-      else if(idx.val_idx==flf_map::EMPTY)
-        Print("EMPTY ");
-      else 
-        Print(idx.val_idx, " ");
-    }
-    Println("\n");
-
-    u32* lstSt = mp.listStart(cap);
-    Print("List: ");
-    TO(cap,i){ 
-      if(lstSt[i]==flf_map::LIST_END)
-        Print("LIST_END");
-      else 
-        Print(lstSt[i], " "); 
-    }
-}
+//void print_flf_map(flf_map mp)
+//{
+//  flf_map::Header* hd = mp.header();
+//
+//  Println("Header | typechar1: ", (char)hd->typeChar1, 
+//    " typechar2: ",         (char)hd->typeChar2, 
+//    " sizeBytes: ",    hd->sizeBytes, 
+//    " size: ",         hd->size, 
+//    " valSizeBytes: ", hd->valSizeBytes );
+//
+//    u64    cap = mp.capacity();
+//    
+//    auto slots = mp.slotPtr();
+//    Print("Slots: ");
+//    TO(cap,i){
+//      auto idx = slots[i];
+//      Print(idx.readers, ",");
+//      if(idx.val_idx==flf_map::DELETED)
+//        Print("DELETED ");
+//      else if(idx.val_idx==flf_map::EMPTY)
+//        Print("EMPTY ");
+//      else 
+//        Print(idx.val_idx, " ");
+//    }
+//    Println("\n");
+//
+//    u32* lstSt = mp.listStart(cap);
+//    Print("List: ");
+//    TO(cap,i){ 
+//      if(lstSt[i]==flf_map::LIST_END)
+//        Print("LIST_END");
+//      else 
+//        Print(lstSt[i], " "); 
+//    }
+//}
 
 ENTRY_DECLARATION // main or winmain
 {

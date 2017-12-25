@@ -75,7 +75,8 @@ extern "C"
   const char* OutTypes[]  = {"IdxVerts",           nullptr};
 
   //uint64_t MakeCube(LavaParams* inout_lp, LavaVal* in, LavaOut* out) noexcept
-  uint64_t MakeCube(LavaParams* inout_lp, LavaFrame* in, LavaOut* out) noexcept
+  //uint64_t MakeCube(LavaParams* inout_lp, LavaFrame* in, LavaOut* out) noexcept
+  uint64_t MakeCube(LavaParams* inout_lp, LavaFrame* in, lava_threadQ* out) noexcept
   {
     using namespace std;
 
@@ -120,9 +121,13 @@ extern "C"
     //
     //Print(lftTri);
 
-    inout_lp->outputs = 1;
-    out[0] = LavaTblToOut(inout_lp, lftTri);
-    out[0].key.slot = 0;
+    auto lo = LavaTblToOut(inout_lp, lftTri);
+    lo.key.slot = 0;
+    out->push(lo);
+
+    //inout_lp->outputs = 1;
+    //out[0] = LavaTblToOut(inout_lp, lftTri);
+    //out[0].key.slot = 0;
 
     //printf("\n\n dropping null dereference bomb \n\n");
     //int*  bomb  =  nullptr;

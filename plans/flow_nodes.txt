@@ -219,4 +219,26 @@ Gather Nodes:
 |
 
 
+Slow down execution in GUI:
+|  Add a delay to each packet 
+|  Slow down execution and visualization
+
+Search Bar:
+|  Give nodes tags so that they can be searched in a search bar
+|  Search could look for names, parameters, tags, or inside the source 
+|  Search could live highlight the nodes it finds
+
+Shapes and Icons:
+|  Embed SVGs in json 
+|  Use vectors as shapes for message nodes
+|  Use vectors as icons for any node 
+|  Use vector icons for data types?
+|   
+
+
+Sub Networks:
+|  Condense multiple nodes into a single node
+|  Make a sub-network box that still shows inner nodes, but shrinks it's canvas space 
+|  |  Can still see inside a sub-network, but just have to zoom in to see details
+
 
