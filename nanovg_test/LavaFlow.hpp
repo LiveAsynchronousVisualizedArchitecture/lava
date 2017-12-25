@@ -40,6 +40,51 @@
   namespace fs = std::experimental::filesystem;
 #endif
 
+struct LavaQ
+{
+// single producer, multi-consumer Q
+// todo: make an assert if more than one thread does a push
+
+//public:
+  using         T = int;
+  using       u64 = uint64_t;
+  using      au64 = std::atomic<u64>;
+  using AllocFunc = void*(*)(u64);
+  using  FreeFunc = void(*)(void*);
+
+//private:
+  AllocFunc  m_alloc = nullptr;
+  FreeFunc    m_free = nullptr;
+  void*        m_mem = nullptr;
+   u8          m_cap = 0;                         // capacity will always be a power of two
+  u64           m_sz = 0;
+  au64         m_cur = 0;
+
+//public:
+  LavaQ(AllocFunc a, FreeFunc f) : m_alloc(a), m_free(f)
+  {}
+
+  u64   size(){ return m_sz; }
+  void  push(T val)
+  {
+    // will need to increment both the current index and size at the same time
+    // if the capacity is not high enough, use a secondary buffer to enlarge it
+    // this should work well, since only the owning thread can make it larger, while any thread can pop() items from the queue
+  }
+  T      pop()
+  {
+    // this will need to copy the element indexed by m_cur, 
+    // then make sure the index (which will only increase) hasn't changed, 
+    // then increment the index atomically
+
+    T curVal = 0;
+
+    m_cur.fetch_add(1);
+
+    return curVal;
+  }
+};
+
 /*
 * libpopcnt.h - C/C++ library for counting the number of 1 bits (bit
 * population count) in an array as quickly as possible using
@@ -83,6 +128,8 @@ static inline u64 popcount64(u64 x)
 
   return (x * h01) >> 56;
 }
+// GCC built in intrinsic - int  __builtin_popcount(unsigned int)
+// End libpopcnt
 
 // static data segment data
 #if defined(_WIN32)
@@ -192,9 +239,6 @@ template <class T> void    ThreadAllocator<T>::deallocate(T* const& p, size_t) c
   //p = nullptr;
 }
 // end allocator definitions
-
-// GCC built in intrinsic - int  __builtin_popcount(unsigned int)
-// End libpopcnt
 
 // data types
 struct       LavaNode;
