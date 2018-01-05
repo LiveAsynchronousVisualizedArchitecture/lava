@@ -1,4 +1,15 @@
 
+// -todo: update nana to 1.5.6 - was already at 1.5.6, the release notes page only went to 1.5.4
+// -todo: turn off run time type information
+// -todo: try stripping the binary (didn't decrease size, but there are still 116KB of strings left inside)
+// -todo: try to use nana from source instead of from a compiled library - works, binary same size
+// -todo: bring back altered permission source
+// -todo: debug build
+// -todo: try stdcall on release build - 50KB smaller?
+
+// todo: put back pixel_buffer tests
+// todo: rough in labels for the tbl header data
+
 #include <iostream>
 
 #include <nana/gui.hpp>
@@ -11,12 +22,20 @@
 #include <../source/paint/detail/image_pixbuf.hpp>
 #include <../source/paint/pixel_buffer.cpp>
 #include "../../nanovg_test/tbl.hpp"
+#include "../../str_util.hpp"
 
 int main()
 {
   using namespace  std;
   using namespace nana;
   using namespace nana::paint;
+
+  tbl<> t;
+  t("wat")       = 21;
+  t("skidoosh")  = 42;
+  t("wut")       = 84;
+  t("squidoosh") = 168;
+
 
   //Define a form.
   //API::make_center
@@ -65,11 +84,12 @@ int main()
 
   //treebox tree(fm, {10,10,300,300}, true);
   treebox tree(fm, true);
+  tree.borderless(false);
   auto root = tree.insert("root", "wat");
-  //tree.insert("root", "skidoosh");
   tree.insert("root/wat",       "wat");
   tree.insert("root/squidoosh", "squidoosh");
-  tree.insert("root/long", "alkjs alksjfklasjlk sj klasjkfklajsj klasfkjas jkas adl;fjlkasjfl;jalfkjalsjkdflkjaslkfdjl;ajfklja sklfj klsajfljsalfjklajs klf;jlas;jdfkljaksjfkl;ajs klf;jklas jfkljksaldjfklsajdkl;jkla;sjfkljasklkljfklajklfjaskljfklajs klf jkla;jklfej;lajklfjklaj;lfjm;amvlksdljmvl;kajs;klfdjlak;sjv;mnsdklfjm;klnvm;jlznljvnm;ldfnmh;ln;fjnbxl;fjjsklklfjasklfjlsd;ajf;as ");
+  //tree.insert("root", "skidoosh");
+  //tree.insert("root/long", "alkjs alksjfklasjlk sj klasjkfklajsj klasfkjas jkas adl;fjlkasjfl;jalfkjalsjkdflkjaslkfdjl;ajfklja sklfj klsajfljsalfjklajs klf;jlas;jdfkljaksjfkl;ajs klf;jklas jfkljksaldjfklsajdkl;jkla;sjfkljasklkljfklajklfjaskljfklajs klf jkla;jklfej;lajklfjklaj;lfjm;amvlksdljmvl;kajs;klfdjlak;sjv;mnsdklfjm;klnvm;jlznljvnm;ldfnmh;ln;fjnbxl;fjjsklklfjasklfjlsd;ajf;as ");
   auto& img = tree.icon("ID1");
   //paint::image* img = &(tree.icon("ID1"));
   //drawerbase::treebox::node_image_tag* img = &(tree.icon("ID1"));
@@ -78,6 +98,7 @@ int main()
   //auto ib = new paint::detail::basic_image_pixbuf
   //nrm.image_ptr_ = make_shared<paint::detail::basic_image_pixbuf>(); // ::basic_image_pixbuf>();
   //paint::detail::basic_image_pixbuf pxbuf;
+
   pixel_buffer pxbuf(128,128);
   pixel_buffer::pixel_buffer_storage* stor = pxbuf.storage_.get();
   auto rawpx = stor->raw_pixel_buffer;
@@ -103,9 +124,27 @@ int main()
   tree.auto_draw(true);
   //auto trplc = tree.placer();
 
-  fm["mb"]   << mb;
-  fm["tree"] << tree;
-  fm.div("vert<mb weight=30><tree weight=90%>");
+  
+  label szBytes(fm, toString("Size in Bytes: ", t.sizeBytes()), true);
+
+  place plc(fm);
+  plc["mb"]      << mb;
+  plc["szBytes"] << szBytes;
+  plc["tree"]    << tree;
+  plc.div("vert"
+          "<mb weight=30>"
+          "<fit szBytes weight=10% margin=[0,10,5,10]>" //  gap=5 margin=[10,40,10,0]" //margin=[10,10,10,10]>"
+          "<tree weight=90%>"
+          );
+  plc.collocate();
+
+  //fm["mb"]      << mb;
+  //fm["szBytes"] << szBytes;
+  //fm["tree"]    << tree;
+  //fm.div("vert <margin=[75,75,75,75]> <mb weight=30>"
+  //       "<fit szBytes weight=10%>" //  gap=5 margin=[10,40,10,0]" //margin=[10,10,10,10]>"
+  //       "<tree weight=90%>"
+  //       );
 
   //fm.div("vert<mb weight=10%>");
   //
