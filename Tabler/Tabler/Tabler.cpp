@@ -10,6 +10,7 @@
 #include <nana/paint/pixel_buffer.hpp>
 #include <../source/paint/detail/image_pixbuf.hpp>
 #include <../source/paint/pixel_buffer.cpp>
+#include "../../nanovg_test/tbl.hpp"
 
 int main()
 {

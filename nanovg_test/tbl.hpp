@@ -83,8 +83,11 @@
 #ifndef TO
   #define TO(to,var) for(uint64_t var=0, lim=(uint64_t)to; var<lim; ++var)
 #endif
+
+
 #ifndef FROM
-  #define FROM(from,var) for(std::remove_const<decltype(from)>::type var=from; var-- > 0; )
+  #define       FROM(from, var) for(int64_t var = ((i64)from)-1; var >= int64_t(0); --var)
+  //#define FROM(from,var) for(std::remove_const<decltype(from)>::type var=from; var-- > 0; )
 #endif
 
 #if defined(_MSC_VER) && defined(_DEBUG)
@@ -987,7 +990,7 @@ public:
       if(prevElems){
         u8* prevEl = (u8*)re + prevOfst;
         u64  prevB = prevMapCap * sizeof(KV);                    // prevB is previous map bytes
-        FROM(prevB,i) elb[i] = prevEl[i];
+        FROM(prevB,i){ elb[i] = prevEl[i]; }
       }
 
       i64 extcap = mapcap - prevMapCap;
