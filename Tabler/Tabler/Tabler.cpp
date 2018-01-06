@@ -8,9 +8,13 @@
 // -todo: try stdcall on release build - 50KB smaller?
 // -todo: rough in labels for the tbl header data
 // -todo: put back pixel_buffer tests
+// -todo: refine labels layout
+// -todo: make initial array string
 
-// todo: refine labels layout
+// todo: run event on unfold
+// todo: try compiling with clang
 // todo: compile with png and jpeg labels
+// todo: make array string be created only when unfolded
 
 #include <iostream>
 
@@ -26,6 +30,8 @@
 #include "../../nanovg_test/tbl.hpp"
 #include "../../str_util.hpp"
 
+using str = std::string;
+
 int main()
 {
   using namespace  std;
@@ -33,15 +39,25 @@ int main()
   using namespace nana::paint;
 
   tbl<> t;
+  TO(12,i){
+    t.push_back( (tbl<>::i8)i );
+  }
   t("wat")       = 21;
   t("skidoosh")  = 42;
   t("wut")       = 84;
   t("squidoosh") = 168;
+  t("table key") = 336;
+  //t("wat")       = (int)21;
+  //t("skidoosh")  = (int)42;
+  //t("wut")       = (int)84;
+  //t("squidoosh") = (int)168;
+  //t("table key") = (int)336;
+
 
 
   //Define a form.
   //API::make_center
-  form fm(API::make_center(512, 512));
+  form fm(API::make_center(768, 768));
   fm.caption("Tabler");
 
   menubar mb;
@@ -87,9 +103,37 @@ int main()
   //treebox tree(fm, {10,10,300,300}, true);
   treebox tree(fm, true);
   tree.borderless(false);
-  auto root = tree.insert("root", "wat");
-  tree.insert("root/wat",       "wat");
-  tree.insert("root/squidoosh", "squidoosh");
+  tree.events().expanded([](const auto& tbArg){
+    Println("array expanded ");
+    Println(tbArg.item.text(), "  ", tbArg.item.key() );
+    Println(tbArg.item.owner().key(), "  ", tbArg.item.child().key() );
+  });
+
+  str aszStr = toString("Array Size: ", t.size());
+  tree.insert("ary", aszStr);
+  str aryStr = "";
+  TO(t.size(),i){
+    aryStr += toString( i==0? "" : ", ", (tbl<>::i64)t[i] );
+  }
+  tree.insert("ary/arystr", aryStr);
+
+  tree.insert("elems", toString("Elements: ", t.elems()) );
+  TO(t.elems(),i){
+    auto e = t.elemStart()[i];
+    if(e.isEmpty()) continue;
+
+    auto k = e.key;
+    tree.insert( toString("elems/", k), toString(k,":  ", e.as<tbl<>::i64>()) ); 
+  }
+
+  //for(auto e : t){
+  //  tree.insert( 
+  //}
+
+  //auto root = tree.insert("root", "wat");
+  //tree.insert("root/wat",       "wat");
+  //tree.insert("root/squidoosh", "squidoosh");
+
   //tree.insert("root", "skidoosh");
   //tree.insert("root/long", "alkjs alksjfklasjlk sj klasjkfklajsj klasfkjas jkas adl;fjlkasjfl;jalfkjalsjkdflkjaslkfdjl;ajfklja sklfj klsajfljsalfjklajs klf;jlas;jdfkljaksjfkl;ajs klf;jklas jfkljksaldjfklsajdkl;jkla;sjfkljasklkljfklajklfjaskljfklajs klf jkla;jklfej;lajklfjklaj;lfjm;amvlksdljmvl;kajs;klfdjlak;sjv;mnsdklfjm;klnvm;jlznljvnm;ldfnmh;ln;fjnbxl;fjjsklklfjasklfjlsd;ajf;as ");
   auto& img = tree.icon("ID1");
@@ -119,10 +163,11 @@ int main()
   //pxbuf.storage_->
   //nrm.image_ptr_
   //nrm
+
   img.normal.open("normal1.png");
   img.hovered.open("hovered1.png");
   img.expanded.open("expanded1.png");
-  root.icon("ID1");
+  //root.icon("ID1");
   tree.auto_draw(true);
   //auto trplc = tree.placer();
 
@@ -131,6 +176,7 @@ int main()
   label szBytes(fm, toString("Size in Bytes: ", t.sizeBytes()),    true);
   label     cap(fm, toString("Capacity: ",      t.capacity()),     true);
   label  mapcap(fm, toString("Map Capacity: ",  t.map_capacity()), true);
+  label   owned(fm, toString("Owned: ",         t.owned()? "True" : "False"), true);
 
   place       plc(fm);
   place  lblPlace(fm);
@@ -139,12 +185,13 @@ int main()
   plc["elems"]   << elems;
   plc["szBytes"] << szBytes;
   plc["cap"]     << cap;
+  plc["owned"]   << owned;
   plc["mapcap"]  << mapcap;
   plc["tree"]    << tree;
   plc.div("vert"
           "<mb weight=30>"
           "<weight=20 margin=[0,0,5,10] " // weight=20 "<weight=10% "
-           " <fit sz margin=[0,10]> <fit elems margin=[0,10]> <fit szBytes margin=[0,10]> <fit cap margin=[0,10]> <fit mapcap margin=[0,10]>"
+           " <fit sz margin=[0,10]> <fit elems margin=[0,10]> <fit szBytes margin=[0,10]> <fit cap margin=[0,10]> <fit mapcap margin=[0,10]> <fit owned>"
           ">" //  gap=5 margin=[10,40,10,0]" //margin=[10,10,10,10]>"
           "<tree weight=90%>"
           );
@@ -157,7 +204,7 @@ int main()
   //       "<fit szBytes weight=10%>" //  gap=5 margin=[10,40,10,0]" //margin=[10,10,10,10]>"
   //       "<tree weight=90%>"
   //       );
-
+  
   //fm.div("vert<mb weight=10%>");
   //
   //fm.div("vert<><<><weight=80% text><>><><weight=24<><button><>><>");

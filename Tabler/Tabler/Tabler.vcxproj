@@ -211,6 +211,7 @@
     <ClCompile Include="..\source\paint\image_process_selector.cpp" />
     <ClCompile Include="..\source\paint\pixel_buffer.cpp">
       <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Release|x64'">true</ExcludedFromBuild>
     </ClCompile>
     <ClCompile Include="..\source\paint\text_renderer.cpp" />
     <ClCompile Include="..\source\stdc++.cpp" />
