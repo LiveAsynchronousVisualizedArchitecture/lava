@@ -6,9 +6,11 @@
 // -todo: bring back altered permission source
 // -todo: debug build
 // -todo: try stdcall on release build - 50KB smaller?
+// -todo: rough in labels for the tbl header data
+// -todo: put back pixel_buffer tests
 
-// todo: put back pixel_buffer tests
-// todo: rough in labels for the tbl header data
+// todo: refine labels layout
+// todo: compile with png and jpeg labels
 
 #include <iostream>
 
@@ -39,7 +41,7 @@ int main()
 
   //Define a form.
   //API::make_center
-  form fm(API::make_center(320, 320));
+  form fm(API::make_center(512, 512));
   fm.caption("Tabler");
 
   menubar mb;
@@ -124,16 +126,26 @@ int main()
   tree.auto_draw(true);
   //auto trplc = tree.placer();
 
-  
-  label szBytes(fm, toString("Size in Bytes: ", t.sizeBytes()), true);
+  label     sz(fm,  toString("Size: ",          t.size()),         true);
+  label  elems(fm,  toString("Elements: ",      t.elems()),        true);
+  label szBytes(fm, toString("Size in Bytes: ", t.sizeBytes()),    true);
+  label     cap(fm, toString("Capacity: ",      t.capacity()),     true);
+  label  mapcap(fm, toString("Map Capacity: ",  t.map_capacity()), true);
 
-  place plc(fm);
+  place       plc(fm);
+  place  lblPlace(fm);
   plc["mb"]      << mb;
+  plc["sz"]      << sz;
+  plc["elems"]   << elems;
   plc["szBytes"] << szBytes;
+  plc["cap"]     << cap;
+  plc["mapcap"]  << mapcap;
   plc["tree"]    << tree;
   plc.div("vert"
           "<mb weight=30>"
-          "<fit szBytes weight=10% margin=[0,10,5,10]>" //  gap=5 margin=[10,40,10,0]" //margin=[10,10,10,10]>"
+          "<weight=20 margin=[0,0,5,10] " // weight=20 "<weight=10% "
+           " <fit sz margin=[0,10]> <fit elems margin=[0,10]> <fit szBytes margin=[0,10]> <fit cap margin=[0,10]> <fit mapcap margin=[0,10]>"
+          ">" //  gap=5 margin=[10,40,10,0]" //margin=[10,10,10,10]>"
           "<tree weight=90%>"
           );
   plc.collocate();
