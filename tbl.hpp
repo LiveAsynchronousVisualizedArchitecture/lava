@@ -737,11 +737,6 @@ private:
 public:  
   u8*     m_mem;                                                                         // the only member variable - everything else is a contiguous block of memory
  
-  template<class T> tbl(T initVal)
-  {
-    tbltype( enum_of<T>() );
-  }
-
   tbl() : m_mem(nullptr) {}
   tbl(void* memst, bool _init=false, bool _owned=false, u64 _count=0) : m_mem( ((u8*)memst)+memberBytes() )
   {
