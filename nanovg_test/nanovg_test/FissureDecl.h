@@ -9,8 +9,10 @@
 #include <set>
 #include <queue>
 #include <nanogui/nanogui.h>
-#include "../no_rt_util.h"
-#include "../simdb.hpp"
+//#include "../no_rt_util.h"
+//#include "../simdb.hpp"
+#include "../../no_rt_util.h"
+#include "../../simdb.hpp"
 #include "vec.hpp"
 
 #define __LAVAFLOW_IMPL__

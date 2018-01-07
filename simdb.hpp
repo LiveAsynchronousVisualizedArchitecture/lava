@@ -132,10 +132,21 @@
   #include <codecvt>
 
   #include <tchar.h>
+
+  //#ifdef UNICODE
+  //  #undef UNICODE
+  //#endif
   #define NOMINMAX
   #define WIN32_LEAN_AND_MEAN
   #include <windows.h>
   #include <strsafe.h>
+
+  #ifdef MIN
+    #undef MIN
+  #endif
+  #ifdef MAX
+    #undef MAX
+  #endif
 
   #ifdef _MSC_VER
     #if !defined(_CRT_SECURE_NO_WARNINGS)
@@ -326,7 +337,7 @@ namespace {
       va_list argptr;
           
       va_start( argptr, format );
-      retValue = wvsprintf( szBuff, format, argptr );
+      retValue = wvsprintfA( szBuff, format, argptr );
       va_end( argptr );
 
       WriteFile(  GetStdHandle(STD_OUTPUT_HANDLE), szBuff, retValue,
@@ -1256,7 +1267,8 @@ public:
     else       return VerIdx(lo32(cur), hi32(cur));
   }
   u32         nxtIdx(u32 i) const { return (i+1)%m_sz; }
-  u32        prevIdx(u32 i) const { return std::min(i-1, m_sz-1); }        // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap
+  //u32        prevIdx(u32 i) const { return std::min(i-1, m_sz-1); }        // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap
+  u32        prevIdx(u32 i) const { using namespace std; return min(i-1, m_sz-1); }        // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap - syntax errors and possible windows min/max macros make this less problematic than std::min() 
 
 };
 struct  SharedMem
@@ -1340,7 +1352,7 @@ public:
     #ifdef _WIN32      // windows
       if(raw_path)
       {
-        sm.fileHndl = CreateFile(
+        sm.fileHndl = CreateFileA(
           sm.path, 
           GENERIC_READ|GENERIC_WRITE,   //FILE_MAP_READ|FILE_MAP_WRITE,  // apparently FILE_MAP constants have no effects here
           FILE_SHARE_READ|FILE_SHARE_WRITE, 
@@ -1350,11 +1362,11 @@ public:
           NULL                          //_In_opt_ HANDLE hTemplateFile
         );
       }
-      sm.fileHndl = OpenFileMapping(FILE_MAP_READ | FILE_MAP_WRITE, FALSE, sm.path);
+      sm.fileHndl = OpenFileMappingA(FILE_MAP_READ | FILE_MAP_WRITE, FALSE, sm.path);
 
       if(sm.fileHndl==NULL)
       {
-        sm.fileHndl = CreateFileMapping(  // todo: simplify and call this right away, it will open the section if it already exists
+        sm.fileHndl = CreateFileMappingA(  // todo: simplify and call this right away, it will open the section if it already exists
           INVALID_HANDLE_VALUE,
           NULL,
           PAGE_READWRITE,
@@ -1786,13 +1798,15 @@ public:
     vector<string> ret;
 
     if(!NtOpenDirectoryObject){  
-      NtOpenDirectoryObject  = (NTOPENDIRECTORYOBJECT)GetLibraryProcAddress( _T("ntdll.dll"), "NtOpenDirectoryObject");
+      //NtOpenDirectoryObject  = (NTOPENDIRECTORYOBJECT)GetLibraryProcAddress( _T("ntdll.dll"), "NtOpenDirectoryObject");
+      NtOpenDirectoryObject  = (NTOPENDIRECTORYOBJECT)GetLibraryProcAddress( (PSTR)_T("ntdll.dll"), (PSTR)_T("NtOpenDirectoryObject") );
     }
     if(!NtQueryDirectoryObject){ 
-      NtQueryDirectoryObject = (NTQUERYDIRECTORYOBJECT)GetLibraryProcAddress(_T("ntdll.dll"), "NtQueryDirectoryObject");
+      //NtQueryDirectoryObject = (NTQUERYDIRECTORYOBJECT)GetLibraryProcAddress(_T("ntdll.dll"), "NtQueryDirectoryObject");
+      NtQueryDirectoryObject = (NTQUERYDIRECTORYOBJECT)GetLibraryProcAddress( (PSTR)_T("ntdll.dll"), (PSTR)_T("NtQueryDirectoryObject") );
     }
     if(!NtOpenFile){ 
-      NtOpenFile = (NTOPENFILE)GetLibraryProcAddress(_T("ntdll.dll"), "NtOpenFile");
+      NtOpenFile = (NTOPENFILE)GetLibraryProcAddress( (PSTR)_T("ntdll.dll"), (PSTR)_T("NtOpenFile") );
     }
 
     HANDLE     hDir = NULL;

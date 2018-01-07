@@ -32,7 +32,11 @@ appearance::appearance(bool has_decorate, bool taskbar, bool is_float, bool no_a
 //end struct appearance
 
 #if defined(NANA_WINDOWS)
-#	include <windows.h>
+  //sbassett
+  #define NOMINMAX 
+  #define WIN32_LEAN_AND_MEAN
+
+  #	include <windows.h>
 #endif
 
 mouse_wheel::mouse_wheel()

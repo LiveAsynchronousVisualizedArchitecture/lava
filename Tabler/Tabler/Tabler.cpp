@@ -17,12 +17,14 @@
 // -todo: organize in to sections
 // -todo: put in open, save, and help/about menu items
 // -todo: check on nana drag and drop - works by enabling file drag and drop - nana gives an iterator of files
+// -todo: make fold event only print on unfold
+// -todo: make array string be created only when unfolded
+// -todo: get including simdb to compile - needed strings to be cast to PSTR for windows functions
 
-// todo: make fold event only print on unfold
-// todo: make array string be created only when unfolded
-// todo: compile with png and jpeg labels
+// todo: wrap filling treebox in to a function
 // todo: make list or tree of simdb databases 
 // todo: make selecting simdb database list the keys in that database
+// todo: compile with png and jpeg libs
 // todo: implement clearing of the tbl and gui on menu new
 // todo: implement saving of the tbl
 // todo: implement opening on drag and drop of a tbl
@@ -39,11 +41,18 @@
 #include <nana/paint/pixel_buffer.hpp>
 #include <../source/paint/detail/image_pixbuf.hpp>
 #include <../source/paint/pixel_buffer.cpp>
+#include "../../no_rt_util.h"
+#include "../../simdb.hpp"
 #include "../../tbl.hpp"
 #include "../../str_util.hpp"
-#include "../../no_rt_util.h"
 
 using str = std::string;
+
+tbl<>             t;
+nana::form       fm;
+nana::treebox  tree;
+
+//nana::form  fm(nana::API::make_center(768, 768));
 
 int main()
 {
@@ -51,7 +60,6 @@ int main()
   using namespace nana;
   using namespace nana::paint;
 
-  tbl<> t;
   SECTION(initialize the table)
   {
     TO(12,i){
@@ -64,11 +72,11 @@ int main()
     t("table key") = 336;
   }
 
-  form fm(API::make_center(768, 768));
   SECTION(set up the main window and its events)
   {
     API::enable_dropfiles(fm, true);
     fm.caption("Tabler");
+    fm.size({768, 768});
     fm.events().mouse_dropfiles([](const arg_dropfiles& arg)
     {
       Println("drop file event");
@@ -108,65 +116,80 @@ int main()
     mb.show();
   }
 
-  treebox tree(fm, true);
-  SECTION(treebox item insertion from the current tbl)
+  //treebox tree(fm, true);
+  SECTION(all treebox setup)
   {
-    str aszStr = toString("Array Size: ", t.size());
-    tree.insert("ary", aszStr);
-    str aryStr = "";
-    TO(t.size(),i){
-      aryStr += toString( i==0? "" : ", ", (tbl<>::i64)t[i] );
-    }
-    tree.insert("ary/arystr", aryStr);
-
-    tree.insert("elems", toString("Elements: ", t.elems()) );
-    TO(t.elems(),i){
-      auto e = t.elemStart()[i];
-      if(e.isEmpty()) continue;
-
-      auto k = e.key;
-      tree.insert( toString("elems/", k), toString(k,":  ", e.as<tbl<>::i64>()) ); 
-    }
-  }
-  SECTION(treebox set up including events)
-  {
-    tree.borderless(false);
-    tree.events().expanded([](const arg_treebox& tbArg)
+    tree.create(fm, true);
+    treebox::item_proxy aryViz;
+    SECTION(treebox item insertion from the current tbl)
     {
-      if(tbArg.item.expanded()){
-        Println("");
-        Println("array expanded ");
-        Println(tbArg.item.text(), "  ", tbArg.item.key() );
-        Println(tbArg.item.owner().key(), "  ", tbArg.item.child().key() );
-        Println("expanded: ", tbArg.item.expanded() );
-        Println("");
+      str aszStr = toString("Array Size: ", t.size());
+      tree.insert("ary", aszStr);
+      //str aryStr = "";
+      //TO(t.size(),i){
+      //  aryStr += toString( i==0? "" : ", ", (tbl<>::i64)t[i] );
+      //}
+      //tree.insert("ary/arystr", aryStr);
+      aryViz = tree.insert("ary/arystr", "");
+
+      tree.insert("elems", toString("Elements: ", t.elems()) );
+      TO(t.elems(),i){
+        auto e = t.elemStart()[i];
+        if(e.isEmpty()) continue;
+
+        auto k = e.key;
+        tree.insert( toString("elems/", k), toString(k,":  ", e.as<tbl<>::i64>()) ); 
       }
-    });
-  }
-  SECTION(treebox custom drawing)
-  {
-    auto& img = tree.icon("ID1");
-    auto& nrm = img.normal;
+    }
+    SECTION(treebox set up including events)
+    {
+      tree.borderless(false);
+      //tree.events().expanded([&t, aryViz](const arg_treebox& tbArg) mutable  // lambda captures by value are const by default, so mutable is used
+      tree.events().expanded([aryViz](const arg_treebox& tbArg) mutable  // lambda captures by value are const by default, so mutable is used
+      {
+        if(tbArg.item.expanded())
+        {
+          str aryStr = "";
+          if(aryViz.text() == ""){
+            //Println("creating array visualization");
+            TO(t.size(),i){
+              aryStr += toString( i==0? "" : ", ", (tbl<>::i64)t[i] );
+            }
+            aryViz.text(aryStr);
+          }
 
-    pixel_buffer pxbuf(128,128);
-    pixel_buffer::pixel_buffer_storage* stor = pxbuf.storage_.get();
-    auto rawpx = stor->raw_pixel_buffer;
-    auto    w = stor->pixel_size.width;
-    auto    h = stor->pixel_size.height;
-    for(unsigned int y=0; y<h; ++y)
-     for(unsigned int x=0; x<w; ++x){
-       pixel_argb_t p;
-       p.element.red   = 0;
-       p.element.green = 0;
-       p.element.blue  = 0;
-       p.element.alpha_channel = 1;
-       rawpx[y*w + x]  = p;
-     }
+          Println("");
+          Println("txt: ", tbArg.item.text(), " key: ", tbArg.item.key() );
+          Println("expanded: ", tbArg.item.expanded() );
+          Println("");
+        }
+      });
+    }
+    SECTION(treebox custom drawing)
+    {
+      auto& img = tree.icon("ID1");
+      auto& nrm = img.normal;
 
-    img.normal.open("normal1.png");
-    img.hovered.open("hovered1.png");
-    img.expanded.open("expanded1.png");
-    tree.auto_draw(true);
+      pixel_buffer pxbuf(128,128);
+      pixel_buffer::pixel_buffer_storage* stor = pxbuf.storage_.get();
+      auto rawpx = stor->raw_pixel_buffer;
+      auto    w = stor->pixel_size.width;
+      auto    h = stor->pixel_size.height;
+      for(unsigned int y=0; y<h; ++y)
+       for(unsigned int x=0; x<w; ++x){
+         pixel_argb_t p;
+         p.element.red   = 0;
+         p.element.green = 0;
+         p.element.blue  = 0;
+         p.element.alpha_channel = 1;
+         rawpx[y*w + x]  = p;
+       }
+
+      img.normal.open("normal1.png");
+      img.hovered.open("hovered1.png");
+      img.expanded.open("expanded1.png");
+      tree.auto_draw(true);
+    }
   }
 
   label sz(fm), elems(fm), szBytes(fm), cap(fm), mapcap(fm), owned(fm);
@@ -215,6 +238,13 @@ int main()
 
 
 
+
+
+//aryViz.clear();
+//aryViz.append("ary/arystr", aryStr);
+//aryViz.text("wat skidoosh");
+//Println("array expanded ");
+//Println(tbArg.item.owner().key(), "  ", tbArg.item.child().key() );
 
 //label     sz(fm,  toString("Size: ",          t.size()),         true);
 //label  elems(fm,  toString("Elements: ",      t.elems()),        true);
