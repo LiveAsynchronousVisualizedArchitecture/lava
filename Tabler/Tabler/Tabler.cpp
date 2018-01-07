@@ -16,11 +16,18 @@
 // -todo: move no_rt_util.h to higher directory to share 
 // -todo: organize in to sections
 // -todo: put in open, save, and help/about menu items
+// -todo: check on nana drag and drop - works by enabling file drag and drop - nana gives an iterator of files
 
-// todo: check on nana drag and drop
+// todo: make fold event only print on unfold
 // todo: make array string be created only when unfolded
-// todo: try compiling with clang
 // todo: compile with png and jpeg labels
+// todo: make list or tree of simdb databases 
+// todo: make selecting simdb database list the keys in that database
+// todo: implement clearing of the tbl and gui on menu new
+// todo: implement saving of the tbl
+// todo: implement opening on drag and drop of a tbl
+// todo: implement opening of the tbl through the menu and file dialog
+// todo: try compiling with clang
 
 #include <iostream>
 #include <nana/gui.hpp>
@@ -102,88 +109,106 @@ int main()
   }
 
   treebox tree(fm, true);
-  tree.borderless(false);
-  tree.events().expanded([](const arg_treebox& tbArg){
-    Println("array expanded ");
-    Println(tbArg.item.text(), "  ", tbArg.item.key() );
-    Println(tbArg.item.owner().key(), "  ", tbArg.item.child().key() );
+  SECTION(treebox item insertion from the current tbl)
+  {
+    str aszStr = toString("Array Size: ", t.size());
+    tree.insert("ary", aszStr);
+    str aryStr = "";
+    TO(t.size(),i){
+      aryStr += toString( i==0? "" : ", ", (tbl<>::i64)t[i] );
+    }
+    tree.insert("ary/arystr", aryStr);
 
-    Println("expanded: ", tbArg.item.expanded() );
-  });
+    tree.insert("elems", toString("Elements: ", t.elems()) );
+    TO(t.elems(),i){
+      auto e = t.elemStart()[i];
+      if(e.isEmpty()) continue;
 
-  str aszStr = toString("Array Size: ", t.size());
-  tree.insert("ary", aszStr);
-  str aryStr = "";
-  TO(t.size(),i){
-    aryStr += toString( i==0? "" : ", ", (tbl<>::i64)t[i] );
+      auto k = e.key;
+      tree.insert( toString("elems/", k), toString(k,":  ", e.as<tbl<>::i64>()) ); 
+    }
   }
-  tree.insert("ary/arystr", aryStr);
+  SECTION(treebox set up including events)
+  {
+    tree.borderless(false);
+    tree.events().expanded([](const arg_treebox& tbArg)
+    {
+      if(tbArg.item.expanded()){
+        Println("");
+        Println("array expanded ");
+        Println(tbArg.item.text(), "  ", tbArg.item.key() );
+        Println(tbArg.item.owner().key(), "  ", tbArg.item.child().key() );
+        Println("expanded: ", tbArg.item.expanded() );
+        Println("");
+      }
+    });
+  }
+  SECTION(treebox custom drawing)
+  {
+    auto& img = tree.icon("ID1");
+    auto& nrm = img.normal;
 
-  tree.insert("elems", toString("Elements: ", t.elems()) );
-  TO(t.elems(),i){
-    auto e = t.elemStart()[i];
-    if(e.isEmpty()) continue;
+    pixel_buffer pxbuf(128,128);
+    pixel_buffer::pixel_buffer_storage* stor = pxbuf.storage_.get();
+    auto rawpx = stor->raw_pixel_buffer;
+    auto    w = stor->pixel_size.width;
+    auto    h = stor->pixel_size.height;
+    for(unsigned int y=0; y<h; ++y)
+     for(unsigned int x=0; x<w; ++x){
+       pixel_argb_t p;
+       p.element.red   = 0;
+       p.element.green = 0;
+       p.element.blue  = 0;
+       p.element.alpha_channel = 1;
+       rawpx[y*w + x]  = p;
+     }
 
-    auto k = e.key;
-    tree.insert( toString("elems/", k), toString(k,":  ", e.as<tbl<>::i64>()) ); 
+    img.normal.open("normal1.png");
+    img.hovered.open("hovered1.png");
+    img.expanded.open("expanded1.png");
+    tree.auto_draw(true);
   }
 
-  auto& img = tree.icon("ID1");
-  auto& nrm = img.normal;
+  label sz(fm), elems(fm), szBytes(fm), cap(fm), mapcap(fm), owned(fm);
+  SECTION(label captions)
+  {
+    sz.caption(     toString("Size: ",          t.size()        ));
+    elems.caption(  toString("Elements: ",      t.elems()       ));
+    szBytes.caption(toString("Size in Bytes: ", t.sizeBytes()   ));
+    cap.caption(    toString("Capacity: ",      t.capacity()    ));
+    mapcap.caption( toString("Map Capacity: ",  t.map_capacity()));
+    owned.caption(  toString("Owned: ",         t.owned()? "True" : "False"));
+  }
 
-  pixel_buffer pxbuf(128,128);
-  pixel_buffer::pixel_buffer_storage* stor = pxbuf.storage_.get();
-  auto rawpx = stor->raw_pixel_buffer;
-  auto    w = stor->pixel_size.width;
-  auto    h = stor->pixel_size.height;
-  for(unsigned int y=0; y<h; ++y)
-   for(unsigned int x=0; x<w; ++x){
-     pixel_argb_t p;
-     p.element.red   = 0;
-     p.element.green = 0;
-     p.element.blue  = 0;
-     p.element.alpha_channel = 1;
-     rawpx[y*w + x]  = p;
-   }
+  SECTION(place and gui component layout)
+  {
+    place       plc(fm);
+    place  lblPlace(fm);
+    plc["mb"]      << mb;
+    plc["sz"]      << sz;
+    plc["elems"]   << elems;
+    plc["szBytes"] << szBytes;
+    plc["cap"]     << cap;
+    plc["owned"]   << owned;
+    plc["mapcap"]  << mapcap;
+    plc["tree"]    << tree;
+    plc.div("vert"
+            "<mb weight=30>"
+            "<weight=20 margin=[0,0,5,10] " // weight=20 "<weight=10% "
+             " <fit sz margin=[0,10]> <fit elems margin=[0,10]> <fit szBytes margin=[0,10]> <fit cap margin=[0,10]> <fit mapcap margin=[0,10]> <fit owned>"
+            ">" //  gap=5 margin=[10,40,10,0]" //margin=[10,10,10,10]>"
+            "<tree weight=90%>"
+            );
+    plc.collocate();
+  }
 
-  img.normal.open("normal1.png");
-  img.hovered.open("hovered1.png");
-  img.expanded.open("expanded1.png");
-  tree.auto_draw(true);
+  SECTION(layout the main window, show it, and start the event loop)
+  {
+    fm.collocate();
+    fm.show();         //Show the form
 
-  label     sz(fm,  toString("Size: ",          t.size()),         true);
-  label  elems(fm,  toString("Elements: ",      t.elems()),        true);
-  label szBytes(fm, toString("Size in Bytes: ", t.sizeBytes()),    true);
-  label     cap(fm, toString("Capacity: ",      t.capacity()),     true);
-  label  mapcap(fm, toString("Map Capacity: ",  t.map_capacity()), true);
-  label   owned(fm, toString("Owned: ",         t.owned()? "True" : "False"), true);
-
-  place       plc(fm);
-  place  lblPlace(fm);
-  plc["mb"]      << mb;
-  plc["sz"]      << sz;
-  plc["elems"]   << elems;
-  plc["szBytes"] << szBytes;
-  plc["cap"]     << cap;
-  plc["owned"]   << owned;
-  plc["mapcap"]  << mapcap;
-  plc["tree"]    << tree;
-  plc.div("vert"
-          "<mb weight=30>"
-          "<weight=20 margin=[0,0,5,10] " // weight=20 "<weight=10% "
-           " <fit sz margin=[0,10]> <fit elems margin=[0,10]> <fit szBytes margin=[0,10]> <fit cap margin=[0,10]> <fit mapcap margin=[0,10]> <fit owned>"
-          ">" //  gap=5 margin=[10,40,10,0]" //margin=[10,10,10,10]>"
-          "<tree weight=90%>"
-          );
-  plc.collocate();
-
-  fm.collocate();
-
-  //Show the form
-  fm.show();
-
-  //Start to event loop process, it blocks until the form is closed.
-  exec();
+    exec();            //Start to event loop process, it blocks until the form is closed.
+  }
 }
 
 
@@ -191,6 +216,12 @@ int main()
 
 
 
+//label     sz(fm,  toString("Size: ",          t.size()),         true);
+//label  elems(fm,  toString("Elements: ",      t.elems()),        true);
+//label szBytes(fm, toString("Size in Bytes: ", t.sizeBytes()),    true);
+//label     cap(fm, toString("Capacity: ",      t.capacity()),     true);
+//label  mapcap(fm, toString("Map Capacity: ",  t.map_capacity()), true);
+//label   owned(fm, toString("Owned: ",         t.owned()? "True" : "False"), true);
 
 //fm["mb"]      << mb;
 //fm["szBytes"] << szBytes;
