@@ -10,14 +10,19 @@
 // -todo: put back pixel_buffer tests
 // -todo: refine labels layout
 // -todo: make initial array string
+// -todo: run event on unfold
+// -todo: check expanded()
+// -todo: move comments out of main()
+// -todo: move no_rt_util.h to higher directory to share 
+// -todo: organize in to sections
+// -todo: put in open, save, and help/about menu items
 
-// todo: run event on unfold
+// todo: check on nana drag and drop
+// todo: make array string be created only when unfolded
 // todo: try compiling with clang
 // todo: compile with png and jpeg labels
-// todo: make array string be created only when unfolded
 
 #include <iostream>
-
 #include <nana/gui.hpp>
 #include <nana/gui/widgets/label.hpp>
 #include <nana/gui/widgets/button.hpp>
@@ -27,8 +32,9 @@
 #include <nana/paint/pixel_buffer.hpp>
 #include <../source/paint/detail/image_pixbuf.hpp>
 #include <../source/paint/pixel_buffer.cpp>
-#include "../../nanovg_test/tbl.hpp"
+#include "../../tbl.hpp"
 #include "../../str_util.hpp"
+#include "../../no_rt_util.h"
 
 using str = std::string;
 
@@ -39,74 +45,70 @@ int main()
   using namespace nana::paint;
 
   tbl<> t;
-  TO(12,i){
-    t.push_back( (tbl<>::i8)i );
+  SECTION(initialize the table)
+  {
+    TO(12,i){
+      t.push_back( (tbl<>::i8)i );
+    }
+    t("wat")       = 21;
+    t("skidoosh")  = 42;
+    t("wut")       = 84;
+    t("squidoosh") = 168;
+    t("table key") = 336;
   }
-  t("wat")       = 21;
-  t("skidoosh")  = 42;
-  t("wut")       = 84;
-  t("squidoosh") = 168;
-  t("table key") = 336;
-  //t("wat")       = (int)21;
-  //t("skidoosh")  = (int)42;
-  //t("wut")       = (int)84;
-  //t("squidoosh") = (int)168;
-  //t("table key") = (int)336;
 
-
-
-  //Define a form.
-  //API::make_center
   form fm(API::make_center(768, 768));
-  fm.caption("Tabler");
+  SECTION(set up the main window and its events)
+  {
+    API::enable_dropfiles(fm, true);
+    fm.caption("Tabler");
+    fm.events().mouse_dropfiles([](const arg_dropfiles& arg)
+    {
+      Println("drop file event");
+
+      int i = 0;
+      for(auto& f : arg.files){
+        Println("file ", i, ": ", f);
+      }
+    });
+  }
 
   menubar mb;
-  mb.create(fm);
-  mb.push_back("&File");
-  mb.push_back("&Help");
-  mb.caption("menu wat");
-  mb.enabled(true);
-  //mb.size({400, 50});
+  SECTION(set up the menu bar)
+  {
+    mb.create(fm);
+    mb.push_back("&File");
+    mb.push_back("&Help");
+    mb.caption("menu wat");
+    mb.enabled(true);
 
-  //std::cout << mb.length() << "  ";
-  auto& fileMenu = mb.at(0);
-  fileMenu.append("&New", [](auto& itmprxy){
-    cout << "New pressed" << endl;
-  });
-  //auto   fileSub = fileMenu.create_sub_menu(0);
-  //fileSub->append("&New");
-  //fileSub->append("&Open");
-  //fileSub->append("&Save");
+    auto& fileMenu = mb.at(0);
+    fileMenu.append("&New", [](auto& itmprxy){
+      cout << "New pressed" << endl;
+    });
+    fileMenu.append("&Open", [](auto& itmprxy){
+      cout << "Open pressed" << endl;
+    });
+    fileMenu.append("&Save", [](auto& itmprxy){
+      cout << "Save pressed" << endl;
+    });
 
-  mb.show();
+    auto& helpMenu = mb.at(1);
+    helpMenu.append("&About", [](auto& itmprxy){
+      cout << "About pressed" << endl;
+    });
 
-  //menu main_menu;
-  //main_menu.append("Item 0");
-  //main_menu.append("Item 1");
-  //
-  //main_menu.gaps({ 3, -2 }); //Sets gaps
-  //
-  //menu* submenu = main_menu.create_sub_menu(0);
-  //submenu->append("Item 0");
-  //submenu->append("Item 1");
+    mb.show();
+  }
 
-  ////Define a label and display a text.
-  //label lab{fm, "Hello, <bold blue size=16>Nana C++ Library</>"};
-  //lab.format(true);
-  //
-  ////Define a button and answer the click event.
-  //button btn{fm, "Quit"};
-  //btn.events().click([&fm]{
-  //  fm.close();
-  //});
-
-  //treebox tree(fm, {10,10,300,300}, true);
   treebox tree(fm, true);
   tree.borderless(false);
-  tree.events().expanded([](const auto& tbArg){
+  tree.events().expanded([](const arg_treebox& tbArg){
     Println("array expanded ");
     Println(tbArg.item.text(), "  ", tbArg.item.key() );
     Println(tbArg.item.owner().key(), "  ", tbArg.item.child().key() );
+
+    Println("expanded: ", tbArg.item.expanded() );
   });
 
   str aszStr = toString("Array Size: ", t.size());
@@ -126,24 +128,8 @@ int main()
     tree.insert( toString("elems/", k), toString(k,":  ", e.as<tbl<>::i64>()) ); 
   }
 
-  //for(auto e : t){
-  //  tree.insert( 
-  //}
-
-  //auto root = tree.insert("root", "wat");
-  //tree.insert("root/wat",       "wat");
-  //tree.insert("root/squidoosh", "squidoosh");
-
-  //tree.insert("root", "skidoosh");
-  //tree.insert("root/long", "alkjs alksjfklasjlk sj klasjkfklajsj klasfkjas jkas adl;fjlkasjfl;jalfkjalsjkdflkjaslkfdjl;ajfklja sklfj klsajfljsalfjklajs klf;jlas;jdfkljaksjfkl;ajs klf;jklas jfkljksaldjfklsajdkl;jkla;sjfkljasklkljfklajklfjaskljfklajs klf jkla;jklfej;lajklfjklaj;lfjm;amvlksdljmvl;kajs;klfdjlak;sjv;mnsdklfjm;klnvm;jlznljvnm;ldfnmh;ln;fjnbxl;fjjsklklfjasklfjlsd;ajf;as ");
   auto& img = tree.icon("ID1");
-  //paint::image* img = &(tree.icon("ID1"));
-  //drawerbase::treebox::node_image_tag* img = &(tree.icon("ID1"));
   auto& nrm = img.normal;
-  //nrm.
-  //auto ib = new paint::detail::basic_image_pixbuf
-  //nrm.image_ptr_ = make_shared<paint::detail::basic_image_pixbuf>(); // ::basic_image_pixbuf>();
-  //paint::detail::basic_image_pixbuf pxbuf;
 
   pixel_buffer pxbuf(128,128);
   pixel_buffer::pixel_buffer_storage* stor = pxbuf.storage_.get();
@@ -160,16 +146,10 @@ int main()
      rawpx[y*w + x]  = p;
    }
 
-  //pxbuf.storage_->
-  //nrm.image_ptr_
-  //nrm
-
   img.normal.open("normal1.png");
   img.hovered.open("hovered1.png");
   img.expanded.open("expanded1.png");
-  //root.icon("ID1");
   tree.auto_draw(true);
-  //auto trplc = tree.placer();
 
   label     sz(fm,  toString("Size: ",          t.size()),         true);
   label  elems(fm,  toString("Elements: ",      t.elems()),        true);
@@ -197,50 +177,6 @@ int main()
           );
   plc.collocate();
 
-  //fm["mb"]      << mb;
-  //fm["szBytes"] << szBytes;
-  //fm["tree"]    << tree;
-  //fm.div("vert <margin=[75,75,75,75]> <mb weight=30>"
-  //       "<fit szBytes weight=10%>" //  gap=5 margin=[10,40,10,0]" //margin=[10,10,10,10]>"
-  //       "<tree weight=90%>"
-  //       );
-  
-  //fm.div("vert<mb weight=10%>");
-  //
-  //fm.div("vert<><<><weight=80% text><>><><weight=24<><button><>><>");
-  //fm.div("vert<><<><weight=80% text><>><><weight=24<><button><>><>");
-  //
-  //place plc(fm);
-  //plc.field("tree") << tree;
-  //plc.div("vert<tree weight=100%>");
-  //plc.collocate();
-  //
-  //Sets the images
-  //auto & img = tree.icon("ID1");
-  //img.normal.open("normal1.png");
-  //img.hovered.open("hovered1.png");
-  //img.expanded.open("expanded1.png");
-  //
-  //auto prx = tree.insert("root", "ROOT");
-  //prx.icon("ID1"); //Sets the images for the item.
-  //
-  //auto & img2 = tree.icon("ID2");
-  //img2.normal.open("normal2.png");
-  //img2.hovered.open("hovered2.png");
-  //img2.expanded.open("expanded2.png");
-  ////If hovered or expanded is not set, it uses normal image for these 2 states.
-  //
-  //prx = tree.insert("root/abc", "abc");
-  //prx.icon("ID2");
-  //tree.insert("root/def", "def").icon("ID2");
-  //images ID2 are shared for item "abc" and "def".
-  //
-  ////Layout management
-  //fm.div("vert <><<><weight=80% text><>><><weight=24<><button><>><>");
-  //fm["text"]   << lab;
-  //fm["button"] << btn;
-  //fm["tree"]   << tree;
-
   fm.collocate();
 
   //Show the form
@@ -250,6 +186,124 @@ int main()
   exec();
 }
 
+
+
+
+
+
+
+//fm["mb"]      << mb;
+//fm["szBytes"] << szBytes;
+//fm["tree"]    << tree;
+//fm.div("vert <margin=[75,75,75,75]> <mb weight=30>"
+//       "<fit szBytes weight=10%>" //  gap=5 margin=[10,40,10,0]" //margin=[10,10,10,10]>"
+//       "<tree weight=90%>"
+//       );
+
+//fm.div("vert<mb weight=10%>");
+//
+//fm.div("vert<><<><weight=80% text><>><><weight=24<><button><>><>");
+//fm.div("vert<><<><weight=80% text><>><><weight=24<><button><>><>");
+//
+//place plc(fm);
+//plc.field("tree") << tree;
+//plc.div("vert<tree weight=100%>");
+//plc.collocate();
+//
+//Sets the images
+//auto & img = tree.icon("ID1");
+//img.normal.open("normal1.png");
+//img.hovered.open("hovered1.png");
+//img.expanded.open("expanded1.png");
+//
+//auto prx = tree.insert("root", "ROOT");
+//prx.icon("ID1"); //Sets the images for the item.
+//
+//auto & img2 = tree.icon("ID2");
+//img2.normal.open("normal2.png");
+//img2.hovered.open("hovered2.png");
+//img2.expanded.open("expanded2.png");
+////If hovered or expanded is not set, it uses normal image for these 2 states.
+//
+//prx = tree.insert("root/abc", "abc");
+//prx.icon("ID2");
+//tree.insert("root/def", "def").icon("ID2");
+//images ID2 are shared for item "abc" and "def".
+//
+////Layout management
+//fm.div("vert <><<><weight=80% text><>><><weight=24<><button><>><>");
+//fm["text"]   << lab;
+//fm["button"] << btn;
+//fm["tree"]   << tree;
+
+//root.icon("ID1");
+//auto trplc = tree.placer();
+
+//pxbuf.storage_->
+//nrm.image_ptr_
+//nrm
+
+//paint::image* img = &(tree.icon("ID1"));
+//drawerbase::treebox::node_image_tag* img = &(tree.icon("ID1"));
+
+//nrm.
+//auto ib = new paint::detail::basic_image_pixbuf
+//nrm.image_ptr_ = make_shared<paint::detail::basic_image_pixbuf>(); // ::basic_image_pixbuf>();
+//paint::detail::basic_image_pixbuf pxbuf;
+
+//for(auto e : t){
+//  tree.insert( 
+//}
+
+//auto root = tree.insert("root", "wat");
+//tree.insert("root/wat",       "wat");
+//tree.insert("root/squidoosh", "squidoosh");
+
+//tree.insert("root", "skidoosh");
+//tree.insert("root/long", "alkjs alksjfklasjlk sj klasjkfklajsj klasfkjas jkas adl;fjlkasjfl;jalfkjalsjkdflkjaslkfdjl;ajfklja sklfj klsajfljsalfjklajs klf;jlas;jdfkljaksjfkl;ajs klf;jklas jfkljksaldjfklsajdkl;jkla;sjfkljasklkljfklajklfjaskljfklajs klf jkla;jklfej;lajklfjklaj;lfjm;amvlksdljmvl;kajs;klfdjlak;sjv;mnsdklfjm;klnvm;jlznljvnm;ldfnmh;ln;fjnbxl;fjjsklklfjasklfjlsd;ajf;as ");
+
+//auto   fileSub = fileMenu.create_sub_menu(0);
+//fileSub->append("&New");
+//fileSub->append("&Open");
+//fileSub->append("&Save");
+
+//
+//mb.size({400, 50});
+
+//t("wat")       = (int)21;
+//t("skidoosh")  = (int)42;
+//t("wut")       = (int)84;
+//t("squidoosh") = (int)168;
+//t("table key") = (int)336;
+
+//Define a form.
+//API::make_center
+
+//
+//#include "../../nanovg_test/tbl.hpp"
+
+//menu main_menu;
+//main_menu.append("Item 0");
+//main_menu.append("Item 1");
+//
+//main_menu.gaps({ 3, -2 }); //Sets gaps
+//
+//menu* submenu = main_menu.create_sub_menu(0);
+//submenu->append("Item 0");
+//submenu->append("Item 1");
+
+////Define a label and display a text.
+//label lab{fm, "Hello, <bold blue size=16>Nana C++ Library</>"};
+//lab.format(true);
+//
+////Define a button and answer the click event.
+//button btn{fm, "Quit"};
+//btn.events().click([&fm]{
+//  fm.close();
+//});
+
+//
+//treebox tree(fm, {10,10,300,300}, true);
 
 //#include <nana/gui.hpp>
 //#include <nana/gui/widgets/treebox.hpp>
