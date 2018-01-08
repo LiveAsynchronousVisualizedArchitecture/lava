@@ -1799,14 +1799,17 @@ public:
 
     if(!NtOpenDirectoryObject){  
       //NtOpenDirectoryObject  = (NTOPENDIRECTORYOBJECT)GetLibraryProcAddress( _T("ntdll.dll"), "NtOpenDirectoryObject");
-      NtOpenDirectoryObject  = (NTOPENDIRECTORYOBJECT)GetLibraryProcAddress( (PSTR)_T("ntdll.dll"), (PSTR)_T("NtOpenDirectoryObject") );
+      //NtOpenDirectoryObject  = (NTOPENDIRECTORYOBJECT)GetLibraryProcAddress( (PSTR)_T("ntdll.dll"), (PSTR)_T("NtOpenDirectoryObject") );
+      NtOpenDirectoryObject  = (NTOPENDIRECTORYOBJECT)GetLibraryProcAddress( (PSTR)"ntdll.dll", (PSTR)"NtOpenDirectoryObject" );
     }
     if(!NtQueryDirectoryObject){ 
       //NtQueryDirectoryObject = (NTQUERYDIRECTORYOBJECT)GetLibraryProcAddress(_T("ntdll.dll"), "NtQueryDirectoryObject");
-      NtQueryDirectoryObject = (NTQUERYDIRECTORYOBJECT)GetLibraryProcAddress( (PSTR)_T("ntdll.dll"), (PSTR)_T("NtQueryDirectoryObject") );
+      //NtQueryDirectoryObject = (NTQUERYDIRECTORYOBJECT)GetLibraryProcAddress( (PSTR)_T("ntdll.dll"), (PSTR)_T("NtQueryDirectoryObject") );
+      NtQueryDirectoryObject = (NTQUERYDIRECTORYOBJECT)GetLibraryProcAddress( (PSTR)"ntdll.dll", (PSTR)"NtQueryDirectoryObject");
     }
     if(!NtOpenFile){ 
-      NtOpenFile = (NTOPENFILE)GetLibraryProcAddress( (PSTR)_T("ntdll.dll"), (PSTR)_T("NtOpenFile") );
+      //NtOpenFile = (NTOPENFILE)GetLibraryProcAddress( (PSTR)_T("ntdll.dll"), (PSTR)_T("NtOpenFile") );
+      NtOpenFile = (NTOPENFILE)GetLibraryProcAddress( (PSTR)"ntdll.dll", (PSTR)"NtOpenFile" );
     }
 
     HANDLE     hDir = NULL;

@@ -861,7 +861,7 @@ ENTRY_DECLARATION
   using namespace std;
   using namespace nanogui;
 
-  //genTestGeo(&db);
+  genTestGeo(&db);
 
   //tbl<u8> pears<std::initializer_list<std::pair<char*,tbl<u8>::KV> >( { std::make_pair("wat",85) } );
   tbl<u8> pears = { {"wat",85} };
@@ -1197,7 +1197,8 @@ ENTRY_DECLARATION
         cam.lookAt  +=  ofst;
         cam.pos     +=  ofst;
         
-        viewProj     =  camera_to_mat4(cam, (f32)vd.ui.w, (f32)vd.ui.h);
+        if(vd.ui.w>0 && vd.ui.h>0)
+          viewProj   =  camera_to_mat4(cam, (f32)vd.ui.w, (f32)vd.ui.h);
       }
       SECTION(draw shapes)
       {
