@@ -988,7 +988,12 @@ ENTRY_DECLARATION
     Printf("\n sizeof(tbl::fields): %d \n\n", sizeof(tbl<u8>::fields) );
 
     tu64 chld;
+    assert(chld.owned());
+    Printf("\n %d \n", chld.owned() );
     chld.push(4);
+    assert(chld.owned());
+    Printf("\n %d \n", chld.owned() );
+
     chld.push(8);
     chld("wat") = 259;
     i64 wat = chld("wat");
@@ -1002,6 +1007,11 @@ ENTRY_DECLARATION
     //KV kv      =  tst("child");
     //kv         =  chld;
     tst("child") =  &chld;
+    assert(tst.owned());
+    Printf("\n %d \n", tst.owned() );
+
+    assert(chld.owned());
+    Printf("\n %d \n", chld.owned() );
 
     //KV kv        =  tst("child");
     //tf64& chldp  =  kv.operator tf64 &();

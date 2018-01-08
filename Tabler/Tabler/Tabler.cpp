@@ -20,16 +20,26 @@
 // -todo: make fold event only print on unfold
 // -todo: make array string be created only when unfolded
 // -todo: get including simdb to compile - needed strings to be cast to PSTR for windows functions
+// -todo: wrap filling treebox in to a function
+// -todo: wrap label updating in the regen function
 
-// todo: wrap filling treebox in to a function
-// todo: make list or tree of simdb databases 
-// todo: make selecting simdb database list the keys in that database
+// todo: fix table element count
+// todo: make list or tree of simdb databases - just put them at root level in the tree
+// todo: make selecting simdb database list the keys in that database - just make dbs the root level tree items
 // todo: compile with png and jpeg libs
 // todo: implement clearing of the tbl and gui on menu new
+// todo: make tables drag and droppable to files
 // todo: implement saving of the tbl
 // todo: implement opening on drag and drop of a tbl
+// todo: make drag and drop of a tbl file drop it into simdb
+// todo: make simdb tables drag and droppable to other simdb dbs 
+// todo: make table files drag and droppable to sub tables 
 // todo: implement opening of the tbl through the menu and file dialog
 // todo: try compiling with clang
+
+// idea: should tbls exist as either files, memory, or sub tables?
+//       | icon in the tree could show which is which
+//       | editing a memory mapped table could edit the table on disk
 
 #include <iostream>
 #include <nana/gui.hpp>
@@ -48,13 +58,53 @@
 
 using str = std::string;
 
-tbl<>             t;
-nana::form       fm;
-nana::treebox  tree;
+tbl<>                          t;
+nana::form                    fm;
+nana::treebox               tree;
+nana::treebox::item_proxy aryViz;
+nana::label sz, elems, szBytes, cap, mapcap, owned;
 
+//nana::label sz(fm), elems(fm), szBytes(fm), cap(fm), mapcap(fm), owned(fm);
 //nana::form  fm(nana::API::make_center(768, 768));
 
-int main()
+void regenTblInfo()
+{
+  SECTION(list simdb files and insert them at the top level of the tree)
+  {
+    simdb_error err;
+    auto dbs = simdb_listDBs(&err);
+
+    for(auto& pth : dbs){
+      tree.insert(pth, pth);
+    }
+  }
+  SECTION(insert tbl data into the tree)
+  {
+    str aszStr = toString("Array Size: ", t.size());
+    tree.insert("ary", aszStr);
+    aryViz     = tree.insert("ary/arystr", "");
+
+    tree.insert("elems", toString("Elements: ", t.elems()) );
+    TO(t.map_capacity(),i){
+      auto e = t.elemStart()[i];
+      if(e.isEmpty()) continue;
+
+      auto k = e.key;
+      tree.insert( toString("elems/", k), toString(k,":  ", e.as<tbl<>::i64>()) ); 
+    }
+  }
+  SECTION(label captions)
+  {
+    sz.caption(     toString("Size: ",          t.size()        ));
+    elems.caption(  toString("Elements: ",      t.elems()       ));
+    szBytes.caption(toString("Size in Bytes: ", t.sizeBytes()   ));
+    cap.caption(    toString("Capacity: ",      t.capacity()    ));
+    mapcap.caption( toString("Map Capacity: ",  t.map_capacity()));
+    owned.caption(  toString("Owned: ",         t.owned()? "True" : "False"));
+  }
+}
+
+int  main()
 {
   using namespace  std;
   using namespace nana;
@@ -87,6 +137,15 @@ int main()
       }
     });
   }
+  SECTION(initialize components with the main window handle)
+  {
+    sz.create(fm);
+    elems.create(fm);
+    szBytes.create(fm);
+    cap.create(fm);
+    mapcap.create(fm);
+    owned.create(fm);
+  }
 
   menubar mb;
   SECTION(set up the menu bar)
@@ -99,7 +158,15 @@ int main()
 
     auto& fileMenu = mb.at(0);
     fileMenu.append("&New", [](auto& itmprxy){
-      cout << "New pressed" << endl;
+      t.clear();
+      SECTION(clear tree)
+      {
+        //tree.create(fm,true);
+        tree.clear();
+        tree.erase("ary");
+        tree.erase("elems");
+      }
+      regenTblInfo();
     });
     fileMenu.append("&Open", [](auto& itmprxy){
       cout << "Open pressed" << endl;
@@ -116,36 +183,18 @@ int main()
     mb.show();
   }
 
-  //treebox tree(fm, true);
   SECTION(all treebox setup)
   {
     tree.create(fm, true);
-    treebox::item_proxy aryViz;
     SECTION(treebox item insertion from the current tbl)
     {
-      str aszStr = toString("Array Size: ", t.size());
-      tree.insert("ary", aszStr);
-      //str aryStr = "";
-      //TO(t.size(),i){
-      //  aryStr += toString( i==0? "" : ", ", (tbl<>::i64)t[i] );
-      //}
-      //tree.insert("ary/arystr", aryStr);
-      aryViz = tree.insert("ary/arystr", "");
-
-      tree.insert("elems", toString("Elements: ", t.elems()) );
-      TO(t.elems(),i){
-        auto e = t.elemStart()[i];
-        if(e.isEmpty()) continue;
-
-        auto k = e.key;
-        tree.insert( toString("elems/", k), toString(k,":  ", e.as<tbl<>::i64>()) ); 
-      }
+      regenTblInfo();
     }
     SECTION(treebox set up including events)
     {
+      tree.auto_draw(true);
       tree.borderless(false);
-      //tree.events().expanded([&t, aryViz](const arg_treebox& tbArg) mutable  // lambda captures by value are const by default, so mutable is used
-      tree.events().expanded([aryViz](const arg_treebox& tbArg) mutable  // lambda captures by value are const by default, so mutable is used
+      tree.events().expanded([](const arg_treebox& tbArg) mutable  // lambda captures by value are const by default, so mutable is used
       {
         if(tbArg.item.expanded())
         {
@@ -192,17 +241,6 @@ int main()
     }
   }
 
-  label sz(fm), elems(fm), szBytes(fm), cap(fm), mapcap(fm), owned(fm);
-  SECTION(label captions)
-  {
-    sz.caption(     toString("Size: ",          t.size()        ));
-    elems.caption(  toString("Elements: ",      t.elems()       ));
-    szBytes.caption(toString("Size in Bytes: ", t.sizeBytes()   ));
-    cap.caption(    toString("Capacity: ",      t.capacity()    ));
-    mapcap.caption( toString("Map Capacity: ",  t.map_capacity()));
-    owned.caption(  toString("Owned: ",         t.owned()? "True" : "False"));
-  }
-
   SECTION(place and gui component layout)
   {
     place       plc(fm);
@@ -239,6 +277,45 @@ int main()
 
 
 
+
+//tree.clear();
+//Println("tbl elems: ", t.elems() );
+
+//treebox tree(fm, true);
+//treebox::item_proxy aryViz;
+//tree.events().expanded([&t, aryViz](const arg_treebox& tbArg) mutable  // lambda captures by value are const by default, so mutable is used
+//tree.events().expanded([aryViz](const arg_treebox& tbArg) mutable  // lambda captures by value are const by default, so mutable is used
+
+//cout << "New pressed" << endl;
+//tree.clear();
+//tree.create(fm,true);
+//tree.erase();
+//tree.clear();
+//tree.create(
+
+//str aszStr = toString("Array Size: ", t.size());
+//tree.insert("ary", aszStr);
+////str aryStr = "";
+////TO(t.size(),i){
+////  aryStr += toString( i==0? "" : ", ", (tbl<>::i64)t[i] );
+////}
+////tree.insert("ary/arystr", aryStr);
+//aryViz = tree.insert("ary/arystr", "");
+//
+//tree.insert("elems", toString("Elements: ", t.elems()) );
+//TO(t.elems(),i){
+//  auto e = t.elemStart()[i];
+//  if(e.isEmpty()) continue;
+//
+//  auto k = e.key;
+//  tree.insert( toString("elems/", k), toString(k,":  ", e.as<tbl<>::i64>()) ); 
+//}
+
+//str aryStr = "";
+//TO(t.size(),i){
+//  aryStr += toString( i==0? "" : ", ", (tbl<>::i64)t[i] );
+//}
+//tree.insert("ary/arystr", aryStr);
 
 //aryViz.clear();
 //aryViz.append("ary/arystr", aryStr);
