@@ -22,20 +22,31 @@
 // -todo: get including simdb to compile - needed strings to be cast to PSTR for windows functions
 // -todo: wrap filling treebox in to a function
 // -todo: wrap label updating in the regen function
+// -todo: make list or tree of simdb databases - just put them at root level in the tree
+// -todo: make sub list of keys below simdb databases
+// -todo: implement clearing of the tbl and gui on menu new
+// -todo: make selecting simdb database list the keys in that database - just make dbs the root level tree items
+// -todo: fix tree expansion bug - looking for specific item_proxy AND not checking if it was empty before tying to compare it to ""
+// -todo: make tbl insert function insert under an arbitrary key
 
-// todo: fix table element count
-// todo: make list or tree of simdb databases - just put them at root level in the tree
-// todo: make selecting simdb database list the keys in that database - just make dbs the root level tree items
+
+// todo: visualize 'type' element as an 8 character string first, then as a number
+// todo: make switch case for fundamental types that the map elements can be
+// todo: take tbls out of dbs and insert them into the tree
+// todo: make listing the keys of a db happen on expand
+// todo: make insertion of tbls from a db key happen on expand
+// todo: change regen function to a refreshDBs function name
+// todo: fix tbl element count
 // todo: compile with png and jpeg libs
-// todo: implement clearing of the tbl and gui on menu new
-// todo: make tables drag and droppable to files
 // todo: implement saving of the tbl
+// todo: make tables drag and droppable to files
 // todo: implement opening on drag and drop of a tbl
 // todo: make drag and drop of a tbl file drop it into simdb
 // todo: make simdb tables drag and droppable to other simdb dbs 
 // todo: make table files drag and droppable to sub tables 
 // todo: implement opening of the tbl through the menu and file dialog
 // todo: try compiling with clang
+// todo: make a tabler simdb database on start, as scratch space for dragged in files and dragged tables from other dbs
 
 // idea: should tbls exist as either files, memory, or sub tables?
 //       | icon in the tree could show which is which
@@ -56,7 +67,8 @@
 #include "../../tbl.hpp"
 #include "../../str_util.hpp"
 
-using str = std::string;
+using str    = std::string;
+using vec_u8 = std::vector<u8>; 
 
 tbl<>                          t;
 nana::form                    fm;
@@ -64,9 +76,46 @@ nana::treebox               tree;
 nana::treebox::item_proxy aryViz;
 nana::label sz, elems, szBytes, cap, mapcap, owned;
 
+struct vert { f32 p[3],n[3],c[4],tx[2]; };
+using IvTbl = tbl<vert>;
+
 //nana::label sz(fm), elems(fm), szBytes(fm), cap(fm), mapcap(fm), owned(fm);
 //nana::form  fm(nana::API::make_center(768, 768));
 
+namespace {
+
+void insertTbl(str const& parentKey, IvTbl const& t)
+{
+  SECTION(array visualization)
+  {
+    str aszStr = toString("Array Size: ", t.size());
+    str aryKey = parentKey+"/ary"; 
+    tree.insert(aryKey, aszStr);
+
+    aryViz     = tree.insert(aryKey+"/arystr", "");
+  }
+  SECTION(hash map elements)
+  {
+    str elemKey = parentKey+"/elems";
+    tree.insert(elemKey, toString("Elements: ", t.elems()) );
+    TO(t.map_capacity(),i)
+    {
+      auto e = t.elemStart()[i];
+      if(e.isEmpty()) continue;
+
+      str     k = e.key;
+      str title = toString(k,":  ", e.val);
+      if(k == "type"){
+        char typeStr[9];
+        memcpy(typeStr, &e.val, 8);
+        typeStr[8] = '\0';
+        title = toString(k,":  ", typeStr, "  -  (",e.val,")");
+      }
+      
+      tree.insert( toString(elemKey,"/", k), title); // e.as<tbl<>::i64>()) ); 
+    }
+  }
+}
 void regenTblInfo()
 {
   SECTION(list simdb files and insert them at the top level of the tree)
@@ -76,21 +125,42 @@ void regenTblInfo()
 
     for(auto& pth : dbs){
       tree.insert(pth, pth);
-    }
-  }
-  SECTION(insert tbl data into the tree)
-  {
-    str aszStr = toString("Array Size: ", t.size());
-    tree.insert("ary", aszStr);
-    aryViz     = tree.insert("ary/arystr", "");
+      
+      simdb db(pth.c_str(), 4096, 1 << 14);
+      auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
+      vec_u8 tblBuf; 
+      for(auto const& key : dbKeys){
+        //Println(pth+"/"+key.str);
+        //Println(key.str);
+        auto pthStr = pth+"/"+key.str;
+        tree.insert(pth+"/"+key.str, key.str);
 
-    tree.insert("elems", toString("Elements: ", t.elems()) );
-    TO(t.map_capacity(),i){
-      auto e = t.elemStart()[i];
-      if(e.isEmpty()) continue;
+        u32     vlen = 0;
+        u32  version = 0;
+        auto     len = db.len(key.str, &vlen, &version);          // todo: make ui64 as the input length
 
-      auto k = e.key;
-      tree.insert( toString("elems/", k), toString(k,":  ", e.as<tbl<>::i64>()) ); 
+        tblBuf.resize(vlen);
+        db.get(key.str.c_str(), tblBuf.data(), vlen);
+        //vs.ver = version;
+        //auto ivbuf = (u8*)malloc(vlen);   // todo: check to make sure this succeeds 
+        //
+        //IvTbl iv(ivbuf, false, false);
+        //auto     f = iv.memStart();
+        //
+        //auto tblBytes = db.get<u8>(key.str);
+        //t.memStart( tblBytes.data() );
+        //memcpy(&t, tblBytes.data(), sizeof(void*));
+
+        IvTbl ivTbl(tblBuf.data());
+        insertTbl(pth+"/"+key.str, ivTbl);
+      }
+      //for(auto const& key : dbKeys){
+      //  //db.len(key);
+      //  auto tblBytes = db.get<u8>(key.str);
+      //  tbl<> t;
+      //  memcpy(&t, tblBytes.data(), sizeof(void*));
+      //  insertTbl(
+      //}
     }
   }
   SECTION(label captions)
@@ -102,6 +172,8 @@ void regenTblInfo()
     mapcap.caption( toString("Map Capacity: ",  t.map_capacity()));
     owned.caption(  toString("Owned: ",         t.owned()? "True" : "False"));
   }
+}
+
 }
 
 int  main()
@@ -189,6 +261,10 @@ int  main()
     SECTION(treebox item insertion from the current tbl)
     {
       regenTblInfo();
+      tree.insert("place", "place");
+      tree.insert("place/wat", "wat");
+      tree.insert( toString("skidoosh"), toString("skidoosh") );
+      //insertTbl("", t);
     }
     SECTION(treebox set up including events)
     {
@@ -199,9 +275,10 @@ int  main()
         if(tbArg.item.expanded())
         {
           str aryStr = "";
-          if(aryViz.text() == ""){
+          if(!aryViz.empty() && aryViz.text() == ""){
             //Println("creating array visualization");
-            TO(t.size(),i){
+            auto mx = std::min<u64>(t.size(),10); 
+            TO(mx,i){
               aryStr += toString( i==0? "" : ", ", (tbl<>::i64)t[i] );
             }
             aryViz.text(aryStr);
@@ -277,6 +354,10 @@ int  main()
 
 
 
+
+//SECTION(insert tbl data into the tree)
+//{
+//}
 
 //tree.clear();
 //Println("tbl elems: ", t.elems() );

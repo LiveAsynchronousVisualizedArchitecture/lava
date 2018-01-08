@@ -107,6 +107,10 @@
 
 */
 
+
+// todo: make a get function that takes a key version struct
+// todo: make a get function that returns a tbl if tbl.hpp is included
+
 #ifdef _MSC_VER
   #pragma once
   #pragma warning(push, 0)

@@ -23,7 +23,9 @@
 // -todo: make u8* constructor assert that the first two bytes are 't' and 'b'
 // -todo: transition indexed verts to use tbl
 // -todo: make initializer list syntax possible to create pairs of strings and lists of values
+// -todo: make setting owned, always happen on construction from a void pointer
 
+// todo: use upper bit of pointer to represent ownership, so that if memory is freed out from under the tbl, it isn't freed? - ownership would be overridden when a table is based off of a buffer that it doesn't own - only should be neccesary if one tbl owns that memory but others don't, otherwise, ownership should just be set to false in the contiguous memory
 // todo: make tbl structs local to the scope of the tbl
 // todo: once tbl is switched to not be an array, this might not need to be a template
 // todo: allocation template parameters might mean that a template is still neccesary
@@ -744,11 +746,11 @@ public:
     if(_init){
       //assert(count > 0);
       this->init(_count);
-      this->owned(_owned);
     }else{
       assert( ((i8*)memStart())[0]=='t' );
       assert( ((i8*)memStart())[1]=='b' );
     }
+    this->owned(_owned);
   }
   tbl(u64 count) : m_mem(nullptr) { init(count); }                                                           // have to run default constructor here?
   tbl(u64 count, T const& value) : m_mem(nullptr)
