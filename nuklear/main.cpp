@@ -100,7 +100,9 @@
 #include "VizGen.hpp"
 #include "VizTfm.hpp"
 
-#include "no_rt_util.h"
+//#include "no_rt_util.h"
+#include "../str_util.hpp"
+#include "../no_rt_util.h"
 
 #define ENTRY_DECLARATION int main(void)
 #ifdef _MSC_VER
@@ -871,8 +873,8 @@ ENTRY_DECLARATION
   //tbl<u8> pears = { std::make_pair("wat", (i32)85) };
 
   //i32 wt = pear_kv; 
-  i32 wt = pears("wat");
-  Printf("\n wat: %d \n", (i32)wt );
+  //i32 wt = pears("wat");
+  //Printf("\n wat: %d \n", (i32)wt );
 
   SECTION(initialization)
   {
@@ -984,124 +986,127 @@ ENTRY_DECLARATION
     //vecstr ts; ts.reserve(5);
     //ts.push_back(s);
 
-    Printf("\n sizeof(KV): %d \n", sizeof(KV) );
-    Printf("\n sizeof(tbl::fields): %d \n\n", sizeof(tbl<u8>::fields) );
+    //SECTION(tbl tests)
+    //{
+    //  Printf("\n sizeof(KV): %d \n", sizeof(KV) );
+    //  Printf("\n sizeof(tbl::fields): %d \n\n", sizeof(tbl<u8>::fields) );
 
-    tu64 chld;
-    assert(chld.owned());
-    Printf("\n %d \n", chld.owned() );
-    chld.push(4);
-    assert(chld.owned());
-    Printf("\n %d \n", chld.owned() );
+    //  tu64 chld;
+    //  assert(chld.owned());
+    //  Printf("\n %d \n", chld.owned() );
+    //  chld.push(4);
+    //  assert(chld.owned());
+    //  Printf("\n %d \n", chld.owned() );
 
-    chld.push(8);
-    chld("wat") = 259;
-    i64 wat = chld("wat");
+    //  chld.push(8);
+    //  chld("wat") = 259;
+    //  i64 wat = chld("wat");
 
-    Printf("\n %d \n", wat);
+    //  Printf("\n %d \n", wat);
 
-    //chld.push(.1);
-    //chld.push(.2);
-    
-    //tst("wat") =    84;
-    //KV kv      =  tst("child");
-    //kv         =  chld;
-    tst("child") =  &chld;
-    assert(tst.owned());
-    Printf("\n %d \n", tst.owned() );
+    //  //chld.push(.1);
+    //  //chld.push(.2);
+    //
+    //  //tst("wat") =    84;
+    //  //KV kv      =  tst("child");
+    //  //kv         =  chld;
+    //  tst("child") =  &chld;
+    //  assert(tst.owned());
+    //  Printf("\n %d \n", tst.owned() );
 
-    assert(chld.owned());
-    Printf("\n %d \n", chld.owned() );
+    //  assert(chld.owned());
+    //  Printf("\n %d \n", chld.owned() );
 
-    //KV kv        =  tst("child");
-    //tf64& chldp  =  kv.operator tf64 &();
-    //tf64& chldp  =  kv;
-    //tf64* chldp  =  kv.operator tf64 *();
+    //  //KV kv        =  tst("child");
+    //  //tf64& chldp  =  kv.operator tf64 &();
+    //  //tf64& chldp  =  kv;
+    //  //tf64* chldp  =  kv.operator tf64 *();
 
-    tst.flatten();
-    //tst.shrink_to_fit();
-    //KV       kv  =  tst("child");
+    //  tst.flatten();
+    //  //tst.shrink_to_fit();
+    //  //KV       kv  =  tst("child");
 
-    //auto      f  =  (tst("child").operator tu64() ).memStart();
+    //  //auto      f  =  (tst("child").operator tu64() ).memStart();
 
-    tbl<f32> nonChld;
-    nonChld.push(1.0f);
-    nonChld.push(0.5f);
-    tst(0) = &nonChld;
+    //  tbl<f32> nonChld;
+    //  nonChld.push(1.0f);
+    //  nonChld.push(0.5f);
+    //  tst(0) = &nonChld;
 
-    //tu64*  chldc  =  tst("child");   // should and does create an error because the table is a child and being cast to a pointer
-    //Printf("\n\n %d %d \n\n", (*chldc)[0], (*chldc)[1] );
+    //  //tu64*  chldc  =  tst("child");   // should and does create an error because the table is a child and being cast to a pointer
+    //  //Printf("\n\n %d %d \n\n", (*chldc)[0], (*chldc)[1] );
 
-    tu64  chldc  =  tst("child");
-    Printf("\n\n %d %d \n\n", chldc[0], chldc[1] );
-
-
-    tf32 a = {0.1f, 0.2f, 0.4f, 0.8f, 1.6f}; 
-    tf32 b = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
-    //a.push({0.1f, 0.2f, 0.4f, 0.8f, 1.6f});
-    //b.push({1.0f, 2.0f, 3.0f, 4.0f, 5.0f});
-
-    auto c = a * b;
-    TO(5,i) Printf("  %f  ", c[i]);
-
-    //auto      f  =  chldc.memStart();
-    //tst = chldc;
-
-    //chldc[0] *= 4.f;
-    //chldc[1] *= 4.f;
-
-    //tf64* chldp  =  tst("child"); //kv;
-    //Printf("\n\n %f %f \n\n", (*chldp)[0], (*chldp)[1] );
-    //(*chldp)[0] *= 4.f; 
-    //(*chldp)[1] *= 4.f;
-
-    //tf64& chldr  =  tst("child"); //kv;
-    //Printf("\n\n %f %f \n\n", chldr[0], chldr[1] );
+    //  tu64  chldc  =  tst("child");
+    //  Printf("\n\n %d %d \n\n", chldc[0], chldc[1] );
 
 
-    //tst = c;
-    //tst.flatten();
-    
-    //tst("child")  =  chld;
+    //  tf32 a = {0.1f, 0.2f, 0.4f, 0.8f, 1.6f}; 
+    //  tf32 b = {1.0f, 2.0f, 3.0f, 4.0f, 5.0f};
+    //  //a.push({0.1f, 0.2f, 0.4f, 0.8f, 1.6f});
+    //  //b.push({1.0f, 2.0f, 3.0f, 4.0f, 5.0f});
 
-    //tst("wat")       =   84;
-    //tst("bamf")      =   (u64)36789;
-    //tst("skidoosh")  =   (u64)6371;
-    //tst("wat")       =   464;
-    //tst("luv and peace") = 99;
-    //tst.put("squidoosh", (u64)109);
-    //tst.put("zzz", (u64)(21) );
-    //tst.put("aaa", (u64)(7217) );
+    //  auto c = a * b;
+    //  TO(5,i) Printf("  %f  ", c[i]);
 
-    ////tst.expand();
-    ////tst.expand();
-    ////tst.expand();
-    ////tst.expand();
-    ////tst.expand();
+    //  //auto      f  =  chldc.memStart();
+    //  //tst = chldc;
 
-    //tst.push(82);
-    //tst.push(83);
-    //tst.push(84);
-    //tst.push(85);
-    //tst.push(0);
-    //tst.push(1);
-    //tst.push(6);
-    //tst.push(101);
-    //tst.push(45);
-    //tst.push({0,1,6,101,45});
-    //tst.push({0,1,6,101, 45, 86, 87, 33, 45,45,45,45,45,45,24 });
-    ////tst.push({0,1,2,3,4,5,6,7,8,9});
-    //TO(20,i){ tst.push(i); }
-    //TO(12,i){   tst.push(i*i); }
-    //FROM(12,i){ tst.push(i*i); }
+    //  //chldc[0] *= 4.f;
+    //  //chldc[1] *= 4.f;
 
-    //auto tst2 = tst;
-    //sort(ALL(tst2));
-    //TO(tst2.size(),i){ tst.push( tst2[i] ); }
+    //  //tf64* chldp  =  tst("child"); //kv;
+    //  //Printf("\n\n %f %f \n\n", (*chldp)[0], (*chldp)[1] );
+    //  //(*chldp)[0] *= 4.f; 
+    //  //(*chldp)[1] *= 4.f;
+
+    //  //tf64& chldr  =  tst("child"); //kv;
+    //  //Printf("\n\n %f %f \n\n", chldr[0], chldr[1] );
 
 
-    //simdb lavadb("lava_db", 128, 2<<6);
-    //printdb(lavadb);
+    //  //tst = c;
+    //  //tst.flatten();
+    //
+    //  //tst("child")  =  chld;
+
+    //  //tst("wat")       =   84;
+    //  //tst("bamf")      =   (u64)36789;
+    //  //tst("skidoosh")  =   (u64)6371;
+    //  //tst("wat")       =   464;
+    //  //tst("luv and peace") = 99;
+    //  //tst.put("squidoosh", (u64)109);
+    //  //tst.put("zzz", (u64)(21) );
+    //  //tst.put("aaa", (u64)(7217) );
+
+    //  ////tst.expand();
+    //  ////tst.expand();
+    //  ////tst.expand();
+    //  ////tst.expand();
+    //  ////tst.expand();
+
+    //  //tst.push(82);
+    //  //tst.push(83);
+    //  //tst.push(84);
+    //  //tst.push(85);
+    //  //tst.push(0);
+    //  //tst.push(1);
+    //  //tst.push(6);
+    //  //tst.push(101);
+    //  //tst.push(45);
+    //  //tst.push({0,1,6,101,45});
+    //  //tst.push({0,1,6,101, 45, 86, 87, 33, 45,45,45,45,45,45,24 });
+    //  ////tst.push({0,1,2,3,4,5,6,7,8,9});
+    //  //TO(20,i){ tst.push(i); }
+    //  //TO(12,i){   tst.push(i*i); }
+    //  //FROM(12,i){ tst.push(i*i); }
+
+    //  //auto tst2 = tst;
+    //  //sort(ALL(tst2));
+    //  //TO(tst2.size(),i){ tst.push( tst2[i] ); }
+
+
+    //  //simdb lavadb("lava_db", 128, 2<<6);
+    //  //printdb(lavadb);
+    //}
   }
 
   while(!glfwWindowShouldClose(vd.win))

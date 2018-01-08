@@ -14,8 +14,10 @@
 #include <nanogui/nanogui.h>
 
 //#include "../DataStore/ConcurrentMap/simdb.hpp"
-#include "../nanovg_test/simdb.hpp"
-#include "../nanovg_test/tbl.hpp"
+//#include "../nanovg_test/simdb.hpp"
+//#include "../nanovg_test/tbl.hpp"
+#include "../simdb.hpp"
+#include "../tbl.hpp"
 #include "IndexedVerts.h"
 
 //#include "../nanovg_test/tbl_test/tbl.hpp"

@@ -738,7 +738,8 @@ public:
   u8*     m_mem;                                                                         // the only member variable - everything else is a contiguous block of memory
  
   tbl() : m_mem(nullptr) {}
-  tbl(void* memst, bool _init=false, bool _owned=false, u64 _count=0) : m_mem( ((u8*)memst)+memberBytes() )
+  tbl(void* memst, bool _init=false, bool _owned=false, u64 _count=0) 
+  : m_mem( ((u8*)memst)+memberBytes() )
   {
     if(_init){
       //assert(count > 0);
@@ -749,19 +750,20 @@ public:
       assert( ((i8*)memStart())[1]=='b' );
     }
   }
-  tbl(u64 count){ init(count); }                                                           // have to run default constructor here?
-  tbl(u64 count, T const& value)
+  tbl(u64 count) : m_mem(nullptr) { init(count); }                                                           // have to run default constructor here?
+  tbl(u64 count, T const& value) : m_mem(nullptr)
   {
     init(count);
     TO(count, i){ (*this)[i] = value; }
   }
-  tbl(std::initializer_list<KV> lst){ initKV(lst); }
-  tbl(std::initializer_list<T>  lst)
+  tbl(std::initializer_list<KV> lst) : m_mem(nullptr)
+  { initKV(lst); }
+  tbl(std::initializer_list<T>  lst) : m_mem(nullptr)
   {
     //init(lst.size()); 
     init(lst); 
   }
-  tbl(const char* s){ init_cstr(s); }
+  tbl(const char* s) : m_mem(nullptr) { init_cstr(s); }
   ~tbl(){ destroy(); }
 
   tbl           (tbl const& l){ cp(l);                          }
@@ -974,8 +976,9 @@ public:
 
     if(re){
       m_mem = ((u8*)re) + memberBytes();
-      sizeBytes(nxtBytes);
-      capacity(count);
+      initFields(nxtBytes, count);
+      //sizeBytes(nxtBytes);
+      //capacity(count);
       this->mapcap(mapcap);
       if(re && fresh){
         auto f = memStart();
