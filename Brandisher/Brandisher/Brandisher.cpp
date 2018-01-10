@@ -34,9 +34,10 @@
 // -todo: make drag and drop of a tbl file drop it into simdb - nana limitation 
 // -todo: make simdb tables drag and droppable to other simdb dbs - nana limitation
 // -todo: make table files drag and droppable to sub tables - nana limitation 
+// -todo: rename Tabler to Brandisher
+// -todo: try array visualization again, maybe extend the base interface - memory image_impl_interface created
 
-// todo: try array visualization again, maybe extend the base interface
-// todo: rename Brandisher to Brandisher
+// todo: try picture widget
 // todo: make listing the keys of a db happen on expand
 // todo: make insertion of tbls from a db key happen on expand
 // todo: change regen function to a refreshDBs function name
@@ -63,6 +64,7 @@
 #include <nana/gui/widgets/menu.hpp>
 #include <nana/gui/widgets/menubar.hpp>
 #include <nana/paint/pixel_buffer.hpp>
+#include <nana/gui/widgets/picture.hpp>
 #include <../source/paint/detail/image_pixbuf.hpp>
 #include <../source/paint/pixel_buffer.cpp>
 #include "../../no_rt_util.h"
@@ -71,12 +73,13 @@
 #include "../../str_util.hpp"
 
 using str    = std::string;
-using vec_u8 = std::vector<u8>; 
+using vec_u8 = std::vector<u8>;
 
-tbl<>                      glblT;
-nana::form                    fm;
-nana::treebox               tree;
-nana::treebox::item_proxy aryViz;
+tbl<>                       glblT;
+nana::form                     fm;
+nana::treebox                tree;
+nana::picture              aryViz;
+//nana::treebox::item_proxy  aryViz;
 nana::label sz, elems, szBytes, cap, mapcap, owned;
 //nana::button drgBtn;
 
@@ -85,6 +88,36 @@ using IvTbl = tbl<vert>;
 
 //nana::label sz(fm), elems(fm), szBytes(fm), cap(fm), mapcap(fm), owned(fm);
 //nana::form  fm(nana::API::make_center(768, 768));
+
+//namespace nana{	namespace paint{
+//
+//  // class image::image_impl_interface
+//  //		the nana::image refers to an object of image::image_impl_interface by nana::refer. Employing nana::refer to refer the image::implement_t object indirectly is used
+//  //	for saving the memory that sharing the same image resource with many nana::image objects.
+//  class image::image_impl_interface
+//    : private nana::noncopyable
+//  {
+//    image_impl_interface& operator=(const image_impl_interface& rhs);
+//  public:
+//    using graph_reference = nana::paint::graphics&;
+//    virtual ~image_impl_interface() = 0;	//The destructor is defined in ../image.cpp
+//    virtual bool open(const std::experimental::filesystem::path& file) = 0;
+//    virtual bool open(const void* data, std::size_t bytes) = 0; // reads image from memory
+//    virtual bool alpha_channel() const = 0;
+//    virtual bool empty() const = 0;
+//    virtual void close() = 0;
+//    virtual nana::size size() const = 0;
+//    virtual void paste(const nana::rectangle& src_r, graph_reference dst, const point& p_dst) const = 0;
+//    virtual void stretch(const nana::rectangle& src_r, graph_reference dst, const nana::rectangle& r) const = 0;
+//  };//end class image::image_impl_interface
+//}//end namespace paint
+//}//end namespace nana
+
+class mem_pixbuf : public nana::paint::detail::basic_image_pixbuf
+{
+  bool open(const std::experimental::filesystem::path& file){ return false; }
+  bool open(const void* data, std::size_t bytes){ return false; }
+};
 
 namespace {
 
@@ -96,7 +129,8 @@ void insertTbl(str const& parentKey, IvTbl const& t)
     str aryKey = parentKey+"/ary"; 
     tree.insert(aryKey, aszStr);
 
-    aryViz     = tree.insert(aryKey+"/arystr", "");
+    //aryViz     = tree.insert(aryKey+"/arystr", "");
+    tree.insert(aryKey+"/arystr", "");
   }
   SECTION(hash map elements)
   {
@@ -221,6 +255,9 @@ int  main()
     //drgBtn.create(fm);
     //drgBtn.caption("drag me");
 
+    aryViz.create(fm, true);
+    aryViz.stretchable(true);
+
     sz.create(fm);
     elems.create(fm);
     szBytes.create(fm);
@@ -268,11 +305,46 @@ int  main()
   SECTION(all treebox setup)
   {
     tree.create(fm, true);
+    SECTION(treebox custom drawing)
+    {
+      auto& img = tree.icon("TestIcon");
+      auto& nrm = img.normal;
+
+      //paint::detail::basic_image_pixbuf bipb;
+
+      //pixel_buffer pxbuf(128,128);
+      //pixel_buffer::pixel_buffer_storage* stor = pxbuf.storage_.get();
+      auto     mempxbuf = make_shared<mem_pixbuf>(); // todo: initialize this buffer 
+      mempxbuf->pixbuf_ = pixel_buffer(512,256);
+      auto* stor = mempxbuf->pixbuf_.storage_.get();
+      auto rawpx = stor->raw_pixel_buffer;
+      auto     w = stor->pixel_size.width;
+      auto     h = stor->pixel_size.height;
+      for(unsigned int y=0; y<h; ++y)
+        for(unsigned int x=0; x<w; ++x){
+          pixel_argb_t p;
+          p.element.red   = (u8)(y/(f32)h * 255.f);
+          p.element.green = (u8)(x/(f32)w * 255.f);
+          p.element.blue  = 0;
+          p.element.alpha_channel = 1;
+          rawpx[y*w + x]  = p;
+        }
+
+      img.normal.open("normal1.png");
+      img.hovered.open("hovered1.png");
+      img.expanded.open("expanded1.png");
+      auto ptr = img.normal.image_ptr_.get();
+
+      img.normal.image_ptr_ = mempxbuf;
+      aryViz.load(img.normal);
+      tree.auto_draw(true);
+    }
     SECTION(treebox item insertion from the current tbl)
     {
       regenTblInfo();
       tree.insert("place", "place");
-      tree.insert("place/wat", "wat");
+      auto watPrxy = tree.insert("place/wat", "wat");
+      watPrxy.icon("TestIcon");
       tree.insert( toString("skidoosh"), toString("skidoosh") );
       //insertTbl("", t);
     }
@@ -280,19 +352,20 @@ int  main()
     {
       tree.auto_draw(true);
       tree.borderless(false);
+      //tree.
       tree.events().expanded([](const arg_treebox& tbArg) mutable  // lambda captures by value are const by default, so mutable is used
       {
         if(tbArg.item.expanded())
         {
-          str aryStr = "";
-          if(!aryViz.empty() && aryViz.text() == ""){
-            //Println("creating array visualization");
-            //auto mx = std::min<u64>(t.size(),10); 
-            //TO(mx,i){
-            //  aryStr += toString( i==0? "" : ", ", (tbl<>::i64)t[i] );
-            //}
-            aryViz.text(aryStr);
-          }
+          //str aryStr = "";
+          //if(!aryViz.empty() && aryViz.text() == ""){
+          //  //Println("creating array visualization");
+          //  //auto mx = std::min<u64>(t.size(),10); 
+          //  //TO(mx,i){
+          //  //  aryStr += toString( i==0? "" : ", ", (tbl<>::i64)t[i] );
+          //  //}
+          //  aryViz.text(aryStr);
+          //}
 
           Println("");
           Println("txt: ", tbArg.item.text(), " key: ", tbArg.item.key() );
@@ -311,31 +384,6 @@ int  main()
       //drg.trigger(fm);
       //drg.trigger(tree);
     }
-    SECTION(treebox custom drawing)
-    {
-      auto& img = tree.icon("ID1");
-      auto& nrm = img.normal;
-
-      pixel_buffer pxbuf(128,128);
-      pixel_buffer::pixel_buffer_storage* stor = pxbuf.storage_.get();
-      auto rawpx = stor->raw_pixel_buffer;
-      auto    w = stor->pixel_size.width;
-      auto    h = stor->pixel_size.height;
-      for(unsigned int y=0; y<h; ++y)
-       for(unsigned int x=0; x<w; ++x){
-         pixel_argb_t p;
-         p.element.red   = 0;
-         p.element.green = 0;
-         p.element.blue  = 0;
-         p.element.alpha_channel = 1;
-         rawpx[y*w + x]  = p;
-       }
-
-      img.normal.open("normal1.png");
-      img.hovered.open("hovered1.png");
-      img.expanded.open("expanded1.png");
-      tree.auto_draw(true);
-    }
   }
 
   SECTION(place and gui component layout)
@@ -345,6 +393,7 @@ int  main()
     plc["mb"]      << mb;
     //plc["drgBtn"]  << drgBtn;
     plc["sz"]      << sz;
+    plc["aryViz"]  << aryViz;
     plc["elems"]   << elems;
     plc["szBytes"] << szBytes;
     plc["cap"]     << cap;
@@ -354,9 +403,10 @@ int  main()
     plc.div("vert"
             "<mb weight=30>"
             "<weight=20 margin=[0,0,5,10] " // weight=20 "<weight=10% "
-             " <fit drgBtn margin=[0,10]> <fit sz margin=[0,10]> <fit elems margin=[0,10]> <fit szBytes margin=[0,10]> <fit cap margin=[0,10]> <fit mapcap margin=[0,10]> <fit owned>"
+             "  <fit sz margin=[0,10]> <fit elems margin=[0,10]> <fit szBytes margin=[0,10]> <fit cap margin=[0,10]> <fit mapcap margin=[0,10]> <fit owned>"
             ">" //  gap=5 margin=[10,40,10,0]" //margin=[10,10,10,10]>"
-            "<tree weight=90%>"
+            "<fit aryViz margin=[10,10,10,10] >"// weight=30%>" // margin=[10,10,10,10] > "
+            "<tree>" // weight=70%>"
             );
     plc.collocate();
   }
@@ -365,15 +415,7 @@ int  main()
   SECTION(layout the main window, show it, and start the event loop)
   {
     fm.collocate();
-
-    //drg.trigger(drgBtn);
-    //drg.target(drgBtn);
-
-    //drg.trigger(tree);
-    //drg.target(tree);
-
     fm.show();         //Show the form
-
     exec();            //Start to event loop process, it blocks until the form is closed.
   }
 }
@@ -383,6 +425,13 @@ int  main()
 
 
 
+
+
+//drg.trigger(drgBtn);
+//drg.target(drgBtn);
+
+//drg.trigger(tree);
+//drg.target(tree);
 
 //SECTION(insert tbl data into the tree)
 //{
