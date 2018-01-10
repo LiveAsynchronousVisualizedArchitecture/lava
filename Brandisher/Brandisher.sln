@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27130.2010
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Tabler", "Tabler\Tabler.vcxproj", "{0D9CBF10-D80B-4D81-B82B-06F2AD3AC215}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Brandisher", "Brandisher\Brandisher.vcxproj", "{0D9CBF10-D80B-4D81-B82B-06F2AD3AC215}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

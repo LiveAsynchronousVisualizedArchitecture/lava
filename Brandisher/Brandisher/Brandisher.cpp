@@ -35,7 +35,8 @@
 // -todo: make simdb tables drag and droppable to other simdb dbs - nana limitation
 // -todo: make table files drag and droppable to sub tables - nana limitation 
 
-// todo: rename Tabler to Brandisher
+// todo: try array visualization again, maybe extend the base interface
+// todo: rename Brandisher to Brandisher
 // todo: make listing the keys of a db happen on expand
 // todo: make insertion of tbls from a db key happen on expand
 // todo: change regen function to a refreshDBs function name
@@ -203,7 +204,7 @@ int  main()
   SECTION(set up the main window and its events)
   {
     API::enable_dropfiles(fm, true);
-    fm.caption("Tabler");
+    fm.caption("Brandisher");
     fm.size({768, 768});
     fm.events().mouse_dropfiles([](const arg_dropfiles& arg)
     {
