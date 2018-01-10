@@ -36,8 +36,12 @@
 // -todo: make table files drag and droppable to sub tables - nana limitation 
 // -todo: rename Tabler to Brandisher
 // -todo: try array visualization again, maybe extend the base interface - memory image_impl_interface created
+// -todo: try picture widget
+// -todo: make a full key of the selected tree box element on selected event
 
-// todo: try picture widget
+// todo: figure out when a table is being selected - just look at the level?
+// todo: get table from the db and point to it 
+// todo: make a pointer to the current tble that is set on clicking within a table
 // todo: make listing the keys of a db happen on expand
 // todo: make insertion of tbls from a db key happen on expand
 // todo: change regen function to a refreshDBs function name
@@ -72,46 +76,19 @@
 #include "../../tbl.hpp"
 #include "../../str_util.hpp"
 
-using str    = std::string;
-using vec_u8 = std::vector<u8>;
+struct   vert { f32 p[3],n[3],c[4],tx[2]; };
+using     str = std::string;
+using vec_str = std::vector<str>;
+using  vec_u8 = std::vector<u8>;
+using   IvTbl = tbl<vert>;
 
 tbl<>                       glblT;
+IvTbl*                        cur;
+vec_str                       sel;
 nana::form                     fm;
 nana::treebox                tree;
 nana::picture              aryViz;
-//nana::treebox::item_proxy  aryViz;
 nana::label sz, elems, szBytes, cap, mapcap, owned;
-//nana::button drgBtn;
-
-struct vert { f32 p[3],n[3],c[4],tx[2]; };
-using IvTbl = tbl<vert>;
-
-//nana::label sz(fm), elems(fm), szBytes(fm), cap(fm), mapcap(fm), owned(fm);
-//nana::form  fm(nana::API::make_center(768, 768));
-
-//namespace nana{	namespace paint{
-//
-//  // class image::image_impl_interface
-//  //		the nana::image refers to an object of image::image_impl_interface by nana::refer. Employing nana::refer to refer the image::implement_t object indirectly is used
-//  //	for saving the memory that sharing the same image resource with many nana::image objects.
-//  class image::image_impl_interface
-//    : private nana::noncopyable
-//  {
-//    image_impl_interface& operator=(const image_impl_interface& rhs);
-//  public:
-//    using graph_reference = nana::paint::graphics&;
-//    virtual ~image_impl_interface() = 0;	//The destructor is defined in ../image.cpp
-//    virtual bool open(const std::experimental::filesystem::path& file) = 0;
-//    virtual bool open(const void* data, std::size_t bytes) = 0; // reads image from memory
-//    virtual bool alpha_channel() const = 0;
-//    virtual bool empty() const = 0;
-//    virtual void close() = 0;
-//    virtual nana::size size() const = 0;
-//    virtual void paste(const nana::rectangle& src_r, graph_reference dst, const point& p_dst) const = 0;
-//    virtual void stretch(const nana::rectangle& src_r, graph_reference dst, const nana::rectangle& r) const = 0;
-//  };//end class image::image_impl_interface
-//}//end namespace paint
-//}//end namespace nana
 
 class mem_pixbuf : public nana::paint::detail::basic_image_pixbuf
 {
@@ -205,6 +182,11 @@ void regenTblInfo()
   SECTION(label captions)
   {
     sz.caption(     toString("Size: "));
+    elems.caption(  toString("Elements: "));
+    szBytes.caption(toString("Size in Bytes: "));
+    cap.caption(    toString("Capacity: "));
+    mapcap.caption( toString("Map Capacity: "));
+    owned.caption(  toString("Owned: "));
 
     //sz.caption(     toString("Size: ",          t.size()        ));
     //elems.caption(  toString("Elements: ",      t.elems()       ));
@@ -252,9 +234,6 @@ int  main()
   }
   SECTION(initialize components with the main window handle)
   {
-    //drgBtn.create(fm);
-    //drgBtn.caption("drag me");
-
     aryViz.create(fm, true);
     aryViz.stretchable(true);
 
@@ -352,7 +331,6 @@ int  main()
     {
       tree.auto_draw(true);
       tree.borderless(false);
-      //tree.
       tree.events().expanded([](const arg_treebox& tbArg) mutable  // lambda captures by value are const by default, so mutable is used
       {
         if(tbArg.item.expanded())
@@ -373,16 +351,32 @@ int  main()
           Println("");
         }
       });
+      tree.events().selected([](const arg_treebox& tbArg) mutable
+      {
+        sel.clear();
 
-      //dragger drg;
-      //drg.trigger(sz);
-      //drg.target(sz);
+        Println("key:  ", tree.selected().key() );
+        Println("selected: ", tbArg.item.key() );
+        Println("owner: ", tbArg.item.owner().key() );
 
-      //drg.target(fm);
-      //drg.target(tree);
+        auto* cur = &tbArg.item;
+        do{
+          sel.push_back(cur->key());
+          cur = &(cur->owner());
+        }while(cur->level() > 0);
 
-      //drg.trigger(fm);
-      //drg.trigger(tree);
+        //for(auto const& s : sel){
+        //  Print(s,"/");
+        //}
+        str key = "";
+        FROM(sel.size(),i){    // loop from the last to the first, since they were pushed in reverse order while walking back up the tree
+          key += sel[i];
+          if(i!=0) key += "/";
+        }
+        Print(key);
+
+        Println("\n\n");
+      });
     }
   }
 
@@ -426,6 +420,54 @@ int  main()
 
 
 
+//nana::label sz(fm), elems(fm), szBytes(fm), cap(fm), mapcap(fm), owned(fm);
+//nana::form  fm(nana::API::make_center(768, 768));
+
+//namespace nana{	namespace paint{
+//
+//  // class image::image_impl_interface
+//  //		the nana::image refers to an object of image::image_impl_interface by nana::refer. Employing nana::refer to refer the image::implement_t object indirectly is used
+//  //	for saving the memory that sharing the same image resource with many nana::image objects.
+//  class image::image_impl_interface
+//    : private nana::noncopyable
+//  {
+//    image_impl_interface& operator=(const image_impl_interface& rhs);
+//  public:
+//    using graph_reference = nana::paint::graphics&;
+//    virtual ~image_impl_interface() = 0;	//The destructor is defined in ../image.cpp
+//    virtual bool open(const std::experimental::filesystem::path& file) = 0;
+//    virtual bool open(const void* data, std::size_t bytes) = 0; // reads image from memory
+//    virtual bool alpha_channel() const = 0;
+//    virtual bool empty() const = 0;
+//    virtual void close() = 0;
+//    virtual nana::size size() const = 0;
+//    virtual void paste(const nana::rectangle& src_r, graph_reference dst, const point& p_dst) const = 0;
+//    virtual void stretch(const nana::rectangle& src_r, graph_reference dst, const nana::rectangle& r) const = 0;
+//  };//end class image::image_impl_interface
+//}//end namespace paint
+//}//end namespace nana
+
+//nana::treebox::item_proxy  aryViz;
+//nana::button drgBtn;
+
+//drgBtn.create(fm);
+//drgBtn.caption("drag me");
+
+//tree.
+//tree.events().mouse_down([]() mutable
+//{
+//  Println("mouse down");
+//});
+
+//dragger drg;
+//drg.trigger(sz);
+//drg.target(sz);
+
+//drg.target(fm);
+//drg.target(tree);
+
+//drg.trigger(fm);
+//drg.trigger(tree);
 
 //drg.trigger(drgBtn);
 //drg.target(drgBtn);
