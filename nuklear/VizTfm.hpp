@@ -140,7 +140,7 @@ inline Shape          ivbuf_to_shape(void* buf, u64 len)    //IndexedVerts* iv)
 
   return move(shp);
 }
-inline Shape          tbl_to_shape(IvTbl& t)
+inline Shape          tbl_to_shape(IvTbl& t)  // todo: try to change this to a const reference
 {
   using namespace std;
   static float tmpImg[] = { 0.5f, 0.5f, 0.5f, 0.5f };
@@ -149,7 +149,8 @@ inline Shape          tbl_to_shape(IvTbl& t)
   assert( ((i8*)t.memStart())[0] = 't' );
   assert( ((i8*)t.memStart())[1] = 'b' );
 
-  u64 typenum = typenum=t("type");
+  //u64 typenum = typenum=t("type");
+  u64 typenum = t("type");
   assert( memcmp(&typenum, (u64*)"IdxVerts", sizeof(u64))==0 );
 
   Shape shp;   // = {0,0,0,0,0};         // Shape of all 0s

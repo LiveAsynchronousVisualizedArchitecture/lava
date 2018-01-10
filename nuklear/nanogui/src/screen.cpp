@@ -102,7 +102,9 @@ Screen::Screen(const Vector2i &size, const std::string &caption, bool resizable,
                unsigned int glMajor, unsigned int glMinor)
     : Widget(nullptr), mGLFWWindow(nullptr), mNVGContext(nullptr),
       mCursor(Cursor::Arrow), mBackground(0.3f, 0.3f, 0.32f, 1.f), mCaption(caption),
-      mShutdownGLFWOnDestruct(false), mFullscreen(fullscreen) {
+      mShutdownGLFWOnDestruct(false), mFullscreen(fullscreen),
+      mDragWidget(nullptr)
+{
     memset(mCursors, 0, sizeof(GLFWcursor *) * (int) Cursor::CursorCount);
 
     /* Request a forward compatible OpenGL glMajor.glMinor core profile context.
@@ -259,6 +261,7 @@ Screen::Screen(const Vector2i &size, const std::string &caption, bool resizable,
 }
 
 void Screen::initialize(GLFWwindow *window, bool shutdownGLFWOnDestruct) {
+    mDragWidget = nullptr; // sbassett
     mGLFWWindow = window;
     mShutdownGLFWOnDestruct = shutdownGLFWOnDestruct;
     glfwGetWindowSize(mGLFWWindow, &mSize[0], &mSize[1]);

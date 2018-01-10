@@ -24,8 +24,11 @@
 // -todo: transition indexed verts to use tbl
 // -todo: make initializer list syntax possible to create pairs of strings and lists of values
 // -todo: make setting owned, always happen on construction from a void pointer
+// -todo: use upper bit of pointer to represent ownership, so that if memory is freed out from under the tbl, it isn't freed? - ownership would be overridden when a table is based off of a buffer that it doesn't own - only should be neccesary if one tbl owns that memory but others don't, otherwise, ownership should just be set to false in the contiguous memory - maybe a tbl should never be able to be an observer to another tbl's memory, it should be copied, moved, referenced or pointed to instead 
+// -todo: figure out why empty KV is found after expand - reserve was initting all fields but not resetting to them to their previous values
 
-// todo: use upper bit of pointer to represent ownership, so that if memory is freed out from under the tbl, it isn't freed? - ownership would be overridden when a table is based off of a buffer that it doesn't own - only should be neccesary if one tbl owns that memory but others don't, otherwise, ownership should just be set to false in the contiguous memory
+// todo: fix kv of a sub tbl having a base and val that are 0 - should be 0 at that stage, since they haven't been set yet? 
+// todo: make owning of memory execute a copy in the tbl constructor that takes a void pointer
 // todo: make tbl structs local to the scope of the tbl
 // todo: once tbl is switched to not be an array, this might not need to be a template
 // todo: allocation template parameters might mean that a template is still neccesary
@@ -681,23 +684,32 @@ private:
   {    
     //if(l.owned()){
       //tbl_PRNT("\n full copy \n");
-      tbl<T> prev;
-      prev.m_mem = m_mem;                                                                // make a tbl for the old memory - this will be destructed at the end of this scope, which will free up the old memory. the old memory is not freed up first, since we could be copying from a child of this very same tbl 
 
-      m_mem = nullptr;
-      reserve(l.size(), l.elems(), l.child_capacity() );                                 // this will size the current table exactly because it starts from a nullptr - it also means however that realloc is not used and malloc is called for a brand new allocation
-      TO(l.size(),i) push(l[i]); 
+      //tbl<T> prev;
+      //prev.m_mem = m_mem;                                                                // make a tbl for the old memory - this will be destructed at the end of this scope, which will free up the old memory. the old memory is not freed up first, since we could be copying from a child of this very same tbl 
+
+      //m_mem = nullptr;
+      //reserve(l.size(), l.elems(), l.child_capacity() );                                 // this will size the current table exactly because it starts from a nullptr - it also means however that realloc is not used and malloc is called for a brand new allocation
+      //TO(l.size(),i) push(l[i]); 
     
-      auto e = l.elemStart();
-      TO(l.map_capacity(),i) if( !e[i].isEmpty() ){
-        put(e[i].key, e[i].val);
-      }
+      //auto e = l.elemStart();
+      //TO(l.map_capacity(),i) if( !e[i].isEmpty() ){
+      //  put(e[i].key, e[i].val);
+      //}
 
-      memcpy(childData(), l.childData(), l.child_capacity() );                           // since this is a straight copy of the child memory, the values/offsets in the map's child table can stay the same
+      //memcpy(childData(), l.childData(), l.child_capacity() );                           // since this is a straight copy of the child memory, the values/offsets in the map's child table can stay the same
+
     //}else{
     //  //tbl_PRNT("\n shallow copy \n");
     //  m_mem = l.m_mem;
     //} 
+
+     // try straight memcpy with ownership change here
+     auto szBytes = l.sizeBytes();
+     u8*    memSt = (u8*)malloc(szBytes);
+     m_mem        = memSt + memberBytes();
+     memcpy(memSt, l.memStart(), szBytes);
+     owned(true);
   }
   void             mv(tbl&& r)
   {
@@ -768,7 +780,7 @@ public:
   tbl(const char* s) : m_mem(nullptr) { init_cstr(s); }
   ~tbl(){ destroy(); }
 
-  tbl           (tbl const& l){ cp(l);                          }
+  tbl           (tbl const& l){ cp(l);                          }  // does this need to destroy the current table first?
   tbl& operator=(tbl const& l){ cp(l);            return *this; }
   tbl           (tbl&&      r){ mv(std::move(r));               }
   tbl& operator=(tbl&&      r){ mv(std::move(r)); return *this; }
@@ -802,7 +814,7 @@ public:
     { 
       if( !map_expand(!kv) ) return KVOfst();                                            // if map_expand returns false, that means that memory expansion was tried but failed
 
-      kv = get(key, &hsh);                                                               // if the expansion succeeded there has to be space now, but the keys will be reordered 
+      kv = get(key, &hsh);                                                               // if the expansion succeeded there has to be space now, but the keys will be reordered, so kv needs to be found again 
 
       auto type = kv->hsh.type;
       if(type==HshType::EMPTY)
@@ -978,9 +990,9 @@ public:
 
     if(re){
       m_mem = ((u8*)re) + memberBytes();
-      initFields(nxtBytes, count);
-      //sizeBytes(nxtBytes);
-      //capacity(count);
+      //initFields(nxtBytes, count);
+      sizeBytes(nxtBytes);
+      capacity(count);
       this->mapcap(mapcap);
       if(re && fresh){
         auto f = memStart();
@@ -1306,8 +1318,10 @@ public:
 
 template<class T> KVOfst::operator tbl<T>() 
 {   
+  using namespace std;
+  
   if(base){
-    tbl<T>   t;                                                                          // type only matters so that c 
+    //tbl<T>   t;                                                                          // type only matters so that c 
     tbl<T> ret;
 
     //auto  f   = (tbl<T>::fields*)base;
@@ -1316,9 +1330,11 @@ template<class T> KVOfst::operator tbl<T>()
 
     auto  fff = (tbl<T>::fields*)(kv->val + (u64)base);
     ret.m_mem = (u8*)(fff+1);
-    u64     a = ((u64*)ret.m_mem)[0];
-    u64     b = ((u64*)ret.m_mem)[1];
-    t.m_mem   = nullptr;                                                                 // prevents the destructor running
+
+    // left over terrible nonsense
+    //u64     a = ((u64*)ret.m_mem)[0];
+    //u64     b = ((u64*)ret.m_mem)[1];
+    //t.m_mem   = nullptr;                                                                 // prevents the destructor running
 
     return ret;
   }else{

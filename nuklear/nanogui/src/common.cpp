@@ -282,6 +282,10 @@ std::string file_dialog(const std::vector<std::pair<std::string, std::string>> &
 
 void Object::decRef(bool dealloc) const noexcept {
     --m_refCount;
+
+    assert( !(m_refCount <  0));
+    assert(   m_refCount < 100 );
+
     if (m_refCount == 0 && dealloc) {
         delete this;
     } else if (m_refCount < 0) {

@@ -28,22 +28,23 @@
 // -todo: make selecting simdb database list the keys in that database - just make dbs the root level tree items
 // -todo: fix tree expansion bug - looking for specific item_proxy AND not checking if it was empty before tying to compare it to ""
 // -todo: make tbl insert function insert under an arbitrary key
+// -todo: visualize 'type' element as an 8 character string first, then as a number
+// -todo: take tbls out of dbs and insert them into the tree
+// -todo: make tables drag and droppable to files - might not be possible from nana
+// -todo: make drag and drop of a tbl file drop it into simdb - nana limitation 
+// -todo: make simdb tables drag and droppable to other simdb dbs - nana limitation
+// -todo: make table files drag and droppable to sub tables - nana limitation 
 
-
-// todo: visualize 'type' element as an 8 character string first, then as a number
-// todo: make switch case for fundamental types that the map elements can be
-// todo: take tbls out of dbs and insert them into the tree
+// todo: rename Tabler to Brandisher
 // todo: make listing the keys of a db happen on expand
 // todo: make insertion of tbls from a db key happen on expand
 // todo: change regen function to a refreshDBs function name
+// todo: debug tbl elem count coming from the visualizer
 // todo: fix tbl element count
+// todo: make switch case for fundamental types that the map elements can be
 // todo: compile with png and jpeg libs
 // todo: implement saving of the tbl
-// todo: make tables drag and droppable to files
 // todo: implement opening on drag and drop of a tbl
-// todo: make drag and drop of a tbl file drop it into simdb
-// todo: make simdb tables drag and droppable to other simdb dbs 
-// todo: make table files drag and droppable to sub tables 
 // todo: implement opening of the tbl through the menu and file dialog
 // todo: try compiling with clang
 // todo: make a tabler simdb database on start, as scratch space for dragged in files and dragged tables from other dbs
@@ -54,6 +55,7 @@
 
 #include <iostream>
 #include <nana/gui.hpp>
+#include <nana/gui/dragger.hpp>
 #include <nana/gui/widgets/label.hpp>
 #include <nana/gui/widgets/button.hpp>
 #include <nana/gui/widgets/treebox.hpp>
@@ -70,11 +72,12 @@
 using str    = std::string;
 using vec_u8 = std::vector<u8>; 
 
-tbl<>                          t;
+tbl<>                      glblT;
 nana::form                    fm;
 nana::treebox               tree;
 nana::treebox::item_proxy aryViz;
 nana::label sz, elems, szBytes, cap, mapcap, owned;
+//nana::button drgBtn;
 
 struct vert { f32 p[3],n[3],c[4],tx[2]; };
 using IvTbl = tbl<vert>;
@@ -98,6 +101,7 @@ void insertTbl(str const& parentKey, IvTbl const& t)
   {
     str elemKey = parentKey+"/elems";
     tree.insert(elemKey, toString("Elements: ", t.elems()) );
+
     TO(t.map_capacity(),i)
     {
       auto e = t.elemStart()[i];
@@ -165,12 +169,14 @@ void regenTblInfo()
   }
   SECTION(label captions)
   {
-    sz.caption(     toString("Size: ",          t.size()        ));
-    elems.caption(  toString("Elements: ",      t.elems()       ));
-    szBytes.caption(toString("Size in Bytes: ", t.sizeBytes()   ));
-    cap.caption(    toString("Capacity: ",      t.capacity()    ));
-    mapcap.caption( toString("Map Capacity: ",  t.map_capacity()));
-    owned.caption(  toString("Owned: ",         t.owned()? "True" : "False"));
+    sz.caption(     toString("Size: "));
+
+    //sz.caption(     toString("Size: ",          t.size()        ));
+    //elems.caption(  toString("Elements: ",      t.elems()       ));
+    //szBytes.caption(toString("Size in Bytes: ", t.sizeBytes()   ));
+    //cap.caption(    toString("Capacity: ",      t.capacity()    ));
+    //mapcap.caption( toString("Map Capacity: ",  t.map_capacity()));
+    //owned.caption(  toString("Owned: ",         t.owned()? "True" : "False"));
   }
 }
 
@@ -184,14 +190,14 @@ int  main()
 
   SECTION(initialize the table)
   {
-    TO(12,i){
-      t.push_back( (tbl<>::i8)i );
-    }
-    t("wat")       = 21;
-    t("skidoosh")  = 42;
-    t("wut")       = 84;
-    t("squidoosh") = 168;
-    t("table key") = 336;
+    //TO(12,i){
+    //  t.push_back( (tbl<>::i8)i );
+    //}
+    //t("wat")       = 21;
+    //t("skidoosh")  = 42;
+    //t("wut")       = 84;
+    //t("squidoosh") = 168;
+    //t("table key") = 336;
   }
 
   SECTION(set up the main window and its events)
@@ -211,6 +217,9 @@ int  main()
   }
   SECTION(initialize components with the main window handle)
   {
+    //drgBtn.create(fm);
+    //drgBtn.caption("drag me");
+
     sz.create(fm);
     elems.create(fm);
     szBytes.create(fm);
@@ -230,7 +239,7 @@ int  main()
 
     auto& fileMenu = mb.at(0);
     fileMenu.append("&New", [](auto& itmprxy){
-      t.clear();
+      //t.clear();
       SECTION(clear tree)
       {
         //tree.create(fm,true);
@@ -277,10 +286,10 @@ int  main()
           str aryStr = "";
           if(!aryViz.empty() && aryViz.text() == ""){
             //Println("creating array visualization");
-            auto mx = std::min<u64>(t.size(),10); 
-            TO(mx,i){
-              aryStr += toString( i==0? "" : ", ", (tbl<>::i64)t[i] );
-            }
+            //auto mx = std::min<u64>(t.size(),10); 
+            //TO(mx,i){
+            //  aryStr += toString( i==0? "" : ", ", (tbl<>::i64)t[i] );
+            //}
             aryViz.text(aryStr);
           }
 
@@ -290,6 +299,16 @@ int  main()
           Println("");
         }
       });
+
+      //dragger drg;
+      //drg.trigger(sz);
+      //drg.target(sz);
+
+      //drg.target(fm);
+      //drg.target(tree);
+
+      //drg.trigger(fm);
+      //drg.trigger(tree);
     }
     SECTION(treebox custom drawing)
     {
@@ -323,6 +342,7 @@ int  main()
     place       plc(fm);
     place  lblPlace(fm);
     plc["mb"]      << mb;
+    //plc["drgBtn"]  << drgBtn;
     plc["sz"]      << sz;
     plc["elems"]   << elems;
     plc["szBytes"] << szBytes;
@@ -333,16 +353,24 @@ int  main()
     plc.div("vert"
             "<mb weight=30>"
             "<weight=20 margin=[0,0,5,10] " // weight=20 "<weight=10% "
-             " <fit sz margin=[0,10]> <fit elems margin=[0,10]> <fit szBytes margin=[0,10]> <fit cap margin=[0,10]> <fit mapcap margin=[0,10]> <fit owned>"
+             " <fit drgBtn margin=[0,10]> <fit sz margin=[0,10]> <fit elems margin=[0,10]> <fit szBytes margin=[0,10]> <fit cap margin=[0,10]> <fit mapcap margin=[0,10]> <fit owned>"
             ">" //  gap=5 margin=[10,40,10,0]" //margin=[10,10,10,10]>"
             "<tree weight=90%>"
             );
     plc.collocate();
   }
 
+  dragger drg;
   SECTION(layout the main window, show it, and start the event loop)
   {
     fm.collocate();
+
+    //drg.trigger(drgBtn);
+    //drg.target(drgBtn);
+
+    //drg.trigger(tree);
+    //drg.target(tree);
+
     fm.show();         //Show the form
 
     exec();            //Start to event loop process, it blocks until the form is closed.

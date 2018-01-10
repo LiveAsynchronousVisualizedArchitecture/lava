@@ -55,8 +55,10 @@
 // -todo: use tbl for IndexedVerts after adding sub-tables
 // -todo: convert makeTriangle and makeCube to return IdxVerts tbls
 // -todo: make sure currently selected db is initialized - how does the initial name become set? - needed to reorganize to make sure that listing the dbs was done at first and the dbs were opened on a menu list if there is no current db open, even if the index hasn't changed
+// -todo: fix blank tbl elements - look at testGeo creation - tbl initialization arguments were mixed up
+// -todo: fix crash while turning on second button - can't repeat this old note/bug
 
-// todo: fix crash while turning on second button 
+// todo: fix crash from VS execution in release mode
 // todo: fix tbl visualization cells going outside the bounds of bounding box - need to wrap sooner, possibly based on more margins
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
@@ -354,11 +356,11 @@ void  framebufferSizeCallback(GLFWwindow* window, int w, int h)
 }
 GLFWwindow*          initGLFW(VizData* vd)
 {
-  glfwSetErrorCallback(errorCallback);
   if( !glfwInit() ){
     fprintf(stdout, "[GFLW] failed to init!\n");
     exit(1);
   }
+  glfwSetErrorCallback(errorCallback);
 
   glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
   glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
@@ -424,6 +426,7 @@ vec_vs         shapesFromKeys(simdb const& db, vec_vs dbKeys, VizData* vd)  // v
 {
   using namespace std;
 
+  vec<u8> ivbuf;
   for(auto& vs : dbKeys)
     TO(dbKeys.size(),i)
     {
@@ -438,12 +441,20 @@ vec_vs         shapesFromKeys(simdb const& db, vec_vs dbKeys, VizData* vd)  // v
       auto     len = db.len(vs.str.data(), (u32)vs.str.length(), &vlen, &version);          // todo: make ui64 as the input length
       vs.ver = version;
 
-      auto ivbuf = (u8*)malloc(vlen);   // todo: check to make sure this succeeds 
-      db.get(vs.str.data(), (u32)vs.str.length(),  ivbuf, vlen);
-      IvTbl iv(ivbuf, false, false);
+      //auto ivbuf = (u8*)malloc(vlen);   // todo: check to make sure this succeeds 
+      //db.get(vs.str.data(), (u32)vs.str.length(),  ivbuf, vlen);
+      //IvTbl iv(ivbuf, false, true);
+      //auto     f = iv.memStart();
+
+      ivbuf.resize(vlen);
+      db.get(vs.str.data(), (u32)vs.str.length(),  ivbuf.data(), vlen);
+      IvTbl iv(ivbuf.data(), false, false);
       auto     f = iv.memStart();
 
-      Shape  s   = tbl_to_shape(iv);      PRINT_GL_ERRORS
+      IvTbl ivcpy(iv);
+
+      Shape  s   = tbl_to_shape(ivcpy);      PRINT_GL_ERRORS
+      //Shape  s   = tbl_to_shape(iv);      PRINT_GL_ERRORS
       s.shader   = vd->shaderId;
       s.active   = vd->shapes[vs.str].active;
       s.version  = version;
@@ -924,7 +935,8 @@ ENTRY_DECLARATION
     }
     SECTION(nanogui)
     {
-      vd.ui.screen.initialize(vd.win, false);
+      //vd.ui.screen.initialize(vd.win, false);
+      vd.ui.screen.initialize(vd.win, true);
 
       SECTION(sidebar)
       {
