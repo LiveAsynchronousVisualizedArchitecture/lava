@@ -1255,6 +1255,7 @@ private:
   }
 
 public:
+  //static u8*      getTblPtr(void* p){ auto f = (TblFields*)p; 
   static u64    memberBytes(){ return sizeof(fields); }
   static u64     size_bytes(u64 count)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
   {

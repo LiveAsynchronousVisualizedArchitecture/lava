@@ -38,15 +38,18 @@
 // -todo: try array visualization again, maybe extend the base interface - memory image_impl_interface created
 // -todo: try picture widget
 // -todo: make a full key of the selected tree box element on selected event
+// -todo: fix tbl element count - due to initialization problems in both tbl and brandisher
+// -todo: figure out when a table is being selected - just look at the level? - keep a hash of all keys that correspond to tables
+// -todo: split out label regen into separate function
+// -todo: change labels on selection of a different tbl
+// -todo: get table from the db and point to it
 
-// todo: figure out when a table is being selected - just look at the level?
-// todo: get table from the db and point to it 
+// todo: fix crash on selecting the inner array
 // todo: make a pointer to the current tble that is set on clicking within a table
 // todo: make listing the keys of a db happen on expand
 // todo: make insertion of tbls from a db key happen on expand
 // todo: change regen function to a refreshDBs function name
 // todo: debug tbl elem count coming from the visualizer
-// todo: fix tbl element count
 // todo: make switch case for fundamental types that the map elements can be
 // todo: compile with png and jpeg libs
 // todo: implement saving of the tbl
@@ -83,13 +86,18 @@ using vec_str = std::vector<str>;
 using  vec_u8 = std::vector<u8>;
 using vec_dbs = std::vector<simdb>;
 using   IvTbl = tbl<vert>;
-//using TblKeys = std::unordered_map<str,str>;
 
-using TblKeys = std::unordered_set<str>;
-
-tbl<>                       glblT;
+//using  IdxKey = std::pair<u32,str>;
+//using TblKeys = std::unordered_set<str>;
+//
 //IvTbl*                        cur;
-vec_u8                curTblBytes;
+//vec_u8                curTblBytes;
+
+struct IdxKey { bool subTbl; u32 idx; str key; };            // this represents an index into the db vector and a key  
+using TblKeys = std::unordered_map<str,IdxKey>;
+
+IvTbl                       glblT;
+vec_u8                     tblBuf;
 vec_str                       sel;
 vec_dbs                       dbs;
 TblKeys                   tblKeys;
@@ -106,10 +114,10 @@ class mem_pixbuf : public nana::paint::detail::basic_image_pixbuf
 
 namespace {
 
-void      insertTbl(str const& parentKey, IvTbl const& t)
+void        insertTbl(str const& parentKey, IvTbl const& t)
 {
   //tblKeys[parentKey] = parentKey;
-  tblKeys.insert(parentKey);
+  //tblKeys.insert(parentKey);
   SECTION(array visualization)
   {
     str aszStr = toString("Array Size: ", t.size());
@@ -142,61 +150,103 @@ void      insertTbl(str const& parentKey, IvTbl const& t)
     }
   }
 }
-vec_u8 extractDbKey(simdb const& db, str key)
+vec_u8   extractDbKey(simdb const& db, str key)
 {
   u32     vlen = 0;
   u32  version = 0;
-  auto     len = db.len(key, &vlen, &version);          // todo: make ui64 as the input length
+  u64      len = db.len(key, &vlen, &version);          // todo: make ui64 as the input length
 
   vec_u8 ret(vlen);
   db.get(key.c_str(), ret.data(), vlen);
 
   return ret;
 }
-void   regenTblInfo()
+void      regenLabels(IvTbl const& t)
+{
+  SECTION(label captions)
+  {
+    //sz.caption(     toString("Size: "));
+    //elems.caption(  toString("Elements: "));
+    //szBytes.caption(toString("Size in Bytes: "));
+    //cap.caption(    toString("Capacity: "));
+    //mapcap.caption( toString("Map Capacity: "));
+    //owned.caption(  toString("Owned: "));
+
+    //auto& t = glblT;
+    sz.caption(     toString("Size: ",          t.size()        ));
+    elems.caption(  toString("Elements: ",      t.elems()       ));
+    szBytes.caption(toString("Size in Bytes: ", t.sizeBytes()   ));
+    cap.caption(    toString("Capacity: ",      t.capacity()    ));
+    mapcap.caption( toString("Map Capacity: ",  t.map_capacity()));
+    owned.caption(  toString("Owned: ",         t.owned()? "True" : "False"));
+  }
+}
+void     regenTblInfo()
 {
   SECTION(list simdb files and insert them at the top level of the tree)
   {
+    dbs.clear();
+    tblKeys.clear();
+
     simdb_error err;
     auto dbPths = simdb_listDBs(&err);
 
-    for(auto& pth : dbPths)
+    //for(auto& pth : dbPths)
+    TO(dbPths.size(),i)
     {
+      auto const& pth = dbPths[i];
       tree.insert(pth, pth);
       
       //simdb db(pth.c_str(), 4096, 1 << 14);
       //auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
+      //vec_u8 tblBuf; 
       dbs.emplace_back(pth.c_str(), 4096, 1 << 14);
       simdb& db = dbs.back();
       auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
-      vec_u8 tblBuf; 
-      for(auto const& key : dbKeys)
+      //for(auto const& key : dbKeys)
+      TO(dbKeys.size(),j)
       {
-        auto pthStr = pth+"/"+key.str;
-        tree.insert(pth+"/"+key.str, key.str);
+        auto const& key = dbKeys[j];
+        auto tblKey = pth+"/"+key.str;
+        //tree.insert(pth+"/"+key.str, key.str);
+        tree.insert(tblKey, key.str);
 
-        tblBuf = extractDbKey(db, key.str);
+        //str tblKey = pth+"/"+key.str;
+        tblBuf     = extractDbKey(db, key.str);
         IvTbl ivTbl(tblBuf.data());
-        insertTbl(pth+"/"+key.str, ivTbl);
+        insertTbl(tblKey, ivTbl);
+
+        IdxKey ik;
+        ik.subTbl = false;
+        ik.idx    = i;
+        ik.key    = key.str;
+        tblKeys[tblKey] = ik;
       }
     }
   }
-  SECTION(label captions)
-  {
-    sz.caption(     toString("Size: "));
-    elems.caption(  toString("Elements: "));
-    szBytes.caption(toString("Size in Bytes: "));
-    cap.caption(    toString("Capacity: "));
-    mapcap.caption( toString("Map Capacity: "));
-    owned.caption(  toString("Owned: "));
+  regenLabels( glblT );
+}
+bool       isTableKey(str const& key)
+{
+  auto iter = tblKeys.find(key);
+  return iter != tblKeys.end();
+}
+IvTbl* setCurTblFromTreeKey(str key)  // set current table from tree key
+{
+  //if( !isTableKey(key) ) return nullptr;
 
-    //sz.caption(     toString("Size: ",          t.size()        ));
-    //elems.caption(  toString("Elements: ",      t.elems()       ));
-    //szBytes.caption(toString("Size in Bytes: ", t.sizeBytes()   ));
-    //cap.caption(    toString("Capacity: ",      t.capacity()    ));
-    //mapcap.caption( toString("Map Capacity: ",  t.map_capacity()));
-    //owned.caption(  toString("Owned: ",         t.owned()? "True" : "False"));
-  }
+  auto iter = tblKeys.find(key);
+  if( iter == tblKeys.end() ) return nullptr;
+  
+  IdxKey& ik = iter->second;
+  if( ik.subTbl ) return nullptr;
+
+  tblBuf = extractDbKey( dbs[ik.idx], ik.key );
+
+  if(tblBuf.size() >= IvTbl::memberBytes() ){
+    glblT  = IvTbl(tblBuf.data());
+    return &glblT;
+  }else{ return nullptr; }
 }
 
 }
@@ -371,11 +421,19 @@ int  main()
         //  Print(s,"/");
         //}
         str key = "";
-        FROM(sel.size(),i){    // loop from the last to the first, since they were pushed in reverse order while walking back up the tree
+        FROM(sel.size(),i){             // loop from the last to the first, since they were pushed in reverse order while walking back up the tree
           key += sel[i];
           if(i!=0) key += "/";
         }
-        Print(key);
+        Println(key);
+
+        bool isTbl = isTableKey(key);
+        Println("isTableKey: ", isTbl);
+
+        IvTbl* curT = setCurTblFromTreeKey(key);
+        if(curT){
+          regenLabels( *curT );
+        }
 
         Println("\n\n");
       });
@@ -413,6 +471,11 @@ int  main()
     fm.collocate();
     fm.show();         //Show the form
     exec();            //Start to event loop process, it blocks until the form is closed.
+  }
+
+  SECTION(shutdown)
+  {
+    glblT.m_mem = nullptr;
   }
 }
 
