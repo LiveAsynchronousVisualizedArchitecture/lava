@@ -115,19 +115,19 @@
   #define tbl_PRNT(msg)
 #endif
 
-template<class T=int8_t> class tbl;
-using   tu8   =  tbl<uint8_t>;
-using   tu16  =  tbl<uint16_t>;
-using   tu32  =  tbl<uint32_t>;
-using   tu64  =  tbl<uint64_t>;
-using   ti8   =  tbl<int8_t>;
-using   ti16  =  tbl<int16_t>;
-using   ti32  =  tbl<int32_t>;
-using   ti64  =  tbl<int64_t>;
-using   tf32  =  tbl<float>;
-using   tf64  =  tbl<double>;
-using   Tbl   =  tbl<>;
-//using   tbl   =  tbl<int8_t>;
+class tbl;
+// using   tu8   =  tbl<uint8_t>;
+// using   tu16  =  tbl<uint16_t>;
+// using   tu32  =  tbl<uint32_t>;
+// using   tu64  =  tbl<uint64_t>;
+// using   ti8   =  tbl<int8_t>;
+// using   ti16  =  tbl<int16_t>;
+// using   ti32  =  tbl<int32_t>;
+// using   ti64  =  tbl<int64_t>;
+// using   tf32  =  tbl<float>;
+// using   tf64  =  tbl<double>;
+// using   Tbl   =  tbl<>;
+// using   tbl   =  tbl<int8_t>;
 
 union     HshType
 {
@@ -234,31 +234,31 @@ struct         KV
   template<> struct typenum<long>               { static const Type num = HshType::I64;   };
   template<> struct typenum<unsigned long>      { static const Type num = HshType::U64;   };
 
-  template<> struct typenum<tu8*>   { static const Type num = HshType::tU8;   }; 
-  template<> struct typenum<ti8*>   { static const Type num = HshType::tI8;   }; 
-  template<> struct typenum<tu16*>  { static const Type num = HshType::tU16;  }; 
-  template<> struct typenum<ti16*>  { static const Type num = HshType::tI16;  }; 
-  template<> struct typenum<tu32*>  { static const Type num = HshType::tU32;  }; 
-  template<> struct typenum<ti32*>  { static const Type num = HshType::tI32;  }; 
-  template<> struct typenum<tf32*>  { static const Type num = HshType::tF32;  };
-  template<> struct typenum<tu64*>  { static const Type num = HshType::tU64;  }; 
-  template<> struct typenum<ti64*>  { static const Type num = HshType::tI64;  }; 
-  template<> struct typenum<tf64*>  { static const Type num = HshType::tF64;  };
-  template<> struct typenum<tbl<long>*>          { static const Type num = HshType::tI64;  };
-  template<> struct typenum<tbl<unsigned long>*> { static const Type num = HshType::tU64;  };
+  // template<> struct typenum<tu8*>   { static const Type num = HshType::tU8;   }; 
+  // template<> struct typenum<ti8*>   { static const Type num = HshType::tI8;   }; 
+  // template<> struct typenum<tu16*>  { static const Type num = HshType::tU16;  }; 
+  // template<> struct typenum<ti16*>  { static const Type num = HshType::tI16;  }; 
+  // template<> struct typenum<tu32*>  { static const Type num = HshType::tU32;  }; 
+  // template<> struct typenum<ti32*>  { static const Type num = HshType::tI32;  }; 
+  // template<> struct typenum<tf32*>  { static const Type num = HshType::tF32;  };
+  // template<> struct typenum<tu64*>  { static const Type num = HshType::tU64;  }; 
+  // template<> struct typenum<ti64*>  { static const Type num = HshType::tI64;  }; 
+  // template<> struct typenum<tf64*>  { static const Type num = HshType::tF64;  };
+  // template<> struct typenum<tbl<long>*>          { static const Type num = HshType::tI64;  };
+  // template<> struct typenum<tbl<unsigned long>*> { static const Type num = HshType::tU64;  };
 
-  template<> struct typenum<tu8>   { static const Type num = HshType::cU8;   }; 
-  template<> struct typenum<ti8>   { static const Type num = HshType::cI8;   }; 
-  template<> struct typenum<tu16>  { static const Type num = HshType::cU16;  }; 
-  template<> struct typenum<ti16>  { static const Type num = HshType::cI16;  }; 
-  template<> struct typenum<tu32>  { static const Type num = HshType::cU32;  }; 
-  template<> struct typenum<ti32>  { static const Type num = HshType::cI32;  }; 
-  template<> struct typenum<tf32>  { static const Type num = HshType::cF32;  };
-  template<> struct typenum<tu64>  { static const Type num = HshType::cU64;  }; 
-  template<> struct typenum<ti64>  { static const Type num = HshType::cI64;  }; 
-  template<> struct typenum<tf64>  { static const Type num = HshType::cF64;  };
-  template<> struct typenum<tbl<long>>          { static const Type num = HshType::cI64;  };
-  template<> struct typenum<tbl<unsigned long>> { static const Type num = HshType::cU64;  };
+  // template<> struct typenum<tu8>   { static const Type num = HshType::cU8;   }; 
+  // template<> struct typenum<ti8>   { static const Type num = HshType::cI8;   }; 
+  // template<> struct typenum<tu16>  { static const Type num = HshType::cU16;  }; 
+  // template<> struct typenum<ti16>  { static const Type num = HshType::cI16;  }; 
+  // template<> struct typenum<tu32>  { static const Type num = HshType::cU32;  }; 
+  // template<> struct typenum<ti32>  { static const Type num = HshType::cI32;  }; 
+  // template<> struct typenum<tf32>  { static const Type num = HshType::cF32;  };
+  // template<> struct typenum<tu64>  { static const Type num = HshType::cU64;  }; 
+  // template<> struct typenum<ti64>  { static const Type num = HshType::cI64;  }; 
+  // template<> struct typenum<tf64>  { static const Type num = HshType::cF64;  };
+  // template<> struct typenum<tbl<long>>          { static const Type num = HshType::cI64;  };
+  // template<> struct typenum<tbl<unsigned long>> { static const Type num = HshType::cU64;  };
 
   template<class C> struct typecast { using type = C;   };                               // cast types
   template<> struct typecast<i8>    { using type = i64; };
@@ -324,10 +324,10 @@ struct         KV
   {
     return init(p);
   }
-  template<class N> KV& operator=(tbl<N>  const& n) = delete;
-  template<class N> KV& operator=(tbl<N>  const* const n)
+  KV& operator=(tbl const& n) = delete;
+  KV& operator=(tbl const* const n)
   {
-    hsh.type  =  typenum< tbl<N> >::num;
+    hsh.type  =  typenum< tbl >::num;
     val       =  (u64)n;
     return *this;
   }
@@ -435,8 +435,8 @@ struct     KVOfst
   operator bool() const { return (bool)(kv); }
   template<class N> N as() const { return kv->as<N>(); }
 
-  template<class T> operator tbl<T> ();
-  template<class T> operator tbl<T>*();
+  operator tbl ();
+  operator tbl*();
 
   template<class N> operator N() { return (N)(*kv); }
   template<class N> KVOfst& operator=(N const& n){ *kv = n; return *this; }
@@ -458,9 +458,11 @@ struct  TblFields
   u64     owned :  1;
   u64     elems : 21;
   u64      size : 42;
+
+  u64 tbltype;
 };
 
-template<class T> class tbl
+class tbl
 {
 public:                 
   using AllocFunc = void* (*)(uint64_t bytes);
@@ -477,16 +479,41 @@ public:
   using   f32   =     float;
   using   f64   =    double;
 
-  using   tu8   =  tbl<u8>;
-  using   tu16  =  tbl<u16>;
-  using   tu32  =  tbl<u32>;
-  using   tu64  =  tbl<u64>;
-  using   ti8   =  tbl<i8>;
-  using   ti16  =  tbl<i16>;
-  using   ti32  =  tbl<i32>;
-  using   ti64  =  tbl<i64>;
-  using   tf32  =  tbl<f32>;
-  using   tf64  =  tbl<f64>;
+  using    Type   =  HshType::Type;
+
+  template<class N> struct typenum { static const Type num = HshType::EMPTY; };
+  template<> struct typenum<u8>    { static const Type num = HshType::U64;   };
+  template<> struct typenum<i8>    { static const Type num = HshType::I64;   };
+  template<> struct typenum<u16>   { static const Type num = HshType::U64;   };
+  template<> struct typenum<i16>   { static const Type num = HshType::I64;   };
+  template<> struct typenum<u32>   { static const Type num = HshType::U64;   };
+  template<> struct typenum<i32>   { static const Type num = HshType::I64;   };
+  template<> struct typenum<f32>   { static const Type num = HshType::F64;   };
+  template<> struct typenum<u64>   { static const Type num = HshType::U64;   };
+  template<> struct typenum<i64>   { static const Type num = HshType::I64;   };
+  template<> struct typenum<f64>   { static const Type num = HshType::F64;   };
+  template<> struct typenum<long>               { static const Type num = HshType::I64;   };
+  template<> struct typenum<unsigned long>      { static const Type num = HshType::U64;   };
+
+  template<class C> struct typecast { using type = C;   };                               // cast types
+  template<> struct typecast<i8>    { using type = i64; };
+  template<> struct typecast<i16>   { using type = i64; };
+  template<> struct typecast<i32>   { using type = i64; };
+  template<> struct typecast<u8>    { using type = u64; };
+  template<> struct typecast<u16>   { using type = u64; };
+  template<> struct typecast<u32>   { using type = u64; };
+  template<> struct typecast<f32>   { using type = f64; };
+
+  // using   tu8   =  tbl<u8>;
+  // using   tu16  =  tbl<u16>;
+  // using   tu32  =  tbl<u32>;
+  // using   tu64  =  tbl<u64>;
+  // using   ti8   =  tbl<i8>;
+  // using   ti16  =  tbl<i16>;
+  // using   ti32  =  tbl<i32>;
+  // using   ti64  =  tbl<i64>;
+  // using   tf32  =  tbl<f32>;
+  // using   tf64  =  tbl<f64>;
 
 private:
   void      sizeBytes(u64  bytes){ memStart()->sizeBytes =  bytes; }
@@ -494,6 +521,7 @@ private:
   void       capacity(u64    cap){ memStart()->capacity  =    cap; }
   void          elems(u64  elems){ memStart()->elems     =  elems; }
   void         mapcap(u64 mapcap){ memStart()->mapcap    = mapcap; }
+  void        tbltype(u64   type){ memStart()->tbltype   =   type; }
   bool     map_expand(bool force=false)
   {  
     u64 mapcap = map_capacity();
@@ -557,17 +585,17 @@ private:
     KV*     el = elemStart(); 
     u64     i = st;
     u64 empty;
-    while(i!=en && el[i].hsh.type!=EMPTY){ 
+    while(i!=en && el[i].hsh.type!=HshType::EMPTY){ 
       i = nxt(i,mapcap);
       ++cnt;
     } // finds the first empty slot
     empty = i;
-    while(i!=en && el[i].hsh.type==EMPTY){
+    while(i!=en && el[i].hsh.type==HshType::EMPTY){
       i = nxt(i,mapcap);
       ++cnt;
     } // find the first non-empty slot after finding an empty slot
     u64 prevElemDst = 0;
-    while(i!=en && el[i].hsh.type!=EMPTY){
+    while(i!=en && el[i].hsh.type!=HshType::EMPTY){
       u64 elemDst = wrapDist(el,i,mapcap);
       if(elemDst<prevElemDst) return i;
 
@@ -642,24 +670,24 @@ private:
       kv.hsh.type = n.hsh.type;
     }
   }
-  void           init(std::initializer_list<T>  lst)
-  {
-    using namespace std;
+  // void           init(std::initializer_list  lst)
+  // {
+  //   using namespace std;
     
-    reserve(lst.size(),0,0);
-    initFields( sizeBytes(), lst.size() ); 
+  //   reserve(lst.size(),0,0);
+  //   initFields( sizeBytes(), lst.size() ); 
 
-    auto i = 0;
-    for(auto&& n : lst){ (*this)[i++] = move(n); }
+  //   auto i = 0;
+  //   for(auto&& n : lst){ (*this)[i++] = move(n); }
 
-    //for(auto&& n : lst){ emplace(n); }
-  }
-  void      init_cstr(const char* s)
-  {
-    auto len = strlen(s) + 1;
-    init(len);
-    memcpy(data(), s, len);
-  }
+  //   //for(auto&& n : lst){ emplace(n); }
+  // }
+  // void      init_cstr(const char* s)
+  // {
+  //   auto len = strlen(s) + 1;
+  //   init(len);
+  //   memcpy(data(), s, len);
+  // }
   void        destroy()
   { 
     if( m_mem && owned() ){
@@ -679,7 +707,7 @@ private:
   {    
     //if(l.owned()){
       //tbl_PRNT("\n full copy \n");
-      tbl<T> prev;
+      tbl prev;
       prev.m_mem = m_mem;                                                                // make a tbl for the old memory - this will be destructed at the end of this scope, which will free up the old memory. the old memory is not freed up first, since we could be copying from a child of this very same tbl 
 
       m_mem = nullptr;
@@ -722,21 +750,30 @@ private:
 
     return ret;
   }
-  template<class OP> void op_asn(T   const& l, OP op)
-  {
-    TO(size(),i) op( (*this)[i], l);
-  }
-  template<class OP> tbl  bin_op(T   const& l, OP op) const
-  {     
-    tbl ret( size() ); 
-    TO(ret, i) ret[i] = op( (*this)[i], l );
+  // template<class OP> void op_asn(T   const& l, OP op)
+  // {
+  //   TO(size(),i) op( (*this)[i], l);
+  // }
+  // template<class OP> tbl  bin_op(T   const& l, OP op) const
+  // {     
+  //   tbl ret( size() ); 
+  //   TO(ret, i) ret[i] = op( (*this)[i], l );
 
-    return ret;
+  //   return ret;
+  // }
+  template<class T> u64 enum_of()
+  {
+    return typecast<T>(typenum<T>::num);
   }
 
 public:  
   u8*     m_mem;                                                                         // the only member variable - everything else is a contiguous block of memory
  
+  template<class T> tbl(T initVal)
+  {
+    tbltype(enum_of<T>());
+  }
+
   tbl() : m_mem(nullptr) {}
   tbl(void* memst, bool _init=false, bool _owned=false, u64 _count=0) : m_mem( ((u8*)memst)+memberBytes() )
   {
@@ -750,17 +787,17 @@ public:
     }
   }
   tbl(u64 count){ init(count); }                                                           // have to run default constructor here?
-  tbl(u64 count, T const& value)
-  {
-    init(count);
-    TO(count, i){ (*this)[i] = value; }
-  }
+  // tbl(u64 count, T const& value)
+  // {
+  //   init(count);
+  //   TO(count, i){ (*this)[i] = value; }
+  // }
   tbl(std::initializer_list<KV> lst){ initKV(lst); }
-  tbl(std::initializer_list<T>  lst)
-  {
-    //init(lst.size()); 
-    init(lst); 
-  }
+  // tbl(std::initializer_list<T>  lst)
+  // {
+  //   //init(lst.size()); 
+  //   init(lst); 
+  // }
   tbl(const char* s){ init_cstr(s); }
   ~tbl(){ destroy(); }
 
@@ -769,19 +806,19 @@ public:
   tbl           (tbl&&      r){ mv(std::move(r));               }
   tbl& operator=(tbl&&      r){ mv(std::move(r)); return *this; }
   tbl& operator=(std::initializer_list<KV> lst){ initKV(lst); return *this; }
-  tbl& operator=(std::initializer_list<T>  lst){   init(lst); return *this; }
+  // tbl& operator=(std::initializer_list<T>  lst){   init(lst); return *this; }
   tbl& operator=(const char* s){ init_cstr(s); return *this; }
 
-  T&      operator[](u64 i)
-  {
-    tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
-    return ((T*)m_mem)[i];
-  }
-  auto    operator[](u64 i) const -> T const& 
-  {
-    tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
-    return ((T*)m_mem)[i];
-  }
+  // T&      operator[](u64 i)
+  // {
+  //   tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
+  //   return ((T*)m_mem)[i];
+  // }
+  // auto    operator[](u64 i) const -> T const& 
+  // {
+  //   tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
+  //   return ((T*)m_mem)[i];
+  // }
   KVOfst  operator()(i32 k)
   {
     char key[sizeof(k)+1];
@@ -832,16 +869,16 @@ public:
   tbl     operator* (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a * b;}); }
   tbl     operator/ (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
   tbl     operator% (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
-  void    operator+=(T   const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
-  void    operator-=(T   const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }
-  void    operator*=(T   const& l){ op_asn(l, [](T& a, T const& b){ a *= b; } ); }
-  void    operator/=(T   const& l){ op_asn(l, [](T& a, T const& b){ a /= b; } ); }
-  void    operator%=(T   const& l){ op_asn(l, [](T& a, T const& b){ a %= b; } ); }
-  tbl     operator+ (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a + b;}); }
-  tbl     operator- (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a - b;}); }
-  tbl     operator* (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a * b;}); }
-  tbl     operator/ (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
-  tbl     operator% (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
+  // void    operator+=(T   const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
+  // void    operator-=(T   const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }
+  // void    operator*=(T   const& l){ op_asn(l, [](T& a, T const& b){ a *= b; } ); }
+  // void    operator/=(T   const& l){ op_asn(l, [](T& a, T const& b){ a /= b; } ); }
+  // void    operator%=(T   const& l){ op_asn(l, [](T& a, T const& b){ a %= b; } ); }
+  // tbl     operator+ (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a + b;}); }
+  // tbl     operator- (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a - b;}); }
+  // tbl     operator* (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a * b;}); }
+  // tbl     operator/ (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
+  // tbl     operator% (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
 
   template<class V> KVOfst put(const char* key, V val){ return this->operator()(key) = val; }
 
@@ -862,23 +899,23 @@ public:
     return true;
   }
   template<class... V> bool emplace_back(V&&... val){ return emplace(std::forward<V>(val)...);  }
-  bool           push(T const& val){ return emplace(val); }
-  u64            push(std::initializer_list<T> lst)
-  {
-    u64 cnt = 0;
-    for(auto const& v : lst){
-      bool ok = this->push(v);
-      if(!ok){ return cnt; }
-      ++cnt;
-    }
+  // bool           push(T const& val){ return emplace(val); }
+  // u64            push(std::initializer_list<T> lst)
+  // {
+  //   u64 cnt = 0;
+  //   for(auto const& v : lst){
+  //     bool ok = this->push(v);
+  //     if(!ok){ return cnt; }
+  //     ++cnt;
+  //   }
 
-    return cnt;
-  }
-  bool      push_back(T const& value){ return emplace(value); }
-  void            pop(){ back()->T::~T(); set_size(size()-1); }
+  //   return cnt;
+  // }
+  // bool      push_back(T const& value){ return emplace(value); }
+  // void            pop(){ back()->T::~T(); set_size(size()-1); }
   void       pop_back(){ pop(); }
-  T const&      front() const{ return (*this)[0]; }
-  T const&       back() const{ return (*this)[size()-1]; }
+  // T const&      front() const{ return (*this)[0]; }
+  // T const&       back() const{ return (*this)[size()-1]; }
 
   template<class N> bool insert(const char* key, N const& val)
   {
@@ -930,7 +967,7 @@ public:
   }
 
   u64            size() const { return m_mem? memStart()->size : 0; }
-  T*             data() const {return (T*)m_mem; }
+  // T*             data() const {return (T*)m_mem; }
   void*     childData() const { return (void*)(elemStart() + map_capacity()); }                                                      // elemStart return a KV* so map_capacity will increment that pointer by the map_capacity * sizeof(KV)
   u64  child_capacity() const
   {
@@ -950,6 +987,7 @@ public:
   u64        capacity() const { return m_mem? memStart()->capacity  : 0; }
   u64           elems() const { return m_mem?  memStart()->elems    : 0; }
   u64    map_capacity() const { return m_mem?  memStart()->mapcap   : 0; }
+  u64         tbltype() const { return m_mem? memStart()->tbltype   : 0; }
   auto      elemStart() ->KV* { return m_mem? (KV*)(data() + capacity()) : nullptr; }
   auto      elemStart() const -> KV const* { return m_mem? (KV*)(data() + capacity()) : nullptr; }
   void*       reserve(u64 count, u64 mapcap=0, u64 childcap=0)
@@ -1047,7 +1085,7 @@ public:
 
       auto  prvF = (fields*)(prvChld);
 
-      tbl<T> prev;
+      tbl prev;
       prev.m_mem = m_mem;                                                                 // make a table to hold the previous span of bytes
       m_mem    = nxtp+memberBytes();                                                      // now this table holds the new span of bytes
 
@@ -1142,9 +1180,9 @@ public:
     return true;
   }
   void          clear(){ if(m_mem){ destroy(); init(0); } }
-  T*            begin(){ return  (T*)m_mem;           }
-  T*              end(){ return ((T*)m_mem) + size(); }
-  auto        flatten() -> tbl<T>&
+  // T*            begin(){ return  (T*)m_mem;           }
+  // T*              end(){ return ((T*)m_mem) + size(); }
+  auto        flatten() -> tbl&
   {
     u64   memst = (u64)memStart();
     u64 prevCap = child_capacity();
@@ -1154,7 +1192,7 @@ public:
     TO(mapcap,i)
       if(  (e[i].hsh.type & HshType::TABLE) && 
           !(e[i].hsh.type & HshType::CHILD) ){                                 // if the table bit is set but the child bit is not set
-        tbl<T>*  t  =  (tbl<T>*)e[i].val;
+        tbl*  t  =  (tbl*)e[i].val;
         newcap  +=  t->sizeBytes();
     }
     reserve(0,0, prevCap + newcap);
@@ -1164,7 +1202,7 @@ public:
     TO(mapcap,i){
       if(  (e[i].hsh.type & HshType::TABLE) && 
           !(e[i].hsh.type & HshType::CHILD) ){                                 // if the table bit is set but the child bit is not set
-        tbl<T>*    t  =  (tbl<T>*)e[i].val;
+        tbl*    t  =  (tbl*)e[i].val;
         auto szbytes  =  t->sizeBytes();
 
         memcpy(curChild, t->memStart(), szbytes);
@@ -1299,7 +1337,7 @@ public:
   }
 };
 
-template<class T> KVOfst::operator tbl<T>() 
+template<class T> KVOfst::operator tbl() 
 {   
   if(base){
     tbl<T>   t;                                                                          // type only matters so that c 
@@ -1320,7 +1358,7 @@ template<class T> KVOfst::operator tbl<T>()
     return *((tbl<T>*)kv->val);
   }
 }
-template<class T> KVOfst::operator tbl<T>*()
+template<class T> KVOfst::operator tbl*()
 {
   tbl_msg_assert(
     kv->hsh.type == KV::typenum< tbl<T>* >::num, 
@@ -1355,16 +1393,16 @@ auto HshType::type_str(Type t) -> char const* const
     case  HshType::cI64: return  "child table  i64";
     case  HshType::cF64: return  "child table  f64";
 
-    case   HshType::tU8: return  "table pointer  u8";
-    case   HshType::tI8: return  "table pointer  i8";
-    case  HshType::tU16: return  "table pointer  u16";
-    case  HshType::tI16: return  "table pointer  i16";
-    case  HshType::tU32: return  "table pointer  u32";
-    case  HshType::tI32: return  "table pointer  i32";
-    case  HshType::tF32: return  "table pointer  f32";
-    case  HshType::tU64: return  "table pointer  u64";
-    case  HshType::tI64: return  "table pointer  i64";
-    case  HshType::tF64: return  "table pointer  f64";
+    // case   HshType::tU8: return  "table pointer  u8";
+    // case   HshType::tI8: return  "table pointer  i8";
+    // case  HshType::tU16: return  "table pointer  u16";
+    // case  HshType::tI16: return  "table pointer  i16";
+    // case  HshType::tU32: return  "table pointer  u32";
+    // case  HshType::tI32: return  "table pointer  i32";
+    // case  HshType::tF32: return  "table pointer  f32";
+    // case  HshType::tU64: return  "table pointer  u64";
+    // case  HshType::tI64: return  "table pointer  i64";
+    // case  HshType::tF64: return  "table pointer  f64";
 
     default: return "Unknown Type";
   }
