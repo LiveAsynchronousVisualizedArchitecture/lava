@@ -60,6 +60,7 @@
 //       | editing a memory mapped table could edit the table on disk
 
 #include <iostream>
+#include <unordered_map>
 #include <nana/gui.hpp>
 #include <nana/gui/dragger.hpp>
 #include <nana/gui/widgets/label.hpp>
@@ -80,11 +81,18 @@ struct   vert { f32 p[3],n[3],c[4],tx[2]; };
 using     str = std::string;
 using vec_str = std::vector<str>;
 using  vec_u8 = std::vector<u8>;
+using vec_dbs = std::vector<simdb>;
 using   IvTbl = tbl<vert>;
+//using TblKeys = std::unordered_map<str,str>;
+
+using TblKeys = std::unordered_set<str>;
 
 tbl<>                       glblT;
-IvTbl*                        cur;
+//IvTbl*                        cur;
+vec_u8                curTblBytes;
 vec_str                       sel;
+vec_dbs                       dbs;
+TblKeys                   tblKeys;
 nana::form                     fm;
 nana::treebox                tree;
 nana::picture              aryViz;
@@ -98,8 +106,10 @@ class mem_pixbuf : public nana::paint::detail::basic_image_pixbuf
 
 namespace {
 
-void insertTbl(str const& parentKey, IvTbl const& t)
+void      insertTbl(str const& parentKey, IvTbl const& t)
 {
+  //tblKeys[parentKey] = parentKey;
+  tblKeys.insert(parentKey);
   SECTION(array visualization)
   {
     str aszStr = toString("Array Size: ", t.size());
@@ -132,51 +142,43 @@ void insertTbl(str const& parentKey, IvTbl const& t)
     }
   }
 }
-void regenTblInfo()
+vec_u8 extractDbKey(simdb const& db, str key)
+{
+  u32     vlen = 0;
+  u32  version = 0;
+  auto     len = db.len(key, &vlen, &version);          // todo: make ui64 as the input length
+
+  vec_u8 ret(vlen);
+  db.get(key.c_str(), ret.data(), vlen);
+
+  return ret;
+}
+void   regenTblInfo()
 {
   SECTION(list simdb files and insert them at the top level of the tree)
   {
     simdb_error err;
-    auto dbs = simdb_listDBs(&err);
+    auto dbPths = simdb_listDBs(&err);
 
-    for(auto& pth : dbs){
+    for(auto& pth : dbPths)
+    {
       tree.insert(pth, pth);
       
-      simdb db(pth.c_str(), 4096, 1 << 14);
+      //simdb db(pth.c_str(), 4096, 1 << 14);
+      //auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
+      dbs.emplace_back(pth.c_str(), 4096, 1 << 14);
+      simdb& db = dbs.back();
       auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
       vec_u8 tblBuf; 
-      for(auto const& key : dbKeys){
-        //Println(pth+"/"+key.str);
-        //Println(key.str);
+      for(auto const& key : dbKeys)
+      {
         auto pthStr = pth+"/"+key.str;
         tree.insert(pth+"/"+key.str, key.str);
 
-        u32     vlen = 0;
-        u32  version = 0;
-        auto     len = db.len(key.str, &vlen, &version);          // todo: make ui64 as the input length
-
-        tblBuf.resize(vlen);
-        db.get(key.str.c_str(), tblBuf.data(), vlen);
-        //vs.ver = version;
-        //auto ivbuf = (u8*)malloc(vlen);   // todo: check to make sure this succeeds 
-        //
-        //IvTbl iv(ivbuf, false, false);
-        //auto     f = iv.memStart();
-        //
-        //auto tblBytes = db.get<u8>(key.str);
-        //t.memStart( tblBytes.data() );
-        //memcpy(&t, tblBytes.data(), sizeof(void*));
-
+        tblBuf = extractDbKey(db, key.str);
         IvTbl ivTbl(tblBuf.data());
         insertTbl(pth+"/"+key.str, ivTbl);
       }
-      //for(auto const& key : dbKeys){
-      //  //db.len(key);
-      //  auto tblBytes = db.get<u8>(key.str);
-      //  tbl<> t;
-      //  memcpy(&t, tblBytes.data(), sizeof(void*));
-      //  insertTbl(
-      //}
     }
   }
   SECTION(label captions)
@@ -419,6 +421,36 @@ int  main()
 
 
 
+
+
+
+
+//for(auto const& key : dbKeys){
+//  //db.len(key);
+//  auto tblBytes = db.get<u8>(key.str);
+//  tbl<> t;
+//  memcpy(&t, tblBytes.data(), sizeof(void*));
+//  insertTbl(
+//}
+
+//Println(pth+"/"+key.str);
+//Println(key.str);
+
+//u32     vlen = 0;
+//u32  version = 0;
+//auto     len = db.len(key.str, &vlen, &version);          // todo: make ui64 as the input length
+//tblBuf.resize(vlen);
+//db.get(key.str.c_str(), tblBuf.data(), vlen);
+
+//vs.ver = version;
+//auto ivbuf = (u8*)malloc(vlen);   // todo: check to make sure this succeeds 
+//
+//IvTbl iv(ivbuf, false, false);
+//auto     f = iv.memStart();
+//
+//auto tblBytes = db.get<u8>(key.str);
+//t.memStart( tblBytes.data() );
+//memcpy(&t, tblBytes.data(), sizeof(void*));
 
 //nana::label sz(fm), elems(fm), szBytes(fm), cap(fm), mapcap(fm), owned(fm);
 //nana::form  fm(nana::API::make_center(768, 768));
