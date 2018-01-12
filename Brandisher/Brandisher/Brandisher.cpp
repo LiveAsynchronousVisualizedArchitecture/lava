@@ -48,8 +48,8 @@
 // -todo: make function to get a full key from an item proxy
 // -todo: make a function to check if an item proxy is a table key
 // -todo: detect when the ary item in a table is expanded 
+// -todo: make the tree text under an array be the mean, median, mode and variance of the array values
 
-// todo: make the tree text under an array be the mean, median, mode and variance of the array values
 // todo: make a graph visualization of the current table in the picture widget
 // todo: debug crash when selecting key of first table in the tree
 // todo: make listing the keys of a db happen on expand
@@ -62,13 +62,14 @@
 // todo: implement opening on drag and drop of a tbl
 // todo: implement opening of the tbl through the menu and file dialog
 // todo: try compiling with clang
-// todo: make a tabler simdb database on start, as scratch space for dragged in files and dragged tables from other dbs
+// todo: make a Brandisher simdb database on start, as scratch space for dragged in files and dragged tables from other dbs
 
 // idea: should tbls exist as either files, memory, or sub tables?
 //       | icon in the tree could show which is which
 //       | editing a memory mapped table could edit the table on disk
 
 #include <iostream>
+#include <algorithm>
 #include <unordered_map>
 #include <nana/gui.hpp>
 #include <nana/gui/dragger.hpp>
@@ -404,10 +405,10 @@ int  main()
     SECTION(treebox item insertion from the current tbl)
     {
       regenTblInfo();
-      tree.insert("place", "place");
-      auto watPrxy = tree.insert("place/wat", "wat");
-      watPrxy.icon("TestIcon");
-      tree.insert( toString("skidoosh"), toString("skidoosh") );
+      //tree.insert("place", "place");
+      //auto watPrxy = tree.insert("place/wat", "wat");
+      //watPrxy.icon("TestIcon");
+      //tree.insert( toString("skidoosh"), toString("skidoosh") );
       //insertTbl("", t);
     }
     SECTION(treebox set up including events)
@@ -419,15 +420,69 @@ int  main()
         
         if(tbArg.item.expanded())
         {          
-          //&& tbArg.item.key() == "ary"
-
           str tblKey = getFullKey( tbArg.item.owner() );
           if( isTableKey(tblKey) && 
               tbArg.item.key() == "ary"      &&
               tbArg.item.child().text() == ""){
-            //tree.insert( tbArg.item, "/watsquidoosh", "watsquidoosh");
-            auto t = tblFromKey( tblKey );
-            str txtStr = toString("size: ", t.size() );
+            auto    t = tblFromKey( tblKey );
+
+            auto flen = t.size() * 12; // 12 floats in a vert struct
+            f32*    f = (float*)t.m_mem;
+            sort(f, f+flen);                // sort for both the median and the mode
+
+            f32 mean=0, median=0; 
+            SECTION(calc mean and median)
+            {
+              f32 total = 0;
+              TO(flen,i){ total += f[i]; }
+              mean = total / flen;
+
+              u64 mid = flen / 2;
+              median  = f[mid];
+
+              Println("\n");
+              TO(flen,i){
+                Print(f[i]," "); 
+              }
+              Println("\n");
+            }
+
+            f32 hiVal=0; u64 hiCnt=0;
+            SECTION(calc Mode - the value with the highest frequency)
+            {
+              f32 curVal=0;
+              u64 curCnt=0;
+              TO(flen,i){
+                if(f[i] == curVal){ ++curCnt; }
+                else if( curCnt > hiCnt ){
+                  hiVal  = curVal;
+                  hiCnt  = curCnt;
+                  curVal = f[i];
+                  curCnt = 0;
+                }
+              }
+              if( curCnt > hiCnt ){
+                hiVal = curVal;
+                hiCnt = curCnt;
+              }
+            }
+
+            f32 variance=0;
+            SECTION(calc variance)
+            {
+              f32 difSqr = 0;
+              TO(flen,i){
+                f32 dif  = f[i] - mean;
+                difSqr  += dif * dif;
+              }
+              variance = flen>1?  difSqr/(flen-1)  :   difSqr;  // length of the array needs to be at least 2 to use the n-1 'unbiased' variance  
+            }
+
+            str txtStr = toString(
+              "Mean: ",mean,
+              "   Median: ",median,
+              "   Mode: ", hiVal, " (",hiCnt,
+              ")   Variance: ", variance);
             tbArg.item.child().text(txtStr);
           }
 
@@ -519,6 +574,8 @@ int  main()
 
 
 
+//&& tbArg.item.key() == "ary"
+//tree.insert( tbArg.item, "/watsquidoosh", "watsquidoosh");
 
 //u32     i = 0;
 //++i;
