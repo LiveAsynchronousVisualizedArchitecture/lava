@@ -47,6 +47,7 @@
 // -todo: make a pointer to the current tble that is set on clicking within a table
 // -todo: make function to get a full key from an item proxy
 // -todo: make a function to check if an item proxy is a table key
+// -todo: detect when the ary item in a table is expanded 
 
 // todo: make the tree text under an array be the mean, median, mode and variance of the array values
 // todo: make a graph visualization of the current table in the picture widget
@@ -200,7 +201,7 @@ void     regenTblInfo()
       //auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
       //vec_u8 tblBuf; 
       dbs.emplace_back(pth.c_str(), 4096, 1 << 14);
-      simdb& db = dbs.back();
+      simdb&   db = dbs.back();
       auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
       //for(auto const& key : dbKeys)
       TO(dbKeys.size(),j)
@@ -227,22 +228,12 @@ void     regenTblInfo()
 }
 str        getFullKey(nana::treebox::item_proxy const& ip)
 {
-  u32     i = 0;
-  str   key = "";
   auto* cur = &ip;
-  do{
-    //sel.push_back(cur->key());
-    key = cur->key() + "/" + key;
+  str   key = cur->key();
+  while(cur->level() > 1){
     cur = &(cur->owner());
-    //if(i!=0){ key += "/"; }
-    ++i;
-  }while(cur->level() > 0);
-
-  //str key = "";
-  //FROM(sel.size(),i){             // loop from the last to the first, since they were pushed in reverse order while walking back up the tree
-  //  key += sel[i];
-  //  if(i!=0) key += "/";
-  //}
+    key = cur->key() + "/" + key;
+  }
 
   return key;
 }
@@ -254,6 +245,22 @@ bool       isTableKey(str const& key)
 bool       isTableKey(nana::treebox::item_proxy const& ip)
 {
   return isTableKey( getFullKey(ip) );
+}
+IvTbl      tblFromKey(str key)
+{
+  IvTbl ret;
+  auto iter = tblKeys.find(key);
+  if( iter == tblKeys.end() ) return ret;
+
+  IdxKey& ik = iter->second;
+  if( ik.subTbl ) return ret;
+
+  auto buf = extractDbKey( dbs[ik.idx], ik.key );
+
+  if(buf.size() >= IvTbl::memberBytes() ){
+    ret = IvTbl(buf.data(),false,true);
+    return ret;
+  }else{ return ret; }
 }
 IvTbl* setCurTblFromTreeKey(str key)  // set current table from tree key
 {
@@ -409,21 +416,19 @@ int  main()
       tree.borderless(false);
       tree.events().expanded([](const arg_treebox& tbArg) mutable  // lambda captures by value are const by default, so mutable is used
       {
+        
         if(tbArg.item.expanded())
-        {
-          //str aryStr = "";
-          //if(!aryViz.empty() && aryViz.text() == ""){
-          //  //Println("creating array visualization");
-          //  //auto mx = std::min<u64>(t.size(),10); 
-          //  //TO(mx,i){
-          //  //  aryStr += toString( i==0? "" : ", ", (tbl<>::i64)t[i] );
-          //  //}
-          //  aryViz.text(aryStr);
-          //}
+        {          
+          //&& tbArg.item.key() == "ary"
 
-          
-          if( isTableKey(tbArg.item) ){ //&& tbArg.item.child().key() == "arystr" ){
-            tree.insert( tbArg.item.key() + "/watsquidoosh", "watsquidoosh");
+          str tblKey = getFullKey( tbArg.item.owner() );
+          if( isTableKey(tblKey) && 
+              tbArg.item.key() == "ary"      &&
+              tbArg.item.child().text() == ""){
+            //tree.insert( tbArg.item, "/watsquidoosh", "watsquidoosh");
+            auto t = tblFromKey( tblKey );
+            str txtStr = toString("size: ", t.size() );
+            tbArg.item.child().text(txtStr);
           }
 
           Println("");
@@ -513,6 +518,34 @@ int  main()
 
 
 
+
+
+//u32     i = 0;
+//++i;
+
+//cur = &(cur->owner());
+//key = cur->key() + "/" + key;
+
+//sel.push_back(cur->key());
+//if(i!=0){ key += "/"; }
+
+//str key = "";
+//FROM(sel.size(),i){             // loop from the last to the first, since they were pushed in reverse order while walking back up the tree
+//  key += sel[i];
+//  if(i!=0) key += "/";
+//}
+
+//str aryStr = "";
+//if(!aryViz.empty() && aryViz.text() == ""){
+//  //Println("creating array visualization");
+//  //auto mx = std::min<u64>(t.size(),10); 
+//  //TO(mx,i){
+//  //  aryStr += toString( i==0? "" : ", ", (tbl<>::i64)t[i] );
+//  //}
+//  aryViz.text(aryStr);
+//}
+//
+//&& tbArg.item.child().key() == "arystr" ){
 
 //for(auto const& s : sel){
 //  Print(s,"/");

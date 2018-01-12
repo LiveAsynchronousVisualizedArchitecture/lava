@@ -711,6 +711,15 @@ private:
      memcpy(memSt, l.memStart(), szBytes);
      owned(true);
   }
+  void             cp(void* tblPtr)
+  {
+    TblFields* f = (TblFields*)tblPtr;
+    auto szBytes = f->sizeBytes;
+    u8*    memSt = (u8*)malloc(szBytes);
+    m_mem        = memSt + memberBytes();
+    memcpy(memSt, tblPtr, szBytes);
+    owned(true);
+  }
   void             mv(tbl&& r)
   {
     //tbl_PRNT("\n moved \n");
@@ -761,6 +770,8 @@ public:
     }else{
       assert( ((i8*)memStart())[0]=='t' );
       assert( ((i8*)memStart())[1]=='b' );
+
+      if(_owned) cp(memst);
     }
     this->owned(_owned);
   }
