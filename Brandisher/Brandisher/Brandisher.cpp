@@ -567,7 +567,7 @@ int  main()
         auto&   t = *curT;
         auto flen = t.size() * 12;      // 12 floats in a vert struct
         f32*    f = (float*)t.m_mem;
-        
+
         //TO(flen,i){
         //  f[i] = 
         //}
@@ -577,20 +577,44 @@ int  main()
         //vizImg.image_ptr_ = mempxbuf;
         //viz.load(vizImg);
 
+        //vector<f32>  tst(512);
+        //TO(tst.size(),i){ tst[i] = rand() / (f32)RAND_MAX; }
+        //flen = 512;
+        //f = tst.data();
+
+        f32     mx = -numeric_limits<float>::infinity(); 
+        f32     mn =  numeric_limits<float>::infinity();
+        TO(flen,i){
+          mx = max<f32>(mx, f[i]);
+          mn = min<f32>(mn, f[i]);
+        }
+        Println("\n Table Key mx: ",mx, " mn: ", mn, " \n" );
+
         auto* stor = mempxbuf->pixbuf_.storage_.get();
         auto rawpx = stor->raw_pixel_buffer;
         auto     w = stor->pixel_size.width;
         auto     h = stor->pixel_size.height;
+        f32  ratio = w / (f32)flen;
+        f32 hRatio = h / (mx-mn);
         for(unsigned int y=0; y<h; ++y)
-          for(unsigned int x=0; x<w; ++x){
+          for(unsigned int x=0; x<w; ++x)
+          {
             pixel_argb_t p;
-            //p.element.red   = (u8)(y/(f32)h * 255.f);
-            //p.element.green = (u8)(x/(f32)w * 255.f);
             p.element.red   = 0;
             p.element.green = 0;
             p.element.blue  = 0;
             p.element.alpha_channel = 1;
-            rawpx[y*w + x]  = p;
+
+            //p.element.red   = (u8)(y/(f32)h * 255.f);
+            //p.element.green = (u8)(x/(f32)w * 255.f);
+
+            //f32 val = f[ (u64)(x*ratio) ];
+            f32 val = f[ (u64)(x/ratio) ];
+            if(h-y < val*hRatio){ // this flips the graph vertically, but increasing y goes down in screen space, so we want it flipped
+              p.element.green = 255;
+            }
+
+            rawpx[y*w + x] = p;
           }
 
         vizImg.image_ptr_ = mempxbuf;
