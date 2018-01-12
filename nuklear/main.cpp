@@ -760,12 +760,10 @@ void       genTestGeo(simdb* db)
 {
   using namespace std;
   
-  static simdb db1("test 1", 4096, 1 << 14);
-  static simdb db2("test 2", 4096, 1 << 14);
+  static simdb db1("test1", 4096, 1 << 14);
+  //static simdb db2("test 2", 4096, 1 << 14);
 
-  // new (&db2) simdb(name.c_str(), 4096, 1 << 14);             // inititialize the DB with placement new into the data segment
-
-  initSimDB("Viz Default");
+  //initSimDB("VizDefault");
 
   // Create serialized IndexedVerts
   size_t leftLen, rightLen, cubeLen;
@@ -788,56 +786,14 @@ void       genTestGeo(simdb* db)
   str rightTriangle = "rightTriangle";
   str          cube = "cube";
 
-  //db->put(leftTriangle, leftData);
-  //db->put(rightTriangle, rightData);
-  //db->put(cube, cubeData);
-
   db1.put("1", leftBytes);
   db1.put("2", rightBytes);
   db1.put("3", cubeBytes);
 
-  db2.put("one",    leftBytes);
-  db2.put("two",   rightBytes);
-  db2.put("three",  cubeBytes);
-  db2.put("super long key name as a test", cubeBytes);
-
-  //iv->verts[0] = {
-  //  {-1.0, -1.0f, 0.0f},      //pos
-  //  {0.0f, 0.0f, -1.0f},      //norm
-  //  {1.0f, 1.0f, 1.0f, 1.0f}, //color
-  //  {0.0f, 0.0f}              //texCoord
-  //};
-  //iv->verts[1] = {
-  //  {-0.17f, -1.0f, 0.0f},      //pos
-  //  {0.0f, 0.0f, -1.0f},      //norm
-  //  {1.0f, 1.0f, 1.0f, 1.0f}, //color
-  //  {0.0f, 0.0f}              //texCoord
-  //};
-  //iv->verts[2] = {
-  //  {-0.58f, 1.0f, 0.0f},       //pos
-  //  {0.0f, 0.0f, -1.0f},        //norm
-  //  {1.0f, 1.0f, 1.0f, 1.0f},   //color
-  //  {0.0f, 0.0f}                //texCoord
-  //};
-
-  //u64 type = lftTri("type");
-  //char* tstr = (char*)&type;
-
-  //Tbl lftTri;
-  //auto typenum = "IdxVerts";
-  //lftTri("type") = *((u64*)typenum);
-  //lftTri("mode") = GL_TRIANGLES;
-  //tf32 p   = { -1.0, -1.0f,  0.0f, -0.17f, -1.0f,  0.0f, -0.58f, 1.0f,  0.0f };
-  //tf32 n   = { 0.0f,  0.0f, -1.0f,   0.0f,  0.0f, -1.0f,  0.0f,  0.0f, -1.0f };
-  //tf32 c   = { 1.0f,  1.0f,  1.0f,   1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f, 1.0f, 1.0f, 1.0f };
-  //tf32 tx  = { 0.0f,  0.0f,  0.0f,   0.0f,  0.0f,  0.0f };
-  //tu32 ind = { 0, 1, 2};
-  //
-  //lftTri("P")   =  &p;
-  //lftTri("N")   =  &n;
-  //lftTri("C")   =  &c;
-  //lftTri("TX")  =  &tx;
-
+  //db2.put("one",    leftBytes);
+  //db2.put("two",   rightBytes);
+  //db2.put("three",  cubeBytes);
+  //db2.put("super long key name as a test", cubeBytes);
 
   IvTbl lftTri = {             // array of vert structs
    {{-1.0, -1.0f, 0.0f},       //pos
@@ -864,7 +820,7 @@ void       genTestGeo(simdb* db)
 
   auto f = lftTri.memStart();
 
-  db->put("tb left triangle", lftTri.memStart(), lftTri.sizeBytes() );
+  //db->put("tb left triangle", lftTri.memStart(), lftTri.sizeBytes() );
 }
 
 ENTRY_DECLARATION
@@ -1140,7 +1096,7 @@ ENTRY_DECLARATION
     SECTION(database)
     {
       if(vd.keyRefreshClock > vd.keyRefresh){
-        glfwPollEvents();
+        //glfwPollEvents();
         refreshDB(&vd);
       } // end of updates to shapes 
       PRINT_GL_ERRORS
@@ -1318,6 +1274,50 @@ ENTRY_DECLARATION
 
 
 
+
+//
+// new (&db2) simdb(name.c_str(), 4096, 1 << 14);             // inititialize the DB with placement new into the data segment
+
+//db->put(leftTriangle, leftData);
+//db->put(rightTriangle, rightData);
+//db->put(cube, cubeData);
+
+//iv->verts[0] = {
+//  {-1.0, -1.0f, 0.0f},      //pos
+//  {0.0f, 0.0f, -1.0f},      //norm
+//  {1.0f, 1.0f, 1.0f, 1.0f}, //color
+//  {0.0f, 0.0f}              //texCoord
+//};
+//iv->verts[1] = {
+//  {-0.17f, -1.0f, 0.0f},      //pos
+//  {0.0f, 0.0f, -1.0f},      //norm
+//  {1.0f, 1.0f, 1.0f, 1.0f}, //color
+//  {0.0f, 0.0f}              //texCoord
+//};
+//iv->verts[2] = {
+//  {-0.58f, 1.0f, 0.0f},       //pos
+//  {0.0f, 0.0f, -1.0f},        //norm
+//  {1.0f, 1.0f, 1.0f, 1.0f},   //color
+//  {0.0f, 0.0f}                //texCoord
+//};
+
+//u64 type = lftTri("type");
+//char* tstr = (char*)&type;
+
+//Tbl lftTri;
+//auto typenum = "IdxVerts";
+//lftTri("type") = *((u64*)typenum);
+//lftTri("mode") = GL_TRIANGLES;
+//tf32 p   = { -1.0, -1.0f,  0.0f, -0.17f, -1.0f,  0.0f, -0.58f, 1.0f,  0.0f };
+//tf32 n   = { 0.0f,  0.0f, -1.0f,   0.0f,  0.0f, -1.0f,  0.0f,  0.0f, -1.0f };
+//tf32 c   = { 1.0f,  1.0f,  1.0f,   1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  1.0f, 1.0f, 1.0f, 1.0f };
+//tf32 tx  = { 0.0f,  0.0f,  0.0f,   0.0f,  0.0f,  0.0f };
+//tu32 ind = { 0, 1, 2};
+//
+//lftTri("P")   =  &p;
+//lftTri("N")   =  &n;
+//lftTri("C")   =  &c;
+//lftTri("TX")  =  &tx;
 
 //auto prevSz = vd.ui.dbNames.size();
 //if(vd.ui.dbNames.size()==0){

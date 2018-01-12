@@ -1449,7 +1449,12 @@ public:
     return move(sm);
   }
 
-  SharedMem(){}
+  SharedMem() :
+    hndlPtr(nullptr),
+    ptr(nullptr),
+    size(0),
+    owner(false)
+  {}
   SharedMem(SharedMem&)       = delete;
   SharedMem(SharedMem&& rval){ mv(std::move(rval)); }
   SharedMem& operator=(SharedMem&& rval){ mv(std::move(rval)); return *this; }
@@ -1550,7 +1555,15 @@ private:
   }
 
 public:
-  simdb(){}
+  simdb() : 
+    m_nxtChIdx(0),
+    m_curChIdx(0),
+    m_isOpen(false),
+    s_flags(nullptr),
+    s_cnt(nullptr),
+    s_blockSize(nullptr),
+    s_blockCount(nullptr)
+  {}
   simdb(const char* name, u32 blockSize, u32 blockCount, bool raw_path=false) : 
     m_nxtChIdx(0),
     m_curChIdx(0),
@@ -1562,8 +1575,11 @@ public:
     if(error_code!=simdb_error::NO_ERRORS){ m_error = error_code; return; }
     if(!m_mem.hndlPtr){ m_error = simdb_error::SHARED_MEMORY_ERROR; return; }
 
+    //  flags     blockSize
+    // |----|----|--------|--------|     each dash ('-') represents one byte - flags is the first four, cnt is the next 4, blockSize is the next 8, blockCount is the 8 bytes after that
+    //       cnt           blockCount
     s_blockCount  =  ((au64*)m_mem.data())+2;
-    s_blockSize   =  ((au64*)m_mem.data())+1;
+    s_blockSize   =  ((au64*)m_mem.data())+1;      // 8 byte offset to be after flags and cnt 
     s_flags       =   (au32*)m_mem.data();
     s_cnt         =  ((au32*)m_mem.data())+1;
 
@@ -1633,6 +1649,7 @@ public:
   }
   bool         put(char const* const key, const void *const val, u32 vlen, u32* out_startBlock=nullptr)
   {
+    assert(m_isOpen); // make sure if the db is being used it has been initialized
     assert(strlen(key)>0);
     return put(key, (u32)strlen(key), val, vlen, out_startBlock);
   }
@@ -1680,7 +1697,8 @@ public:
   {
     if(m_isOpen){
       m_isOpen = false;
-      u64 prev = s_flags->fetch_sub(1);                                                   // prev is previous flags value - the number of simdb instances across process that had the shared memory file open
+      //u64 prev = s_flags->fetch_sub(1);                                                   // should this be s_cnt? - prev is previous flags value - the number of simdb instances across process that had the shared memory file open
+      u64 prev = s_cnt->fetch_sub(1);                                                   // should this be s_cnt? - prev is previous flags value - the number of simdb instances across process that had the shared memory file open
       if(prev==1){                                                                        // if the previous value was 1, that means the value is now 0, and we are the last one to stop using the file, which also means we need to be the one to clean it up
         SharedMem::FreeAnon(m_mem);                                                       // close and delete the shared memory - this is done automatically on windows when all processes are no longer accessing a shared memory file
         return true;
@@ -1703,7 +1721,8 @@ public:
 
   i64          len(str    const& key, u32* out_vlen=nullptr, u32* out_version=nullptr) const
   {
-    return len( (void*)key.data(), (u32)key.length(), out_vlen, out_version);
+    //return len( (void*)key.data(), (u32)key.length(), out_vlen, out_version);
+    return len( (void*)key.c_str(), (u32)key.length(), out_vlen, out_version);
   }
   i64          put(str    const& key, str const& value)
   {

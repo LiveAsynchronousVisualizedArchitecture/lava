@@ -43,9 +43,14 @@
 // -todo: split out label regen into separate function
 // -todo: change labels on selection of a different tbl
 // -todo: get table from the db and point to it
+// -todo: fix crash on selecting the inner array - iterator was being checked if not equal to end instead of equal to end
+// -todo: make a pointer to the current tble that is set on clicking within a table
+// -todo: make function to get a full key from an item proxy
+// -todo: make a function to check if an item proxy is a table key
 
-// todo: fix crash on selecting the inner array
-// todo: make a pointer to the current tble that is set on clicking within a table
+// todo: make the tree text under an array be the mean, median, mode and variance of the array values
+// todo: make a graph visualization of the current table in the picture widget
+// todo: debug crash when selecting key of first table in the tree
 // todo: make listing the keys of a db happen on expand
 // todo: make insertion of tbls from a db key happen on expand
 // todo: change regen function to a refreshDBs function name
@@ -86,12 +91,6 @@ using vec_str = std::vector<str>;
 using  vec_u8 = std::vector<u8>;
 using vec_dbs = std::vector<simdb>;
 using   IvTbl = tbl<vert>;
-
-//using  IdxKey = std::pair<u32,str>;
-//using TblKeys = std::unordered_set<str>;
-//
-//IvTbl*                        cur;
-//vec_u8                curTblBytes;
 
 struct IdxKey { bool subTbl; u32 idx; str key; };            // this represents an index into the db vector and a key  
 using TblKeys = std::unordered_map<str,IdxKey>;
@@ -226,10 +225,35 @@ void     regenTblInfo()
   }
   regenLabels( glblT );
 }
+str        getFullKey(nana::treebox::item_proxy const& ip)
+{
+  u32     i = 0;
+  str   key = "";
+  auto* cur = &ip;
+  do{
+    //sel.push_back(cur->key());
+    key = cur->key() + "/" + key;
+    cur = &(cur->owner());
+    //if(i!=0){ key += "/"; }
+    ++i;
+  }while(cur->level() > 0);
+
+  //str key = "";
+  //FROM(sel.size(),i){             // loop from the last to the first, since they were pushed in reverse order while walking back up the tree
+  //  key += sel[i];
+  //  if(i!=0) key += "/";
+  //}
+
+  return key;
+}
 bool       isTableKey(str const& key)
 {
   auto iter = tblKeys.find(key);
   return iter != tblKeys.end();
+}
+bool       isTableKey(nana::treebox::item_proxy const& ip)
+{
+  return isTableKey( getFullKey(ip) );
 }
 IvTbl* setCurTblFromTreeKey(str key)  // set current table from tree key
 {
@@ -397,6 +421,11 @@ int  main()
           //  aryViz.text(aryStr);
           //}
 
+          
+          if( isTableKey(tbArg.item) ){ //&& tbArg.item.child().key() == "arystr" ){
+            tree.insert( tbArg.item.key() + "/watsquidoosh", "watsquidoosh");
+          }
+
           Println("");
           Println("txt: ", tbArg.item.text(), " key: ", tbArg.item.key() );
           Println("expanded: ", tbArg.item.expanded() );
@@ -417,9 +446,6 @@ int  main()
           cur = &(cur->owner());
         }while(cur->level() > 0);
 
-        //for(auto const& s : sel){
-        //  Print(s,"/");
-        //}
         str key = "";
         FROM(sel.size(),i){             // loop from the last to the first, since they were pushed in reverse order while walking back up the tree
           key += sel[i];
@@ -487,6 +513,16 @@ int  main()
 
 
 
+
+//for(auto const& s : sel){
+//  Print(s,"/");
+//}
+
+//using  IdxKey = std::pair<u32,str>;
+//using TblKeys = std::unordered_set<str>;
+//
+//IvTbl*                        cur;
+//vec_u8                curTblBytes;
 
 //for(auto const& key : dbKeys){
 //  //db.len(key);
