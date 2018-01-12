@@ -50,6 +50,7 @@
 // -todo: detect when the ary item in a table is expanded 
 // -todo: make the tree text under an array be the mean, median, mode and variance of the array values
 
+// todo: make multiple selections additivly draw multiple colored lines?
 // todo: make a graph visualization of the current table in the picture widget
 // todo: debug crash when selecting key of first table in the tree
 // todo: make listing the keys of a db happen on expand
@@ -97,21 +98,26 @@ using   IvTbl = tbl<vert>;
 struct IdxKey { bool subTbl; u32 idx; str key; };            // this represents an index into the db vector and a key  
 using TblKeys = std::unordered_map<str,IdxKey>;
 
-IvTbl                       glblT;
-vec_u8                     tblBuf;
-vec_str                       sel;
-vec_dbs                       dbs;
-TblKeys                   tblKeys;
-nana::form                     fm;
-nana::treebox                tree;
-nana::picture              aryViz;
-nana::label sz, elems, szBytes, cap, mapcap, owned;
-
 class mem_pixbuf : public nana::paint::detail::basic_image_pixbuf
 {
   bool open(const std::experimental::filesystem::path& file){ return false; }
   bool open(const void* data, std::size_t bytes){ return false; }
 };
+using MemPixbuf = std::shared_ptr<mem_pixbuf>;
+
+IvTbl                       glblT;
+vec_u8                     tblBuf;
+vec_str                       sel;
+vec_dbs                       dbs;
+TblKeys                   tblKeys;
+MemPixbuf                mempxbuf;
+nana::form                     fm;
+nana::treebox                tree;
+nana::picture                 viz;
+nana::paint::image         vizImg;
+nana::place                   plc;
+nana::label sz, elems, szBytes, cap, mapcap, owned;
+
 
 namespace {
 
@@ -192,27 +198,20 @@ void     regenTblInfo()
     simdb_error err;
     auto dbPths = simdb_listDBs(&err);
 
-    //for(auto& pth : dbPths)
     TO(dbPths.size(),i)
     {
       auto const& pth = dbPths[i];
       tree.insert(pth, pth);
       
-      //simdb db(pth.c_str(), 4096, 1 << 14);
-      //auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
-      //vec_u8 tblBuf; 
       dbs.emplace_back(pth.c_str(), 4096, 1 << 14);
       simdb&   db = dbs.back();
       auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
-      //for(auto const& key : dbKeys)
       TO(dbKeys.size(),j)
       {
         auto const& key = dbKeys[j];
         auto tblKey = pth+"/"+key.str;
-        //tree.insert(pth+"/"+key.str, key.str);
         tree.insert(tblKey, key.str);
 
-        //str tblKey = pth+"/"+key.str;
         tblBuf     = extractDbKey(db, key.str);
         IvTbl ivTbl(tblBuf.data());
         insertTbl(tblKey, ivTbl);
@@ -281,6 +280,33 @@ IvTbl* setCurTblFromTreeKey(str key)  // set current table from tree key
   }else{ return nullptr; }
 }
 
+
+void          initViz()
+{
+  using namespace std;
+  using namespace nana;
+  using namespace nana::paint;
+
+  mempxbuf = make_shared<mem_pixbuf>();
+  mempxbuf->pixbuf_ = pixel_buffer(512,256);
+  auto* stor = mempxbuf->pixbuf_.storage_.get();
+  auto rawpx = stor->raw_pixel_buffer;
+  auto     w = stor->pixel_size.width;
+  auto     h = stor->pixel_size.height;
+  for(unsigned int y=0; y<h; ++y)
+    for(unsigned int x=0; x<w; ++x){
+      pixel_argb_t p;
+      p.element.red   = (u8)(y/(f32)h * 255.f);
+      p.element.green = (u8)(x/(f32)w * 255.f);
+      p.element.blue  = 0;
+      p.element.alpha_channel = 1;
+      rawpx[y*w + x]  = p;
+    }
+  
+  vizImg.image_ptr_ = mempxbuf;
+  viz.load(vizImg);
+}
+
 }
 
 int  main()
@@ -318,8 +344,10 @@ int  main()
   }
   SECTION(initialize components with the main window handle)
   {
-    aryViz.create(fm, true);
-    aryViz.stretchable(true);
+    viz.create(fm, true);
+    viz.stretchable(true);
+    viz.borderless(false);
+    viz.bgcolor(color(0,0,0,1.0));
 
     sz.create(fm);
     elems.create(fm);
@@ -327,6 +355,28 @@ int  main()
     cap.create(fm);
     mapcap.create(fm);
     owned.create(fm);
+
+    initViz();
+
+    //mempxbuf = make_shared<mem_pixbuf>();
+    //mempxbuf->pixbuf_ = pixel_buffer(512,256);
+    //auto* stor = mempxbuf->pixbuf_.storage_.get();
+    //auto rawpx = stor->raw_pixel_buffer;
+    //auto     w = stor->pixel_size.width;
+    //auto     h = stor->pixel_size.height;
+    //for(unsigned int y=0; y<h; ++y)
+    //  for(unsigned int x=0; x<w; ++x){
+    //    pixel_argb_t p;
+    //    p.element.red   = (u8)(y/(f32)h * 255.f);
+    //    p.element.green = (u8)(x/(f32)w * 255.f);
+    //    p.element.blue  = 0;
+    //    p.element.alpha_channel = 1;
+    //    rawpx[y*w + x]  = p;
+    //  }
+    //
+    //vizImg.image_ptr_ = mempxbuf;
+    //viz.load(vizImg);
+
   }
 
   menubar mb;
@@ -373,43 +423,34 @@ int  main()
       auto& img = tree.icon("TestIcon");
       auto& nrm = img.normal;
 
-      //paint::detail::basic_image_pixbuf bipb;
+      //auto     mempxbuf = make_shared<mem_pixbuf>(); // todo: initialize this buffer 
+      //mempxbuf->pixbuf_ = pixel_buffer(512,256);
+      //auto* stor = mempxbuf->pixbuf_.storage_.get();
+      //auto rawpx = stor->raw_pixel_buffer;
+      //auto     w = stor->pixel_size.width;
+      //auto     h = stor->pixel_size.height;
+      //for(unsigned int y=0; y<h; ++y)
+      //  for(unsigned int x=0; x<w; ++x){
+      //    pixel_argb_t p;
+      //    p.element.red   = (u8)(y/(f32)h * 255.f);
+      //    p.element.green = (u8)(x/(f32)w * 255.f);
+      //    p.element.blue  = 0;
+      //    p.element.alpha_channel = 1;
+      //    rawpx[y*w + x]  = p;
+      //  }
 
-      //pixel_buffer pxbuf(128,128);
-      //pixel_buffer::pixel_buffer_storage* stor = pxbuf.storage_.get();
-      auto     mempxbuf = make_shared<mem_pixbuf>(); // todo: initialize this buffer 
-      mempxbuf->pixbuf_ = pixel_buffer(512,256);
-      auto* stor = mempxbuf->pixbuf_.storage_.get();
-      auto rawpx = stor->raw_pixel_buffer;
-      auto     w = stor->pixel_size.width;
-      auto     h = stor->pixel_size.height;
-      for(unsigned int y=0; y<h; ++y)
-        for(unsigned int x=0; x<w; ++x){
-          pixel_argb_t p;
-          p.element.red   = (u8)(y/(f32)h * 255.f);
-          p.element.green = (u8)(x/(f32)w * 255.f);
-          p.element.blue  = 0;
-          p.element.alpha_channel = 1;
-          rawpx[y*w + x]  = p;
-        }
+      //img.normal.open("normal1.png");
+      //img.hovered.open("hovered1.png");
+      //img.expanded.open("expanded1.png");
+      //auto ptr = img.normal.image_ptr_.get();
 
-      img.normal.open("normal1.png");
-      img.hovered.open("hovered1.png");
-      img.expanded.open("expanded1.png");
-      auto ptr = img.normal.image_ptr_.get();
-
-      img.normal.image_ptr_ = mempxbuf;
-      aryViz.load(img.normal);
+      //img.normal.image_ptr_ = mempxbuf;
+      //viz.load(img.normal);
       tree.auto_draw(true);
     }
     SECTION(treebox item insertion from the current tbl)
     {
       regenTblInfo();
-      //tree.insert("place", "place");
-      //auto watPrxy = tree.insert("place/wat", "wat");
-      //watPrxy.icon("TestIcon");
-      //tree.insert( toString("skidoosh"), toString("skidoosh") );
-      //insertTbl("", t);
     }
     SECTION(treebox set up including events)
     {
@@ -423,10 +464,11 @@ int  main()
           str tblKey = getFullKey( tbArg.item.owner() );
           if( isTableKey(tblKey) && 
               tbArg.item.key() == "ary"      &&
-              tbArg.item.child().text() == ""){
+              tbArg.item.child().text() == "")
+          {
             auto    t = tblFromKey( tblKey );
 
-            auto flen = t.size() * 12; // 12 floats in a vert struct
+            auto flen = t.size() * 12;      // 12 floats in a vert struct
             f32*    f = (float*)t.m_mem;
             sort(f, f+flen);                // sort for both the median and the mode
 
@@ -520,6 +562,43 @@ int  main()
         if(curT){
           regenLabels( *curT );
         }
+        if(curT == nullptr) return;
+
+        auto&   t = *curT;
+        auto flen = t.size() * 12;      // 12 floats in a vert struct
+        f32*    f = (float*)t.m_mem;
+        
+        //TO(flen,i){
+        //  f[i] = 
+        //}
+
+        //image img;
+        //initViz();
+        //vizImg.image_ptr_ = mempxbuf;
+        //viz.load(vizImg);
+
+        auto* stor = mempxbuf->pixbuf_.storage_.get();
+        auto rawpx = stor->raw_pixel_buffer;
+        auto     w = stor->pixel_size.width;
+        auto     h = stor->pixel_size.height;
+        for(unsigned int y=0; y<h; ++y)
+          for(unsigned int x=0; x<w; ++x){
+            pixel_argb_t p;
+            //p.element.red   = (u8)(y/(f32)h * 255.f);
+            //p.element.green = (u8)(x/(f32)w * 255.f);
+            p.element.red   = 0;
+            p.element.green = 0;
+            p.element.blue  = 0;
+            p.element.alpha_channel = 1;
+            rawpx[y*w + x]  = p;
+          }
+
+        vizImg.image_ptr_ = mempxbuf;
+        viz.load(vizImg);
+
+        plc.collocate();
+        fm.collocate();
+        fm.activate();
 
         Println("\n\n");
       });
@@ -528,12 +607,13 @@ int  main()
 
   SECTION(place and gui component layout)
   {
-    place       plc(fm);
-    place  lblPlace(fm);
+    plc.bind(fm);
+    //place       plc(fm);
+    //place  lblPlace(fm);
     plc["mb"]      << mb;
     //plc["drgBtn"]  << drgBtn;
     plc["sz"]      << sz;
-    plc["aryViz"]  << aryViz;
+    plc["viz"]     << viz;
     plc["elems"]   << elems;
     plc["szBytes"] << szBytes;
     plc["cap"]     << cap;
@@ -545,7 +625,7 @@ int  main()
             "<weight=20 margin=[0,0,5,10] " // weight=20 "<weight=10% "
              "  <fit sz margin=[0,10]> <fit elems margin=[0,10]> <fit szBytes margin=[0,10]> <fit cap margin=[0,10]> <fit mapcap margin=[0,10]> <fit owned>"
             ">" //  gap=5 margin=[10,40,10,0]" //margin=[10,10,10,10]>"
-            "<fit aryViz margin=[10,10,10,10] >"// weight=30%>" // margin=[10,10,10,10] > "
+            "<fit viz margin=[10,10,10,10] >"// weight=30%>" // margin=[10,10,10,10] > "
             "<tree>" // weight=70%>"
             );
     plc.collocate();
@@ -573,6 +653,29 @@ int  main()
 
 
 
+
+//for(auto& pth : dbPths)
+//
+//simdb db(pth.c_str(), 4096, 1 << 14);
+//auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
+//vec_u8 tblBuf; 
+//
+//for(auto const& key : dbKeys)
+//
+//tree.insert(pth+"/"+key.str, key.str);
+//
+//str tblKey = pth+"/"+key.str;
+
+//tree.insert("place", "place");
+//auto watPrxy = tree.insert("place/wat", "wat");
+//watPrxy.icon("TestIcon");
+//tree.insert( toString("skidoosh"), toString("skidoosh") );
+//insertTbl("", t);
+
+//paint::detail::basic_image_pixbuf bipb;
+//
+//pixel_buffer pxbuf(128,128);
+//pixel_buffer::pixel_buffer_storage* stor = pxbuf.storage_.get();
 
 //&& tbArg.item.key() == "ary"
 //tree.insert( tbArg.item, "/watsquidoosh", "watsquidoosh");
