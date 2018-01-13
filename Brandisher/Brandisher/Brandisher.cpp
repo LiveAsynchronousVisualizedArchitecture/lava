@@ -49,14 +49,14 @@
 // -todo: make a function to check if an item proxy is a table key
 // -todo: detect when the ary item in a table is expanded 
 // -todo: make the tree text under an array be the mean, median, mode and variance of the array values
+// -todo: debug crash when selecting key of first table in the tree - might have been the way the table is being handled by the viewer
+// -todo: change regen function to a refreshDBs function name - regen is good enough
+// -todo: debug tbl elem count coming from the visualizer - tbl initialization bugs
 
 // todo: make multiple selections additivly draw multiple colored lines?
 // todo: make a graph visualization of the current table in the picture widget
-// todo: debug crash when selecting key of first table in the tree
 // todo: make listing the keys of a db happen on expand
 // todo: make insertion of tbls from a db key happen on expand
-// todo: change regen function to a refreshDBs function name
-// todo: debug tbl elem count coming from the visualizer
 // todo: make switch case for fundamental types that the map elements can be
 // todo: compile with png and jpeg libs
 // todo: implement saving of the tbl
@@ -357,26 +357,6 @@ int  main()
     owned.create(fm);
 
     initViz();
-
-    //mempxbuf = make_shared<mem_pixbuf>();
-    //mempxbuf->pixbuf_ = pixel_buffer(512,256);
-    //auto* stor = mempxbuf->pixbuf_.storage_.get();
-    //auto rawpx = stor->raw_pixel_buffer;
-    //auto     w = stor->pixel_size.width;
-    //auto     h = stor->pixel_size.height;
-    //for(unsigned int y=0; y<h; ++y)
-    //  for(unsigned int x=0; x<w; ++x){
-    //    pixel_argb_t p;
-    //    p.element.red   = (u8)(y/(f32)h * 255.f);
-    //    p.element.green = (u8)(x/(f32)w * 255.f);
-    //    p.element.blue  = 0;
-    //    p.element.alpha_channel = 1;
-    //    rawpx[y*w + x]  = p;
-    //  }
-    //
-    //vizImg.image_ptr_ = mempxbuf;
-    //viz.load(vizImg);
-
   }
 
   menubar mb;
@@ -423,29 +403,6 @@ int  main()
       auto& img = tree.icon("TestIcon");
       auto& nrm = img.normal;
 
-      //auto     mempxbuf = make_shared<mem_pixbuf>(); // todo: initialize this buffer 
-      //mempxbuf->pixbuf_ = pixel_buffer(512,256);
-      //auto* stor = mempxbuf->pixbuf_.storage_.get();
-      //auto rawpx = stor->raw_pixel_buffer;
-      //auto     w = stor->pixel_size.width;
-      //auto     h = stor->pixel_size.height;
-      //for(unsigned int y=0; y<h; ++y)
-      //  for(unsigned int x=0; x<w; ++x){
-      //    pixel_argb_t p;
-      //    p.element.red   = (u8)(y/(f32)h * 255.f);
-      //    p.element.green = (u8)(x/(f32)w * 255.f);
-      //    p.element.blue  = 0;
-      //    p.element.alpha_channel = 1;
-      //    rawpx[y*w + x]  = p;
-      //  }
-
-      //img.normal.open("normal1.png");
-      //img.hovered.open("hovered1.png");
-      //img.expanded.open("expanded1.png");
-      //auto ptr = img.normal.image_ptr_.get();
-
-      //img.normal.image_ptr_ = mempxbuf;
-      //viz.load(img.normal);
       tree.auto_draw(true);
     }
     SECTION(treebox item insertion from the current tbl)
@@ -568,10 +525,6 @@ int  main()
         auto flen = t.size() * 12;      // 12 floats in a vert struct
         f32*    f = (float*)t.m_mem;
 
-        //TO(flen,i){
-        //  f[i] = 
-        //}
-
         //image img;
         //initViz();
         //vizImg.image_ptr_ = mempxbuf;
@@ -677,6 +630,52 @@ int  main()
 
 
 
+
+
+
+
+//mempxbuf = make_shared<mem_pixbuf>();
+//mempxbuf->pixbuf_ = pixel_buffer(512,256);
+//auto* stor = mempxbuf->pixbuf_.storage_.get();
+//auto rawpx = stor->raw_pixel_buffer;
+//auto     w = stor->pixel_size.width;
+//auto     h = stor->pixel_size.height;
+//for(unsigned int y=0; y<h; ++y)
+//  for(unsigned int x=0; x<w; ++x){
+//    pixel_argb_t p;
+//    p.element.red   = (u8)(y/(f32)h * 255.f);
+//    p.element.green = (u8)(x/(f32)w * 255.f);
+//    p.element.blue  = 0;
+//    p.element.alpha_channel = 1;
+//    rawpx[y*w + x]  = p;
+//  }
+//
+//vizImg.image_ptr_ = mempxbuf;
+//viz.load(vizImg);
+
+//auto     mempxbuf = make_shared<mem_pixbuf>(); // todo: initialize this buffer 
+//mempxbuf->pixbuf_ = pixel_buffer(512,256);
+//auto* stor = mempxbuf->pixbuf_.storage_.get();
+//auto rawpx = stor->raw_pixel_buffer;
+//auto     w = stor->pixel_size.width;
+//auto     h = stor->pixel_size.height;
+//for(unsigned int y=0; y<h; ++y)
+//  for(unsigned int x=0; x<w; ++x){
+//    pixel_argb_t p;
+//    p.element.red   = (u8)(y/(f32)h * 255.f);
+//    p.element.green = (u8)(x/(f32)w * 255.f);
+//    p.element.blue  = 0;
+//    p.element.alpha_channel = 1;
+//    rawpx[y*w + x]  = p;
+//  }
+//
+//img.normal.open("normal1.png");
+//img.hovered.open("hovered1.png");
+//img.expanded.open("expanded1.png");
+//auto ptr = img.normal.image_ptr_.get();
+//
+//img.normal.image_ptr_ = mempxbuf;
+//viz.load(img.normal);
 
 //for(auto& pth : dbPths)
 //
