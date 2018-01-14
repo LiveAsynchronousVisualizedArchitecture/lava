@@ -5,6 +5,8 @@ VisualStudioVersion = 15.0.27130.2010
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Brandisher", "Brandisher\Brandisher.vcxproj", "{0D9CBF10-D80B-4D81-B82B-06F2AD3AC215}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "nana_test01", "nana_test01\nana_test01.vcxproj", "{48791A55-C26E-4C99-A539-A6A1B483210F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -21,6 +23,14 @@ Global
 		{0D9CBF10-D80B-4D81-B82B-06F2AD3AC215}.Release|x64.Build.0 = Release|x64
 		{0D9CBF10-D80B-4D81-B82B-06F2AD3AC215}.Release|x86.ActiveCfg = Release|Win32
 		{0D9CBF10-D80B-4D81-B82B-06F2AD3AC215}.Release|x86.Build.0 = Release|Win32
+		{48791A55-C26E-4C99-A539-A6A1B483210F}.Debug|x64.ActiveCfg = Debug|x64
+		{48791A55-C26E-4C99-A539-A6A1B483210F}.Debug|x64.Build.0 = Debug|x64
+		{48791A55-C26E-4C99-A539-A6A1B483210F}.Debug|x86.ActiveCfg = Debug|Win32
+		{48791A55-C26E-4C99-A539-A6A1B483210F}.Debug|x86.Build.0 = Debug|Win32
+		{48791A55-C26E-4C99-A539-A6A1B483210F}.Release|x64.ActiveCfg = Release|x64
+		{48791A55-C26E-4C99-A539-A6A1B483210F}.Release|x64.Build.0 = Release|x64
+		{48791A55-C26E-4C99-A539-A6A1B483210F}.Release|x86.ActiveCfg = Release|Win32
+		{48791A55-C26E-4C99-A539-A6A1B483210F}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

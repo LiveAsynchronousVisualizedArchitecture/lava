@@ -1,0 +1,333 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Source Files\nana">
+      <UniqueIdentifier>{97685e97-a652-48ae-bf79-d4d827721925}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files\nana\exclude">
+      <UniqueIdentifier>{80c974fd-43b6-4568-b60e-980116b6c97f}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="nana_test01.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\system\dataexch.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\system\platform.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\system\shared_wrapper.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\system\timepiece.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\threads\pool.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\any.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\basic_types.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\charset.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\datetime.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\deploy.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\internationalization.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\stdc++.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\unicode_bidi.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\audio\detail\audio_device.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\audio\detail\audio_stream.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\audio\detail\buffer_preparation.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\audio\player.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\detail\platform_abstraction.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\detail\platform_spec_posix.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\detail\platform_spec_windows.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\filesystem\filesystem.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\animation.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\basis.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\detail\basic_window.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\detail\bedrock_pi.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\detail\bedrock_posix.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\detail\bedrock_windows.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\detail\color_schemes.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\detail\drawer.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\detail\element_store.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\detail\events_operation.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\detail\native_window_interface.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\detail\window_layout.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\detail\window_manager.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\dragger.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\drawing.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\effects.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\element.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\filebox.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\layout_utility.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\msgbox.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\notifier.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\place.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\programming_interface.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\screen.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\state_cursor.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\timer.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\tooltip.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\button.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\categorize.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\checkbox.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\combox.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\date_chooser.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\float_listbox.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\form.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\frame.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\group.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\label.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\listbox.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\menu.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\menubar.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\panel.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\picture.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\progress.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\scroll.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\skeletons\content_view.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\skeletons\text_editor.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\slider.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\spinbox.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\tabbar.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\textbox.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\toolbar.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\treebox.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\widgets\widget.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\gui\wvl.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\paint\detail\image_process_provider.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\paint\detail\native_paint_interface.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\paint\image.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\paint\image_process_selector.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\paint\text_renderer.cpp">
+      <Filter>Source Files\nana</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\paint\pixel_buffer.cpp">
+      <Filter>Source Files\nana\exclude</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\paint\graphics.cpp">
+      <Filter>Source Files\nana\exclude</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\source\detail\mswin\platform_spec.hpp">
+      <Filter>Source Files\nana</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\detail\platform_abstraction.hpp">
+      <Filter>Source Files\nana</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\detail\platform_abstraction_types.hpp">
+      <Filter>Source Files\nana</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\detail\platform_spec_selector.hpp">
+      <Filter>Source Files\nana</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\detail\posix\msg_dispatcher.hpp">
+      <Filter>Source Files\nana</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\detail\posix\msg_packet.hpp">
+      <Filter>Source Files\nana</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\detail\posix\platform_spec.hpp">
+      <Filter>Source Files\nana</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\gui\detail\dynamic_drawing_object.hpp">
+      <Filter>Source Files\nana</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\gui\detail\window_register.hpp">
+      <Filter>Source Files\nana</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\gui\place_parts.hpp">
+      <Filter>Source Files\nana</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\gui\widgets\skeletons\content_view.hpp">
+      <Filter>Source Files\nana</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\paint\detail\image_bmp.hpp">
+      <Filter>Source Files\nana</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\paint\detail\image_ico.hpp">
+      <Filter>Source Files\nana</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\paint\detail\image_ico_resource.hpp">
+      <Filter>Source Files\nana</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\paint\detail\image_jpeg.hpp">
+      <Filter>Source Files\nana</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\paint\detail\image_pixbuf.hpp">
+      <Filter>Source Files\nana</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\paint\detail\image_png.hpp">
+      <Filter>Source Files\nana</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\paint\image_accessor.hpp">
+      <Filter>Source Files\nana</Filter>
+    </ClInclude>
+    <ClInclude Include="..\source\paint\truetype.hpp">
+      <Filter>Source Files\nana</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

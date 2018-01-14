@@ -64,6 +64,7 @@
 // todo: implement opening of the tbl through the menu and file dialog
 // todo: try compiling with clang
 // todo: make a Brandisher simdb database on start, as scratch space for dragged in files and dragged tables from other dbs
+// todo: look in to making a custom nana drawing component that will expand to the space it has
 
 // idea: should tbls exist as either files, memory, or sub tables?
 //       | icon in the tree could show which is which
@@ -81,8 +82,12 @@
 #include <nana/gui/widgets/menubar.hpp>
 #include <nana/paint/pixel_buffer.hpp>
 #include <nana/gui/widgets/picture.hpp>
+#include <nana/gui/wvl.hpp>
+#include <nana/gui/drawing.hpp>
+#include <nana/paint/image_process_selector.hpp>
 #include <../source/paint/detail/image_pixbuf.hpp>
 #include <../source/paint/pixel_buffer.cpp>
+#include <../source/paint/graphics.cpp>
 #include "../../no_rt_util.h"
 #include "../../simdb.hpp"
 #include "../../tbl.hpp"
@@ -98,12 +103,97 @@ using   IvTbl = tbl<vert>;
 struct IdxKey { bool subTbl; u32 idx; str key; };            // this represents an index into the db vector and a key  
 using TblKeys = std::unordered_map<str,IdxKey>;
 
+std::ostream& operator << (std::ostream& os, const nana::point& p)
+{
+  return os << "point{" << p.x << "," << p.y << "}";
+}
+std::ostream& operator<< (std::ostream& os, const nana::size& z)
+{
+  return os << "size{" << z.width << "," << z.height << "}";
+}
+std::ostream& operator<< (std::ostream& os, const nana::rectangle& r)
+{
+  return os << "rect{" << r.position() << "," << r.dimension() << "}";
+}
+
 class mem_pixbuf : public nana::paint::detail::basic_image_pixbuf
 {
   bool open(const std::experimental::filesystem::path& file){ return false; }
   bool open(const void* data, std::size_t bytes){ return false; }
 };
 using MemPixbuf = std::shared_ptr<mem_pixbuf>;
+
+class tsform
+  : public nana::form
+{
+  nana::paint::image img_;
+  nana::paint::graphics gr_;
+public:
+  tsform()
+  {
+    if (!img_.open(("../Examples/bground.6states.bmp")))
+      throw std::runtime_error("Imposible to open the image");    
+
+    nana::drawing dw(*this);
+    dw.draw([this](nana::paint::graphics& graph)
+    {
+      using namespace nana;
+      
+      rectangle r { point{ 0,0 }, img_.size() };
+      rectangle rw{ point{ 0,0 }, size() };
+      //nana::size sz{size()};
+      graph.rectangle(nana::rectangle{ 5, 5, 50, 50 }, true, colors::red);
+      graph.line(point(5, 5), point(55, 55), colors::blue);
+      graph.line_begin(200, 100);
+      graph.line_to(point(300, 300));
+      graph.line_to(point(100, 200));
+      graph.line_to(point(300, 200));
+      graph.line_to(point(100, 300));
+      graph.line_to(point(200, 100));
+      img_.stretch(r, gr_, rw );
+      std::cout << "Pict: " << r << ", Windows: " << rw << "\n";
+    });
+    //      // get the graphycs !?
+    //if (!API::window_graphics(*this, gr_))
+    //      throw std::runtime_error("Imposible to get the graph");
+    //      
+    //      //Copy the image to the window
+    //img_.paste( rectangle{ point{0,0}, img_.size() },
+    //                        gr_,
+    //                        {0,0});
+    //img_.stretch( rectangle{ point{0,0}, img_.size() },
+    //                        gr_,
+    //                        size()  );
+    dw.update();
+    //Register events
+    events().click  ( [this](){_m_click();} );  
+    //events().resized( [this](){_m_size ();} );  
+  }
+private:
+  //Switchs the algorithm between two algorithms in every click on the form.
+  void _m_click()
+  {
+    static bool interop;
+    nana::paint::image_process::selector sl;
+    sl.stretch(interop ? "bilinear interoplation" : "proximal interoplation");
+    interop = !interop;
+    std::cout << (interop ? "Click: bilinear interoplation\n" 
+      : "Click: proximal interoplation\n") ;
+  }
+  //  //When the window size is changed, it stretches the image to fit the window.
+  //  void _m_size()
+  //  {
+  //      drawing dw(*this);
+  //     
+  //      dw.clear();  //Before stretch, it should clear the operations that are generated before.
+  //      
+  //img_.stretch(rectangle{ point{ 0,0 }, img_.size() },
+  //      gr_,
+  //      size());
+  //dw.update();
+  //std::cout << "resize\n";
+  //  }
+};
 
 IvTbl                       glblT;
 vec_u8                     tblBuf;
@@ -117,7 +207,8 @@ nana::picture                 viz;
 nana::paint::image         vizImg;
 nana::place                   plc;
 nana::label sz, elems, szBytes, cap, mapcap, owned;
-
+//nana::drawing                dviz(viz);
+//tsform                        tsf;
 
 namespace {
 
@@ -280,7 +371,6 @@ IvTbl* setCurTblFromTreeKey(str key)  // set current table from tree key
   }else{ return nullptr; }
 }
 
-
 void          initViz()
 {
   using namespace std;
@@ -344,6 +434,8 @@ int  main()
   }
   SECTION(initialize components with the main window handle)
   {
+    //dviz.
+
     viz.create(fm, true);
     viz.stretchable(true);
     viz.borderless(false);
@@ -564,7 +656,9 @@ int  main()
             //f32 val = f[ (u64)(x*ratio) ];
             f32 val = f[ (u64)(x/ratio) ];
             if(h-y < val*hRatio){ // this flips the graph vertically, but increasing y goes down in screen space, so we want it flipped
+              p.element.red   = 255;
               p.element.green = 255;
+              p.element.blue  = 255;
             }
 
             rawpx[y*w + x] = p;
@@ -585,24 +679,24 @@ int  main()
   SECTION(place and gui component layout)
   {
     plc.bind(fm);
-    //place       plc(fm);
-    //place  lblPlace(fm);
     plc["mb"]      << mb;
-    //plc["drgBtn"]  << drgBtn;
     plc["sz"]      << sz;
     plc["viz"]     << viz;
+    //plc["dviz"]    << dviz;
+    //plc["tsf"]     << tsf;
     plc["elems"]   << elems;
     plc["szBytes"] << szBytes;
     plc["cap"]     << cap;
     plc["owned"]   << owned;
     plc["mapcap"]  << mapcap;
     plc["tree"]    << tree;
-    plc.div("vert"
+    plc.div("vertical"
             "<mb weight=30>"
             "<weight=20 margin=[0,0,5,10] " // weight=20 "<weight=10% "
              "  <fit sz margin=[0,10]> <fit elems margin=[0,10]> <fit szBytes margin=[0,10]> <fit cap margin=[0,10]> <fit mapcap margin=[0,10]> <fit owned>"
             ">" //  gap=5 margin=[10,40,10,0]" //margin=[10,10,10,10]>"
             "<fit viz margin=[10,10,10,10] >"// weight=30%>" // margin=[10,10,10,10] > "
+            //"<splitter>"
             "<tree>" // weight=70%>"
             );
     plc.collocate();
@@ -611,6 +705,8 @@ int  main()
   dragger drg;
   SECTION(layout the main window, show it, and start the event loop)
   {
+    //tsf.show();
+
     fm.collocate();
     fm.show();         //Show the form
     exec();            //Start to event loop process, it blocks until the form is closed.
@@ -633,6 +729,77 @@ int  main()
 
 
 
+//struct Ary
+//{
+//   u8 m_mem[16];
+//
+//   struct Ret
+//   {
+//     void* p;
+//
+//     template<class T> void operator=(T val)
+//     {
+//       T* tp = (T*)p;
+//       *tp = val;
+//     }
+//
+//     template<class T> operator T()
+//     {
+//       return *((T*)p);
+//     }
+//   };
+//
+//   Ret operator[](u64 i)
+//   {
+//     Ret r;
+//     r.p = m_mem + sizeof(f32)*i;
+//     return r;
+//   }
+//};
+//
+//template<class T> T& operator[](u64 i)
+//{
+//  u8* p = m_mem + sizeof(T)*i;
+//  return *((T*)p);
+//}
+//f32& operator[](u64 i)
+//{
+//  u8* p = m_mem + sizeof(f32)*i;
+//  return *((f32*)p);
+//}
+//u32& operator[](u64 i)
+//{
+//  u8* p = m_mem + sizeof(u32)*i;
+//  return *((u32*)p);
+//}
+//
+//template<class T> void operator=(Ary::Ret& r, T val)
+//{
+//  T* p = (T*)r.p;
+//  *P = val;
+//}
+//void operator=(Ary::Ret& r, f32 val)
+//{
+//  f32* p = (f32*)r.p;
+//  *p = val;
+//}
+//
+//f32 a = ary_inst.operator[]<f32>(3);
+
+//Ary a;
+//TO(4,i){
+//  //a[i] = (f32)i;
+//  //a.operator[]<f32>(i) = (f32)i;
+//  a[i] = (f32)i;
+//}
+//TO(4,i){
+//  f32 b = a[i];
+//  Println("b: ", b);
+//}
+
+//place       plc(fm);
+//place  lblPlace(fm);
+//plc["drgBtn"]  << drgBtn;
 
 //mempxbuf = make_shared<mem_pixbuf>();
 //mempxbuf->pixbuf_ = pixel_buffer(512,256);

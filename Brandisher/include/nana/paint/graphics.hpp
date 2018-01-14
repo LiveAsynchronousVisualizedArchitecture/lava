@@ -182,7 +182,7 @@ namespace nana
 
 			void gradual_rectangle(const ::nana::rectangle&, const color& from, const color& to, bool vertical);
 			void round_rectangle(const ::nana::rectangle&, unsigned radius_x, unsigned radius_y, const color&, bool solid, const color& color_if_solid);
-		private:
+		//private:
 			struct implementation;
 			std::unique_ptr<implementation> impl_;
 		};

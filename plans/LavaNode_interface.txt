@@ -79,6 +79,10 @@ Emit Packets using a function instead of outputting into an array:
  - After emitting all packets, emitting thread can then sort them and put them into a cache or NUMA local lock free queue
 
 
+
+Display text of the file inside a node
+|  Have a window inside a node that can show the directory, or the text of the main file
+
 -------------------------------------------------------------------------------------------
 Simplicity does not precede complexity, but follows it.
 

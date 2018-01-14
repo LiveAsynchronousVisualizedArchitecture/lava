@@ -428,7 +428,7 @@ struct         KV
     return hsh & HASH_MASK;
   }
 };
-struct     KVOfst
+struct     KVOfst  // KVOfst is key value offset 
 {
   KV*         kv;
   void*     base;
@@ -1327,6 +1327,7 @@ public:
     //auto st = ret.memStart();
   }
 };
+
 
 template<class T> KVOfst::operator tbl<T>() 
 {   
