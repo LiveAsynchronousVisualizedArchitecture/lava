@@ -52,7 +52,9 @@
 // -todo: debug crash when selecting key of first table in the tree - might have been the way the table is being handled by the viewer
 // -todo: change regen function to a refreshDBs function name - regen is good enough
 // -todo: debug tbl elem count coming from the visualizer - tbl initialization bugs
+// -todo: put back table graphing in visualization component
 
+// todo: figure out how to refresh on table selection
 // todo: make multiple selections additivly draw multiple colored lines?
 // todo: make a graph visualization of the current table in the picture widget
 // todo: make listing the keys of a db happen on expand
@@ -104,53 +106,130 @@ using   IvTbl = tbl<vert>;
 struct IdxKey { bool subTbl; u32 idx; str key; };            // this represents an index into the db vector and a key  
 using TblKeys = std::unordered_map<str,IdxKey>;
 
-std::ostream& operator << (std::ostream& os, const nana::point& p)
+std::ostream& operator<<(std::ostream& os, const nana::point&     p)
 {
   return os << "point{" << p.x << "," << p.y << "}";
 }
-std::ostream& operator<< (std::ostream& os, const nana::size& z)
+std::ostream& operator<<(std::ostream& os, const nana::size&      z)
 {
   return os << "size{" << z.width << "," << z.height << "}";
 }
-std::ostream& operator<< (std::ostream& os, const nana::rectangle& r)
+std::ostream& operator<<(std::ostream& os, const nana::rectangle& r)
 {
   return os << "rect{" << r.position() << "," << r.dimension() << "}";
 }
 
-//class mem_pixbuf : public nana::paint::detail::basic_image_pixbuf
-//{
-//  bool open(const std::experimental::filesystem::path& file){ return false; }
-//  bool open(const void* data, std::size_t bytes){ return false; }
-//};
-//using MemPixbuf = std::shared_ptr<mem_pixbuf>;
+IvTbl                       glblT;
+vec_u8                     tblBuf;
+vec_str                       sel;
+vec_dbs                       dbs;
+TblKeys                   tblKeys;
+nana::form                     fm;
+nana::treebox                tree;
+nana::paint::image         vizImg;
+nana::place                   plc;
+nana::label sz, elems, szBytes, cap, mapcap, owned;
 
-class VizDraw : public nana::drawer_trigger
+class  VizDraw : public nana::drawer_trigger
 {
-  //friend class ::nana::picture;
-  //
-  //private:
-
-
-
-public:
-  VizDraw(){}
-  ~VizDraw(){}
-  void attached(widget_reference, nana::paint::graphics&)
-  {}
-
-  void refresh(nana::paint::graphics& g)
+  void  drawGradient(nana::paint::graphics& g)
   {
     using namespace nana;
     using namespace nana::paint;
 
-    //rectangle r { point{ 0,0 }, img_.size() };
-    //
-    //nana::size sz{size()};
-    //
-    //g.flush();
-    //g.pixmap();
+    pixel_argb_t* pxbuf = g.impl_->handle->pixbuf_ptr;
+    if(pxbuf)
+    {
+      auto w = g.width();
+      auto h = g.height();
+      for(unsigned int y=0; y<h; ++y)
+        for(unsigned int x=0; x<w; ++x)
+        {
+          pixel_argb_t p;
+          p.element.red   = (u8)(y/(f32)h * 255.f);
+          p.element.green = (u8)(x/(f32)w * 255.f);
+          p.element.blue  = 0;
+          p.element.alpha_channel = 1;
 
-    rectangle rw{ point{ 0,0 }, size() };
+          pxbuf[y*w + x] = p;
+        }
+    }
+  }
+  void     drawBlack(nana::paint::graphics& g)
+  {
+    using namespace nana;
+    using namespace nana::paint;
+
+    pixel_argb_t* pxbuf = g.impl_->handle->pixbuf_ptr;
+    if(pxbuf)
+    {
+      auto w = g.width();
+      auto h = g.height();
+      for(unsigned int y=0; y<h; ++y)
+        for(unsigned int x=0; x<w; ++x){
+          pixel_argb_t p;
+          p.element.red   = 0;
+          p.element.green = 0;
+          p.element.blue  = 0;
+          p.element.alpha_channel = 1;
+          pxbuf[y*w + x] = p;
+        }
+    }
+  }
+  void  drawTblGraph(IvTbl& t, nana::paint::graphics& g)
+  {
+    using namespace std;
+    using namespace nana;
+    using namespace nana::paint;
+
+    if( !t.m_mem || t.size()==0 ){ 
+      drawBlack(g);
+    }else{
+      auto&    t = glblT;
+      auto  flen = t.size() * 12;      // 12 floats in a vert struct
+      f32*     f = (float*)t.m_mem;
+      f32     mx = -numeric_limits<float>::infinity(); 
+      f32     mn =  numeric_limits<float>::infinity();
+      TO(flen,i){
+        mx = max<f32>(mx, f[i]);
+        mn = min<f32>(mn, f[i]);
+      }
+      pixel_argb_t* pxbuf = g.impl_->handle->pixbuf_ptr;
+      auto     w = g.width();
+      auto     h = g.height();
+      f32  ratio = w / (f32)flen;
+      f32 hRatio = h / (mx-mn);
+      for(unsigned int y=0; y<h; ++y)
+        for(unsigned int x=0; x<w; ++x)
+        {
+          pixel_argb_t p;
+          p.element.red   = 0;
+          p.element.green = 0;
+          p.element.blue  = 0;
+          f32 val = f[ (u64)(x/ratio) ];
+          if(h-y < val*hRatio){ // this flips the graph vertically, but increasing y goes down in screen space, so we want it flipped
+            p.element.red   = 255;
+            p.element.green = 255;
+            p.element.blue  = 255;
+          }
+          p.element.alpha_channel = 1;
+
+          pxbuf[y*w + x] = p;
+        }
+    }
+  }
+
+public:
+  VizDraw(){}
+  ~VizDraw(){}
+  void attached(widget_reference, nana::paint::graphics&){}
+  void refresh(nana::paint::graphics& g)
+  {
+    using namespace std;
+    using namespace nana;
+    using namespace nana::paint;
+
+    rectangle rw{ point{ 0,0 }, nana::size() };
     g.rectangle(rectangle{ 5, 5, 50, 50 }, true, colors::red);
     g.line(point(5, 5), point(55, 55), colors::blue);
     g.line_begin(200, 100);
@@ -160,57 +239,11 @@ public:
     g.line_to(point(100, 300));
     g.line_to(point(200, 100));
 
-    pixel_argb_t* pxbuf = g.impl_->handle->pixbuf_ptr;
-    if(pxbuf)
-    {
-      auto     w = g.width();
-      auto     h = g.height();
-      for(unsigned int y=0; y<h; ++y)
-        for(unsigned int x=0; x<w; ++x)
-        {
-          pixel_argb_t p;
-          p.element.red   = (u8)(y/(f32)h * 255.f);
-          p.element.green = (u8)(x/(f32)w * 255.f);
-          //p.element.red   = 0;
-          //p.element.green = 0;
-          p.element.blue  = 0;
-          p.element.alpha_channel = 1;
-
-          pxbuf[y*w + x] = p;
-        }
-    }
-
-    //auto* stor = mempxbuf->pixbuf_.storage_.get();
-    //auto rawpx = stor->raw_pixel_buffer;
-    //auto     w = stor->pixel_size.width;
-    //auto     h = stor->pixel_size.height;
-    f32  ratio = w / (f32)flen;
-    f32 hRatio = h / (mx-mn);
-    for(unsigned int y=0; y<h; ++y)
-      for(unsigned int x=0; x<w; ++x)
-      {
-        pixel_argb_t p;
-        p.element.red   = 0;
-        p.element.green = 0;
-        p.element.blue  = 0;
-        p.element.alpha_channel = 1;
-
-        //p.element.red   = (u8)(y/(f32)h * 255.f);
-        //p.element.green = (u8)(x/(f32)w * 255.f);
-
-        //f32 val = f[ (u64)(x*ratio) ];
-        f32 val = f[ (u64)(x/ratio) ];
-        if(h-y < val*hRatio){ // this flips the graph vertically, but increasing y goes down in screen space, so we want it flipped
-          p.element.red   = 255;
-          p.element.green = 255;
-          p.element.blue  = 255;
-        }
-
-        rawpx[y*w + x] = p;
-      }
+    //drawGradient(g);
+    drawTblGraph(glblT, g);
   }
 };
-class Viz : public nana::widget_object<nana::category::widget_tag, VizDraw>
+class      Viz : public nana::widget_object<nana::category::widget_tag, VizDraw>
 {
 public:
   Viz()
@@ -218,33 +251,11 @@ public:
     using namespace nana;
   }
 private:
-  //Switchs the algorithm between two algorithms in every click on the form.
   void _m_click()
-  {
+  {  //Switchs the algorithm between two algorithms in every click on the form.
   }
 };
-// : public nana::picture // : public nana::panel<true>   // : public nana::widget // : public nana::form
-//
-//nana::paint::image     img_;
-//nana::paint::graphics   gr_;
-//mem_pixbuf mempb;
-//
-//tsform()
-//Viz(nana::window wd)
 
-
-IvTbl                       glblT;
-vec_u8                     tblBuf;
-vec_str                       sel;
-vec_dbs                       dbs;
-TblKeys                   tblKeys;
-//MemPixbuf                mempxbuf;
-nana::form                     fm;
-nana::treebox                tree;
-//nana::picture                 viz;
-nana::paint::image         vizImg;
-nana::place                   plc;
-nana::label sz, elems, szBytes, cap, mapcap, owned;
 Viz                           viz;
 
 namespace {
@@ -652,6 +663,13 @@ int  main()
         }
         if(curT == nullptr) return;
 
+        //fm.events().resized.emit(
+        //fm.show();
+        //viz.focus();
+        //fm.focus();
+        //fm.restore();
+        viz.caption("Setting this caption is the only way I know to refresh the component");
+
         auto&   t = *curT;
         auto flen = t.size() * 12;      // 12 floats in a vert struct
         f32*    f = (float*)t.m_mem;
@@ -733,6 +751,75 @@ int  main()
 
 
 
+
+
+
+
+
+
+
+
+//class mem_pixbuf : public nana::paint::detail::basic_image_pixbuf
+//{
+//  bool open(const std::experimental::filesystem::path& file){ return false; }
+//  bool open(const void* data, std::size_t bytes){ return false; }
+//};
+//using MemPixbuf = std::shared_ptr<mem_pixbuf>;
+//
+//MemPixbuf                mempxbuf;
+//nana::picture                 viz;
+
+//p.element.red   = (u8)(y/(f32)h * 255.f);
+//p.element.green = (u8)(x/(f32)w * 255.f);
+//
+//f32 val = f[ (u64)(x*ratio) ];
+
+//pixel_argb_t* pxbuf = g.impl_->handle->pixbuf_ptr;
+//if(pxbuf)
+//{
+//  auto     w = g.width();
+//  auto     h = g.height();
+//  for(unsigned int y=0; y<h; ++y)
+//    for(unsigned int x=0; x<w; ++x)
+//    {
+//      pixel_argb_t p;
+//      p.element.red   = (u8)(y/(f32)h * 255.f);
+//      p.element.green = (u8)(x/(f32)w * 255.f);
+//      //p.element.red   = 0;
+//      //p.element.green = 0;
+//      p.element.blue  = 0;
+//      p.element.alpha_channel = 1;
+//
+//      pxbuf[y*w + x] = p;
+//    }
+//}
+//
+//auto* stor = mempxbuf->pixbuf_.storage_.get();
+//auto rawpx = stor->raw_pixel_buffer;
+//auto     w = stor->pixel_size.width;
+//auto     h = stor->pixel_size.height;
+//
+//auto&    t = *curT;
+
+// : public nana::picture // : public nana::panel<true>   // : public nana::widget // : public nana::form
+//
+//nana::paint::image     img_;
+//nana::paint::graphics   gr_;
+//mem_pixbuf mempb;
+//
+//tsform()
+//Viz(nana::window wd)
+
+//friend class ::nana::picture;
+//
+//private:
+//
+//rectangle r { point{ 0,0 }, img_.size() };
+//
+//nana::size sz{size()};
+//
+//g.flush();
+//g.pixmap();
 
 //pixel_buffer& pxbuf = graph.impl_.get()->pxbuf;
 //pixel_buffer& pxbuf = graph.impl_->handle->pixbuf_ptr;
