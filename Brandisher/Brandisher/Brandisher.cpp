@@ -53,10 +53,11 @@
 // -todo: change regen function to a refreshDBs function name - regen is good enough
 // -todo: debug tbl elem count coming from the visualizer - tbl initialization bugs
 // -todo: put back table graphing in visualization component
+// -todo: figure out how to refresh on table selection
+// -todo: make a graph visualization of the current table in the picture widget
 
-// todo: figure out how to refresh on table selection
+// todo: add min and max to table array stats
 // todo: make multiple selections additivly draw multiple colored lines?
-// todo: make a graph visualization of the current table in the picture widget
 // todo: make listing the keys of a db happen on expand
 // todo: make insertion of tbls from a db key happen on expand
 // todo: make switch case for fundamental types that the map elements can be
@@ -119,6 +120,8 @@ std::ostream& operator<<(std::ostream& os, const nana::rectangle& r)
   return os << "rect{" << r.position() << "," << r.dimension() << "}";
 }
 
+f32       mx = -std::numeric_limits<float>::infinity(); 
+f32       mn =  std::numeric_limits<float>::infinity();
 IvTbl                       glblT;
 vec_u8                     tblBuf;
 vec_str                       sel;
@@ -128,7 +131,7 @@ nana::form                     fm;
 nana::treebox                tree;
 nana::paint::image         vizImg;
 nana::place                   plc;
-nana::label sz, elems, szBytes, cap, mapcap, owned;
+nana::label sz, elems, szBytes, cap, mapcap, owned, status;
 
 class  VizDraw : public nana::drawer_trigger
 {
@@ -419,32 +422,6 @@ IvTbl* setCurTblFromTreeKey(str key)  // set current table from tree key
   }else{ return nullptr; }
 }
 
-void          initViz()
-{
-  using namespace std;
-  using namespace nana;
-  using namespace nana::paint;
-
-  //mempxbuf = make_shared<mem_pixbuf>();
-  //mempxbuf->pixbuf_ = pixel_buffer(512,256);
-  //auto* stor = mempxbuf->pixbuf_.storage_.get();
-  //auto rawpx = stor->raw_pixel_buffer;
-  //auto     w = stor->pixel_size.width;
-  //auto     h = stor->pixel_size.height;
-  //for(unsigned int y=0; y<h; ++y)
-  //  for(unsigned int x=0; x<w; ++x){
-  //    pixel_argb_t p;
-  //    p.element.red   = (u8)(y/(f32)h * 255.f);
-  //    p.element.green = (u8)(x/(f32)w * 255.f);
-  //    p.element.blue  = 0;
-  //    p.element.alpha_channel = 1;
-  //    rawpx[y*w + x]  = p;
-  //  }
-  
-  //vizImg.image_ptr_ = mempxbuf;
-  //viz.load(vizImg);
-}
-
 }
 
 int  main()
@@ -482,23 +459,38 @@ int  main()
   }
   SECTION(initialize components with the main window handle)
   {
-    //dviz.
-    
-    //viz.create(fm, true);
+    SECTION(initialize the Viz component and add events)
+    {
+      viz.create(fm, true);
+      //viz.stretchable(true);
+      viz.borderless(false);
+      viz.bgcolor(color(0,0,0,1.0));
 
-    viz.create(fm, true);
-    //viz.stretchable(true);
-    viz.borderless(false);
-    viz.bgcolor(color(0,0,0,1.0));
+      viz.events().mouse_move([](arg_mouse const& arg){
+        auto    vsz = viz.size();
+        auto&     t = glblT;
+        auto   flen = t.size() * 12;      // 12 floats in a vert struct
+        f32*      f = (float*)t.m_mem;
+        f32   ratio = vsz.width  / (f32)flen;
+        f32  hRatio = vsz.height / (mx-mn);
 
-    sz.create(fm);
-    elems.create(fm);
-    szBytes.create(fm);
-    cap.create(fm);
-    mapcap.create(fm);
-    owned.create(fm);
+        auto capStr = toString("X: ", arg.pos.x, "   Y: ", arg.pos.y);
+        status.caption( capStr );
+      });
+    }
+    SECTION(initialize the table header labels)
+    {
+      sz.create(fm);
+      elems.create(fm);
+      szBytes.create(fm);
+      cap.create(fm);
+      mapcap.create(fm);
+      owned.create(fm);
+    }
 
-    initViz();
+    status.create(fm);
+
+    //initViz();
   }
 
   menubar mb;
@@ -663,11 +655,6 @@ int  main()
         }
         if(curT == nullptr) return;
 
-        //fm.events().resized.emit(
-        //fm.show();
-        //viz.focus();
-        //fm.focus();
-        //fm.restore();
         viz.caption("Setting this caption is the only way I know to refresh the component");
 
         auto&   t = *curT;
@@ -679,8 +666,8 @@ int  main()
         //flen = 512;
         //f = tst.data();
 
-        f32     mx = -numeric_limits<float>::infinity(); 
-        f32     mn =  numeric_limits<float>::infinity();
+        mx = -numeric_limits<float>::infinity(); 
+        mn =  numeric_limits<float>::infinity();
         TO(flen,i){
           mx = max<f32>(mx, f[i]);
           mn = min<f32>(mn, f[i]);
@@ -713,14 +700,16 @@ int  main()
     plc["owned"]   << owned;
     plc["mapcap"]  << mapcap;
     plc["tree"]    << tree;
+    plc["status"]  << status;
     plc.div("vertical"
             "<mb weight=30>"
             "<weight=20 margin=[0,0,5,10] " // weight=20 "<weight=10% "
              "  <fit sz margin=[0,10]> <fit elems margin=[0,10]> <fit szBytes margin=[0,10]> <fit cap margin=[0,10]> <fit mapcap margin=[0,10]> <fit owned>"
             ">" //  gap=5 margin=[10,40,10,0]" //margin=[10,10,10,10]>"
-            "<fit viz margin=[10,10,10,10] >"// weight=30%>" // margin=[10,10,10,10] > "
+            "<fit viz margin=[5,5,5,5] >"// weight=30%>" // margin=[10,10,10,10] > "
             //"<splitter>"
             "<tree>" // weight=70%>"
+            "<status weight=30 margin=[5,5,5,5]>"
             );
     plc.collocate();
   }
@@ -758,6 +747,38 @@ int  main()
 
 
 
+
+//void          initViz()
+//{
+//  using namespace std;
+//  using namespace nana;
+//  using namespace nana::paint;
+//
+//  //mempxbuf = make_shared<mem_pixbuf>();
+//  //mempxbuf->pixbuf_ = pixel_buffer(512,256);
+//  //auto* stor = mempxbuf->pixbuf_.storage_.get();
+//  //auto rawpx = stor->raw_pixel_buffer;
+//  //auto     w = stor->pixel_size.width;
+//  //auto     h = stor->pixel_size.height;
+//  //for(unsigned int y=0; y<h; ++y)
+//  //  for(unsigned int x=0; x<w; ++x){
+//  //    pixel_argb_t p;
+//  //    p.element.red   = (u8)(y/(f32)h * 255.f);
+//  //    p.element.green = (u8)(x/(f32)w * 255.f);
+//  //    p.element.blue  = 0;
+//  //    p.element.alpha_channel = 1;
+//  //    rawpx[y*w + x]  = p;
+//  //  }
+//  
+//  //vizImg.image_ptr_ = mempxbuf;
+//  //viz.load(vizImg);
+//}
+
+//fm.events().resized.emit(
+//fm.show();
+//viz.focus();
+//fm.focus();
+//fm.restore();
 
 //class mem_pixbuf : public nana::paint::detail::basic_image_pixbuf
 //{
