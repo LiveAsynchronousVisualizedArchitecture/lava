@@ -191,8 +191,8 @@ class  VizDraw : public nana::drawer_trigger
       auto&    t = glblT;
       auto  flen = t.size() * 12;      // 12 floats in a vert struct
       f32*     f = (float*)t.m_mem;
-      f32     mx = -numeric_limits<float>::infinity(); 
-      f32     mn =  numeric_limits<float>::infinity();
+      mx = -numeric_limits<float>::infinity();
+      mn =  numeric_limits<float>::infinity();
       TO(flen,i){
         mx = max<f32>(mx, f[i]);
         mn = min<f32>(mn, f[i]);
@@ -202,6 +202,8 @@ class  VizDraw : public nana::drawer_trigger
       auto     h = g.height();
       f32  ratio = w / (f32)flen;
       f32 hRatio = h / (mx-mn);
+      f32    rng = mx - mn;
+      //f32 hRemap = rng 
       for(unsigned int y=0; y<h; ++y)
         for(unsigned int x=0; x<w; ++x)
         {
@@ -210,7 +212,9 @@ class  VizDraw : public nana::drawer_trigger
           p.element.green = 0;
           p.element.blue  = 0;
           f32 val = f[ (u64)(x/ratio) ];
-          if(h-y < val*hRatio){ // this flips the graph vertically, but increasing y goes down in screen space, so we want it flipped
+          f32  re =  (val - mn) / rng;
+          //if(h-y < val*hRatio){ // this flips the graph vertically, but increasing y goes down in screen space, so we want it flipped
+          if( (h-y)/(f32)h < re){ // this flips the graph vertically, but increasing y goes down in screen space, so we want it flipped
             p.element.red   = 255;
             p.element.green = 255;
             p.element.blue  = 255;
@@ -467,15 +471,18 @@ int  main()
       viz.bgcolor(color(0,0,0,1.0));
 
       viz.events().mouse_move([](arg_mouse const& arg){
+        f32     msX = arg.pos.x;
         auto    vsz = viz.size();
         auto&     t = glblT;
-        auto   flen = t.size() * 12;      // 12 floats in a vert struct
-        f32*      f = (float*)t.m_mem;
-        f32   ratio = vsz.width  / (f32)flen;
-        f32  hRatio = vsz.height / (mx-mn);
-
-        auto capStr = toString("X: ", arg.pos.x, "   Y: ", arg.pos.y);
-        status.caption( capStr );
+        if( t.m_mem && t.size()>0 ){
+          auto   flen = t.size() * 12;      // 12 floats in a vert struct
+          f32*      f = (float*)t.m_mem;
+          f32   ratio = vsz.width  / (f32)flen;
+          f32  hRatio = vsz.height / (mx-mn);
+          auto    val = f[  (u64)(msX/ratio) ];
+          auto capStr = toString(val,"   X: ",arg.pos.x,"   Y: ",arg.pos.y);
+          status.caption( capStr );
+        }
       });
     }
     SECTION(initialize the table header labels)
@@ -692,8 +699,6 @@ int  main()
     plc["mb"]      << mb;
     plc["sz"]      << sz;
     plc["viz"]     << viz;
-    //plc["dviz"]    << dviz;
-    //plc["tsf"]     << tsf;
     plc["elems"]   << elems;
     plc["szBytes"] << szBytes;
     plc["cap"]     << cap;
@@ -747,6 +752,8 @@ int  main()
 
 
 
+//plc["dviz"]    << dviz;
+//plc["tsf"]     << tsf;
 
 //void          initViz()
 //{
