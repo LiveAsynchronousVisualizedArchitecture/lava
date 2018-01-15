@@ -55,19 +55,20 @@
 // -todo: put back table graphing in visualization component
 // -todo: figure out how to refresh on table selection
 // -todo: make a graph visualization of the current table in the picture widget
+// -todo: compile with png and jpeg libs - not needed for now
 
 // todo: add min and max to table array stats
-// todo: make multiple selections additivly draw multiple colored lines?
 // todo: make listing the keys of a db happen on expand
 // todo: make insertion of tbls from a db key happen on expand
 // todo: make switch case for fundamental types that the map elements can be
-// todo: compile with png and jpeg libs
 // todo: implement saving of the tbl
 // todo: implement opening on drag and drop of a tbl
 // todo: implement opening of the tbl through the menu and file dialog
 // todo: try compiling with clang
 // todo: make a Brandisher simdb database on start, as scratch space for dragged in files and dragged tables from other dbs
 // todo: look in to making a custom nana drawing component that will expand to the space it has
+// todo: make multiple selections additivly draw multiple colored lines?
+
 
 // idea: should tbls exist as either files, memory, or sub tables?
 //       | icon in the tree could show which is which
@@ -318,14 +319,6 @@ void      regenLabels(IvTbl const& t)
 {
   SECTION(label captions)
   {
-    //sz.caption(     toString("Size: "));
-    //elems.caption(  toString("Elements: "));
-    //szBytes.caption(toString("Size in Bytes: "));
-    //cap.caption(    toString("Capacity: "));
-    //mapcap.caption( toString("Map Capacity: "));
-    //owned.caption(  toString("Owned: "));
-
-    //auto& t = glblT;
     sz.caption(     toString("Size: ",          t.size()        ));
     elems.caption(  toString("Elements: ",      t.elems()       ));
     szBytes.caption(toString("Size in Bytes: ", t.sizeBytes()   ));
@@ -556,7 +549,6 @@ int  main()
       tree.borderless(false);
       tree.events().expanded([](const arg_treebox& tbArg) mutable  // lambda captures by value are const by default, so mutable is used
       {
-        
         if(tbArg.item.expanded())
         {          
           str tblKey = getFullKey( tbArg.item.owner() );
@@ -618,8 +610,21 @@ int  main()
               variance = flen>1?  difSqr/(flen-1)  :   difSqr;  // length of the array needs to be at least 2 to use the n-1 'unbiased' variance  
             }
 
+            f32 tmn, tmx;
+            SECTION(calc min and max)
+            {
+              tmx = -numeric_limits<float>::infinity(); 
+              tmn =  numeric_limits<float>::infinity();
+              TO(flen,i){
+                tmx = max<f32>(tmx, f[i]);
+                tmn = min<f32>(tmn, f[i]);
+              }
+            }
+
             str txtStr = toString(
-              "Mean: ",mean,
+              "Min: ",tmn,
+              "   Max: ",tmx,
+              "   Mean: ",mean,
               "   Median: ",median,
               "   Mode: ", hiVal, " (",hiCnt,
               ")   Variance: ", variance);
@@ -751,6 +756,14 @@ int  main()
 
 
 
+//sz.caption(     toString("Size: "));
+//elems.caption(  toString("Elements: "));
+//szBytes.caption(toString("Size in Bytes: "));
+//cap.caption(    toString("Capacity: "));
+//mapcap.caption( toString("Map Capacity: "));
+//owned.caption(  toString("Owned: "));
+//
+//auto& t = glblT;
 
 //plc["dviz"]    << dviz;
 //plc["tsf"]     << tsf;
