@@ -117,85 +117,105 @@ std::ostream& operator<< (std::ostream& os, const nana::rectangle& r)
   return os << "rect{" << r.position() << "," << r.dimension() << "}";
 }
 
-class mem_pixbuf : public nana::paint::detail::basic_image_pixbuf
-{
-  bool open(const std::experimental::filesystem::path& file){ return false; }
-  bool open(const void* data, std::size_t bytes){ return false; }
-};
-using MemPixbuf = std::shared_ptr<mem_pixbuf>;
+//class mem_pixbuf : public nana::paint::detail::basic_image_pixbuf
+//{
+//  bool open(const std::experimental::filesystem::path& file){ return false; }
+//  bool open(const void* data, std::size_t bytes){ return false; }
+//};
+//using MemPixbuf = std::shared_ptr<mem_pixbuf>;
 
 class VizDraw : public nana::drawer_trigger
 {
-  friend class ::nana::picture;
-public:
-  VizDraw();
-  ~VizDraw();
-  void attached(widget_reference, nana::paint::graphics&)
-  {
-  }
-//private:
-  void refresh(nana::paint::graphics&)
-  {
-  }
-};
+  //friend class ::nana::picture;
+  //
+  //private:
 
-class Viz : public nana::widget_object<nana::category::widget_tag, VizDraw>
-  // : public nana::picture // : public nana::panel<true>   // : public nana::widget // : public nana::form
-{
-  //nana::paint::image     img_;
-  //nana::paint::graphics   gr_;
-  //mem_pixbuf mempb;
+
+
 public:
-  //tsform()
-  Viz(nana::window wd)
+  VizDraw(){}
+  ~VizDraw(){}
+  void attached(widget_reference, nana::paint::graphics&)
+  {}
+
+  void refresh(nana::paint::graphics& g)
   {
     using namespace nana;
+    using namespace nana::paint;
 
-    drawing dw(wd);
-    //drawing dw
-    dw.draw([this](paint::graphics& graph)
+    //rectangle r { point{ 0,0 }, img_.size() };
+    //
+    //nana::size sz{size()};
+    //
+    //g.flush();
+    //g.pixmap();
+
+    rectangle rw{ point{ 0,0 }, size() };
+    g.rectangle(rectangle{ 5, 5, 50, 50 }, true, colors::red);
+    g.line(point(5, 5), point(55, 55), colors::blue);
+    g.line_begin(200, 100);
+    g.line_to(point(300, 300));
+    g.line_to(point(100, 200));
+    g.line_to(point(300, 200));
+    g.line_to(point(100, 300));
+    g.line_to(point(200, 100));
+
+    pixel_argb_t* pxbuf = g.impl_->handle->pixbuf_ptr;
+    if(pxbuf)
     {
-      using namespace nana;
-      using namespace nana::paint;
+      auto     w = g.width();
+      auto     h = g.height();
+      for(unsigned int y=0; y<h; ++y)
+        for(unsigned int x=0; x<w; ++x)
+        {
+          pixel_argb_t p;
+          p.element.red   = (u8)(y/(f32)h * 255.f);
+          p.element.green = (u8)(x/(f32)w * 255.f);
+          //p.element.red   = 0;
+          //p.element.green = 0;
+          p.element.blue  = 0;
+          p.element.alpha_channel = 1;
 
-      //rectangle r { point{ 0,0 }, img_.size() };
-      rectangle rw{ point{ 0,0 }, size() };
-      //nana::size sz{size()};
-      graph.rectangle(rectangle{ 5, 5, 50, 50 }, true, colors::red);
-      graph.line(point(5, 5), point(55, 55), colors::blue);
-      graph.line_begin(200, 100);
-      graph.line_to(point(300, 300));
-      graph.line_to(point(100, 200));
-      graph.line_to(point(300, 200));
-      graph.line_to(point(100, 300));
-      graph.line_to(point(200, 100));
-      graph.flush();
-      graph.pixmap();
+          pxbuf[y*w + x] = p;
+        }
+    }
 
-      pixel_argb_t* pxbuf = graph.impl_->handle->pixbuf_ptr;
-      if(pxbuf)
+    //auto* stor = mempxbuf->pixbuf_.storage_.get();
+    //auto rawpx = stor->raw_pixel_buffer;
+    //auto     w = stor->pixel_size.width;
+    //auto     h = stor->pixel_size.height;
+    f32  ratio = w / (f32)flen;
+    f32 hRatio = h / (mx-mn);
+    for(unsigned int y=0; y<h; ++y)
+      for(unsigned int x=0; x<w; ++x)
       {
-        auto     w = graph.width();
-        auto     h = graph.height();
-        for(unsigned int y=0; y<h; ++y)
-          for(unsigned int x=0; x<w; ++x)
-          {
-            pixel_argb_t p;
-            p.element.red   = (u8)(y/(f32)h * 255.f);
-            p.element.green = (u8)(x/(f32)w * 255.f);
-            //p.element.red   = 0;
-            //p.element.green = 0;
-            p.element.blue  = 0;
-            p.element.alpha_channel = 1;
+        pixel_argb_t p;
+        p.element.red   = 0;
+        p.element.green = 0;
+        p.element.blue  = 0;
+        p.element.alpha_channel = 1;
 
-            pxbuf[y*w + x] = p;
-          }
+        //p.element.red   = (u8)(y/(f32)h * 255.f);
+        //p.element.green = (u8)(x/(f32)w * 255.f);
+
+        //f32 val = f[ (u64)(x*ratio) ];
+        f32 val = f[ (u64)(x/ratio) ];
+        if(h-y < val*hRatio){ // this flips the graph vertically, but increasing y goes down in screen space, so we want it flipped
+          p.element.red   = 255;
+          p.element.green = 255;
+          p.element.blue  = 255;
+        }
+
+        rawpx[y*w + x] = p;
       }
-    });
-    dw.update();
-    //Register events
-    events().click  ( [this](){_m_click();} );  
-    //events().resized( [this](){_m_size ();} );  
+  }
+};
+class Viz : public nana::widget_object<nana::category::widget_tag, VizDraw>
+{
+public:
+  Viz()
+  {
+    using namespace nana;
   }
 private:
   //Switchs the algorithm between two algorithms in every click on the form.
@@ -203,13 +223,22 @@ private:
   {
   }
 };
+// : public nana::picture // : public nana::panel<true>   // : public nana::widget // : public nana::form
+//
+//nana::paint::image     img_;
+//nana::paint::graphics   gr_;
+//mem_pixbuf mempb;
+//
+//tsform()
+//Viz(nana::window wd)
+
 
 IvTbl                       glblT;
 vec_u8                     tblBuf;
 vec_str                       sel;
 vec_dbs                       dbs;
 TblKeys                   tblKeys;
-MemPixbuf                mempxbuf;
+//MemPixbuf                mempxbuf;
 nana::form                     fm;
 nana::treebox                tree;
 //nana::picture                 viz;
@@ -385,24 +414,24 @@ void          initViz()
   using namespace nana;
   using namespace nana::paint;
 
-  mempxbuf = make_shared<mem_pixbuf>();
-  mempxbuf->pixbuf_ = pixel_buffer(512,256);
-  auto* stor = mempxbuf->pixbuf_.storage_.get();
-  auto rawpx = stor->raw_pixel_buffer;
-  auto     w = stor->pixel_size.width;
-  auto     h = stor->pixel_size.height;
-  for(unsigned int y=0; y<h; ++y)
-    for(unsigned int x=0; x<w; ++x){
-      pixel_argb_t p;
-      p.element.red   = (u8)(y/(f32)h * 255.f);
-      p.element.green = (u8)(x/(f32)w * 255.f);
-      p.element.blue  = 0;
-      p.element.alpha_channel = 1;
-      rawpx[y*w + x]  = p;
-    }
+  //mempxbuf = make_shared<mem_pixbuf>();
+  //mempxbuf->pixbuf_ = pixel_buffer(512,256);
+  //auto* stor = mempxbuf->pixbuf_.storage_.get();
+  //auto rawpx = stor->raw_pixel_buffer;
+  //auto     w = stor->pixel_size.width;
+  //auto     h = stor->pixel_size.height;
+  //for(unsigned int y=0; y<h; ++y)
+  //  for(unsigned int x=0; x<w; ++x){
+  //    pixel_argb_t p;
+  //    p.element.red   = (u8)(y/(f32)h * 255.f);
+  //    p.element.green = (u8)(x/(f32)w * 255.f);
+  //    p.element.blue  = 0;
+  //    p.element.alpha_channel = 1;
+  //    rawpx[y*w + x]  = p;
+  //  }
   
-  vizImg.image_ptr_ = mempxbuf;
-  viz.load(vizImg);
+  //vizImg.image_ptr_ = mempxbuf;
+  //viz.load(vizImg);
 }
 
 }
@@ -627,11 +656,6 @@ int  main()
         auto flen = t.size() * 12;      // 12 floats in a vert struct
         f32*    f = (float*)t.m_mem;
 
-        //image img;
-        //initViz();
-        //vizImg.image_ptr_ = mempxbuf;
-        //viz.load(vizImg);
-
         //vector<f32>  tst(512);
         //TO(tst.size(),i){ tst[i] = rand() / (f32)RAND_MAX; }
         //flen = 512;
@@ -645,37 +669,8 @@ int  main()
         }
         Println("\n Table Key mx: ",mx, " mn: ", mn, " \n" );
 
-        auto* stor = mempxbuf->pixbuf_.storage_.get();
-        auto rawpx = stor->raw_pixel_buffer;
-        auto     w = stor->pixel_size.width;
-        auto     h = stor->pixel_size.height;
-        f32  ratio = w / (f32)flen;
-        f32 hRatio = h / (mx-mn);
-        for(unsigned int y=0; y<h; ++y)
-          for(unsigned int x=0; x<w; ++x)
-          {
-            pixel_argb_t p;
-            p.element.red   = 0;
-            p.element.green = 0;
-            p.element.blue  = 0;
-            p.element.alpha_channel = 1;
-
-            //p.element.red   = (u8)(y/(f32)h * 255.f);
-            //p.element.green = (u8)(x/(f32)w * 255.f);
-
-            //f32 val = f[ (u64)(x*ratio) ];
-            f32 val = f[ (u64)(x/ratio) ];
-            if(h-y < val*hRatio){ // this flips the graph vertically, but increasing y goes down in screen space, so we want it flipped
-              p.element.red   = 255;
-              p.element.green = 255;
-              p.element.blue  = 255;
-            }
-
-            rawpx[y*w + x] = p;
-          }
-
-        vizImg.image_ptr_ = mempxbuf;
-        viz.load(vizImg);
+        //vizImg.image_ptr_ = mempxbuf;
+        //viz.load(vizImg);
 
         plc.collocate();
         fm.collocate();
@@ -739,6 +734,66 @@ int  main()
 
 
 
+//pixel_buffer& pxbuf = graph.impl_.get()->pxbuf;
+//pixel_buffer& pxbuf = graph.impl_->handle->pixbuf_ptr;
+//
+//auto* stor = pxbuf.storage_.get();
+//if(stor){
+//
+//auto rawpx = stor->raw_pixel_buffer;
+//auto     w = stor->pixel_size.width;
+//auto     h = stor->pixel_size.height;
+
+//image img;
+//initViz();
+//vizImg.image_ptr_ = mempxbuf;
+//viz.load(vizImg);
+
+//drawing dw(wd);
+////drawing dw
+//dw.draw([this](paint::graphics& graph)
+//{
+//  using namespace nana;
+//  using namespace nana::paint;
+//
+//  //rectangle r { point{ 0,0 }, img_.size() };
+//  rectangle rw{ point{ 0,0 }, size() };
+//  //nana::size sz{size()};
+//  graph.rectangle(rectangle{ 5, 5, 50, 50 }, true, colors::red);
+//  graph.line(point(5, 5), point(55, 55), colors::blue);
+//  graph.line_begin(200, 100);
+//  graph.line_to(point(300, 300));
+//  graph.line_to(point(100, 200));
+//  graph.line_to(point(300, 200));
+//  graph.line_to(point(100, 300));
+//  graph.line_to(point(200, 100));
+//  graph.flush();
+//  graph.pixmap();
+//
+//  pixel_argb_t* pxbuf = graph.impl_->handle->pixbuf_ptr;
+//  if(pxbuf)
+//  {
+//    auto     w = graph.width();
+//    auto     h = graph.height();
+//    for(unsigned int y=0; y<h; ++y)
+//      for(unsigned int x=0; x<w; ++x)
+//      {
+//        pixel_argb_t p;
+//        p.element.red   = (u8)(y/(f32)h * 255.f);
+//        p.element.green = (u8)(x/(f32)w * 255.f);
+//        //p.element.red   = 0;
+//        //p.element.green = 0;
+//        p.element.blue  = 0;
+//        p.element.alpha_channel = 1;
+//
+//        pxbuf[y*w + x] = p;
+//      }
+//  }
+//});
+//dw.update();
+////Register events
+//events().click  ( [this](){_m_click();} );  
+////events().resized( [this](){_m_size ();} );  
 
 //static bool interop;
 //nana::paint::image_process::selector sl;
