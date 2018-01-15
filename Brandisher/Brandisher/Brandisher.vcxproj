@@ -206,7 +206,9 @@
     <ClCompile Include="..\source\internationalization.cpp" />
     <ClCompile Include="..\source\paint\detail\image_process_provider.cpp" />
     <ClCompile Include="..\source\paint\detail\native_paint_interface.cpp" />
-    <ClCompile Include="..\source\paint\graphics.cpp" />
+    <ClCompile Include="..\source\paint\graphics.cpp">
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+    </ClCompile>
     <ClCompile Include="..\source\paint\image.cpp" />
     <ClCompile Include="..\source\paint\image_process_selector.cpp" />
     <ClCompile Include="..\source\paint\pixel_buffer.cpp">

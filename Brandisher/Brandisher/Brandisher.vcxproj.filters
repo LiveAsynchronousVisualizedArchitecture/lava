@@ -240,9 +240,6 @@
     <ClCompile Include="..\source\paint\detail\native_paint_interface.cpp">
       <Filter>Source Files\nana</Filter>
     </ClCompile>
-    <ClCompile Include="..\source\paint\graphics.cpp">
-      <Filter>Source Files\nana</Filter>
-    </ClCompile>
     <ClCompile Include="..\source\paint\image.cpp">
       <Filter>Source Files\nana</Filter>
     </ClCompile>
@@ -268,6 +265,9 @@
       <Filter>Source Files\nana</Filter>
     </ClCompile>
     <ClCompile Include="..\source\paint\pixel_buffer.cpp">
+      <Filter>Source Files\nana\main_comp_unit</Filter>
+    </ClCompile>
+    <ClCompile Include="..\source\paint\graphics.cpp">
       <Filter>Source Files\nana\main_comp_unit</Filter>
     </ClCompile>
   </ItemGroup>

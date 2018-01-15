@@ -82,6 +82,7 @@
 #include <nana/gui/widgets/menubar.hpp>
 #include <nana/paint/pixel_buffer.hpp>
 #include <nana/gui/widgets/picture.hpp>
+#include <nana/gui/widgets/panel.hpp>
 #include <nana/gui/wvl.hpp>
 #include <nana/gui/drawing.hpp>
 #include <nana/paint/image_process_selector.hpp>
@@ -123,26 +124,44 @@ class mem_pixbuf : public nana::paint::detail::basic_image_pixbuf
 };
 using MemPixbuf = std::shared_ptr<mem_pixbuf>;
 
-class tsform
-  : public nana::form
+class VizDraw : public nana::drawer_trigger
 {
-  nana::paint::image img_;
-  nana::paint::graphics gr_;
+  friend class ::nana::picture;
 public:
-  tsform()
+  VizDraw();
+  ~VizDraw();
+  void attached(widget_reference, nana::paint::graphics&)
   {
-    if (!img_.open(("../Examples/bground.6states.bmp")))
-      throw std::runtime_error("Imposible to open the image");    
+  }
+//private:
+  void refresh(nana::paint::graphics&)
+  {
+  }
+};
 
-    nana::drawing dw(*this);
-    dw.draw([this](nana::paint::graphics& graph)
+class Viz : public nana::widget_object<nana::category::widget_tag, VizDraw>
+  // : public nana::picture // : public nana::panel<true>   // : public nana::widget // : public nana::form
+{
+  //nana::paint::image     img_;
+  //nana::paint::graphics   gr_;
+  //mem_pixbuf mempb;
+public:
+  //tsform()
+  Viz(nana::window wd)
+  {
+    using namespace nana;
+
+    drawing dw(wd);
+    //drawing dw
+    dw.draw([this](paint::graphics& graph)
     {
       using namespace nana;
-      
-      rectangle r { point{ 0,0 }, img_.size() };
+      using namespace nana::paint;
+
+      //rectangle r { point{ 0,0 }, img_.size() };
       rectangle rw{ point{ 0,0 }, size() };
       //nana::size sz{size()};
-      graph.rectangle(nana::rectangle{ 5, 5, 50, 50 }, true, colors::red);
+      graph.rectangle(rectangle{ 5, 5, 50, 50 }, true, colors::red);
       graph.line(point(5, 5), point(55, 55), colors::blue);
       graph.line_begin(200, 100);
       graph.line_to(point(300, 300));
@@ -150,20 +169,29 @@ public:
       graph.line_to(point(300, 200));
       graph.line_to(point(100, 300));
       graph.line_to(point(200, 100));
-      img_.stretch(r, gr_, rw );
-      std::cout << "Pict: " << r << ", Windows: " << rw << "\n";
+      graph.flush();
+      graph.pixmap();
+
+      pixel_argb_t* pxbuf = graph.impl_->handle->pixbuf_ptr;
+      if(pxbuf)
+      {
+        auto     w = graph.width();
+        auto     h = graph.height();
+        for(unsigned int y=0; y<h; ++y)
+          for(unsigned int x=0; x<w; ++x)
+          {
+            pixel_argb_t p;
+            p.element.red   = (u8)(y/(f32)h * 255.f);
+            p.element.green = (u8)(x/(f32)w * 255.f);
+            //p.element.red   = 0;
+            //p.element.green = 0;
+            p.element.blue  = 0;
+            p.element.alpha_channel = 1;
+
+            pxbuf[y*w + x] = p;
+          }
+      }
     });
-    //      // get the graphycs !?
-    //if (!API::window_graphics(*this, gr_))
-    //      throw std::runtime_error("Imposible to get the graph");
-    //      
-    //      //Copy the image to the window
-    //img_.paste( rectangle{ point{0,0}, img_.size() },
-    //                        gr_,
-    //                        {0,0});
-    //img_.stretch( rectangle{ point{0,0}, img_.size() },
-    //                        gr_,
-    //                        size()  );
     dw.update();
     //Register events
     events().click  ( [this](){_m_click();} );  
@@ -173,26 +201,7 @@ private:
   //Switchs the algorithm between two algorithms in every click on the form.
   void _m_click()
   {
-    static bool interop;
-    nana::paint::image_process::selector sl;
-    sl.stretch(interop ? "bilinear interoplation" : "proximal interoplation");
-    interop = !interop;
-    std::cout << (interop ? "Click: bilinear interoplation\n" 
-      : "Click: proximal interoplation\n") ;
   }
-  //  //When the window size is changed, it stretches the image to fit the window.
-  //  void _m_size()
-  //  {
-  //      drawing dw(*this);
-  //     
-  //      dw.clear();  //Before stretch, it should clear the operations that are generated before.
-  //      
-  //img_.stretch(rectangle{ point{ 0,0 }, img_.size() },
-  //      gr_,
-  //      size());
-  //dw.update();
-  //std::cout << "resize\n";
-  //  }
 };
 
 IvTbl                       glblT;
@@ -203,12 +212,11 @@ TblKeys                   tblKeys;
 MemPixbuf                mempxbuf;
 nana::form                     fm;
 nana::treebox                tree;
-nana::picture                 viz;
+//nana::picture                 viz;
 nana::paint::image         vizImg;
 nana::place                   plc;
 nana::label sz, elems, szBytes, cap, mapcap, owned;
-//nana::drawing                dviz(viz);
-//tsform                        tsf;
+Viz                           viz;
 
 namespace {
 
@@ -435,9 +443,11 @@ int  main()
   SECTION(initialize components with the main window handle)
   {
     //dviz.
+    
+    //viz.create(fm, true);
 
     viz.create(fm, true);
-    viz.stretchable(true);
+    //viz.stretchable(true);
     viz.borderless(false);
     viz.bgcolor(color(0,0,0,1.0));
 
@@ -702,10 +712,11 @@ int  main()
     plc.collocate();
   }
 
-  dragger drg;
+  dragger  drg;
   SECTION(layout the main window, show it, and start the event loop)
   {
     //tsf.show();
+    //tsfm.show();
 
     fm.collocate();
     fm.show();         //Show the form
@@ -728,6 +739,63 @@ int  main()
 
 
 
+
+//static bool interop;
+//nana::paint::image_process::selector sl;
+//sl.stretch(interop ? "bilinear interoplation" : "proximal interoplation");
+//interop = !interop;
+//std::cout << (interop ? "Click: bilinear interoplation\n" 
+//  : "Click: proximal interoplation\n") ;
+
+//  //When the window size is changed, it stretches the image to fit the window.
+//  void _m_size()
+//  {
+//      drawing dw(*this);
+//     
+//      dw.clear();  //Before stretch, it should clear the operations that are generated before.
+//      
+//img_.stretch(rectangle{ point{ 0,0 }, img_.size() },
+//      gr_,
+//      size());
+//dw.update();
+//std::cout << "resize\n";
+//  }
+
+//      // get the graphycs !?
+//if (!API::window_graphics(*this, gr_))
+//      throw std::runtime_error("Imposible to get the graph");
+//      
+//      //Copy the image to the window
+//img_.paste( rectangle{ point{0,0}, img_.size() },
+//                        gr_,
+//                        {0,0});
+//img_.stretch( rectangle{ point{0,0}, img_.size() },
+//                        gr_,
+//                        size()  );
+
+//nana::drawing                dviz(viz);
+//tsform                        tsf;
+
+//auto rawpx = stor->raw_pixel_buffer;
+//auto     w = stor->pixel_size.width;
+//auto     h = stor->pixel_size.height;
+//
+//img_.paste(graph, 0, 0);
+//graph.p
+//
+//img_.stretch(r, gr_, rw );
+//std::cout << "Pict: " << r << ", Windows: " << rw << "\n";
+
+//pixel_buffer& pxbuf = graph.impl_.get()->pxbuf;
+//pixel_buffer& pxbuf = graph.impl_->handle->pixbuf_ptr;
+//
+//auto* stor = pxbuf.storage_.get();
+//if(stor){
+
+//img_.image_ptr_ = mempb;
+//
+//if (!img_.open(("../Examples/bground.6states.bmp")))
+//throw std::runtime_error("Imposible to open the image");    
 
 //struct Ary
 //{
