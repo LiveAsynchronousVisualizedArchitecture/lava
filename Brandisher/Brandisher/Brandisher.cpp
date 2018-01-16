@@ -58,18 +58,18 @@
 // -todo: compile with png and jpeg libs - not needed for now
 // -todo: add min and max to table array stats
 // -todo: look in to making a custom nana drawing component that will expand to the space it has - made from looking at the implementation of picture
+// -todo: implement saving of the tbl - native file dialog used for file selection
+// -todo: implement opening of the tbl through the menu and file dialog - opens to the current tbl but not into a scratch db now
 
-// todo: try compiling with clang
 // todo: check the file size on load to make sure it matches the tbl size
+// todo: try compiling with clang
 // todo: load file into Brandisher simdb instead of current tbl
-// todo: implement saving of the tbl
 // todo: implement opening on drag and drop of a tbl
-// todo: implement opening of the tbl through the menu and file dialog
 // todo: make a Brandisher simdb database on start, as scratch space for dragged in files and dragged tables from other dbs
-// todo: make multiple selections additivly draw multiple colored lines?
 // todo: make listing the keys of a db happen on expand
 // todo: make insertion of tbls from a db key happen on expand
-// todo: make switch case for fundamental types that the map elements can be
+// todo: make switch case for fundamental types that the map elements can be - need the non-templated table
+// todo: make multiple selections additivly draw multiple colored lines?
 
 // idea: should tbls exist as either files, memory, or sub tables?
 //       | icon in the tree could show which is which
@@ -434,7 +434,7 @@ vec_u8       readFile(const char* path)
 
   ret.resize(fsize);
 
-  auto rdSz = fread(ret.data(), fsize, 1, f);
+  auto rdSz = fread(ret.data(), 1, fsize, f);
   fclose(f);
 
   ret.resize(rdSz);
@@ -556,6 +556,11 @@ int  main()
 
       tblBuf = readFile(path);
       glblT  = IvTbl(tblBuf.data(), false, false);
+      if(glblT.sizeBytes() > tblBuf.size()){
+        glblT.m_mem = nullptr;
+        tblBuf.resize(0);
+        Println("File size and tbl size did not match");
+      }
       refreshViz();
 
       Println("File Opened");
