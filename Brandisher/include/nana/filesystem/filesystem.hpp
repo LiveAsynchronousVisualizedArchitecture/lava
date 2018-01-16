@@ -82,7 +82,14 @@ namespace std {
 #else
 #   undef NANA_USING_STD_FILESYSTEM
 #   define NANA_USING_STD_FILESYSTEM 1
-#   include <experimental/filesystem>
+
+  // sbassett
+  #ifdef __clang__
+    #include <filesystem>
+  #else 
+    #include <experimental/filesystem>
+  #endif
+
 #endif
 
 

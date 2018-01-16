@@ -28,7 +28,13 @@ namespace nana
 	public:
 		using font = font_interface;
 
-		using path_type = ::std::experimental::filesystem::path;
+    // sbassett
+    #ifdef __clang__
+      using path_type = ::std::filesystem::path;
+    #else 
+      using path_type = ::std::experimental::filesystem::path;
+    #endif
+
 
 		static void initialize();
 		/// Shutdown before destruction of platform_spec 

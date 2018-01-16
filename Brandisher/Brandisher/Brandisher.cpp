@@ -60,12 +60,14 @@
 // -todo: look in to making a custom nana drawing component that will expand to the space it has - made from looking at the implementation of picture
 // -todo: implement saving of the tbl - native file dialog used for file selection
 // -todo: implement opening of the tbl through the menu and file dialog - opens to the current tbl but not into a scratch db now
+// -todo: check the file size on load to make sure it matches the tbl size
+// -todo: try compiling with clang - can work, but there are many errors from the filesystem 
+// -todo: load file into Brandisher simdb instead of current tbl
+// -todo: make open and file drag the same underlying operation
+// -todo: implement opening on drag and drop of a tbl
+// -todo: make a Brandisher simdb database on start, as scratch space for dragged in files and dragged tables from other dbs
 
-// todo: check the file size on load to make sure it matches the tbl size
-// todo: try compiling with clang
-// todo: load file into Brandisher simdb instead of current tbl
-// todo: implement opening on drag and drop of a tbl
-// todo: make a Brandisher simdb database on start, as scratch space for dragged in files and dragged tables from other dbs
+// todo: make a refresh button to refresh the db - only need to refresh the dbs if they get their keys on expand
 // todo: make listing the keys of a db happen on expand
 // todo: make insertion of tbls from a db key happen on expand
 // todo: make switch case for fundamental types that the map elements can be - need the non-templated table
@@ -79,6 +81,7 @@
 #include <iostream>
 #include <algorithm>
 #include <unordered_map>
+#include <filesystem>
 #include <nana/gui.hpp>
 #include <nana/gui/dragger.hpp>
 #include <nana/gui/widgets/label.hpp>
@@ -106,6 +109,7 @@ using     str = std::string;
 using vec_str = std::vector<str>;
 using  vec_u8 = std::vector<u8>;
 using vec_dbs = std::vector<simdb>;
+using    path = std::experimental::filesystem::path;         // why is this still experimental?
 using   IvTbl = tbl<vert>;
 
 struct IdxKey { bool subTbl; u32 idx; str key; };            // this represents an index into the db vector and a key  
@@ -131,9 +135,11 @@ vec_u8                     tblBuf;
 vec_str                       sel;
 vec_dbs                       dbs;
 TblKeys                   tblKeys;
+simdb                          db;
 nana::form                     fm;
 nana::treebox                tree;
 nana::paint::image         vizImg;
+nana::button              refresh;
 nana::place                   plc;
 nana::label sz, elems, szBytes, cap, mapcap, owned, status;
 
@@ -166,6 +172,9 @@ class  VizDraw : public nana::drawer_trigger
   {
     using namespace nana;
     using namespace nana::paint;
+
+    if( !g.impl_ || !g.impl_->handle || !g.impl_->handle->pixbuf_ptr )
+      return;
 
     pixel_argb_t* pxbuf = g.impl_->handle->pixbuf_ptr;
     if(pxbuf)
@@ -404,7 +413,7 @@ IvTbl      tblFromKey(str key)
     return ret;
   }else{ return ret; }
 }
-IvTbl* setCurTblFromTreeKey(str key)  // set current table from tree key
+IvTbl*   setCurTblFromTreeKey(str key)  // set current table from tree key
 {
   //if( !isTableKey(key) ) return nullptr;
 
@@ -445,6 +454,19 @@ void       refreshViz()
 {
   viz.caption("Setting this caption is the only way I know to refresh the component");
 }
+void        openFiles(vec_str const& files)
+{
+  int i = 0;
+  for(auto& f : files){
+    Println("file ", i, ": ", f);
+    path p(f);
+    auto fileBytes = readFile(f.c_str());
+    auto  justName = p.filename().replace_extension().string();
+    db.put(justName, fileBytes);
+  }
+
+  regenTblInfo();
+}
 
 }
 
@@ -453,6 +475,8 @@ int  main()
   using namespace  std;
   using namespace nana;
   using namespace nana::paint;
+
+  new (&db) simdb("Brandisher", 1024, 1 << 12);
 
   SECTION(initialize the table)
   {
@@ -475,10 +499,7 @@ int  main()
     {
       Println("drop file event");
 
-      int i = 0;
-      for(auto& f : arg.files){
-        Println("file ", i, ": ", f);
-      }
+      openFiles(arg.files);
     });
   }
   SECTION(initialize components with the main window handle)
@@ -503,6 +524,14 @@ int  main()
           auto capStr = toString(val,"   X: ",arg.pos.x,"   Y: ",arg.pos.y);
           status.caption( capStr );
         }
+      });
+    }
+    SECTION(refresh button and push event)
+    {
+      refresh.create(fm);
+      refresh.caption("REFRESH");
+      refresh.events().click([](){
+        regenTblInfo();
       });
     }
     SECTION(initialize the table header labels)
@@ -547,13 +576,6 @@ int  main()
       nfdresult_t result = NFD_OpenDialog("tbl", NULL, &path );
       if(!path) return;
 
-      //FILE* tblFile = fopen("test_table.tbl","w");
-      //FILE* tblFile = fopen(path,"r");
-      //if(!tblFile) return;
-      //
-      //fread(glblT.memStart(), sizeof(u8), glblT.sizeBytes(), tblFile);
-      //fclose(tblFile);
-
       tblBuf = readFile(path);
       glblT  = IvTbl(tblBuf.data(), false, false);
       if(glblT.sizeBytes() > tblBuf.size()){
@@ -563,6 +585,8 @@ int  main()
       }
       refreshViz();
 
+      openFiles({path});
+
       Println("File Opened");
     });
     fileMenu.append("&Save", [](auto& itmprxy)
@@ -571,8 +595,7 @@ int  main()
       nfdresult_t result = NFD_SaveDialog("tbl", NULL, &path );
       if(!path) return;
 
-      //FILE* tblFile = fopen("test_table.tbl","w");
-      FILE* tblFile = fopen(path,"w");
+      FILE* tblFile = fopen(path,"wb");
       if(!tblFile) return;
         fwrite(glblT.memStart(), sizeof(u8), glblT.sizeBytes(), tblFile);
       fclose(tblFile);
@@ -761,6 +784,7 @@ int  main()
   {
     plc.bind(fm);
     plc["mb"]      << mb;
+    plc["refresh"] << refresh;
     plc["sz"]      << sz;
     plc["viz"]     << viz;
     plc["elems"]   << elems;
@@ -772,8 +796,9 @@ int  main()
     plc["status"]  << status;
     plc.div("vertical"
             "<mb weight=30>"
-            "<weight=20 margin=[0,0,5,10] " // weight=20 "<weight=10% "
-             "  <fit sz margin=[0,10]> <fit elems margin=[0,10]> <fit szBytes margin=[0,10]> <fit cap margin=[0,10]> <fit mapcap margin=[0,10]> <fit owned>"
+            "<weight=30 margin=[0,0,5,10] " // weight=20 "<weight=10% "
+              // labels and refresh button
+              "<fit refresh margin=[0,10]> <fit sz margin=[0,10]> <fit elems margin=[0,10]> <fit szBytes margin=[0,10]> <fit cap margin=[0,10]> <fit mapcap margin=[0,10]> <fit owned>"
             ">" //  gap=5 margin=[10,40,10,0]" //margin=[10,10,10,10]>"
             "<fit viz margin=[5,5,5,5] >"// weight=30%>" // margin=[10,10,10,10] > "
             //"<splitter>"
@@ -814,6 +839,21 @@ int  main()
 
 
 
+//int i = 0;
+//for(auto& f : arg.files){
+//  Println("file ", i, ": ", f);
+//  path p(f);
+//  auto fileBytes = readFile(f.c_str());
+//  auto  justName = p.filename().replace_extension().string();
+//  db.put(justName, fileBytes);
+//}
+
+//FILE* tblFile = fopen("test_table.tbl","w");
+//FILE* tblFile = fopen(path,"r");
+//if(!tblFile) return;
+//
+//fread(glblT.memStart(), sizeof(u8), glblT.sizeBytes(), tblFile);
+//fclose(tblFile);
 
 //sz.caption(     toString("Size: "));
 //elems.caption(  toString("Elements: "));

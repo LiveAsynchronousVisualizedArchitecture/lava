@@ -426,7 +426,8 @@ namespace nana
 //		auto def_encoding_error_police = std::make_unique<utf8_error_police_latin>();
 //		auto def_encoding_error_police = std::make_unique<utf8_error_police_throw>();
 //		auto def_encoding_error_police = std::make_unique<utf8_error_police_def_char>('X');
-		auto def_encoding_error_police = std::make_unique<utf8_error_police_system>();
+		//auto def_encoding_error_police = std::make_unique<utf8_error_police_system>();
+    std::unique_ptr<utf8_error_police_system> def_encoding_error_police(new utf8_error_police_system());   // = std::make_unique<utf8_error_police_system>();
 
 
 
