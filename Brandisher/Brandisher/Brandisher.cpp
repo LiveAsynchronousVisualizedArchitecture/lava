@@ -56,24 +56,26 @@
 // -todo: figure out how to refresh on table selection
 // -todo: make a graph visualization of the current table in the picture widget
 // -todo: compile with png and jpeg libs - not needed for now
+// -todo: add min and max to table array stats
+// -todo: look in to making a custom nana drawing component that will expand to the space it has - made from looking at the implementation of picture
 
-// todo: add min and max to table array stats
-// todo: make listing the keys of a db happen on expand
-// todo: make insertion of tbls from a db key happen on expand
-// todo: make switch case for fundamental types that the map elements can be
+// todo: try compiling with clang
+// todo: check the file size on load to make sure it matches the tbl size
+// todo: load file into Brandisher simdb instead of current tbl
 // todo: implement saving of the tbl
 // todo: implement opening on drag and drop of a tbl
 // todo: implement opening of the tbl through the menu and file dialog
-// todo: try compiling with clang
 // todo: make a Brandisher simdb database on start, as scratch space for dragged in files and dragged tables from other dbs
-// todo: look in to making a custom nana drawing component that will expand to the space it has
 // todo: make multiple selections additivly draw multiple colored lines?
-
+// todo: make listing the keys of a db happen on expand
+// todo: make insertion of tbls from a db key happen on expand
+// todo: make switch case for fundamental types that the map elements can be
 
 // idea: should tbls exist as either files, memory, or sub tables?
 //       | icon in the tree could show which is which
 //       | editing a memory mapped table could edit the table on disk
 
+#include <cstdio>
 #include <iostream>
 #include <algorithm>
 #include <unordered_map>
@@ -93,6 +95,7 @@
 #include <../source/paint/detail/image_pixbuf.hpp>
 #include <../source/paint/pixel_buffer.cpp>
 #include <../source/paint/graphics.cpp>
+#include "../../nfd.h"
 #include "../../no_rt_util.h"
 #include "../../simdb.hpp"
 #include "../../tbl.hpp"
@@ -418,6 +421,30 @@ IvTbl* setCurTblFromTreeKey(str key)  // set current table from tree key
     return &glblT;
   }else{ return nullptr; }
 }
+vec_u8       readFile(const char* path)
+{
+  vec_u8 ret;
+
+  FILE *f = fopen(path, "rb");
+  if(!f) return ret;
+
+  fseek(f, 0, SEEK_END);
+  long fsize = ftell(f);
+  fseek(f, 0, SEEK_SET);  //same as rewind(f);
+
+  ret.resize(fsize);
+
+  auto rdSz = fread(ret.data(), fsize, 1, f);
+  fclose(f);
+
+  ret.resize(rdSz);
+  
+  return ret;
+}
+void       refreshViz()
+{
+  viz.caption("Setting this caption is the only way I know to refresh the component");
+}
 
 }
 
@@ -514,11 +541,38 @@ int  main()
       }
       regenTblInfo();
     });
-    fileMenu.append("&Open", [](auto& itmprxy){
-      cout << "Open pressed" << endl;
+    fileMenu.append("&Open", [](auto& itmprxy)
+    {
+      nfdchar_t    *path = NULL;
+      nfdresult_t result = NFD_OpenDialog("tbl", NULL, &path );
+      if(!path) return;
+
+      //FILE* tblFile = fopen("test_table.tbl","w");
+      //FILE* tblFile = fopen(path,"r");
+      //if(!tblFile) return;
+      //
+      //fread(glblT.memStart(), sizeof(u8), glblT.sizeBytes(), tblFile);
+      //fclose(tblFile);
+
+      tblBuf = readFile(path);
+      glblT  = IvTbl(tblBuf.data(), false, false);
+      refreshViz();
+
+      Println("File Opened");
     });
-    fileMenu.append("&Save", [](auto& itmprxy){
-      cout << "Save pressed" << endl;
+    fileMenu.append("&Save", [](auto& itmprxy)
+    {
+      nfdchar_t *path = NULL;
+      nfdresult_t result = NFD_SaveDialog("tbl", NULL, &path );
+      if(!path) return;
+
+      //FILE* tblFile = fopen("test_table.tbl","w");
+      FILE* tblFile = fopen(path,"w");
+      if(!tblFile) return;
+        fwrite(glblT.memStart(), sizeof(u8), glblT.sizeBytes(), tblFile);
+      fclose(tblFile);
+
+      Println("File Written");
     });
 
     auto& helpMenu = mb.at(1);
@@ -667,7 +721,7 @@ int  main()
         }
         if(curT == nullptr) return;
 
-        viz.caption("Setting this caption is the only way I know to refresh the component");
+        refreshViz();
 
         auto&   t = *curT;
         auto flen = t.size() * 12;      // 12 floats in a vert struct

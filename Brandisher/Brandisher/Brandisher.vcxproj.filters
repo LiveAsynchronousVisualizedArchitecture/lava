@@ -19,6 +19,9 @@
     <Filter Include="Source Files\nana\main_comp_unit">
       <UniqueIdentifier>{2aab4c99-f06a-4aa1-bff3-dbdd3fd9149c}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\nfd">
+      <UniqueIdentifier>{dcf8df89-6dde-4247-9bda-20f551c28ad4}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Brandisher.cpp">
@@ -269,6 +272,12 @@
     </ClCompile>
     <ClCompile Include="..\source\paint\graphics.cpp">
       <Filter>Source Files\nana\main_comp_unit</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\nfd_common.c">
+      <Filter>Source Files\nfd</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\nfd_win.cpp">
+      <Filter>Source Files\nfd</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

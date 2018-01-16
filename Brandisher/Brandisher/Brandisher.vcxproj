@@ -91,6 +91,7 @@
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <MinimalRebuild>false</MinimalRebuild>
+      <PreprocessorDefinitions>_CRT_SECURE_NO_WARNINGS;_MBCS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <AdditionalLibraryDirectories>H:\projects\LAVA\lava\Brandisher\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
@@ -136,6 +137,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\nfd_common.c" />
+    <ClCompile Include="..\..\nfd_win.cpp" />
     <ClCompile Include="..\source\any.cpp" />
     <ClCompile Include="..\source\audio\detail\audio_device.cpp" />
     <ClCompile Include="..\source\audio\detail\audio_stream.cpp" />
