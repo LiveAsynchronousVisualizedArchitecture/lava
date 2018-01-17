@@ -67,13 +67,13 @@
 // -todo: implement opening on drag and drop of a tbl
 // -todo: make a Brandisher simdb database on start, as scratch space for dragged in files and dragged tables from other dbs
 // -todo: make a refresh button to refresh the db - only need to refresh the dbs if they get their keys on expand
+// -todo: make status have the remapped value of the cursor's Y
 
-// todo: make status have the remapped value of the cursor's Y
 // todo: make listing the keys of a db happen on expand
 // todo: make insertion of tbls from a db key happen on expand
-// todo: make switch case for fundamental types that the map elements can be - need the non-templated table
-// todo: make multiple selections additivly draw multiple colored lines?
 
+// idea: make switch case for fundamental types that the map elements can be - need the non-templated table
+// idea: make multiple selections additivly draw multiple colored lines?
 // idea: should tbls exist as either files, memory, or sub tables?
 //       | icon in the tree could show which is which
 //       | editing a memory mapped table could edit the table on disk
@@ -131,6 +131,7 @@ std::ostream& operator<<(std::ostream& os, const nana::rectangle& r)
 
 f32       mx = -std::numeric_limits<float>::infinity(); 
 f32       mn =  std::numeric_limits<float>::infinity();
+f32                  msX=0, msY=0;
 IvTbl                       glblT;
 vec_u8                     tblBuf;
 vec_str                       sel;
@@ -255,18 +256,19 @@ public:
     using namespace nana;
     using namespace nana::paint;
 
-    rectangle rw{ point{ 0,0 }, nana::size() };
-    g.rectangle(rectangle{ 5, 5, 50, 50 }, true, colors::red);
-    g.line(point(5, 5), point(55, 55), colors::blue);
-    g.line_begin(200, 100);
-    g.line_to(point(300, 300));
-    g.line_to(point(100, 200));
-    g.line_to(point(300, 200));
-    g.line_to(point(100, 300));
-    g.line_to(point(200, 100));
+    //rectangle rw{ point{ 0,0 }, nana::size() };
+    //g.rectangle(rectangle{ 5, 5, 50, 50 }, true, colors::red);
+    //g.line(point(5, 5), point(55, 55), colors::blue);
+    //g.line_begin(200, 100);
+    //g.line_to(point(300, 300));
+    //g.line_to(point(100, 200));
+    //g.line_to(point(300, 200));
+    //g.line_to(point(100, 300));
+    //g.line_to(point(200, 100));
 
-    //drawGradient(g);
     drawTblGraph(glblT, g);
+
+    //g.line( point(0,(int)msY), point((int)g.width(),(int)msY), {255,255,255,255} );
   }
 };
 class      Viz : public nana::widget_object<nana::category::widget_tag, VizDraw>
@@ -521,8 +523,8 @@ int  main()
 
       viz.events().mouse_move([](arg_mouse const& arg)
       {
-        f32     msX = arg.pos.x;
-        f32     msY = arg.pos.y;
+        msX         = arg.pos.x;
+        msY         = arg.pos.y;
         auto    vsz = viz.size();
         f32       h = vsz.height;
         auto&     t = glblT;
