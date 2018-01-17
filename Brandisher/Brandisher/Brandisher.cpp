@@ -66,8 +66,9 @@
 // -todo: make open and file drag the same underlying operation
 // -todo: implement opening on drag and drop of a tbl
 // -todo: make a Brandisher simdb database on start, as scratch space for dragged in files and dragged tables from other dbs
+// -todo: make a refresh button to refresh the db - only need to refresh the dbs if they get their keys on expand
 
-// todo: make a refresh button to refresh the db - only need to refresh the dbs if they get their keys on expand
+// todo: make status have the remapped value of the cursor's Y
 // todo: make listing the keys of a db happen on expand
 // todo: make insertion of tbls from a db key happen on expand
 // todo: make switch case for fundamental types that the map elements can be - need the non-templated table
@@ -200,7 +201,8 @@ class  VizDraw : public nana::drawer_trigger
 
     if( !t.m_mem || t.size()==0 ){ 
       drawBlack(g);
-    }else{
+    }else
+    {
       auto&    t = glblT;
       auto  flen = t.size() * 12;      // 12 floats in a vert struct
       f32*     f = (float*)t.m_mem;
@@ -236,6 +238,10 @@ class  VizDraw : public nana::drawer_trigger
 
           pxbuf[y*w + x] = p;
         }
+
+      //str mxStr = toString("Max: ", mx);
+      //g.bidi_string( {0,0}, mxStr.c_str(), mxStr.length() );
+      //g.string( {0,0}, mxStr, {255,255,255,255} );
     }
   }
 
@@ -343,6 +349,8 @@ void     regenTblInfo()
 {
   SECTION(list simdb files and insert them at the top level of the tree)
   {
+    glblT.m_mem = nullptr;
+    tblBuf.resize(0);
     dbs.clear();
     tblKeys.clear();
 
@@ -511,17 +519,24 @@ int  main()
       viz.borderless(false);
       viz.bgcolor(color(0,0,0,1.0));
 
-      viz.events().mouse_move([](arg_mouse const& arg){
+      viz.events().mouse_move([](arg_mouse const& arg)
+      {
         f32     msX = arg.pos.x;
+        f32     msY = arg.pos.y;
         auto    vsz = viz.size();
+        f32       h = vsz.height;
         auto&     t = glblT;
         if( t.m_mem && t.size()>0 ){
           auto   flen = t.size() * 12;      // 12 floats in a vert struct
           f32*      f = (float*)t.m_mem;
           f32   ratio = vsz.width  / (f32)flen;
-          f32  hRatio = vsz.height / (mx-mn);
+          f32     dif = mx - mn;
+          f32  hRatio = vsz.height / dif;
           auto    val = f[  (u64)(msX/ratio) ];
-          auto capStr = toString(val,"   X: ",arg.pos.x,"   Y: ",arg.pos.y);
+          f32  remapY = (((h-msY)/h));
+          remapY     *= dif;
+          remapY     += mn;
+          auto capStr = toString(val,"   X: ",arg.pos.x,"   Y: ",arg.pos.y,"   Remapped Y: ",remapY);
           status.caption( capStr );
         }
       });
@@ -808,7 +823,7 @@ int  main()
     plc.collocate();
   }
 
-  dragger  drg;
+  dragger drg;
   SECTION(layout the main window, show it, and start the event loop)
   {
     //tsf.show();
