@@ -123,12 +123,12 @@ int main()
     //manager->resizeEvent = HandleResize;
     ////manager->mouseMoveEvent = HandleMouseMovement;
 
-    glClearColor(0.25f, 0.25f, 0.25f, 0.0f);
+    glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
     while (!window->shouldClose)
     {
       manager->PollForEvents();
     
-      glClearColor(0.25f, 0.25f, 0.25f, 1.0f);
+      glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
       //if (spacePressed)

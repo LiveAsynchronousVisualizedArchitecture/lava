@@ -31,14 +31,14 @@
 #include <Windows.h>
 #if !defined(TW_USE_VULKAN)
 #include <gl/GL.h>
-//#include <gl/wglext.h>
-#include "wglext.h"
+#include <gl/wglext.h>
 #else
 #include <vulkan.h>
 #endif
 #include <io.h>
 #include <fcntl.h>
 #include <mmsystem.h>
+#include <shellapi.h>
 #endif	//_WIN32 || _WIN64
 
 #if defined(__linux__)
@@ -66,6 +66,7 @@
 #include <system_error>
 #include <bitset>
 #include <ctype.h>
+#include <math.h>
 
 namespace TinyWindow
 {
@@ -165,21 +166,20 @@ namespace TinyWindow
 		unsigned int				bitsPerPixel;
 		unsigned int				displayFrequency;
 
-		monitorSetting_t(vec2_t<unsigned int> resolution, unsigned int bitsPerPixel, unsigned int displayFrequency)
+		monitorSetting_t(vec2_t<unsigned int> inResolution, unsigned int inBitsPerPixel, unsigned int inDisplayFrequency)	: resolution(inResolution), bitsPerPixel(inBitsPerPixel), displayFrequency(inDisplayFrequency)
 		{
-			this->resolution = resolution;
-			this->bitsPerPixel = bitsPerPixel;
-			this->displayFrequency = displayFrequency;
+
 		}
 	};	
 
 	struct monitor_t
 	{
 		monitorSetting_t*					currentSetting;
-		vec4_t<unsigned int>				extents;
 		std::vector<monitorSetting_t*>		settings;
 		//store all display settings
 
+		vec2_t<unsigned int> resolution;
+		vec4_t<int> extents;;
 		std::string deviceName;
 		std::string monitorName;
 		std::string displayName;
@@ -197,6 +197,8 @@ namespace TinyWindow
 		{
 			currentSetting = NULL;
 			isPrimary = false;
+			resolution = vec2_t<unsigned int>::Zero();
+			extents = vec4_t<int>::Zero();
 #if defined(TW_WINDOWS)
 			monitorHandle = NULL;
 #endif
@@ -435,16 +437,17 @@ namespace TinyWindow
 		windowsFunctionNotImplemented,			/**< Windows: when a function has yet to be implemented on the Windows platform in the current version of the API */
 	};
 
-	typedef std::function<void(tWindow* window, int key, keyState_t keyState)>												keyEvent_t;
-	typedef std::function<void(tWindow* window, mouseButton_t mouseButton, buttonState_t buttonState)>						mouseButtonEvent_t;
-	typedef std::function<void(tWindow* window, mouseScroll_t mouseScrollDirection)>										mouseWheelEvent_t;
-	typedef std::function<void(tWindow* window)>																			destroyedEvent_t;
-	typedef std::function<void(tWindow* window)>																			maximizedEvent_t;
-	typedef std::function<void(tWindow* window)>																			minimizedEvent_t;
-	typedef std::function<void(tWindow* window, bool isFocused)>															focusEvent_t;
-	typedef std::function<void(tWindow* window, vec2_t<int> windowPosition)>												movedEvent_t;
-	typedef std::function<void(tWindow* window, vec2_t<unsigned int> windowResolution)>										resizeEvent_t;
-	typedef std::function<void(tWindow* window, vec2_t<int> windowMousePosition, vec2_t<int> screenMousePosition)>			mouseMoveEvent_t;
+	typedef std::function<void(tWindow* window, int key, keyState_t keyState)>													keyEvent_t;
+	typedef std::function<void(tWindow* window, mouseButton_t mouseButton, buttonState_t buttonState)>							mouseButtonEvent_t;
+	typedef std::function<void(tWindow* window, mouseScroll_t mouseScrollDirection)>											mouseWheelEvent_t;
+	typedef std::function<void(tWindow* window)>																				destroyedEvent_t;
+	typedef std::function<void(tWindow* window)>																				maximizedEvent_t;
+	typedef std::function<void(tWindow* window)>																				minimizedEvent_t;
+	typedef std::function<void(tWindow* window, bool isFocused)>																focusEvent_t;
+	typedef std::function<void(tWindow* window, vec2_t<int> windowPosition)>													movedEvent_t;
+	typedef std::function<void(tWindow* window, vec2_t<unsigned int> windowResolution)>											resizeEvent_t;
+	typedef std::function<void(tWindow* window, vec2_t<int> windowMousePosition, vec2_t<int> screenMousePosition)>				mouseMoveEvent_t;
+	typedef std::function<void(tWindow* window, std::vector<std::string> files, vec2_t<int> windowMousePosition)>		fileDropEvent_t;
 
 	class errorCategory_t : public std::error_category
 	{
@@ -810,9 +813,7 @@ namespace TinyWindow
 			this->userData = userData;
 			this->versionMajor = versionMajor;
 			this->versionMinor = versionMinor;
-#if defined(TW_WINDOWS)
-			this->profile = (profile == profile_t::compatibility) ? WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB : WGL_CONTEXT_CORE_PROFILE_BIT_ARB;
-#endif
+
 			initialized = false;
 			contextCreated = false;
 			currentStyle = titleBar | icon | border | minimizeButton | maximizeButton | closeButton | sizeableBorder;
@@ -835,12 +836,59 @@ namespace TinyWindow
 			windowHandle = NULL;
 			instanceHandle = NULL;
 			accumWheelDelta = 0;
-			#endif
+			this->profile = (profile == profile_t::compatibility) ? WGL_CONTEXT_COMPATIBILITY_PROFILE_BIT_ARB : WGL_CONTEXT_CORE_PROFILE_BIT_ARB;
+#endif
 			
-
 #if defined(__linux__)
 			context = 0;
 #endif 
+		}
+
+		tWindow(tWindow* sourceWindow, const char* name = nullptr, void* userData = nullptr,
+			vec2_t<unsigned int> resolution = vec2_t<unsigned int>(defaultWindowWidth, defaultWindowHeight))
+		{
+			if (sourceWindow)
+			{
+				this->name = name;
+				this->resolution = resolution;
+				this->colorBits = sourceWindow->colorBits;
+				this->depthBits = sourceWindow->depthBits;
+				this->stencilBits = sourceWindow->stencilBits;
+				this->shouldClose = false;
+				this->currentState = sourceWindow->currentState;
+				this->userData = userData;
+				this->versionMajor = sourceWindow->versionMajor;
+				this->versionMinor = sourceWindow->versionMinor;
+
+				initialized = false;
+				contextCreated = false;
+				currentStyle = sourceWindow->currentStyle;
+
+				std::fill(keys, keys + last, keyState_t::up);// = { keyState_t.bad };
+				std::fill(mouseButton, mouseButton + (unsigned int)mouseButton_t::last, buttonState_t::up);
+
+				inFocus = false;
+				isCurrentContext = false;
+				currentScreenIndex = 0;
+				isFullscreen = false;
+				currentMonitor = NULL;
+
+#if defined(TW_WINDOWS)
+				this->profile = sourceWindow->profile;
+				deviceContextHandle = NULL;
+				glRenderingContextHandle = NULL;
+				paletteHandle = NULL;
+				pixelFormatDescriptor = PIXELFORMATDESCRIPTOR();
+				windowClass = WNDCLASS();
+				windowHandle = NULL;
+				instanceHandle = NULL;
+				accumWheelDelta = 0;
+#endif
+
+#if defined(__linux__)
+				context = 0;
+#endif
+			}
 		}
 
 		/**
@@ -925,7 +973,7 @@ namespace TinyWindow
 		/**
 		* Swap the draw buffers of the given window.
 		*/
-		inline std::error_code SwapDrawBuffers()
+		inline std::error_code SwapDrawBuffers() 
 		{
 #if defined(TW_WINDOWS)
 			SwapBuffers(deviceContextHandle);
@@ -1356,7 +1404,7 @@ namespace TinyWindow
 			SetWindowLongPtr(windowHandle, GWL_STYLE,
 				static_cast<LONG_PTR>(currentStyle | WS_VISIBLE));
 
-			SetWindowPos(windowHandle, HWND_TOP, position.x, position.y,
+			SetWindowPos(windowHandle, HWND_TOPMOST, position.x, position.y,
 				resolution.width, resolution.height, SWP_FRAMECHANGED);
 #elif defined(TW_LINUX)
 			if (decorators & closeButton)
@@ -1446,6 +1494,9 @@ namespace TinyWindow
 			return TinyWindow::error_t::success;
 		}
 
+		/**
+		* Toggles full-screen mode for a window by parsing in a monitor
+		*/
 		std::error_code ToggleFullscreen(monitor_t* monitor)
 		{
 #if defined(TW_WINDOWS)
@@ -1565,6 +1616,7 @@ namespace TinyWindow
 		movedEvent_t							movedEvent;												/**< This is the callback to be used the window has been moved in a non-programmatic fashion */
 		resizeEvent_t							resizeEvent;											/**< This is a callback to be used when the window has been resized in a non-programmatic fashion */
 		mouseMoveEvent_t						mouseMoveEvent;											/**< This is a callback to be used when the mouse has been moved */
+		fileDropEvent_t							fileDropEvent;											/**< This is a callback to be used when files have been dragged onto a window */
 
 		windowManager(/*error_t* errorCode = nullptr*/)
 		{
@@ -1653,6 +1705,21 @@ namespace TinyWindow
 				return windowList.back().get();
 			}
 			//PrintErrorMessage(std::error_code(invalidWindowName));
+			return nullptr;
+		}
+
+		tWindow* AddSharedWindow(tWindow* sourceWindow, const char* windowName, void* userData = nullptr,
+			vec2_t<unsigned int> const& resolution = vec2_t<unsigned int>(defaultWindowWidth, defaultWindowHeight))
+		{
+			if (windowName != nullptr)
+			{
+				std::unique_ptr<tWindow> newWindow(new tWindow(sourceWindow, windowName, userData, resolution));
+				windowList.push_back(std::move(newWindow));
+				Platform_InitializeWindow(windowList.back().get());
+				Platform_ShareContexts(sourceWindow, windowList.back().get());
+
+				return windowList.back().get();
+			}
 			return nullptr;
 		}
 
@@ -1923,7 +1990,7 @@ namespace TinyWindow
 				window->glRenderingContextHandle = wglCreateContext(window->deviceContextHandle);
 			}
 
-			bool ok = wglMakeCurrent(window->deviceContextHandle, window->glRenderingContextHandle);
+			wglMakeCurrent(window->deviceContextHandle, window->glRenderingContextHandle);
 
 			window->contextCreated = (window->glRenderingContextHandle != nullptr);
 
@@ -2033,6 +2100,15 @@ namespace TinyWindow
 					break;
 				}
 			}
+		}
+
+		void Platform_ShareContexts(tWindow* sourceWindow, tWindow* newWindow)
+		{
+#if defined(TW_WINDOWS)
+			wglShareLists(sourceWindow->glRenderingContextHandle, newWindow->glRenderingContextHandle);
+#elif defined(TW_LINUX)
+
+#endif
 		}
 	
 #if defined(TW_WINDOWS)
@@ -2398,8 +2474,6 @@ namespace TinyWindow
 
 								window->keys[translatedKey] = keyState_t::up;
 							}
-							//reset it
-							wasLowerCase = false;
 							break;
 						}
 					}
@@ -2633,6 +2707,37 @@ namespace TinyWindow
 					break;
 				}
 
+				case WM_DROPFILES:
+				{
+					//get the number of files that were dropped
+					unsigned int numfilesDropped = DragQueryFile((HDROP)wordParam, 0xFFFFFFFF, NULL, 0);
+					std::vector<std::string> files;
+					
+					//for each file dropped store the path
+					for (size_t fileIter = 0; fileIter < numfilesDropped; fileIter++)
+					{
+						char file[255] = {0};
+						unsigned int stringSize = DragQueryFile((HDROP)wordParam, (UINT)fileIter, NULL, 0); //get the size of the string
+						DragQueryFile((HDROP)wordParam, (UINT)fileIter, file, stringSize + 1);  //get the string itself
+						files.push_back(file);
+					}
+					POINT mousePoint;
+					vec2_t<int> mousePosition;
+					if (DragQueryPoint((HDROP)wordParam, &mousePoint)) //get the mouse position where the file was dropped
+					{
+						mousePosition = vec2_t<int>(mousePoint.x, mousePoint.y);
+					}
+
+					//release the memory
+					DragFinish((HDROP)wordParam);
+
+					if (manager->fileDropEvent != nullptr)
+					{
+						manager->fileDropEvent(window, std::move(files), mousePosition);
+					}
+					break;
+				}
+
 				default:
 				{
 					return DefWindowProc(windowHandle, winMessage, wordParam, longParam);
@@ -2649,10 +2754,11 @@ namespace TinyWindow
 			info.cbSize = sizeof(info);
 			GetMonitorInfo(monitorHandle, &info);
 			
-			monitor_t* monitor = manager->GetMonitorByHandle(info.szDevice);// new monitor_t(std::string(info.szDevice), nullptr);// ,
+			monitor_t* monitor = manager->GetMonitorByHandle(info.szDevice);
 			monitor->monitorHandle = monitorHandle;
-			//monitor->currentSetting->resolution = vec2_t<unsigned int>((monitorSize->right - monitorSize->left), (monitorSize->bottom - monitorSize->top));
-			monitor->extents = vec4_t<unsigned int>(monitorSize->left, monitorSize->top, monitorSize->right, monitorSize->bottom);
+			monitor->extents = vec4_t<int>(monitorSize->left, monitorSize->top, monitorSize->right, monitorSize->bottom);
+			monitor->resolution.width = abs(monitor->extents.right - monitor->extents.left);
+			monitor->resolution.height = abs(monitor->extents.bottom - monitor->extents.top);
 			return true;
 		}
 
@@ -2718,20 +2824,13 @@ namespace TinyWindow
 			ShowWindow(window->windowHandle, 1);
 			UpdateWindow(window->windowHandle);
 
-			//get the current screen the window is on
-			//MonitorFromWindow(window->windowHandle);
 			CheckWindowScreen(window);
 
 			//get screen by window Handle
 
 			window->SetStyle(style_t::normal);
 
-			/*RAWINPUTDEVICE device;
-			device.usUsagePage = 0x01;
-			device.usUsage = 0x06;
-			device.dwFlags = RIDEV_NOLEGACY;        // do not generate legacy messages such as WM_KEYDOWN
-			device.hwndTarget = window->windowHandle;
-			RegisterRawInputDevices(&device, 1, sizeof(device)); */
+			DragAcceptFiles(window->windowHandle, true);
 		}
 
 		//initialize the pixel format for the selected window
@@ -2921,17 +3020,17 @@ namespace TinyWindow
 
 					if (desiredSetting->redBits != -1)
 					{
-						colorDiff += pow((desiredSetting->redBits - currentFormat->redBits), 2);
+						colorDiff += (unsigned int)pow((desiredSetting->redBits - currentFormat->redBits), 2);
 					}
 
 					if (desiredSetting->greenBits != -1)
 					{
-						colorDiff += pow((desiredSetting->greenBits - currentFormat->greenBits), 2);
+						colorDiff += (unsigned int)pow((desiredSetting->greenBits - currentFormat->greenBits), 2);
 					}
 
 					if (desiredSetting->blueBits != -1)
 					{
-						colorDiff += pow((desiredSetting->blueBits - currentFormat->blueBits), 2);
+						colorDiff += (unsigned int)pow((desiredSetting->blueBits - currentFormat->blueBits), 2);
 					}
 				}
 
@@ -2941,42 +3040,42 @@ namespace TinyWindow
 
 					if (desiredSetting->alphaBits != -1)
 					{
-						extraDiff += pow((desiredSetting->alphaBits - currentFormat->alphaBits), 2);
+						extraDiff += (unsigned int)pow((desiredSetting->alphaBits - currentFormat->alphaBits), 2);
 					}
 
 					if (desiredSetting->depthBits != -1)
 					{
-						extraDiff += pow((desiredSetting->depthBits - currentFormat->depthBits), 2);
+						extraDiff += (unsigned int)pow((desiredSetting->depthBits - currentFormat->depthBits), 2);
 					}
 
 					if (desiredSetting->stencilBits != -1)
 					{
-						extraDiff += pow((desiredSetting->stencilBits - currentFormat->stencilBits), 2);
+						extraDiff += (unsigned int)pow((desiredSetting->stencilBits - currentFormat->stencilBits), 2);
 					}
 
 					if (desiredSetting->accumRedBits != -1)
 					{
-						extraDiff += pow((desiredSetting->accumRedBits - currentFormat->accumRedBits), 2);
+						extraDiff += (unsigned int)pow((desiredSetting->accumRedBits - currentFormat->accumRedBits), 2);
 					}
 
 					if (desiredSetting->accumGreenBits != -1)
 					{
-						extraDiff += pow((desiredSetting->accumGreenBits - currentFormat->accumGreenBits), 2);
+						extraDiff += (unsigned int)pow((desiredSetting->accumGreenBits - currentFormat->accumGreenBits), 2);
 					}
 
 					if (desiredSetting->accumBlueBits != -1)
 					{
-						extraDiff += pow((desiredSetting->accumBlueBits - currentFormat->accumBlueBits), 2);
+						extraDiff += (unsigned int)pow((desiredSetting->accumBlueBits - currentFormat->accumBlueBits), 2);
 					}
 
 					if (desiredSetting->numSamples != -1)
 					{
-						extraDiff += pow((desiredSetting->numSamples - currentFormat->numSamples), 2);
+						extraDiff += (unsigned int)pow((desiredSetting->numSamples - currentFormat->numSamples), 2);
 					}
 
 					if (desiredSetting->alphaBits != -1)
 					{
-						extraDiff += pow((desiredSetting->alphaBits - currentFormat->alphaBits), 2);
+						extraDiff += (unsigned int)pow((desiredSetting->alphaBits - currentFormat->alphaBits), 2);
 					}
 
 					if (desiredSetting->pixelRGB && !currentFormat->pixelRGB)
@@ -3023,10 +3122,10 @@ namespace TinyWindow
 			unsigned int bestPFDHandle = CreateLegacyPFD(desiredSetting, dummyDeviceContextHandle)->handle;
 			if (!DescribePixelFormat(dummyDeviceContextHandle, bestPFDHandle, sizeof(pfd), &pfd))
 			{
-				error_t::invalidDummyPixelFormat;
+				return error_t::invalidDummyPixelFormat;
 			}
 
-			if (SetPixelFormat(dummyDeviceContextHandle, bestPFDHandle, &pfd))
+			if (!SetPixelFormat(dummyDeviceContextHandle, bestPFDHandle, &pfd))
 			{
 				return error_t::invalidDummyPixelFormat;
 			}
@@ -3338,52 +3437,51 @@ namespace TinyWindow
 
 		void Windows_GetScreenInfo()
 		{
-			DISPLAY_DEVICE monitorDevice;
-			monitorDevice.cb = sizeof(DISPLAY_DEVICE);
-			DWORD deviceNum = 0;
-			while (EnumDisplayDevices(NULL, deviceNum, &monitorDevice, NULL))
+			//get display device info
+			DISPLAY_DEVICE graphicsDevice;
+			graphicsDevice.cb = sizeof(DISPLAY_DEVICE);
+			graphicsDevice.StateFlags = DISPLAY_DEVICE_ATTACHED_TO_DESKTOP;
+			DWORD deviceNum = 0; 
+			DWORD monitorNum = 0;
+			while (EnumDisplayDevices(NULL, deviceNum, &graphicsDevice, EDD_GET_DEVICE_INTERFACE_NAME))
 			{
-				DISPLAY_DEVICE graphicsDevice = { 0 };
-				graphicsDevice.cb = sizeof(DISPLAY_DEVICE);
-				DWORD monitorNum = 0;
+				//get monitor infor for the current display device
+				DISPLAY_DEVICE monitorDevice = { 0 };
+				monitorDevice.cb = sizeof(DISPLAY_DEVICE);
+				monitorDevice.StateFlags = DISPLAY_DEVICE_ATTACHED_TO_DESKTOP;
+				monitor_t* monitor = nullptr;
+				
 				//if it has children add them to the list, else, ignore them since those are only POTENTIAL monitors/devices
-				while (EnumDisplayDevices(monitorDevice.DeviceName, monitorNum, &graphicsDevice, 0))
+				while (EnumDisplayDevices(graphicsDevice.DeviceName, monitorNum, &monitorDevice, EDD_GET_DEVICE_INTERFACE_NAME))
 				{
-					monitor_t* monitor = new monitor_t(monitorDevice.DeviceName, monitorDevice.DeviceString, graphicsDevice.DeviceString, (monitorDevice.StateFlags | DISPLAY_DEVICE_PRIMARY_DEVICE) ? true : false);					
+					monitor = new monitor_t(graphicsDevice.DeviceName, graphicsDevice.DeviceString, monitorDevice.DeviceString, (graphicsDevice.StateFlags | DISPLAY_DEVICE_PRIMARY_DEVICE) ? true : false);
 					//get current display mode
 					DEVMODE devmode;
-
-					/*if (EnumDisplaySettings(monitorDevice.DeviceName, ENUM_CURRENT_SETTINGS, &devmode))
-					{
-
-					}*/
 					//get all display modes
 					unsigned int modeIndex = -1;
-					while (EnumDisplaySettings(monitorDevice.DeviceName, modeIndex, &devmode))
+					while (EnumDisplaySettings(graphicsDevice.DeviceName, modeIndex, &devmode))
 					{
+						//get the current settings od the display
 						if (modeIndex == ENUM_CURRENT_SETTINGS)
 						{
 							monitor->currentSetting = new monitorSetting_t(vec2_t<unsigned int>(devmode.dmPelsWidth, devmode.dmPelsHeight), devmode.dmBitsPerPel, devmode.dmDisplayFrequency);
-							//monitor->settings.push_back(monitor->currentSetting);
 						}
+						//get the settings that are stored in the registry
 						else
 						{
 							monitor->settings.push_back(std::move(new monitorSetting_t(vec2_t<unsigned int>(devmode.dmPelsWidth, devmode.dmPelsHeight), devmode.dmBitsPerPel, devmode.dmDisplayFrequency)));
 						}
-						modeIndex++;
-						
+						modeIndex++;						
 					}
-
 					monitorList.push_back(std::move(monitor));
 					monitorNum++;
+					monitorDevice.StateFlags = DISPLAY_DEVICE_ATTACHED_TO_DESKTOP;
 				}
 				deviceNum++;
+				monitorNum = 0;
 			}
-
-			if (EnumDisplayMonitors(NULL, NULL, MonitorEnumProcedure, (LPARAM)this))
-			{
-
-			}
+			//this is just to grab the monitor extents
+			EnumDisplayMonitors(NULL, NULL, MonitorEnumProcedure, (LPARAM)this);
 		}
 
 		bool Windows_ExtensionSupported(const char* extensionName)

@@ -125,6 +125,9 @@
 // -todo: make priority part of LavaPacket operator< 
 // -todo: make a queue for output arguments that uses the thread local heap
 
+// todo: change project name to Fissure
+// todo: try to unify nanogui into a single file
+// todo: try to unify nfd into a single file ? 
 // todo: make a queue that carries its allocation and deallocation functions with it as pointers so that it can be passed to a .dll
 //       |  make queue use a read buffer and a write buffer - the write buffer will only be used by the thread that owns the queue, so there won't need to be a write lock
 // todo: change lava_theadQ to lava_outQ? lava_threadOutQ?
