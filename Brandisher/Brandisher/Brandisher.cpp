@@ -68,7 +68,10 @@
 // -todo: make a Brandisher simdb database on start, as scratch space for dragged in files and dragged tables from other dbs
 // -todo: make a refresh button to refresh the db - only need to refresh the dbs if they get their keys on expand
 // -todo: make status have the remapped value of the cursor's Y
+// -todo: make all values cut off at 0
+// -todo: make values below 0 face down, and values above 0 face upwards
 
+// todo: make status show the array value being used at each pixel
 // todo: make listing the keys of a db happen on expand
 // todo: make insertion of tbls from a db key happen on expand
 
@@ -145,6 +148,15 @@ nana::button              refresh;
 nana::place                   plc;
 nana::label sz, elems, szBytes, cap, mapcap, owned, status;
 
+namespace { 
+  template <class T> T remap(T val, T fromLo, T fromHi, T toLo, T toHi)
+  {
+    auto  dif = fromHi - fromLo;
+    auto norm = dif!=0?  (val - fromLo) / dif  :  0.f;
+    return norm * (toHi - toLo) + toLo;
+  }
+}
+
 class  VizDraw : public nana::drawer_trigger
 {
   void  drawGradient(nana::paint::graphics& g)
@@ -213,6 +225,7 @@ class  VizDraw : public nana::drawer_trigger
         mx = max<f32>(mx, f[i]);
         mn = min<f32>(mn, f[i]);
       }
+      if( !g.impl_ || !g.impl_->handle || !g.impl_->handle->pixbuf_ptr ) return;
       pixel_argb_t* pxbuf = g.impl_->handle->pixbuf_ptr;
       auto     w = g.width();
       auto     h = g.height();
@@ -227,10 +240,16 @@ class  VizDraw : public nana::drawer_trigger
           p.element.red   = 0;
           p.element.green = 0;
           p.element.blue  = 0;
-          f32 val = f[ (u64)(x/ratio) ];
-          f32  re =  (val - mn) / rng;
+          f32     val = f[ (u64)(x/ratio) ];
+          f32      re =  (val - mn) / rng;
+          f32   flipY = h - y - 1;
+          f32   rempY = remap(flipY,0.f,(f32)h,mn,mx);
+          bool  inVal = false;
+          if(val>=0 && rempY>=0 && rempY<=val){ inVal = true; }
+          else if(val<=0 && rempY<=0 && rempY>=val){ inVal = true; }
+          //bool inVal = (h-y)/(f32)h < re;
           //if(h-y < val*hRatio){ // this flips the graph vertically, but increasing y goes down in screen space, so we want it flipped
-          if( (h-y)/(f32)h < re){ // this flips the graph vertically, but increasing y goes down in screen space, so we want it flipped
+          if( inVal ){ // this flips the graph vertically, but increasing y goes down in screen space, so we want it flipped
             p.element.red   = 255;
             p.element.green = 255;
             p.element.blue  = 255;
@@ -534,11 +553,16 @@ int  main()
           f32   ratio = vsz.width  / (f32)flen;
           f32     dif = mx - mn;
           f32  hRatio = vsz.height / dif;
-          auto    val = f[  (u64)(msX/ratio) ];
+          u64     idx = (u64)(msX/ratio);
+          auto    val = f[ idx ];
           f32  remapY = (((h-msY)/h));
           remapY     *= dif;
           remapY     += mn;
-          auto capStr = toString(val,"   X: ",arg.pos.x,"   Y: ",arg.pos.y,"   Remapped Y: ",remapY);
+          auto capStr = toString("  ",val,
+          "   X: ",arg.pos.x,
+          "   Y: ",arg.pos.y,
+          "   Index: ",idx,
+          "   Remapped Y: ",remapY);
           status.caption( capStr );
         }
       });
