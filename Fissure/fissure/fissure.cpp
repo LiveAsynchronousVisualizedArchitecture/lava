@@ -126,8 +126,6 @@
 // -todo: make a queue for output arguments that uses the thread local heap
 // -todo: change project name to Fissure
 
-// todo: try to unify nanogui into a single file?
-// todo: try to unify nfd into a single file ? 
 // todo: make a queue that carries its allocation and deallocation functions with it as pointers so that it can be passed to a .dll
 //       |  make queue use a read buffer and a write buffer - the write buffer will only be used by the thread that owns the queue, so there won't need to be a write lock
 // todo: change lava_theadQ to lava_outQ? lava_threadOutQ?
@@ -150,6 +148,8 @@
 // todo: make shared libraries only try to load one per frame
 // todo: make nodes a little fatter or slots offset a little more from the edge
 // todo: integrate type into LavaMem instead of as part of the LavaMem struct so that it can be queried externally
+// todo: try to unify nanogui into a single file?
+// todo: try to unify nfd into a single file ? 
 
 // todo: make input slots start at 0 - does there need to be a separation between input and out slots or does there need to be an offset so that the input frame starts at 0 
 // todo: convert tbl to use arrays of the data types smaller than 64 bits

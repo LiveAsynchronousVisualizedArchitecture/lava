@@ -48,28 +48,83 @@ struct LavaQ
 //public:
   using         T = int;
   using       u64 = uint64_t;
+  using     abool = std::atomic<bool>;
   using      au64 = std::atomic<u64>;
   using AllocFunc = void*(*)(u64);
   using  FreeFunc = void(*)(void*);
 
+  struct PushResult { u64 idx; bool usedA; };
+
 //private:
   AllocFunc  m_alloc = nullptr;
   FreeFunc    m_free = nullptr;
-  void*        m_mem = nullptr;
+  T*          m_memA = nullptr;
+  T*          m_memB = nullptr;
    u8          m_cap = 0;                         // capacity will always be a power of two
   u64           m_sz = 0;
   au64         m_cur = 0;
+  abool       m_useA = true;
+
+  // #ifndef _NDEBUG
+  std::thread::id  writeThrd;
 
 //public:
   LavaQ(AllocFunc a, FreeFunc f) : m_alloc(a), m_free(f)
-  {}
-
-  u64   size(){ return m_sz; }
-  void  push(T val)
   {
+    writeThrd = std::this_thread::get_id();
+  }
+
+  void      expand()
+  {
+    using namespace std;
+    
+    // 0. assume that the opposite buffer pointer is nullptr
+    // 1. make another allocation 
+    // 2. copy the data
+    // 3. switch the buffers
+    // 4. deallocate the previous allocation
+    auto nxtCap    = m_cap << 1;
+    m_cap          = nxtCap;
+    void* nxtAlloc = m_alloc( nxtCap * sizeof(T) );      // 1
+    if( m_useA.load() ){
+      m_memB = (T*)nxtAlloc;                             // 1
+      copy(m_memB, m_memB + m_sz, m_memA);               // 2 
+      m_useA.store(false);                               // 3
+      m_free(m_memA);                                    // 4
+      m_memB = nullptr;
+    }else{
+      m_memA = (T*)nxtAlloc;                             // 1
+      copy(m_memA, m_memA + m_sz, m_memB);               // 2
+      m_useA.store(true);                                // 3 
+      m_free(m_memB);                                    // 4
+      m_memB = nullptr;
+    }
+  }
+  u64         size(){ return m_sz; }
+  PushResult  push(T val)
+  {
+    assert(std::this_thread::get_id() == writeThrd);
+
     // will need to increment both the current index and size at the same time
     // if the capacity is not high enough, use a secondary buffer to enlarge it
     // this should work well, since only the owning thread can make it larger, while any thread can pop() items from the queue
+
+    if(m_sz == m_cap){
+      expand();
+    }
+
+    u64   cur = m_cur.fetch_add(1);
+    bool useA = m_useA.load();
+    if( useA ){ 
+      m_memA[cur] = val;
+    }else{ 
+      m_memB[cur] = val;
+    }
+
+    PushResult ret;
+    ret.idx   = cur;
+    ret.usedA = useA; 
+    return ret;
   }
   T      pop()
   {
