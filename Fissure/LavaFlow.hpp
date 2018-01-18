@@ -59,6 +59,12 @@ struct LavaQ
 
   struct PushResult { bool usedA; u64 endIdx; };
 
+  union StEnBuf
+  {
+    struct { u64 st : 31; u64 en : 31; u64 useA : 1; };
+    u64 asInt;
+  };
+
 //private:
   AllocFunc  m_alloc = nullptr;
   FreeFunc    m_free = nullptr;
@@ -73,6 +79,7 @@ struct LavaQ
   au64        m_endA = 0;
   au64        m_endB = 0;
   abool       m_useA = true;
+  StEnBuf      m_buf;
 
   #ifndef _NDEBUG
     std::thread::id  writeThrd;
@@ -81,24 +88,49 @@ struct LavaQ
 //public:
   LavaQ(AllocFunc a, FreeFunc f) : m_alloc(a), m_free(f)
   {
+    m_buf.st   = 0;
+    m_buf.en   = 0;
+    m_buf.useA = true;
+
     #ifndef _NDEBUG
       writeThrd = std::this_thread::get_id();
     #endif
   }
 
-  u64          capA() const
+  StEnBuf       loadBuf() const
+  {
+    StEnBuf ret;
+    ret.asInt = ((au64*)&m_buf.asInt)->load();
+    return ret;
+  }
+  void         storeBuf(StEnBuf buf)
+  {
+    ((au64*)&m_buf.asInt)->store(buf.asInt);
+  }
+  StEnBuf switchBuffers()
+  {
+    StEnBuf prev, buf;
+    au64* abuf = (au64*)&m_buf.asInt;
+    do{
+      prev = buf = loadBuf();
+      buf.useA = !buf.useA;
+    }while( abuf->compare_exchange_strong(prev.asInt, buf.asInt) );
+
+    return prev;
+  }
+  u64              capA() const
   {
     // use functions for getting capacity, since it will always be a power of two, and thus will never be over 64, let alone the 255 that a u8 can store
     assert(m_capA < 64);
     return (1 << m_capA.load()) >> 1;
   }
-  u64          capB() const
+  u64              capB() const
   {
     // use functions for getting capacity, since it will always be a power of two, and thus will never be over 64, let alone the 255 that a u8 can store
     assert(m_capB < 64);
     return (1 << m_capB.load()) >> 1;
   }
-  void       expand()
+  void           expand()
   {
     using namespace std;
     
@@ -107,8 +139,8 @@ struct LavaQ
     // 2. copy the data
     // 3. switch the buffers
     // 4. deallocate the previous allocation
-    if( m_useA.load() ){
-      auto nxtCap    = m_capB.load() << 1;
+    if( m_buf.useA ){
+      auto nxtCap    = m_capA.load() << 1;
       m_capB.store(nxtCap);
       void* nxtAlloc = m_alloc( nxtCap * sizeof(T) );    // 1
 
@@ -116,14 +148,11 @@ struct LavaQ
       copy(m_memB, m_memB + m_sz, m_memA);               // 2
       m_capB.store( m_capA.load() );
 
-      m_endB.store( m_endA.load() );  // todo: these need to be unified with the buffer switching boolean
-      m_curB.store( m_curA.load() );
-
-      m_useA.store(false);                               // 3  -  now that the opposite buffer is good to go, switch the single boolean that controls which buffer to use
+      switchBuffers();                                   // this has to make sure that the start and end stay the same, but the current thread is the only one that can change the buffer bit
       m_free(m_memA);                                    // 4
       m_memA = nullptr;                                  // 4
     }else{
-      auto nxtCap    = m_capA.load() << 1;
+      auto nxtCap    = m_capB.load() << 1;
       m_capA.store(nxtCap);
       void* nxtAlloc = m_alloc( nxtCap * sizeof(T) );    // 1
 
@@ -131,19 +160,9 @@ struct LavaQ
       copy(m_memA, m_memA + m_sz, m_memB);               // 2
       m_capA.store( m_capB.load() );
 
-      m_endA.store( m_endB.load() );  // todo: these need to be unified with the buffer switching boolean
-      m_curA.store( m_curB.load() );
-
-      m_useA.store(false);                               // 3  -  now that the opposite buffer is good to go, switch the single boolean that controls which buffer to use
+      switchBuffers();
       m_free(m_memB);                                    // 4
       m_memB = nullptr;                                  // 4
-
-
-      //m_memA = (T*)nxtAlloc;                             // 1
-      //copy(m_memA, m_memA + m_sz, m_memB);               // 2
-      //m_useA.store(true);                                // 3 - -  now that the opposite buffer is good to go, switch the single boolean that controls which buffer to use
-      //m_free(m_memB);                                    // 4
-      //m_memB = nullptr;                                  // 4
     }
   }
   u64          size()
@@ -212,6 +231,28 @@ struct LavaQ
   }
 };
 
+
+//
+//if( m_useA.load() ){
+
+//auto buf = loadBuf();
+//buf.useA = false;
+
+//m_endB.store( m_endA.load() );  // todo: these need to be unified with the buffer switching boolean
+//m_curB.store( m_curA.load() );
+//
+//m_useA.store(false);                               // 3  -  now that the opposite buffer is good to go, switch the single boolean that controls which buffer to use
+
+//m_endA.store( m_endB.load() );  // todo: these need to be unified with the buffer switching boolean
+//m_curA.store( m_curB.load() );
+//
+//m_useA.store(false);                               // 3  -  now that the opposite buffer is good to go, switch the single boolean that controls which buffer to use
+
+//m_memA = (T*)nxtAlloc;                             // 1
+//copy(m_memA, m_memA + m_sz, m_memB);               // 2
+//m_useA.store(true);                                // 3 - -  now that the opposite buffer is good to go, switch the single boolean that controls which buffer to use
+//m_free(m_memB);                                    // 4
+//m_memB = nullptr;                                  // 4
 
 // todo: need to check that cur does not exceed size - is size needed or just capacity?
 //if(m_cur.load() == m_sz || m_sz == m_cap){

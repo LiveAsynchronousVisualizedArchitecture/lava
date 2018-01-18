@@ -128,8 +128,9 @@
 // -todo: make an assert if more than one thread does a push
 // -todo: make a queue that carries its allocation and deallocation functions with it as pointers so that it can be passed to a .dll
 //       | -with two buffers and only one thread writing, the structure can be different -make queue use a read buffer and a write buffer - the write buffer will only be used by the thread that owns the queue, so there won't need to be a write lock
+// -todo: rework lavaQ to have a cur and an end
 
-// todo: rework lavaQ to have a cur and an end
+// todo: make a union that will hold the st, en and buffer boolean
 // todo: possibly make cur, end, and buffer boolean into a single struct of 31, 31, and 1 bits - buffer and capacity need to be in the same struct - can combining everything in to single atomics be avoided by using an A and B variable for each?
 // todo: change lava_theadQ to lava_outQ? lava_threadOutQ?
 // todo: make packets be emitted (lava_send() ?) instead of simply returned
