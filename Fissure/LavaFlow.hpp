@@ -40,20 +40,24 @@
   namespace fs = std::experimental::filesystem;
 #endif
 
+//#define _SCL_SECURE_NO_WARNINGS
 struct LavaQ
 {
-// single producer, multi-consumer Q
-// todo: make an assert if more than one thread does a push
+// single producer, multi-consumer queue
+// Design: Two buffers with a single 64 bit atomic that contains which buffer to use as well as the start and end of the queue
+// Two function pointers contain the allocation and deallocation functions to use so that the data structure can cross and shared library boundary
+
 
 //public:
   using         T = int;
   using       u64 = uint64_t;
   using     abool = std::atomic<bool>;
+  using       au8 = std::atomic<u8>;
   using      au64 = std::atomic<u64>;
   using AllocFunc = void*(*)(u64);
   using  FreeFunc = void(*)(void*);
 
-  struct PushResult { u64 idx; bool usedA; };
+  struct PushResult { bool usedA; u64 endIdx; };
 
 //private:
   AllocFunc  m_alloc = nullptr;
@@ -61,20 +65,40 @@ struct LavaQ
   T*          m_memA = nullptr;
   T*          m_memB = nullptr;
    u8          m_cap = 0;                         // capacity will always be a power of two
+  au8         m_capA = 0;                         // capacity will always be a power of two
+  au8         m_capB = 0;                         // capacity will always be a power of two
   u64           m_sz = 0;
-  au64         m_cur = 0;
+  au64        m_curA = 0;
+  au64        m_curB = 0;
+  au64        m_endA = 0;
+  au64        m_endB = 0;
   abool       m_useA = true;
 
-  // #ifndef _NDEBUG
-  std::thread::id  writeThrd;
+  #ifndef _NDEBUG
+    std::thread::id  writeThrd;
+  #endif
 
 //public:
   LavaQ(AllocFunc a, FreeFunc f) : m_alloc(a), m_free(f)
   {
-    writeThrd = std::this_thread::get_id();
+    #ifndef _NDEBUG
+      writeThrd = std::this_thread::get_id();
+    #endif
   }
 
-  void      expand()
+  u64          capA() const
+  {
+    // use functions for getting capacity, since it will always be a power of two, and thus will never be over 64, let alone the 255 that a u8 can store
+    assert(m_capA < 64);
+    return (1 << m_capA.load()) >> 1;
+  }
+  u64          capB() const
+  {
+    // use functions for getting capacity, since it will always be a power of two, and thus will never be over 64, let alone the 255 that a u8 can store
+    assert(m_capB < 64);
+    return (1 << m_capB.load()) >> 1;
+  }
+  void       expand()
   {
     using namespace std;
     
@@ -83,25 +107,50 @@ struct LavaQ
     // 2. copy the data
     // 3. switch the buffers
     // 4. deallocate the previous allocation
-    auto nxtCap    = m_cap << 1;
-    m_cap          = nxtCap;
-    void* nxtAlloc = m_alloc( nxtCap * sizeof(T) );      // 1
     if( m_useA.load() ){
+      auto nxtCap    = m_capB.load() << 1;
+      m_capB.store(nxtCap);
+      void* nxtAlloc = m_alloc( nxtCap * sizeof(T) );    // 1
+
       m_memB = (T*)nxtAlloc;                             // 1
-      copy(m_memB, m_memB + m_sz, m_memA);               // 2 
-      m_useA.store(false);                               // 3
+      copy(m_memB, m_memB + m_sz, m_memA);               // 2
+      m_capB.store( m_capA.load() );
+
+      m_endB.store( m_endA.load() );  // todo: these need to be unified with the buffer switching boolean
+      m_curB.store( m_curA.load() );
+
+      m_useA.store(false);                               // 3  -  now that the opposite buffer is good to go, switch the single boolean that controls which buffer to use
       m_free(m_memA);                                    // 4
-      m_memB = nullptr;
+      m_memA = nullptr;                                  // 4
     }else{
+      auto nxtCap    = m_capA.load() << 1;
+      m_capA.store(nxtCap);
+      void* nxtAlloc = m_alloc( nxtCap * sizeof(T) );    // 1
+
       m_memA = (T*)nxtAlloc;                             // 1
       copy(m_memA, m_memA + m_sz, m_memB);               // 2
-      m_useA.store(true);                                // 3 
+      m_capA.store( m_capB.load() );
+
+      m_endA.store( m_endB.load() );  // todo: these need to be unified with the buffer switching boolean
+      m_curA.store( m_curB.load() );
+
+      m_useA.store(false);                               // 3  -  now that the opposite buffer is good to go, switch the single boolean that controls which buffer to use
       m_free(m_memB);                                    // 4
-      m_memB = nullptr;
+      m_memB = nullptr;                                  // 4
+
+
+      //m_memA = (T*)nxtAlloc;                             // 1
+      //copy(m_memA, m_memA + m_sz, m_memB);               // 2
+      //m_useA.store(true);                                // 3 - -  now that the opposite buffer is good to go, switch the single boolean that controls which buffer to use
+      //m_free(m_memB);                                    // 4
+      //m_memB = nullptr;                                  // 4
     }
   }
-  u64         size(){ return m_sz; }
-  PushResult  push(T val)
+  u64          size()
+  { 
+    return m_sz; // todo: make thisi subtract m_cur from m_end and take care of looping
+  }
+  PushResult   push(T const& val)
   {
     assert(std::this_thread::get_id() == writeThrd);
 
@@ -109,36 +158,76 @@ struct LavaQ
     // if the capacity is not high enough, use a secondary buffer to enlarge it
     // this should work well, since only the owning thread can make it larger, while any thread can pop() items from the queue
 
-    if(m_sz == m_cap){
-      expand();
+    u64 en=0, cap=0;                          // this will append a value to the end, while pop, will grab it from the start/current index
+    bool useA = m_useA.load();
+    if( useA ){
+      en  = m_endA.load();
+      cap = capA();
+    }else{
+      en  = m_endB.load();
+      cap = capB();
     }
 
-    u64   cur = m_cur.fetch_add(1);
-    bool useA = m_useA.load();
-    if( useA ){ 
-      m_memA[cur] = val;
+    if( en+1 == cap ){
+      expand();
+      useA = m_useA.load();           // expand should have switched this
+    }
+
+    if( useA ){
+      en  = m_endA.load();
+      cap = capA();
+      m_memA[en+1] = val;
+      m_endA.fetch_add(1);       // because this is the only thread writing, it can simply update the enrent index after copying the value
     }else{ 
-      m_memB[cur] = val;
+      en  = m_endB.load();
+      cap = capB();
+      m_memB[en+1] = val;
+      m_endB.fetch_add(1);
     }
 
     PushResult ret;
-    ret.idx   = cur;
-    ret.usedA = useA; 
+    ret.endIdx = en;
+    ret.usedA  = useA; 
     return ret;
   }
-  T      pop()
+  bool          pop(T& ret)
   {
     // this will need to copy the element indexed by m_cur, 
     // then make sure the index (which will only increase) hasn't changed, 
     // then increment the index atomically
 
-    T curVal = 0;
+    if( m_useA.load() ){
+      auto cur = m_curA.fetch_add(1);
+      auto  en = m_endA.load();
+      if(cur == en) return false;
+      ret = m_memA[cur];
+    }else{ 
+      auto cur = m_curB.fetch_add(1);
+      auto  en = m_endB.load();
+      if(cur == en) return false;
+      ret = m_memB[cur];
+    }
 
-    m_cur.fetch_add(1);
-
-    return curVal;
+    return true;
   }
 };
+
+
+// todo: need to check that cur does not exceed size - is size needed or just capacity?
+//if(m_cur.load() == m_sz || m_sz == m_cap){
+//if(m_cur.load() == m_sz || m_sz == m_cap){
+//  expand();
+//}
+//
+//u64   en = m_en.load();      //fetch_add(1);
+
+//T curVal = 0;
+//
+//auto cur = m_curA.fetch_add(1) % m_capA.load();
+//
+//auto cur = m_curB.fetch_add(1) % m_capB.load();
+//ret = m_memB[cur];
+
 
 /*
 * libpopcnt.h - C/C++ library for counting the number of 1 bits (bit
