@@ -70,15 +70,15 @@ struct LavaQ
   FreeFunc    m_free = nullptr;
   T*          m_memA = nullptr;
   T*          m_memB = nullptr;
-   u8          m_cap = 0;                         // capacity will always be a power of two
+   //u8          m_cap = 0;                         // capacity will always be a power of two
   au8         m_capA = 0;                         // capacity will always be a power of two
   au8         m_capB = 0;                         // capacity will always be a power of two
   u64           m_sz = 0;
-  au64        m_curA = 0;
-  au64        m_curB = 0;
-  au64        m_endA = 0;
-  au64        m_endB = 0;
-  abool       m_useA = true;
+  //au64        m_curA = 0;
+  //au64        m_curB = 0;
+  //au64        m_endA = 0;
+  //au64        m_endB = 0;
+  //abool       m_useA = true;
   StEnBuf      m_buf;
 
   #ifndef _NDEBUG
@@ -109,6 +109,8 @@ struct LavaQ
   }
   StEnBuf switchBuffers()
   {
+    // it doesn't matter if the start and end have changed when copying the memory from one buffer to the other, since the reading threads will only increment the start
+
     StEnBuf prev, buf;
     au64* abuf = (au64*)&m_buf.asInt;
     do{
@@ -169,7 +171,7 @@ struct LavaQ
   { 
     return m_sz; // todo: make thisi subtract m_cur from m_end and take care of looping
   }
-  PushResult   push(T const& val)
+  StEnBuf      push(T const& val)
   {
     assert(std::this_thread::get_id() == writeThrd);
 
@@ -177,37 +179,26 @@ struct LavaQ
     // if the capacity is not high enough, use a secondary buffer to enlarge it
     // this should work well, since only the owning thread can make it larger, while any thread can pop() items from the queue
 
-    u64 en=0, cap=0;                          // this will append a value to the end, while pop, will grab it from the start/current index
-    bool useA = m_useA.load();
-    if( useA ){
-      en  = m_endA.load();
+    u64 cap=0;                          // this will append a value to the end, while pop, will grab it from the start/current index
+    auto buf = loadBuf();
+    if( buf.useA ){
       cap = capA();
     }else{
-      en  = m_endB.load();
       cap = capB();
     }
 
-    if( en+1 == cap ){
+    if( buf.en+1 == cap ){
       expand();
-      useA = m_useA.load();           // expand should have switched this
+      buf = loadBuf();
     }
 
-    if( useA ){
-      en  = m_endA.load();
-      cap = capA();
-      m_memA[en+1] = val;
-      m_endA.fetch_add(1);       // because this is the only thread writing, it can simply update the enrent index after copying the value
+    if( buf.useA ){
+      m_memA[buf.en+1] = val;
     }else{ 
-      en  = m_endB.load();
-      cap = capB();
-      m_memB[en+1] = val;
-      m_endB.fetch_add(1);
+      m_memB[buf.en+1] = val;
     }
 
-    PushResult ret;
-    ret.endIdx = en;
-    ret.usedA  = useA; 
-    return ret;
+    return buf;
   }
   bool          pop(T& ret)
   {
@@ -230,44 +221,6 @@ struct LavaQ
     return true;
   }
 };
-
-
-//
-//if( m_useA.load() ){
-
-//auto buf = loadBuf();
-//buf.useA = false;
-
-//m_endB.store( m_endA.load() );  // todo: these need to be unified with the buffer switching boolean
-//m_curB.store( m_curA.load() );
-//
-//m_useA.store(false);                               // 3  -  now that the opposite buffer is good to go, switch the single boolean that controls which buffer to use
-
-//m_endA.store( m_endB.load() );  // todo: these need to be unified with the buffer switching boolean
-//m_curA.store( m_curB.load() );
-//
-//m_useA.store(false);                               // 3  -  now that the opposite buffer is good to go, switch the single boolean that controls which buffer to use
-
-//m_memA = (T*)nxtAlloc;                             // 1
-//copy(m_memA, m_memA + m_sz, m_memB);               // 2
-//m_useA.store(true);                                // 3 - -  now that the opposite buffer is good to go, switch the single boolean that controls which buffer to use
-//m_free(m_memB);                                    // 4
-//m_memB = nullptr;                                  // 4
-
-// todo: need to check that cur does not exceed size - is size needed or just capacity?
-//if(m_cur.load() == m_sz || m_sz == m_cap){
-//if(m_cur.load() == m_sz || m_sz == m_cap){
-//  expand();
-//}
-//
-//u64   en = m_en.load();      //fetch_add(1);
-
-//T curVal = 0;
-//
-//auto cur = m_curA.fetch_add(1) % m_capA.load();
-//
-//auto cur = m_curB.fetch_add(1) % m_capB.load();
-//ret = m_memB[cur];
 
 
 /*
@@ -2102,3 +2055,55 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//useA = m_useA.load();           // expand should have switched this
+//
+//en  = m_endA.load();
+//cap = capA();
+//
+//m_endA.fetch_add(1);       // because this is the only thread writing, it can simply update the enrent index after copying the value
+//
+//en  = m_endB.load();
+//cap = capB();
+//
+//m_endB.fetch_add(1);
+//
+//PushResult ret;
+//ret.endIdx = en;
+//ret.usedA  = useA; 
+
+//
+//if( m_useA.load() ){
+
+//auto buf = loadBuf();
+//buf.useA = false;
+
+//m_endB.store( m_endA.load() );  // todo: these need to be unified with the buffer switching boolean
+//m_curB.store( m_curA.load() );
+//
+//m_useA.store(false);                               // 3  -  now that the opposite buffer is good to go, switch the single boolean that controls which buffer to use
+
+//m_endA.store( m_endB.load() );  // todo: these need to be unified with the buffer switching boolean
+//m_curA.store( m_curB.load() );
+//
+//m_useA.store(false);                               // 3  -  now that the opposite buffer is good to go, switch the single boolean that controls which buffer to use
+
+//m_memA = (T*)nxtAlloc;                             // 1
+//copy(m_memA, m_memA + m_sz, m_memB);               // 2
+//m_useA.store(true);                                // 3 - -  now that the opposite buffer is good to go, switch the single boolean that controls which buffer to use
+//m_free(m_memB);                                    // 4
+//m_memB = nullptr;                                  // 4
+
+// todo: need to check that cur does not exceed size - is size needed or just capacity?
+//if(m_cur.load() == m_sz || m_sz == m_cap){
+//if(m_cur.load() == m_sz || m_sz == m_cap){
+//  expand();
+//}
+//
+//u64   en = m_en.load();      //fetch_add(1);
+
+//T curVal = 0;
+//
+//auto cur = m_curA.fetch_add(1) % m_capA.load();
+//
+//auto cur = m_curB.fetch_add(1) % m_capB.load();
+//ret = m_memB[cur];
