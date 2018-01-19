@@ -130,6 +130,9 @@
 //       | -with two buffers and only one thread writing, the structure can be different -make queue use a read buffer and a write buffer - the write buffer will only be used by the thread that owns the queue, so there won't need to be a write lock
 // -todo: rework lavaQ to have a cur and an end
 
+// todo: make read happen inside a compare_exchange loop
+// todo: make a template to run an arbitrary function on the StEnBuf
+// todo: can the start and buf flag in the queue be put together while leaving the end and capacity separate?  - might need to leave start and end together so that the reading threads are always in sync with the writing thread, though maybe it is fine
 // todo: make a union that will hold the st, en and buffer boolean
 // todo: possibly make cur, end, and buffer boolean into a single struct of 31, 31, and 1 bits - buffer and capacity need to be in the same struct - can combining everything in to single atomics be avoided by using an A and B variable for each?
 // todo: change lava_theadQ to lava_outQ? lava_threadOutQ?

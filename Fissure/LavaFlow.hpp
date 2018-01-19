@@ -47,7 +47,6 @@ struct LavaQ
 // Design: Two buffers with a single 64 bit atomic that contains which buffer to use as well as the start and end of the queue
 // Two function pointers contain the allocation and deallocation functions to use so that the data structure can cross and shared library boundary
 
-
 //public:
   using         T = int;
   using       u64 = uint64_t;
@@ -57,7 +56,8 @@ struct LavaQ
   using AllocFunc = void*(*)(u64);
   using  FreeFunc = void(*)(void*);
 
-  struct PushResult { bool usedA; u64 endIdx; };
+  //struct PushResult { bool usedA; u64 endIdx; };
+  
 
   union StEnBuf
   {
@@ -70,16 +70,10 @@ struct LavaQ
   FreeFunc    m_free = nullptr;
   T*          m_memA = nullptr;
   T*          m_memB = nullptr;
-   //u8          m_cap = 0;                         // capacity will always be a power of two
   au8         m_capA = 0;                         // capacity will always be a power of two
   au8         m_capB = 0;                         // capacity will always be a power of two
-  u64           m_sz = 0;
-  //au64        m_curA = 0;
-  //au64        m_curB = 0;
-  //au64        m_endA = 0;
-  //au64        m_endB = 0;
-  //abool       m_useA = true;
   StEnBuf      m_buf;
+  //u64           m_sz = 0;
 
   #ifndef _NDEBUG
     std::thread::id  writeThrd;
@@ -110,12 +104,33 @@ struct LavaQ
   StEnBuf switchBuffers()
   {
     // it doesn't matter if the start and end have changed when copying the memory from one buffer to the other, since the reading threads will only increment the start
-
     StEnBuf prev, buf;
     au64* abuf = (au64*)&m_buf.asInt;
     do{
       prev = buf = loadBuf();
       buf.useA = !buf.useA;
+    }while( abuf->compare_exchange_strong(prev.asInt, buf.asInt) );
+
+    return prev;
+  }
+  StEnBuf        incEnd()
+  {
+    StEnBuf prev, buf;
+    au64* abuf = (au64*)&m_buf.asInt;
+    do{
+      prev = buf = loadBuf();
+      buf.en += 1;
+    }while( abuf->compare_exchange_strong(prev.asInt, buf.asInt) );
+
+    return prev;
+  }
+  StEnBuf      incStart()
+  {
+    StEnBuf prev, buf;
+    au64* abuf = (au64*)&m_buf.asInt;
+    do{
+      prev = buf = loadBuf();
+      buf.en += 1;
     }while( abuf->compare_exchange_strong(prev.asInt, buf.asInt) );
 
     return prev;
@@ -142,43 +157,53 @@ struct LavaQ
     // 3. switch the buffers
     // 4. deallocate the previous allocation
     if( m_buf.useA ){
-      auto nxtCap    = m_capA.load() << 1;
-      m_capB.store(nxtCap);
-      void* nxtAlloc = m_alloc( nxtCap * sizeof(T) );    // 1
+      auto   prevCap = m_capA.load();
+      m_capB.store(prevCap + 1);                         // since capacity is stored as a power of 2 instead of an absolute number, only add 1 instead of bitshifting 1 over  
+      void* nxtAlloc = m_alloc( capB() * sizeof(T) );    // the capacity functions will get the absolute value from the power of 2 that is stored in the 1 byte capacity variables
+      m_memB         = (T*)nxtAlloc;                     // 1
 
-      m_memB = (T*)nxtAlloc;                             // 1
-      copy(m_memB, m_memB + m_sz, m_memA);               // 2
-      m_capB.store( m_capA.load() );
+      copy(m_memB, m_memB + capA(), m_memA);             // 2  - only need to copy the number of T equal to the capacity of memA
 
       switchBuffers();                                   // this has to make sure that the start and end stay the same, but the current thread is the only one that can change the buffer bit
       m_free(m_memA);                                    // 4
       m_memA = nullptr;                                  // 4
     }else{
-      auto nxtCap    = m_capB.load() << 1;
-      m_capA.store(nxtCap);
-      void* nxtAlloc = m_alloc( nxtCap * sizeof(T) );    // 1
+      auto   prevCap = m_capB.load();
+      m_capA.store(prevCap + 1);                         // since capacity is stored as a power of 2 instead of an absolute number, only add 1 instead of bitshifting 1 over  
+      void* nxtAlloc = m_alloc( capA() * sizeof(T) );    // the capacity functions will get the absolute value from the power of 2 that is stored in the 1 byte capacity variables
+      m_memA         = (T*)nxtAlloc;                     // 1
 
-      m_memA = (T*)nxtAlloc;                             // 1
-      copy(m_memA, m_memA + m_sz, m_memB);               // 2
-      m_capA.store( m_capB.load() );
+      copy(m_memA, m_memA + capB(), m_memB);             // 2  - only need to copy the number of T equal to the capacity of memA
 
-      switchBuffers();
+      switchBuffers();                                   // this has to make sure that the start and end stay the same, but the current thread is the only one that can change the buffer bit
       m_free(m_memB);                                    // 4
       m_memB = nullptr;                                  // 4
     }
   }
-  u64          size()
+  u64              size()
   { 
-    return m_sz; // todo: make thisi subtract m_cur from m_end and take care of looping
+    //return m_sz; // todo: make this subtract m_cur from m_end and take care of looping
+    
+    auto buf = loadBuf();
+    return buf.en - buf.st;
+
+    //if(buf.en >= buf.st)
+    //  return buf.en - buf.st;
+    //else{
+    //  u64 cap = m_capB;
+    //  if(buf.useA)
+    //     cap = m_capA;
+    //  auto st = buf.st % cap;
+    //  auto en = buf.en % cap;
+    //}
   }
-  StEnBuf      push(T const& val)
+  StEnBuf          push(T const& val)
   {
     assert(std::this_thread::get_id() == writeThrd);
 
     // will need to increment both the current index and size at the same time
     // if the capacity is not high enough, use a secondary buffer to enlarge it
     // this should work well, since only the owning thread can make it larger, while any thread can pop() items from the queue
-
     u64 cap=0;                          // this will append a value to the end, while pop, will grab it from the start/current index
     auto buf = loadBuf();
     if( buf.useA ){
@@ -187,38 +212,45 @@ struct LavaQ
       cap = capB();
     }
 
-    if( buf.en+1 == cap ){
+    // this needs to check the capacity against the size, and that means checking the wrapping distance between the start and the end
+    if( buf.en+1 == cap ){ 
       expand();
       buf = loadBuf();
     }
 
+    // don't need to write within the increment loop since there is only one writing thread
     if( buf.useA ){
       m_memA[buf.en+1] = val;
     }else{ 
       m_memB[buf.en+1] = val;
     }
 
+    incEnd();
+
     return buf;
   }
-  bool          pop(T& ret)
+  bool              pop(T& ret)
   {
     // this will need to copy the element indexed by m_cur, 
-    // then make sure the index (which will only increase) hasn't changed, 
-    // then increment the index atomically
+    // then make sure the index (which will only increase) hasn't changed while incrementing the start
+    StEnBuf prev, buf;
+    au64* abuf = (au64*)&m_buf.asInt;
+    //do{
+      prev = buf = loadBuf();
 
-    if( m_useA.load() ){
-      auto cur = m_curA.fetch_add(1);
-      auto  en = m_endA.load();
-      if(cur == en) return false;
-      ret = m_memA[cur];
-    }else{ 
-      auto cur = m_curB.fetch_add(1);
-      auto  en = m_endB.load();
-      if(cur == en) return false;
-      ret = m_memB[cur];
-    }
+      if(buf.st == buf.en) return false;
 
-    return true;
+      if( buf.useA ){
+        ret = m_memA[buf.st];
+      }else{ 
+        ret = m_memB[buf.st];
+      }
+
+      buf.st += 1;
+    //}
+    bool ok = abuf->compare_exchange_strong(prev.asInt, buf.asInt);
+
+    return ok;
   }
 };
 
@@ -2054,6 +2086,50 @@ void               LavaLoop(LavaFlow& lf) noexcept
 #endif
 
 
+
+
+
+
+
+
+//auto buf = loadBuf();
+//
+//if( buf.useA ){
+//  ret = m_memA[buf.st];
+//}else{ 
+//  ret = m_memB[buf.st];
+//}
+
+//auto nxtCap    = m_capB.load() << 1;
+//m_capA.store(nxtCap);
+//void* nxtAlloc = m_alloc( nxtCap * sizeof(T) );    // 1
+//
+//m_memA = (T*)nxtAlloc;                             // 1
+//copy(m_memA, m_memA + m_sz, m_memB);               // 2
+//m_capA.store( m_capB.load() );
+//
+//switchBuffers();
+//m_free(m_memB);                                    // 4
+//m_memB = nullptr;                                  // 4
+
+//u8          m_cap = 0;                         // capacity will always be a power of two
+//au64        m_curA = 0;
+//au64        m_curB = 0;
+//au64        m_endA = 0;
+//au64        m_endB = 0;
+//abool       m_useA = true;
+
+//if( m_useA.load() ){
+//  auto cur = m_curA.fetch_add(1);
+//  auto  en = m_endA.load();
+//  if(cur == en) return false;
+//  ret = m_memA[cur];
+//}else{ 
+//  auto cur = m_curB.fetch_add(1);
+//  auto  en = m_endB.load();
+//  if(cur == en) return false;
+//  ret = m_memB[cur];
+//}
 
 //useA = m_useA.load();           // expand should have switched this
 //
