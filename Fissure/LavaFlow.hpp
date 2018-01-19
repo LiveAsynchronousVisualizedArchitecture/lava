@@ -56,9 +56,6 @@ struct LavaQ
   using AllocFunc = void*(*)(u64);
   using  FreeFunc = void(*)(void*);
 
-  //struct PushResult { bool usedA; u64 endIdx; };
-  
-
   union StEnBuf
   {
     struct { u64 st : 31; u64 en : 31; u64 useA : 1; };
@@ -73,7 +70,6 @@ struct LavaQ
   au8         m_capA = 0;                         // capacity will always be a power of two
   au8         m_capB = 0;                         // capacity will always be a power of two
   StEnBuf      m_buf;
-  //u64           m_sz = 0;
 
   #ifndef _NDEBUG
     std::thread::id  writeThrd;
@@ -97,11 +93,7 @@ struct LavaQ
     ret.asInt = ((au64*)&m_buf.asInt)->load();
     return ret;
   }
-  void         storeBuf(StEnBuf buf)
-  {
-    ((au64*)&m_buf.asInt)->store(buf.asInt);
-  }
-  StEnBuf switchBuffers()
+  StEnBuf switchBuffers() const
   {
     // it doesn't matter if the start and end have changed when copying the memory from one buffer to the other, since the reading threads will only increment the start
     StEnBuf prev, buf;
@@ -113,7 +105,7 @@ struct LavaQ
 
     return prev;
   }
-  StEnBuf        incEnd()
+  StEnBuf        incEnd() const
   {
     StEnBuf prev, buf;
     au64* abuf = (au64*)&m_buf.asInt;
@@ -124,7 +116,7 @@ struct LavaQ
 
     return prev;
   }
-  StEnBuf      incStart()
+  StEnBuf      incStart() const
   {
     StEnBuf prev, buf;
     au64* abuf = (au64*)&m_buf.asInt;
@@ -180,7 +172,7 @@ struct LavaQ
       m_memB = nullptr;                                  // 4
     }
   }
-  u64              size()
+  u64              size() const
   { 
     //return m_sz; // todo: make this subtract m_cur from m_end and take care of looping
     
@@ -229,13 +221,13 @@ struct LavaQ
 
     return buf;
   }
-  bool              pop(T& ret)
+  bool              pop(T& ret) const
   {
     // this will need to copy the element indexed by m_cur, 
     // then make sure the index (which will only increase) hasn't changed while incrementing the start
     StEnBuf prev, buf;
     au64* abuf = (au64*)&m_buf.asInt;
-    //do{
+
       prev = buf = loadBuf();
 
       if(buf.st == buf.en) return false;
@@ -247,12 +239,20 @@ struct LavaQ
       }
 
       buf.st += 1;
-    //}
     bool ok = abuf->compare_exchange_strong(prev.asInt, buf.asInt);
 
     return ok;
   }
 };
+
+//struct PushResult { bool usedA; u64 endIdx; };
+//
+//u64           m_sz = 0;
+//
+//void         storeBuf(StEnBuf buf)
+//{
+//  ((au64*)&m_buf.asInt)->store(buf.asInt);
+//}
 
 
 /*

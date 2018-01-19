@@ -129,8 +129,10 @@
 // -todo: make a queue that carries its allocation and deallocation functions with it as pointers so that it can be passed to a .dll
 //       | -with two buffers and only one thread writing, the structure can be different -make queue use a read buffer and a write buffer - the write buffer will only be used by the thread that owns the queue, so there won't need to be a write lock
 // -todo: rework lavaQ to have a cur and an end
+// -todo: make read happen inside a compare_exchange loop - added without a loop, pop fails on contention 
+// -todo: change project name to Fissure 
 
-// todo: make read happen inside a compare_exchange loop
+// todo: test LavaQ
 // todo: make a template to run an arbitrary function on the StEnBuf
 // todo: can the start and buf flag in the queue be put together while leaving the end and capacity separate?  - might need to leave start and end together so that the reading threads are always in sync with the writing thread, though maybe it is fine
 // todo: make a union that will hold the st, en and buffer boolean
@@ -147,7 +149,6 @@
 // todo: fix type warnings in simdb
 // todo: make button that creates a project for a node - would it need to pop up a modal dialog?
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array - can any heirarchy of initializer_lists be brought down to an array of the same types?
-// todo: change project name to Fissure 
 // todo: make popup text box that avoids the bounding box of the moused over node? - put graph of node times in the box? put graph of covariance data of data in, time spent, data out, and time ?   
 // todo: make segmented vertical bar that shows packets building up on certain node
 // todo: make right click or space bar open up a text box that can contain the build command, stats and/or hotbox
