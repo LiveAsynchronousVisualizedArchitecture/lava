@@ -136,10 +136,12 @@
 // -todo: make a union that will hold the st, en and buffer boolean
 // -todo: possibly make cur, end, and buffer boolean into a single struct of 31, 31, and 1 bits - buffer and capacity need to be in the same struct - can combining everything in to single atomics be avoided by using an A and B variable for each?
 // -todo: change lava_theadQ to lava_outQ? lava_threadOutQ? - LavaQ is fined
+// -todo: can the start and buf flag in the queue be put together while leaving the end and capacity separate?  - might need to leave start and end together so that the reading threads are always in sync with the writing thread, though maybe it is fine
+// -todo: make LavaFrame slots start from the begining - not neccesary with output queue
 
-// todo: can the start and buf flag in the queue be put together while leaving the end and capacity separate?  - might need to leave start and end together so that the reading threads are always in sync with the writing thread, though maybe it is fine
+// todo: make deallocation happen just before it is needed
+// todo: fix concurrent pop returning unitialized memory 
 // todo: make packets be emitted (lava_send() ?) instead of simply returned
-// todo: make LavaFrame slots start from the begining
 // todo: change cur() functions to const and rename to read()
 // todo: change opp() functions to non-const only and rename to write()
 // todo: figure out a way to have a reader count with lava.graph - is an atomic hash map inevitable? 
@@ -1508,21 +1510,59 @@ void              debug_coords(v2 a)
 //    }
 //}
 
+void PrintAB(LavaQ& q)
+{
+  Print("A:  ");
+  TO(q.capA(),i) Print(q.atA(i)," ");
+  Println("");
+
+  Print("B:  ");
+  TO(q.capB(),i) Print(q.atB(i)," ");
+  Println("");
+}
+
 ENTRY_DECLARATION // main or winmain
 {
   using namespace std;
   
+  Println("\n\n");
   LavaQ q;
-  TO(100,i){
+  bool running = true; 
+  vector<thread> qthrds;
+  //TO(1,i)
+  //{
+  //  qthrds.emplace_back([i, &q, &running](){
+  //    while( running )
+  //    {
+  //      int val;
+  //      bool ok = q.pop(val);
+  //      if(ok){
+  //        printAB(q);
+  //        Println(i,": ",val,"\n");
+  //      }
+  //      //this_thread::sleep_for( 0ms );
+  //    }
+  //  });
+  //}
+  TO(7,i){
     q.push(i);
+    PrintAB(q);
+    Println();
+  }
+  while( q.size() > 0 )
+    this_thread::sleep_for( 0ms );
+
+  running = false;
+  for(auto& t : qthrds){
+    t.join();
   }
 
-  Println("\n\n");
   int val = 0;
   while( q.size() > 0 ){
     bool ok = q.pop( val );
     Print(val," ");
   }
+
   Println("\n\n");
 
 	NVGcontext* vg = NULL;

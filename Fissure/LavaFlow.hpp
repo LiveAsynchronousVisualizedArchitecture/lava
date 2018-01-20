@@ -49,6 +49,7 @@ struct LavaQ
 
 //public:
   using         T = int;
+  using      aPtr = std::atomic<T*>;
   using       u64 = uint64_t;
   using     abool = std::atomic<bool>;
   using       au8 = std::atomic<u8>;
@@ -74,6 +75,8 @@ struct LavaQ
   FreeFunc     m_free = nullptr;
   T*           m_memA = nullptr;
   T*           m_memB = nullptr;
+  //aPtr*        m_memA = nullptr;
+  //aPtr*        m_memB = nullptr;
   au8          m_capA = 0;                             // capacity will always be a power of two
   au8          m_capB = 0;                             // capacity will always be a power of two
   au64          m_end = 0;
@@ -106,6 +109,14 @@ struct LavaQ
   {
     init();
   }
+  ~LavaQ()
+  {
+    if(m_memA)
+      free(m_memA);
+    if(m_memB)
+      free(m_memB);
+  }
+
 
   StEnBuf       loadBuf() const
   {
@@ -149,7 +160,7 @@ struct LavaQ
   //    prev = buf = loadBuf();
   //    buf.st += 1;
   //  }while( !abuf->compare_exchange_strong(prev.asInt, buf.asInt) );
-
+  //
   //  return prev;
   //}
   u64              capA() const
@@ -166,13 +177,14 @@ struct LavaQ
   }
   void           expand()
   {
-    using namespace std;
-    
     // 0. assume that the opposite buffer pointer is nullptr
     // 1. make another allocation 
     // 2. copy the data
     // 3. switch the buffers
     // 4. deallocate the previous allocation
+
+    using namespace std;
+    
     if( m_memA==nullptr && m_memB==nullptr ){
       // initial allocation
       m_capA = INITIAL_CAPACITY;
@@ -181,24 +193,28 @@ struct LavaQ
       auto   prevCap = m_capA.load();
       m_capB.store(prevCap + 1);                         // since capacity is stored as a power of 2 instead of an absolute number, only add 1 instead of bitshifting 1 over  
       void* nxtAlloc = m_alloc( capB() * sizeof(T) );    // the capacity functions will get the absolute value from the power of 2 that is stored in the 1 byte capacity variables
+
+      if(m_memB) free(m_memB);
       m_memB         = (T*)nxtAlloc;                     // 1
 
       copy(m_memA, m_memA + capA(), m_memB);             // 2  - only need to copy the number of T equal to the capacity of memA
 
       switchBuffers();                                   // this has to make sure that the start and end stay the same, but the current thread is the only one that can change the buffer bit
-      m_free(m_memA);                                    // 4
-      m_memA = nullptr;                                  // 4
+      //m_free(m_memA);                                    // 4
+      //m_memA = nullptr;                                  // 4
     }else{
       auto   prevCap = m_capB.load();
       m_capA.store(prevCap + 1);                         // since capacity is stored as a power of 2 instead of an absolute number, only add 1 instead of bitshifting 1 over  
       void* nxtAlloc = m_alloc( capA() * sizeof(T) );    // the capacity functions will get the absolute value from the power of 2 that is stored in the 1 byte capacity variables
+      
+      if(m_memA) free(m_memA);
       m_memA         = (T*)nxtAlloc;                     // 1
 
       copy(m_memB, m_memB + capB(), m_memA);             // 2  - only need to copy the number of T equal to the capacity of memA
 
       switchBuffers();                                   // this has to make sure that the start and end stay the same, but the current thread is the only one that can change the buffer bit
-      m_free(m_memB);                                    // 4
-      m_memB = nullptr;                                  // 4
+      //m_free(m_memB);                                    // 4
+      //m_memB = nullptr;                                  // 4
     }
   }
   u64              size() const
@@ -235,21 +251,10 @@ struct LavaQ
       cap = capB();
     }
 
-    // this needs to check the capacity against the size, and that means checking the wrapping distance between the start and the end
-    //if( buf.en+1 >= cap ){ 
     if( size() >= cap ){
       expand();
       buf = loadBuf();
     }
-
-    // don't need to write within the increment loop since there is only one writing thread
-    //if( buf.useA ){
-    //  auto idx = (buf.en) % capA();
-    //  m_memA[idx] = val;
-    //}else{ 
-    //  auto idx = (buf.en) % capB();
-    //  m_memB[idx] = val;
-    //}
 
     if( buf.useA ){
       auto idx = m_end.load() % capA();
@@ -274,6 +279,8 @@ struct LavaQ
       if(buf.st == m_end) return false;
       //if(buf.st == buf.en) return false;
 
+
+
       if( buf.useA ){
         auto idx = buf.st % capA();
         ret = m_memA[idx];
@@ -285,6 +292,14 @@ struct LavaQ
     bool ok = abuf->compare_exchange_strong(prev.asInt, buf.asInt);
 
     return ok;
+  }
+  T                 atA(u64 i)
+  {
+    return m_memA[i];
+  }
+  T                 atB(u64 i)
+  {
+    return m_memB[i];
   }
 };
 
@@ -2125,6 +2140,17 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+// this needs to check the capacity against the size, and that means checking the wrapping distance between the start and the end
+//if( buf.en+1 >= cap ){ 
+//
+// don't need to write within the increment loop since there is only one writing thread
+//if( buf.useA ){
+//  auto idx = (buf.en) % capA();
+//  m_memA[idx] = val;
+//}else{ 
+//  auto idx = (buf.en) % capB();
+//  m_memB[idx] = val;
+//}
 
 //struct PushResult { bool usedA; u64 endIdx; };
 //
