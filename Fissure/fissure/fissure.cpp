@@ -131,13 +131,13 @@
 // -todo: rework lavaQ to have a cur and an end
 // -todo: make read happen inside a compare_exchange loop - added without a loop, pop fails on contention 
 // -todo: change project name to Fissure 
+// -todo: test LavaQ
+// -todo: make a template to run an arbitrary function on the StEnBuf - just copy and paste for now
+// -todo: make a union that will hold the st, en and buffer boolean
+// -todo: possibly make cur, end, and buffer boolean into a single struct of 31, 31, and 1 bits - buffer and capacity need to be in the same struct - can combining everything in to single atomics be avoided by using an A and B variable for each?
+// -todo: change lava_theadQ to lava_outQ? lava_threadOutQ? - LavaQ is fined
 
-// todo: test LavaQ
-// todo: make a template to run an arbitrary function on the StEnBuf
 // todo: can the start and buf flag in the queue be put together while leaving the end and capacity separate?  - might need to leave start and end together so that the reading threads are always in sync with the writing thread, though maybe it is fine
-// todo: make a union that will hold the st, en and buffer boolean
-// todo: possibly make cur, end, and buffer boolean into a single struct of 31, 31, and 1 bits - buffer and capacity need to be in the same struct - can combining everything in to single atomics be avoided by using an A and B variable for each?
-// todo: change lava_theadQ to lava_outQ? lava_threadOutQ?
 // todo: make packets be emitted (lava_send() ?) instead of simply returned
 // todo: make LavaFrame slots start from the begining
 // todo: change cur() functions to const and rename to read()
@@ -1512,6 +1512,19 @@ ENTRY_DECLARATION // main or winmain
 {
   using namespace std;
   
+  LavaQ q;
+  TO(100,i){
+    q.push(i);
+  }
+
+  Println("\n\n");
+  int val = 0;
+  while( q.size() > 0 ){
+    bool ok = q.pop( val );
+    Print(val," ");
+  }
+  Println("\n\n");
+
 	NVGcontext* vg = NULL;
   SECTION(initialization)
   {
@@ -1723,15 +1736,16 @@ ENTRY_DECLARATION // main or winmain
     //decltype(std::unordered_map<int,int>::begin()) 
     Println("sizeof( std::unordered_map<int,int>::iterator ) ): ",  sizeof( std::unordered_map<int,int>::iterator ) );
 
-    AtomicBitset ab;
-    Println("  slot 0: ", (bool)ab[0], " : ", (char*)ab.toStr().bitstr );
-    ab[0] = 1;
-    Println("  slot 0: ", (bool)ab[0], " : ", (char*)ab.toStr().bitstr );
-    ab[0] = 1;
-    Println("  slot 7: ", (bool)ab[7], " : ", (char*)ab.toStr().bitstr );
-    ab[7] = 1;
-    Println("  slot 7: ", (bool)ab[7], " : ", (char*)ab.toStr().bitstr );
-    ab[7] = 1;
+    //AtomicBitset ab;
+    //Println("  slot 0: ", (bool)ab[0], " : ", (char*)ab.toStr().bitstr );
+    //ab[0] = 1;
+    //Println("  slot 0: ", (bool)ab[0], " : ", (char*)ab.toStr().bitstr );
+    //ab[0] = 1;
+    //Println("  slot 7: ", (bool)ab[7], " : ", (char*)ab.toStr().bitstr );
+    //ab[7] = 1;
+    //Println("  slot 7: ", (bool)ab[7], " : ", (char*)ab.toStr().bitstr );
+    //ab[7] = 1;
+    //
     //Println("  slot 0: ", ab[0], " : ", ab.toStr().bitstr);
     //ab[0] = 0;
     //Println("  slot 0: ", ab[0], " : ", ab.toStr().bitstr);
