@@ -138,8 +138,10 @@
 // -todo: change lava_theadQ to lava_outQ? lava_threadOutQ? - LavaQ is fined
 // -todo: can the start and buf flag in the queue be put together while leaving the end and capacity separate?  - might need to leave start and end together so that the reading threads are always in sync with the writing thread, though maybe it is fine
 // -todo: make LavaFrame slots start from the begining - not neccesary with output queue
+// -todo: make deallocation happen just before it is needed
 
-// todo: make deallocation happen just before it is needed
+// todo: redo memory allocation sequence so that the buffers are always pointing to allocated memory - should they also be atomic?
+// todo: make a custom copy function that takes in to account wrapping
 // todo: fix concurrent pop returning unitialized memory 
 // todo: make packets be emitted (lava_send() ?) instead of simply returned
 // todo: change cur() functions to const and rename to read()
@@ -1510,15 +1512,25 @@ void              debug_coords(v2 a)
 //    }
 //}
 
-void PrintAB(LavaQ& q)
+void PrintAB(LavaQ& q, str label="")
 {
-  Print("A:  ");
-  TO(q.capA(),i) Print(q.atA(i)," ");
-  Println("");
+  str sA = "A:  ";
+  TO(q.capA(),i) sA += toString(q.atA(i)," ");
+  //sA += "\n";
 
-  Print("B:  ");
-  TO(q.capB(),i) Print(q.atB(i)," ");
-  Println("");
+  str sB = "B:  ";
+  TO(q.capB(),i) sB += toString(q.atA(i)," ");
+  //sB += "\n";
+
+  Println(label,":\n",sA,"\n",sB,"\n");
+
+  //Print("A:  ");
+  //TO(q.capA(),i) Print(q.atA(i)," ");
+  //Println("");
+
+  //Print("B:  ");
+  //TO(q.capB(),i) Print(q.atB(i)," ");
+  //Println("");
 }
 
 ENTRY_DECLARATION // main or winmain
@@ -1529,26 +1541,29 @@ ENTRY_DECLARATION // main or winmain
   LavaQ q;
   bool running = true; 
   vector<thread> qthrds;
-  //TO(1,i)
-  //{
-  //  qthrds.emplace_back([i, &q, &running](){
-  //    while( running )
-  //    {
-  //      int val;
-  //      bool ok = q.pop(val);
-  //      if(ok){
-  //        printAB(q);
-  //        Println(i,": ",val,"\n");
-  //      }
-  //      //this_thread::sleep_for( 0ms );
-  //    }
-  //  });
-  //}
-  TO(7,i){
-    q.push(i);
-    PrintAB(q);
-    Println();
+  TO(11,i)
+  {
+    qthrds.emplace_back([i, &q, &running](){
+      while( running )
+      {
+        int val;
+        bool ok = q.pop(val);
+        if(ok){
+          //PrintAB(q, toString("thread ",i) );
+          Println(i,": ",val,"\n");
+          //assert(val > 0);
+        }
+        //this_thread::sleep_for( 0ms );
+      }
+    });
   }
+  TO(300,i){
+    q.push(i);
+    //PrintAB(q);
+    //Println();
+  }
+  PrintAB(q, "Main Thread");
+
   while( q.size() > 0 )
     this_thread::sleep_for( 0ms );
 
