@@ -240,7 +240,6 @@ struct LavaQ
       cap = capB();
     }
 
-    //auto sz = size(buf);
     if(cap==0 || size(buf) >= (cap-1) ){
       expand();
       buf = loadBuf();
@@ -267,21 +266,14 @@ struct LavaQ
     auto    en = m_end.load();
     prev = buf = loadBuf();
     
-    //assert(buf.st <= en);
-    //if(buf.st == en) return false;
     if( size(buf) == 0 ) return false;
-    //auto cap_a = capA();
-    //auto cap_b = capB();
 
     u64 idx = 0;
-    //u64 cap = buf.useA? cap_a : cap_b;
     u64 cap = buf.useA? capA() : capB();
     if( buf.useA ){
-      //cap = capA();
       idx = buf.st % cap;
       ret = atA(idx);
     }else{ 
-      //cap = capB();
       idx = buf.st % cap;
       ret = atB(idx);
     }
@@ -289,8 +281,8 @@ struct LavaQ
     buf.st += 1;
     bool ok = abuf->compare_exchange_strong(prev.asInt, buf.asInt);
 
-    auto endDif = m_end.load() - en;  // The buf struct could be the same if the bit was flipped twice, though if that happened, m_end would have been incremented by at least <capacity> amount to make that happen - does sz need to be incremented by the new capacity so that it wraps around to the same spot yet is a different number?
-    if(endDif > cap) ok = false;
+    //auto endDif = m_end.load() - en;  // The buf struct could be the same if the bit was flipped twice, though if that happened, m_end would have been incremented by at least <capacity> amount to make that happen - does sz need to be incremented by the new capacity so that it wraps around to the same spot yet is a different number?
+    //if(endDif > cap) ok = false;
 
     assert( (ret < 10000 && ret >= 0) || !ok);
 
@@ -2144,7 +2136,16 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//assert(buf.st <= en);
+//if(buf.st == en) return false;
+//
+//auto cap_a = capA();
+//auto cap_b = capB();
+//
+//u64 cap = buf.useA? cap_a : cap_b;
 
+//
+//auto sz = size(buf);
 
 //return m_memA[i];
 //return *((m_memA+i)->load());

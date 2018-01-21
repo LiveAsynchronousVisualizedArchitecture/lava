@@ -1531,7 +1531,7 @@ void PrintAB(LavaQ& q, str label="")
   TO(q.capA(),i) sA += toString(q.atA(i)," ");
 
   str sB = "B:  ";
-  TO(q.capB(),i) sB += toString(q.atA(i)," ");
+  TO(q.capB(),i) sB += toString(q.atB(i)," ");
 
   Println(label,":\n",sA,"\n",sB,"\n");
 }
@@ -1568,7 +1568,7 @@ ENTRY_DECLARATION // main or winmain
       }
     });
   }
-  TO(2000,i){
+  TO(5000,i){
     q.push(i);
     //PrintAB(q);
     //Println();
