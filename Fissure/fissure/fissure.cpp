@@ -146,8 +146,12 @@
 // -todo: make a custom copy function that takes in to account wrapping
 // -todo: fix concurrent pop returning unitialized memory 
 // -todo: clean up LavaQ
+// -todo: make LavaQ::size() take into account wrapping
+// -todo: make StBuf::st be incremented by the new capacity so that it wraps around to the same spot yet is a different number - have to increment m_end first? can their wrapped versions be used? - prove that buf.st can't overflow 
 
-
+// todo: work around st == en being empty and full
+// -todo: only need to change buf.st on every other buffer flip
+// todo: reset buf.st if it gets bigger than double capacity
 // todo: think of a way to make sure that the buffer can't be double flipped during a read - can m_end be checked to see if it hasn't increased by the capacity before the read? - if the buffers have been switched twice, that means that m_end must have been incremented by at least the current capacity, to make that happen 
 // todo: write about design of LavaQ including that it is lock free, wait free, and doesn't need versions since the start and end only increment - when a reader is reading a value, it can be sure that the buffer underneath hasn't been switched twice, because that would require inserting more values, which would increment end.... but end isn't atomicly linked to the start index - does switching buffers need to add the absolute capacity to both start and end ? 
 // todo: test LavaQ with explicity malloc and free + thread local allocations

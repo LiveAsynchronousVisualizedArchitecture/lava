@@ -126,8 +126,10 @@ struct LavaQ
     StBuf prev, buf;
     au64* abuf = (au64*)&m_buf.asInt;
     do{
-      prev = buf = loadBuf();
-      buf.useA = !buf.useA;
+      prev = buf =  loadBuf();
+      buf.useA   = !buf.useA;
+      u64  cap   =  buf.useA?  capA() : capB();
+      if(buf.useA){ buf.st += cap; }  // when switching to buffer A, make buf.st wrap fully around so that a double buffer switch still creates a different StBuf struct
     }while( !abuf->compare_exchange_strong(prev.asInt, buf.asInt) );
 
     return prev;
@@ -151,6 +153,8 @@ struct LavaQ
   }
   void           expand()
   {
+    assert(std::this_thread::get_id() == writeThrd);
+
     // 0. assume that the opposite buffer pointer is nullptr
     // 1. make another allocation 
     // 2. copy the data
@@ -160,7 +164,7 @@ struct LavaQ
     using namespace std;
     
     auto buf = loadBuf();
-    auto  en = m_end.load(); 
+    auto  en = m_end.load();
     if( m_memA==(u64)nullptr && m_memB==(u64)nullptr ){
       m_capA = INITIAL_CAPACITY;
       m_memA.store( (u64)m_alloc(capA() * sizeof(T)) );      // initial allocation
@@ -202,10 +206,24 @@ struct LavaQ
       switchBuffers();                                       // this has to make sure that the start and end stay the same, but the current thread is the only one that can change the buffer bit or the end. 
     }
   }
+  u64              size(StBuf buf) const
+  { 
+    //auto buf = loadBuf();
+    auto cap = buf.useA? capA() : capB();
+    if(cap==0) return 0;
+
+    auto  st = buf.st % cap;
+    auto  en = m_end.load() % cap;
+
+    if(en >= st){
+      return en - st;
+    }else{
+      return cap - st + en;
+    }
+  }
   u64              size() const
   { 
-    auto buf = loadBuf();
-    return m_end.load() - buf.st;
+    return size(loadBuf());
   }
   StBuf            push(T const& val)
   {
@@ -222,7 +240,8 @@ struct LavaQ
       cap = capB();
     }
 
-    if( size() >= cap ){
+    //auto sz = size(buf);
+    if(cap==0 || size(buf) >= (cap-1) ){
       expand();
       buf = loadBuf();
     }
@@ -245,24 +264,33 @@ struct LavaQ
     // then make sure the index (which will only increase) hasn't changed while incrementing the start
     StBuf prev, buf;
     au64* abuf = (au64*)&m_buf.asInt;
-      prev = buf = loadBuf();
-      assert(buf.st <= m_end);
-      if(buf.st == m_end) return false;
+    auto    en = m_end.load();
+    prev = buf = loadBuf();
+    
+    //assert(buf.st <= en);
+    //if(buf.st == en) return false;
+    if( size(buf) == 0 ) return false;
+    //auto cap_a = capA();
+    //auto cap_b = capB();
 
-      u64 idx = 0;
-      u64 cap = 0;
-      if( buf.useA ){
-        cap = capA();
-        idx = buf.st % cap;
-        ret = atA(idx);
-      }else{ 
-        cap = capB();
-        idx = buf.st % cap;
-        ret = atB(idx);
-      }
+    u64 idx = 0;
+    //u64 cap = buf.useA? cap_a : cap_b;
+    u64 cap = buf.useA? capA() : capB();
+    if( buf.useA ){
+      //cap = capA();
+      idx = buf.st % cap;
+      ret = atA(idx);
+    }else{ 
+      //cap = capB();
+      idx = buf.st % cap;
+      ret = atB(idx);
+    }
 
-      buf.st += 1;
+    buf.st += 1;
     bool ok = abuf->compare_exchange_strong(prev.asInt, buf.asInt);
+
+    auto endDif = m_end.load() - en;  // The buf struct could be the same if the bit was flipped twice, though if that happened, m_end would have been incremented by at least <capacity> amount to make that happen - does sz need to be incremented by the new capacity so that it wraps around to the same spot yet is a different number?
+    if(endDif > cap) ok = false;
 
     assert( (ret < 10000 && ret >= 0) || !ok);
 
