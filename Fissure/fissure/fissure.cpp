@@ -139,10 +139,19 @@
 // -todo: can the start and buf flag in the queue be put together while leaving the end and capacity separate?  - might need to leave start and end together so that the reading threads are always in sync with the writing thread, though maybe it is fine
 // -todo: make LavaFrame slots start from the begining - not neccesary with output queue
 // -todo: make deallocation happen just before it is needed
+// -todo: change StEnBuf to StBuf
+// -todo: make sure that different StBuf structs have different integer respresentations - integer representations are more legible with the buffer switch bit first
+// -todo: redo memory allocation sequence so that the buffers are always pointing to allocated memory - should they also be atomic?
+// -todo: make memory pointers into atomics
+// -todo: make a custom copy function that takes in to account wrapping
+// -todo: fix concurrent pop returning unitialized memory 
+// -todo: clean up LavaQ
 
-// todo: redo memory allocation sequence so that the buffers are always pointing to allocated memory - should they also be atomic?
-// todo: make a custom copy function that takes in to account wrapping
-// todo: fix concurrent pop returning unitialized memory 
+
+// todo: think of a way to make sure that the buffer can't be double flipped during a read - can m_end be checked to see if it hasn't increased by the capacity before the read? - if the buffers have been switched twice, that means that m_end must have been incremented by at least the current capacity, to make that happen 
+// todo: write about design of LavaQ including that it is lock free, wait free, and doesn't need versions since the start and end only increment - when a reader is reading a value, it can be sure that the buffer underneath hasn't been switched twice, because that would require inserting more values, which would increment end.... but end isn't atomicly linked to the start index - does switching buffers need to add the absolute capacity to both start and end ? 
+// todo: test LavaQ with explicity malloc and free + thread local allocations
+// todo: test LavaQ across shared library borders
 // todo: make packets be emitted (lava_send() ?) instead of simply returned
 // todo: change cur() functions to const and rename to read()
 // todo: change opp() functions to non-const only and rename to write()
@@ -1516,29 +1525,27 @@ void PrintAB(LavaQ& q, str label="")
 {
   str sA = "A:  ";
   TO(q.capA(),i) sA += toString(q.atA(i)," ");
-  //sA += "\n";
 
   str sB = "B:  ";
   TO(q.capB(),i) sB += toString(q.atA(i)," ");
-  //sB += "\n";
 
   Println(label,":\n",sA,"\n",sB,"\n");
-
-  //Print("A:  ");
-  //TO(q.capA(),i) Print(q.atA(i)," ");
-  //Println("");
-
-  //Print("B:  ");
-  //TO(q.capB(),i) Print(q.atB(i)," ");
-  //Println("");
 }
 
 ENTRY_DECLARATION // main or winmain
 {
   using namespace std;
   
+  //Println("sizeof(LavaQ::StEnBuf): ", sizeof(LavaQ::StBuf));
+  //LavaQ::StBuf a, b;
+  //a.st   = 0;
+  //a.useA = 1;
+  //b.st   = 2000;
+  //b.useA = 1;
+  //Println(a.asInt,"   ",b.asInt);
+
   Println("\n\n");
-  LavaQ q;
+  LavaQ q(malloc, free);
   bool running = true; 
   vector<thread> qthrds;
   TO(11,i)
@@ -1557,7 +1564,7 @@ ENTRY_DECLARATION // main or winmain
       }
     });
   }
-  TO(300,i){
+  TO(2000,i){
     q.push(i);
     //PrintAB(q);
     //Println();
@@ -2336,6 +2343,14 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+//Print("A:  ");
+//TO(q.capA(),i) Print(q.atA(i)," ");
+//Println("");
+//
+//Print("B:  ");
+//TO(q.capB(),i) Print(q.atB(i)," ");
+//Println("");
 
 //LavaId          slot_add(Slot s)
 //{
