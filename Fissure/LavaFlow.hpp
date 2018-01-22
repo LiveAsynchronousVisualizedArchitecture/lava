@@ -57,6 +57,7 @@ struct LavaQ
   using       u64 = uint64_t;
   using     abool = std::atomic<bool>;
   using       au8 = std::atomic<u8>;
+  using      ai32 = std::atomic<i32>;
   using      au64 = std::atomic<u64>;
   using AllocFunc = void*(*)(u64);
   using  FreeFunc = void(*)(void*);
@@ -64,20 +65,78 @@ struct LavaQ
   union StBuf
   {
     struct { u64 useA : 1; u64 st : 63; };
-    u64 asInt;
+    u64 asInt = 0;
+  };
+  union RefMem
+  {
+    struct{
+      u64 m_addr : 48;
+      u64  m_ref : 16;
+    };
+    mutable au64  atmInt;
+    u64            asInt = 0;
+
+    static const u64 DELETED = 0xFFFF;
+
+    u64        ref() const 
+    {
+      RefMem ret;
+      ret.asInt = atmInt.load();
+      return ret.m_addr? ret.m_ref  :  0; // if m_addr is nullptr, return that there are 0 references
+    }
+    T*        addr() const
+    {
+      RefMem ret;
+      ret.asInt = atmInt.load();
+      return (T*)ret.m_addr;
+    }
+    void      addr(void* p) // todo: change this to a simple atomic store, since it will only be done by the single writing thread
+    {
+      RefMem nxt, prev;
+      do{
+        prev.asInt = nxt.asInt = atmInt.load();
+        nxt.m_addr = (u64)p;
+      }while( !atmInt.compare_exchange_strong(prev.asInt, nxt.asInt) );
+    }
+    T*  addrIncRef() const // todo: make this const
+    {
+      RefMem nxt, prev;
+      do{
+        prev.asInt  = nxt.asInt  = atmInt.load();
+        if(nxt.m_addr)
+          nxt.m_ref  += 1;
+        else return nullptr;
+      }while( !atmInt.compare_exchange_strong(prev.asInt, nxt.asInt) );
+
+      return (T*)nxt.m_addr;
+    }
+    void    subRef() const
+    {
+      RefMem nxt, prev;
+      do{
+        prev.asInt  = nxt.asInt  = atmInt.load();
+        if(nxt.m_addr)
+          nxt.m_ref  -= 1;
+        else return;
+      }while( !atmInt.compare_exchange_strong(prev.asInt, nxt.asInt) );
+    }
   };
 
 //private:
-  const u32 INITIAL_CAPACITY = 2;
+  const u32 INITIAL_CAPACITY = 3;
 
-  AllocFunc   m_alloc = nullptr;
-  FreeFunc     m_free = nullptr;
-  au64         m_memA = 0;
-  au64         m_memB = 0;
-  au8          m_capA = 0;                             // capacity will always be a power of two
-  au8          m_capB = 0;                             // capacity will always be a power of two
-  au64          m_end = 0;
-  StBuf         m_buf;
+  AllocFunc    m_alloc = nullptr;
+  FreeFunc      m_free = nullptr;
+  //au64          m_memA = 0;
+  //au64          m_memB = 0;
+  au8           m_capA = 0;                             // capacity will always be a power of two
+  au8           m_capB = 0;                             // capacity will always be a power of two
+  au64           m_end = 0;
+  //mutable ai32  m_refA = 0;
+  //mutable ai32  m_refB = 0;
+  RefMem        m_memA;
+  RefMem        m_memB;
+  StBuf          m_buf;
 
   #ifndef _NDEBUG
     std::thread::id  writeThrd;
@@ -85,8 +144,9 @@ struct LavaQ
 
   void init()
   {
-    m_buf.useA = true;
+    m_buf.useA = 0;
     m_buf.st   = 0;
+
     //m_buf.en   = 0;
     //m_end = 0;
 
@@ -108,10 +168,17 @@ struct LavaQ
   }
   ~LavaQ()
   {
-    if(m_memA)
-      free( (T*)m_memA.load() );
-    if(m_memB)
-      free( (T*)m_memB.load() );
+    RefMem memA, memB;
+    memA.asInt = m_memA.atmInt.load();
+    memB.asInt = m_memB.atmInt.load();
+
+    assert(memA.m_ref == 0);
+    assert(memB.m_ref == 0);
+
+    if(memA.m_addr)
+      free( (T*)memA.m_addr );
+    if(memB.m_addr)
+      free( (T*)memB.m_addr );
   }
 
   StBuf         loadBuf() const
@@ -127,9 +194,17 @@ struct LavaQ
     au64* abuf = (au64*)&m_buf.asInt;
     do{
       prev = buf =  loadBuf();
+      if(buf.useA){
+        auto cap = capA();
+      }else{
+      }
+      auto cap   = buf.useA? capA() : capB();        // buf.st can be changed here because even if it wraps around and causes a reader to see the same buf.st despite other threads having executed reads, the buffer bit will change, so the compare_exchange in the reader thread will fail
+      buf.st     = cap? buf.st % cap  :  0;
+      //buf.st     =  buf.useA? buf.st % capA()  :  buf.st % capB();        // buf.st can be changed here because even if it wraps around and causes a reader to see the same buf.st despite other threads having executed reads, the buffer bit will change, so the compare_exchange in the reader thread will fail
       buf.useA   = !buf.useA;
-      u64  cap   =  buf.useA?  capA() : capB();
-      if(buf.useA){ buf.st += cap; }  // when switching to buffer A, make buf.st wrap fully around so that a double buffer switch still creates a different StBuf struct
+      //u64  cap   =  buf.useA?  capA() : capB();
+      //if(buf.useA){ buf.st += cap; }  // when switching to buffer A, make buf.st wrap fully around so that a double buffer switch still creates a different StBuf struct
+      //buf.st += buf.useA? capA() : capB();
     }while( !abuf->compare_exchange_strong(prev.asInt, buf.asInt) );
 
     return prev;
@@ -151,6 +226,28 @@ struct LavaQ
     assert(m_capB < 64);
     return (1 << m_capB.load()) >> 1;
   }
+  void           expand(StBuf buf, RefMem& prevMem, RefMem& nxtMem, u64 prevCap, u64 nxtCap)
+  {
+    using namespace std;
+    
+    void*  nxtAlloc = m_alloc( nxtCap * sizeof(T) );       // the capacity functions will get the absolute value from the power of 2 that is stored in the 1 byte capacity variables
+
+    while( nxtMem.ref() != 0 ){
+      this_thread::sleep_for( 0ms );                       // todo: check if yield holds any advantages here
+    }
+    T* oldAddr = nxtMem.addr();                          // make sure the references are 0 - they can't go up here, since any new read would use the other buffer
+    nxtMem.addr( nxtAlloc );                              // 1
+    if(oldAddr) free(oldAddr);
+
+    T* nxtAddr = (T*)nxtAlloc;
+    T* prvAddr = prevMem.addr();
+    auto   en = m_end.load();
+    for(u64 i=buf.st; i<en; ++i){                          // other threads can increment buf.st, but that should only mean some of the copied elements have already been popped and not cause an actual problem
+      auto prevIdx = i % prevCap;
+      auto  nxtIdx = i % nxtCap;
+      nxtAddr[nxtIdx] = prvAddr[prevIdx];                  // only this thread can change anything, so no other thread should interfere with the actual data
+    }
+  }
   void           expand()
   {
     assert(std::this_thread::get_id() == writeThrd);
@@ -165,46 +262,21 @@ struct LavaQ
     
     auto buf = loadBuf();
     auto  en = m_end.load();
-    if( m_memA==(u64)nullptr && m_memB==(u64)nullptr ){
+    //if( m_memA==(u64)nullptr && m_memB==(u64)nullptr ){
+    //
+    //m_memA.store( (u64)m_alloc(capA() * sizeof(T)) );    // initial allocation
+
+    if( m_memA.addr()==nullptr && m_memB.addr()==nullptr ){
       m_capA = INITIAL_CAPACITY;
-      m_memA.store( (u64)m_alloc(capA() * sizeof(T)) );      // initial allocation
+      m_memA.addr( m_alloc(capA()*sizeof(T)) );              // initial allocation
     }else if( buf.useA ){
-      auto    prevCap = m_capA.load();
-      m_capB.store(prevCap + 1);                             // since capacity is stored as a power of 2 instead of an absolute number, only add 1 instead of bitshifting 1 over  
-      auto prvRealCap = capA();                              // previous real capacity - this should equal 2 to the power of the m_capA variable
-      auto nxtRealCap = capB();                              // next real capacity - this should equal 2 to the power of the m_capB variable
-      void*  nxtAlloc = m_alloc( nxtRealCap * sizeof(T) );   // the capacity functions will get the absolute value from the power of 2 that is stored in the 1 byte capacity variables
-
-      T* prevMem = (T*)m_memB.load();
-      m_memB.store( (u64)nxtAlloc );                         // 1
-      if(prevMem) free(prevMem);
-
-      for(u64 i=buf.st; i<en; ++i){                          // other threads can increment buf.st, but that should only mean some of the copied elements have already been popped and not cause an actual problem
-        auto prevIdx = i % prvRealCap;
-        auto  nxtIdx = i % nxtRealCap;
-        ((T*)m_memB.load())[nxtIdx] = atA(prevIdx);          // only this thread can change anything, so no other thread should interfere with the actual data
-      }
-
-      switchBuffers();                                       // this has to make sure that the start and end stay the same, but the current thread is the only one that can change the buffer bit or the end. 
+      m_capB.store(m_capA.load() + 1);                                // since capacity is stored as a power of 2 instead of an absolute number, only add 1 instead of bitshifting 1 over  
+      expand(buf, m_memA, m_memB, capA(), capB() );
     }else{
-      auto    prevCap = m_capB.load();
-      m_capA.store(prevCap + 1);                             // since capacity is stored as a power of 2 instead of an absolute number, only add 1 instead of bitshifting 1 over  
-      auto prvRealCap = capB();                              // previous real capacity - this should equal 2 to the power of the m_capA variable
-      auto nxtRealCap = capA();                              // next real capacity - this should equal 2 to the power of the m_capB variable
-      void*  nxtAlloc = m_alloc( nxtRealCap * sizeof(T) );   // the capacity functions will get the absolute value from the power of 2 that is stored in the 1 byte capacity variables
-
-      T* prevMem = (T*)m_memA.load();
-      m_memA.store( (u64)nxtAlloc );                         // 1
-      if(prevMem) free(prevMem);
-
-      for(u64 i=buf.st; i<en; ++i){                          // other threads can increment buf.st, but that should only mean some of the copied elements have already been popped and not cause an actual problem
-        auto prevIdx = i % prvRealCap;
-        auto  nxtIdx = i % nxtRealCap;
-        ((T*)m_memA.load())[nxtIdx] = atB(prevIdx);          // only this thread can change anything, so no other thread should interfere with the actual data
-      }
-
-      switchBuffers();                                       // this has to make sure that the start and end stay the same, but the current thread is the only one that can change the buffer bit or the end. 
+      expand(buf, m_memB, m_memA, capB(), capA() );
     }
+
+    switchBuffers();                                       // this has to make sure that the start and end stay the same, but the current thread is the only one that can change the buffer bit or the end. 
   }
   u64              size(StBuf buf) const
   { 
@@ -245,13 +317,18 @@ struct LavaQ
       buf = loadBuf();
     }
 
-    if( buf.useA ){
-      auto idx = m_end.load() % capA();
-      ((T*)m_memA.load())[idx] = val;
-    }else{ 
-      auto idx = m_end.load() % capB();
-      ((T*)m_memB.load())[idx] = val;
-    }
+    T*   mem = buf.useA? m_memA.addr() : m_memB.addr();
+         cap = buf.useA? capA() : capB();
+    auto idx = m_end.load() % cap;
+    mem[idx] = val;
+
+    //if( buf.useA ){
+    //  auto idx = m_end.load() % capA();
+    //  ((T*)m_memA.load())[idx] = val;
+    //}else{ 
+    //  auto idx = m_end.load() % capB();
+    //  ((T*)m_memB.load())[idx] = val;
+    //}
 
     incEnd();
 
@@ -261,25 +338,35 @@ struct LavaQ
   {
     // this will need to copy the element indexed by m_cur, 
     // then make sure the index (which will only increase) hasn't changed while incrementing the start
+
     StBuf prev, buf;
     au64* abuf = (au64*)&m_buf.asInt;
     auto    en = m_end.load();
     prev = buf = loadBuf();
-    
+
     if( size(buf) == 0 ) return false;
 
     u64 idx = 0;
     u64 cap = buf.useA? capA() : capB();
     if( buf.useA ){
       idx = buf.st % cap;
-      ret = atA(idx);
+      //m_refA.fetch_add(1);
+        ret = atA(idx);
+      //m_refA.fetch_add(-1);
     }else{ 
       idx = buf.st % cap;
-      ret = atB(idx);
+      //m_refB.fetch_add(1);
+        ret = atB(idx);
+      //m_refB.fetch_add(-1);
     }
 
     buf.st += 1;
     bool ok = abuf->compare_exchange_strong(prev.asInt, buf.asInt);
+
+    //if(buf.useA)
+    //  m_refA.fetch_add(-1);
+    //else
+    //  m_refB.fetch_add(-1);
 
     //auto endDif = m_end.load() - en;  // The buf struct could be the same if the bit was flipped twice, though if that happened, m_end would have been incremented by at least <capacity> amount to make that happen - does sz need to be incremented by the new capacity so that it wraps around to the same spot yet is a different number?
     //if(endDif > cap) ok = false;
@@ -288,13 +375,22 @@ struct LavaQ
 
     return ok;
   }
-  T const&          atA(u64 i)  const
+  T          atA(u64 i) const
   {
-    return ((T*)m_memA.load())[i];
+    auto mem = m_memA.addrIncRef();
+      T ret = mem[i];
+    m_memA.subRef();
+    return ret;
+
+    //return ((T*)m_memA.load())[i];
   }
-  T const&          atB(u64 i)  const
+  T          atB(u64 i)  const
   {
-    return ((T*)m_memB.load())[i];
+    auto mem = m_memB.addrIncRef();
+      T ret = mem[i];
+    m_memB.subRef();
+    return ret;
+    //return ((T*)m_memB.load())[i];
   }
 };
 
@@ -2135,6 +2231,63 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+
+
+
+
+
+//auto    curCap = m_capA.load();
+//m_capB.store(curCap + 1);                                // since capacity is stored as a power of 2 instead of an absolute number, only add 1 instead of bitshifting 1 over  
+//auto prvRealCap = capA();                              // previous real capacity - this should equal 2 to the power of the m_capA variable
+//auto nxtRealCap = capB();                              // next real capacity - this should equal 2 to the power of the m_capB variable
+
+//void*  nxtAlloc = m_alloc( nxtRealCap * sizeof(T) );   // the capacity functions will get the absolute value from the power of 2 that is stored in the 1 byte capacity variables
+//
+////T* prevMem = (T*)m_memB.load();
+//T* prevMem = m_memB.addr();                            // make sure the references are 0 - they can't go up here, since any new read would use the other buffer
+//while( m_memB.ref() != 0 ){
+//  this_thread::sleep_for( 0ms );                       // todo: check if yield holds any advantages here
+//}
+////m_memB.store( (u64)nxtAlloc );                       // 1
+//m_memB.addr( nxtAlloc );                         // 1
+//assert( m_memB.ref() == 0 );
+//if(prevMem) free(prevMem);
+//
+//T* nxtMem = (T*)nxtAlloc;
+//for(u64 i=buf.st; i<en; ++i){                          // other threads can increment buf.st, but that should only mean some of the copied elements have already been popped and not cause an actual problem
+//  auto prevIdx = i % prvRealCap;
+//  auto  nxtIdx = i % nxtRealCap;
+//  //((T*)m_memB.load())[nxtIdx] = atA(prevIdx);          // only this thread can change anything, so no other thread should interfere with the actual data
+//  nxtMem[nxtIdx] = atA(prevIdx);          // only this thread can change anything, so no other thread should interfere with the actual data
+//}
+
+//switchBuffers();                                       // this has to make sure that the start and end stay the same, but the current thread is the only one that can change the buffer bit or the end. 
+
+//m_memB.store( (u64)nxtAlloc );                       // 1
+//
+//assert( oldMem.ref() == 0 );
+//
+//nxtMem[nxtIdx] = atA(prevIdx);                     // only this thread can change anything, so no other thread should interfere with the actual data
+
+//auto    prevCap = m_capB.load();
+//m_capA.store(prevCap + 1);                             // since capacity is stored as a power of 2 instead of an absolute number, only add 1 instead of bitshifting 1 over  
+//auto prvRealCap = capB();                              // previous real capacity - this should equal 2 to the power of the m_capA variable
+//auto nxtRealCap = capA();                              // next real capacity - this should equal 2 to the power of the m_capB variable
+//void*  nxtAlloc = m_alloc( nxtRealCap * sizeof(T) );   // the capacity functions will get the absolute value from the power of 2 that is stored in the 1 byte capacity variables
+//
+//T* prevMem = (T*)m_memA.load();
+//m_memA.store( (u64)nxtAlloc );                         // 1
+//assert( m_refA == 0 );
+//if(prevMem) free(prevMem);
+//
+//for(u64 i=buf.st; i<en; ++i){                          // other threads can increment buf.st, but that should only mean some of the copied elements have already been popped and not cause an actual problem
+//  auto prevIdx = i % prvRealCap;
+//  auto  nxtIdx = i % nxtRealCap;
+//  ((T*)m_memA.load())[nxtIdx] = atB(prevIdx);          // only this thread can change anything, so no other thread should interfere with the actual data
+//}
+//
+//switchBuffers();                                       // this has to make sure that the start and end stay the same, but the current thread is the only one that can change the buffer bit or the end. 
 
 //assert(buf.st <= en);
 //if(buf.st == en) return false;

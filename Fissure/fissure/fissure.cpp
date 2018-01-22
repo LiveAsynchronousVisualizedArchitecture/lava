@@ -148,10 +148,14 @@
 // -todo: clean up LavaQ
 // -todo: make LavaQ::size() take into account wrapping
 // -todo: make StBuf::st be incremented by the new capacity so that it wraps around to the same spot yet is a different number - have to increment m_end first? can their wrapped versions be used? - prove that buf.st can't overflow 
-
 // -todo: work around st == en being empty and full - expand happens when buffer has one slot left, instead of no slots left
 // -todo: only need to change buf.st on every other buffer flip
+// -todo: make at() functions increment and decrement reference counts 
+// -todo: put reference count as well as deleted flag into the pointers for memA and memB
+// -todo: add reference count for each buffer
+
 // todo: try StBuf with 6 bits for the current capacity - if the buffer is flipped, it should go up by one - what should be done on shrink?
+// todo: use an array of reference counted buffers? 
 // todo: reset buf.st if it gets bigger than double capacity
 // todo: think of a way to make sure that the buffer can't be double flipped during a read - can m_end be checked to see if it hasn't increased by the capacity before the read? - if the buffers have been switched twice, that means that m_end must have been incremented by at least the current capacity, to make that happen 
 // todo: write about design of LavaQ including that it is lock free, wait free, and doesn't need versions since the start and end only increment - when a reader is reading a value, it can be sure that the buffer underneath hasn't been switched twice, because that would require inserting more values, which would increment end.... but end isn't atomicly linked to the start index - does switching buffers need to add the absolute capacity to both start and end ? 
@@ -1563,23 +1567,23 @@ ENTRY_DECLARATION // main or winmain
   LavaQ q(malloc, free);
   bool running = true; 
   vector<thread> qthrds;
-  TO(1,i)
-  {
-    qthrds.emplace_back([i, &q, &running](){
-      while( running )
-      {
-        int val;
-        bool ok = q.pop(val);
-        if(ok){
-          //PrintAB(q, toString("thread ",i) );
-          //Println(i,": ",val,"\n");
-          //assert(val > 0);
-        }
-        //this_thread::sleep_for( 0ms );
-      }
-    });
-  }
-  TO(5000,i){
+  //TO(1,i)
+  //{
+  //  qthrds.emplace_back([i, &q, &running](){
+  //    while( running )
+  //    {
+  //      int val;
+  //      bool ok = q.pop(val);
+  //      if(ok){
+  //        //PrintAB(q, toString("thread ",i) );
+  //        //Println(i,": ",val,"\n");
+  //        //assert(val > 0);
+  //      }
+  //      //this_thread::sleep_for( 0ms );
+  //    }
+  //  });
+  //}
+  TO(5,i){
     q.push(i);
     //PrintAB(q);
     //Println();
