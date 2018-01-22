@@ -284,7 +284,7 @@ struct LavaQ
     //auto endDif = m_end.load() - en;  // The buf struct could be the same if the bit was flipped twice, though if that happened, m_end would have been incremented by at least <capacity> amount to make that happen - does sz need to be incremented by the new capacity so that it wraps around to the same spot yet is a different number?
     //if(endDif > cap) ok = false;
 
-    assert( (ret < 10000 && ret >= 0) || !ok);
+    assert( (ret < 1000000 && ret >= 0) || !ok);
 
     return ok;
   }
