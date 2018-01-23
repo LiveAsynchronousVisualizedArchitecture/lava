@@ -153,13 +153,16 @@
 // -todo: make at() functions increment and decrement reference counts 
 // -todo: put reference count as well as deleted flag into the pointers for memA and memB
 // -todo: add reference count for each buffer
+// -todo: try StBuf with 6 bits for the current capacity - if the buffer is flipped, it should go up by one - what should be done on shrink? - doesn't seem neccesary 
+// -todo: use an array of reference counted buffers? - doesn't seem neccesary
+// -todo: think of a way to make sure that the buffer can't be double flipped during a read - can m_end be checked to see if it hasn't increased by the capacity before the read? - if the buffers have been switched twice, that means that m_end must have been incremented by at least the current capacity, to make that happen - maybe an idea for later
+// -todo: reset buf.st if it gets bigger than double capacity - not neccesary when not using extra increment tricks
+// -todo: clean unused line out of LavaQ again
 
-// todo: try StBuf with 6 bits for the current capacity - if the buffer is flipped, it should go up by one - what should be done on shrink?
-// todo: use an array of reference counted buffers? 
-// todo: reset buf.st if it gets bigger than double capacity
-// todo: think of a way to make sure that the buffer can't be double flipped during a read - can m_end be checked to see if it hasn't increased by the capacity before the read? - if the buffers have been switched twice, that means that m_end must have been incremented by at least the current capacity, to make that happen 
-// todo: write about design of LavaQ including that it is lock free, wait free, and doesn't need versions since the start and end only increment - when a reader is reading a value, it can be sure that the buffer underneath hasn't been switched twice, because that would require inserting more values, which would increment end.... but end isn't atomicly linked to the start index - does switching buffers need to add the absolute capacity to both start and end ? 
+// todo: put capacity into StBuf, since the array index is the combination of the constantly incrementing st variable and the capacity of that buffer
 // todo: test LavaQ with explicity malloc and free + thread local allocations
+// todo: write about design of LavaQ including that it is lock free, wait free, and doesn't need versions since the start and end only increment - when a reader is reading a value, it can be sure that the buffer underneath hasn't been switched twice, because that would require inserting more values, which would increment end.... but end isn't atomicly linked to the start index - does switching buffers need to add the absolute capacity to both start and end ? 
+// todo: profile LavaQ
 // todo: test LavaQ across shared library borders
 // todo: make packets be emitted (lava_send() ?) instead of simply returned
 // todo: change cur() functions to const and rename to read()
@@ -1579,11 +1582,11 @@ ENTRY_DECLARATION // main or winmain
           //Println(i,": ",val,"\n");
           //assert(val > 0);
         }
-        this_thread::sleep_for( 0ms );
+        //this_thread::sleep_for( 0ms );
       }
     });
   }
-  TO(500,i){
+  TO(5000,i){
     q.push(i);
     //PrintAB(q);
     //Println();

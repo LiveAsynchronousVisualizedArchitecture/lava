@@ -41,8 +41,6 @@
   namespace fs = std::experimental::filesystem;
 #endif
 
-//
-//#define _SCL_SECURE_NO_WARNINGS
 
 struct LavaQ
 {
@@ -62,7 +60,7 @@ struct LavaQ
   using AllocFunc = void*(*)(u64);
   using  FreeFunc = void(*)(void*);
 
-  union StBuf
+  union  StBuf
   {
     struct { u64 useA : 1; u64 st : 63; };
     u64 asInt = 0;
@@ -127,13 +125,9 @@ struct LavaQ
 
   AllocFunc    m_alloc = nullptr;
   FreeFunc      m_free = nullptr;
-  //au64          m_memA = 0;
-  //au64          m_memB = 0;
   au8           m_capA = 0;                             // capacity will always be a power of two
   au8           m_capB = 0;                             // capacity will always be a power of two
   au64           m_end = 0;
-  //mutable ai32  m_refA = 0;
-  //mutable ai32  m_refB = 0;
   RefMem        m_memA;
   RefMem        m_memB;
   StBuf          m_buf;
@@ -194,22 +188,10 @@ struct LavaQ
     au64* abuf = (au64*)&m_buf.asInt;
     do{
       prev = buf =  loadBuf();
-      //if(buf.useA){
-      //  auto cap = capA();
-      //}else{
-      //}
-
-      //auto cap   = buf.useA? capA() : capB();        // buf.st can be changed here because even if it wraps around and causes a reader to see the same buf.st despite other threads having executed reads, the buffer bit will change, so the compare_exchange in the reader thread will fail
-      //buf.st     = cap? buf.st % cap  :  0;
       buf.useA   = !buf.useA;
     }while( !abuf->compare_exchange_strong(prev.asInt, buf.asInt) );
 
     return prev;
-  }
-  u64            incEnd()
-  {
-    assert(std::this_thread::get_id() == writeThrd);
-    return m_end.fetch_add(1);
   }
   u64              capA() const
   {
@@ -223,17 +205,88 @@ struct LavaQ
     assert(m_capB < 64);
     return (1 << m_capB.load()) >> 1;
   }
+  u64              size(StBuf buf) const
+  { 
+    auto cap = buf.useA? capA() : capB();
+    if(cap==0) return 0;
+
+    auto  st = buf.st % cap;
+    auto  en = m_end.load() % cap;
+
+    if(en >= st){
+      return en - st;
+    }else{
+      return cap - st + en;
+    }
+  }
+  u64              size()          const
+  { 
+    return size(loadBuf());
+  }
+  bool              pop(T& ret)    const
+  {
+    // this will make sure the index (which will only increase) hasn't changed while incrementing the start
+    // todo: also needs to make sure the capacity hasn't changed, since that will dictate the other side of the modulo operator
+    // ultimatly the index is made from buf.st and buf.capacity()
+    StBuf prev, buf;
+    au64* abuf = (au64*)&m_buf.asInt;
+    auto    en = m_end.load();
+    prev = buf = loadBuf();
+
+    if( size(buf) == 0 ) return false;
+
+    u64 idx = 0;
+    u64 cap = buf.useA? capA() : capB();
+    if( buf.useA ){
+      idx = buf.st % cap;
+        ret = atA(idx);
+    }else{ 
+      idx = buf.st % cap;
+        ret = atB(idx);
+    }
+
+    buf.st += 1;
+    bool ok = abuf->compare_exchange_strong(prev.asInt, buf.asInt);
+
+    assert( (ret < 1000000 && ret >= 0) || !ok);
+
+    return ok;
+  }
+  T                 atA(u64 i)     const
+  {
+    // mem should never be nullptr, since it is updated to the new pointer atomically, and never set to nullptr as an intermediate 
+    // the buffers are only nullptr on initialization
+    auto mem = m_memA.addrIncRef();
+      T ret = mem[i];
+    m_memA.subRef();
+    return ret;
+  }
+  T                 atB(u64 i)     const
+  {
+    // mem should never be nullptr, since it is updated to the new pointer atomically, and never set to nullptr as an intermediate 
+    // the buffers are only nullptr on initialization
+    auto mem = m_memB.addrIncRef();
+      T ret = mem[i];
+    m_memB.subRef();
+    return ret;
+  }
+
+  u64            incEnd()
+  {
+    assert(std::this_thread::get_id() == writeThrd);
+    return m_end.fetch_add(1);
+  }
   void           expand(StBuf buf, RefMem& prevMem, RefMem& nxtMem, u64 prevCap, u64 nxtCap)
   {
     using namespace std;
-    
+
     void*  nxtAlloc = m_alloc( nxtCap * sizeof(T) );       // the capacity functions will get the absolute value from the power of 2 that is stored in the 1 byte capacity variables
 
     while( nxtMem.ref() != 0 ){
       this_thread::sleep_for( 0ms );                       // todo: check if yield holds any advantages here
     }
-    T* oldAddr = nxtMem.addr();                          // make sure the references are 0 - they can't go up here, since any new read would use the other buffer
-    nxtMem.addr( nxtAlloc );                              // 1
+    T* oldAddr = nxtMem.addr();                            // make sure the references are 0 - they can't go up here, since any new read would use the other buffer
+    nxtMem.addr( nxtAlloc );                               // 1
     if(oldAddr) free(oldAddr);
 
     T* nxtAddr = (T*)nxtAlloc;
@@ -256,13 +309,9 @@ struct LavaQ
     // 4. deallocate the previous allocation
 
     using namespace std;
-    
+
     auto buf = loadBuf();
     auto  en = m_end.load();
-    //if( m_memA==(u64)nullptr && m_memB==(u64)nullptr ){
-    //
-    //m_memA.store( (u64)m_alloc(capA() * sizeof(T)) );    // initial allocation
-
     if( m_memA.addr()==nullptr && m_memB.addr()==nullptr ){
       m_capA = INITIAL_CAPACITY;
       m_memA.addr( m_alloc(capA()*sizeof(T)) );              // initial allocation
@@ -276,30 +325,12 @@ struct LavaQ
 
     switchBuffers();                                       // this has to make sure that the start and end stay the same, but the current thread is the only one that can change the buffer bit or the end. 
   }
-  u64              size(StBuf buf) const
-  { 
-    //auto buf = loadBuf();
-    auto cap = buf.useA? capA() : capB();
-    if(cap==0) return 0;
-
-    auto  st = buf.st % cap;
-    auto  en = m_end.load() % cap;
-
-    if(en >= st){
-      return en - st;
-    }else{
-      return cap - st + en;
-    }
-  }
-  u64              size() const
-  { 
-    return size(loadBuf());
-  }
   StBuf            push(T const& val)
   {
     assert(std::this_thread::get_id() == writeThrd);
 
-    // will need to increment both the current index and size at the same time
+    // This increment the end m_end variable, which sits at one beyond the last index, just like STL iterators
+    // T must be dealt with by value and can be arbitrary sized because there won't be multiple writing threads - writes don't need to be atomic, just write into the unused slot and increment m_end
     // if the capacity is not high enough, use a secondary buffer to enlarge it
     // this should work well, since only the owning thread can make it larger, while any thread can pop() items from the queue
     u64 cap=0;                          // this will append a value to the end, while pop, will grab it from the start/current index
@@ -316,79 +347,13 @@ struct LavaQ
     }
 
     T*   mem = buf.useA? m_memA.addr() : m_memB.addr();
-         cap = buf.useA? capA() : capB();
+    cap = buf.useA? capA() : capB();
     auto idx = m_end.load() % cap;
     mem[idx] = val;
-
-    //if( buf.useA ){
-    //  auto idx = m_end.load() % capA();
-    //  ((T*)m_memA.load())[idx] = val;
-    //}else{ 
-    //  auto idx = m_end.load() % capB();
-    //  ((T*)m_memB.load())[idx] = val;
-    //}
 
     incEnd();
 
     return buf;
-  }
-  bool              pop(T& ret) const
-  {
-    // this will need to copy the element indexed by m_cur, 
-    // then make sure the index (which will only increase) hasn't changed while incrementing the start
-
-    StBuf prev, buf;
-    au64* abuf = (au64*)&m_buf.asInt;
-    auto    en = m_end.load();
-    prev = buf = loadBuf();
-
-    if( size(buf) == 0 ) return false;
-
-    u64 idx = 0;
-    u64 cap = buf.useA? capA() : capB();
-    if( buf.useA ){
-      idx = buf.st % cap;
-      //m_refA.fetch_add(1);
-        ret = atA(idx);
-      //m_refA.fetch_add(-1);
-    }else{ 
-      idx = buf.st % cap;
-      //m_refB.fetch_add(1);
-        ret = atB(idx);
-      //m_refB.fetch_add(-1);
-    }
-
-    buf.st += 1;
-    bool ok = abuf->compare_exchange_strong(prev.asInt, buf.asInt);
-
-    //if(buf.useA)
-    //  m_refA.fetch_add(-1);
-    //else
-    //  m_refB.fetch_add(-1);
-
-    //auto endDif = m_end.load() - en;  // The buf struct could be the same if the bit was flipped twice, though if that happened, m_end would have been incremented by at least <capacity> amount to make that happen - does sz need to be incremented by the new capacity so that it wraps around to the same spot yet is a different number?
-    //if(endDif > cap) ok = false;
-
-    assert( (ret < 1000000 && ret >= 0) || !ok);
-
-    return ok;
-  }
-  T          atA(u64 i) const
-  {
-    auto mem = m_memA.addrIncRef();
-      T ret = mem[i];
-    m_memA.subRef();
-    return ret;
-
-    //return ((T*)m_memA.load())[i];
-  }
-  T          atB(u64 i)  const
-  {
-    auto mem = m_memB.addrIncRef();
-      T ret = mem[i];
-    m_memB.subRef();
-    return ret;
-    //return ((T*)m_memB.load())[i];
   }
 };
 
@@ -2230,10 +2195,43 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//if( m_memA==(u64)nullptr && m_memB==(u64)nullptr ){
+//
+//m_memA.store( (u64)m_alloc(capA() * sizeof(T)) );    // initial allocation
 
+//m_refA.fetch_add(1);
+//m_refA.fetch_add(-1);
+//m_refB.fetch_add(1);
+//m_refB.fetch_add(-1);
+//
+//if(buf.useA)
+//  m_refA.fetch_add(-1);
+//else
+//  m_refB.fetch_add(-1);
+//
+//auto endDif = m_end.load() - en;  // The buf struct could be the same if the bit was flipped twice, though if that happened, m_end would have been incremented by at least <capacity> amount to make that happen - does sz need to be incremented by the new capacity so that it wraps around to the same spot yet is a different number?
+//if(endDif > cap) ok = false;
 
+//return ((T*)m_memA.load())[i];
+//
+//return ((T*)m_memB.load())[i];
 
+//if(buf.useA){
+//  auto cap = capA();
+//}else{
+//}
+//
+//auto cap   = buf.useA? capA() : capB();        // buf.st can be changed here because even if it wraps around and causes a reader to see the same buf.st despite other threads having executed reads, the buffer bit will change, so the compare_exchange in the reader thread will fail
+//buf.st     = cap? buf.st % cap  :  0;
 
+//au64          m_memA = 0;
+//au64          m_memB = 0;
+//
+//mutable ai32  m_refA = 0;
+//mutable ai32  m_refB = 0;
+
+//
+//#define _SCL_SECURE_NO_WARNINGS
 
 //buf.st     =  buf.useA? buf.st % capA()  :  buf.st % capB();        // buf.st can be changed here because even if it wraps around and causes a reader to see the same buf.st despite other threads having executed reads, the buffer bit will change, so the compare_exchange in the reader thread will fail
 //
@@ -2266,6 +2264,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
 //  nxtMem[nxtIdx] = atA(prevIdx);          // only this thread can change anything, so no other thread should interfere with the actual data
 //}
 
+// 
 //switchBuffers();                                       // this has to make sure that the start and end stay the same, but the current thread is the only one that can change the buffer bit or the end. 
 
 //m_memB.store( (u64)nxtAlloc );                       // 1
