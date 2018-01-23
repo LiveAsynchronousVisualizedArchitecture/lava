@@ -1540,7 +1540,7 @@ void PrintAB(LavaQ& q, str label="")
     ++i;
   }
 
-  str sB = "B:  ";
+  str sB = "\nB:  ";
   //TO(q.capB(),i) sB += toString(q.atB(i)," ");
   i=0;
   while(i < q.capB()){
@@ -1567,23 +1567,23 @@ ENTRY_DECLARATION // main or winmain
   LavaQ q(malloc, free);
   bool running = true; 
   vector<thread> qthrds;
-  //TO(1,i)
-  //{
-  //  qthrds.emplace_back([i, &q, &running](){
-  //    while( running )
-  //    {
-  //      int val;
-  //      bool ok = q.pop(val);
-  //      if(ok){
-  //        //PrintAB(q, toString("thread ",i) );
-  //        //Println(i,": ",val,"\n");
-  //        //assert(val > 0);
-  //      }
-  //      //this_thread::sleep_for( 0ms );
-  //    }
-  //  });
-  //}
-  TO(5,i){
+  TO(11,i)
+  {
+    qthrds.emplace_back([i, &q, &running](){
+      while( running )
+      {
+        int val;
+        bool ok = q.pop(val);
+        if(ok){
+          //PrintAB(q, toString("thread ",i) );
+          //Println(i,": ",val,"\n");
+          //assert(val > 0);
+        }
+        this_thread::sleep_for( 0ms );
+      }
+    });
+  }
+  TO(500,i){
     q.push(i);
     //PrintAB(q);
     //Println();

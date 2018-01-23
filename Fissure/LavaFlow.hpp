@@ -123,7 +123,7 @@ struct LavaQ
   };
 
 //private:
-  const u32 INITIAL_CAPACITY = 3;
+  const u32 INITIAL_CAPACITY = 1;
 
   AllocFunc    m_alloc = nullptr;
   FreeFunc      m_free = nullptr;
@@ -194,17 +194,14 @@ struct LavaQ
     au64* abuf = (au64*)&m_buf.asInt;
     do{
       prev = buf =  loadBuf();
-      if(buf.useA){
-        auto cap = capA();
-      }else{
-      }
-      auto cap   = buf.useA? capA() : capB();        // buf.st can be changed here because even if it wraps around and causes a reader to see the same buf.st despite other threads having executed reads, the buffer bit will change, so the compare_exchange in the reader thread will fail
-      buf.st     = cap? buf.st % cap  :  0;
-      //buf.st     =  buf.useA? buf.st % capA()  :  buf.st % capB();        // buf.st can be changed here because even if it wraps around and causes a reader to see the same buf.st despite other threads having executed reads, the buffer bit will change, so the compare_exchange in the reader thread will fail
+      //if(buf.useA){
+      //  auto cap = capA();
+      //}else{
+      //}
+
+      //auto cap   = buf.useA? capA() : capB();        // buf.st can be changed here because even if it wraps around and causes a reader to see the same buf.st despite other threads having executed reads, the buffer bit will change, so the compare_exchange in the reader thread will fail
+      //buf.st     = cap? buf.st % cap  :  0;
       buf.useA   = !buf.useA;
-      //u64  cap   =  buf.useA?  capA() : capB();
-      //if(buf.useA){ buf.st += cap; }  // when switching to buffer A, make buf.st wrap fully around so that a double buffer switch still creates a different StBuf struct
-      //buf.st += buf.useA? capA() : capB();
     }while( !abuf->compare_exchange_strong(prev.asInt, buf.asInt) );
 
     return prev;
@@ -241,7 +238,7 @@ struct LavaQ
 
     T* nxtAddr = (T*)nxtAlloc;
     T* prvAddr = prevMem.addr();
-    auto   en = m_end.load();
+    auto    en = m_end.load();
     for(u64 i=buf.st; i<en; ++i){                          // other threads can increment buf.st, but that should only mean some of the copied elements have already been popped and not cause an actual problem
       auto prevIdx = i % prevCap;
       auto  nxtIdx = i % nxtCap;
@@ -273,6 +270,7 @@ struct LavaQ
       m_capB.store(m_capA.load() + 1);                                // since capacity is stored as a power of 2 instead of an absolute number, only add 1 instead of bitshifting 1 over  
       expand(buf, m_memA, m_memB, capA(), capB() );
     }else{
+      m_capA.store(m_capB.load() + 1);                                // since capacity is stored as a power of 2 instead of an absolute number, only add 1 instead of bitshifting 1 over  
       expand(buf, m_memB, m_memA, capB(), capA() );
     }
 
@@ -2236,6 +2234,12 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+//buf.st     =  buf.useA? buf.st % capA()  :  buf.st % capB();        // buf.st can be changed here because even if it wraps around and causes a reader to see the same buf.st despite other threads having executed reads, the buffer bit will change, so the compare_exchange in the reader thread will fail
+//
+//u64  cap   =  buf.useA?  capA() : capB();
+//if(buf.useA){ buf.st += cap; }  // when switching to buffer A, make buf.st wrap fully around so that a double buffer switch still creates a different StBuf struct
+//buf.st += buf.useA? capA() : capB();
 
 //auto    curCap = m_capA.load();
 //m_capB.store(curCap + 1);                                // since capacity is stored as a power of 2 instead of an absolute number, only add 1 instead of bitshifting 1 over  
