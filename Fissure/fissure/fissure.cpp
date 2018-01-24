@@ -166,7 +166,9 @@
 //       | -test - fix blank output
 //       | -take out m_capA and m_capB
 // -todo: profile LavaQ
+// -todo: profile LavaQ with only one thread calling pop()
 
+// todo: template LavaQ
 // todo: test LavaQ across shared library borders
 // todo: make packets be emitted (lava_send() ?) instead of simply returned
 // todo: change cur() functions to const and rename to read()
@@ -1588,7 +1590,7 @@ ENTRY_DECLARATION // main or winmain
   LavaQ q(LavaHeapAlloc, LavaHeapFree);
   bool running = true; 
   vector<thread> qthrds;
-  TO(11,i)
+  TO(1,i)
   {
     qthrds.emplace_back([i, &q, &running](){
       while( running )
@@ -1604,28 +1606,30 @@ ENTRY_DECLARATION // main or winmain
       }
     });
   }
-  TO(3000000,i){
+  TO(1000000,i){
     q.push(i);
 
     //PrintAB(q);
     //Println();
   }
 
+  //Println("left over size: ", q.size());
+
   //PrintAB(q, "Main Thread");
 
-  while( q.size() > 0 )
-    this_thread::sleep_for( 0ms );
+  //while( q.size() > 0 )
+  //  this_thread::sleep_for( 0ms );
 
   running = false;
   for(auto& t : qthrds){
     t.join();
   }
 
-  int val = 0;
-  while( q.size() > 0 ){
-    bool ok = q.pop( val );
-    Print(val," ");
-  }
+  //int val = 0;
+  //while( q.size() > 0 ){
+  //  bool ok = q.pop( val );
+  //  Print(val," ");
+  //}
 
   Println("\n\n");
 

@@ -1,5 +1,6 @@
 
 // todo: write about design of LavaQ including that it is lock free, uses contiguous memory, does not rely on pointers and small allocations, and doesn't need versions since the start and end only increment - when a reader is reading a value, it can be sure that the buffer underneath hasn't been switched twice, because that would require inserting more values, which would increment end.... but end isn't atomicly linked to the start index - does switching buffers need to add the absolute capacity to both start and end ? 
+// todo: use the capacity as a power of two exponent directly so that the modulo operator is avoided - would this mean masking with ~(0xFF << cap) to isolate the bits below the exponent as 0, then flipping all the bits so only the bit below the exponent are 1s, then applying bitwise AND to have only those bits from st and m_end ?
 
 // idea: make pop into a template that can try to pull out a variable amount of values at one time
 // idea: try using realloc with LavaQ 
