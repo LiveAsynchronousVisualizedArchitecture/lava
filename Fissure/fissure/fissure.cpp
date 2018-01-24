@@ -159,16 +159,14 @@
 // -todo: reset buf.st if it gets bigger than double capacity - not neccesary when not using extra increment tricks
 // -todo: clean unused line out of LavaQ again
 // -todo: test LavaQ with explicity malloc and free + thread local allocations - free needed to use the stored function pointer in m_free in 3 different places
-
-// todo: put capacity into StBuf, since the array index is the combination of the constantly incrementing st variable and the capacity of that buffer
+// -todo: put capacity into StBuf, since the array index is the combination of the constantly incrementing st variable and the capacity of that buffer
 //       | -change StBuf to have 6 bits for capacity
 //       | -make push / expand put capacity into StBuf
 //       | -make pop use the StBuf capacity
-//       | test - fix blank output
-//       | take out m_capA and m_capB
-// todo: try using realloc with LavaQ - does the windows thread local heap have a realloc function? - it does - the realloc function would need to be optional and there will need to be two different paths depending on whether the realloc function is nullptr or not
-// todo: write about design of LavaQ including that it is lock free, uses contiguous memory, does not rely on pointers and small allocations, and doesn't need versions since the start and end only increment - when a reader is reading a value, it can be sure that the buffer underneath hasn't been switched twice, because that would require inserting more values, which would increment end.... but end isn't atomicly linked to the start index - does switching buffers need to add the absolute capacity to both start and end ? 
-// todo: profile LavaQ
+//       | -test - fix blank output
+//       | -take out m_capA and m_capB
+// -todo: profile LavaQ
+
 // todo: test LavaQ across shared library borders
 // todo: make packets be emitted (lava_send() ?) instead of simply returned
 // todo: change cur() functions to const and rename to read()
@@ -1583,7 +1581,6 @@ ENTRY_DECLARATION // main or winmain
   b.useA = 1;
   Println(a.asInt,"   ",b.asInt);
 
-
   LavaHeapInit();
 
   Println("\n\n");
@@ -1607,13 +1604,14 @@ ENTRY_DECLARATION // main or winmain
       }
     });
   }
-  TO(3000,i){
+  TO(3000000,i){
     q.push(i);
 
     //PrintAB(q);
     //Println();
   }
-  PrintAB(q, "Main Thread");
+
+  //PrintAB(q, "Main Thread");
 
   while( q.size() > 0 )
     this_thread::sleep_for( 0ms );

@@ -1,4 +1,13 @@
 
+// todo: write about design of LavaQ including that it is lock free, uses contiguous memory, does not rely on pointers and small allocations, and doesn't need versions since the start and end only increment - when a reader is reading a value, it can be sure that the buffer underneath hasn't been switched twice, because that would require inserting more values, which would increment end.... but end isn't atomicly linked to the start index - does switching buffers need to add the absolute capacity to both start and end ? 
+
+// idea: make pop into a template that can try to pull out a variable amount of values at one time
+// idea: try using realloc with LavaQ 
+//       | windows has a thread local heap have a realloc function
+//       | the realloc function would need to be optional and there will need to be two different paths depending on whether the realloc function is nullptr or not 
+//       | the realloc copying could be tricky, might need to fill the new slots in the buffer 
+//       | if a new buffer is double the size of the old, the wrapped part of the buffer could simply be appended, but what does it mean for the only increasing m_end and st variables? 
+//       | there should be an offset of the st and m_end wrapped around the previous buffer to the same numbers wrapped around the current buffer - after the all the elements are in one contiguous line, if the span moves backwards, start from the st and move it backwards, if the span moves everything forwards, start at the end and move it forwards - would the C lib memmove work?
 
 #ifdef _MSC_VER
   #pragma once
@@ -125,8 +134,6 @@ struct LavaQ
 
   AllocFunc    m_alloc = nullptr;
   FreeFunc      m_free = nullptr;
-  au8           m_capA = 0;                             // capacity will always be a power of two
-  au8           m_capB = 0;                             // capacity will always be a power of two
   au64           m_end = 0;
   RefMem        m_memA;
   RefMem        m_memB;
@@ -141,9 +148,6 @@ struct LavaQ
     m_buf.useA = 0;
     m_buf.st   = 0;
     m_buf.cap  = 0;
-
-    //m_buf.en   = 0;
-    //m_end = 0;
 
     #ifndef _NDEBUG
       writeThrd = std::this_thread::get_id();
@@ -182,28 +186,11 @@ struct LavaQ
     ret.asInt = ((au64*)&m_buf.asInt)->load();
     return ret;
   }
-  u64              capA() const
-  {
-    // use functions for getting capacity, since it will always be a power of two, and thus will never be over 64, let alone the 255 that a u8 can store
-    assert(m_capA < 64);
-    return (1 << m_capA.load()) >> 1;
-  }
-  u64              capB() const
-  {
-    // use functions for getting capacity, since it will always be a power of two, and thus will never be over 64, let alone the 255 that a u8 can store
-    assert(m_capB < 64);
-    return (1 << m_capB.load()) >> 1;
-  }
   u64              size(StBuf buf) const
   { 
-    //auto cap = buf.useA? capA() : capB();
-    //if(cap==0) return 0;
-
     if(buf.cap == 0) return 0;
  
     auto cap = Capacity(buf.cap);
-    //auto  st = buf.st % cap;
-    //auto  en = m_end>cap? (((m_end-1)%cap)+1)%cap  :  m_end;
     auto  st = buf.st;
     auto  en = m_end.load();
 
@@ -236,15 +223,6 @@ struct LavaQ
       ret = atB(idx);
     }
 
-    //u64 cap = buf.useA? capA() : capB();
-    //if( buf.useA ){
-    //  idx = buf.st % cap;
-    //    ret = atA(idx);
-    //}else{ 
-    //  idx = buf.st % cap;
-    //    ret = atB(idx);
-    //}
-
     buf.st += 1;
     bool ok = abuf->compare_exchange_strong(prev.asInt, buf.asInt);
 
@@ -275,7 +253,7 @@ struct LavaQ
 
   StBuf   switchBuffers(u64 nxtCapExp)
   {
-    // it doesn't matter if the start and end have changed when copying the memory from one buffer to the other, since the reading threads will only increment the start
+    // It doesn't matter if the start and end have changed when copying the memory from one buffer to the other, since the reading threads will only increment the start
     StBuf prev, buf;
     au64* abuf = (au64*)&m_buf.asInt;
     do{
@@ -380,11 +358,11 @@ struct LavaQ
     return buf;
   }
 
-  static u64 Capacity(u64 capExp)          // capExp is capacity exponent
+  static u64   Capacity(u64 capExp)          // capExp is capacity exponent
   {
     return (1 << capExp) >> 1;
   }
-  static u64 Idx(StBuf buf)
+  static u64        Idx(StBuf buf)
   {
     return buf.st % Capacity(buf.cap);
   }
@@ -456,14 +434,14 @@ inline void    LavaHeapDestroyCallback(void* heapHnd)
   if(heapHnd)
     HeapDestroy(heapHnd);
 }
-inline void*   LavaHeapInit(size_t initialSz = 0)
+inline void*      LavaHeapInit(size_t initialSz = 0)
 {
   if(!lava_thread_heap) {
     lava_thread_heap = HeapCreate(HEAP_NO_SERIALIZE, initialSz, 0);
   }
   return lava_thread_heap;
 }
-inline void*   LavaHeapAlloc(size_t sz)
+inline void*     LavaHeapAlloc(size_t sz)
 {
   void* thread_heap = LavaHeapInit(sz);
 
@@ -473,17 +451,18 @@ inline void*   LavaHeapAlloc(size_t sz)
 
   return ret;
 }
-//inline int     LavaHeapFree(void* memptr)
-//{
-//  void* thread_heap = LavaHeapInit();
-//
-//  void* ret = nullptr;
-//  if(thread_heap && memptr) {
-//    auto ret = HeapFree(thread_heap, HEAP_NO_SERIALIZE, memptr);
-//    return ret;
-//  }else{ return 0; }
-//}
-inline void     LavaHeapFree(void* memptr)
+inline void*   LavaHeapReAlloc(void* memptr, size_t sz)
+{
+  void* thread_heap = LavaHeapInit(sz);
+
+  // HeapReAlloc has exception codes that can be checked and put in to a thread local error code
+  void* ret = nullptr;
+  if(thread_heap)
+    ret = HeapReAlloc(thread_heap, HEAP_REALLOC_IN_PLACE_ONLY|HEAP_NO_SERIALIZE, memptr, sz);
+
+  return ret;
+}
+inline void       LavaHeapFree(void* memptr)
 {
   void* thread_heap = LavaHeapInit();
 
@@ -493,6 +472,7 @@ inline void     LavaHeapFree(void* memptr)
     //return ret;
   }//else{ return 0; }
 }
+
 
 template <class T> struct  ThreadAllocator
 {
@@ -2235,9 +2215,50 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//inline int     LavaHeapFree(void* memptr)
+//{
+//  void* thread_heap = LavaHeapInit();
+//
+//  void* ret = nullptr;
+//  if(thread_heap && memptr) {
+//    auto ret = HeapFree(thread_heap, HEAP_NO_SERIALIZE, memptr);
+//    return ret;
+//  }else{ return 0; }
+//}
 
+//au8           m_capA = 0;                             // capacity will always be a power of two
+//au8           m_capB = 0;                             // capacity will always be a power of two
+//
+//m_buf.en   = 0;
+//m_end = 0;
+//
+//u64              capA() const
+//{
+//  // use functions for getting capacity, since it will always be a power of two, and thus will never be over 64, let alone the 255 that a u8 can store
+//  assert(m_capA < 64);
+//  return (1 << m_capA.load()) >> 1;
+//}
+//u64              capB() const
+//{
+//  // use functions for getting capacity, since it will always be a power of two, and thus will never be over 64, let alone the 255 that a u8 can store
+//  assert(m_capB < 64);
+//  return (1 << m_capB.load()) >> 1;
+//}
 
+//u64 cap = buf.useA? capA() : capB();
+//if( buf.useA ){
+//  idx = buf.st % cap;
+//    ret = atA(idx);
+//}else{ 
+//  idx = buf.st % cap;
+//    ret = atB(idx);
+//}
 
+//auto cap = buf.useA? capA() : capB();
+//if(cap==0) return 0;
+//
+//auto  st = buf.st % cap;
+//auto  en = m_end>cap? (((m_end-1)%cap)+1)%cap  :  m_end;
 
 //static u64 Capacity(StBuf buf)
 //{
