@@ -158,10 +158,16 @@
 // -todo: think of a way to make sure that the buffer can't be double flipped during a read - can m_end be checked to see if it hasn't increased by the capacity before the read? - if the buffers have been switched twice, that means that m_end must have been incremented by at least the current capacity, to make that happen - maybe an idea for later
 // -todo: reset buf.st if it gets bigger than double capacity - not neccesary when not using extra increment tricks
 // -todo: clean unused line out of LavaQ again
+// -todo: test LavaQ with explicity malloc and free + thread local allocations - free needed to use the stored function pointer in m_free in 3 different places
 
 // todo: put capacity into StBuf, since the array index is the combination of the constantly incrementing st variable and the capacity of that buffer
-// todo: test LavaQ with explicity malloc and free + thread local allocations
-// todo: write about design of LavaQ including that it is lock free, wait free, and doesn't need versions since the start and end only increment - when a reader is reading a value, it can be sure that the buffer underneath hasn't been switched twice, because that would require inserting more values, which would increment end.... but end isn't atomicly linked to the start index - does switching buffers need to add the absolute capacity to both start and end ? 
+//       | -change StBuf to have 6 bits for capacity
+//       | -make push / expand put capacity into StBuf
+//       | -make pop use the StBuf capacity
+//       | test - fix blank output
+//       | take out m_capA and m_capB
+// todo: try using realloc with LavaQ - does the windows thread local heap have a realloc function? - it does - the realloc function would need to be optional and there will need to be two different paths depending on whether the realloc function is nullptr or not
+// todo: write about design of LavaQ including that it is lock free, uses contiguous memory, does not rely on pointers and small allocations, and doesn't need versions since the start and end only increment - when a reader is reading a value, it can be sure that the buffer underneath hasn't been switched twice, because that would require inserting more values, which would increment end.... but end isn't atomicly linked to the start index - does switching buffers need to add the absolute capacity to both start and end ? 
 // todo: profile LavaQ
 // todo: test LavaQ across shared library borders
 // todo: make packets be emitted (lava_send() ?) instead of simply returned
@@ -183,6 +189,7 @@
 // todo: integrate type into LavaMem instead of as part of the LavaMem struct so that it can be queried externally
 // todo: try to unify nanogui into a single file?
 // todo: try to unify nfd into a single file ? 
+// todo: make LavaHeapFree use a thread local variable for the errors instead of a return value, so that it's signature will match with free
 
 // todo: make input slots start at 0 - does there need to be a separation between input and out slots or does there need to be an offset so that the input frame starts at 0 
 // todo: convert tbl to use arrays of the data types smaller than 64 bits
@@ -1535,21 +1542,31 @@ void              debug_coords(v2 a)
 
 void PrintAB(LavaQ& q, str label="")
 {
-  str sA = "A:  ";
   //TO(q.capA(),i) sA += toString(q.atA(i)," ");
+  //while(i < q.capA()){
+  //
+  //TO(q.capB(),i) sB += toString(q.atB(i)," ");
+  //while(i < q.capB()){
+
+  str sA = "A:  ";
   int i=0;
-  while(i < q.capA()){
-    sA += toString(q.atA(i)," ");
-    ++i;
-  }
+  auto  buf = q.m_buf;
+  auto capA =  buf.useA? LavaQ::Capacity(buf.cap) : LavaQ::Capacity(buf.cap-1);
+  auto capB = !buf.useA? LavaQ::Capacity(buf.cap) : LavaQ::Capacity(buf.cap-1);
+
+  if(q.m_memA.addr() != nullptr)
+    while(i < capA ){
+      sA += toString(q.atA(i)," ");
+      ++i;
+    }
 
   str sB = "\nB:  ";
-  //TO(q.capB(),i) sB += toString(q.atB(i)," ");
   i=0;
-  while(i < q.capB()){
-    sB += toString(q.atB(i)," ");
-    ++i;
-  }
+  if(q.m_memB.addr() != nullptr)
+    while(i < capB){
+      sB += toString(q.atB(i)," ");
+      ++i;
+    }
 
   Println(label,":\n",sA,"\n",sB,"\n");
 }
@@ -1558,16 +1575,20 @@ ENTRY_DECLARATION // main or winmain
 {
   using namespace std;
   
-  //Println("sizeof(LavaQ::StEnBuf): ", sizeof(LavaQ::StBuf));
-  //LavaQ::StBuf a, b;
-  //a.st   = 0;
-  //a.useA = 1;
-  //b.st   = 2000;
-  //b.useA = 1;
-  //Println(a.asInt,"   ",b.asInt);
+  Println("sizeof(LavaQ::StEnBuf): ", sizeof(LavaQ::StBuf));
+  LavaQ::StBuf a, b;
+  a.st   = 0;
+  a.useA = 1;
+  b.st   = 2000;
+  b.useA = 1;
+  Println(a.asInt,"   ",b.asInt);
+
+
+  LavaHeapInit();
 
   Println("\n\n");
-  LavaQ q(malloc, free);
+  //LavaQ q(malloc, free);
+  LavaQ q(LavaHeapAlloc, LavaHeapFree);
   bool running = true; 
   vector<thread> qthrds;
   TO(11,i)
@@ -1586,8 +1607,9 @@ ENTRY_DECLARATION // main or winmain
       }
     });
   }
-  TO(5000,i){
+  TO(3000,i){
     q.push(i);
+
     //PrintAB(q);
     //Println();
   }
