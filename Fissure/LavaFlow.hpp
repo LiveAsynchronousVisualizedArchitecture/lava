@@ -51,14 +51,15 @@
   namespace fs = std::experimental::filesystem;
 #endif
 
-struct LavaQ
+//struct LavaQ
+template<class T> struct LavaQ
 {
 // single producer, multi-consumer queue
 // Design: Two buffers with a single 64 bit atomic that contains which buffer to use as well as the start and end of the queue
 // Two function pointers contain the allocation and deallocation functions to use so that the data structure can cross and shared library boundary
 
 //public:
-  using         T = int;
+  //using         T = int;
   using      Tptr = T*;
   using      aPtr = std::atomic<T*>;
   using       u64 = uint64_t;

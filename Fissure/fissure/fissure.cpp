@@ -1540,7 +1540,7 @@ void              debug_coords(v2 a)
 //    }
 //}
 
-void PrintAB(LavaQ& q, str label="")
+void PrintAB(LavaQ<int>& q, str label="")
 {
   //TO(q.capA(),i) sA += toString(q.atA(i)," ");
   //while(i < q.capA()){
@@ -1551,8 +1551,8 @@ void PrintAB(LavaQ& q, str label="")
   str sA = "A:  ";
   int i=0;
   auto  buf = q.m_buf;
-  auto capA =  buf.useA? LavaQ::Capacity(buf.cap) : LavaQ::Capacity(buf.cap-1);
-  auto capB = !buf.useA? LavaQ::Capacity(buf.cap) : LavaQ::Capacity(buf.cap-1);
+  auto capA =  buf.useA? LavaQ<int>::Capacity(buf.cap) : LavaQ<int>::Capacity(buf.cap-1);
+  auto capB = !buf.useA? LavaQ<int>::Capacity(buf.cap) : LavaQ<int>::Capacity(buf.cap-1);
 
   if(q.m_memA.addr() != nullptr)
     while(i < capA ){
@@ -1575,8 +1575,8 @@ ENTRY_DECLARATION // main or winmain
 {
   using namespace std;
   
-  Println("sizeof(LavaQ::StEnBuf): ", sizeof(LavaQ::StBuf));
-  LavaQ::StBuf a, b;
+  Println("sizeof(LavaQ::StEnBuf): ", sizeof(LavaQ<int>::StBuf));
+  LavaQ<int>::StBuf a, b;
   a.st   = 0;
   a.useA = 1;
   b.st   = 2000;
@@ -1587,7 +1587,7 @@ ENTRY_DECLARATION // main or winmain
 
   Println("\n\n");
   //LavaQ q(malloc, free);
-  LavaQ q(LavaHeapAlloc, LavaHeapFree);
+  LavaQ<int> q(LavaHeapAlloc, LavaHeapFree);
   bool running = true; 
   vector<thread> qthrds;
   TO(1,i)
@@ -1606,7 +1606,7 @@ ENTRY_DECLARATION // main or winmain
       }
     });
   }
-  TO(1000000,i){
+  TO(100,i){
     q.push(i);
 
     //PrintAB(q);
