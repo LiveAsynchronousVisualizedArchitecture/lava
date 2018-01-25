@@ -228,7 +228,7 @@ template<class T> struct LavaQ
     buf.st += 1;
     bool ok = abuf->compare_exchange_strong(prev.asInt, buf.asInt);
 
-    assert( (ret < 1000000 && ret >= 0) || !ok);
+    //assert( (ret < 1000000 && ret >= 0) || !ok);
 
     return ok;
   }
@@ -329,7 +329,7 @@ template<class T> struct LavaQ
   {
     assert(std::this_thread::get_id() == writeThrd);
 
-    assert(val < 1000000 && val >= 0);
+    //assert(val < 1000000 && val >= 0);
 
     // This increment the end m_end variable, which sits at one beyond the last index, just like STL iterators
     // T must be dealt with by value and can be arbitrary sized because there won't be multiple writing threads - writes don't need to be atomic, just write into the unused slot and increment m_end
@@ -560,10 +560,12 @@ using lava_nidMap        =  std::unordered_multimap<std::string, uint64_t>;     
 using lava_flowPtrs      =  std::unordered_set<LavaNode*>;                                // LavaFlowNode pointers referenced uniquely by address instead of using an id
 using lava_ptrsvec       =  std::vector<LavaNode*>;
 using lava_nameNodeMap   =  std::unordered_map<std::string, LavaNode*>;                   // maps the node names to their pointers
+using lava_threadQ       =  LavaQ<LavaOut>;
+//using lava_threadQ       =  LavaQ<LavaPacket>;
 //using lava_threadQ       =  std::queue<LavaPacket, std::vector<LavaPacket,ThreadAllocator<LavaPacket>> >;
 //using lava_threadQ       =  std::queue<LavaOut, std::vector<LavaOut,ThreadAllocator<LavaOut>> >;
 //using lava_threadQ       =  std::queue<LavaOut, std::deque<LavaOut,ThreadAllocator<LavaOut>> >;
-using lava_threadQ       =  std::queue<LavaOut, std::deque<LavaOut> >;
+//using lava_threadQ       =  std::queue<LavaOut, std::deque<LavaOut> >;
 
 //extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaVal*, LavaOut*);   // data flow node function
 //extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaFrame*, LavaOut*);   // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
@@ -1944,8 +1946,10 @@ LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t ni
       //TO(lp.outputs,i)
       while(outArgs->size() > 0)
       {
-        LavaOut outArg = outArgs->front();
-        outArgs->pop();
+        LavaOut outArg;
+        if( !outArgs->pop(outArg) ){ continue; }
+        //LavaOut outArg = outArgs->front();
+        //outArgs->pop();
         //if(outArgs[i].type == LavaArgType::NONE){ continue; }
 
         // create new value for the new packet
@@ -2077,14 +2081,14 @@ void               LavaLoop(LavaFlow& lf) noexcept
   using namespace std;
   const LavaOut defOut = { LavaArgType::NONE, 0, 0, 0, 0 };
 
-  LavaHeapInit();
-
-  lava_memvec ownedMem;
-
   lf.incThreadCount();
 
-  LavaVal      inArgs[LAVA_ARG_COUNT];              // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
+  LavaHeapInit();
+  lava_memvec    ownedMem;
+  //LavaQ<LavaPacket>  outQ;
   lava_threadQ   outQ;                              // queue of the output arguments
+
+  LavaVal      inArgs[LAVA_ARG_COUNT];              // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
   LavaFrame   inFrame;
   LavaFrame    runFrm;
   LavaOut     outArgs[LAVA_ARG_COUNT];              // if the arguments are going to 

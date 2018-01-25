@@ -145,7 +145,8 @@ const u32 TITLE_MAX_LEN = 256;
 //  return toString(a) + toString(args...);
 //}
 
-#include "../nanovg_test/str_util.hpp"
+//#include "../nanovg_test/str_util.hpp"
+#include "../../../str_util.hpp"
 void printdb(simdb const& db)
 {
   using namespace std;

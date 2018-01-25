@@ -167,8 +167,13 @@
 //       | -take out m_capA and m_capB
 // -todo: profile LavaQ
 // -todo: profile LavaQ with only one thread calling pop()
+// -todo: template LavaQ
+// -todo: test std::queue - about 3 times faster to only push() 100 million integers
+// -todo: compile with LavaQ instead of std::queue
+// -todo: integrate MakeCube into fissure to try out the new LavaQ
 
-// todo: template LavaQ
+// todo: make a node to transform the cube from MakeCube
+// todo: visualize both nodes 
 // todo: test LavaQ across shared library borders
 // todo: make packets be emitted (lava_send() ?) instead of simply returned
 // todo: change cur() functions to const and rename to read()
@@ -1587,31 +1592,35 @@ ENTRY_DECLARATION // main or winmain
 
   Println("\n\n");
   //LavaQ q(malloc, free);
+  queue<int> stdQ;
   LavaQ<int> q(LavaHeapAlloc, LavaHeapFree);
   bool running = true; 
   vector<thread> qthrds;
-  TO(1,i)
-  {
-    qthrds.emplace_back([i, &q, &running](){
-      while( running )
-      {
-        int val;
-        bool ok = q.pop(val);
-        if(ok){
-          //PrintAB(q, toString("thread ",i) );
-          //Println(i,": ",val,"\n");
-          //assert(val > 0);
-        }
-        //this_thread::sleep_for( 0ms );
-      }
-    });
-  }
-  TO(100,i){
+  //TO(1,i)
+  //{
+  //  qthrds.emplace_back([i, &q, &running](){
+  //    while( running )
+  //    {
+  //      int val;
+  //      bool ok = q.pop(val);
+  //      if(ok){
+  //        //PrintAB(q, toString("thread ",i) );
+  //        //Println(i,": ",val,"\n");
+  //        //assert(val > 0);
+  //      }
+  //      //this_thread::sleep_for( 0ms );
+  //    }
+  //  });
+  //}
+  TO(10,i){
     q.push(i);
+
+    //stdQ.push(i);
 
     //PrintAB(q);
     //Println();
   }
+
 
   //Println("left over size: ", q.size());
 
