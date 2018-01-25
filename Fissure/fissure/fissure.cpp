@@ -172,8 +172,11 @@
 // -todo: compile with LavaQ instead of std::queue
 // -todo: integrate MakeCube into fissure to try out the new LavaQ
 // -todo: make packets be emitted (lava_send() ?) instead of simply returned
+// -todo: define a const LavaNodeEnd
 
-// todo: make template visual studio project file
+// -todo: make template visual studio project file
+
+// todo: embed visual studio template and node cpp template
 // todo: make a node to transform the cube from MakeCube
 // todo: visualize both nodes 
 // todo: test LavaQ across shared library borders
@@ -1583,67 +1586,69 @@ ENTRY_DECLARATION // main or winmain
 {
   using namespace std;
   
-  Println("sizeof(LavaQ::StEnBuf): ", sizeof(LavaQ<int>::StBuf));
-  LavaQ<int>::StBuf a, b;
-  a.st   = 0;
-  a.useA = 1;
-  b.st   = 2000;
-  b.useA = 1;
-  Println(a.asInt,"   ",b.asInt);
+  SECTION(LavaQ test)
+  {
+    //Println("sizeof(LavaQ::StEnBuf): ", sizeof(LavaQ<int>::StBuf));
+    //LavaQ<int>::StBuf a, b;
+    //a.st   = 0;
+    //a.useA = 1;
+    //b.st   = 2000;
+    //b.useA = 1;
+    //Println(a.asInt,"   ",b.asInt);
 
-  LavaHeapInit();
+    //LavaHeapInit();
 
-  Println("\n\n");
-  //LavaQ q(malloc, free);
-  queue<int> stdQ;
-  LavaQ<int> q(LavaHeapAlloc, LavaHeapFree);
-  bool running = true; 
-  vector<thread> qthrds;
-  //TO(1,i)
-  //{
-  //  qthrds.emplace_back([i, &q, &running](){
-  //    while( running )
-  //    {
-  //      int val;
-  //      bool ok = q.pop(val);
-  //      if(ok){
-  //        //PrintAB(q, toString("thread ",i) );
-  //        //Println(i,": ",val,"\n");
-  //        //assert(val > 0);
-  //      }
-  //      //this_thread::sleep_for( 0ms );
-  //    }
-  //  });
-  //}
-  TO(10,i){
-    q.push(i);
+    //Println("\n\n");
+    ////LavaQ q(malloc, free);
+    //queue<int> stdQ;
+    //LavaQ<int> q(LavaHeapAlloc, LavaHeapFree);
+    //bool running = true; 
+    //vector<thread> qthrds;
+    //TO(1,i)
+    //{
+    //  qthrds.emplace_back([i, &q, &running](){
+    //    while( running )
+    //    {
+    //      int val;
+    //      bool ok = q.pop(val);
+    //      if(ok){
+    //        //PrintAB(q, toString("thread ",i) );
+    //        //Println(i,": ",val,"\n");
+    //        //assert(val > 0);
+    //      }
+    //      //this_thread::sleep_for( 0ms );
+    //    }
+    //  });
+    //}
+    //TO(10,i){
+    //  q.push(i);
 
-    //stdQ.push(i);
+    //  //stdQ.push(i);
 
-    //PrintAB(q);
-    //Println();
+    //  //PrintAB(q);
+    //  //Println();
+    //}
+
+    //Println("left over size: ", q.size());
+
+    //PrintAB(q, "Main Thread");
+
+    //while( q.size() > 0 )
+    //  this_thread::sleep_for( 0ms );
+
+    //running = false;
+    //for(auto& t : qthrds){
+    //  t.join();
+    //}
+
+    //int val = 0;
+    //while( q.size() > 0 ){
+    //  bool ok = q.pop( val );
+    //  Print(val," ");
+    //}
+
+    //Println("\n\n");
   }
-
-
-  //Println("left over size: ", q.size());
-
-  //PrintAB(q, "Main Thread");
-
-  //while( q.size() > 0 )
-  //  this_thread::sleep_for( 0ms );
-
-  running = false;
-  for(auto& t : qthrds){
-    t.join();
-  }
-
-  //int val = 0;
-  //while( q.size() > 0 ){
-  //  bool ok = q.pop( val );
-  //  Print(val," ");
-  //}
-
-  Println("\n\n");
 
 	NVGcontext* vg = NULL;
   SECTION(initialization)

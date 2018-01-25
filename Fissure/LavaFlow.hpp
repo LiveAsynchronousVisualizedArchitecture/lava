@@ -869,6 +869,7 @@ struct    LavaCommand
 };
 // end data types
 
+const LavaNode LavaNodeListEnd = {nullptr, (uint64_t)LavaNode::NONE, nullptr, nullptr, nullptr, nullptr, nullptr, 0};
 
 extern "C" __declspec(dllexport) LavaNode* GetLavaFlowNodes();   // prototype of function to return static plugin loading struct
 // end function declarations
@@ -1729,7 +1730,6 @@ void                printdb(simdb const& db)
     putc(memv[i] ,stdout);
   }
 }
-
 void           PrintLavaMem(LavaMem lm)
 {
   printf("\n addr: %llu  data addr: %llu  ref count: %llu   size bytes: %llu \n", 
@@ -1895,9 +1895,6 @@ void                 LavaFree(uint64_t addr)
   //free(p);
   LavaHeapFree(p);
 }
-
-//uint64_t      exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaVal* inArgs, LavaOut* outArgs)
-//uint64_t                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaVal* inArgs,  LavaOut* outArgs) noexcept   // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
 
 LavaInst::State exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaFrame* inFrame, lava_threadQ* outArgs) // LavaOut* outArgs)
 {
@@ -2220,6 +2217,9 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+//uint64_t      exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaVal* inArgs, LavaOut* outArgs)
+//uint64_t                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaVal* inArgs,  LavaOut* outArgs) noexcept   // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
 
 //inline int     LavaHeapFree(void* memptr)
 //{

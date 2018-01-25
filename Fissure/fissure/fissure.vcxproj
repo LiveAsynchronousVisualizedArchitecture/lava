@@ -144,6 +144,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\nanovg\nanovg.c" />
+    <ClCompile Include="FissureStatic.cpp" />
     <ClCompile Include="glew.c">
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">CompileAsC</CompileAs>
       <CompileAs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">CompileAsC</CompileAs>
@@ -195,7 +196,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\LavaFlow.hpp" />
-    <ClInclude Include="..\nanovg-master\example\demo.h" />
     <ClInclude Include="..\nanovg-master\src\fontstash.h" />
     <ClInclude Include="..\nanovg-master\src\nanovg.h" />
     <ClInclude Include="..\nanovg-master\src\nanovg_gl.h" />

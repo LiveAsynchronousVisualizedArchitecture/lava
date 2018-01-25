@@ -9,66 +9,6 @@
 struct vert { f32 p[3],n[3],c[4],tx[2]; };
 using IvTbl = tbl<vert>;
 
-//void Print(vert const& v)
-//{
-//  Print("p: ",    v.p[0],  " ", v.p[1], " ", v.p[2]);
-//  Print("  n: ",  v.n[0],  " ", v.n[1], " ", v.n[2]);
-//  Print("  c: ",  v.c[0],  " ", v.c[1], " ", v.c[2], " ", v.c[3]);
-//  Print("  tx: ", v.tx[0], " ", v.tx[1]);
-//  Println();
-//}
-//
-//template<class T> void PrintTbl(tbl<T> const& t)
-//{
-//  Println();
-//  i8* memst = (i8*)t.memStart();
-//  Println("tbl check: ", memst[0]," ",memst[1]); 
-//  Println("owned: ",      t.owned(),
-//    " sizeBytes: ",       t.sizeBytes(),
-//    " capacity: ",        t.capacity(), 
-//    " size: ",            t.size(),  "\n",
-//    " map_capacity: ",    t.map_capacity(),
-//    " elems: ",           t.elems(), "\n",
-//    " child_capacity: ",  t.child_capacity(),
-//    " childData: ",       t.childData() );
-//
-//  Println();
-//  Println("-map-");
-//  auto e = t.elemStart();
-//  TO(t.map_capacity(),i) if( !e[i].isEmpty() ){
-//    Print("hash: ", e[i].hsh.hash);
-//    Print("  k: ", e[i].key, "   v: ", e[i].val);
-//    Print("  type: ", e[i].hsh.type, "  ");
-//    if(e[i].hsh.type & HshType::TABLE)   Print("TABLE ");
-//    if(e[i].hsh.type & HshType::CHILD)   Print("CHILD ");
-//    if(e[i].hsh.type & HshType::INTEGER) Print("INTEGER ");
-//    Println();
-//  }
-//  Println();
-//}
-//
-//void Print(tbl<u32> const& t)
-//{
-//  PrintTbl(t);
-//
-//  Println("-array-");
-//  TO(t.size(),i){
-//    Print(t[i], " ");
-//  }
-//  Println();
-//}
-//
-//void Print(IvTbl const& iv)
-//{
-//  PrintTbl(iv);
-//
-//  Println("-array-");
-//  TO(iv.size(),i){
-//    Print(iv[i]);
-//  }
-//  Println();
-//}
-
 extern "C"
 {
   const char* OutNames[]  = {"Cube Indexed Verts", nullptr};
@@ -166,6 +106,65 @@ extern "C"
 
 
 
+//void Print(vert const& v)
+//{
+//  Print("p: ",    v.p[0],  " ", v.p[1], " ", v.p[2]);
+//  Print("  n: ",  v.n[0],  " ", v.n[1], " ", v.n[2]);
+//  Print("  c: ",  v.c[0],  " ", v.c[1], " ", v.c[2], " ", v.c[3]);
+//  Print("  tx: ", v.tx[0], " ", v.tx[1]);
+//  Println();
+//}
+//
+//template<class T> void PrintTbl(tbl<T> const& t)
+//{
+//  Println();
+//  i8* memst = (i8*)t.memStart();
+//  Println("tbl check: ", memst[0]," ",memst[1]); 
+//  Println("owned: ",      t.owned(),
+//    " sizeBytes: ",       t.sizeBytes(),
+//    " capacity: ",        t.capacity(), 
+//    " size: ",            t.size(),  "\n",
+//    " map_capacity: ",    t.map_capacity(),
+//    " elems: ",           t.elems(), "\n",
+//    " child_capacity: ",  t.child_capacity(),
+//    " childData: ",       t.childData() );
+//
+//  Println();
+//  Println("-map-");
+//  auto e = t.elemStart();
+//  TO(t.map_capacity(),i) if( !e[i].isEmpty() ){
+//    Print("hash: ", e[i].hsh.hash);
+//    Print("  k: ", e[i].key, "   v: ", e[i].val);
+//    Print("  type: ", e[i].hsh.type, "  ");
+//    if(e[i].hsh.type & HshType::TABLE)   Print("TABLE ");
+//    if(e[i].hsh.type & HshType::CHILD)   Print("CHILD ");
+//    if(e[i].hsh.type & HshType::INTEGER) Print("INTEGER ");
+//    Println();
+//  }
+//  Println();
+//}
+//
+//void Print(tbl<u32> const& t)
+//{
+//  PrintTbl(t);
+//
+//  Println("-array-");
+//  TO(t.size(),i){
+//    Print(t[i], " ");
+//  }
+//  Println();
+//}
+//
+//void Print(IvTbl const& iv)
+//{
+//  PrintTbl(iv);
+//
+//  Println("-array-");
+//  TO(iv.size(),i){
+//    Print(iv[i]);
+//  }
+//  Println();
+//}
 
 //void* outmem = inout_lp->mem_alloc(lftTri.sizeBytes());
 //memcpy(outmem, lftTri.memStart(), lftTri.sizeBytes());

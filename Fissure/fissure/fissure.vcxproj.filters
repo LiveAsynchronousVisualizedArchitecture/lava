@@ -146,6 +146,9 @@
     <ClCompile Include="..\nanovg\nanovg.c">
       <Filter>Source Files\libs</Filter>
     </ClCompile>
+    <ClCompile Include="FissureStatic.cpp">
+      <Filter>Source Files\unified</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="glfw_3.2.1.h">
@@ -153,9 +156,6 @@
     </ClInclude>
     <ClInclude Include="glew_2.0.0.h">
       <Filter>libh</Filter>
-    </ClInclude>
-    <ClInclude Include="..\nanovg-master\example\demo.h">
-      <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="vec.hpp">
       <Filter>hpp</Filter>
