@@ -171,11 +171,14 @@
 // -todo: test std::queue - about 3 times faster to only push() 100 million integers
 // -todo: compile with LavaQ instead of std::queue
 // -todo: integrate MakeCube into fissure to try out the new LavaQ
+// -todo: make packets be emitted (lava_send() ?) instead of simply returned
 
+// todo: make template visual studio project file
 // todo: make a node to transform the cube from MakeCube
 // todo: visualize both nodes 
 // todo: test LavaQ across shared library borders
-// todo: make packets be emitted (lava_send() ?) instead of simply returned
+// todo: draw a number inside the slot
+// todo: popup the slots string name in the status bar
 // todo: change cur() functions to const and rename to read()
 // todo: change opp() functions to non-const only and rename to write()
 // todo: figure out a way to have a reader count with lava.graph - is an atomic hash map inevitable? 
