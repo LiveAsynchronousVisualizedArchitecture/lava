@@ -173,10 +173,10 @@
 // -todo: integrate MakeCube into fissure to try out the new LavaQ
 // -todo: make packets be emitted (lava_send() ?) instead of simply returned
 // -todo: define a const LavaNodeEnd
-
 // -todo: make template visual studio project file
+// -todo: embed visual studio template and node cpp template
 
-// todo: embed visual studio template and node cpp template
+// todo: make a button to create a node directory, project and cpp file
 // todo: make a node to transform the cube from MakeCube
 // todo: visualize both nodes 
 // todo: test LavaQ across shared library borders
@@ -356,6 +356,7 @@
 #include <unordered_set>
 #include <algorithm>
 #include <thread>
+#include <regex>
 #include "nfd.h"
 #include "jzon.h"
 #include "vec.hpp"
@@ -1709,12 +1710,20 @@ ENTRY_DECLARATION // main or winmain
       fd.ui.keyWin   = new Window(&fd.ui.screen,    "");
       auto spcr1     = new  Label(fd.ui.keyWin,     "");
       auto spcr2     = new  Label(fd.ui.keyWin,     "");
-      auto spcr3     = new  Label(fd.ui.keyWin,     "");
+      //auto spcr3     = new  Label(fd.ui.keyWin,     "");
       auto loadBtn   = new Button(fd.ui.keyWin,      "Load");
       auto saveBtn   = new Button(fd.ui.keyWin,      "Save");
       auto playBtn   = new Button(fd.ui.keyWin,    "Play >");
       auto pauseBtn  = new Button(fd.ui.keyWin,  "Pause ||");
       auto stopBtn   = new Button(fd.ui.keyWin,  "Stop |_|");
+      auto nodeBtn   = new Button(fd.ui.keyWin,  "Create Node");
+      auto nodeTxt   = new TextBox(fd.ui.keyWin,  "");
+
+      //nodeTxt->setWidth(800);
+      nodeTxt->setEditable(true);
+      nodeTxt->setFixedWidth(250);
+      nodeTxt->setAlignment(TextBox::Alignment::Left);
+      fd.ui.keyWin->setLayout(fd.ui.keyLay);
 
       playBtn->setBackgroundColor(  Color(e3f(.15f, .2f,  .15f)) ); 
       pauseBtn->setBackgroundColor( Color(e3f(.2f,  .2f,  .15f)) ); 
@@ -1759,6 +1768,14 @@ ENTRY_DECLARATION // main or winmain
       stopBtn->setCallback([playBtn](){
         stopFlowThreads();
         playBtn->setEnabled(true);
+      });
+      nodeBtn->setCallback([nodeTxt](){
+        regex whtSpc("[ |\t]+");
+        str nxtStr = regex_replace( nodeTxt->value(), whtSpc, "_"); 
+
+        Println("nodeTxt: ", nodeTxt->value());
+        nodeTxt->setValue( nxtStr );
+
       });
 
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
@@ -1859,7 +1876,7 @@ ENTRY_DECLARATION // main or winmain
     //Println();
 
     //decltype(std::unordered_map<int,int>::begin()) 
-    Println("sizeof( std::unordered_map<int,int>::iterator ) ): ",  sizeof( std::unordered_map<int,int>::iterator ) );
+    //Println("sizeof( std::unordered_map<int,int>::iterator ) ): ",  sizeof( std::unordered_map<int,int>::iterator ) );
 
     //AtomicBitset ab;
     //Println("  slot 0: ", (bool)ab[0], " : ", (char*)ab.toStr().bitstr );
