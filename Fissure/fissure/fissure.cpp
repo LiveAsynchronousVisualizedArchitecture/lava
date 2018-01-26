@@ -175,13 +175,17 @@
 // -todo: define a const LavaNodeEnd
 // -todo: make template visual studio project file
 // -todo: embed visual studio template and node cpp template
+// -todo: make a button to create a node directory, project and cpp file
 
-// todo: make a button to create a node directory, project and cpp file
+// todo: replace the node name in the cpp file with |_NAME_|
+// todo: use regex to substitute the node name into the cpp and project files 
 // todo: make a node to transform the cube from MakeCube
 // todo: visualize both nodes 
 // todo: test LavaQ across shared library borders
 // todo: draw a number inside the slot
 // todo: popup the slots string name in the status bar
+// todo: expand the margin around flow nodes so that the slots don't obscure the text
+// todo: draw node names after the slots so the text is on top?
 // todo: change cur() functions to const and rename to read()
 // todo: change opp() functions to non-const only and rename to write()
 // todo: figure out a way to have a reader count with lava.graph - is an atomic hash map inevitable? 
@@ -239,6 +243,7 @@
 //       |  use a union of bytes that is filled with the frame, slot, list index?
 //       |  use malloc addresses initially
 
+// idea: build guard pages into Lava heap allocations that can be set to non read or write - use these to crash if memory is read or written out of bounds 
 // idea: make a table creation and editing GUI
 // idea: make a dialog to set a compilation command for each node - think about debug and release modes, different OSs - set the current working directory to the node directory path
 // idea: when turning off a slot, take it out, delete it, and put it back under a name with 'OFF: ' as a prefix
@@ -320,6 +325,9 @@
 //   | Node graph visualizations, tests and notes treated specially with the ability to be hidden
 //   | Packet queueing based on cache and memory heirarchies - look in a queue for the physical core, then whatever shares the L2 cache, L3 cache, and finally the same NUMA node - special queue structure needed that will automatically use this heirarchy by being specifically structured around it - need to weigh importance of having the absolute correct ordering versus using the memory heirarchy as effectivly as possible - maybe the memory heirarchy is the most important, but would out of order frames cause problems? possibly only if message passing nodes did not make sure to process the frames they recieve in order - would this end up being a tree structure of queues
 
+
+#include "FissureStatic.cpp"
+
 // glew might include windows.h
 #define  WIN32_LEAN_AND_MEAN
 #define  NOMINMAX
@@ -357,6 +365,7 @@
 #include <algorithm>
 #include <thread>
 #include <regex>
+#include <filesystem>
 #include "nfd.h"
 #include "jzon.h"
 #include "vec.hpp"
@@ -364,11 +373,17 @@
 #include "../Transform.h"
 #include "FissureDecl.h"
 
+namespace fs = std::experimental::filesystem;
+
 //using Id      = LavaId;
 using vec_ids = std::vector<LavaId>;
 
 static FisData    fd;
 static simdb   fisdb;
+
+//extern "C" const char const* Template_cpp;
+//extern "C" const char const* Template_vcxproj;
+
 
 namespace{
 
@@ -1586,6 +1601,7 @@ void PrintAB(LavaQ<int>& q, str label="")
 ENTRY_DECLARATION // main or winmain
 {
   using namespace std;
+  using namespace fs;
   
   SECTION(LavaQ test)
   {
@@ -1770,12 +1786,32 @@ ENTRY_DECLARATION // main or winmain
         playBtn->setEnabled(true);
       });
       nodeBtn->setCallback([nodeTxt](){
-        regex whtSpc("[ |\t]+");
-        str nxtStr = regex_replace( nodeTxt->value(), whtSpc, "_"); 
-
         Println("nodeTxt: ", nodeTxt->value());
-        nodeTxt->setValue( nxtStr );
 
+        regex whiteSpace("[ |\t]+");
+        regex whiteSpaceTrail("[ |\t]+$");
+
+        str nodeName = nodeTxt->value();
+        nodeName = regex_replace( nodeName, whiteSpaceTrail, ""); 
+        nodeName = regex_replace( nodeName, whiteSpace, "_"); 
+
+        nodeTxt->setValue( nodeName );
+
+        create_directory(nodeName);
+        str      cppFile = nodeName+"/"+nodeName+".cpp";
+        str   vcprojFile = nodeName+"/"+nodeName+".vcxproj";
+        
+        FILE*    cppHndl = fopen(cppFile.c_str(),    "wb");
+        if(!cppHndl) return;
+
+        FILE* vcprojHndl = fopen(vcprojFile.c_str(), "wb");
+        if(!vcprojHndl) return;
+
+        fwrite(Template_cpp,     1, strlen(Template_cpp)+1,        cppHndl);
+        fwrite(Template_vcxproj, 1, strlen(Template_vcxproj)+1, vcprojHndl);
+
+        fclose(cppHndl);
+        fclose(vcprojHndl);
       });
 
       fd.ui.keyWin->setLayout(fd.ui.keyLay);

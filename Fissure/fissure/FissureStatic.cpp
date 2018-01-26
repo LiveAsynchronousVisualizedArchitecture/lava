@@ -1,6 +1,8 @@
 
+extern "C"
+{
 
-static const char* Template_vcxproj = ""
+static const char const* Template_vcxproj = ""
 "<?xml version=\"1.0\" encoding=\"utf-8\"?>"
 "<Project DefaultTargets=\"Build\">"
 "  <ItemGroup Label=\"ProjectConfigurations\">"
@@ -79,7 +81,7 @@ static const char* Template_vcxproj = ""
 "";
 
 
-static const char* Template_cpp = ""
+static const char const* Template_cpp = ""
 "#include \"../../no_rt_util.h\""
 "#include \"../../tbl.hpp\""
 "#include \"../LavaFlow.hpp\""
@@ -130,3 +132,5 @@ static const char* Template_cpp = ""
 "  }"
 "}"
 "";
+
+}
