@@ -30,9 +30,9 @@ extern "C"
   LavaNode LavaNodes[] =
   {
     {
-      TemplateTest,                                  // function
+      |_NAME_|,                                      // function
       LavaNode::MSG,                                 // node_type  
-      "TemplateTest",                                // name
+      "|_NAME_|",                                    // name
       InNames,                                       // in_names
       OutNames,                                      // out_names
       InTypes,                                       // in_types 

@@ -176,9 +176,13 @@
 // -todo: make template visual studio project file
 // -todo: embed visual studio template and node cpp template
 // -todo: make a button to create a node directory, project and cpp file
+// -todo: fix vc proj xml 
+// -todo: replace the node name in the cpp file with |_NAME_|
+// -todo: use regex to substitute the node name into the cpp and project files 
+// -todo: put |_NAME_| in for cpp file in the project file
+// -todo: put |_NAME_| in for the function name in cpp file
 
-// todo: replace the node name in the cpp file with |_NAME_|
-// todo: use regex to substitute the node name into the cpp and project files 
+// todo: make errors in the directory creation give an error in the status bar 
 // todo: make a node to transform the cube from MakeCube
 // todo: visualize both nodes 
 // todo: test LavaQ across shared library borders
@@ -375,15 +379,10 @@
 
 namespace fs = std::experimental::filesystem;
 
-//using Id      = LavaId;
 using vec_ids = std::vector<LavaId>;
 
 static FisData    fd;
 static simdb   fisdb;
-
-//extern "C" const char const* Template_cpp;
-//extern "C" const char const* Template_vcxproj;
-
 
 namespace{
 
@@ -1726,7 +1725,6 @@ ENTRY_DECLARATION // main or winmain
       fd.ui.keyWin   = new Window(&fd.ui.screen,    "");
       auto spcr1     = new  Label(fd.ui.keyWin,     "");
       auto spcr2     = new  Label(fd.ui.keyWin,     "");
-      //auto spcr3     = new  Label(fd.ui.keyWin,     "");
       auto loadBtn   = new Button(fd.ui.keyWin,      "Load");
       auto saveBtn   = new Button(fd.ui.keyWin,      "Save");
       auto playBtn   = new Button(fd.ui.keyWin,    "Play >");
@@ -1735,7 +1733,6 @@ ENTRY_DECLARATION // main or winmain
       auto nodeBtn   = new Button(fd.ui.keyWin,  "Create Node");
       auto nodeTxt   = new TextBox(fd.ui.keyWin,  "");
 
-      //nodeTxt->setWidth(800);
       nodeTxt->setEditable(true);
       nodeTxt->setFixedWidth(250);
       nodeTxt->setAlignment(TextBox::Alignment::Left);
@@ -1785,7 +1782,8 @@ ENTRY_DECLARATION // main or winmain
         stopFlowThreads();
         playBtn->setEnabled(true);
       });
-      nodeBtn->setCallback([nodeTxt](){
+      nodeBtn->setCallback([nodeTxt]()
+      {
         Println("nodeTxt: ", nodeTxt->value());
 
         regex whiteSpace("[ |\t]+");
@@ -1797,18 +1795,24 @@ ENTRY_DECLARATION // main or winmain
 
         nodeTxt->setValue( nodeName );
 
-        create_directory(nodeName);
-        str      cppFile = nodeName+"/"+nodeName+".cpp";
-        str   vcprojFile = nodeName+"/"+nodeName+".vcxproj";
+        str     nodeDir = "../" + nodeName;
+        create_directory(nodeDir);
+        str      cppPth = nodeDir+"/"+nodeName+".cpp";
+        str   vcprojPth = nodeDir+"/"+nodeName+".vcxproj";
+        //str      cppPth = "../"+nodeName+"/"+nodeName+".cpp";
+        //str   vcprojPth = "../"+nodeName+"/"+nodeName+".vcxproj";
         
-        FILE*    cppHndl = fopen(cppFile.c_str(),    "wb");
+        FILE*    cppHndl = fopen(cppPth.c_str(),    "wb");
         if(!cppHndl) return;
 
-        FILE* vcprojHndl = fopen(vcprojFile.c_str(), "wb");
+        FILE* vcprojHndl = fopen(vcprojPth.c_str(), "wb");
         if(!vcprojHndl) return;
 
-        fwrite(Template_cpp,     1, strlen(Template_cpp)+1,        cppHndl);
-        fwrite(Template_vcxproj, 1, strlen(Template_vcxproj)+1, vcprojHndl);
+        str    cppFile = regex_replace( Template_cpp,     regex("\\|_NAME_\\|"), nodeName);
+        str vcprojFile = regex_replace( Template_vcxproj, regex("\\|_NAME_\\|"), nodeName);
+
+        fwrite(cppFile.c_str(),     1, cppFile.length(),        cppHndl);                   // don't want to write the '\0' null character at the end of the string into the file
+        fwrite(vcprojFile.c_str(),  1, vcprojFile.length(),  vcprojHndl);
 
         fclose(cppHndl);
         fclose(vcprojHndl);
@@ -2459,6 +2463,17 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//using Id      = LavaId;
+//
+//extern "C" const char const* Template_cpp;
+//extern "C" const char const* Template_vcxproj;
+//
+//auto spcr3     = new  Label(fd.ui.keyWin,     "");
+//
+//nodeTxt->setWidth(800);
+//
+//fwrite(Template_cpp,     1, strlen(Template_cpp)+1,        cppHndl);
+//fwrite(Template_vcxproj, 1, strlen(Template_vcxproj)+1, vcprojHndl);
 
 //Print("A:  ");
 //TO(q.capA(),i) Print(q.atA(i)," ");
