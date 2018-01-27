@@ -9,7 +9,7 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MakeCube", "MakeCube\MakeCu
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ReadFile", "ReadFile\ReadFile.vcxproj", "{6F77CA43-083C-440C-AF01-CF24BAE5A7AD}"
 EndProject
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "NewNodeTest", "NewNodeTest\NewNodeTest.vcxproj", "{51244A73-98D0-45BD-BACD-B58113E0A182}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TfmCube", "TfmCube\TfmCube.vcxproj", "{51244A73-98D0-45BD-BACD-B58113E0A182}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

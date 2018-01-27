@@ -24,6 +24,7 @@
 #include <memory>
 #include <thread>
 #include <mutex>
+#include <array>
 #include <string>
 #include <queue>
 #include <stack>
@@ -475,7 +476,6 @@ inline void       LavaHeapFree(void* memptr)
   }//else{ return 0; }
 }
 
-
 template <class T> struct  ThreadAllocator
 {
   using value_type  =  T;
@@ -618,7 +618,13 @@ struct   AtomicBitset
 
     return h;
   }
-  u8        count() const  // make x an atomic load
+  bool operator[](u64 bit) const
+  {
+    au64* abits = (au64*)(&bits);
+    u64    bits = abits->load();
+    return (bool) ((bits >> bit) & 0x1);
+  }
+  u8        count()        const  // make x an atomic load
   {
     auto x = bits;
     u64 m1 = 0x5555555555555555ll;
@@ -731,18 +737,19 @@ struct      LavaFrame
 {
   enum FRAME { ERR_FRAME = 0xFFFFFFFFFFFFFFFE, NO_FRAME = 0xFFFFFFFFFFFFFFFF };
   static const u64 PACKET_SLOTS = 16;
-  //using Slots = std::atomic<std::bitset<PACKET_SLOTS>>;
-  //using Slots = std::bitset<PACKET_SLOTS>;
-  using Slots = AtomicBitset;
+
+  using       Slots = AtomicBitset;
+  using PacketArray = std::array<LavaPacket, PACKET_SLOTS>;
 
   u64                dest = LavaId::NODE_NONE;             // The destination node this frame will be run with
   u64               frame = 0;                             // The numer of this frame - lowest frame needs to be run first
   u64           src_frame = 0;                             // Does this need to come from the message node?
   u64          dest_frame = 0;                             // should this come from the node instance?
-  Slots          slotMask;// = 0;                             // The bit mask respresenting which slots already have packets in them
+  Slots          slotMask;                                 // The bit mask respresenting which slots already have packets in them
 
-  u16               slots = 0;                           // The total number of slots needed for this frame to be complete 
-  LavaPacket      packets[PACKET_SLOTS];
+  u16               slots = 0;                             // The total number of slots needed for this frame to be complete 
+  PacketArray     packets;
+  //LavaPacket      packets[PACKET_SLOTS];
 
   bool          putSlot(u64 sIdx, LavaPacket const& pkt)
   {
@@ -1961,7 +1968,8 @@ LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t ni
         //LavaMem mem = LavaMem::fromDataAddr(outArgs[i].value);
         //PrintLavaMem(mem);
         LavaMem  mem = LavaMem::fromDataAddr(outArg.value);
-        auto szBytes = mem.sizeBytes();
+        // todo: deal with mem being 0 here
+        auto szBytes = outArg.value? mem.sizeBytes()  :  0;
 
         // create new packet 
         LavaPacket basePkt;
@@ -2076,21 +2084,20 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow)
 void               LavaLoop(LavaFlow& lf) noexcept
 {
   using namespace std;
-  const LavaOut defOut = { LavaArgType::NONE, 0, 0, 0, 0 };
+  //const LavaOut defOut = { LavaArgType::NONE, 0, 0, 0, 0 };
 
   lf.incThreadCount();
 
   LavaHeapInit();
   lava_memvec    ownedMem;
-  //LavaQ<LavaPacket>  outQ;
   lava_threadQ   outQ;                              // queue of the output arguments
 
   LavaVal      inArgs[LAVA_ARG_COUNT];              // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
   LavaFrame   inFrame;
   LavaFrame    runFrm;
-  LavaOut     outArgs[LAVA_ARG_COUNT];              // if the arguments are going to 
+  //LavaOut     outArgs[LAVA_ARG_COUNT];              // if the arguments are going to 
   memset(inArgs, 0, sizeof(inArgs) );
-  TO(LAVA_ARG_COUNT,i){ outArgs[i] = defOut; }      // memset(outArgs, 0, sizeof(outArgs) );
+  //TO(LAVA_ARG_COUNT,i){ outArgs[i] = defOut; }      // memset(outArgs, 0, sizeof(outArgs) );
 
   while(lf.m_running)
   {    
@@ -2217,6 +2224,11 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//
+//LavaQ<LavaPacket>  outQ;
+
+//using Slots = std::atomic<std::bitset<PACKET_SLOTS>>;
+//using Slots = std::bitset<PACKET_SLOTS>;
 
 //uint64_t      exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaVal* inArgs, LavaOut* outArgs)
 //uint64_t                runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaVal* inArgs,  LavaOut* outArgs) noexcept   // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue

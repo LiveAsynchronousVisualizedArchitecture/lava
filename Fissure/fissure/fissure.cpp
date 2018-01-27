@@ -181,11 +181,18 @@
 // -todo: use regex to substitute the node name into the cpp and project files 
 // -todo: put |_NAME_| in for cpp file in the project file
 // -todo: put |_NAME_| in for the function name in cpp file
+// -todo: make slot mask have a const operator[]
+// -todo: use std::array for static packet array so that it can be iterated through 
 
-// todo: make errors in the directory creation give an error in the status bar 
+// todo: make assert to check if the mem in nullptr
+// todo: visualize packets being created
+// todo: visualize packets being routed
+// todo: make a node that passes cube through
 // todo: make a node to transform the cube from MakeCube
 // todo: visualize both nodes 
 // todo: test LavaQ across shared library borders
+// todo: make errors in the directory creation give an error in the status bar 
+// todo: make list of nodes a side window, right click menu, hot box, etc
 // todo: draw a number inside the slot
 // todo: popup the slots string name in the status bar
 // todo: expand the margin around flow nodes so that the slots don't obscure the text
@@ -247,7 +254,7 @@
 //       |  use a union of bytes that is filled with the frame, slot, list index?
 //       |  use malloc addresses initially
 
-// idea: build guard pages into Lava heap allocations that can be set to non read or write - use these to crash if memory is read or written out of bounds 
+// idea: build guard pages into Lava heap allocations that can be set to non read or write - use these to crash if memory is read or written out of bounds - maybe do this only in debug mode
 // idea: make a table creation and editing GUI
 // idea: make a dialog to set a compilation command for each node - think about debug and release modes, different OSs - set the current working directory to the node directory path
 // idea: when turning off a slot, take it out, delete it, and put it back under a name with 'OFF: ' as a prefix
