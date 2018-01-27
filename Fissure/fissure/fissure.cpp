@@ -184,6 +184,7 @@
 // -todo: make slot mask have a const operator[]
 // -todo: use std::array for static packet array so that it can be iterated through 
 
+// todo: clean up comments in LavaFlow.hpp
 // todo: make assert to check if the mem in nullptr
 // todo: visualize packets being created
 // todo: visualize packets being routed
