@@ -188,10 +188,10 @@
 // -todo: expand the margin around flow nodes so that the slots don't obscure the text - need to make the node width dependant on the text bounds in the first place
 // -todo: visualize packets at outputs and frames at inputs/nodes? - packets already are on slots, and the 'current node' highlights should represent a frame being run
 // -todo: visualize packets being created - halos around slots for all packets in the queue
+// -todo: calc text size + margins before node drawing so that bounding boxes are correct (for both selection and slot drawing)
 
-// todo: calc text size + margins before node drawing so that bounding boxes are correct (for both selection and slot drawing)
-// todo: make packets visualize on slots circles stack as concentric circles or as portions/segments of a single circle 
 // todo: put total outstanding packet size (in bytes) in the status bar
+// todo: make packets visualize on slots circles stack as concentric circles or as portions/segments of a single circle 
 // todo: make a node that passes cube through
 // todo: make assert to check if the mem in nullptr - make a debug function for the end of a node that has its body empty in release mode
 // todo: make a node to transform the cube from MakeCube
@@ -738,7 +738,21 @@ auto            node_add(str node_name, Node n) -> uint64_t
 }
 Bnd             node_bnd(NVGcontext* vg, Node const&  n)
 {
-  f32 x=n.P.x, y=n.P.y, w=n.b.w(), h=n.b.h();
+  using namespace std;
+  
+  //f32 x=n.P.x, y=n.P.y, w=n.b.w(), h=n.b.h();
+  //Bnd b;
+  //b = { x, y, x+w, y+h };
+  //return b;
+
+  f32   txtsz = fd.graph.textSize;
+  f32 wMargin = fd.graph.textMarginW;
+  nvgFontSize(vg, txtsz);
+  nvgFontFace(vg, "sans-bold");
+  f32      tw = nvgTextBounds(vg, 0,0, n.txt.c_str(), NULL, NULL);
+  f32       w = max<float>(n.b.w(), tw + wMargin);
+
+  f32 x=n.P.x, y=n.P.y, h=n.b.h();
   Bnd b;
   b = { x, y, x+w, y+h };
 

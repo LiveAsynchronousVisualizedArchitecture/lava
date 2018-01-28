@@ -241,6 +241,7 @@ struct FisData
 
     // text
     f32            textSize  =  18.f;  //18.f;
+    f32         textMarginW  =  50.f; 
 
     // graph colors
     NVGcolor        lineClr  =  nvgRGBAf(.04f, .04f, .04f, 1.f);
