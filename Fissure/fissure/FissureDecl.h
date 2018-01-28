@@ -235,13 +235,15 @@ struct FisData
     NodeOrder          ordr;       // ordr is orders 
     Slots             slots;       // 
 
-    u64             curNode = LavaNode::NODE_ERROR;
+    u64             curNode = LavaNode::NODE_ERROR;              // information from the running lava graph for visualization in the GUI
+    u64        qPacketBytes = 0;
     vec_slt     packetSlots;
     //u64       curNode = 1;
 
     // text
     f32            textSize  =  18.f;  //18.f;
-    f32         textMarginW  =  50.f; 
+    f32         textMarginW  =  55.f; 
+    f32         textMarginH  =  35.f; 
 
     // graph colors
     NVGcolor        lineClr  =  nvgRGBAf(.04f, .04f, .04f, 1.f);

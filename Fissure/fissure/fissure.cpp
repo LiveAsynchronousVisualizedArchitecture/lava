@@ -189,11 +189,14 @@
 // -todo: visualize packets at outputs and frames at inputs/nodes? - packets already are on slots, and the 'current node' highlights should represent a frame being run
 // -todo: visualize packets being created - halos around slots for all packets in the queue
 // -todo: calc text size + margins before node drawing so that bounding boxes are correct (for both selection and slot drawing)
+// -todo: fix play being grayed out on pause
+// -todo: put total outstanding packet size (in bytes) in the status bar
+// -todo: make nodes a little fatter or slots offset a little more from the edge
 
-// todo: put total outstanding packet size (in bytes) in the status bar
+// todo: make assert to check if the mem in nullptr - make a debug function for the end of a node that has its body empty in release mode
+// todo: fix packet sz_bytes parameter
 // todo: make packets visualize on slots circles stack as concentric circles or as portions/segments of a single circle 
 // todo: make a node that passes cube through
-// todo: make assert to check if the mem in nullptr - make a debug function for the end of a node that has its body empty in release mode
 // todo: make a node to transform the cube from MakeCube
 // todo: visualize both nodes 
 // todo: test LavaQ across shared library borders
@@ -216,7 +219,6 @@
 // todo: make right click or space bar open up a text box that can contain the build command, stats and/or hotbox
 // todo: make shared libraries loaded after the GUI
 // todo: make shared libraries only try to load one per frame
-// todo: make nodes a little fatter or slots offset a little more from the edge
 // todo: integrate type into LavaMem instead of as part of the LavaMem struct so that it can be queried externally
 // todo: try to unify nanogui into a single file?
 // todo: try to unify nfd into a single file ? 
@@ -747,12 +749,15 @@ Bnd             node_bnd(NVGcontext* vg, Node const&  n)
 
   f32   txtsz = fd.graph.textSize;
   f32 wMargin = fd.graph.textMarginW;
+  f32 hMargin = fd.graph.textMarginH;
   nvgFontSize(vg, txtsz);
   nvgFontFace(vg, "sans-bold");
-  f32      tw = nvgTextBounds(vg, 0,0, n.txt.c_str(), NULL, NULL);
+  f32 txtBnds[4];
+  f32      tw = nvgTextBounds(vg, 0,0, n.txt.c_str(), NULL, txtBnds);
   f32       w = max<float>(n.b.w(), tw + wMargin);
+  f32       h = max<float>(n.b.h(), (txtBnds[3]-txtBnds[1]) + hMargin );  // nvgTextBounds puts minx, miny, maxx, maxy in the txtBnds float array
 
-  f32 x=n.P.x, y=n.P.y, h=n.b.h();
+  f32 x=n.P.x, y=n.P.y; // h=n.b.h();
   Bnd b;
   b = { x, y, x+w, y+h };
 
@@ -1812,8 +1817,9 @@ ENTRY_DECLARATION // main or winmain
         playBtn->setEnabled(false);
         startFlowThreads(1);
       });
-      pauseBtn->setCallback([](){
+      pauseBtn->setCallback([playBtn](){
         stopFlowThreads();
+        playBtn->setEnabled(true);
       });
       stopBtn->setCallback([playBtn](){
         stopFlowThreads();
@@ -2007,6 +2013,8 @@ ENTRY_DECLARATION // main or winmain
         fd.flow.m_qLck.lock();
           if(fd.flow.q.size() > 0){
             auto& pckt = fd.flow.q.top();
+            fd.graph.qPacketBytes = 0;
+            fd.graph.qPacketBytes += pckt.sz_bytes;
             slts.emplace_back( pckt.dest_node, pckt.dest_slot );
             slts.emplace_back( pckt.src_node, pckt.src_slot );
           }
@@ -2142,7 +2150,7 @@ ENTRY_DECLARATION // main or winmain
           f64 totalTime = timeToSeconds(fd.lgrph.totalTime());
 
           if(nid.nid == LavaId::NODE_NONE){
-            fd.ui.statusTxt->setValue("");
+            fd.ui.statusTxt->setValue( toString("Queued Packets: ",fd.graph.qPacketBytes," bytes") );
           }else if(slotRtClk){
             fd.ui.statusTxt->setValue( toString(" right click on slot ") );
           }else if(isInSlot){
