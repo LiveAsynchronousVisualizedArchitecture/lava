@@ -558,14 +558,7 @@ using lava_flowPtrs      =  std::unordered_set<LavaNode*>;                      
 using lava_ptrsvec       =  std::vector<LavaNode*>;
 using lava_nameNodeMap   =  std::unordered_map<std::string, LavaNode*>;                   // maps the node names to their pointers
 using lava_threadQ       =  LavaQ<LavaOut>;
-//using lava_threadQ       =  LavaQ<LavaPacket>;
-//using lava_threadQ       =  std::queue<LavaPacket, std::vector<LavaPacket,ThreadAllocator<LavaPacket>> >;
-//using lava_threadQ       =  std::queue<LavaOut, std::vector<LavaOut,ThreadAllocator<LavaOut>> >;
-//using lava_threadQ       =  std::queue<LavaOut, std::deque<LavaOut,ThreadAllocator<LavaOut>> >;
-//using lava_threadQ       =  std::queue<LavaOut, std::deque<LavaOut> >;
 
-//extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaVal*, LavaOut*);   // data flow node function
-//extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaFrame*, LavaOut*);   // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
 extern "C" using           LavaAlloc  =  void* (*)(uint64_t);                                    // custom allocation function passed in to each node call
 extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                                         // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
 extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaFrame*, lava_threadQ*);   // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
@@ -652,7 +645,7 @@ union     LavaArgType{
   enum { NONE=0, END, DATA_ERROR, STORE, MEMORY, SEQUENCE, ENUMERATION };                // todo: does this need store sequence and memory sequence?
   u8 asInt;
 };
-union          LavaId                                                // this Id serves as both a nodeId and LavaFlowSlot index, since a LavaFlowSlot index will alway coordinate with only one node 
+union          LavaId                                            // this Id serves as both a nodeId and LavaFlowSlot index, since a LavaFlowSlot index will alway coordinate with only one node 
 {    
   static  const u64 NODE_NONE = 0xFFFFFFFFFFFF;                  // 48 bits all set
   static  const u64 SLOT_NONE = 0xFFFF;                          // 16 bits all set
@@ -2216,6 +2209,14 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//using lava_threadQ       =  LavaQ<LavaPacket>;
+//using lava_threadQ       =  std::queue<LavaPacket, std::vector<LavaPacket,ThreadAllocator<LavaPacket>> >;
+//using lava_threadQ       =  std::queue<LavaOut, std::vector<LavaOut,ThreadAllocator<LavaOut>> >;
+//using lava_threadQ       =  std::queue<LavaOut, std::deque<LavaOut,ThreadAllocator<LavaOut>> >;
+//using lava_threadQ       =  std::queue<LavaOut, std::deque<LavaOut> >;
+//
+//extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaVal*, LavaOut*);   // data flow node function
+//extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaFrame*, LavaOut*);   // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
 
 //if(n==0) return;
 //

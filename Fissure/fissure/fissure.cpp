@@ -183,12 +183,17 @@
 // -todo: put |_NAME_| in for the function name in cpp file
 // -todo: make slot mask have a const operator[]
 // -todo: use std::array for static packet array so that it can be iterated through 
+// -todo: clean up comments in LavaFlow.hpp
+// -todo: visualize packets being routed - can the current queue simply be read and drawn by the interface? - seems so, though it locks for now
+// -todo: expand the margin around flow nodes so that the slots don't obscure the text - need to make the node width dependant on the text bounds in the first place
+// -todo: visualize packets at outputs and frames at inputs/nodes? - packets already are on slots, and the 'current node' highlights should represent a frame being run
+// -todo: visualize packets being created - halos around slots for all packets in the queue
 
-// todo: clean up comments in LavaFlow.hpp
-// todo: make assert to check if the mem in nullptr
-// todo: visualize packets being created
-// todo: visualize packets being routed
+// todo: calc text size + margins before node drawing so that bounding boxes are correct (for both selection and slot drawing)
+// todo: make packets visualize on slots circles stack as concentric circles or as portions/segments of a single circle 
+// todo: put total outstanding packet size (in bytes) in the status bar
 // todo: make a node that passes cube through
+// todo: make assert to check if the mem in nullptr - make a debug function for the end of a node that has its body empty in release mode
 // todo: make a node to transform the cube from MakeCube
 // todo: visualize both nodes 
 // todo: test LavaQ across shared library borders
@@ -196,7 +201,6 @@
 // todo: make list of nodes a side window, right click menu, hot box, etc
 // todo: draw a number inside the slot
 // todo: popup the slots string name in the status bar
-// todo: expand the margin around flow nodes so that the slots don't obscure the text
 // todo: draw node names after the slots so the text is on top?
 // todo: change cur() functions to const and rename to read()
 // todo: change opp() functions to non-const only and rename to write()
@@ -752,20 +756,31 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
                          f32     border=3.5f,
                          bool highlight=false)
 {
-  const float   rthk = 8.f;    // rw is rail thickness
+  using namespace std;
 
-	NVGpaint bg;
-	char icon[8];
-  float tw=0, iw=0, x=n.P.x, y=n.P.y, w=n.b.w(), h=n.b.h();
-	float rad = lerp(rnd, 0.f, h/2.f);           // rad is corner radius
-  f32 cntrX = x + w/2.f;
-  f32 cntrY = y + h/2.f; 
-  f32    rr = rad;      // rr is rail radius
-  //Bnd b;
-  bool  sel = forceSel || n.sel;
+  const float   rthk = 8.f;    // rw is rail thickness
 
   nvgResetTransform(vg);
   nvgGlobalAlpha(vg, 1.f);
+  
+  float wMargin=50.f, hMargin=20.f;
+	
+  NVGpaint bg;
+	char icon[8];
+  float tw=0, iw=0, x=n.P.x, y=n.P.y, h=n.b.h(); // w=n.b.w(),
+
+  f32 txtsz = fd.graph.textSize;
+  nvgFontSize(vg, txtsz);
+  nvgFontFace(vg, "sans-bold");
+  tw = nvgTextBounds(vg, 0,0, n.txt.c_str(), NULL, NULL);
+  float w  = max<float>(n.b.w(), tw + wMargin);
+
+	float rad = lerp(rnd, 0.f, h/2.f);                                  // rad is corner radius
+  f32 cntrX = x + w/2.f;
+  f32 cntrY = y + h/2.f; 
+  f32    rr = rad;                                                    // rr is rail radius
+  bool  sel = forceSel || n.sel;
+
   switch(n.type)
   {
   case Node::Type::FLOW: {
@@ -854,10 +869,10 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
 
   SECTION(text)
   {
-    f32 txtsz = fd.graph.textSize;
-	  nvgFontSize(vg, txtsz);
-	  nvgFontFace(vg, "sans-bold");
-	  tw = nvgTextBounds(vg, 0,0, n.txt.c_str(), NULL, NULL);
+   // f32 txtsz = fd.graph.textSize;
+	  //nvgFontSize(vg, txtsz);
+	  //nvgFontFace(vg, "sans-bold");
+	  //tw = nvgTextBounds(vg, 0,0, n.txt.c_str(), NULL, NULL);
 	  if(preicon != 0){
 		  //nvgFontSize(vg, h*1.3f);
       nvgFontSize(vg, h);
@@ -1898,71 +1913,31 @@ ENTRY_DECLARATION // main or winmain
       LavaInit();
     }
 
-    //Println("size of frame: ", sizeof(LavaFrame));
-    //LavaFrame tstFrame;
-    //Println("  slot 0: ", tstFrame.slotMask[0], " : ", tstFrame.slotMask);
-    //tstFrame.slotMask[0] = 1;
-    //Println("  slot 0: ", tstFrame.slotMask[0], " : ", tstFrame.slotMask);
-    //tstFrame.slotMask[0] = 0;
-    //Println("  slot 0: ", tstFrame.slotMask[0], " : ", tstFrame.slotMask);
-    //
-    ////tstFrame.slotMask[16] = 1;
-    ////Println("  slot 16: ", tstFrame.slotMask[16], " : ", tstFrame.slotMask);
-    ////tstFrame.slotMask[0] = 1;
-    ////Println("  slot 16: ", tstFrame.slotMask[16], " : ", tstFrame.slotMask);
-    ////tstFrame.slotMask[63] = 1;
-    ////Println("  slot 63: ", tstFrame.slotMask[63], " : ", tstFrame.slotMask);
-    //
-    //Println("\n");
-    //// tstFrame.slotMask = 0;
-    //Println("slot cout: ",tstFrame.slotCount(),"  slot ",0,": ", tstFrame.slotMask[0], " : ", tstFrame.slotMask);
-    //TO(LavaFrame::PACKET_SLOTS,i){
-    //  tstFrame.slotMask[i] = 1;
-    //  Println("slot cout: ",tstFrame.slotCount(),"  slot ",i,": ", tstFrame.slotMask[i], " : ", tstFrame.slotMask);
-    //  //tstFrame.slotMask[i,0);
-    //}
-    //Println();
-
-    //decltype(std::unordered_map<int,int>::begin()) 
-    //Println("sizeof( std::unordered_map<int,int>::iterator ) ): ",  sizeof( std::unordered_map<int,int>::iterator ) );
-
-    //AtomicBitset ab;
-    //Println("  slot 0: ", (bool)ab[0], " : ", (char*)ab.toStr().bitstr );
-    //ab[0] = 1;
-    //Println("  slot 0: ", (bool)ab[0], " : ", (char*)ab.toStr().bitstr );
-    //ab[0] = 1;
-    //Println("  slot 7: ", (bool)ab[7], " : ", (char*)ab.toStr().bitstr );
-    //ab[7] = 1;
-    //Println("  slot 7: ", (bool)ab[7], " : ", (char*)ab.toStr().bitstr );
-    //ab[7] = 1;
-    //
-    //Println("  slot 0: ", ab[0], " : ", ab.toStr().bitstr);
-    //ab[0] = 0;
-    //Println("  slot 0: ", ab[0], " : ", ab.toStr().bitstr);
-
-
-   // Println();
-   // flf_map  defaultMap;
-   // flf_map  tstMap(4);
-   // Println("Idx: ", sizeof(flf_map::Idx) 
-   //          );
-   //Print("List: ");
-   //u32* lst = tstMap.listStart( tstMap.capacity() );
-   //TO(tstMap.capacity(),i) Print(lst[i]," ");
-   //Println();
-   //Println("size: ", tstMap.size(), " capacity: ", tstMap.capacity() );
-   //Println();
-   //Println("put: ", tstMap.put(85, 101) );
-   //Println("put: ", tstMap.put(20, 40) );
-   //Println("put: ", tstMap.put(5, 7) );
-   ////Println("put: ", tstMap.put(11, 13) );
-   ////Println("put: ", tstMap.put(17, 19) );
-   //Println();
-   //print_flf_map(tstMap);
-   //Println("get() as bool: ",  (bool)tstMap.get(85), "   ", tstMap.get(85).ok);
-   //Println("get() as Value: ", (u64)tstMap.get(85),  "   ", tstMap.get(85).value);
-   //Println();
-   //print_flf_map(tstMap);
+    SECTION(test flat lock free map)
+    {
+      // Println();
+      // flf_map  defaultMap;
+      // flf_map  tstMap(4);
+      // Println("Idx: ", sizeof(flf_map::Idx) 
+      //          );
+      //Print("List: ");
+      //u32* lst = tstMap.listStart( tstMap.capacity() );
+      //TO(tstMap.capacity(),i) Print(lst[i]," ");
+      //Println();
+      //Println("size: ", tstMap.size(), " capacity: ", tstMap.capacity() );
+      //Println();
+      //Println("put: ", tstMap.put(85, 101) );
+      //Println("put: ", tstMap.put(20, 40) );
+      //Println("put: ", tstMap.put(5, 7) );
+      ////Println("put: ", tstMap.put(11, 13) );
+      ////Println("put: ", tstMap.put(17, 19) );
+      //Println();
+      //print_flf_map(tstMap);
+      //Println("get() as bool: ",  (bool)tstMap.get(85), "   ", tstMap.get(85).ok);
+      //Println("get() as Value: ", (u64)tstMap.get(85),  "   ", tstMap.get(85).value);
+      //Println();
+      //print_flf_map(tstMap);
+    }
   }
 
   glfwSetTime(0);
@@ -2009,9 +1984,21 @@ ENTRY_DECLARATION // main or winmain
 			  glClearColor(.075f, .075f, .075f, 1.0f);
 		    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
       }
-      SECTION(lava graph visualization)
+      SECTION(get lava graph visualization data)
       {        
         fd.graph.curNode  =  fd.flow.m_curId.nid;          // todo: make atomic, although this may just work since it is only reading 8 bytes
+
+        auto& slts = fd.graph.packetSlots;
+        slts.clear();
+        fd.flow.m_qLck.lock();
+          if(fd.flow.q.size() > 0){
+            auto& pckt = fd.flow.q.top();
+            slts.emplace_back( pckt.dest_node, pckt.dest_slot );
+            slts.emplace_back( pckt.src_node, pckt.src_slot );
+          }
+        fd.flow.m_qLck.unlock();
+
+        sort( ALL(slts) );
       }
       SECTION(selection)
       {
@@ -2296,6 +2283,32 @@ ENTRY_DECLARATION // main or winmain
                 s->P.x, s->P.y, fd.ui.slot_rad*5); 
             }
           }
+          SECTION(draw outstanding packets as circle segments around slots)
+          {
+            nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
+            nvgStrokeWidth(vg, 1.f);
+            nvgFillColor(vg, nvgRGBAf(1.f,1.f,0,.75f) );
+
+            auto const& slots = fd.graph.slots;
+            for(auto lid : fd.graph.packetSlots)
+            {
+              auto sIter = node_slots(lid.nid);
+              for(; sIter!=end(slots) && sIter->first.nid==lid.nid; ++sIter)
+              {
+                auto sIdx = sIter->first;                        // todo: needs to be redone
+                if(lid.sidx != sIdx.sidx){ continue; }
+                  
+                Slot const& s = sIter->second;
+
+                // draw a circle larger than the slot circle, which will show up as a sort of halo when the slot is drawn over it in the next section
+                nvgBeginPath(vg);
+                  nvgCircle(vg, s.P.x, s.P.y, fd.ui.slot_rad+5.f);
+                  nvgFill(vg);
+                  nvgStroke(vg);
+                nvgStroke(vg);
+              }
+            }
+          }
           SECTION(draw connections)
           {
             auto di = g.srcCnctsMap().begin();                                    // di is destination iterator
@@ -2470,6 +2483,70 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+
+//TO(sz,i)
+//Node&     n = *(nds[i]);
+//
+//auto sIter = node_slots(n.id);
+//
+//Slot const& s = *(grph.slot(sIdx));
+//
+//bool   inSlot = len(pntr - s.P) < fd.ui.slot_rad; //io_rad;
+//
+//Slot::State drawState = Slot::NORMAL;
+//if(s.state==Slot::SELECTED) drawState = Slot::SELECTED;
+//else if(inSlot)             drawState = Slot::HIGHLIGHTED;
+//slot_draw(vg, s, drawState, fd.ui.slot_rad);
+
+//decltype(std::unordered_map<int,int>::begin()) 
+//Println("sizeof( std::unordered_map<int,int>::iterator ) ): ",  sizeof( std::unordered_map<int,int>::iterator ) );
+
+//SECTION(test atomic bitset)
+//{
+//  //AtomicBitset ab;
+//  //Println("  slot 0: ", (bool)ab[0], " : ", (char*)ab.toStr().bitstr );
+//  //ab[0] = 1;
+//  //Println("  slot 0: ", (bool)ab[0], " : ", (char*)ab.toStr().bitstr );
+//  //ab[0] = 1;
+//  //Println("  slot 7: ", (bool)ab[7], " : ", (char*)ab.toStr().bitstr );
+//  //ab[7] = 1;
+//  //Println("  slot 7: ", (bool)ab[7], " : ", (char*)ab.toStr().bitstr );
+//  //ab[7] = 1;
+//  //
+//  //Println("  slot 0: ", ab[0], " : ", ab.toStr().bitstr);
+//  //ab[0] = 0;
+//  //Println("  slot 0: ", ab[0], " : ", ab.toStr().bitstr);
+//}
+
+//SECTION(test slot mask)
+//{
+//  //Println("size of frame: ", sizeof(LavaFrame));
+//  //LavaFrame tstFrame;
+//  //Println("  slot 0: ", tstFrame.slotMask[0], " : ", tstFrame.slotMask);
+//  //tstFrame.slotMask[0] = 1;
+//  //Println("  slot 0: ", tstFrame.slotMask[0], " : ", tstFrame.slotMask);
+//  //tstFrame.slotMask[0] = 0;
+//  //Println("  slot 0: ", tstFrame.slotMask[0], " : ", tstFrame.slotMask);
+//  //
+//  ////tstFrame.slotMask[16] = 1;
+//  ////Println("  slot 16: ", tstFrame.slotMask[16], " : ", tstFrame.slotMask);
+//  ////tstFrame.slotMask[0] = 1;
+//  ////Println("  slot 16: ", tstFrame.slotMask[16], " : ", tstFrame.slotMask);
+//  ////tstFrame.slotMask[63] = 1;
+//  ////Println("  slot 63: ", tstFrame.slotMask[63], " : ", tstFrame.slotMask);
+//  //
+//  //Println("\n");
+//  //// tstFrame.slotMask = 0;
+//  //Println("slot cout: ",tstFrame.slotCount(),"  slot ",0,": ", tstFrame.slotMask[0], " : ", tstFrame.slotMask);
+//  //TO(LavaFrame::PACKET_SLOTS,i){
+//  //  tstFrame.slotMask[i] = 1;
+//  //  Println("slot cout: ",tstFrame.slotCount(),"  slot ",i,": ", tstFrame.slotMask[i], " : ", tstFrame.slotMask);
+//  //  //tstFrame.slotMask[i,0);
+//  //}
+//  //Println();
+//}
 
 //using Id      = LavaId;
 //
