@@ -194,10 +194,10 @@
 // -todo: make nodes a little fatter or slots offset a little more from the edge
 // -todo: make assert to check if the mem in nullptr - make a debug function for the end of a node that has its body empty in release mode - make the packet q be checked in debug mode somehow
 // -todo: figure out why PrintLavaMem crashes even while checking for ptr == nullptr - LavaMem is just a pointer moved back a few dozen bytes to point to the start of a lava allocation instead of just the start of the data portion - if LavaOut::value is 0, LavaMem::ptr will end up wrapping around in the negative and be a large number
+// -todo: fix packet sz_bytes parameter - just needed to be initialized
 
-// todo: move dealing with the output queue out of the run func function
-// todo: fix packet sz_bytes parameter
 // todo: make LavaMem use a struct for layout of bytes
+// todo: move dealing with the output queue out of the run func function
 // todo: make packets visualize on slots circles stack as concentric circles or as portions/segments of a single circle 
 // todo: make a node that passes cube through
 // todo: make a node to transform the cube from MakeCube

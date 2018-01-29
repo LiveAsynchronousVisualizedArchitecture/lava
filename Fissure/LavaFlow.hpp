@@ -1969,6 +1969,7 @@ LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t ni
         basePkt.src_slot    =   sidx;
         basePkt.msg.id      =   lf.nxtMsgId();         // todo: rethink this, since nxtMsgId might not be neccesary
         basePkt.msg.val     =   val;
+        basePkt.sz_bytes    =   mem.sizeBytes();  
 
         // route the packet using the graph - the packet may be copied multiple times and go to multiple destination slots
         LavaId   src  =  { nid, sidx };
