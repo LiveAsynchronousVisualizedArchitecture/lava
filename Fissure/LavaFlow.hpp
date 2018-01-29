@@ -694,6 +694,8 @@ struct        LavaOut
   }key;
 
   LavaOut() : type(0), value(0) {}
+  LavaOut(u64 val) : value(val), type(LavaArgType::MEMORY) {}
+  LavaOut(u64 val, u64 _type) : value(val), type(_type) {}
 };
 struct        LavaMsg
 {
@@ -1575,7 +1577,6 @@ public:
   MsgNodeVec          m_msgNodesA;
   LavaGraph                 graph;
 
-
   void  udpateMsgIdxCache() // todo: not thread safe - this takes the current hash map of message nodes 
   {
     auto& cur = graph.curMsgNodes();
@@ -1926,7 +1927,8 @@ LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t ni
   FlowFunc func = li.node->func;                      //lf.graph[nid].node->func;
   if(func)
   {
-    LavaParams lp;
+    LavaInst::State ret;
+    LavaParams       lp;
     SECTION(create arguments and call function)
     {
       lp.inputs      =     1;
@@ -1936,8 +1938,14 @@ LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t ni
       lp.mem_alloc   =   LavaAlloc;
 
       auto  stTime = high_resolution_clock::now();
-        LavaInst::State ret = exceptWrapper(func, lf, &lp, inFrame, outArgs);
-        if(ret != LavaInst::NORMAL){ return ret; }
+        ret = exceptWrapper(func, lf, &lp, inFrame, outArgs);
+        if(ret != LavaInst::NORMAL){
+          LavaOut o;                                                        // if there was an error, clear the queue of the produced data - there may be better ways of doing this, such as integrating it with the queue loop below, or building a specific method into the LavaQ
+          while(outArgs->size()>0)
+            outArgs->pop(o);
+          
+          return ret;
+        }
       auto endTime = high_resolution_clock::now();
       duration<u64,nano> diff = (endTime - stTime);
       li.addTime( diff.count() );
@@ -1949,7 +1957,7 @@ LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t ni
         LavaOut outArg;
         if( !outArgs->pop(outArg) ){ continue; }
 
-        if(outArg.value == 0){ return LavaInst::OUTPUT_ERROR; }
+        if(outArg.value == 0){ ret = LavaInst::OUTPUT_ERROR; continue; }
 
         // create new value for the new packet
         LavaVal val;
@@ -1995,7 +2003,7 @@ LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t ni
       }
     } // SECTION(create packets and put them into packet queue)
 
-    return LavaInst::NORMAL;
+    return ret; // LavaInst::NORMAL;
   }
 
   return LavaInst::LOAD_ERROR;

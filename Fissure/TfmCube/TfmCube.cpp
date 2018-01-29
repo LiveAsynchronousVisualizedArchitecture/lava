@@ -24,24 +24,17 @@ extern "C"
   {
     using namespace std;
 
-    //in[i].packets
-
-    TO(inout_lp->inputs,i)
-    {
-      LavaFrame const& frame = in[i];
-      TO(frame.packets.size(),j)
-      {
-        if(frame.slotMask[j]){
-          LavaPacket const& pkt = frame.packets[j];
-
-        }
-      }
+    TO(in->packets.size(),i) if(in->slotMask[i]){
+      LavaPacket const& pkt = in->packets[i];
     }
 
-    LavaOut lo;
-    lo.type  = LavaArgType::MEMORY;
-    lo.value = (u64)nullptr;
-    out->push(lo);
+    //LavaOut lo;
+    //lo.type  = LavaArgType::MEMORY;
+    //lo.value = (u64)nullptr;
+    //out->push(lo);
+
+    out->push(LavaOut(0));
+    out->push({0});
 
     return 1;
   }
@@ -67,3 +60,24 @@ extern "C"
     return (LavaNode*)LavaNodes;
   }
 }
+
+
+
+
+
+
+
+
+
+//in[i].packets
+//
+//TO(inout_lp->inputs,i)
+//{
+//  LavaFrame const& frame = in[i];
+//  TO(frame.packets.size(),j)
+//  {
+//    if(frame.slotMask[j]){
+//      LavaPacket const& pkt = frame.packets[j];
+//    }
+//  }
+//}

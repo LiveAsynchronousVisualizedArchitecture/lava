@@ -195,17 +195,17 @@
 // -todo: make assert to check if the mem in nullptr - make a debug function for the end of a node that has its body empty in release mode - make the packet q be checked in debug mode somehow
 // -todo: figure out why PrintLavaMem crashes even while checking for ptr == nullptr - LavaMem is just a pointer moved back a few dozen bytes to point to the start of a lava allocation instead of just the start of the data portion - if LavaOut::value is 0, LavaMem::ptr will end up wrapping around in the negative and be a large number
 // -todo: fix packet sz_bytes parameter - just needed to be initialized
+// -todo: draw a number inside the slot - not neccesary if the slot information is in the status bar on mouse over
+// -todo: make a constructor for LavaOut
+// -todo: figure out why MakeCube is giving an error - queued LavaOuts that were set to nullptr were not being removed after being detected, and later nodes run by the same thread were giving errors
 
-// todo: make LavaMem use a struct for layout of bytes
-// todo: move dealing with the output queue out of the run func function
-// todo: make packets visualize on slots circles stack as concentric circles or as portions/segments of a single circle 
+// todo: make 'stop' clear packets and errors
 // todo: make a node that passes cube through
 // todo: make a node to transform the cube from MakeCube
 // todo: visualize both nodes 
 // todo: test LavaQ across shared library borders
-// todo: make errors in the directory creation give an error in the status bar 
+// todo: move dealing with the output queue out of the run func function
 // todo: make list of nodes a side window, right click menu, hot box, etc
-// todo: draw a number inside the slot
 // todo: popup the slots string name in the status bar
 // todo: draw node names after the slots so the text is on top?
 // todo: change cur() functions to const and rename to read()
@@ -226,6 +226,10 @@
 // todo: try to unify nanogui into a single file?
 // todo: try to unify nfd into a single file ? 
 // todo: make LavaHeapFree use a thread local variable for the errors instead of a return value, so that it's signature will match with free
+// todo: make LavaMem use a struct for layout of bytes
+// todo: make packets visualize on slots circles stack as concentric circles or as portions/segments of a single circle 
+// todo: make errors in the directory creation give an error in the status bar 
+
 
 // todo: make input slots start at 0 - does there need to be a separation between input and out slots or does there need to be an offset so that the input frame starts at 0 
 // todo: convert tbl to use arrays of the data types smaller than 64 bits
@@ -2254,7 +2258,7 @@ ENTRY_DECLARATION // main or winmain
         SECTION(nanovg drawing - |node graph|)
         {
           nvgBeginFrame(vg, fd.ui.w, fd.ui.h, pxRatio);
-          SECTION(draw background grid)
+          SECTION(background grid)
           {
             nvgStrokeWidth(vg, 1.f);
             nvgStrokeColor(vg, nvgRGBAf( .12f, .12f, .12f, 1.f));
@@ -2283,7 +2287,7 @@ ENTRY_DECLARATION // main or winmain
               curY += lineIncY;
             }
           }
-          SECTION(draw current node highlights)
+          SECTION(current node highlights)
           {
             auto nid = fd.graph.curNode;
             if(nid != LavaNode::NONE  &&
@@ -2293,7 +2297,7 @@ ENTRY_DECLARATION // main or winmain
               node_draw_radial(n, vg, nvgRGBA(0,255,128,48));
             }
           }
-          SECTION(draw highlights behind visualized slots)
+          SECTION(highlights behind visualized slots)
           {
             TO(fd.vizIds.sz,i)
             {
