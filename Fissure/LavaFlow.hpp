@@ -692,6 +692,8 @@ struct        LavaOut
     struct { u64 frame; u32 slot; u32 listIdx; };
     u8 bytes[16];
   }key;
+
+  LavaOut() : type(0), value(0) {}
 };
 struct        LavaMsg
 {
@@ -780,7 +782,7 @@ struct       LavaInst
   using au32  =  std::atomic<uint32_t>;
   using au64  =  std::atomic<uint64_t>;
 
-  enum State { NORMAL=0, RUN_ERROR, LOAD_ERROR, COMPILE_ERROR };
+  enum State { NORMAL=0, OUTPUT_ERROR, RUN_ERROR, LOAD_ERROR, COMPILE_ERROR };              // OUTPUT_ERROR is for nodes who output a value that contains a nullptr instead of a valid memory allocation
 
   LavaId         id;
   LavaNode*    node;
@@ -1729,8 +1731,9 @@ void                printdb(simdb const& db)
 }
 void           PrintLavaMem(LavaMem lm)
 {
-  printf("\n addr: %llu  data addr: %llu  ref count: %llu   size bytes: %llu \n", 
-    (u64)(lm.ptr), (u64)(lm.data()), (u64)lm.refCount(), (u64)lm.sizeBytes() );
+  if(lm.ptr)
+    printf("\n addr: %llu  data addr: %llu  ref count: %llu   size bytes: %llu \n", 
+      (u64)(lm.ptr), (u64)(lm.data()), (u64)lm.refCount(), (u64)lm.sizeBytes() );
 }
 
 auto       GetSharedLibPath() -> std::wstring
@@ -1898,14 +1901,19 @@ LavaInst::State exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaFram
   LavaInst::State        ret = LavaInst::NORMAL;  // LavaFlow::NONE;
   uint64_t         winExcept = 0;
   __try{
-    //f(lp, inArgs, outArgs);
     f(lp, inFrame, outArgs);
   }__except( (winExcept=GetExceptionCode()) || EXCEPTION_EXECUTE_HANDLER ){
-    ret =  LavaInst::RUN_ERROR; // LavaFlow::RUN_ERR;
-    //lf.graph.setState(lp->id.nid, LavaInst::RUN_ERROR);
-
+    ret =  LavaInst::RUN_ERROR; 
     printf("\n windows exception code: %llu \n", winExcept);
   }
+
+  //#ifndef _NDEBUG
+  //  TO(outArgs->size(),i){
+  //    LavaOut o = outArgs->m_buf.useA? outArgs->atA(i) : outArgs->atB(i);
+  //    //LavaMem  mem = LavaMem::fromDataAddr(o.value);
+  //    if(o.value == 0){ ret = LavaInst::OUTPUT_ERROR; }
+  //  }
+  //#endif
 
   return ret;
 }
@@ -1925,38 +1933,30 @@ LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t ni
       lp.outputs     =   512;
       lp.frame       =   lf.m_frame;
       lp.id          =   LavaId(nid);
-      lp.mem_alloc   =   LavaAlloc;             //lp.mem_alloc   =   malloc;  // LavaHeapAlloc;
+      lp.mem_alloc   =   LavaAlloc;
 
       auto  stTime = high_resolution_clock::now();
         LavaInst::State ret = exceptWrapper(func, lf, &lp, inFrame, outArgs);
-        //if(ret != LavaFlow::NONE){ return ret; }
         if(ret != LavaInst::NORMAL){ return ret; }
       auto endTime = high_resolution_clock::now();
       duration<u64,nano> diff = (endTime - stTime);
-      li.addTime( diff.count() );   //li.time += diff.count();
+      li.addTime( diff.count() );
     }
-    SECTION(create packets and put them into packet queue)
+    SECTION(create packets and put them into packet queue)  // this section will not be reached if there was an error
     {
-      //TO(lp.outputs,i)
       while(outArgs->size() > 0)
       {
         LavaOut outArg;
         if( !outArgs->pop(outArg) ){ continue; }
-        //LavaOut outArg = outArgs->front();
-        //outArgs->pop();
-        //if(outArgs[i].type == LavaArgType::NONE){ continue; }
+
+        if(outArg.value == 0){ return LavaInst::OUTPUT_ERROR; }
 
         // create new value for the new packet
         LavaVal val;
         val.type  = outArg.type;
         val.value = outArg.value;
         auto sidx = outArg.key.slot;
-        //val.type  = outArgs[i].type;
-        //val.value = outArgs[i].value;
-        //auto sidx = outArgs[i].key.slot;
 
-        //LavaMem mem = LavaMem::fromDataAddr(outArgs[i].value);
-        //PrintLavaMem(mem);
         LavaMem  mem = LavaMem::fromDataAddr(outArg.value);
         // todo: deal with mem being 0 here
         auto szBytes = outArg.value? mem.sizeBytes()  :  0;
@@ -1985,20 +1985,12 @@ LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t ni
 
           mem.incRef();
 
-          lf.putPacket(pkt);
-
-          //lf.m_qLck.lock();              // mutex lock
-          //  lf.q.push(pkt);              // todo: use a mutex here initially
-          //lf.m_qLck.unlock();            // mutex unlock
+          lf.putPacket(pkt);                                                 // putPacket contains a mutex for now, eventually will be a lock free queue
         }
 
         ownedMem.push_back(mem);
 
         lf.packetCallback(basePkt);
-
-        //PutMem(LavaId(basePkt.src_node, basePkt.src_slot) , mem);
-        //auto keys = vizdb.getKeyStrs();
-        //printdb(vizdb);
       }
     } // SECTION(create packets and put them into packet queue)
 
@@ -2081,7 +2073,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
   lava_memvec    ownedMem;
   lava_threadQ   outQ;                              // queue of the output arguments
 
-  LavaVal      inArgs[LAVA_ARG_COUNT];              // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
+  LavaVal      inArgs[LAVA_ARG_COUNT]={};           // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
   LavaFrame   inFrame;
   LavaFrame    runFrm;
   memset(inArgs, 0, sizeof(inArgs) );
@@ -2151,6 +2143,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
         LavaInst::State ret = (nodeId!=LavaId::NODE_NONE)? runFunc(lf, ownedMem, nodeId, &lp, &runFrm, &outQ)  :  LavaInst::LOAD_ERROR;  // LavaFlow::RUN_ERR; 
         switch(ret)
         {
+          case LavaInst::OUTPUT_ERROR:
           case LavaInst::RUN_ERROR:{
             lf.graph.setState(nodeId, LavaInst::RUN_ERROR);
             //lf.putPacket(pckt);               // if there was an error, put the packet back into the queue
@@ -2161,7 +2154,6 @@ void               LavaLoop(LavaFlow& lf) noexcept
           case LavaInst::NORMAL:
           default:{ // if everything worked, decrement the references of all the packets in the frame
             if(doFlow){
-              //TO(LavaFrame::PACKET_SLOTS,i) if(runFrm.getSlot(i)){ 
               TO(LavaFrame::PACKET_SLOTS,i) if(runFrm.slotMask[i]){ 
                 LavaMem mem = LavaMem::fromDataAddr(runFrm.packets[i].msg.val.value);
                 mem.decRef();
@@ -2174,7 +2166,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
     SECTION(partition owned allocations and free those with their reference count at 0)
     {
       for(auto const& lm : ownedMem){
-        PrintLavaMem(lm);
+        //PrintLavaMem(lm);
       }
 
       auto zeroRef  = partition(ALL(ownedMem), [](auto a){return a.refCount() > 0;} );                           // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
@@ -2185,7 +2177,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
       ownedMem.erase(zeroRef, end(ownedMem));                                                                    // erase the now freed memory
     }
-  } // while(m_running)
+  }
 
   SECTION(loop through allocations and wait for their ref counts to be zero before exiting the loop)
   {
@@ -2208,6 +2200,45 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+
+
+
+
+
+
+
+//
+//TO(LavaFrame::PACKET_SLOTS,i) if(runFrm.getSlot(i)){ 
+
+//if(ret != LavaFlow::NONE){ return ret; }
+//
+//li.time += diff.count();
+
+//TO(lp.outputs,i)
+//
+//LavaOut outArg = outArgs->front();
+//outArgs->pop();
+//if(outArgs[i].type == LavaArgType::NONE){ continue; }
+//
+//val.type  = outArgs[i].type;
+//val.value = outArgs[i].value;
+//auto sidx = outArgs[i].key.slot;
+//
+//LavaMem mem = LavaMem::fromDataAddr(outArgs[i].value);
+//PrintLavaMem(mem);
+
+//lf.m_qLck.lock();              // mutex lock
+//  lf.q.push(pkt);              // todo: use a mutex here initially
+//lf.m_qLck.unlock();            // mutex unlock
+//
+//PutMem(LavaId(basePkt.src_node, basePkt.src_slot) , mem);
+//auto keys = vizdb.getKeyStrs();
+//printdb(vizdb);
+
+// LavaFlow::RUN_ERR;
+//f(lp, inArgs, outArgs);
+//lf.graph.setState(lp->id.nid, LavaInst::RUN_ERROR);
 
 //using lava_threadQ       =  LavaQ<LavaPacket>;
 //using lava_threadQ       =  std::queue<LavaPacket, std::vector<LavaPacket,ThreadAllocator<LavaPacket>> >;
