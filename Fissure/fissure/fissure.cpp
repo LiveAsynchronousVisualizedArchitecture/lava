@@ -205,8 +205,8 @@
 // -todo: put slot name in the status bar of slot mouse over
 // -todo: put slot type in the status bar
 // -todo: fix slots labels - lower slot indices were outputs, higher were inputs
+// -todo: put error type in the status bar on mouse over of a errored node
 
-// todo: put error type in the status bar on mouse over of a errored node
 // todo: make a node that passes cube through
 // todo: make a node to transform the cube from MakeCube
 // todo: give message passing nodes constructors and destructors 
@@ -510,11 +510,34 @@ str       makeStatusText(u64 nid, f64 totalTime, vec_ndptrs const& nds, u64 nIdx
 {
   using namespace std;
 
-  f64 seconds  =  timeToSeconds(fd.lgrph.node(nid).time);
+  auto&     n  =  fd.lgrph.node(nid);
+  f64 seconds  =  timeToSeconds(n.time);
   f64 percent  =  totalTime>0?  (seconds/totalTime)*100  :  0;
   percent      =  max(100.0, percent);
   seconds      =  (int)(seconds*1000) / 1000.0;    // should clamp the seconds to 3 decimal places 
-  auto status  =  toString("Node [",nid,"]  ",nds[nIdx]->txt," | ",seconds," seconds  %",percent);
+  
+  str     err;
+  switch(n.getState())
+  {
+  case LavaInst::COMPILE_ERROR:{
+      err = "COMPILE ERROR";
+    }break;
+  case LavaInst::LOAD_ERROR:{
+      err = "LOAD ERROR (the node could not be loaded)";
+    }break;
+  case LavaInst::RUN_ERROR:{
+      err = "RUN ERROR (did the node output a value that had no memory allocated?)";
+    }break;
+  case LavaInst::NORMAL:
+  default:
+    break;
+  }
+
+  auto status = toString(
+    "Node [",nid,"]  ",nds[nIdx]->txt,
+    " | ",seconds," seconds  %",
+    percent,"   ",
+    err);
 
   return status;
 }
