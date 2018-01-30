@@ -1354,11 +1354,6 @@ public:
     auto nIter = curNodes().find(id);                                          // nIter is node iterator
     if(nIter == end(curNodes())) return errorInst();
 
-    //LavaInst ret;
-    //ret.id   = nIter->first;
-    //ret.node = nIter->second;
-    //return ret;
-
     return nIter->second;
   }
   auto           node(u64 id) const -> LavaInst
@@ -1374,11 +1369,6 @@ public:
     nds.reserve(curNodes().size());
     for(auto& on : curNodes()){                                  // on is order and node - order is on.first    LavaInst is on.second
       nds.push_back(on.second);
-
-      //NodeInstance inst;
-      //inst.id = on.first;
-      //inst.nd = on.second;
-      //nds.push_back(inst);
     }
     return nds;
   }
@@ -2215,6 +2205,17 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+
+//LavaInst ret;
+//ret.id   = nIter->first;
+//ret.node = nIter->second;
+//return ret;
+
+//NodeInstance inst;
+//inst.id = on.first;
+//inst.nd = on.second;
+//nds.push_back(inst);
 
 
 //

@@ -15,10 +15,13 @@ enum Slots
 
 extern "C"
 {
-  const char*  InNames[]  = {"Template Slot In",   nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
-  const char*  InTypes[]  = {"IdxVerts",           nullptr};            // This array contains the type that each slot of the same index will accept as input.
-  const char* OutNames[]  = {"Template Slot Out",  nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
-  const char* OutTypes[]  = {"IdxVerts",           nullptr};            // This array contains the types that are output in each slot of the same index
+  const char*  InNames[] = {"Input Model",         nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char*  InTypes[] = {"IdxVerts",            nullptr};            // This array contains the type that each slot of the same index will accept as input.
+  const char* OutNames[] = {"Output Model",        nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char* OutTypes[] = {"IdxVerts",            nullptr};            // This array contains the types that are output in each slot of the same index
+  
+  //const char*  InNames[]  = {"Template Slot In",   nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  //const char* OutNames[]  = {"Template Slot Out",  nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
 
   uint64_t TfmCube(LavaParams* inout_lp, LavaFrame* in, lava_threadQ* out) noexcept
   {

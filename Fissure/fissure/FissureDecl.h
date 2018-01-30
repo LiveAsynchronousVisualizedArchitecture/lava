@@ -228,7 +228,6 @@ struct FisData
   vec_thrd      flowThreads;
   AtmSet             vizIds;
 
-
   struct Graph
   {
     NodeMap             nds;       // nds  is nodes

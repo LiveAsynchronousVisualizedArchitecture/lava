@@ -199,14 +199,21 @@
 // -todo: make a constructor for LavaOut
 // -todo: figure out why MakeCube is giving an error - queued LavaOuts that were set to nullptr were not being removed after being detected, and later nodes run by the same thread were giving errors
 // -todo: make 'stop' clear packets and errors
+// -todo: visualize a slot - already works
+// -todo: keep state in make cube so it only emits once - done with an atomic boolean but does not reset on 'stop'
+// -todo: popup the slots string name in the status bar - only needed to reorder status bar if statements
+// -todo: put slot name in the status bar of slot mouse over
+// -todo: put slot type in the status bar
+// -todo: fix slots labels - lower slot indices were outputs, higher were inputs
 
+// todo: put error type in the status bar on mouse over of a errored node
 // todo: make a node that passes cube through
 // todo: make a node to transform the cube from MakeCube
-// todo: visualize both nodes 
+// todo: give message passing nodes constructors and destructors 
 // todo: test LavaQ across shared library borders
 // todo: move dealing with the output queue out of the run func function
+// todo: make a settings file that is read on load if it in the same directory
 // todo: make list of nodes a side window, right click menu, hot box, etc
-// todo: popup the slots string name in the status bar
 // todo: draw node names after the slots so the text is on top?
 // todo: change cur() functions to const and rename to read()
 // todo: change opp() functions to non-const only and rename to write()
@@ -2169,25 +2176,33 @@ ENTRY_DECLARATION // main or winmain
         {
           f64 totalTime = timeToSeconds(fd.lgrph.totalTime());
 
-          if(nid.nid == LavaId::NODE_NONE){
+          if(isInSlot)
+          {
+            str slotName; str slotType;
+            SECTION(figure out slot name)
+            {
+              LavaInst&   li  =  fd.lgrph.node(sid.nid);
+              bool outputSlt  =  sid.sidx < li.outputs;
+              LavaNode*    n  =  li.node;
+            
+              if(outputSlt){ 
+                slotName = n->out_names[sid.sidx];
+                slotType = n->out_types[sid.sidx];
+              }else{
+                slotName = n->in_names[sid.sidx - li.outputs];
+                slotType = n->in_types[sid.sidx - li.outputs];
+              }
+            }
+            auto status = toString("Slot [",sid.nid,":",sid.sidx,"]    ",slotName,"  <",slotType,">");
+            fd.ui.statusTxt->setValue( status );
+          }else if(nid.nid == LavaId::NODE_NONE){
             fd.ui.statusTxt->setValue( toString("Queued Packets: ",fd.graph.qPacketBytes," bytes") );
           }else if(slotRtClk){
             fd.ui.statusTxt->setValue( toString(" right click on slot ") );
-          }else if(isInSlot){
-            auto status  =  toString("Slot [",sid.nid,":",sid.sidx,"]");
-            fd.ui.statusTxt->setValue( status );
           }else if(isInNode){
-            //f64 seconds  =  timeToSeconds(fd.lgrph.node(nid.nid).time);
-            //f64 percent  =  totalTime>0?  (seconds/totalTime)*100  :  0;
-            //auto status  =  toString("Node [",nid.nid,"]  ",nds[nIdx]->txt," | ",seconds," seconds  %",percent);
-
             auto status = makeStatusText(nid.nid, totalTime, nds, nIdx);
             fd.ui.statusTxt->setValue( status );
           }else if(fd.sel.pri != LavaNode::NODE_ERROR){
-            //f64 seconds  =  timeToSeconds(fd.lgrph.node(fd.sel.pri).time);
-            //f64 percent  =  totalTime>0?  (seconds/totalTime)*100  :  0;
-            //auto status  =  toString("Node [",fd.sel.pri,"]  ",fd.graph.nds[fd.sel.pri].txt," | ",seconds," seconds  %",percent);
-
             auto status = makeStatusText(nid.nid, totalTime, nds, nIdx);
             fd.ui.statusTxt->setValue( status );
           }else{
@@ -2526,7 +2541,13 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//f64 seconds  =  timeToSeconds(fd.lgrph.node(fd.sel.pri).time);
+//f64 percent  =  totalTime>0?  (seconds/totalTime)*100  :  0;
+//auto status  =  toString("Node [",fd.sel.pri,"]  ",fd.graph.nds[fd.sel.pri].txt," | ",seconds," seconds  %",percent);
 
+//f64 seconds  =  timeToSeconds(fd.lgrph.node(nid.nid).time);
+//f64 percent  =  totalTime>0?  (seconds/totalTime)*100  :  0;
+//auto status  =  toString("Node [",nid.nid,"]  ",nds[nIdx]->txt," | ",seconds," seconds  %",percent);
 
 //TO(sz,i)
 //Node&     n = *(nds[i]);

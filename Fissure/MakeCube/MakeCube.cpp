@@ -9,16 +9,20 @@
 struct vert { f32 p[3],n[3],c[4],tx[2]; };
 using IvTbl = tbl<vert>;
 
+static std::atomic<bool> hasRun = false;
+
 extern "C"
 {
-  const char* OutNames[]  = {"Cube Indexed Verts", nullptr};
-  const char* OutTypes[]  = {"IdxVerts",           nullptr};
+  //const char*  InNames[] = {"Cube Indexed Verts", nullptr};
+  //const char*  InTypes[] = {"IdxVerts",           nullptr};
+  const char* OutNames[] = {"Cube Indexed Verts",      nullptr};
+  const char* OutTypes[] = {"IdxVerts",           nullptr};
 
-  //uint64_t MakeCube(LavaParams* inout_lp, LavaVal* in, LavaOut* out) noexcept
-  //uint64_t MakeCube(LavaParams* inout_lp, LavaFrame* in, LavaOut* out) noexcept
   uint64_t MakeCube(LavaParams* inout_lp, LavaFrame* in, lava_threadQ* out) noexcept
   {
     using namespace std;
+
+    if( hasRun.exchange(true) ) return 1;
 
     printf("\n MakeCube run \n");
 
@@ -42,39 +46,17 @@ extern "C"
       {0.0f, 0.0f}}               //texCoord
     };
 
-    //Print(lftTri);
-
     auto typenum    =  "IdxVerts";
     lftTri("type")  =  *((u64*)typenum);
     lftTri("mode")  =  (u64)0x0004; // (u64)GL_TRIANGLES;  // #define GL_TRIANGLES 0x0004
     tu32 ind        =  {0, 1, 2};
     lftTri("IND")   =  &ind; 
 
-    //Println("before flatten");
-    //Print(lftTri);
-
     lftTri.flatten();
-
-    //Println("IND tbl"); 
-    //Print(ind);
-    //Println();
-    //
-    //Print(lftTri);
 
     auto lo = LavaTblToOut(inout_lp, lftTri);
     lo.key.slot = 0;
     out->push(lo);
-
-    //inout_lp->outputs = 1;
-    //out[0] = LavaTblToOut(inout_lp, lftTri);
-    //out[0].key.slot = 0;
-
-    //printf("\n\n dropping null dereference bomb \n\n");
-    //int*  bomb  =  nullptr;
-    //int    wat  =  *bomb;
-    //printf("\n\n bomb dropped \n\n");
-
-    //this_thread::sleep_for( chrono::milliseconds(500) );
 
     return 1;
   }
@@ -105,6 +87,37 @@ extern "C"
 
 
 
+
+
+
+
+
+
+//Print(lftTri);
+//
+//Println("before flatten");
+//Print(lftTri);
+//
+//Println("IND tbl"); 
+//Print(ind);
+//Println();
+//
+//Print(lftTri);
+
+//inout_lp->outputs = 1;
+//out[0] = LavaTblToOut(inout_lp, lftTri);
+//out[0].key.slot = 0;
+
+//printf("\n\n dropping null dereference bomb \n\n");
+//int*  bomb  =  nullptr;
+//int    wat  =  *bomb;
+//printf("\n\n bomb dropped \n\n");
+
+//
+//this_thread::sleep_for( chrono::milliseconds(500) );
+
+//uint64_t MakeCube(LavaParams* inout_lp, LavaVal* in, LavaOut* out) noexcept
+//uint64_t MakeCube(LavaParams* inout_lp, LavaFrame* in, LavaOut* out) noexcept
 
 //void Print(vert const& v)
 //{
