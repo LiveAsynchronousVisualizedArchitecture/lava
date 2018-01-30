@@ -198,8 +198,8 @@
 // -todo: draw a number inside the slot - not neccesary if the slot information is in the status bar on mouse over
 // -todo: make a constructor for LavaOut
 // -todo: figure out why MakeCube is giving an error - queued LavaOuts that were set to nullptr were not being removed after being detected, and later nodes run by the same thread were giving errors
+// -todo: make 'stop' clear packets and errors
 
-// todo: make 'stop' clear packets and errors
 // todo: make a node that passes cube through
 // todo: make a node to transform the cube from MakeCube
 // todo: visualize both nodes 
@@ -398,7 +398,7 @@
 #include "../Transform.h"
 #include "FissureDecl.h"
 
-namespace fs = std::experimental::filesystem;
+namespace  fs = std::experimental::filesystem;
 
 using vec_ids = std::vector<LavaId>;
 
@@ -1830,6 +1830,19 @@ ENTRY_DECLARATION // main or winmain
       });
       stopBtn->setCallback([playBtn](){
         stopFlowThreads();
+        fd.flow.m_curId.nid = LavaNode::NODE_ERROR;
+        auto         nInsts = fd.lgrph.nodes();
+        for(auto const& n : nInsts){
+          fd.lgrph.setState(n.id.nid, LavaInst::NORMAL);
+        }
+        fd.flow.m_qLck.lock();
+          if(fd.flow.q.size() > 0){
+            auto& pckt = fd.flow.q.top();
+            fd.graph.qPacketBytes = 0;
+            fd.graph.qPacketBytes += pckt.sz_bytes;
+            //fd.flow.q.pop();
+          }
+        fd.flow.m_qLck.unlock();
         playBtn->setEnabled(true);
       });
       nodeBtn->setCallback([nodeTxt]()
