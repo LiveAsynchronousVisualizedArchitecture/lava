@@ -237,7 +237,6 @@ struct FisData
     u64             curNode = LavaNode::NODE_ERROR;              // information from the running lava graph for visualization in the GUI
     u64        qPacketBytes = 0;
     vec_slt     packetSlots;
-    //u64       curNode = 1;
 
     // text
     f32            textSize  =  18.f;  //18.f;

@@ -693,9 +693,11 @@ struct        LavaOut
     u8 bytes[16];
   }key;
 
-  LavaOut() : type(0), value(0) {}
-  LavaOut(u64 val) : value(val), type(LavaArgType::MEMORY) {}
-  LavaOut(u64 val, u64 _type) : value(val), type(_type) {}
+  LavaOut() : key{0,0,0}, type(0), value(0) {}
+  LavaOut(u32 slot, u64 val) : key{0,slot,0}, value(val), type(LavaArgType::MEMORY)
+  {}
+  LavaOut(u32 slot, u64 val, u64 _type) : key{0,slot,0}, value(val), type(_type)
+  {}
 };
 struct        LavaMsg
 {
@@ -1975,21 +1977,22 @@ LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t ni
         auto   diCnt  =  di;                                                 // diCnt is destination iterator counter - used to count the number of destination slots this packet will be copied to so that the reference count can be set correctly
         auto    diEn  =  lf.graph.destCnctEnd();
 
+        LavaPacket pkt = basePkt;
         for(; di!=diEn && di->first==src; ++di)
         {                                                                    // loop through the 1 or more destination slots connected to this source
-          LavaId   pktId = di->second;
-          LavaPacket pkt = basePkt;                                          // pkt is packet
-          pkt.dest_node  = pktId.nid;
-          pkt.dest_slot  = pktId.sidx;
+          LavaId  pktId = di->second;
+                    pkt = basePkt;                                          // pkt is packet
+          pkt.dest_node = pktId.nid;
+          pkt.dest_slot = pktId.sidx;
 
           mem.incRef();
 
           lf.putPacket(pkt);                                                 // putPacket contains a mutex for now, eventually will be a lock free queue
         }
 
-        ownedMem.push_back(mem);
+        lf.packetCallback(pkt);
 
-        lf.packetCallback(basePkt);
+        ownedMem.push_back(mem);
       }
     } // SECTION(create packets and put them into packet queue)
 
@@ -2169,12 +2172,33 @@ void               LavaLoop(LavaFlow& lf) noexcept
       }
 
       auto zeroRef  = partition(ALL(ownedMem), [](auto a){return a.refCount() > 0;} );                           // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
+
+      // only need to sort the memory with zero reference counts, and only need to sort them by address, since their references are already known to be zero
+      sort(zeroRef, end(ownedMem), [](LavaMem a, LavaMem b)
+      {
+        return (u64)a.ptr < (u64)b.ptr;
+      });                           // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
+      u64 lastFreed = 0;
       auto freeIter = zeroRef;
       for(; freeIter != end(ownedMem); ++freeIter){                                                              // loop through the memory with zero references and free them
-        LavaFree( (uint64_t)freeIter->data() );
+        
+        if((u64)freeIter->ptr != lastFreed){
+          LavaFree( (uint64_t)freeIter->data() );
+          lastFreed = (u64)freeIter->ptr;
+        }
       }
 
       ownedMem.erase(zeroRef, end(ownedMem));                                                                    // erase the now freed memory
+
+      //auto freeIter = zeroRef;
+      //for(; freeIter != end(ownedMem); ++freeIter){                                                              // loop through the memory with zero references and free them
+      //  LavaFree( (uint64_t)freeIter->data() );
+      //}
+
+      //auto aref = a.refCount();
+      //auto bref = b.refCount();
+      //if(aref==bref) 
+      //else           return aref < bref;
     }
   }
 

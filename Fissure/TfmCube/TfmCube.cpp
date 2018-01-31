@@ -7,8 +7,8 @@ enum Slots
 {
   // This is an example enumeration that is meant to be helpful, though is not strictly neccesary. Referencing slots by a name will generally be less error prone than using their index and remembering what each index is for
   
-  SLOT_0 = 0,        
-  SLOT_1 = 1
+  MODEL_OUT = 0,
+  //SLOT_1 = 1
   //SLOT_2 = 2,
   //SLOT_3 = 3
 };
@@ -20,24 +20,18 @@ extern "C"
   const char* OutNames[] = {"Output Model",        nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   const char* OutTypes[] = {"IdxVerts",            nullptr};            // This array contains the types that are output in each slot of the same index
   
-  //const char*  InNames[]  = {"Template Slot In",   nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
-  //const char* OutNames[]  = {"Template Slot Out",  nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
-
   uint64_t TfmCube(LavaParams* inout_lp, LavaFrame* in, lava_threadQ* out) noexcept
   {
     using namespace std;
 
-    TO(in->packets.size(),i) if(in->slotMask[i]){
+    TO(in->packets.size(),i) if(in->slotMask[i])
+    {
       LavaPacket const& pkt = in->packets[i];
+      out->push({MODEL_OUT, pkt.msg.val.value, pkt.msg.val.type});
     }
 
-    //LavaOut lo;
-    //lo.type  = LavaArgType::MEMORY;
-    //lo.value = (u64)nullptr;
-    //out->push(lo);
-
-    out->push(LavaOut(0));
-    out->push({0});
+    //out->push(LavaOut(0));
+    //out->push({0});
 
     return 1;
   }
@@ -71,6 +65,13 @@ extern "C"
 
 
 
+//LavaOut lo;
+//lo.type  = LavaArgType::MEMORY;
+//lo.value = (u64)nullptr;
+//out->push(lo);
+
+//const char*  InNames[]  = {"Template Slot In",   nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+//const char* OutNames[]  = {"Template Slot Out",  nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
 
 //in[i].packets
 //

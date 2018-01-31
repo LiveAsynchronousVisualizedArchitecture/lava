@@ -206,8 +206,12 @@
 // -todo: put slot type in the status bar
 // -todo: fix slots labels - lower slot indices were outputs, higher were inputs
 // -todo: put error type in the status bar on mouse over of a errored node
+// -todo: figure out why passing memory through creates a crash - possible duplications create a double free scenario? - seems to be the case - only have to sort the already partitioned memory with a reference count of zero, then skip over duplicates, all the zero referenced memory are already partitioned and will be erased anyway
+// -todo: make a node that passes cube through
+// -todo: visualize the passed through memory - visualizes on output - passed through node was not setting the slot of its output value
+// -todo: get input slot to be visualized - needed to give the packet callback a packet with the dest node and slot set
 
-// todo: make a node that passes cube through
+// todo: make a new output type of passthrough, that does not make an entry in owned mem - no longer need to sort memory allocations to eliminate duplicates?
 // todo: make a node to transform the cube from MakeCube
 // todo: give message passing nodes constructors and destructors 
 // todo: test LavaQ across shared library borders
@@ -1591,9 +1595,14 @@ str                   genDbKey(LavaId     sid)            // genDbKey is generat
 }
 void        lavaPacketCallback(LavaPacket pkt)
 {
-  LavaId id(pkt.src_node, pkt.src_slot);
-  if( fd.vizIds.has(id.asInt) ){
-    auto label  =  genDbKey(id);
+  LavaId srcid(pkt.src_node, pkt.src_slot);
+  LavaId destid(pkt.dest_node, pkt.dest_slot);
+  if( fd.vizIds.has(srcid.asInt) ){
+    auto label  =  genDbKey(srcid);
+    auto    lm  =  LavaMem::fromDataAddr(pkt.msg.val.value);
+    bool    ok  =  fisdb.put(label.data(), label.size(), lm.data(), lm.sizeBytes() );
+  }else if( fd.vizIds.has(destid.asInt) ){
+    auto label  =  genDbKey(destid);
     auto    lm  =  LavaMem::fromDataAddr(pkt.msg.val.value);
     bool    ok  =  fisdb.put(label.data(), label.size(), lm.data(), lm.sizeBytes() );
   }
