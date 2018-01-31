@@ -58,6 +58,9 @@
 // -todo: fix blank tbl elements - look at testGeo creation - tbl initialization arguments were mixed up
 // -todo: fix crash while turning on second button - can't repeat this old note/bug
 
+// todo: take out test db
+// todo: take out nanovg visualization of tbl
+// todo: investigate crash while visualizing multiple tables in a running graph
 // todo: fix crash from VS execution in release mode
 // todo: fix tbl visualization cells going outside the bounds of bounding box - need to wrap sooner, possibly based on more margins
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
@@ -829,7 +832,7 @@ ENTRY_DECLARATION
   using namespace std;
   using namespace nanogui;
 
-  genTestGeo(&db);
+  //genTestGeo(&db);
 
   //tbl<u8> pears<std::initializer_list<std::pair<char*,tbl<u8>::KV> >( { std::make_pair("wat",85) } );
   tbl<u8> pears = { {"wat",85} };
@@ -1185,13 +1188,12 @@ ENTRY_DECLARATION
     }
     SECTION(table)
     {
-      auto w = vd.ui.w - vd.ui.keyWin->width();
-      auto h = vd.ui.h - vd.ui.keyWin->height();
+      //auto w = vd.ui.w - vd.ui.keyWin->width();
+      //auto h = vd.ui.h - vd.ui.keyWin->height();
 
-      nvgBeginFrame(vd.ui.nvg, vd.ui.w, vd.ui.h, 1.f);             // vd.ui.w / (f32)vd.ui.h);
-        //drawTbl(vd.ui.nvg, tst("chld"), (f32)w, (f32)h, 25, 50, 20, 10);
-        drawTbl(vd.ui.nvg, tst, (f32)w, (f32)h, 25, 50, 20, 10);
-      nvgEndFrame(vd.ui.nvg);
+      //nvgBeginFrame(vd.ui.nvg, vd.ui.w, vd.ui.h, 1.f);             
+      //  drawTbl(vd.ui.nvg, tst, (f32)w, (f32)h, 25, 50, 20, 10);
+      //nvgEndFrame(vd.ui.nvg);
     }
     SECTION(nanogui)
     {
@@ -1275,6 +1277,9 @@ ENTRY_DECLARATION
 
 
 
+
+// vd.ui.w / (f32)vd.ui.h);
+//drawTbl(vd.ui.nvg, tst("chld"), (f32)w, (f32)h, 25, 50, 20, 10);
 
 //
 // new (&db2) simdb(name.c_str(), 4096, 1 << 14);             // inititialize the DB with placement new into the data segment

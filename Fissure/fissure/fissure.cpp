@@ -1619,42 +1619,6 @@ void              debug_coords(v2 a)
 
 } // end namespace
 
-//void print_flf_map(flf_map mp)
-//{
-//  flf_map::Header* hd = mp.header();
-//
-//  Println("Header | typechar1: ", (char)hd->typeChar1, 
-//    " typechar2: ",         (char)hd->typeChar2, 
-//    " sizeBytes: ",    hd->sizeBytes, 
-//    " size: ",         hd->size, 
-//    " valSizeBytes: ", hd->valSizeBytes );
-//
-//    u64    cap = mp.capacity();
-//    
-//    auto slots = mp.slotPtr();
-//    Print("Slots: ");
-//    TO(cap,i){
-//      auto idx = slots[i];
-//      Print(idx.readers, ",");
-//      if(idx.val_idx==flf_map::DELETED)
-//        Print("DELETED ");
-//      else if(idx.val_idx==flf_map::EMPTY)
-//        Print("EMPTY ");
-//      else 
-//        Print(idx.val_idx, " ");
-//    }
-//    Println("\n");
-//
-//    u32* lstSt = mp.listStart(cap);
-//    Print("List: ");
-//    TO(cap,i){ 
-//      if(lstSt[i]==flf_map::LIST_END)
-//        Print("LIST_END");
-//      else 
-//        Print(lstSt[i], " "); 
-//    }
-//}
-
 void PrintAB(LavaQ<int>& q, str label="")
 {
   //TO(q.capA(),i) sA += toString(q.atA(i)," ");
@@ -2573,6 +2537,41 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//void print_flf_map(flf_map mp)
+//{
+//  flf_map::Header* hd = mp.header();
+//
+//  Println("Header | typechar1: ", (char)hd->typeChar1, 
+//    " typechar2: ",         (char)hd->typeChar2, 
+//    " sizeBytes: ",    hd->sizeBytes, 
+//    " size: ",         hd->size, 
+//    " valSizeBytes: ", hd->valSizeBytes );
+//
+//    u64    cap = mp.capacity();
+//    
+//    auto slots = mp.slotPtr();
+//    Print("Slots: ");
+//    TO(cap,i){
+//      auto idx = slots[i];
+//      Print(idx.readers, ",");
+//      if(idx.val_idx==flf_map::DELETED)
+//        Print("DELETED ");
+//      else if(idx.val_idx==flf_map::EMPTY)
+//        Print("EMPTY ");
+//      else 
+//        Print(idx.val_idx, " ");
+//    }
+//    Println("\n");
+//
+//    u32* lstSt = mp.listStart(cap);
+//    Print("List: ");
+//    TO(cap,i){ 
+//      if(lstSt[i]==flf_map::LIST_END)
+//        Print("LIST_END");
+//      else 
+//        Print(lstSt[i], " "); 
+//    }
+//}
 
 //f64 seconds  =  timeToSeconds(fd.lgrph.node(fd.sel.pri).time);
 //f64 percent  =  totalTime>0?  (seconds/totalTime)*100  :  0;
