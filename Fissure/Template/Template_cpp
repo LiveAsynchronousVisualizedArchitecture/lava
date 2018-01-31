@@ -20,7 +20,7 @@ extern "C"
   const char* OutNames[]  = {"Template Slot Out",  nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   const char* OutTypes[]  = {"IdxVerts",           nullptr};            // This array contains the types that are output in each slot of the same index
 
-  uint64_t |_NAME_|(LavaParams* inout_lp, LavaFrame* in, lava_threadQ* out) noexcept
+  uint64_t |_NAME_|(LavaParams const* inout_lp, LavaFrame const* in, lava_threadQ* out) noexcept
   {
     using namespace std;
 

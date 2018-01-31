@@ -211,37 +211,33 @@
 // -todo: visualize the passed through memory - visualizes on output - passed through node was not setting the slot of its output value
 // -todo: get input slot to be visualized - needed to give the packet callback a packet with the dest node and slot set
 // -todo: make a new output type of passthrough, that does not make an entry in owned mem - no longer need to sort memory allocations to eliminate duplicates?
+// -todo: make a node to transform the cube from MakeCube
+// -todo: draw node names after the slots so the text is on top? - not neccesary with enough margin
+// -todo: make button that creates a project for a node - would it need to pop up a modal dialog? - done with a button and a text field
+// -todo: test LavaQ across shared library borders - seems to work
+// -todo: integrate type into LavaMem instead of as part of the LavaMem struct so that it can be queried externally - may have to revisit this
+// -todo: look at LavaParams now that it doesn't need to be written to by the node - designated as const and outputs taken out 
 
-// todo: make a node to transform the cube from MakeCube
+// todo: look at taking LavaMsg out
+// todo: make LavaMem use a struct for layout of bytes
+// todo: unify LavaOut and LavaVal
+// todo: make lava allocation function put the new allocation into the current thread's owned mem vector instead of having it happen outside the loop - this will mean no more need for duplicate allocation checking and passthrough types
 // todo: give message passing nodes constructors and destructors 
-// todo: test LavaQ across shared library borders
+// todo: put each thread's owned memory vector into a global vector that other threads can access
 // todo: move dealing with the output queue out of the run func function
 // todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets
 // todo: make a settings file that is read on load if it in the same directory
 // todo: make list of nodes a side window, right click menu, hot box, etc
-// todo: draw node names after the slots so the text is on top?
-// todo: change cur() functions to const and rename to read()
-// todo: change opp() functions to non-const only and rename to write()
-// todo: figure out a way to have a reader count with lava.graph - is an atomic hash map inevitable? 
-// todo: put in read count and write count for both A and B buffers
 // todo: make each variable in the graph individually double buffered or even multi-buffered according to readers?
 // todo: have exec() spinlock until readers of the opposite buffer drops to 0 - could also just skip the command buffer in the rare case that it catches readers as more than 0
 // todo: fix type warnings in simdb
-// todo: make button that creates a project for a node - would it need to pop up a modal dialog?
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array - can any heirarchy of initializer_lists be brought down to an array of the same types?
-// todo: make popup text box that avoids the bounding box of the moused over node? - put graph of node times in the box? put graph of covariance data of data in, time spent, data out, and time ?   
-// todo: make segmented vertical bar that shows packets building up on certain node
-// todo: make right click or space bar open up a text box that can contain the build command, stats and/or hotbox
 // todo: make shared libraries loaded after the GUI
 // todo: make shared libraries only try to load one per frame
-// todo: integrate type into LavaMem instead of as part of the LavaMem struct so that it can be queried externally
-// todo: try to unify nanogui into a single file?
-// todo: try to unify nfd into a single file ? 
-// todo: make LavaHeapFree use a thread local variable for the errors instead of a return value, so that it's signature will match with free
-// todo: make LavaMem use a struct for layout of bytes
 // todo: make packets visualize on slots circles stack as concentric circles or as portions/segments of a single circle 
-// todo: make errors in the directory creation give an error in the status bar 
-
+// todo: make packet visualization also include lighting up connections between slots
+// todo: make LavaHeapFree use a thread local variable for the errors instead of a return value, so that it's signature will match with free
+// todo: look into techniques for keeping data local to CPU cores, and CPU sockets
 
 // todo: make input slots start at 0 - does there need to be a separation between input and out slots or does there need to be an offset so that the input frame starts at 0 
 // todo: convert tbl to use arrays of the data types smaller than 64 bits
@@ -280,6 +276,11 @@
 //       |  use a union of bytes that is filled with the frame, slot, list index?
 //       |  use malloc addresses initially
 
+// idea: make errors in the directory creation give an error in the status bar 
+// idea: make right click or space bar open up a text box that can contain the build command, stats and/or hotbox
+// idea: make popup text box that avoids the bounding box of the moused over node? - put graph of node times in the box? put graph of covariance data of data in, time spent, data out, and time ?   
+// idea: try to unify nanogui into a single file?
+// idea: try to unify nfd into a single file ? 
 // idea: build guard pages into Lava heap allocations that can be set to non read or write - use these to crash if memory is read or written out of bounds - maybe do this only in debug mode
 // idea: make a table creation and editing GUI
 // idea: make a dialog to set a compilation command for each node - think about debug and release modes, different OSs - set the current working directory to the node directory path
@@ -350,6 +351,12 @@
 //    | structurally does this mean that nodes would have attributes instead of one type? 
 //    |  |  main issues are gather and split
 //    |  |  if a node wants to gather packets but not output a single packet, would it be both a gather and a split?
+
+// graph ideas:
+// idea: figure out a way to have a reader count with lava.graph - is an atomic hash map inevitable? 
+// idea: put in read count and write count for both A and B buffers
+// idea: change cur() functions to const and rename to read() - maybe later
+// idea: change opp() functions to non-const only and rename to write() - maybe later
 
 // Major Features: 
 //   | -Catch low level exceptions on each node

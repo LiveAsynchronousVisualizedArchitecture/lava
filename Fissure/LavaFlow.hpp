@@ -559,9 +559,10 @@ using lava_ptrsvec       =  std::vector<LavaNode*>;
 using lava_nameNodeMap   =  std::unordered_map<std::string, LavaNode*>;                   // maps the node names to their pointers
 using lava_threadQ       =  LavaQ<LavaOut>;
 
-extern "C" using           LavaAlloc  =  void* (*)(uint64_t);                                    // custom allocation function passed in to each node call
-extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                                         // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
-extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaFrame*, lava_threadQ*);   // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
+extern "C" using           LavaAlloc  =  void* (*)(uint64_t);                                          // custom allocation function passed in to each node call
+extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                                               // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
+//extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaFrame*, lava_threadQ*);       // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
+extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams const*, LavaFrame const*, lava_threadQ*);   // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
 
 struct   AtomicBitset
 {
@@ -671,7 +672,7 @@ union          LavaId                                            // this Id serv
 struct     LavaParams
 {
   u32            inputs;
-  u32           outputs;
+  //u32           outputs;
   u64             frame;
   LavaId             id;
   LavaAlloc   mem_alloc;
@@ -835,8 +836,8 @@ struct   LavaFlowSlot
 struct        LavaMem
 {
   using au64 = std::atomic<uint64_t>;
-
-  void* ptr = nullptr;
+   
+  void*  ptr = nullptr;
 
   uint64_t    refCount()const{ return ((uint64_t*)ptr)[0]; }
   uint64_t   sizeBytes()const{ return ((uint64_t*)ptr)[1]; }
@@ -866,9 +867,6 @@ struct    LavaCommand
   Command cmd; 
   union { Arg A; Arg dest; Arg nd; };
   union { Arg B; Arg  src; };
-
-  //union { LavaId A; LavaId dest; LavaNode* ndptr; }; 
-  //union { LavaId B; LavaId  src; };
 };
 // end data types
 
@@ -1924,7 +1922,7 @@ LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t ni
     SECTION(create arguments and call function)
     {
       lp.inputs      =     1;
-      lp.outputs     =   512;
+      //lp.outputs     =   512;
       lp.frame       =   lf.m_frame;
       lp.id          =   LavaId(nid);
       lp.mem_alloc   =   LavaAlloc;
@@ -2231,6 +2229,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//union { LavaId A; LavaId dest; LavaNode* ndptr; }; 
+//union { LavaId B; LavaId  src; };
 
 //LavaInst ret;
 //ret.id   = nIter->first;
