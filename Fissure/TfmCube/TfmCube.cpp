@@ -3,6 +3,9 @@
 #include "../../tbl.hpp"
 #include "../LavaFlow.hpp"
 
+struct vert { f32 p[3],n[3],c[4],tx[2]; };
+using IvTbl = tbl<vert>;
+
 enum Slots
 {
   // This is an example enumeration that is meant to be helpful, though is not strictly neccesary. Referencing slots by a name will generally be less error prone than using their index and remembering what each index is for
@@ -20,18 +23,26 @@ extern "C"
   const char* OutNames[] = {"Output Model",        nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   const char* OutTypes[] = {"IdxVerts",            nullptr};            // This array contains the types that are output in each slot of the same index
   
-  uint64_t TfmCube(LavaParams* inout_lp, LavaFrame* in, lava_threadQ* out) noexcept
+  uint64_t TfmCube(LavaParams* lp, LavaFrame* in, lava_threadQ* out) noexcept
   {
     using namespace std;
 
     TO(in->packets.size(),i) if(in->slotMask[i])
     {
       LavaPacket const& pkt = in->packets[i];
-      out->push({MODEL_OUT, pkt.msg.val.value, pkt.msg.val.type});
-    }
+      void*               p = (void*)pkt.msg.val.value;
+      IvTbl inCube(p, false, false);
+      auto  bytes = inCube.sizeBytes();
+      void*    tp = lp->mem_alloc(bytes);
+      memcpy(tp, p, bytes);
+      IvTbl oCube(tp, false, false);
+      TO(oCube.size(),i){
+        oCube[i].c[0] = 0;
+        oCube[i].c[1] = 0;
+      }
 
-    //out->push(LavaOut(0));
-    //out->push({0});
+      out->push({MODEL_OUT, (u64)oCube.memStart()});                               // Creates a LavaOut struct
+    }
 
     return 1;
   }
@@ -64,6 +75,16 @@ extern "C"
 
 
 
+
+
+//
+//out->push({MODEL_OUT, pkt.msg.val.value, LavaArgType::PASSTHRU });
+
+//IvTbl  oCube(p, false, false);
+//tbl<vert>::make_borrowed(lp->mem_alloc, oCube.
+
+//out->push(LavaOut(0));
+//out->push({0});
 
 //LavaOut lo;
 //lo.type  = LavaArgType::MEMORY;

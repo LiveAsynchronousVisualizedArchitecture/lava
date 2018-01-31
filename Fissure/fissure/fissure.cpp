@@ -210,12 +210,13 @@
 // -todo: make a node that passes cube through
 // -todo: visualize the passed through memory - visualizes on output - passed through node was not setting the slot of its output value
 // -todo: get input slot to be visualized - needed to give the packet callback a packet with the dest node and slot set
+// -todo: make a new output type of passthrough, that does not make an entry in owned mem - no longer need to sort memory allocations to eliminate duplicates?
 
-// todo: make a new output type of passthrough, that does not make an entry in owned mem - no longer need to sort memory allocations to eliminate duplicates?
 // todo: make a node to transform the cube from MakeCube
 // todo: give message passing nodes constructors and destructors 
 // todo: test LavaQ across shared library borders
 // todo: move dealing with the output queue out of the run func function
+// todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets
 // todo: make a settings file that is read on load if it in the same directory
 // todo: make list of nodes a side window, right click menu, hot box, etc
 // todo: draw node names after the slots so the text is on top?

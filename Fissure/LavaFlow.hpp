@@ -642,7 +642,7 @@ struct   AtomicBitset
 };
 
 union     LavaArgType{ 
-  enum { NONE=0, END, DATA_ERROR, STORE, MEMORY, SEQUENCE, ENUMERATION };                // todo: does this need store sequence and memory sequence?
+  enum { NONE=0, END, DATA_ERROR, STORE, MEMORY, PASSTHRU, SEQUENCE, ENUMERATION };                // todo: does this need store sequence and memory sequence? // PASSTHROUGH is unfortunatly taken up by the windows gdi header
   u8 asInt;
 };
 union          LavaId                                            // this Id serves as both a nodeId and LavaFlowSlot index, since a LavaFlowSlot index will alway coordinate with only one node 
@@ -1992,7 +1992,8 @@ LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t ni
 
         lf.packetCallback(pkt);
 
-        ownedMem.push_back(mem);
+        if(outArg.type != LavaArgType::PASSTHRU)                            // if set to passthrough, don't take ownership of the memory - should adding to the owned mem vector be part of LavaAlloc ?
+          ownedMem.push_back(mem);
       }
     } // SECTION(create packets and put them into packet queue)
 
@@ -2240,7 +2241,6 @@ void               LavaLoop(LavaFlow& lf) noexcept
 //inst.id = on.first;
 //inst.nd = on.second;
 //nds.push_back(inst);
-
 
 //
 //TO(LavaFrame::PACKET_SLOTS,i) if(runFrm.getSlot(i)){ 

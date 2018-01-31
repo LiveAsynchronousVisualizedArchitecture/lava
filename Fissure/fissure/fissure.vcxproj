@@ -201,7 +201,6 @@
     <ClInclude Include="..\nanovg-master\src\nanovg_gl_utils.h" />
     <ClInclude Include="..\nanovg-master\src\stb_image.h" />
     <ClInclude Include="..\nanovg-master\src\stb_truetype.h" />
-    <ClInclude Include="..\tbl.hpp" />
     <ClInclude Include="..\Transform.h" />
     <ClInclude Include="FissureDecl.h" />
     <ClInclude Include="flat_lockfree_map.hpp" />

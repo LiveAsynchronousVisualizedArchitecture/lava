@@ -27,6 +27,7 @@
 // -todo: use upper bit of pointer to represent ownership, so that if memory is freed out from under the tbl, it isn't freed? - ownership would be overridden when a table is based off of a buffer that it doesn't own - only should be neccesary if one tbl owns that memory but others don't, otherwise, ownership should just be set to false in the contiguous memory - maybe a tbl should never be able to be an observer to another tbl's memory, it should be copied, moved, referenced or pointed to instead 
 // -todo: figure out why empty KV is found after expand - reserve was initting all fields but not resetting to them to their previous values
 
+// todo: does a tbl need to store the address of a pointer to the function that should deallocate it? 
 // todo: fix kv of a sub tbl having a base and val that are 0 - should be 0 at that stage, since they haven't been set yet? 
 // todo: make owning of memory execute a copy in the tbl constructor that takes a void pointer
 // todo: make tbl structs local to the scope of the tbl
@@ -1315,9 +1316,7 @@ public:
   {
     using namespace std;
     
-    
     auto bytes = tbl::size_bytes(count);
-    //ret.m_mem  = (u8*)alloc( bytes );
     u8* memSt = (u8*)alloc( bytes );
     tbl ret;
     ret.m_mem = memSt + tbl::memberBytes();
@@ -1325,6 +1324,8 @@ public:
     ret.owned(false);
 
     return move(ret);
+
+    //ret.m_mem  = (u8*)alloc( bytes );
     //auto st = ret.memStart();
   }
 };
