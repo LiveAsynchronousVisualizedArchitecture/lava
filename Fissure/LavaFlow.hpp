@@ -685,26 +685,27 @@ struct        LavaVal
 };
 struct        LavaOut
 {
-  // todo: change to LavaVal
-  u64      type :  3;          // ArgType
-  u64     value : 61;          // This will hold the address in memory - could also hold the starting block index in the database 
+  //// todo: change to LavaVal
+  //u64      type :  3;          // ArgType
+  //u64     value : 61;          // This will hold the address in memory - could also hold the starting block index in the database 
+  LavaVal val;
 
   union {
     struct { u64 frame; u32 slot; u32 listIdx; };
     u8 bytes[16];
   }key;
 
-  LavaOut() : key{0,0,0}, type(0), value(0) {}
-  LavaOut(u32 slot, u64 val) : key{0,slot,0}, value(val), type(LavaArgType::MEMORY)
+  LavaOut() : key{0,0,0}, val{0,0} {} // type(0), value(0) {}
+  LavaOut(u32 slot, u64 value) : key{0,slot,0}, val{LavaArgType::MEMORY,value}   // value(val), type(LavaArgType::MEMORY)
   {}
-  LavaOut(u32 slot, u64 val, u64 _type) : key{0,slot,0}, value(val), type(_type)
+  LavaOut(u32 slot, u64 value, u64 type) : key{0,slot,0}, val{type,value}  // value(val), type(_type)
   {}
 };
-struct        LavaMsg
-{
-  u64        id;
-  LavaVal    val;
-};
+//struct        LavaMsg
+//{
+//  u64        id;
+//  LavaVal    val;
+//};
 struct     LavaPacket
 {
   u64    ref_count;                               // todo: is this used? 
@@ -718,7 +719,9 @@ struct     LavaPacket
   u64   rangeStart;
   u64     rangeEnd;
   u64     sz_bytes;                               // the size in bytes can be used to further sort the packets so that the largets are processed first, possibly resulting in less memory usage over time
-  LavaMsg      msg;
+  u64           id;
+  LavaVal      val;
+  //LavaMsg      msg;
 
   bool operator<(LavaPacket const& r) const
   {    
@@ -727,7 +730,7 @@ struct     LavaPacket
     if(sz_bytes != r.sz_bytes) return sz_bytes < r.sz_bytes;            // want largest sizes to be done first
     if(framed   != r.framed)   return framed   < r.framed;              // want framed packets to be done first so that their dependencies can be resolved
 
-    return msg.id > r.msg.id;
+    return id > r.id;
   }
 };
 struct      LavaFrame
@@ -839,6 +842,12 @@ struct        LavaMem
    
   void*  ptr = nullptr;
 
+  //struct Header
+  //{
+  //  refCount;
+  //  sizeBytes;
+  //};
+
   uint64_t    refCount()const{ return ((uint64_t*)ptr)[0]; }
   uint64_t   sizeBytes()const{ return ((uint64_t*)ptr)[1]; }
   uint64_t&   refCount()     { return ((uint64_t*)ptr)[0]; }
@@ -889,8 +898,8 @@ template<class T> LavaOut  LavaTblToOut(LavaParams const* lp, tbl<T> const& t)
   memcpy(outmem, t.memStart(), t.sizeBytes());
 
   LavaOut o;
-  o.value = (u64)outmem;
-  o.type  = LavaArgType::MEMORY;
+  o.val.value = (u64)outmem;
+  o.val.type  = LavaArgType::MEMORY;
 
   return o;
 }
@@ -1947,17 +1956,17 @@ LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t ni
         LavaOut outArg;
         if( !outArgs->pop(outArg) ){ continue; }
 
-        if(outArg.value == 0){ ret = LavaInst::OUTPUT_ERROR; continue; }
+        if(outArg.val.value == 0){ ret = LavaInst::OUTPUT_ERROR; continue; }
 
         // create new value for the new packet
         LavaVal val;
-        val.type  = outArg.type;
-        val.value = outArg.value;
+        val.type  = outArg.val.type;
+        val.value = outArg.val.value;
         auto sidx = outArg.key.slot;
 
-        LavaMem  mem = LavaMem::fromDataAddr(outArg.value);
+        LavaMem  mem = LavaMem::fromDataAddr(outArg.val.value);
         // todo: deal with mem being 0 here
-        auto szBytes = outArg.value? mem.sizeBytes()  :  0;
+        auto szBytes = outArg.val.value? mem.sizeBytes()  :  0;
 
         // create new packet 
         LavaPacket basePkt;
@@ -1965,8 +1974,8 @@ LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t ni
         basePkt.framed      =   false;                 // would this go on the socket?
         basePkt.src_node    =   nid;
         basePkt.src_slot    =   sidx;
-        basePkt.msg.id      =   lf.nxtMsgId();         // todo: rethink this, since nxtMsgId might not be neccesary
-        basePkt.msg.val     =   val;
+        basePkt.id          =   lf.nxtMsgId();         // todo: rethink this, since nxtMsgId might not be neccesary
+        basePkt.val         =   val;
         basePkt.sz_bytes    =   mem.sizeBytes();  
 
         // route the packet using the graph - the packet may be copied multiple times and go to multiple destination slots
@@ -1990,7 +1999,7 @@ LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t ni
 
         lf.packetCallback(pkt);
 
-        if(outArg.type != LavaArgType::PASSTHRU)                            // if set to passthrough, don't take ownership of the memory - should adding to the owned mem vector be part of LavaAlloc ?
+        if(outArg.val.type != LavaArgType::PASSTHRU)                            // if set to passthrough, don't take ownership of the memory - should adding to the owned mem vector be part of LavaAlloc ?
           ownedMem.push_back(mem);
       }
     } // SECTION(create packets and put them into packet queue)
@@ -2156,7 +2165,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
           default:{ // if everything worked, decrement the references of all the packets in the frame
             if(doFlow){
               TO(LavaFrame::PACKET_SLOTS,i) if(runFrm.slotMask[i]){ 
-                LavaMem mem = LavaMem::fromDataAddr(runFrm.packets[i].msg.val.value);
+                LavaMem mem = LavaMem::fromDataAddr(runFrm.packets[i].val.value);
                 mem.decRef();
               }
             }

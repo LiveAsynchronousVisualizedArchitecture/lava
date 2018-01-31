@@ -217,10 +217,10 @@
 // -todo: test LavaQ across shared library borders - seems to work
 // -todo: integrate type into LavaMem instead of as part of the LavaMem struct so that it can be queried externally - may have to revisit this
 // -todo: look at LavaParams now that it doesn't need to be written to by the node - designated as const and outputs taken out 
+ // -todo: take LavaMsg out
+// -todo: make LavaMem use a struct for layout of bytes - only two header members, not neccesary 
+// -todo: unify LavaOut and LavaVal
 
-// todo: look at taking LavaMsg out
-// todo: make LavaMem use a struct for layout of bytes
-// todo: unify LavaOut and LavaVal
 // todo: make lava allocation function put the new allocation into the current thread's owned mem vector instead of having it happen outside the loop - this will mean no more need for duplicate allocation checking and passthrough types
 // todo: give message passing nodes constructors and destructors 
 // todo: put each thread's owned memory vector into a global vector that other threads can access
@@ -1607,11 +1607,11 @@ void        lavaPacketCallback(LavaPacket pkt)
   LavaId destid(pkt.dest_node, pkt.dest_slot);
   if( fd.vizIds.has(srcid.asInt) ){
     auto label  =  genDbKey(srcid);
-    auto    lm  =  LavaMem::fromDataAddr(pkt.msg.val.value);
+    auto    lm  =  LavaMem::fromDataAddr(pkt.val.value);
     bool    ok  =  fisdb.put(label.data(), label.size(), lm.data(), lm.sizeBytes() );
   }else if( fd.vizIds.has(destid.asInt) ){
     auto label  =  genDbKey(destid);
-    auto    lm  =  LavaMem::fromDataAddr(pkt.msg.val.value);
+    auto    lm  =  LavaMem::fromDataAddr(pkt.val.value);
     bool    ok  =  fisdb.put(label.data(), label.size(), lm.data(), lm.sizeBytes() );
   }
 }

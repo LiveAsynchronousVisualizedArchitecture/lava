@@ -30,7 +30,8 @@ extern "C"
     TO(in->packets.size(),i) if(in->slotMask[i])
     {
       LavaPacket const& pkt = in->packets[i];
-      void*               p = (void*)pkt.msg.val.value;
+      //void*               p = (void*)pkt.msg.val.value;
+      void*               p = (void*)pkt.val.value;
       IvTbl inCube(p, false, false);
       auto  bytes = inCube.sizeBytes();
       void*    tp = lp->mem_alloc(bytes);
