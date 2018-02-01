@@ -1919,97 +1919,6 @@ LavaInst::State exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaFram
 
   return ret;
 }
-LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaFrame* inFrame,  lava_threadQ* outArgs) noexcept // LavaOut* outArgs) noexcept   // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
-{
-  using namespace std;
-  using namespace std::chrono;
-
-  LavaInst&  li = lf.graph[nid];
-  FlowFunc func = li.node->func;                      //lf.graph[nid].node->func;
-  if(func)
-  {
-    LavaInst::State ret;
-    LavaParams       lp;
-    SECTION(create arguments and call function)
-    {
-      lp.inputs      =     1;
-      lp.frame       =   lf.m_frame;
-      lp.id          =   LavaId(nid);
-      lp.mem_alloc   =   LavaAlloc;
-
-      auto  stTime = high_resolution_clock::now();
-        ret = exceptWrapper(func, lf, &lp, inFrame, outArgs);
-        if(ret != LavaInst::NORMAL){
-          LavaOut o;                                                        // if there was an error, clear the queue of the produced data - there may be better ways of doing this, such as integrating it with the queue loop below, or building a specific method into the LavaQ
-          while(outArgs->size()>0)
-            outArgs->pop(o);
-          
-          return ret;
-        }
-      auto endTime = high_resolution_clock::now();
-      duration<u64,nano> diff = (endTime - stTime);
-      li.addTime( diff.count() );
-    }
-    SECTION(create packets and put them into packet queue)               // this section will not be reached if there was an error
-    {
-      while(outArgs->size() > 0)
-      {
-        LavaOut outArg;
-        if( !outArgs->pop(outArg) ){ continue; }
-
-        if(outArg.val.value == 0){ ret = LavaInst::OUTPUT_ERROR; continue; }
-
-        // create new value for the new packet
-        LavaVal val;
-        val.type  = outArg.val.type;
-        val.value = outArg.val.value;
-        auto sidx = outArg.key.slot;
-
-        LavaMem  mem = LavaMem::fromDataAddr(outArg.val.value);
-        // todo: deal with mem being 0 here
-        auto szBytes = outArg.val.value? mem.sizeBytes()  :  0;
-
-        // create new packet 
-        LavaPacket basePkt;
-        basePkt.frame       =   lf.m_frame;            // increment the frame on every major loop through both data and message nodes - how to know when a full cycle has passed? maybe purely by message nodes - only increment frame if data is created through a message node cycle
-        basePkt.framed      =   false;                 // would this go on the socket?
-        basePkt.src_node    =   nid;
-        basePkt.src_slot    =   sidx;
-        basePkt.id          =   lf.nxtMsgId();         // todo: rethink this, since nxtMsgId might not be neccesary
-        basePkt.val         =   val;
-        basePkt.sz_bytes    =   mem.sizeBytes();  
-
-        // route the packet using the graph - the packet may be copied multiple times and go to multiple destination slots
-        LavaId   src  =  { nid, sidx };
-        auto      di  =  lf.graph.destCncts(src);                            // di is destination iterator
-        auto   diCnt  =  di;                                                 // diCnt is destination iterator counter - used to count the number of destination slots this packet will be copied to so that the reference count can be set correctly
-        auto    diEn  =  lf.graph.destCnctEnd();
-
-        LavaPacket pkt = basePkt;
-        for(; di!=diEn && di->first==src; ++di)
-        {                                                                    // loop through the 1 or more destination slots connected to this source
-          LavaId  pktId = di->second;
-                    pkt = basePkt;                                          // pkt is packet
-          pkt.dest_node = pktId.nid;
-          pkt.dest_slot = pktId.sidx;
-
-          mem.incRef();
-
-          lf.putPacket(pkt);                                                 // putPacket contains a mutex for now, eventually will be a lock free queue
-        }
-
-        lf.packetCallback(pkt);
-
-        //if(outArg.val.type != LavaArgType::PASSTHRU)                            // if set to passthrough, don't take ownership of the memory - should adding to the owned mem vector be part of LavaAlloc ?
-        //  ownedMem.push_back(mem);
-      }
-    } // SECTION(create packets and put them into packet queue)
-
-    return ret; // LavaInst::NORMAL;
-  }
-
-  return LavaInst::LOAD_ERROR;
-}
 
 }
 
@@ -2077,18 +1986,18 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow)
 void               LavaLoop(LavaFlow& lf) noexcept
 {
   using namespace std;
+  using namespace std::chrono;
 
   lf.incThreadCount();
 
+  lava_threadQ     outQ;                              // queue of the output arguments
+  lava_memvec  ownedMem;
+  LavaFrame     inFrame;
+  LavaFrame      runFrm;
+  LavaVal        inArgs[LAVA_ARG_COUNT]={};           // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
+  lava_thread_ownedMem = &ownedMem;                   // move the pointer out to a global scope for the thread, so that the allocation function passed to the shared library can add the pointer the owned memory of the thread
   LavaHeapInit();
-  lava_memvec    ownedMem;
-  lava_thread_ownedMem = &ownedMem;                 // move the pointer out to a global scope for the thread, so that the allocation function passed to the shared library can add the pointer the owned memory of the thread
-  lava_threadQ   outQ;                              // queue of the output arguments
-
-  LavaVal      inArgs[LAVA_ARG_COUNT]={};           // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
-  LavaFrame   inFrame;
-  LavaFrame    runFrm;
-  memset(inArgs, 0, sizeof(inArgs) );
+  //memset(inArgs, 0, sizeof(inArgs) );
 
   while(lf.m_running)
   {    
@@ -2150,65 +2059,135 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
         } // SECTION(loop through message nodes)
 
-      SECTION(run the node with the id and frame)
+      SECTION(RUN the node from id and pass it a frame)
       {
-        LavaInst::State ret = (nodeId!=LavaId::NODE_NONE)? runFunc(lf, ownedMem, nodeId, &lp, &runFrm, &outQ)  :  LavaInst::LOAD_ERROR;  // LavaFlow::RUN_ERR; 
-        switch(ret)
+        LavaInst::State state = LavaInst::NORMAL; 
+        SECTION(run the function then put its results into packets and queue them)
         {
+          LavaInst&  li = lf.graph[nodeId];
+          FlowFunc func = li.node->func;                      //lf.graph[nid].node->func;
+          if(func && nodeId!=LavaId::NODE_NONE)
+          {
+            SECTION(create arguments and call function)
+            {
+              LavaParams       lp;
+              lp.inputs      =   1;
+              lp.frame       =   lf.m_frame;
+              lp.id          =   LavaId(nodeId);
+              lp.mem_alloc   =   LavaAlloc;
+
+              auto stTime = high_resolution_clock::now();
+              state         = exceptWrapper(func, lf, &lp, &runFrm, &outQ);
+              if(state != LavaInst::NORMAL){
+                LavaOut o;                                                        // if there was an error, clear the queue of the produced data - there may be better ways of doing this, such as integrating it with the queue loop below, or building a specific method into the LavaQ
+                while(outQ.size()>0)
+                  outQ.pop(o);
+              }
+              auto endTime = high_resolution_clock::now();
+              duration<u64,nano> diff = (endTime - stTime);
+              li.addTime( diff.count() );
+            }
+            SECTION(take LavaOut structs from the output queue and put them into packet queue as packets)                 // this section will not be reached if there was an error
+            {
+              while(outQ.size() > 0)
+              {
+                LavaOut outArg;
+                SECTION(get the next output value from the queue and continue if there is a problem)
+                {
+                  if( !outQ.pop(outArg) ){ continue; }
+                  if(outArg.val.value == 0){ state = LavaInst::OUTPUT_ERROR; continue; }
+                }
+
+                LavaMem mem = LavaMem::fromDataAddr(outArg.val.value);  // this will be used to increment the reference count for every packet created
+                LavaPacket basePkt, pkt;
+                SECTION(create new base packet and initialize the main packet with the base)
+                {
+                  basePkt.frame       =   lf.m_frame;            // increment the frame on every major loop through both data and message nodes - how to know when a full cycle has passed? maybe purely by message nodes - only increment frame if data is created through a message node cycle
+                  basePkt.framed      =   false;                 // would this go on the socket?
+                  basePkt.src_node    =   nodeId;
+                  basePkt.src_slot    =   outArg.key.slot;
+                  basePkt.id          =   lf.nxtMsgId();         // todo: statehink this, since nxtMsgId might not be neccesary
+                  basePkt.val         =   outArg.val;
+                  basePkt.sz_bytes    =   mem.sizeBytes();  
+                  pkt                 =   basePkt;
+                }
+                SECTION(make a packet for each connection, increment their reference count and put in the main packet queue)
+                {
+                  // route the packet using the graph - the packet may be copied multiple times and go to multiple destination slots
+                  LavaId     src  =  { nodeId, outArg.key.slot };
+                  auto        di  =  lf.graph.destCncts(src);                         // di is destination iterator
+                  auto     diCnt  =  di;                                              // diCnt is destination iterator counter - used to count the number of destination slots this packet will be copied to so that the reference count can be set correctly
+                  auto      diEn  =  lf.graph.destCnctEnd();
+                  for(; di!=diEn && di->first==src; ++di)
+                  {                                                                   // loop through the 1 or more destination slots connected to this source
+                    LavaId  pktId = di->second;
+                    pkt = basePkt;                                                    // pkt is packet
+                    pkt.dest_node = pktId.nid;
+                    pkt.dest_slot = pktId.sidx;
+
+                    mem.incRef();
+
+                    lf.putPacket(pkt);                                                // putPacket contains a mutex for now, eventually will be a lock free queue
+                  }
+                }
+                lf.packetCallback(pkt);  // move into routing loop? - this is just the last packet and so is not consistent
+              }
+            } // SECTION(create packets and put them into packet queue)
+          }
+          else state = LavaInst::LOAD_ERROR;
+        }
+        SECTION(switch on the node state decided by trying to run a packet through the node)
+        {
+          switch(state)
+          {
           case LavaInst::OUTPUT_ERROR:
           case LavaInst::RUN_ERROR:{
             lf.graph.setState(nodeId, LavaInst::RUN_ERROR);
             //lf.putPacket(pckt);               // if there was an error, put the packet back into the queue
-          }break;
+            }break;
           case LavaInst::LOAD_ERROR:{
-            lf.graph.setState(nodeId, LavaInst::RUN_ERROR);  // todo: should deal with this at load time and not here of course
-          }break;
+            lf.graph.setState(nodeId, LavaInst::RUN_ERROR);                                  // todo: should deal with this at load time and not here of course
+            }break;
           case LavaInst::NORMAL:
-          default:{ // if everything worked, decrement the references of all the packets in the frame
+          default:{                                                                          // if everything worked, decrement the references of all the packets in the frame
             if(doFlow){
               TO(LavaFrame::PACKET_SLOTS,i) if(runFrm.slotMask[i]){ 
                 LavaMem mem = LavaMem::fromDataAddr(runFrm.packets[i].val.value);
                 mem.decRef();
               }
             }
-          }break;
+            }break;
+          }
         }
       }
     }
-    SECTION(partition owned allocations and free those with their reference count at 0)
+    SECTION(dealloction - partition owned allocations and free those with their reference count at 0)
     {
       for(auto const& lm : ownedMem){
         //PrintLavaMem(lm);
       }
 
-      auto zeroRef  = partition(ALL(ownedMem), [](auto a){return a.refCount() > 0;} );                           // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
+      auto  zeroRef  =  partition(ALL(ownedMem), [](auto a){return a.refCount() > 0;} );                           // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
+      auto freeIter  =  zeroRef;
+      for(; freeIter != end(ownedMem); ++freeIter){         // loop through the memory with zero references and free them
+        LavaFree( (uint64_t)freeIter->data() );
+      }
+      ownedMem.erase(zeroRef, end(ownedMem));                                  // erase the now freed memory
 
       // only need to sort the memory with zero reference counts, and only need to sort them by address, since their references are already known to be zero
-      sort(zeroRef, end(ownedMem), [](LavaMem a, LavaMem b)
-      {
-        return (u64)a.ptr < (u64)b.ptr;
-      });                           // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
-      u64 lastFreed = 0;
-      auto freeIter = zeroRef;
-      for(; freeIter != end(ownedMem); ++freeIter){                                                              // loop through the memory with zero references and free them
-        
-        if((u64)freeIter->ptr != lastFreed){
-          LavaFree( (uint64_t)freeIter->data() );
-          lastFreed = (u64)freeIter->ptr;
-        }
-      }
-
-      ownedMem.erase(zeroRef, end(ownedMem));                                                                    // erase the now freed memory
-
+      //sort(zeroRef, end(ownedMem), [](LavaMem a, LavaMem b)
+      //{
+      //  return (u64)a.ptr < (u64)b.ptr;
+      //});                           // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
+      //u64 lastFreed = 0;
       //auto freeIter = zeroRef;
       //for(; freeIter != end(ownedMem); ++freeIter){                                                              // loop through the memory with zero references and free them
-      //  LavaFree( (uint64_t)freeIter->data() );
+      //  
+      //  if((u64)freeIter->ptr != lastFreed){
+      //    LavaFree( (uint64_t)freeIter->data() );
+      //    lastFreed = (u64)freeIter->ptr;
+      //  }
       //}
-
-      //auto aref = a.refCount();
-      //auto bref = b.refCount();
-      //if(aref==bref) 
-      //else           return aref < bref;
     }
   }
 
@@ -2236,6 +2215,126 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+//LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaFrame* inFrame,  lava_threadQ* outArgs) noexcept // LavaOut* outArgs) noexcept   // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
+//{
+//  using namespace std;
+//  using namespace std::chrono;
+//
+//  SECTION(run the function then put its results into packets and queue them)
+//  {
+//    LavaInst&  li = lf.graph[nid];
+//    FlowFunc func = li.node->func;                      //lf.graph[nid].node->func;
+//    if(func)
+//    {
+//      LavaInst::State ret;
+//      LavaParams       lp;
+//      SECTION(create arguments and call function)
+//      {
+//        lp.inputs      =     1;
+//        lp.frame       =   lf.m_frame;
+//        lp.id          =   LavaId(nid);
+//        lp.mem_alloc   =   LavaAlloc;
+//
+//        auto  stTime = high_resolution_clock::now();
+//          ret = exceptWrapper(func, lf, &lp, inFrame, outArgs);
+//          if(ret != LavaInst::NORMAL){
+//            LavaOut o;                                                        // if there was an error, clear the queue of the produced data - there may be better ways of doing this, such as integrating it with the queue loop below, or building a specific method into the LavaQ
+//            while(outArgs->size()>0)
+//              outArgs->pop(o);
+//          
+//            return ret;
+//          }
+//        auto endTime = high_resolution_clock::now();
+//        duration<u64,nano> diff = (endTime - stTime);
+//        li.addTime( diff.count() );
+//      }
+//      SECTION(create packets and put them into packet queue)                 // this section will not be reached if there was an error
+//      {
+//        while(outArgs->size() > 0)
+//        {
+//          LavaOut outArg;
+//          if( !outArgs->pop(outArg) ){ continue; }
+//
+//          if(outArg.val.value == 0){ ret = LavaInst::OUTPUT_ERROR; continue; }
+//
+//          // create new value for the new packet
+//          LavaVal val;
+//          val.type  = outArg.val.type;
+//          val.value = outArg.val.value;
+//          auto sidx = outArg.key.slot;
+//
+//          LavaMem  mem = LavaMem::fromDataAddr(outArg.val.value);
+//          // todo: deal with mem being 0 here
+//          auto szBytes = outArg.val.value? mem.sizeBytes()  :  0;
+//
+//          // create new packet 
+//          LavaPacket basePkt;
+//          basePkt.frame       =   lf.m_frame;            // increment the frame on every major loop through both data and message nodes - how to know when a full cycle has passed? maybe purely by message nodes - only increment frame if data is created through a message node cycle
+//          basePkt.framed      =   false;                 // would this go on the socket?
+//          basePkt.src_node    =   nid;
+//          basePkt.src_slot    =   sidx;
+//          basePkt.id          =   lf.nxtMsgId();         // todo: rethink this, since nxtMsgId might not be neccesary
+//          basePkt.val         =   val;
+//          basePkt.sz_bytes    =   mem.sizeBytes();  
+//
+//          // route the packet using the graph - the packet may be copied multiple times and go to multiple destination slots
+//          LavaId   src  =  { nid, sidx };
+//          auto      di  =  lf.graph.destCncts(src);                            // di is destination iterator
+//          auto   diCnt  =  di;                                                 // diCnt is destination iterator counter - used to count the number of destination slots this packet will be copied to so that the reference count can be set correctly
+//          auto    diEn  =  lf.graph.destCnctEnd();
+//
+//          LavaPacket pkt = basePkt;
+//          for(; di!=diEn && di->first==src; ++di)
+//          {                                                                    // loop through the 1 or more destination slots connected to this source
+//            LavaId  pktId = di->second;
+//                      pkt = basePkt;                                          // pkt is packet
+//            pkt.dest_node = pktId.nid;
+//            pkt.dest_slot = pktId.sidx;
+//
+//            mem.incRef();
+//
+//            lf.putPacket(pkt);                                                 // putPacket contains a mutex for now, eventually will be a lock free queue
+//          }
+//
+//          lf.packetCallback(pkt);
+//
+//          //if(outArg.val.type != LavaArgType::PASSTHRU)                            // if set to passthrough, don't take ownership of the memory - should adding to the owned mem vector be part of LavaAlloc ?
+//          //  ownedMem.push_back(mem);
+//        }
+//      } // SECTION(create packets and put them into packet queue)
+//
+//      return ret; // LavaInst::NORMAL;
+//    }
+//
+//    return LavaInst::LOAD_ERROR;
+//  }
+//}
+
+//LavaVal val;                                          // create new value for the new packet
+//val.type    = outArg.val.type;
+//val.value   = outArg.val.value;
+//
+//basePkt.val         =   val;
+
+//auto sidx   = outArg.key.slot;
+//
+// todo: deal with mem being 0 here
+//auto szBytes = outArg.val.value? mem.sizeBytes()  :  0;
+//
+//auto        di  =  lf.graph.destCncts( LavaId(nodeId,sidx) );            // di is destination iterator
+//
+//ret = (nodeId!=LavaId::NODE_NONE)? runFunc(lf, ownedMem, nodeId, &lp, &runFrm, &outQ)  :  LavaInst::LOAD_ERROR;  // LavaFlow::RUN_ERR; 
+
+//auto freeIter = zeroRef;
+//for(; freeIter != end(ownedMem); ++freeIter){                                                              // loop through the memory with zero references and free them
+//  LavaFree( (uint64_t)freeIter->data() );
+//}
+
+//auto aref = a.refCount();
+//auto bref = b.refCount();
+//if(aref==bref) 
+//else           return aref < bref;
 
 //struct OwnedAlloc
 //{

@@ -222,11 +222,13 @@
 // -todo: unify LavaOut and LavaVal
 // -todo: make lava allocation function put the new allocation into the current thread's owned mem vector instead of having it happen outside the loop - this will mean no more need for duplicate allocation checking and passthrough types
 // -todo: test without putting allocated point in owned memory to see the result of a memory leak - big time memory leak, rapid increase in memory used
+// -todo: take out sorting and duplicate detection in thread owned memory dealloction
+// -todo: move dealing with the output queue out of the run func function
 
+// todo: look into why deleting a message node makes packet visualization go away
 // todo: give message passing nodes constructors and destructors 
 // todo: put each thread's owned memory vector into a global vector that other threads can access
-// todo: move dealing with the output queue out of the run func function
-// todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets
+// todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets - use blue 'sunshine' lines going out from the center like a snowflake? 
 // todo: make a settings file that is read on load if it in the same directory
 // todo: make list of nodes a side window, right click menu, hot box, etc
 // todo: make each variable in the graph individually double buffered or even multi-buffered according to readers?
