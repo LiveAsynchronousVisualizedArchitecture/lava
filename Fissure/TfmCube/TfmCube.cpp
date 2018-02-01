@@ -9,7 +9,6 @@ using IvTbl = tbl<vert>;
 enum Slots
 {
   // This is an example enumeration that is meant to be helpful, though is not strictly neccesary. Referencing slots by a name will generally be less error prone than using their index and remembering what each index is for
-  
   MODEL_OUT = 0,
   //SLOT_1 = 1
   //SLOT_2 = 2,
@@ -38,6 +37,9 @@ extern "C"
       memcpy(tp, p, bytes);
       IvTbl oCube(tp, false, false);
       TO(oCube.size(),i){
+        oCube[i].p[0] += 1.f;
+        oCube[i].p[1] += 1.f;
+        
         oCube[i].c[0] = 0;
         oCube[i].c[1] = 0;
       }

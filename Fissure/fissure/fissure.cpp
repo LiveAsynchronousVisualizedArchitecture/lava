@@ -220,8 +220,9 @@
  // -todo: take LavaMsg out
 // -todo: make LavaMem use a struct for layout of bytes - only two header members, not neccesary 
 // -todo: unify LavaOut and LavaVal
+// -todo: make lava allocation function put the new allocation into the current thread's owned mem vector instead of having it happen outside the loop - this will mean no more need for duplicate allocation checking and passthrough types
+// -todo: test without putting allocated point in owned memory to see the result of a memory leak - big time memory leak, rapid increase in memory used
 
-// todo: make lava allocation function put the new allocation into the current thread's owned mem vector instead of having it happen outside the loop - this will mean no more need for duplicate allocation checking and passthrough types
 // todo: give message passing nodes constructors and destructors 
 // todo: put each thread's owned memory vector into a global vector that other threads can access
 // todo: move dealing with the output queue out of the run func function

@@ -24,7 +24,7 @@ extern "C"
 
     //if( hasRun.exchange(true) ) return 1;
 
-    printf("\n MakeCube run \n");
+    //printf("\n MakeCube run \n");
 
     //tbl<f32> idxVerts = tbl<f32>::make_borrowed(inout_lp->mem_alloc, 
     

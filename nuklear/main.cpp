@@ -57,10 +57,12 @@
 // -todo: make sure currently selected db is initialized - how does the initial name become set? - needed to reorganize to make sure that listing the dbs was done at first and the dbs were opened on a menu list if there is no current db open, even if the index hasn't changed
 // -todo: fix blank tbl elements - look at testGeo creation - tbl initialization arguments were mixed up
 // -todo: fix crash while turning on second button - can't repeat this old note/bug
+// -todo: take out test db
+// -todo: take out nanovg visualization of tbl
 
-// todo: take out test db
-// todo: take out nanovg visualization of tbl
+// todo: look in to keys from fissure dissapearing when being overwritten constantly
 // todo: investigate crash while visualizing multiple tables in a running graph
+// todo: change project name to visualizer
 // todo: fix crash from VS execution in release mode
 // todo: fix tbl visualization cells going outside the bounds of bounding box - need to wrap sooner, possibly based on more margins
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 

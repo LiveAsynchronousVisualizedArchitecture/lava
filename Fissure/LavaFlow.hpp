@@ -559,7 +559,7 @@ using lava_ptrsvec       =  std::vector<LavaNode*>;
 using lava_nameNodeMap   =  std::unordered_map<std::string, LavaNode*>;                   // maps the node names to their pointers
 using lava_threadQ       =  LavaQ<LavaOut>;
 
-extern "C" using           LavaAlloc  =  void* (*)(uint64_t);                                          // custom allocation function passed in to each node call
+extern "C" using       LavaAllocFunc  =  void* (*)(uint64_t);                                          // custom allocation function passed in to each node call
 extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                                               // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
 //extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaFrame*, lava_threadQ*);       // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
 extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams const*, LavaFrame const*, lava_threadQ*);   // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
@@ -671,11 +671,12 @@ union          LavaId                                            // this Id serv
 };
 struct     LavaParams
 {
-  u32            inputs;
+  u32              inputs;
+  u64               frame;
+  LavaId               id;
+  LavaAllocFunc mem_alloc;
+
   //u32           outputs;
-  u64             frame;
-  LavaId             id;
-  LavaAlloc   mem_alloc;
   //LavaPut           put;
 };
 struct        LavaVal
@@ -701,11 +702,6 @@ struct        LavaOut
   LavaOut(u32 slot, u64 value, u64 type) : key{0,slot,0}, val{type,value}  // value(val), type(_type)
   {}
 };
-//struct        LavaMsg
-//{
-//  u64        id;
-//  LavaVal    val;
-//};
 struct     LavaPacket
 {
   u64    ref_count;                               // todo: is this used? 
@@ -1681,6 +1677,9 @@ public:
 
 #if defined(__LAVAFLOW_IMPL__)
 
+//static __declspec(thread)  void*   lava_thread_heap     = nullptr;           // thread local handle for thread local heap allocations
+static __declspec(thread)  lava_memvec*  lava_thread_ownedMem = nullptr;       // thread local handle for thread local heap allocations
+
 // function implementations
 BOOL WINAPI DllMain(
   _In_ HINSTANCE    hinstDLL,
@@ -1705,6 +1704,25 @@ BOOL WINAPI DllMain(
     ;
   }
   return true;
+}
+
+void*               LavaAlloc(uint64_t sizeBytes)
+{
+  uint64_t* mem = (uint64_t*)LavaHeapAlloc(sizeBytes + sizeof(uint64_t)*2);
+  mem[0]  =  0;              // reference count
+  mem[1]  =  sizeBytes;      // number of bytes of main allocation
+
+  LavaMem lm;
+  lm.ptr  =  mem;
+
+  lava_thread_ownedMem->push_back(lm);
+
+  return (void*)(mem + 2);   // sizeof(uint64_t)*2);
+}
+void                 LavaFree(uint64_t addr)
+{
+  void* p = (void*)(addr - sizeof(uint64_t)*2);
+  LavaHeapFree(p);
 }
 
 namespace {
@@ -1880,22 +1898,6 @@ auto       GetFlowNodeLists(lava_hndlvec     const& hndls) -> lava_ptrsvec
   return ret;
 }
 
-void*               LavaAlloc(uint64_t sizeBytes)
-{
-  //uint64_t* mem = (uint64_t*)malloc(sizeBytes + sizeof(uint64_t)*2);
-  uint64_t* mem = (uint64_t*)LavaHeapAlloc(sizeBytes + sizeof(uint64_t)*2);
-  mem[0]  =  0;              // reference count
-  mem[1]  =  sizeBytes;      // number of bytes of main allocation
-
-  return (void*)(mem + 2);  // sizeof(uint64_t)*2);
-}
-void                 LavaFree(uint64_t addr)
-{
-  void* p = (void*)(addr - sizeof(uint64_t)*2);
-  //free(p);
-  LavaHeapFree(p);
-}
-
 LavaInst::State exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaFrame* inFrame, lava_threadQ* outArgs) // LavaOut* outArgs)
 {
   LavaInst::State        ret = LavaInst::NORMAL;  // LavaFlow::NONE;
@@ -1931,7 +1933,6 @@ LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t ni
     SECTION(create arguments and call function)
     {
       lp.inputs      =     1;
-      //lp.outputs     =   512;
       lp.frame       =   lf.m_frame;
       lp.id          =   LavaId(nid);
       lp.mem_alloc   =   LavaAlloc;
@@ -1949,7 +1950,7 @@ LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t ni
       duration<u64,nano> diff = (endTime - stTime);
       li.addTime( diff.count() );
     }
-    SECTION(create packets and put them into packet queue)  // this section will not be reached if there was an error
+    SECTION(create packets and put them into packet queue)               // this section will not be reached if there was an error
     {
       while(outArgs->size() > 0)
       {
@@ -1999,8 +2000,8 @@ LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t ni
 
         lf.packetCallback(pkt);
 
-        if(outArg.val.type != LavaArgType::PASSTHRU)                            // if set to passthrough, don't take ownership of the memory - should adding to the owned mem vector be part of LavaAlloc ?
-          ownedMem.push_back(mem);
+        //if(outArg.val.type != LavaArgType::PASSTHRU)                            // if set to passthrough, don't take ownership of the memory - should adding to the owned mem vector be part of LavaAlloc ?
+        //  ownedMem.push_back(mem);
       }
     } // SECTION(create packets and put them into packet queue)
 
@@ -2081,6 +2082,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
   LavaHeapInit();
   lava_memvec    ownedMem;
+  lava_thread_ownedMem = &ownedMem;                 // move the pointer out to a global scope for the thread, so that the allocation function passed to the shared library can add the pointer the owned memory of the thread
   lava_threadQ   outQ;                              // queue of the output arguments
 
   LavaVal      inArgs[LAVA_ARG_COUNT]={};           // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
@@ -2235,8 +2237,59 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//struct OwnedAlloc
+//{
+//  lava_memvec* ownedmem = nullptr;
+//
+//  void* operator()(uint64_t sizeBytes)
+//  {
+//    void* p = LavaAlloc(sizeBytes);
+//    ownedmem->push_back(LavaMem::fromDataAddr((u64)p));         // todo: change this to accept void*
+//  }
+//};
+//
+//uint64_t* mem = (uint64_t*)malloc(sizeBytes + sizeof(uint64_t)*2);
+//
+//free(p);
 
+//struct OwnedAlloc
+//{
+//  lava_memvec* ownedmem = nullptr;
+//  void* alloc(uint64_t sizeBytes)
+//  {
+//    void* p = LavaAlloc(sizeBytes);
+//    ownedmem->push_back(LavaMem::fromDataAddr((u64)p));         // todo: change this to accept void*
+//    return p;
+//  }
+//} ownedAlloc;
+//
+//ownedAlloc.ownedmem    =  &ownedMem;
 
+//lp.outputs     =   512;
+//
+//OwnedAlloc       oa;
+//
+// &ownedAlloc::alloc;
+//
+//LavaAllocFunc ownedAlloc = [&ownedMem](u64 sizeBytes){
+//  void* p = LavaAlloc(sizeBytes);
+//  ownedMem.push_back(LavaMem::fromDataAddr((u64)p));
+//  return p;
+//};
+//
+//lp.mem_alloc   =   ownedAlloc;
+//
+//lp.mem_alloc   =   &(oa.operator());
+
+//void*   LavaAlloc(uint64_t sizeBytes);
+//void     LavaFree(uint64_t addr);
+//struct   OwnedAlloc;
+
+//struct        LavaMsg
+//{
+//  u64        id;
+//  LavaVal    val;
+//};
 
 //union { LavaId A; LavaId dest; LavaNode* ndptr; }; 
 //union { LavaId B; LavaId  src; };
