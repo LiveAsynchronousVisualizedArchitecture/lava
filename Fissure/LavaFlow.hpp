@@ -2106,7 +2106,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
                   basePkt.framed      =   false;                 // would this go on the socket?
                   basePkt.src_node    =   nodeId;
                   basePkt.src_slot    =   outArg.key.slot;
-                  basePkt.id          =   lf.nxtMsgId();         // todo: statehink this, since nxtMsgId might not be neccesary
+                  basePkt.id          =   0;
                   basePkt.val         =   outArg.val;
                   basePkt.sz_bytes    =   mem.sizeBytes();  
                   pkt                 =   basePkt;
@@ -2215,6 +2215,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+// wrong and terrible
+//basePkt.id          =   lf.nxtMsgId();         // todo: statehink this, since nxtMsgId might not be neccesary
 
 //LavaInst::State       runFunc(LavaFlow&   lf, lava_memvec& ownedMem, uint64_t nid, LavaParams* lp, LavaFrame* inFrame,  lava_threadQ* outArgs) noexcept // LavaOut* outArgs) noexcept   // runs the function in the node given by the node id, puts its output into packets and ultimatly puts those packets into the packet queue
 //{
