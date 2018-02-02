@@ -15,14 +15,23 @@ extern "C"
 {
   //const char*  InNames[] = {"Cube Indexed Verts", nullptr};
   //const char*  InTypes[] = {"IdxVerts",           nullptr};
-  const char* OutNames[] = {"Cube Indexed Verts",      nullptr};
-  const char* OutTypes[] = {"IdxVerts",           nullptr};
+  const char* OutNames[] = {"Cube Indexed Verts",   nullptr};
+  const char* OutTypes[] = {"IdxVerts",             nullptr};
+
+  void MakeCube_construct()
+  {
+    hasRun = false;
+  }
+  void MakeCube_destruct()
+  {
+    hasRun = false;
+  }
 
   uint64_t MakeCube(LavaParams const* inout_lp, LavaFrame const* in, lava_threadQ* out) noexcept
   {
     using namespace std;
 
-    //if( hasRun.exchange(true) ) return 1;
+    if( hasRun.exchange(true) ) return 1;
 
     //printf("\n MakeCube run \n");
 
@@ -65,8 +74,8 @@ extern "C"
   {
     {
       MakeCube,                                      // function
-      nullptr,                                       // constructor
-      nullptr,                                       // destructor
+      MakeCube_construct,                            // constructor
+      MakeCube_destruct,                             // destructor
       (uint64_t)LavaNode::MSG,                       // node_type  
       "MakeCube",                                    // name
       nullptr,                                       // in_names

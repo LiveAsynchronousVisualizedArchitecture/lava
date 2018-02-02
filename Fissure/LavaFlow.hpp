@@ -559,7 +559,7 @@ using lava_ptrsvec       =  std::vector<LavaNode*>;
 using lava_nameNodeMap   =  std::unordered_map<std::string, LavaNode*>;                   // maps the node names to their pointers
 using lava_threadQ       =  LavaQ<LavaOut>;
 
-extern "C" using       LavaAllocFunc  =  void* (*)(uint64_t);                                          // custom allocation function passed in to each node call
+extern "C" using       LavaAllocFunc  =  void* (*)(uint64_t);                             // custom allocation function passed in to each node call
 extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                                               // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
 //extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaFrame*, lava_threadQ*);       // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
 extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams const*, LavaFrame const*, lava_threadQ*);   // node function taking a LavaFrame in
@@ -1677,6 +1677,23 @@ public:
     //  t.join();
     //}
   }
+  void     runDestructors()
+  {
+    assert(m_running == false);                               // all threads should be out of the loop by the time this function is called
+    for(auto const& kv : nameToPtr){
+      LavaNode* ln = kv.second;
+      if(ln && ln->destructor){ ln->destructor(); }
+    }
+  }
+  void     runConstructors()
+  {
+    assert(m_running == false);                               // all threads should be out of the loop by the time this function is called
+    for(auto const& kv : nameToPtr){
+      LavaNode* ln = kv.second;
+      if(ln && ln->constructor){ ln->constructor(); }
+    }
+  }
+
   //void          pauseLoop(){}
 };
 
@@ -1866,16 +1883,6 @@ uint64_t           FreeLibs(lava_hndlvec     const& hndls)
   }
   return count;
 }
-//void           DestructLibs(lava_paths       const& paths)
-//{
-//  for(auto const& p : paths){
-//    auto ndIter = inout_flow.flow.find(p); // ndIter is node iterator
-//    for(; ndIter != end(inout_flow.flow) && ndIter->first==p; ++ndIter){
-//      LavaNode* nd = ndIter->second;
-//      nd->destructor();
-//    }
-//  }
-//}
 auto           GetLivePaths(lava_paths       const& paths) -> lava_paths 
 {
   using namespace std;
@@ -2241,6 +2248,20 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+
+
+
+//void           DestructLibs(lava_paths       const& paths)
+//{
+//  for(auto const& p : paths){
+//    auto ndIter = inout_flow.flow.find(p); // ndIter is node iterator
+//    for(; ndIter != end(inout_flow.flow) && ndIter->first==p; ++ndIter){
+//      LavaNode* nd = ndIter->second;
+//      nd->destructor();
+//    }
+//  }
+//}
 
 //auto destr = p;                                             // destr is pointer for destructor
 //for(; destr->func!=nullptr; ++destr)                        // insert each of the LavaFlowNodes in the ndList into the multi-map

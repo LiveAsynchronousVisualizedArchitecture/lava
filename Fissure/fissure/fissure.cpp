@@ -229,11 +229,14 @@
 // -todo: give message passing nodes constructors and destructors 
 // -todo: make constructor and destructor be run on initialization
 // -todo: look in to crashes happening in the visualizer with constantly updated items - are they nanogui crashes unrelated to database updates? is the creation and deletion of nanogui widgets not thread safe?
+// -todo: make constructor run on start and destructor run on stop - should destructors and constructors simply both run on stop?
+// -todo: use MakeCube to test constructor and destructor
 
-// todo: make constructor run on start and destructor run on stop - should destructors and constructors simply both run on stop?
-// todo: use MakeCube to test constructor and destructor
+// todo: make pause and stop buttons greyed out until playing
+// todo: copy template back in to FissureStatic.cpp
 // todo: make visualizing an input actually toggle visualization on the the output it is attached to
 // todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets - use blue 'sunshine' lines going out from the center like a snowflake? 
+// todo: give LavaNode struct a description string
 // todo: make a settings file that is read on load if it in the same directory
 // todo: make list of nodes a side window, right click menu, hot box, etc
 // todo: make each variable in the graph individually double buffered or even multi-buffered according to readers?
@@ -242,7 +245,6 @@
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array - can any heirarchy of initializer_lists be brought down to an array of the same types?
 // todo: make shared libraries loaded after the GUI
 // todo: make shared libraries only try to load one per frame
-// todo: make packets visualize on slots circles stack as concentric circles or as portions/segments of a single circle 
 // todo: make packet visualization also include lighting up connections between slots
 // todo: make LavaHeapFree use a thread local variable for the errors instead of a return value, so that it's signature will match with free
 // todo: look into techniques for keeping data local to CPU cores, and CPU sockets
@@ -285,6 +287,7 @@
 //       |  use a union of bytes that is filled with the frame, slot, list index?
 //       |  use malloc addresses initially
 
+// idea: make packets visualize on slots circles stack as concentric circles or as portions/segments of a single circle 
 // idea: make errors in the directory creation give an error in the status bar 
 // idea: make right click or space bar open up a text box that can contain the build command, stats and/or hotbox
 // idea: make popup text box that avoids the bounding box of the moused over node? - put graph of node times in the box? put graph of covariance data of data in, time spent, data out, and time ?   
@@ -1863,6 +1866,8 @@ ENTRY_DECLARATION // main or winmain
             //fd.flow.q.pop();
           }
         fd.flow.m_qLck.unlock();
+        fd.flow.runDestructors();
+        fd.flow.runConstructors();
         playBtn->setEnabled(true);
       });
       nodeBtn->setCallback([nodeTxt]()
