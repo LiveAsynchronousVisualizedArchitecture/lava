@@ -231,8 +231,8 @@
 // -todo: look in to crashes happening in the visualizer with constantly updated items - are they nanogui crashes unrelated to database updates? is the creation and deletion of nanogui widgets not thread safe?
 // -todo: make constructor run on start and destructor run on stop - should destructors and constructors simply both run on stop?
 // -todo: use MakeCube to test constructor and destructor
+// -todo: make pause and stop buttons greyed out until playing
 
-// todo: make pause and stop buttons greyed out until playing
 // todo: copy template back in to FissureStatic.cpp
 // todo: make visualizing an input actually toggle visualization on the the output it is attached to
 // todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets - use blue 'sunshine' lines going out from the center like a snowflake? 
@@ -1812,7 +1812,9 @@ ENTRY_DECLARATION // main or winmain
 
       playBtn->setBackgroundColor(  Color(e3f(.15f, .2f,  .15f)) ); 
       pauseBtn->setBackgroundColor( Color(e3f(.2f,  .2f,  .15f)) ); 
+      pauseBtn->setEnabled(false);
       stopBtn->setBackgroundColor(  Color(e3f(.19f, .16f, .17f)) ); 
+      stopBtn->setEnabled(false);
 
       loadBtn->setCallback([](){ 
         //stopFlowThreads();
@@ -1843,15 +1845,19 @@ ENTRY_DECLARATION // main or winmain
           else   printf("\nSave did not write successfully to %s\n", outPath);
         }
       });
-      playBtn->setCallback([playBtn](){
+      playBtn->setCallback([playBtn,pauseBtn,stopBtn](){
         playBtn->setEnabled(false);
+        pauseBtn->setEnabled(true);
+        stopBtn->setEnabled(true);
         startFlowThreads(1);
       });
-      pauseBtn->setCallback([playBtn](){
+      pauseBtn->setCallback([playBtn,pauseBtn,stopBtn](){
         stopFlowThreads();
         playBtn->setEnabled(true);
+        pauseBtn->setEnabled(false);
+        stopBtn->setEnabled(false);
       });
-      stopBtn->setCallback([playBtn](){
+      stopBtn->setCallback([playBtn,pauseBtn,stopBtn](){
         stopFlowThreads();
         fd.flow.m_curId.nid = LavaNode::NODE_ERROR;
         auto         nInsts = fd.lgrph.nodes();
@@ -1868,7 +1874,10 @@ ENTRY_DECLARATION // main or winmain
         fd.flow.m_qLck.unlock();
         fd.flow.runDestructors();
         fd.flow.runConstructors();
+
         playBtn->setEnabled(true);
+        pauseBtn->setEnabled(false);
+        stopBtn->setEnabled(false);
       });
       nodeBtn->setCallback([nodeTxt]()
       {
