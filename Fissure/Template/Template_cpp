@@ -31,6 +31,8 @@ extern "C"
   {
     {
       |_NAME_|,                                      // function
+      nullptr,                                       // constructor
+      nullptr,                                       // destructor
       LavaNode::MSG,                                 // node_type  
       "|_NAME_|",                                    // name
       InNames,                                       // in_names

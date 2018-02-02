@@ -562,7 +562,8 @@ using lava_threadQ       =  LavaQ<LavaOut>;
 extern "C" using       LavaAllocFunc  =  void* (*)(uint64_t);                                          // custom allocation function passed in to each node call
 extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                                               // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
 //extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaFrame*, lava_threadQ*);       // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
-extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams const*, LavaFrame const*, lava_threadQ*);   // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
+extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams const*, LavaFrame const*, lava_threadQ*);   // node function taking a LavaFrame in
+extern "C" using       ConstructFunc  =  void(*)();
 
 struct   AtomicBitset
 {
@@ -772,14 +773,16 @@ struct       LavaNode
 {
   enum Type { NONE=0, FLOW, MSG, NODE_ERROR=0xFFFFFFFFFFFFFFFF };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
 
-  FlowFunc              func;
-  uint64_t         node_type;
-  const char*           name;
-  const char**      in_names;
-  const char**     out_names;
-  const char**      in_types;
-  const char**     out_types;
-  uint64_t           version;
+  FlowFunc               func;
+  ConstructFunc   constructor;
+  ConstructFunc    destructor;
+  uint64_t          node_type;
+  const char*            name;
+  const char**       in_names;
+  const char**      out_names;
+  const char**       in_types;
+  const char**      out_types;
+  uint64_t            version;
 };
 struct       LavaInst
 {
@@ -875,7 +878,7 @@ struct    LavaCommand
 };
 // end data types
 
-const LavaNode LavaNodeListEnd = {nullptr, (uint64_t)LavaNode::NONE, nullptr, nullptr, nullptr, nullptr, nullptr, 0};
+const LavaNode LavaNodeListEnd = {nullptr, nullptr, nullptr, (uint64_t)LavaNode::NONE, nullptr, nullptr, nullptr, nullptr, nullptr, 0};
 
 extern "C" __declspec(dllexport) LavaNode* GetLavaFlowNodes();   // prototype of function to return static plugin loading struct
 // end function declarations
@@ -1641,6 +1644,8 @@ public:
   void          putPacket(LavaPacket     pkt)
   {
     m_qLck.lock();              // mutex lock
+      //if( packetCallback )
+        //packetCallback(pkt);
       q.push(pkt);              // todo: use a mutex here initially
     m_qLck.unlock();            // mutex unlock
   }
@@ -2110,6 +2115,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
                   basePkt.val         =   outArg.val;
                   basePkt.sz_bytes    =   mem.sizeBytes();  
                   pkt                 =   basePkt;
+                  lf.packetCallback(pkt);                        // because this is before putting the memory in the queue, it can't get picked up and used yet, though that may not make a difference, since this thread has to free it anyway
                 }
                 SECTION(make a packet for each connection, increment their reference count and put in the main packet queue)
                 {
@@ -2130,7 +2136,6 @@ void               LavaLoop(LavaFlow& lf) noexcept
                     lf.putPacket(pkt);                                                // putPacket contains a mutex for now, eventually will be a lock free queue
                   }
                 }
-                lf.packetCallback(pkt);  // move into routing loop? - this is just the last packet and so is not consistent
               }
             } // SECTION(create packets and put them into packet queue)
           }

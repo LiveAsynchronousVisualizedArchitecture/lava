@@ -61,8 +61,11 @@ public:
 
     /// Return the absolute position on screen
     Vector2i absolutePosition() const {
-        return mParent ?
-            (parent()->absolutePosition() + mPos) : mPos;
+      return mParent ?
+        (mParent->absolutePosition() + mPos) : mPos;     // sbassett
+
+        //return mParent ?
+        //    (parent()->absolutePosition() + mPos) : mPos;
     }
 
     /// Return the size of the widget

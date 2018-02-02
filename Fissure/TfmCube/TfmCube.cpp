@@ -54,6 +54,8 @@ extern "C"
   {
     {
       TfmCube,                                       // function
+      nullptr,                                       // constructor
+      nullptr,                                       // destructor
       LavaNode::FLOW,                                // node_type  
       "TfmCube",                                     // name
       InNames,                                       // in_names

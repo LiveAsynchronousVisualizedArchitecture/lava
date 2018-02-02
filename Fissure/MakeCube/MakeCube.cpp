@@ -65,6 +65,8 @@ extern "C"
   {
     {
       MakeCube,                                      // function
+      nullptr,                                       // constructor
+      nullptr,                                       // destructor
       (uint64_t)LavaNode::MSG,                       // node_type  
       "MakeCube",                                    // name
       nullptr,                                       // in_names
@@ -74,7 +76,7 @@ extern "C"
       0                                              // version 
     },                                             
 
-    {nullptr, (uint64_t)LavaNode::NONE, nullptr, nullptr, nullptr, nullptr, nullptr, 0}
+    LavaNodeListEnd                                  // This is a constant that has all the members of the LavaNode struct set to 0 or nullptr - it is used as a special value that ends the static list of LavaNodes. This negates the need for a separate static variable that gives the size of the list, which would be have to be kept in sync and therefore be error prone.
   };
 
   __declspec(dllexport) LavaNode* GetLavaNodes()
@@ -89,9 +91,8 @@ extern "C"
 
 
 
-
-
-
+//
+//{nullptr, (uint64_t)LavaNode::NONE, nullptr, nullptr, nullptr, nullptr, nullptr, 0}
 
 //Print(lftTri);
 //

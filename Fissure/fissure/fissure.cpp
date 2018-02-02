@@ -225,9 +225,12 @@
 // -todo: take out sorting and duplicate detection in thread owned memory dealloction
 // -todo: move dealing with the output queue out of the run func function
 // -todo: look into why deleting a message node makes packet visualization go away - getting the next message node id might need to be modulo with the number of nodes total, not just with the number of msg nodes - nxtMsgId was being used for the packet ID, so with 2 message nodes only one would ever get run
+// -todo: retstructure how the packet callback is handled
 
+// todo: look in to crashes happening in the visualizer with constantly updated items - are they nanogui crashes unrelated to database updates? is the creation and deletion of nanogui widgets not thread safe?
 // todo: give message passing nodes constructors and destructors 
 // todo: put each thread's owned memory vector into a global vector that other threads can access - can the LavaQ be used or broken into a single writer multi-reader array?
+// todo: make visualizing an input actually toggle visualization on the the output it is attached to
 // todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets - use blue 'sunshine' lines going out from the center like a snowflake? 
 // todo: make a settings file that is read on load if it in the same directory
 // todo: make list of nodes a side window, right click menu, hot box, etc
