@@ -1866,6 +1866,16 @@ uint64_t           FreeLibs(lava_hndlvec     const& hndls)
   }
   return count;
 }
+//void           DestructLibs(lava_paths       const& paths)
+//{
+//  for(auto const& p : paths){
+//    auto ndIter = inout_flow.flow.find(p); // ndIter is node iterator
+//    for(; ndIter != end(inout_flow.flow) && ndIter->first==p; ++ndIter){
+//      LavaNode* nd = ndIter->second;
+//      nd->destructor();
+//    }
+//  }
+//}
 auto           GetLivePaths(lava_paths       const& paths) -> lava_paths 
 {
   using namespace std;
@@ -1942,6 +1952,17 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow)
   }
 
   auto   livePaths  =  GetLivePaths(paths);
+  
+  SECTION(run destructor on the nodes given by the paths)
+  {
+    for(auto const& p : paths){
+      auto ndIter = inout_flow.flow.find(p); // ndIter is node iterator
+      for(; ndIter != end(inout_flow.flow) && ndIter->first==p; ++ndIter){
+        LavaNode* nd = ndIter->second;
+        if(nd->destructor){ nd->destructor(); }
+      }
+    }
+  }
 
   // coordinate live paths to handles
   auto liveHandles  =  GetLiveHandles(inout_flow.libs, livePaths);
@@ -1967,16 +1988,18 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow)
   }
 
   // extract the flow node lists from the handles
-  auto flowNdLists = GetFlowNodeLists(loadedHndls);
+  lava_ptrsvec flowNdLists = GetFlowNodeLists(loadedHndls);
 
   // extract the flow nodes from the lists and put them into the multi-map
   TO(livePaths.size(),i)
   {
     LavaNode* ndList = flowNdLists[i];
     if(ndList){
-      auto const& p = livePaths[i]; 
-      inout_flow.flow.erase(p);                              // delete the current node list for the livePath
-      for(; ndList->func!=nullptr; ++ndList){                // insert each of the LavaFlowNodes in the ndList into the multi-map
+      auto const&  p = livePaths[i];
+      
+      inout_flow.flow.erase(p);                                     // delete the current node list for the livePath 
+      for(; ndList->func!=nullptr; ++ndList){                       // insert each of the LavaFlowNodes in the ndList into the multi-map
+        if(ndList->constructor){ ndList->constructor(); }
         inout_flow.nameToPtr.erase(ndList->name);
         inout_flow.nameToPtr.insert( {ndList->name, ndList} );
         inout_flow.flow.insert( {p, ndList} );
@@ -2219,6 +2242,9 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//auto destr = p;                                             // destr is pointer for destructor
+//for(; destr->func!=nullptr; ++destr)                        // insert each of the LavaFlowNodes in the ndList into the multi-map
+//  if(ndList->destructor) ndList->destructor();
 
 // wrong and terrible
 //basePkt.id          =   lf.nxtMsgId();         // todo: statehink this, since nxtMsgId might not be neccesary

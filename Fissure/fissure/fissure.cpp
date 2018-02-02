@@ -217,7 +217,7 @@
 // -todo: test LavaQ across shared library borders - seems to work
 // -todo: integrate type into LavaMem instead of as part of the LavaMem struct so that it can be queried externally - may have to revisit this
 // -todo: look at LavaParams now that it doesn't need to be written to by the node - designated as const and outputs taken out 
- // -todo: take LavaMsg out
+// -todo: take LavaMsg out
 // -todo: make LavaMem use a struct for layout of bytes - only two header members, not neccesary 
 // -todo: unify LavaOut and LavaVal
 // -todo: make lava allocation function put the new allocation into the current thread's owned mem vector instead of having it happen outside the loop - this will mean no more need for duplicate allocation checking and passthrough types
@@ -226,10 +226,12 @@
 // -todo: move dealing with the output queue out of the run func function
 // -todo: look into why deleting a message node makes packet visualization go away - getting the next message node id might need to be modulo with the number of nodes total, not just with the number of msg nodes - nxtMsgId was being used for the packet ID, so with 2 message nodes only one would ever get run
 // -todo: retstructure how the packet callback is handled
+// -todo: give message passing nodes constructors and destructors 
+// -todo: make constructor and destructor be run on initialization
+// -todo: look in to crashes happening in the visualizer with constantly updated items - are they nanogui crashes unrelated to database updates? is the creation and deletion of nanogui widgets not thread safe?
 
-// todo: look in to crashes happening in the visualizer with constantly updated items - are they nanogui crashes unrelated to database updates? is the creation and deletion of nanogui widgets not thread safe?
-// todo: give message passing nodes constructors and destructors 
-// todo: put each thread's owned memory vector into a global vector that other threads can access - can the LavaQ be used or broken into a single writer multi-reader array?
+// todo: make constructor run on start and destructor run on stop - should destructors and constructors simply both run on stop?
+// todo: use MakeCube to test constructor and destructor
 // todo: make visualizing an input actually toggle visualization on the the output it is attached to
 // todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets - use blue 'sunshine' lines going out from the center like a snowflake? 
 // todo: make a settings file that is read on load if it in the same directory
@@ -244,6 +246,7 @@
 // todo: make packet visualization also include lighting up connections between slots
 // todo: make LavaHeapFree use a thread local variable for the errors instead of a return value, so that it's signature will match with free
 // todo: look into techniques for keeping data local to CPU cores, and CPU sockets
+// todo: put each thread's owned memory vector into a global vector that other threads can access - can the LavaQ be used or broken into a single writer multi-reader array?
 
 // todo: make input slots start at 0 - does there need to be a separation between input and out slots or does there need to be an offset so that the input frame starts at 0 
 // todo: convert tbl to use arrays of the data types smaller than 64 bits

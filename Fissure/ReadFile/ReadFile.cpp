@@ -23,8 +23,7 @@ extern "C"
   const char* FileToStringInTypes[]   = {"tbl_str",      nullptr};
   const char* FileToStringOutTypes[]  = {"tbl_str",      nullptr};
 
-  //uint64_t FileToString(LavaParams* inout_lp, LavaVal* in, LavaOut* out)
-  uint64_t FileToString(LavaParams* inout_lp, LavaFrame* in, lava_threadQ* out) noexcept
+  uint64_t FileToString(LavaParams const* inout_lp, LavaFrame const* in, lava_threadQ* out) noexcept
   {
     using namespace std;
 
@@ -61,6 +60,8 @@ extern "C"
   {
     {
       FileToString,                                  // function
+      nullptr,                                       // constructor
+      nullptr,                                       // destructor
       (uint64_t)LavaNode::FLOW,                      // node_type  
       "FileToString",                                // name
       FileToStringInNames,                           // in_names
@@ -71,7 +72,7 @@ extern "C"
       //0                                              // id
     },                                             
 
-    {nullptr, (uint64_t)LavaNode::NONE, nullptr, nullptr, nullptr, nullptr, nullptr, 0}
+    LavaNodeListEnd                                  // This is a constant that has all the members of the LavaNode struct set to 0 or nullptr - it is used as a special value that ends the static list of LavaNodes. This negates the need for a separate static variable that gives the size of the list, which would be have to be kept in sync and therefore be error prone.
   };
 
   __declspec(dllexport) LavaNode* GetLavaNodes()
@@ -83,6 +84,12 @@ extern "C"
 
 
 
+
+//
+//uint64_t FileToString(LavaParams* inout_lp, LavaVal* in, LavaOut* out)
+
+//
+//{nullptr, (uint64_t)LavaNode::NONE, nullptr, nullptr, nullptr, nullptr, nullptr, 0}
 
 //
 //{nullptr, (uint64_t)LavaNode::NONE, 0,0, nullptr, nullptr,nullptr, 0, 0}
