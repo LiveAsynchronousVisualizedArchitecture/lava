@@ -232,9 +232,9 @@
 // -todo: make constructor run on start and destructor run on stop - should destructors and constructors simply both run on stop?
 // -todo: use MakeCube to test constructor and destructor
 // -todo: make pause and stop buttons greyed out until playing
+// -todo: copy template back in to FissureStatic.cpp
+// -todo: make visualizing an input actually toggle visualization on the the output it is attached to
 
-// todo: copy template back in to FissureStatic.cpp
-// todo: make visualizing an input actually toggle visualization on the the output it is attached to
 // todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets - use blue 'sunshine' lines going out from the center like a snowflake? 
 // todo: give LavaNode struct a description string
 // todo: make a settings file that is read on load if it in the same directory
@@ -2188,14 +2188,29 @@ ENTRY_DECLARATION // main or winmain
              fd.ui.statusTxt->setValue("");
            }
         }
-        SECTION(slot output simdb writing)
+        SECTION(slot visualization output simdb writing)
         {
+          //auto  sIter = node_slots(n.id);
+
           if(slotRtClk){
-            if( fd.vizIds.has(sid.asInt) ){
-              fd.vizIds.del(sid.asInt);
-              fisdb.del( genDbKey(sid) );
+            //auto& slots = fd.graph.slots;
+            //auto  sIter = slots.find(sid); //slots.find(sid);
+            //for(; sIter!=end(slots) && sIter->first==sid; ++sIter){                  // if the slot is an input slot, highlight the outputs connected to it
+            //  if(sIter->second.in){
+            //  }
+            //}
+
+            auto vizSid = sid;
+            if( slot_get(sid)->in ){
+              auto&   cncts = g.cncts();
+              vizSid = cncts[sid];
+            }
+
+            if( fd.vizIds.has(vizSid.asInt) ){
+              fd.vizIds.del(vizSid.asInt);
+              fisdb.del( genDbKey(vizSid) );
             }else{
-              fd.vizIds.put( sid.asInt );
+              fd.vizIds.put( vizSid.asInt );
             }
           }
         }
