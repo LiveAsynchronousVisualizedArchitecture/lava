@@ -435,8 +435,8 @@ struct     KVOfst
   operator bool() const { return (bool)(kv); }
   template<class N> N as() const { return kv->as<N>(); }
 
-  operator tbl ();
-  operator tbl*();
+  // operator tbl ();
+  // operator tbl*();
 
   template<class N> operator N() { return (N)(*kv); }
   template<class N> KVOfst& operator=(N const& n){ *kv = n; return *this; }
@@ -459,7 +459,8 @@ struct  TblFields
   u64     elems : 21;
   u64      size : 42;
 
-  u64 tbltype;
+  u64   tbltype :  8;
+  u64    stride : 56;
 };
 
 class tbl
@@ -482,13 +483,13 @@ public:
   using    Type   =  HshType::Type;
 
   template<class N> struct typenum { static const Type num = HshType::EMPTY; };
-  template<> struct typenum<u8>    { static const Type num = HshType::U64;   };
-  template<> struct typenum<i8>    { static const Type num = HshType::I64;   };
-  template<> struct typenum<u16>   { static const Type num = HshType::U64;   };
-  template<> struct typenum<i16>   { static const Type num = HshType::I64;   };
-  template<> struct typenum<u32>   { static const Type num = HshType::U64;   };
-  template<> struct typenum<i32>   { static const Type num = HshType::I64;   };
-  template<> struct typenum<f32>   { static const Type num = HshType::F64;   };
+  template<> struct typenum<u8>    { static const Type num = HshType::U8;   };
+  template<> struct typenum<i8>    { static const Type num = HshType::I8;   };
+  template<> struct typenum<u16>   { static const Type num = HshType::U16;   };
+  template<> struct typenum<i16>   { static const Type num = HshType::I16;   };
+  template<> struct typenum<u32>   { static const Type num = HshType::U32;   };
+  template<> struct typenum<i32>   { static const Type num = HshType::I32;   };
+  template<> struct typenum<f32>   { static const Type num = HshType::F32;   };
   template<> struct typenum<u64>   { static const Type num = HshType::U64;   };
   template<> struct typenum<i64>   { static const Type num = HshType::I64;   };
   template<> struct typenum<f64>   { static const Type num = HshType::F64;   };
@@ -504,16 +505,16 @@ public:
   template<> struct typecast<u32>   { using type = u64; };
   template<> struct typecast<f32>   { using type = f64; };
 
-  // using   tu8   =  tbl<u8>;
-  // using   tu16  =  tbl<u16>;
-  // using   tu32  =  tbl<u32>;
-  // using   tu64  =  tbl<u64>;
-  // using   ti8   =  tbl<i8>;
-  // using   ti16  =  tbl<i16>;
-  // using   ti32  =  tbl<i32>;
-  // using   ti64  =  tbl<i64>;
-  // using   tf32  =  tbl<f32>;
-  // using   tf64  =  tbl<f64>;
+  /*using   tu8   =  tbl<u8>;
+  using   tu16  =  tbl<u16>;
+  using   tu32  =  tbl<u32>;
+  using   tu64  =  tbl<u64>;
+  using   ti8   =  tbl<i8>;
+  using   ti16  =  tbl<i16>;
+  using   ti32  =  tbl<i32>;
+  using   ti64  =  tbl<i64>;
+  using   tf32  =  tbl<f32>;
+  using   tf64  =  tbl<f64>;*/
 
 private:
   void      sizeBytes(u64  bytes){ memStart()->sizeBytes =  bytes; }
@@ -522,14 +523,15 @@ private:
   void          elems(u64  elems){ memStart()->elems     =  elems; }
   void         mapcap(u64 mapcap){ memStart()->mapcap    = mapcap; }
   void        tbltype(u64   type){ memStart()->tbltype   =   type; }
-  bool     map_expand(bool force=false)
-  {  
-    u64 mapcap = map_capacity();
-    if( force || (mapcap==0 || mapcap*8 < elems()*10) )
-      return expand(false, true);
+  void         stride(u64 stride){ memStart()->stride    = stride; }
+  // bool     map_expand(bool force=false)
+  // {  
+  //   u64 mapcap = map_capacity();
+  //   if( force || (mapcap==0 || mapcap*8 < elems()*10) )
+  //     return expand(false, true);
 
-    return true;
-  }
+  //   return true;
+  // }
   u64             nxt(u64     i, u64 mod) const
   {
     return ++i % mod;
@@ -579,67 +581,67 @@ private:
     if(ret) return *ret;
     else    return KV::error_kv();
   }
-  u64         compact(u64    st, u64 en, u64 mapcap)
-  {
-    u64   cnt = 0;                                   // cnt is count which counts the number of loops, making sure the entire map capacity (mapcap) has not bene exceeded
-    KV*     el = elemStart(); 
-    u64     i = st;
-    u64 empty;
-    while(i!=en && el[i].hsh.type!=HshType::EMPTY){ 
-      i = nxt(i,mapcap);
-      ++cnt;
-    } // finds the first empty slot
-    empty = i;
-    while(i!=en && el[i].hsh.type==HshType::EMPTY){
-      i = nxt(i,mapcap);
-      ++cnt;
-    } // find the first non-empty slot after finding an empty slot
-    u64 prevElemDst = 0;
-    while(i!=en && el[i].hsh.type!=HshType::EMPTY){
-      u64 elemDst = wrapDist(el,i,mapcap);
-      if(elemDst<prevElemDst) return i;
+  // u64         compact(u64    st, u64 en, u64 mapcap)
+  // {
+  //   u64   cnt = 0;                                   // cnt is count which counts the number of loops, making sure the entire map capacity (mapcap) has not bene exceeded
+  //   KV*     el = elemStart(); 
+  //   u64     i = st;
+  //   u64 empty;
+  //   while(i!=en && el[i].hsh.type!=HshType::EMPTY){ 
+  //     i = nxt(i,mapcap);
+  //     ++cnt;
+  //   } // finds the first empty slot
+  //   empty = i;
+  //   while(i!=en && el[i].hsh.type==HshType::EMPTY){
+  //     i = nxt(i,mapcap);
+  //     ++cnt;
+  //   } // find the first non-empty slot after finding an empty slot
+  //   u64 prevElemDst = 0;
+  //   while(i!=en && el[i].hsh.type!=HshType::EMPTY){
+  //     u64 elemDst = wrapDist(el,i,mapcap);
+  //     if(elemDst<prevElemDst) return i;
 
-      prevElemDst = elemDst; // short circuiting based on robin hood hashing - as soon as the distance to the ideal position goes down, its ideal position must be further forward than the current empty position. Because no other EMPTY elements have been found, it must not be able to be moved to the current empty position, and this compact() is done
-      if( elemDst>0 ){ 
-        u64 emptyDst = wrapDist(empty,i,mapcap);           // emptyDst is empty distance - the distance to the empty slot - this can probably be optimized to just be an increment
-        u64    mnDst = mn(elemDst, emptyDst);               // mnDst is the minimum distances
-        u64    mvIdx = i;
-        TO(mnDst,ii) mvIdx=prev(mvIdx,mapcap);
-        el[mvIdx] = el[i];
-        el[i]       = KV();
-        empty       = i;                                     //++empty; // empty = i;  if empty was just the current index or if there are lots of empty elements in between, empty can be incremented by one
-      }
-      i = nxt(i,mapcap);
-      ++cnt;
-    } // moves elements backwards if they would end up closer to their ideal position
+  //     prevElemDst = elemDst; // short circuiting based on robin hood hashing - as soon as the distance to the ideal position goes down, its ideal position must be further forward than the current empty position. Because no other EMPTY elements have been found, it must not be able to be moved to the current empty position, and this compact() is done
+  //     if( elemDst>0 ){ 
+  //       u64 emptyDst = wrapDist(empty,i,mapcap);           // emptyDst is empty distance - the distance to the empty slot - this can probably be optimized to just be an increment
+  //       u64    mnDst = mn(elemDst, emptyDst);               // mnDst is the minimum distances
+  //       u64    mvIdx = i;
+  //       TO(mnDst,ii) mvIdx=prev(mvIdx,mapcap);
+  //       el[mvIdx] = el[i];
+  //       el[i]       = KV();
+  //       empty       = i;                                     //++empty; // empty = i;  if empty was just the current index or if there are lots of empty elements in between, empty can be incremented by one
+  //     }
+  //     i = nxt(i,mapcap);
+  //     ++cnt;
+  //   } // moves elements backwards if they would end up closer to their ideal position
 
-    return i;
-  }
-  u64         reorder()                                         // can this be done by storing chunks (16-64 etc) of KVs in an array, setting the previous slots to empty, sorting the KVs in the array by the slot they will go in, then placing them?   
-  { 
-    u64  mod  =  map_capacity();
-    if(mod==0){ return 0; }
+  //   return i;
+  // }
+  // u64         reorder()                                         // can this be done by storing chunks (16-64 etc) of KVs in an array, setting the previous slots to empty, sorting the KVs in the array by the slot they will go in, then placing them?   
+  // { 
+  //   u64  mod  =  map_capacity();
+  //   if(mod==0){ return 0; }
 
-    KV*   el  =  elemStart();
-    u64    i  =  0;
-    u64   en  =  prev(i,mod);
-    u64  cnt  =  0; 
-    do{
-      u64 nxti = nxt(i,mod); 
-      if(el[i].hsh.type != HshType::EMPTY){
-        KV kv  = el[i];
-        el[i]  = KV();
-        u64 st = kv.hsh.hash % mod;
-        u64  p = i; 
-        place_rh(kv,el,st,0,mod,&p);
-        if(p!=i) en = i;
-      }
-      i = nxti;
-      ++cnt;
-    }while(i!=en);
+  //   KV*   el  =  elemStart();
+  //   u64    i  =  0;
+  //   u64   en  =  prev(i,mod);
+  //   u64  cnt  =  0; 
+  //   do{
+  //     u64 nxti = nxt(i,mod); 
+  //     if(el[i].hsh.type != HshType::EMPTY){
+  //       KV kv  = el[i];
+  //       el[i]  = KV();
+  //       u64 st = kv.hsh.hash % mod;
+  //       u64  p = i; 
+  //       place_rh(kv,el,st,0,mod,&p);
+  //       if(p!=i) en = i;
+  //     }
+  //     i = nxti;
+  //     ++cnt;
+  //   }while(i!=en);
 
-    return cnt;
-  }
+  //   return cnt;
+  // }
   
   void     initFields(u64 sizeBytes, u64 count)
   {
@@ -653,23 +655,25 @@ private:
     f->size       =  count;
     f->mapcap     =  0;
     f->owned      =  1;
+    f->tbltype    =  0;
+    f->stride     =  0;
   }
-  void           init(u64 count)
+  template<class T> void init(u64 count)
   {
-    u64    szBytes  =  tbl::size_bytes(count);
+    u64    szBytes  =  tbl::size_bytes<T>(count);
     u8*      memst  =  (u8*)malloc(szBytes);                 // memst is memory start
     m_mem           =  memst + memberBytes();
 
     initFields(szBytes, count);
   }
-  void         initKV(std::initializer_list<KV> lst)
-  {
-    for(auto&& n : lst){ 
-      KV& kv       = *((*this)(n.key));
-      kv.val      = n.val;
-      kv.hsh.type = n.hsh.type;
-    }
-  }
+  // void         initKV(std::initializer_list<KV> lst)
+  // {
+  //   for(auto&& n : lst){ 
+  //     KV& kv       = *((*this)(n.key));
+  //     kv.val      = n.val;
+  //     kv.hsh.type = n.hsh.type;
+  //   }
+  // }
   // void           init(std::initializer_list  lst)
   // {
   //   using namespace std;
@@ -688,68 +692,68 @@ private:
   //   init(len);
   //   memcpy(data(), s, len);
   // }
-  void        destroy()
-  { 
-    if( m_mem && owned() ){
-      //tbl_PRNT("\n destruction \n");
+  // void        destroy()
+  // { 
+  //   if( m_mem && owned() ){
+  //     //tbl_PRNT("\n destruction \n");
 
-      T*    a = (T*)m_mem;
-      auto sz = size();
-      TO(sz,i){
-        a[i].T::~T();                                                                    // run the destructors manually before freeing the memory
-      }
+  //     // T*    a = (T*)m_mem;
+  //     // auto sz = size();
+  //     // TO(sz,i){
+  //     //   a[i].T::~T();                                                                    // run the destructors manually before freeing the memory
+  //     // }
       
-      free(memStart());
-      m_mem = nullptr;
-    }
-  }
-  void             cp(tbl const& l)
-  {    
-    //if(l.owned()){
-      //tbl_PRNT("\n full copy \n");
-      tbl prev;
-      prev.m_mem = m_mem;                                                                // make a tbl for the old memory - this will be destructed at the end of this scope, which will free up the old memory. the old memory is not freed up first, since we could be copying from a child of this very same tbl 
+  //     free(memStart());
+  //     m_mem = nullptr;
+  //   }
+  // }
+  // void             cp(tbl const& l)
+  // {    
+  //   //if(l.owned()){
+  //     //tbl_PRNT("\n full copy \n");
+  //     tbl prev;
+  //     prev.m_mem = m_mem;                                                                // make a tbl for the old memory - this will be destructed at the end of this scope, which will free up the old memory. the old memory is not freed up first, since we could be copying from a child of this very same tbl 
 
-      m_mem = nullptr;
-      reserve(l.size(), l.elems(), l.child_capacity() );                                 // this will size the current table exactly because it starts from a nullptr - it also means however that realloc is not used and malloc is called for a brand new allocation
-      TO(l.size(),i) push(l[i]); 
+  //     m_mem = nullptr;
+  //     reserve(l.size(), l.elems(), l.child_capacity() );                                 // this will size the current table exactly because it starts from a nullptr - it also means however that realloc is not used and malloc is called for a brand new allocation
+  //     TO(l.size(),i) push(l[i]); 
     
-      auto e = l.elemStart();
-      TO(l.map_capacity(),i) if( !e[i].isEmpty() ){
-        put(e[i].key, e[i].val);
-      }
+  //     auto e = l.elemStart();
+  //     TO(l.map_capacity(),i) if( !e[i].isEmpty() ){
+  //       put(e[i].key, e[i].val);
+  //     }
 
-      memcpy(childData(), l.childData(), l.child_capacity() );                           // since this is a straight copy of the child memory, the values/offsets in the map's child table can stay the same
-    //}else{
-    //  //tbl_PRNT("\n shallow copy \n");
-    //  m_mem = l.m_mem;
-    //} 
-  }
-  void             mv(tbl&& r)
-  {
-    //tbl_PRNT("\n moved \n");
-    m_mem   = r.m_mem;
-    r.m_mem = nullptr;
-  }
-  template<class OP> void op_asn(tbl const& l, OP op)
-  {
-    u64     mx_sz = size();
-    u64     mn_sz = l.size();
-    if(mx_sz<mn_sz){ auto tmp=mx_sz; mx_sz=mn_sz; mn_sz=tmp; }
-    TO(mn_sz,i) op( (*this)[i], l[i] );
-  }
-  template<class OP> tbl  bin_op(tbl const& l, OP op) const
-  {     
-    u64     mx_sz = size();
-    u64     mn_sz = l.size();
-    tbl const* lrg = this;
-    if(mx_sz<mn_sz){ auto tmp=mx_sz; mx_sz=mn_sz; mn_sz=tmp; lrg = &l; }        // swap mx_sz, mn_sz, and the pointer to the larger tbl if mismatched
-    tbl ret(mx_sz); 
-    TO(mn_sz, i) ret[i] = op( (*this)[i], l[i] );
-    TO(mx_sz-mn_sz, i) ret[i+mn_sz] = (*lrg)[i+mn_sz];
+  //     memcpy(childData(), l.childData(), l.child_capacity() );                           // since this is a straight copy of the child memory, the values/offsets in the map's child table can stay the same
+  //   //}else{
+  //   //  //tbl_PRNT("\n shallow copy \n");
+  //   //  m_mem = l.m_mem;
+  //   //} 
+  // }
+  // void             mv(tbl&& r)
+  // {
+  //   //tbl_PRNT("\n moved \n");
+  //   m_mem   = r.m_mem;
+  //   r.m_mem = nullptr;
+  // }
+  // template<class OP> void op_asn(tbl const& l, OP op)
+  // {
+  //   u64     mx_sz = size();
+  //   u64     mn_sz = l.size();
+  //   if(mx_sz<mn_sz){ auto tmp=mx_sz; mx_sz=mn_sz; mn_sz=tmp; }
+  //   TO(mn_sz,i) op( (*this)[i], l[i] );
+  // }
+  // template<class OP> tbl  bin_op(tbl const& l, OP op) const
+  // {     
+  //   u64     mx_sz = size();
+  //   u64     mn_sz = l.size();
+  //   tbl const* lrg = this;
+  //   if(mx_sz<mn_sz){ auto tmp=mx_sz; mx_sz=mn_sz; mn_sz=tmp; lrg = &l; }        // swap mx_sz, mn_sz, and the pointer to the larger tbl if mismatched
+  //   tbl ret(mx_sz); 
+  //   TO(mn_sz, i) ret[i] = op( (*this)[i], l[i] );
+  //   TO(mx_sz-mn_sz, i) ret[i+mn_sz] = (*lrg)[i+mn_sz];
 
-    return ret;
-  }
+  //   return ret;
+  // }
   // template<class OP> void op_asn(T   const& l, OP op)
   // {
   //   TO(size(),i) op( (*this)[i], l);
@@ -763,7 +767,51 @@ private:
   // }
   template<class T> u64 enum_of()
   {
-    return typecast<T>(typenum<T>::num);
+    return static_cast<u64>(typenum<T>::num);
+  }
+
+  u64 get_stride(u64 ttype)
+  {
+    if(ttype == HshType::U8)
+    {
+      return sizeof(u8);
+    }
+    else if(ttype == HshType::I8)
+    {
+      return sizeof(i8);
+    }
+    else if(ttype == HshType::U16)
+    {
+      return sizeof(u16);
+    }
+    else if(ttype == HshType::I16)
+    {
+      return sizeof(i16);
+    }
+    else if(ttype == HshType::U32)
+    {
+      return sizeof(u32);
+    }
+    else if(ttype == HshType::I32)
+    {
+      return sizeof(i32);
+    }
+    else if(ttype == HshType::U64)
+    {
+      return sizeof(u64);
+    }
+    else if(ttype == HshType::I64)
+    {
+      return sizeof(i64);
+    }
+    else if(ttype == HshType::F32)
+    {
+      return sizeof(f32);
+    }
+    else if(ttype == HshType::F64)
+    {
+      return sizeof(f64);
+    }
   }
 
 public:  
@@ -771,122 +819,126 @@ public:
  
   template<class T> tbl(T initVal)
   {
+    init<T>(initVal);
     tbltype(enum_of<T>());
+    stride(get_stride(tbltype()));
   }
 
   tbl() : m_mem(nullptr) {}
-  tbl(void* memst, bool _init=false, bool _owned=false, u64 _count=0) : m_mem( ((u8*)memst)+memberBytes() )
-  {
-    if(_init){
-      //assert(count > 0);
-      this->init(_count);
-      this->owned(_owned);
-    }else{
-      assert( ((i8*)memStart())[0]=='t' );
-      assert( ((i8*)memStart())[1]=='b' );
-    }
-  }
-  tbl(u64 count){ init(count); }                                                           // have to run default constructor here?
-  // tbl(u64 count, T const& value)
-  // {
-  //   init(count);
-  //   TO(count, i){ (*this)[i] = value; }
-  // }
-  tbl(std::initializer_list<KV> lst){ initKV(lst); }
-  // tbl(std::initializer_list<T>  lst)
-  // {
-  //   //init(lst.size()); 
-  //   init(lst); 
-  // }
-  tbl(const char* s){ init_cstr(s); }
-  ~tbl(){ destroy(); }
+//   tbl(void* memst, bool _init=false, bool _owned=false, u64 _count=0) : m_mem( ((u8*)memst)+memberBytes() )
+//   {
+//     if(_init){
+//       //assert(count > 0);
+//       this->init(_count);
+//       this->owned(_owned);
+//     }else{
+//       assert( ((i8*)memStart())[0]=='t' );
+//       assert( ((i8*)memStart())[1]=='b' );
+//     }
+//   }
+//   tbl(u64 count){ init(count); }                                                           // have to run default constructor here?
+//   tbl(u64 count, T const& value)
+//   {
+//     init(count);
+//     TO(count, i){ (*this)[i] = value; }
+//   }
+//   tbl(std::initializer_list<KV> lst){ initKV(lst); }
+//   tbl(std::initializer_list<T>  lst)
+//   {
+//     //init(lst.size()); 
+//     init(lst); 
+//   }
+//   tbl(const char* s){ init_cstr(s); }
+//   ~tbl(){ destroy(); }
 
-  tbl           (tbl const& l){ cp(l);                          }
-  tbl& operator=(tbl const& l){ cp(l);            return *this; }
-  tbl           (tbl&&      r){ mv(std::move(r));               }
-  tbl& operator=(tbl&&      r){ mv(std::move(r)); return *this; }
-  tbl& operator=(std::initializer_list<KV> lst){ initKV(lst); return *this; }
-  // tbl& operator=(std::initializer_list<T>  lst){   init(lst); return *this; }
-  tbl& operator=(const char* s){ init_cstr(s); return *this; }
+//   // tbl           (tbl const& l){ cp(l);                          }
+//   // tbl& operator=(tbl const& l){ cp(l);            return *this; }
+//   tbl           (tbl&&      r){ mv(std::move(r));               }
+//   tbl& operator=(tbl&&      r){ mv(std::move(r)); return *this; }
+//   tbl& operator=(std::initializer_list<KV> lst){ initKV(lst); return *this; }
+//   // tbl& operator=(std::initializer_list<T>  lst){   init(lst); return *this; }
+//   // tbl& operator=(const char* s){ init_cstr(s); return *this; }
 
-  // T&      operator[](u64 i)
-  // {
-  //   tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
-  //   return ((T*)m_mem)[i];
-  // }
-  // auto    operator[](u64 i) const -> T const& 
-  // {
-  //   tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
-  //   return ((T*)m_mem)[i];
-  // }
-  KVOfst  operator()(i32 k)
-  {
-    char key[sizeof(k)+1];
-    memcpy(key, &k, sizeof(k));
-    key[sizeof(k)] = '\0';
-    return operator()(key);
-  }
-  KVOfst  operator()(const char* key)
-  {      
-    KVOfst  ret;                                                                         // this will be set with placement new instead of operator= because operator= is templated and used for assigning to the KV pointed to by KVOfst::KV* -  this is so tbl("some key") = 85  can work correctly
-    u32     hsh;
-    KV*      kv = m_mem?  get(key, &hsh) : nullptr;
-    if(owned())
-    { 
-      if( !map_expand(!kv) ) return KVOfst();                                            // if map_expand returns false, that means that memory expansion was tried but failed
+//   // template<class T> T&      operator[](u64 i)
+//   // {
+//   //   tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
+//   //   return ((T*)m_mem)[i];
+//   // }
 
-      kv = get(key, &hsh);                                                               // if the expansion succeeded there has to be space now, but the keys will be reordered 
+//   // template<class T> auto    operator[](u64 i) const -> T const& 
+//   // {
+//   //   tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
+//   //   return ((T*)m_mem)[i];
+//   // }
 
-      auto type = kv->hsh.type;
-      if(type==HshType::EMPTY)
-      {
-        elems( elems()+1 );
-        //new (kv) KV(key, hsh);
-        new (kv) KV(key);
-        kv->hsh.hash = hsh;
-        kv->hsh.type = HshType::NONE;
-        new (&ret) KVOfst(kv);
-      }else if( (type&HshType::TABLE) && (type&HshType::CHILD) )
-        new (&ret) KVOfst(kv, this->childData());                           // (void*)memStart());
-      else
-        new (&ret) KVOfst(kv);
-    }else 
-      new (&ret) KVOfst(kv);                                                             // if the key wasn't found, kv will be a nullptr which is the same as an error KVOfst that will evaluate to false when cast to a boolean      
+   //KVOfst  operator()(i32 k)
+   //{
+   //  char key[sizeof(k)+1];
+   //  memcpy(key, &k, sizeof(k));
+   //  key[sizeof(k)] = '\0';
+   //  return operator()(key);
+   //}
+   //KVOfst  operator()(const char* key)
+   //{      
+   //  KVOfst  ret;                                                                         // this will be set with placement new instead of operator= because operator= is templated and used for assigning to the KV pointed to by KVOfst::KV* -  this is so tbl("some key") = 85  can work correctly
+   //  u32     hsh;
+   //  KV*      kv = m_mem?  get(key, &hsh) : nullptr;
+   //  if(owned())
+   //  { 
+   //    if( !map_expand(!kv) ) return KVOfst();                                            // if map_expand returns false, that means that memory expansion was tried but failed
 
-    return ret;
-  }
-  tbl     operator>>(tbl const& l){ return tbl::concat_l(*this, l); }
-  tbl     operator<<(tbl const& l){ return tbl::concat_r(*this, l); }
-  tbl&    operator--(){ shrink_to_fit();    return *this; }
-  tbl&    operator++(){ expand(true,false); return *this; }
-  void    operator+=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
-  void    operator-=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }
-  void    operator*=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a *= b; } ); }
-  void    operator/=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a /= b; } ); }
-  void    operator%=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a %= b; } ); }
-  tbl     operator+ (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a + b;}); }
-  tbl     operator- (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a - b;}); }
-  tbl     operator* (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a * b;}); }
-  tbl     operator/ (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
-  tbl     operator% (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
-  // void    operator+=(T   const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
-  // void    operator-=(T   const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }
-  // void    operator*=(T   const& l){ op_asn(l, [](T& a, T const& b){ a *= b; } ); }
-  // void    operator/=(T   const& l){ op_asn(l, [](T& a, T const& b){ a /= b; } ); }
-  // void    operator%=(T   const& l){ op_asn(l, [](T& a, T const& b){ a %= b; } ); }
-  // tbl     operator+ (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a + b;}); }
-  // tbl     operator- (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a - b;}); }
-  // tbl     operator* (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a * b;}); }
-  // tbl     operator/ (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
-  // tbl     operator% (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
+//       kv = get(key, &hsh);                                                               // if the expansion succeeded there has to be space now, but the keys will be reordered 
 
-  template<class V> KVOfst put(const char* key, V val){ return this->operator()(key) = val; }
+//       auto type = kv->hsh.type;
+//       if(type==HshType::EMPTY)
+//       {
+//         elems( elems()+1 );
+//         //new (kv) KV(key, hsh);
+//         new (kv) KV(key);
+//         kv->hsh.hash = hsh;
+//         kv->hsh.type = HshType::NONE;
+//         new (&ret) KVOfst(kv);
+//       }else if( (type&HshType::TABLE) && (type&HshType::CHILD) )
+//         new (&ret) KVOfst(kv, this->childData());                           // (void*)memStart());
+//       else
+//         new (&ret) KVOfst(kv);
+//     }else 
+//       new (&ret) KVOfst(kv);                                                             // if the key wasn't found, kv will be a nullptr which is the same as an error KVOfst that will evaluate to false when cast to a boolean      
 
-  template<class... V> bool emplace(V&&... val)
+//     return ret;
+//   }
+//   tbl     operator>>(tbl const& l){ return tbl::concat_l(*this, l); }
+//   tbl     operator<<(tbl const& l){ return tbl::concat_r(*this, l); }
+//   tbl&    operator--(){ shrink_to_fit();    return *this; }
+//   tbl&    operator++(){ expand(true,false); return *this; }
+//   // void    operator+=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
+//   // void    operator-=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }
+//   // void    operator*=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a *= b; } ); }
+//   // void    operator/=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a /= b; } ); }
+//   // void    operator%=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a %= b; } ); }
+//   // tbl     operator+ (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a + b;}); }
+//   // tbl     operator- (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a - b;}); }
+//   // tbl     operator* (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a * b;}); }
+//   // tbl     operator/ (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
+//   // tbl     operator% (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
+//   // void    operator+=(T   const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
+//   // void    operator-=(T   const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }
+//   // void    operator*=(T   const& l){ op_asn(l, [](T& a, T const& b){ a *= b; } ); }
+//   // void    operator/=(T   const& l){ op_asn(l, [](T& a, T const& b){ a /= b; } ); }
+//   // void    operator%=(T   const& l){ op_asn(l, [](T& a, T const& b){ a %= b; } ); }
+//   // tbl     operator+ (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a + b;}); }
+//   // tbl     operator- (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a - b;}); }
+//   // tbl     operator* (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a * b;}); }
+//   // tbl     operator/ (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
+//   // tbl     operator% (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
+
+//   template<class V> KVOfst put(const char* key, V val){ return this->operator()(key) = val; }
+
+  template<class T, class... V> bool emplace(V&&... val)
   {
     using namespace std;
-    
-    if(!m_mem){ init(0); }
+
+    if(!m_mem){ init<T>(0); }
 
     auto prevSz = size();
     if( !(capacity()>prevSz) )
@@ -898,83 +950,83 @@ public:
 
     return true;
   }
-  template<class... V> bool emplace_back(V&&... val){ return emplace(std::forward<V>(val)...);  }
-  // bool           push(T const& val){ return emplace(val); }
-  // u64            push(std::initializer_list<T> lst)
-  // {
-  //   u64 cnt = 0;
-  //   for(auto const& v : lst){
-  //     bool ok = this->push(v);
-  //     if(!ok){ return cnt; }
-  //     ++cnt;
-  //   }
+//   template<class... V> bool emplace_back(V&&... val){ return emplace(std::forward<V>(val)...);  }
+//   // bool           push(T const& val){ return emplace(val); }
+//   // u64            push(std::initializer_list<T> lst)
+//   // {
+//   //   u64 cnt = 0;
+//   //   for(auto const& v : lst){
+//   //     bool ok = this->push(v);
+//   //     if(!ok){ return cnt; }
+//   //     ++cnt;
+//   //   }
 
-  //   return cnt;
-  // }
-  // bool      push_back(T const& value){ return emplace(value); }
-  // void            pop(){ back()->T::~T(); set_size(size()-1); }
-  void       pop_back(){ pop(); }
-  // T const&      front() const{ return (*this)[0]; }
-  // T const&       back() const{ return (*this)[size()-1]; }
+//   //   return cnt;
+//   // }
+template<class T>  bool push_back(T const& value){ return emplace<T>(value); }
+//   // void            pop(){ back()->T::~T(); set_size(size()-1); }
+//   // void       pop_back(){ pop(); }
+//   // T const&      front() const{ return (*this)[0]; }
+//   // T const&       back() const{ return (*this)[size()-1]; }
 
-  template<class N> bool insert(const char* key, N const& val)
-  {
-    KV& kv = (*this)(key, true);
-    if(kv.hsh.type==ERROR) return false;
+//   template<class N> bool insert(const char* key, N const& val)
+//   {
+//     KV& kv = (*this)(key, true);
+//     if(kv.hsh.type==ERROR) return false;
 
-    kv = val;
-    return true;
-  }
-  bool            has(const char* key)
-  {
-    KV const& kv = (*this)(key, false);
-    return kv.hsh.type != EMPTY;
-  }
-  KV*             get(const char* key, u32* out_hash=nullptr)
-  {
-    HshType hh;
-    hh.hash   =  HashStr(key);
-    u32  hsh  =  hh.hash;                                                 // make sure that the hash is being squeezed into the same bit depth as the hash in HshType
-    if(out_hash){ *out_hash = hsh; }
-    KV*   el  =  (KV*)elemStart();                                        // el is a pointer to the elements 
-    u64  mod  =  map_capacity();
-    if(mod==0) return nullptr;
+//     kv = val;
+//     return true;
+//   }
+//   // bool            has(const char* key)
+//   // {
+//   //   KV const& kv = (*this)(key, false);
+//   //   return kv.hsh.type != HshType::EMPTY;
+//   // }
+//   KV*             get(const char* key, u32* out_hash=nullptr)
+//   {
+//     HshType hh;
+//     hh.hash   =  HashStr(key);
+//     u32  hsh  =  hh.hash;                                                 // make sure that the hash is being squeezed into the same bit depth as the hash in HshType
+//     if(out_hash){ *out_hash = hsh; }
+//     KV*   el  =  (KV*)elemStart();                                        // el is a pointer to the elements 
+//     u64  mod  =  map_capacity();
+//     if(mod==0) return nullptr;
 
-    u64    i  =  hsh % mod;
-    u64   en  =  prev(i,mod);
-    u64 dist  =  0;
-    for(;;++i,++dist)
-    {
-      i %= mod;                                                                // get idx within map_capacity
-      HshType eh = el[i].hsh;                                                  // eh is element hash
-      if( eh.type == HshType::EMPTY || 
-           (hsh == eh.hash &&                                  // if the hashes aren't the same, the keys can't be the same
-           strncmp(el[i].key,key,sizeof(KV::Key)-1)==0) )
-      { 
-        return &el[i];
-      }else if(dist > wrapDist(el,i,mod) ){
-        //KV kv(key, hsh);
-        KV kv(key);
-        kv.hsh.hash = hsh;
-        elems( elems()+1 );
-        return &(place_rh(kv, el, i, dist, mod));
-      }
+//     u64    i  =  hsh % mod;
+//     u64   en  =  prev(i,mod);
+//     u64 dist  =  0;
+//     for(;;++i,++dist)
+//     {
+//       i %= mod;                                                                // get idx within map_capacity
+//       HshType eh = el[i].hsh;                                                  // eh is element hash
+//       if( eh.type == HshType::EMPTY || 
+//            (hsh == eh.hash &&                                  // if the hashes aren't the same, the keys can't be the same
+//            strncmp(el[i].key,key,sizeof(KV::Key)-1)==0) )
+//       { 
+//         return &el[i];
+//       }else if(dist > wrapDist(el,i,mod) ){
+//         //KV kv(key, hsh);
+//         KV kv(key);
+//         kv.hsh.hash = hsh;
+//         elems( elems()+1 );
+//         return &(place_rh(kv, el, i, dist, mod));
+//       }
 
-      if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
-    }
+//       if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+//     }
 
-    return nullptr; // no empty slots and key was not found
-  }
+//     return nullptr; // no empty slots and key was not found
+//   }
 
   u64            size() const { return m_mem? memStart()->size : 0; }
-  // T*             data() const {return (T*)m_mem; }
-  void*     childData() const { return (void*)(elemStart() + map_capacity()); }                                                      // elemStart return a KV* so map_capacity will increment that pointer by the map_capacity * sizeof(KV)
+  void* data() const {return m_mem; }
+//   void*     childData() const { return (void*)(elemStart() + map_capacity()); }                                                      // elemStart return a KV* so map_capacity will increment that pointer by the map_capacity * sizeof(KV)
   u64  child_capacity() const
   {
     u64 szb = 0;
     if(!m_mem || (szb=sizeBytes())==0 ) return 0;
-
-    return sizeBytes() - memberBytes() - capacity()*sizeof(T) - map_capacity()*sizeof(KV);
+ 
+    return sizeBytes() - memberBytes() - capacity()*stride() - map_capacity()*sizeof(KV);
   }
   bool          owned() const  
   {
@@ -988,6 +1040,7 @@ public:
   u64           elems() const { return m_mem?  memStart()->elems    : 0; }
   u64    map_capacity() const { return m_mem?  memStart()->mapcap   : 0; }
   u64         tbltype() const { return m_mem? memStart()->tbltype   : 0; }
+  u64          stride() const { return m_mem? memStart()->stride    : 0; }
   auto      elemStart() ->KV* { return m_mem? (KV*)(data() + capacity()) : nullptr; }
   auto      elemStart() const -> KV const* { return m_mem? (KV*)(data() + capacity()) : nullptr; }
   void*       reserve(u64 count, u64 mapcap=0, u64 childcap=0)
@@ -999,45 +1052,45 @@ public:
     mapcap    =  mx(mapcap,     map_capacity() );
     childcap  =  mx(childcap,       prvChldCap );
     KV*    prevElems  =  elemStart();
-    u64    prevMemSt  =  (u64)memStart();
-    u64     prevOfst  =  prevElems? ((u64)prevElems)-prevMemSt  :  0;
-    u64    prevBytes  =  sizeBytes();
-    u64   prevMapCap  =  map_capacity();
-    void*    prvChld  =  childData();
-    u64     nxtBytes  =  memberBytes() + sizeof(T)*count +  sizeof(KV)*mapcap + childcap;
-    void*     re;
-    bool      fresh  = !m_mem;
-    if(fresh) re = malloc(nxtBytes);
-    else      re = realloc( (void*)memStart(), nxtBytes);
+    //u64    prevMemSt  =  (u64)memStart();
+    //u64     prevOfst  =  prevElems? ((u64)prevElems)-prevMemSt  :  0;
+    //u64    prevBytes  =  sizeBytes();
+    //u64   prevMapCap  =  map_capacity();
+    //void*    prvChld  =  childData();
+    //u64     nxtBytes  =  memberBytes() + sizeof(T)*count +  sizeof(KV)*mapcap + childcap;
+    //void*     re;
+    //bool      fresh  = !m_mem;
+    //if(fresh) re = malloc(nxtBytes);
+    //else      re = realloc( (void*)memStart(), nxtBytes);
 
-    if(re){
-      m_mem = ((u8*)re) + memberBytes();
-      sizeBytes(nxtBytes);
-      capacity(count);
-      this->mapcap(mapcap);
-      if(re && fresh){
-        auto f = memStart();
-        f->t   = 't';
-        f->b   = 'b';
-        size(0); elems(0);
-      }
-      byte_move(childData(), prvChld, prvChldCap);
+    //if(re){
+    //  m_mem = ((u8*)re) + memberBytes();
+    //  sizeBytes(nxtBytes);
+    //  capacity(count);
+    //  this->mapcap(mapcap);
+    //  if(re && fresh){
+    //    auto f = memStart();
+    //    f->t   = 't';
+    //    f->b   = 'b';
+    //    size(0); elems(0);
+    //  }
+    //  byte_move(childData(), prvChld, prvChldCap);
 
-      KV*  el = elemStart();                                     //  is this copying elements forward in memory? can it overwrite elements that are already there? - right now reserve only ends up expanding memory for both the array and map
-      u8* elb = (u8*)el;  
-      if(prevElems){
-        u8* prevEl = (u8*)re + prevOfst;
-        u64  prevB = prevMapCap * sizeof(KV);                    // prevB is previous map bytes
-        FROM(prevB,i){ elb[i] = prevEl[i]; }
-      }
+    //  KV*  el = elemStart();                                     //  is this copying elements forward in memory? can it overwrite elements that are already there? - right now reserve only ends up expanding memory for both the array and map
+    //  u8* elb = (u8*)el;  
+    //  if(prevElems){
+    //    u8* prevEl = (u8*)re + prevOfst;
+    //    u64  prevB = prevMapCap * sizeof(KV);                    // prevB is previous map bytes
+    //    FROM(prevB,i){ elb[i] = prevEl[i]; }
+    //  }
 
-      i64 extcap = mapcap - prevMapCap;
-      if(extcap>0) 
-        TO(extcap,i) 
-          new (&el[i+prevMapCap]) KV();
+    //  i64 extcap = mapcap - prevMapCap;
+    //  if(extcap>0) 
+    //    TO(extcap,i) 
+    //      new (&el[i+prevMapCap]) KV();
 
-      if(prevElems){ u64 cnt = reorder(); }
-    }
+    //  if(prevElems){ u64 cnt = reorder(); }
+    //}
 
     return re;
   }
@@ -1059,316 +1112,316 @@ public:
 
     return reserve(nxtSz, nxtCap);
   }
-  bool  shrink_to_fit()
-  { 
-    if( !owned() ){ return false; }
+//   bool  shrink_to_fit()
+//   { 
+//     if( !owned() ){ return false; }
     
-    u64       sz = size();
-    u64    vecsz = memberBytes() + sz*sizeof(T);
-    u64  elemcnt = elems();
-    u64    mapsz = elemcnt*sizeof(KV);
-    u64  chldCap = child_capacity();
-    u64    nxtsz = vecsz + mapsz + chldCap;
-    auto prvChld = childData();
-    KV const* el = elemStart();
-    u8*     nxtp = (u8*)malloc(nxtsz);
-    if(nxtp){
-      u8*     p = (u8*)memStart();
-      memcpy(nxtp, p, vecsz);                                                            // todo: needs to actually use the copy constructor or the assignment operator 
-      auto   ff = (fields*)nxtp;
-      KV* nxtel = (KV*)(nxtp+vecsz);                                                         // nxtel is next element
-      u64   cur = 0;
-      TO(map_capacity(),i)                                                                // todo: don't these need to be rehashed instead of simply copied?
-        if(el[i].hsh.type!= HshType::EMPTY){
-          nxtel[cur++] = el[i];
-        }
+//     u64       sz = size();
+//     u64    vecsz = memberBytes() + sz*sizeof(T);
+//     u64  elemcnt = elems();
+//     u64    mapsz = elemcnt*sizeof(KV);
+//     u64  chldCap = child_capacity();
+//     u64    nxtsz = vecsz + mapsz + chldCap;
+//     auto prvChld = childData();
+//     KV const* el = elemStart();
+//     u8*     nxtp = (u8*)malloc(nxtsz);
+//     if(nxtp){
+//       u8*     p = (u8*)memStart();
+//       memcpy(nxtp, p, vecsz);                                                            // todo: needs to actually use the copy constructor or the assignment operator 
+//       auto   ff = (fields*)nxtp;
+//       KV* nxtel = (KV*)(nxtp+vecsz);                                                         // nxtel is next element
+//       u64   cur = 0;
+//       TO(map_capacity(),i)                                                                // todo: don't these need to be rehashed instead of simply copied?
+//         if(el[i].hsh.type!= HshType::EMPTY){
+//           nxtel[cur++] = el[i];
+//         }
 
-      auto  prvF = (fields*)(prvChld);
+//       auto  prvF = (fields*)(prvChld);
 
-      tbl prev;
-      prev.m_mem = m_mem;                                                                 // make a table to hold the previous span of bytes
-      m_mem    = nxtp+memberBytes();                                                      // now this table holds the new span of bytes
+//       tbl prev;
+//       prev.m_mem = m_mem;                                                                 // make a table to hold the previous span of bytes
+//       m_mem    = nxtp+memberBytes();                                                      // now this table holds the new span of bytes
 
-      auto f   = memStart();
-      f->t     = 't';
-      f->b     = 'b';
-      f->owned = 1;
-      sizeBytes(nxtsz);
-      size(sz);
-      capacity(sz);
-      elems(elemcnt);
-      mapcap(elemcnt);
+//       auto f   = memStart();
+//       f->t     = 't';
+//       f->b     = 'b';
+//       f->owned = 1;
+//       sizeBytes(nxtsz);
+//       size(sz);
+//       capacity(sz);
+//       elems(elemcnt);
+//       mapcap(elemcnt);
 
-      void* chld = childData();
-      byte_move(chld, prvChld, chldCap);                                                 // shouldn't be neccesary because this is using malloc and not realloc()
-      auto   fff = (fields*)(chld);
+//       void* chld = childData();
+//       byte_move(chld, prvChld, chldCap);                                                 // shouldn't be neccesary because this is using malloc and not realloc()
+//       auto   fff = (fields*)(chld);
       
-      prev.destroy();
-      prev.m_mem = nullptr;                                                              // makes destructor early exit on destroy
+//       prev.destroy();
+//       prev.m_mem = nullptr;                                                              // makes destructor early exit on destroy
       
-      auto cf = (fields*)( childData() );
+//       auto cf = (fields*)( childData() );
 
-      return true;
-    }else 
-      return false;
-  }
-  i64            find(const char* key, u32* hash=nullptr) const
-  {
-    u32   hsh  =  HashStr(key);
-    if(hash) *hash = hsh;
+//       return true;
+//     }else 
+//       return false;
+//   }
+//   i64            find(const char* key, u32* hash=nullptr) const
+//   {
+//     u32   hsh  =  HashStr(key);
+//     if(hash) *hash = hsh;
 
-    KV*     el  =  (KV*)elemStart();                                   // el is a pointer to the elements 
-    u64   cap  =  map_capacity();  
-    u64     i  =  hsh;
-    u64  wrap  =  hsh % cap - 1;
-    u64    en  =  wrap<(cap-1)? wrap : cap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
-    for(;;++i)
-    {
-      i %= cap;                                                        // get idx within map_capacity
-      HshType eh = el[i].hsh;                                          // eh is element hash
-      if(el[i].hsh.type==EMPTY){ 
-        return i;
-      }else if(hsh == eh.hash){                                        // if the hashes aren't the same, the keys can't be the same
-        auto cmp = strncmp(el[i].key, key, sizeof(KV::Key)-1);         // check if the keys are the same 
-        if(cmp==0) return i;
-      }
+//     KV*     el  =  (KV*)elemStart();                                   // el is a pointer to the elements 
+//     u64   cap  =  map_capacity();  
+//     u64     i  =  hsh;
+//     u64  wrap  =  hsh % cap - 1;
+//     u64    en  =  wrap<(cap-1)? wrap : cap-1;                         // clamp to cap-1 for the case that hash==0, which will result in an unsigned integer wrap 
+//     for(;;++i)
+//     {
+//       i %= cap;                                                        // get idx within map_capacity
+//       HshType eh = el[i].hsh;                                          // eh is element hash
+//       if(el[i].hsh.type==EMPTY){ 
+//         return i;
+//       }else if(hsh == eh.hash){                                        // if the hashes aren't the same, the keys can't be the same
+//         auto cmp = strncmp(el[i].key, key, sizeof(KV::Key)-1);         // check if the keys are the same 
+//         if(cmp==0) return i;
+//       }
 
-      if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
-    }
+//       if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+//     }
     
-    return -1;
-  }
-  u64           ideal(u64 i) const
-  {
-    auto el = elemStart();
-    //if(el[i].hsh.type==EMPTY) return i;
-    if(el[i].hsh.type==HshType::EMPTY) return i;
+//     return -1;
+//   }
+//   u64           ideal(u64 i) const
+//   {
+//     auto el = elemStart();
+//     //if(el[i].hsh.type==EMPTY) return i;
+//     if(el[i].hsh.type==HshType::EMPTY) return i;
 
-    return el[i].hsh.hash % map_capacity();
-  }
-  u64        distance(u64 i) const { return wrapDist( ideal(i), i, map_capacity() ); }
-  i64        holeOfst(u64 i) const
-  { // finds the closes hole from an element, but not the furthest hole
-    KV const* el = elemStart();
-    u64     mod = map_capacity();
+//     return el[i].hsh.hash % map_capacity();
+//   }
+//   u64        distance(u64 i) const { return wrapDist( ideal(i), i, map_capacity() ); }
+//   i64        holeOfst(u64 i) const
+//   { // finds the closes hole from an element, but not the furthest hole
+//     KV const* el = elemStart();
+//     u64     mod = map_capacity();
     
-    i64    h = -1;
-    u64 dst = distance(i);
-    u64 cnt = 0;
-    while(dst >= cnt){ // count can equal distance
-      //if(el[i].hsh.type==EMPTY) h = i;
-      if(el[i].hsh.type==HshType::EMPTY) h = i;
-      i = prev(i,mod);
-      ++cnt;
-    }
-    return h;
-  }
-  bool            del(const char* key)
-  { 
-    u64 i = find(key);
-    KV* el = elemStart();
-    if(el[i].hsh.type==EMPTY) return false;
+//     i64    h = -1;
+//     u64 dst = distance(i);
+//     u64 cnt = 0;
+//     while(dst >= cnt){ // count can equal distance
+//       //if(el[i].hsh.type==EMPTY) h = i;
+//       if(el[i].hsh.type==HshType::EMPTY) h = i;
+//       i = prev(i,mod);
+//       ++cnt;
+//     }
+//     return h;
+//   }
+//   bool            del(const char* key)
+//   { 
+//     u64 i = find(key);
+//     KV* el = elemStart();
+//     if(el[i].hsh.type==EMPTY) return false;
 
-    el[i] = KV();
-    u64 mapcap = map_capacity();
-    u64     en = prev(i, mapcap);
+//     el[i] = KV();
+//     u64 mapcap = map_capacity();
+//     u64     en = prev(i, mapcap);
 
-    u64 cnt=0;
-    cnt = reorder();
-    set_elems( elems()-1 );
+//     u64 cnt=0;
+//     cnt = reorder();
+//     set_elems( elems()-1 );
 
-    return true;
-  }
-  void          clear(){ if(m_mem){ destroy(); init(0); } }
-  // T*            begin(){ return  (T*)m_mem;           }
-  // T*              end(){ return ((T*)m_mem) + size(); }
-  auto        flatten() -> tbl&
-  {
-    u64   memst = (u64)memStart();
-    u64 prevCap = child_capacity();
-    u64  newcap = 0;
-    auto      e = elemStart();
-    auto mapcap = map_capacity();
-    TO(mapcap,i)
-      if(  (e[i].hsh.type & HshType::TABLE) && 
-          !(e[i].hsh.type & HshType::CHILD) ){                                 // if the table bit is set but the child bit is not set
-        tbl*  t  =  (tbl*)e[i].val;
-        newcap  +=  t->sizeBytes();
-    }
-    reserve(0,0, prevCap + newcap);
-    e             =  elemStart();
-    u64   chldst  =  (u64)childData();
-    u8* curChild  =  (u8*)chldst + prevCap;
-    TO(mapcap,i){
-      if(  (e[i].hsh.type & HshType::TABLE) && 
-          !(e[i].hsh.type & HshType::CHILD) ){                                 // if the table bit is set but the child bit is not set
-        tbl*    t  =  (tbl*)e[i].val;
-        auto szbytes  =  t->sizeBytes();
+//     return true;
+//   }
+//   void          clear(){ if(m_mem){ destroy(); init(0); } }
+//   // T*            begin(){ return  (T*)m_mem;           }
+//   // T*              end(){ return ((T*)m_mem) + size(); }
+//   auto        flatten() -> tbl&
+//   {
+//     u64   memst = (u64)memStart();
+//     u64 prevCap = child_capacity();
+//     u64  newcap = 0;
+//     auto      e = elemStart();
+//     auto mapcap = map_capacity();
+//     TO(mapcap,i)
+//       if(  (e[i].hsh.type & HshType::TABLE) && 
+//           !(e[i].hsh.type & HshType::CHILD) ){                                 // if the table bit is set but the child bit is not set
+//         tbl*  t  =  (tbl*)e[i].val;
+//         newcap  +=  t->sizeBytes();
+//     }
+//     reserve(0,0, prevCap + newcap);
+//     e             =  elemStart();
+//     u64   chldst  =  (u64)childData();
+//     u8* curChild  =  (u8*)chldst + prevCap;
+//     TO(mapcap,i){
+//       if(  (e[i].hsh.type & HshType::TABLE) && 
+//           !(e[i].hsh.type & HshType::CHILD) ){                                 // if the table bit is set but the child bit is not set
+//         tbl*    t  =  (tbl*)e[i].val;
+//         auto szbytes  =  t->sizeBytes();
 
-        memcpy(curChild, t->memStart(), szbytes);
-        auto   f = (fields*)curChild;
-        f->owned = 0;
+//         memcpy(curChild, t->memStart(), szbytes);
+//         auto   f = (fields*)curChild;
+//         f->owned = 0;
 
-        //e[i].hsh.type  |=  HshType::CHILD;
-        e[i].hsh.type  |=  HshType::CHILD;                                     // turn on CHILD in this element's type by using a logical OR to always turn the bit on
-        e[i].val        =  (u64)curChild - chldst;                             // the memory start will likely have changed due to reallocation
-        curChild       +=  szbytes;
-      }
-    }
+//         //e[i].hsh.type  |=  HshType::CHILD;
+//         e[i].hsh.type  |=  HshType::CHILD;                                     // turn on CHILD in this element's type by using a logical OR to always turn the bit on
+//         e[i].val        =  (u64)curChild - chldst;                             // the memory start will likely have changed due to reallocation
+//         curChild       +=  szbytes;
+//       }
+//     }
 
-    //shrink_to_fit();                                                           // todo: do it all at once to avoid extra copying and allocations 
+//     //shrink_to_fit();                                                           // todo: do it all at once to avoid extra copying and allocations 
 
-    TO(mapcap,i){
-      e[i].hsh.type;
-      // assert that either both child and table are set or neither of them are set
-      //assert(  ((e[i].hsh.type & HshType::CHILD) &&  (e[i].hsh.type & HshType::TABLE)) ||
-      //        (!(e[i].hsh.type & HshType::CHILD) && !(e[i].hsh.type & HshType::TABLE)) );
-      //if( e[i].hsh.type & HshType::TABLE )
-      //  assert( e[i].hsh.type & HshType::CHILD );
-    }
+//     TO(mapcap,i){
+//       e[i].hsh.type;
+//       // assert that either both child and table are set or neither of them are set
+//       //assert(  ((e[i].hsh.type & HshType::CHILD) &&  (e[i].hsh.type & HshType::TABLE)) ||
+//       //        (!(e[i].hsh.type & HshType::CHILD) && !(e[i].hsh.type & HshType::TABLE)) );
+//       //if( e[i].hsh.type & HshType::TABLE )
+//       //  assert( e[i].hsh.type & HshType::CHILD );
+//     }
 
-    return *this;
-  }
+//     return *this;
+//   }
 
-private:
-  static const u32 HASH_MASK = 0x07FFFFFF;
+// private:
+//   static const u32 HASH_MASK = 0x07FFFFFF;
 
-  static u64  fnv_64a_buf(void const* const buf, u64 len)
-  {
-    // const u64 FNV_64_PRIME = 0x100000001b3;
-    u64 hval = 0xcbf29ce484222325;    // FNV1_64_INIT;  // ((Fnv64_t)0xcbf29ce484222325ULL)
-    u8*   bp = (u8*)buf;	           /* start of buffer */
-    u8*   be = bp + len;		           /* beyond end of buffer */
+//   static u64  fnv_64a_buf(void const* const buf, u64 len)
+//   {
+//     // const u64 FNV_64_PRIME = 0x100000001b3;
+//     u64 hval = 0xcbf29ce484222325;    // FNV1_64_INIT;  // ((Fnv64_t)0xcbf29ce484222325ULL)
+//     u8*   bp = (u8*)buf;	           /* start of buffer */
+//     u8*   be = bp + len;		           /* beyond end of buffer */
 
-    while(bp < be)                     // FNV-1a hash each octet of the buffer
-    {
-      hval ^= (u64)*bp++;             /* xor the bottom with the current octet */
+//     while(bp < be)                     // FNV-1a hash each octet of the buffer
+//     {
+//       hval ^= (u64)*bp++;             /* xor the bottom with the current octet */
 
-      //hval *= FNV_64_PRIME; // does this do the same thing?  /* multiply by the 64 bit FNV magic prime mod 2^64 */
-      hval += (hval << 1) + (hval << 4) + (hval << 5) +
-              (hval << 7) + (hval << 8) + (hval << 40);
-    }
-    return hval;
-  }
-  static u32    HashBytes(const void *const buf, u32 len)
-  {
-    u64 hsh = fnv_64a_buf(buf, len);
-    return (u32)( (hsh>>32) ^ ((u32)hsh));        // fold the 64 bit hash onto itself
-  }
-  static u32      HashStr(const char* s)
-  {
-    u32 len = (u32)strlen(s);
-    u32 hsh = HashBytes(s, len);
-    return hsh & HASH_MASK;
-  }
+//       //hval *= FNV_64_PRIME; // does this do the same thing?  /* multiply by the 64 bit FNV magic prime mod 2^64 */
+//       hval += (hval << 1) + (hval << 4) + (hval << 5) +
+//               (hval << 7) + (hval << 8) + (hval << 40);
+//     }
+//     return hval;
+//   }
+//   static u32    HashBytes(const void *const buf, u32 len)
+//   {
+//     u64 hsh = fnv_64a_buf(buf, len);
+//     return (u32)( (hsh>>32) ^ ((u32)hsh));        // fold the 64 bit hash onto itself
+//   }
+//   static u32      HashStr(const char* s)
+//   {
+//     u32 len = (u32)strlen(s);
+//     u32 hsh = HashBytes(s, len);
+//     return hsh & HASH_MASK;
+//   }
 
   template<class S> static void swap(S* a, S* b){ S tmp=*a; *a=*b; *b=tmp; }   // here to avoid a depencies
   template<class N> static    N   mx(N a, N b){return a<b?b:a;}
   template<class N> static    N   mn(N a, N b){return a<b?a:b;}
 
-  void byte_move(void* dest, void* src, u64 sz)
-  {
-    u8*  d = (u8*)dest;
-    u8*  s = (u8*)src;
-    if(dest==src) return;
-    else if(dest < src) TO(sz,i) d[i] = s[i];
-    else FROM(sz,i) d[i] = s[i];
-  }
+//   void byte_move(void* dest, void* src, u64 sz)
+//   {
+//     u8*  d = (u8*)dest;
+//     u8*  s = (u8*)src;
+//     if(dest==src) return;
+//     else if(dest < src) TO(sz,i) d[i] = s[i];
+//     else FROM(sz,i) d[i] = s[i];
+//   }
 
 public:
   static u64    memberBytes(){ return sizeof(fields); }
-  static u64     size_bytes(u64 count)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
+  template<class T> static u64 size_bytes(u64 count)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
   {
     return memberBytes() + sizeof(T)*count;  // todo: not correct yet, needs to factor in map and child data
   }
-  static tbl       concat_l(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
-  {
-    auto sz = a.size();
-    tbl ret(sz + b.size());
+//   static tbl       concat_l(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
+//   {
+//     auto sz = a.size();
+//     tbl ret(sz + b.size());
     
-    TO(sz,i){        ret[i]    = a[i]; }
-    TO(b.size(), i){ ret[sz+i] = b[i]; }
+//     TO(sz,i){        ret[i]    = a[i]; }
+//     TO(b.size(), i){ ret[sz+i] = b[i]; }
 
-    KV const* el = b.elemStart();
-    TO(b.map_capacity(),i) ret( el[i].key ) = el[i];
+//     KV const* el = b.elemStart();
+//     TO(b.map_capacity(),i) ret( el[i].key ) = el[i];
 
-    el = a.elemStart();
-    TO(a.map_capacity(),i) ret( el[i].key ) = el[i];
+//     el = a.elemStart();
+//     TO(a.map_capacity(),i) ret( el[i].key ) = el[i];
 
-    return ret;
-  }
-  static tbl       concat_r(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
-  {
-    auto sz = a.size();
-    tbl ret(sz + b.size());
+//     return ret;
+//   }
+//   static tbl       concat_r(tbl const& a, tbl const& b)                                  // returns the bytes needed to store the data structure if the same arguments were given to the constructor
+//   {
+//     auto sz = a.size();
+//     tbl ret(sz + b.size());
     
-    TO(sz,i){        ret[i]    = a[i]; }
-    TO(b.size(), i){ ret[sz+i] = b[i]; }
+//     TO(sz,i){        ret[i]    = a[i]; }
+//     TO(b.size(), i){ ret[sz+i] = b[i]; }
 
-    KV const* el = a.elemStart();
-    TO(a.map_capacity(),i){
-      if(el[i].hsh.type!=EMPTY) 
-        ret( el[i].key ) = el[i];
-    }
+//     KV const* el = a.elemStart();
+//     TO(a.map_capacity(),i){
+//       if(el[i].hsh.type!=EMPTY) 
+//         ret( el[i].key ) = el[i];
+//     }
 
-    el = b.elemStart();
-    TO(b.map_capacity(),i){
-      if(el[i].hsh.type!=EMPTY) 
-        ret( el[i].key ) = el[i];
-    }
+//     el = b.elemStart();
+//     TO(b.map_capacity(),i){
+//       if(el[i].hsh.type!=EMPTY) 
+//         ret( el[i].key ) = el[i];
+//     }
 
-    return ret;
-  }
-  static tbl  make_borrowed(AllocFunc alloc, u64 count)
-  {
-    using namespace std;
+//     return ret;
+//   }
+//   static tbl  make_borrowed(AllocFunc alloc, u64 count)
+//   {
+//     using namespace std;
     
     
-    auto bytes = tbl::size_bytes(count);
-    //ret.m_mem  = (u8*)alloc( bytes );
-    u8* memSt = (u8*)alloc( bytes );
-    tbl ret;
-    ret.m_mem = memSt + tbl::memberBytes();
-    ret.init(count); 
-    ret.owned(false);
+//     auto bytes = tbl::size_bytes(count);
+//     //ret.m_mem  = (u8*)alloc( bytes );
+//     u8* memSt = (u8*)alloc( bytes );
+//     tbl ret;
+//     ret.m_mem = memSt + tbl::memberBytes();
+//     ret.init(count); 
+//     ret.owned(false);
 
-    return move(ret);
-    //auto st = ret.memStart();
-  }
+//     return move(ret);
+//     //auto st = ret.memStart();
+//   }
 };
 
-template<class T> KVOfst::operator tbl() 
-{   
-  if(base){
-    tbl<T>   t;                                                                          // type only matters so that c 
-    tbl<T> ret;
+// template<class T> KVOfst::operator tbl() 
+// {   
+//   if(base){
+//     tbl<T>   t;                                                                          // type only matters so that c 
+//     tbl<T> ret;
 
-    //auto  f   = (tbl<T>::fields*)base;
-    //t.m_mem   = (u8*)(f+1);
-    //auto  fff = (tbl<T>::fields*)(kv->val + (u64)t.childData());
+//     //auto  f   = (tbl<T>::fields*)base;
+//     //t.m_mem   = (u8*)(f+1);
+//     //auto  fff = (tbl<T>::fields*)(kv->val + (u64)t.childData());
 
-    auto  fff = (tbl<T>::fields*)(kv->val + (u64)base);
-    ret.m_mem = (u8*)(fff+1);
-    u64     a = ((u64*)ret.m_mem)[0];
-    u64     b = ((u64*)ret.m_mem)[1];
-    t.m_mem   = nullptr;                                                                 // prevents the destructor running
+//     auto  fff = (tbl<T>::fields*)(kv->val + (u64)base);
+//     ret.m_mem = (u8*)(fff+1);
+//     u64     a = ((u64*)ret.m_mem)[0];
+//     u64     b = ((u64*)ret.m_mem)[1];
+//     t.m_mem   = nullptr;                                                                 // prevents the destructor running
 
-    return ret;
-  }else{
-    return *((tbl<T>*)kv->val);
-  }
-}
-template<class T> KVOfst::operator tbl*()
-{
-  tbl_msg_assert(
-    kv->hsh.type == KV::typenum< tbl<T>* >::num, 
-    " - tbl TYPE ERROR -\nInternal type: ", 
-    HshType::type_str((HshType::Type)kv->hsh.type), 
-    "Desired type: ",
-    HshType::type_str((HshType::Type)KV::typenum< tbl<T>* >::num) );        
+//     return ret;
+//   }else{
+//     return *((tbl<T>*)kv->val);
+//   }
+// }
+// template<class T> KVOfst::operator tbl*()
+// {
+//   tbl_msg_assert(
+//     kv->hsh.type == KV::typenum< tbl<T>* >::num, 
+//     " - tbl TYPE ERROR -\nInternal type: ", 
+//     HshType::type_str((HshType::Type)kv->hsh.type), 
+//     "Desired type: ",
+//     HshType::type_str((HshType::Type)KV::typenum< tbl<T>* >::num) );        
 
-  return (tbl<T>*)kv->val;
-}
+//   return (tbl<T>*)kv->val;
+// }
 
 auto HshType::type_str(Type t) -> char const* const 
 {
