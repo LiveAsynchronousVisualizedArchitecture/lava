@@ -234,21 +234,26 @@
 // -todo: make pause and stop buttons greyed out until playing
 // -todo: copy template back in to FissureStatic.cpp
 // -todo: make visualizing an input actually toggle visualization on the the output it is attached to
+// -todo: make packet visualization also include lighting up connections between slots
+// -todo: make packetSlots an unordered_set instead of a vector
 
-// todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets - use blue 'sunshine' lines going out from the center like a snowflake? 
 // todo: give LavaNode struct a description string
+// todo: make description strings show up in the status bar on mouse over
+// todo: implement sub tables in brandisher
+// todo: look in to turning tbl into class without a template
+// todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array - can any heirarchy of initializer_lists be brought down to an array of the same types?
+// todo: design packet freezing and packet visualization interface - maybe have three states - neutral, visualized, and frozen
 // todo: make a settings file that is read on load if it in the same directory
+// todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets - use blue 'sunshine' lines going out from the center like a snowflake? 
 // todo: make list of nodes a side window, right click menu, hot box, etc
 // todo: make each variable in the graph individually double buffered or even multi-buffered according to readers?
 // todo: have exec() spinlock until readers of the opposite buffer drops to 0 - could also just skip the command buffer in the rare case that it catches readers as more than 0
 // todo: fix type warnings in simdb
-// todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array - can any heirarchy of initializer_lists be brought down to an array of the same types?
-// todo: make shared libraries loaded after the GUI
-// todo: make shared libraries only try to load one per frame
-// todo: make packet visualization also include lighting up connections between slots
 // todo: make LavaHeapFree use a thread local variable for the errors instead of a return value, so that it's signature will match with free
 // todo: look into techniques for keeping data local to CPU cores, and CPU sockets
 // todo: put each thread's owned memory vector into a global vector that other threads can access - can the LavaQ be used or broken into a single writer multi-reader array?
+// todo: make shared libraries loaded after the GUI
+// todo: make shared libraries only try to load one per frame
 
 // todo: make input slots start at 0 - does there need to be a separation between input and out slots or does there need to be an offset so that the input frame starts at 0 
 // todo: convert tbl to use arrays of the data types smaller than 64 bits
@@ -1101,8 +1106,7 @@ void           cnct_draw(NVGcontext* vg, v2 srcP, v2 destP, v2 srcN, v2 destN, f
   nvgBeginPath(vg);
     nvgMoveTo(vg,   srcP.x, srcP.y);
     nvgBezierTo(vg, outNxt.x,outNxt.y, inNxt.x,inNxt.y, destP.x,destP.y);
-    nvgStrokeWidth(vg, 3.f);
-    nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+    //nvgStrokeWidth(vg, 3.f);
   nvgStroke(vg);
 }
 
@@ -2069,12 +2073,12 @@ ENTRY_DECLARATION // main or winmain
             auto& pckt = fd.flow.q.top();
             fd.graph.qPacketBytes = 0;
             fd.graph.qPacketBytes += pckt.sz_bytes;
-            slts.emplace_back( pckt.dest_node, pckt.dest_slot );
-            slts.emplace_back( pckt.src_node, pckt.src_slot );
+            slts.emplace( pckt.dest_node, pckt.dest_slot );
+            slts.emplace( pckt.src_node, pckt.src_slot );
           }
         fd.flow.m_qLck.unlock();
 
-        sort( ALL(slts) );
+        //sort( ALL(slts) );
       }
       SECTION(selection)
       {
@@ -2410,12 +2414,24 @@ ENTRY_DECLARATION // main or winmain
           }
           SECTION(draw connections)
           {
+            //nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
             auto di = g.srcCnctsMap().begin();                                    // di is destination iterator
             auto en = g.srcCnctsMap().end();
             for(auto di = g.srcCnctsMap().begin(); di != en; )
             {
-              auto     srcIdx = di->first;
-              auto    destIdx = di->second;
+              LavaId  srcIdx = di->first;
+              LavaId destIdx = di->second;
+
+              auto pcktSltIter = find( ALL(fd.graph.packetSlots), srcIdx);  // todo: this is a linear search, it could be a hash lookup
+              //if(fd.vizIds.has(srcIdx.asInt)){
+              if( pcktSltIter !=  end(fd.graph.packetSlots) ){
+                nvgStrokeWidth(vg, 4.f);
+                nvgStrokeColor(vg, nvgRGBAf(1.f, .85f, 0, 0.8f));
+              }else{
+                nvgStrokeWidth(vg, 3.f);
+                nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+              }
+
               u64  cnt = 0; v2 srcP(0,0); v2 srcN(0,0);
               auto const& si = fd.graph.slots.find(srcIdx);
               if(si != fd.graph.slots.end()){

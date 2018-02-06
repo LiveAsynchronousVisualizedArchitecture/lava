@@ -220,6 +220,8 @@ struct FisData
   using       Slots  =  std::multimap<LavaId, Slot>;              // The key is a node id, the value is the index into the slot array.  Every node can have 0 or more slots. Slots can only have 1 and only 1 node. Slots have their node index in their struct so getting the node from the slots is easy. To get the slots that a node has, this multimap is used
   using    vec_thrd  =  std::vector<std::thread>;
   using     vec_slt  =  std::vector<LavaId>;
+  using PacketSlots  =  std::unordered_set<LavaId, LavaId>;       // uses LavaId as the hashing function object
+
 
   u64                 nxtId = 1;
   GLFWwindow*           win = nullptr;                            // Platform 
@@ -236,7 +238,8 @@ struct FisData
 
     u64             curNode = LavaNode::NODE_ERROR;              // information from the running lava graph for visualization in the GUI
     u64        qPacketBytes = 0;
-    vec_slt     packetSlots;
+    //vec_slt     packetSlots;
+    PacketSlots packetSlots;
 
     // text
     f32            textSize  =  18.f;  //18.f;

@@ -27,7 +27,10 @@
 // -todo: use upper bit of pointer to represent ownership, so that if memory is freed out from under the tbl, it isn't freed? - ownership would be overridden when a table is based off of a buffer that it doesn't own - only should be neccesary if one tbl owns that memory but others don't, otherwise, ownership should just be set to false in the contiguous memory - maybe a tbl should never be able to be an observer to another tbl's memory, it should be copied, moved, referenced or pointed to instead 
 // -todo: figure out why empty KV is found after expand - reserve was initting all fields but not resetting to them to their previous values
 
+// todo: make elem cap by getting data<u8>() + size() + stride(), how to deal with structs? they would be an array of bytes with a different stride
+// todo: is it possible to hash a type with constexpr?
 // todo: does a tbl need to store the address of a pointer to the function that should deallocate it? 
+// todo: think about slices
 // todo: fix kv of a sub tbl having a base and val that are 0 - should be 0 at that stage, since they haven't been set yet? 
 // todo: make owning of memory execute a copy in the tbl constructor that takes a void pointer
 // todo: make tbl structs local to the scope of the tbl
@@ -122,18 +125,20 @@
   #define tbl_PRNT(msg)
 #endif
 
-template<class T=int8_t> class tbl;
-using   tu8   =  tbl<uint8_t>;
-using   tu16  =  tbl<uint16_t>;
-using   tu32  =  tbl<uint32_t>;
-using   tu64  =  tbl<uint64_t>;
-using   ti8   =  tbl<int8_t>;
-using   ti16  =  tbl<int16_t>;
-using   ti32  =  tbl<int32_t>;
-using   ti64  =  tbl<int64_t>;
-using   tf32  =  tbl<float>;
-using   tf64  =  tbl<double>;
-using   Tbl   =  tbl<>;
+//template<class T=int8_t> class tbl;
+class tbl;
+
+//using   tu8   =  tbl<uint8_t>;
+//using   tu16  =  tbl<uint16_t>;
+//using   tu32  =  tbl<uint32_t>;
+//using   tu64  =  tbl<uint64_t>;
+//using   ti8   =  tbl<int8_t>;
+//using   ti16  =  tbl<int16_t>;
+//using   ti32  =  tbl<int32_t>;
+//using   ti64  =  tbl<int64_t>;
+//using   tf32  =  tbl<float>;
+//using   tf64  =  tbl<double>;
+//using   Tbl   =  tbl<>;
 //using   tbl   =  tbl<int8_t>;
 
 union     HshType
@@ -455,19 +460,23 @@ struct  TblFields
 {
   using u64 = uint64_t;
   
-  u64         t :  8;                             // will hold the character 't'
-  u64         b :  8;                             // will hold the character 'b'
-  u64 sizeBytes : 48;
+  u64          t :  8;                             // will hold the character 't'
+  u64          b :  8;                             // will hold the character 'b'
+  u64  sizeBytes : 48;
 
-  u64  capacity : 42;
-  u64    mapcap : 22;
+  u64   capacity : 42;
+  u64     mapcap : 22;
 
-  u64     owned :  1;
-  u64     elems : 21;
-  u64      size : 42;
+  u64      owned :  1;
+  u64      elems : 21;
+  u64       size : 42;
+
+  u64  arrayType :  5;                            // can't think of rationale for more than 26 intrinsic types (with a table type for each), so 5 bits (0-31) should work fine for now
+  u64     stride : 20;                            // this would allow strides of up to 1MB, which is probably way too big, so there are plenty of bits left for something else (like a subtype) 
 };
 
-template<class T> class tbl
+//template<class T>
+class tbl
 {
 public:                 
   using AllocFunc = void* (*)(uint64_t bytes);
@@ -484,16 +493,16 @@ public:
   using   f32   =     float;
   using   f64   =    double;
 
-  using   tu8   =  tbl<u8>;
-  using   tu16  =  tbl<u16>;
-  using   tu32  =  tbl<u32>;
-  using   tu64  =  tbl<u64>;
-  using   ti8   =  tbl<i8>;
-  using   ti16  =  tbl<i16>;
-  using   ti32  =  tbl<i32>;
-  using   ti64  =  tbl<i64>;
-  using   tf32  =  tbl<f32>;
-  using   tf64  =  tbl<f64>;
+  //using   tu8   =  tbl<u8>;
+  //using   tu16  =  tbl<u16>;
+  //using   tu32  =  tbl<u32>;
+  //using   tu64  =  tbl<u64>;
+  //using   ti8   =  tbl<i8>;
+  //using   ti16  =  tbl<i16>;
+  //using   ti32  =  tbl<i32>;
+  //using   ti64  =  tbl<i64>;
+  //using   tf32  =  tbl<f32>;
+  //using   tf64  =  tbl<f64>;
 
 private:
   void      sizeBytes(u64  bytes){ memStart()->sizeBytes =  bytes; }
@@ -649,18 +658,20 @@ private:
       kv.hsh.type = n.hsh.type;
     }
   }
-  void           init(std::initializer_list<T>  lst)
-  {
-    using namespace std;
-    
-    reserve(lst.size(),0,0);
-    initFields( sizeBytes(), lst.size() ); 
 
-    auto i = 0;
-    for(auto&& n : lst){ (*this)[i++] = move(n); }
+  //void           init(std::initializer_list<T>  lst)
+  //{
+  //  using namespace std;
+  //  
+  //  reserve(lst.size(),0,0);
+  //  initFields( sizeBytes(), lst.size() ); 
+  //
+  //  auto i = 0;
+  //  for(auto&& n : lst){ (*this)[i++] = move(n); }
+  //
+  //  //for(auto&& n : lst){ emplace(n); }
+  //}
 
-    //for(auto&& n : lst){ emplace(n); }
-  }
   void      init_cstr(const char* s)
   {
     auto len = strlen(s) + 1;
@@ -747,17 +758,17 @@ private:
 
     return ret;
   }
-  template<class OP> void op_asn(T   const& l, OP op)
-  {
-    TO(size(),i) op( (*this)[i], l);
-  }
-  template<class OP> tbl  bin_op(T   const& l, OP op) const
-  {     
-    tbl ret( size() ); 
-    TO(ret, i) ret[i] = op( (*this)[i], l );
-
-    return ret;
-  }
+  //template<class OP> void op_asn(T   const& l, OP op)
+  //{
+  //  TO(size(),i) op( (*this)[i], l);
+  //}
+  //template<class OP> tbl  bin_op(T   const& l, OP op) const
+  //{     
+  //  tbl ret( size() ); 
+  //  TO(ret, i) ret[i] = op( (*this)[i], l );
+  //
+  //  return ret;
+  //}
 
 public:  
   u8*     m_mem;                                                                         // the only member variable - everything else is a contiguous block of memory
@@ -777,19 +788,23 @@ public:
     }
     this->owned(_owned);
   }
-  tbl(u64 count) : m_mem(nullptr) { init(count); }                                                           // have to run default constructor here?
-  tbl(u64 count, T const& value) : m_mem(nullptr)
-  {
-    init(count);
-    TO(count, i){ (*this)[i] = value; }
-  }
+  tbl(u64 count) : m_mem(nullptr) { init(count); }       
+  // have to run default constructor here?
+  //tbl(u64 count, T const& value) : m_mem(nullptr)
+  //{
+  //  init(count);
+  //  TO(count, i){ (*this)[i] = value; }
+  //}
+
   tbl(std::initializer_list<KV> lst) : m_mem(nullptr)
   { initKV(lst); }
-  tbl(std::initializer_list<T>  lst) : m_mem(nullptr)
-  {
-    //init(lst.size()); 
-    init(lst); 
-  }
+  
+  //tbl(std::initializer_list<T>  lst) : m_mem(nullptr)
+  //{
+  //  //init(lst.size()); 
+  //  init(lst); 
+  //}
+
   tbl(const char* s) : m_mem(nullptr) { init_cstr(s); }
   ~tbl(){ destroy(); }
 
@@ -798,19 +813,22 @@ public:
   tbl           (tbl&&      r){ mv(std::move(r));               }
   tbl& operator=(tbl&&      r){ mv(std::move(r)); return *this; }
   tbl& operator=(std::initializer_list<KV> lst){ initKV(lst); return *this; }
-  tbl& operator=(std::initializer_list<T>  lst){   init(lst); return *this; }
+
+  //tbl& operator=(std::initializer_list<T>  lst){   init(lst); return *this; }
+  
   tbl& operator=(const char* s){ init_cstr(s); return *this; }
 
-  T&      operator[](u64 i)
-  {
-    tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
-    return ((T*)m_mem)[i];
-  }
-  auto    operator[](u64 i) const -> T const& 
-  {
-    tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
-    return ((T*)m_mem)[i];
-  }
+  //T&      operator[](u64 i)
+  //{
+  //  tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
+  //  return ((T*)m_mem)[i];
+  //}
+  //auto    operator[](u64 i) const -> T const& 
+  //{
+  //  tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
+  //  return ((T*)m_mem)[i];
+  //}
+
   KVOfst  operator()(i32 k)
   {
     char key[sizeof(k)+1];
@@ -851,26 +869,26 @@ public:
   tbl     operator<<(tbl const& l){ return tbl::concat_r(*this, l); }
   tbl&    operator--(){ shrink_to_fit();    return *this; }
   tbl&    operator++(){ expand(true,false); return *this; }
-  void    operator+=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
-  void    operator-=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }
-  void    operator*=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a *= b; } ); }
-  void    operator/=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a /= b; } ); }
-  void    operator%=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a %= b; } ); }
-  tbl     operator+ (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a + b;}); }
-  tbl     operator- (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a - b;}); }
-  tbl     operator* (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a * b;}); }
-  tbl     operator/ (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
-  tbl     operator% (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
-  void    operator+=(T   const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
-  void    operator-=(T   const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }
-  void    operator*=(T   const& l){ op_asn(l, [](T& a, T const& b){ a *= b; } ); }
-  void    operator/=(T   const& l){ op_asn(l, [](T& a, T const& b){ a /= b; } ); }
-  void    operator%=(T   const& l){ op_asn(l, [](T& a, T const& b){ a %= b; } ); }
-  tbl     operator+ (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a + b;}); }
-  tbl     operator- (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a - b;}); }
-  tbl     operator* (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a * b;}); }
-  tbl     operator/ (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
-  tbl     operator% (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
+  //void    operator+=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
+  //void    operator-=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }
+  //void    operator*=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a *= b; } ); }
+  //void    operator/=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a /= b; } ); }
+  //void    operator%=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a %= b; } ); }
+  //tbl     operator+ (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a + b;}); }
+  //tbl     operator- (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a - b;}); }
+  //tbl     operator* (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a * b;}); }
+  //tbl     operator/ (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
+  //tbl     operator% (tbl const& l) const{ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
+  //void    operator+=(T   const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
+  //void    operator-=(T   const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }
+  //void    operator*=(T   const& l){ op_asn(l, [](T& a, T const& b){ a *= b; } ); }
+  //void    operator/=(T   const& l){ op_asn(l, [](T& a, T const& b){ a /= b; } ); }
+  //void    operator%=(T   const& l){ op_asn(l, [](T& a, T const& b){ a %= b; } ); }
+  //tbl     operator+ (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a + b;}); }
+  //tbl     operator- (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a - b;}); }
+  //tbl     operator* (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a * b;}); }
+  //tbl     operator/ (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
+  //tbl     operator% (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
 
   template<class V> KVOfst put(const char* key, V val){ return this->operator()(key) = val; }
 
@@ -891,23 +909,24 @@ public:
     return true;
   }
   template<class... V> bool emplace_back(V&&... val){ return emplace(std::forward<V>(val)...);  }
-  bool           push(T const& val){ return emplace(val); }
-  u64            push(std::initializer_list<T> lst)
-  {
-    u64 cnt = 0;
-    for(auto const& v : lst){
-      bool ok = this->push(v);
-      if(!ok){ return cnt; }
-      ++cnt;
-    }
 
-    return cnt;
-  }
-  bool      push_back(T const& value){ return emplace(value); }
-  void            pop(){ back()->T::~T(); set_size(size()-1); }
-  void       pop_back(){ pop(); }
-  T const&      front() const{ return (*this)[0]; }
-  T const&       back() const{ return (*this)[size()-1]; }
+  //bool           push(T const& val){ return emplace(val); }
+  //u64            push(std::initializer_list<T> lst)
+  //{
+  //  u64 cnt = 0;
+  //  for(auto const& v : lst){
+  //    bool ok = this->push(v);
+  //    if(!ok){ return cnt; }
+  //    ++cnt;
+  //  }
+  //
+  //  return cnt;
+  //}
+  //bool      push_back(T const& value){ return emplace(value); }
+  //void            pop(){ back()->T::~T(); set_size(size()-1); }
+  //void       pop_back(){ pop(); }
+  //T const&      front() const{ return (*this)[0]; }
+  //T const&       back() const{ return (*this)[size()-1]; }
 
   template<class N> bool insert(const char* key, N const& val)
   {
@@ -959,15 +978,21 @@ public:
   }
 
   u64            size() const { return m_mem? memStart()->size : 0; }
-  T*             data() const {return (T*)m_mem; }
+
+  //T*             data() const {return (T*)m_mem; }  // todo: start here
+
   void*     childData() const { return (void*)(elemStart() + map_capacity()); }                                                      // elemStart return a KV* so map_capacity will increment that pointer by the map_capacity * sizeof(KV)
+
   u64  child_capacity() const
   {
     u64 szb = 0;
     if(!m_mem || (szb=sizeBytes())==0 ) return 0;
-
-    return sizeBytes() - memberBytes() - capacity()*sizeof(T) - map_capacity()*sizeof(KV);
+  
+    // todo: replace sizeof(T) with stride here
+    //return sizeBytes() - memberBytes() - capacity()*sizeof(T) - map_capacity()*sizeof(KV);
+    return sizeBytes() - memberBytes() - capacity()*stride() - map_capacity()*sizeof(KV);
   }
+
   bool          owned() const  
   {
     return m_mem? memStart()->owned : true; 
@@ -979,6 +1004,8 @@ public:
   u64        capacity() const { return m_mem? memStart()->capacity  : 0; }
   u64           elems() const { return m_mem?  memStart()->elems    : 0; }
   u64    map_capacity() const { return m_mem?  memStart()->mapcap   : 0; }
+  u64          stride() const { return m_mem? memStart()->stride    : 0; }
+  u64       arrayType() const { return m_mem? memStart()->arrayType : 0; }
   auto      elemStart() ->KV* { return m_mem? (KV*)(data() + capacity()) : nullptr; }
   auto      elemStart() const -> KV const* { return m_mem? (KV*)(data() + capacity()) : nullptr; }
   void*       reserve(u64 count, u64 mapcap=0, u64 childcap=0)
@@ -995,7 +1022,8 @@ public:
     u64    prevBytes  =  sizeBytes();
     u64   prevMapCap  =  map_capacity();
     void*    prvChld  =  childData();
-    u64     nxtBytes  =  memberBytes() + sizeof(T)*count +  sizeof(KV)*mapcap + childcap;
+    //u64     nxtBytes  =  memberBytes() + sizeof(T)*count +  sizeof(KV)*mapcap + childcap;
+    u64     nxtBytes  =  memberBytes() + stride()*count +  sizeof(KV)*mapcap + childcap;
     void*     re;
     bool      fresh  = !m_mem;
     if(fresh) re = malloc(nxtBytes);
@@ -1056,7 +1084,8 @@ public:
     if( !owned() ){ return false; }
     
     u64       sz = size();
-    u64    vecsz = memberBytes() + sz*sizeof(T);
+    //u64    vecsz = memberBytes() + sz*sizeof(T);
+    u64    vecsz = memberBytes() + sz*stride();     // todo: will have to make sure this 
     u64  elemcnt = elems();
     u64    mapsz = elemcnt*sizeof(KV);
     u64  chldCap = child_capacity();
@@ -1077,7 +1106,8 @@ public:
 
       auto  prvF = (fields*)(prvChld);
 
-      tbl<T> prev;
+      //tbl<T> prev;
+      tbl prev;
       prev.m_mem = m_mem;                                                                 // make a table to hold the previous span of bytes
       m_mem    = nxtp+memberBytes();                                                      // now this table holds the new span of bytes
 
@@ -1172,9 +1202,12 @@ public:
     return true;
   }
   void          clear(){ if(m_mem){ destroy(); init(0); } }
-  T*            begin(){ return  (T*)m_mem;           }
-  T*              end(){ return ((T*)m_mem) + size(); }
-  auto        flatten() -> tbl<T>&
+
+  //T*            begin(){ return  (T*)m_mem;           }
+  //T*              end(){ return ((T*)m_mem) + size(); }
+  
+  //auto        flatten() -> tbl<T>&
+  tbl         flatten()
   {
     u64   memst = (u64)memStart();
     u64 prevCap = child_capacity();
@@ -1184,17 +1217,20 @@ public:
     TO(mapcap,i)
       if(  (e[i].hsh.type & HshType::TABLE) && 
           !(e[i].hsh.type & HshType::CHILD) ){                                 // if the table bit is set but the child bit is not set
-        tbl<T>*  t  =  (tbl<T>*)e[i].val;
+        //tbl<T>*  t  =  (tbl<T>*)e[i].val;
+        tbl*  t  =  (tbl*)e[i].val;
         newcap  +=  t->sizeBytes();
     }
     reserve(0,0, prevCap + newcap);
     e             =  elemStart();
     u64   chldst  =  (u64)childData();
     u8* curChild  =  (u8*)chldst + prevCap;
-    TO(mapcap,i){
+    TO(mapcap,i)
+    {
       if(  (e[i].hsh.type & HshType::TABLE) && 
           !(e[i].hsh.type & HshType::CHILD) ){                                 // if the table bit is set but the child bit is not set
-        tbl<T>*    t  =  (tbl<T>*)e[i].val;
+        //tbl<T>*    t  =  (tbl<T>*)e[i].val;
+        tbl*    t  =  (tbl*)e[i].val;
         auto szbytes  =  t->sizeBytes();
 
         memcpy(curChild, t->memStart(), szbytes);
@@ -1212,6 +1248,7 @@ public:
 
     TO(mapcap,i){
       e[i].hsh.type;
+
       // assert that either both child and table are set or neither of them are set
       //assert(  ((e[i].hsh.type & HshType::CHILD) &&  (e[i].hsh.type & HshType::TABLE)) ||
       //        (!(e[i].hsh.type & HshType::CHILD) && !(e[i].hsh.type & HshType::TABLE)) );
