@@ -1747,11 +1747,13 @@ ENTRY_DECLARATION // main or winmain
 
   SECTION(tbl test)
   {
-    tbl t(10, (u64)0 );
-    TO(t.size(),i){
-      //t.operator[]<u8>(i) = (u8)i;
-      t[i] = (u64)i;
-    }
+    //tbl t(10, (u64)0 );
+    //TO(t.size(),i){
+    //  //t.operator[]<u8>(i) = (u8)i;
+    //  t[i] = (u64)i;
+    //}
+
+    tbl t = {0ull,1ull,2ull,3ull,4ull,5ull,6ull,7ull,8ull,9ull};
     TO(t.size(),i){
       //u64 val = t.operator[]<u8>(i);
       u64 val = t[i];

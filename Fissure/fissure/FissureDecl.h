@@ -9,8 +9,6 @@
 #include <set>
 #include <queue>
 #include <nanogui/nanogui.h>
-//#include "../no_rt_util.h"
-//#include "../simdb.hpp"
 #include "../../no_rt_util.h"
 #include "../../simdb.hpp"
 #include "vec.hpp"

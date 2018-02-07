@@ -40,8 +40,9 @@
 // -todo: build in release mode
 // -todo: test with a bigger number type
 
-
-// todo: make sure the type of a struct is labeled unknown, and if so check that the stride matches the struct size
+// todo: make the default type become a specific 'unknown' value 
+// todo: make sure if the type of a struct is labeled unknown, and if so check that the stride matches the struct size
+// todo: make a constructor out of an initializer list 
 // todo: does a tbl need to store the address of a pointer to the function that should deallocate it? 
 // todo: fix kv of a sub tbl having a base and val that are 0 - should be 0 at that stage, since they haven't been set yet? 
 // todo: make owning of memory execute a copy in the tbl constructor that takes a void pointer
@@ -234,17 +235,17 @@ public:
 
     using Type = u8;
 
-    template<class N> struct typenum { static const Type num = EMPTY; };
-    template<> struct typenum<u8>    { static const Type num = U8;    };
-    template<> struct typenum<i8>    { static const Type num = I8;    };
-    template<> struct typenum<u16>   { static const Type num = U16;   };
-    template<> struct typenum<i16>   { static const Type num = I16;   };
-    template<> struct typenum<u32>   { static const Type num = U32;   };
-    template<> struct typenum<i32>   { static const Type num = I32;   };
-    template<> struct typenum<f32>   { static const Type num = F32;   };
-    template<> struct typenum<u64>   { static const Type num = U64;   };
-    template<> struct typenum<i64>   { static const Type num = I64;   };
-    template<> struct typenum<f64>   { static const Type num = F64;   };
+    template<class N> struct typenum { static const Type num = UNKNOWN; };
+    template<> struct typenum<u8>    { static const Type num = U8;      };
+    template<> struct typenum<i8>    { static const Type num = I8;      };
+    template<> struct typenum<u16>   { static const Type num = U16;     };
+    template<> struct typenum<i16>   { static const Type num = I16;     };
+    template<> struct typenum<u32>   { static const Type num = U32;     };
+    template<> struct typenum<i32>   { static const Type num = I32;     };
+    template<> struct typenum<f32>   { static const Type num = F32;     };
+    template<> struct typenum<u64>   { static const Type num = U64;     };
+    template<> struct typenum<i64>   { static const Type num = I64;     };
+    template<> struct typenum<f64>   { static const Type num = F64;     };
     template<> struct typenum<long>             { static const Type num = I64;   };
     template<> struct typenum<unsigned long>    { static const Type num = U64;   };
 
@@ -257,32 +258,25 @@ public:
     template<> struct typecast<u32>   { using type = u64; };
     template<> struct typecast<f32>   { using type = f64; };
 
-    //static const u8   ERR        =  ~INTEGER & ~SIGNED & ~TABLE & ~CHILD & ~BITS_64 & MASK;
-    //static const u8   ERR        =  ~INTEGER & ~SIGNED & ~TABLE & ~CHILD & ~BITS_32 & MASK;            // A value can't be a non-child non-table while also being a non-integer (float) and non-signed (floats are always signed), so any value with these flags can be used for an error type - this has all of those conflicting bits set along with 32 bit depth set.
-    //static const u8   NONE       =  ~INTEGER & ~SIGNED & ~TABLE & ~CHILD & ~BITS_16 & MASK;                                         // ~TABLE,                              // INTEGER bit turned off, SIGNED bit turned off and TABLE bit turned off, meanin unsigned float table, which is not a viable real type of course
-    //static const u8   EMPTY      =  ~INTEGER & ~SIGNED & ~TABLE & ~CHILD & MASK;     // 0b00111111;                                       // a floating point number can't be unsigned, so this scenario is used for an 'empty' state
-
-    //template<> struct typenum<unsigned char>    { static const Type num = HshType::U8;    };
-    //template<> struct typenum<char>             { static const Type num = HshType::I8;    };
-
     static auto type_str(Type t) -> char const* const 
     {
       switch(t)
       {
-      case   ERR: return  "Error";
-      case EMPTY: return  "Empty";
-      case  NONE: return  "None";
+      case UNKNOWN: return  "UNKNOWN";
+      case     ERR: return  "Error";
+      case   EMPTY: return  "Empty";
+      case    NONE: return  "None";
 
-      case    U8: return  "u8";
-      case    I8: return  "i8";
-      case   U16: return  "u16";
-      case   I16: return  "i16";
-      case   U32: return  "u32";
-      case   I32: return  "i32";
-      case   F32: return  "f32";
-      case   U64: return  "u64";
-      case   I64: return  "i64";
-      case   F64: return  "f64";
+      case      U8: return  "u8";
+      case      I8: return  "i8";
+      case     U16: return  "u16";
+      case     I16: return  "i16";
+      case     U32: return  "u32";
+      case     I32: return  "i32";
+      case     F32: return  "f32";
+      case     U64: return  "u64";
+      case     I64: return  "i64";
+      case     F64: return  "f64";
 
       case   cU8: return  "child table  u8";
       case   cI8: return  "child table  i8";
@@ -489,14 +483,10 @@ public:
     }
 
     bool isEmpty() const { return type==TblType::NONE || type==TblType::EMPTY; }
-    //bool isEmpty() const { return hsh.type==TblType::NONE || hsh.type==TblType::EMPTY; }
 
     static KV&    empty_kv(){ static KV kv; kv.type = TblType::EMPTY; return kv; }
     static KV&     none_kv(){ static KV kv; kv.type = TblType::NONE;  return kv; }
     static KV&    error_kv(){ static KV kv; kv.type = TblType::ERR;   return kv; }
-    //static KV&    empty_kv(){ static KV kv; kv.hsh.type = TblType::EMPTY; return kv; }
-    //static KV&     none_kv(){ static KV kv; kv.hsh.type = TblType::NONE;  return kv; }
-    //static KV&    error_kv(){ static KV kv; kv.hsh.type = TblType::ERR;   return kv; }
     static u64 fnv_64a_buf(void const* const buf, u64 len)
     {
       // const u64 FNV_64_PRIME = 0x100000001b3;
@@ -732,6 +722,14 @@ private:
   //  //for(auto&& n : lst){ emplace(n); }
   //}
 
+  template<class T> void init(std::initializer_list<T>  lst)
+  {
+    init(lst.size(), sizeof(T), TblType::typenum<T>::num);
+
+    auto i = 0;
+    for(auto const& n : lst){ (*this)[i++] = n; }
+  }
+
   void      init_cstr(const char* s)
   {
     auto len = strlen(s) + 1;
@@ -849,12 +847,13 @@ public:
     this->owned(_owned);
   }
   tbl(u64 count) : m_mem(nullptr) { init(count); }
-  //tbl(u64 count, u64 stride){ init(count, stride); };
   template<class T> tbl(u64 count, T type_dummy)
   {
     init(count, sizeof(T), TblType::typenum<T>::num);
   }
 
+  //tbl(u64 count, u64 stride){ init(count, stride); };
+  //
   // have to run default constructor here?
   //tbl(u64 count, T const& value) : m_mem(nullptr)
   //{
@@ -865,11 +864,11 @@ public:
   tbl(std::initializer_list<KV> lst) : m_mem(nullptr)
   { initKV(lst); }
   
-  //tbl(std::initializer_list<T>  lst) : m_mem(nullptr)
-  //{
-  //  //init(lst.size()); 
-  //  init(lst); 
-  //}
+  template<class T> tbl(std::initializer_list<T>  lst) : m_mem(nullptr)
+  {
+    //init(lst.size()); 
+    init(lst); 
+  }
 
   tbl(const char* s) : m_mem(nullptr) { init_cstr(s); }
   ~tbl(){ destroy(); }
@@ -1515,6 +1514,19 @@ tbl::KVOfst::operator tbl*()
 
 
 
+
+//bool isEmpty() const { return hsh.type==TblType::NONE || hsh.type==TblType::EMPTY; }
+//static KV&    empty_kv(){ static KV kv; kv.hsh.type = TblType::EMPTY; return kv; }
+//static KV&     none_kv(){ static KV kv; kv.hsh.type = TblType::NONE;  return kv; }
+//static KV&    error_kv(){ static KV kv; kv.hsh.type = TblType::ERR;   return kv; }
+
+//static const u8   ERR        =  ~INTEGER & ~SIGNED & ~TABLE & ~CHILD & ~BITS_64 & MASK;
+//static const u8   ERR        =  ~INTEGER & ~SIGNED & ~TABLE & ~CHILD & ~BITS_32 & MASK;            // A value can't be a non-child non-table while also being a non-integer (float) and non-signed (floats are always signed), so any value with these flags can be used for an error type - this has all of those conflicting bits set along with 32 bit depth set.
+//static const u8   NONE       =  ~INTEGER & ~SIGNED & ~TABLE & ~CHILD & ~BITS_16 & MASK;                                         // ~TABLE,                              // INTEGER bit turned off, SIGNED bit turned off and TABLE bit turned off, meanin unsigned float table, which is not a viable real type of course
+//static const u8   EMPTY      =  ~INTEGER & ~SIGNED & ~TABLE & ~CHILD & MASK;     // 0b00111111;                                       // a floating point number can't be unsigned, so this scenario is used for an 'empty' state
+
+//template<> struct typenum<unsigned char>    { static const Type num = HshType::U8;    };
+//template<> struct typenum<char>             { static const Type num = HshType::I8;    };
 
 //union    HshType
 //{
