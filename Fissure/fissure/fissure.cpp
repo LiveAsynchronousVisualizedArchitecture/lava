@@ -240,6 +240,7 @@
 // todo: give LavaNode struct a description string
 // todo: make description strings show up in the status bar on mouse over
 // todo: implement sub tables in brandisher
+// todo: think about design for constant variables into class - string, double, u64, i64, file (color? v2,v3,v4? ranged double?, ranged integer?) separate datatype from interface? make all constant inputs tables? how to embed interface queues into a table? make each constant a subtable with a value, an interface type and interface values? 
 // todo: look in to turning tbl into class without a template
 // todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array - can any heirarchy of initializer_lists be brought down to an array of the same types?
 // todo: design packet freezing and packet visualization interface - maybe have three states - neutral, visualized, and frozen
@@ -1740,6 +1741,21 @@ ENTRY_DECLARATION // main or winmain
     //}
 
     //Println("\n\n");
+  }
+
+  SECTION(tbl test)
+  {
+    tbl t(10, (u8)0);
+    TO(t.size(),i){
+      //t.operator[]<u8>(i) = (u8)i;
+      t[i] = (u8)i;
+    }
+    TO(t.size(),i){
+      //u64 val = t.operator[]<u8>(i);
+      u8 val = t[i];
+      Println( (u64)val ); 
+    }
+    Println("\n\n");
   }
 
 	NVGcontext* vg = NULL;

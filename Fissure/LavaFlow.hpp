@@ -886,7 +886,8 @@ extern "C" __declspec(dllexport) LavaNode* GetLavaFlowNodes();   // prototype of
 using lava_memvec          =  std::vector<LavaMem, ThreadAllocator<LavaMem> >;
 
 // Lava Helper Functions
-template<class T> LavaOut  LavaTblToOut(LavaParams const* lp, tbl<T> const& t)
+//template<class T> LavaOut  LavaTblToOut(LavaParams const* lp, tbl<T> const& t)
+template<class T> LavaOut  LavaTblToOut(LavaParams const* lp, tbl const& t)
 {
   // todo: once tbl is switched to not be an array, this might not need to be a template
   // todo: allocation template parameters might mean that a template is still neccesary
