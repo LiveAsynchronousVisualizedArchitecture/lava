@@ -237,6 +237,8 @@
 // -todo: make packet visualization also include lighting up connections between slots
 // -todo: make packetSlots an unordered_set instead of a vector
 
+
+// todo: use new tbl.hpp to re-implement IdxVerts
 // todo: give LavaNode struct a description string
 // todo: make description strings show up in the status bar on mouse over
 // todo: implement sub tables in brandisher
