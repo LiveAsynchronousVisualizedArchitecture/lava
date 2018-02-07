@@ -36,6 +36,10 @@
 // -todo: extract a TblType stuct that contains type numbers 
 // -todo: make KV a struct inside Tbl
 // -todo: take out HshType all together 
+// -todo: take HshType all the way out for real
+// -todo: build in release mode
+// -todo: test with a bigger number type
+
 
 // todo: make sure the type of a struct is labeled unknown, and if so check that the stride matches the struct size
 // todo: does a tbl need to store the address of a pointer to the function that should deallocate it? 
@@ -166,21 +170,12 @@ public:
     u64      elems : 21;
     u64       size : 42;
 
-    u64  arrayType :  5;                            // can't think of rationale for more than 26 intrinsic types (with a table type for each), so 5 bits (0-31) should work fine for now
+    u64  arrayType :  8;                            // can't think of rationale for more than 26 intrinsic types (with a table type for each), so 5 bits (0-31) should work fine for now
     u64     stride : 20;                            // this would allow strides of up to 1MB, which is probably way too big, so there are plenty of bits left for something else (like a subtype) 
+    u64    version : 20;                            // The version of tbl, just in case the binary format changes
   };
   using   fields  =  TblFields;
 
-  union    HshType
-  {
-    struct { u32 type : 6; u32 hash: 26; };
-    u32 as_u32;
-
-    HshType() : 
-      type(TblType::EMPTY),
-      hash(0)
-    {}
-  };
   struct   TblType
   {
     static const u8   MASK       =  0x3F;                    // first 6 bits set to 1 - 0b111111
@@ -274,10 +269,17 @@ public:
     {
       switch(t)
       {
-      case ERR:   return "Error";
-      case EMPTY: return "Empty";
-      case NONE:  return  "None";
+      case   ERR: return  "Error";
+      case EMPTY: return  "Empty";
+      case  NONE: return  "None";
 
+      case    U8: return  "u8";
+      case    I8: return  "i8";
+      case   U16: return  "u16";
+      case   I16: return  "i16";
+      case   U32: return  "u32";
+      case   I32: return  "i32";
+      case   F32: return  "f32";
       case   U64: return  "u64";
       case   I64: return  "i64";
       case   F64: return  "f64";
@@ -311,27 +313,27 @@ public:
   struct    TblVal
   {
     #ifndef _NDEBUG
-      HshType    hsh;          // todo: change this just to a TblType when it is redone - also change it to debug only
+      u8      type;          // todo: change this just to a TblType when it is redone - also change it to debug only
     #endif
     void*      ary;
     u64        idx;
 
-    template<class T> operator T(){ return as<T>(); }
-    template<class T> T as() const
+    template<class T> inline operator T(){ return as<T>(); }
+    template<class T> inline T as() const
     { 
-      tbl_msg_assert(hsh.type==TblType::typenum<T>::num, 
-        "Type mismatch: Array Type: ", 
-        TblType::type_str(hsh.type),
+      tbl_msg_assert(type == TblType::typenum<T>::num, 
+        "Type mismatch:\nArray Type: ", 
+        TblType::type_str(type),
         "Desired Type: ", 
         TblType::type_str(TblType::typenum<T>::num) );
 
       return ((T*)ary)[idx];
     }
-    template<class T> TblVal& operator=(T const& n)
+    template<class T> inline TblVal& operator=(T const& n)
     {      
-      tbl_msg_assert(hsh.type==TblType::typenum<T>::num, 
-        "Type mismatch: Array Type: ", 
-        TblType::type_str(hsh.type),
+      tbl_msg_assert(type == TblType::typenum<T>::num, 
+        "Type mismatch:\nArray Type: ", 
+        TblType::type_str(type),
         "Given Type: ", 
         TblType::type_str(TblType::typenum<T>::num) );
 
@@ -717,7 +719,7 @@ private:
     }
   }
 
-  //void           init(std::initializer_list<T>  lst)
+  //template<class T> void init(std::initializer_list<T>  lst)
   //{
   //  using namespace std;
   //  
@@ -847,8 +849,11 @@ public:
     this->owned(_owned);
   }
   tbl(u64 count) : m_mem(nullptr) { init(count); }
-  tbl(u64 count, u64 stride){ init(count, stride); };
-  template<class T> tbl(u64 count, T type_dummy){ init(count, sizeof(T), TblType::typenum<T>::num); }
+  //tbl(u64 count, u64 stride){ init(count, stride); };
+  template<class T> tbl(u64 count, T type_dummy)
+  {
+    init(count, sizeof(T), TblType::typenum<T>::num);
+  }
 
   // have to run default constructor here?
   //tbl(u64 count, T const& value) : m_mem(nullptr)
@@ -884,19 +889,24 @@ public:
     tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
     
     TblVal v;
-    v.ary      = m_mem; 
-    v.idx      = i;
-    v.hsh.type = arrayType();
+    v.ary    =  m_mem; 
+    v.idx    =  i;
+    #ifndef _NDEBUG
+     v.type  =  arrayType();
+    #endif
+
     return v;
   }
-  auto        operator[](u64 i) const -> const TblVal
-  {
+  auto        operator[](u64 i) const -> const TblVal {
     tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
     
     TblVal v;
-    v.ary      = m_mem;
-    v.idx      = i;
-    v.hsh.type = arrayType();
+    v.ary    =  m_mem;
+    v.idx    =  i;
+    #ifndef _NDEBUG
+     v.type  =  arrayType();
+    #endif
+    
     return v;
   }
 
@@ -1056,14 +1066,9 @@ public:
 
     return nullptr; // no empty slots and key was not found
   }
-
   u64            size() const { return m_mem? memStart()->size : 0; }
-
-  //T*             data() const {return (T*)m_mem; }  // todo: start here
   u8*            data() const {return (u8*)m_mem; }  // todo: start here
-
   void*     childData() const { return (void*)(elemStart() + map_capacity()); }                                                      // elemStart return a KV* so map_capacity will increment that pointer by the map_capacity * sizeof(KV)
-
   u64  child_capacity() const
   {
     u64 szb = 0;
@@ -1073,7 +1078,6 @@ public:
     //return sizeBytes() - memberBytes() - capacity()*sizeof(T) - map_capacity()*sizeof(KV);
     return sizeBytes() - memberBytes() - capacity()*stride() - map_capacity()*sizeof(KV);
   }
-
   bool          owned() const  
   {
     return m_mem? memStart()->owned : true; 
@@ -1086,7 +1090,7 @@ public:
   u64           elems() const { return m_mem?  memStart()->elems    : 0; }
   u64    map_capacity() const { return m_mem?  memStart()->mapcap   : 0; }
   u64          stride() const { return m_mem? memStart()->stride    : 0; }
-  u64       arrayType() const { return m_mem? memStart()->arrayType : 0; }
+  u8        arrayType() const { return m_mem? (u8)memStart()->arrayType : 0; }
   auto      elemStart() ->KV* { return m_mem? (KV*)(data() + capacity()) : nullptr; }
   auto      elemStart() const -> KV const* { return m_mem? (KV*)(data() + capacity()) : nullptr; }
   void*       reserve(u64 count, u64 mapcap=0, u64 childcap=0)
@@ -1507,6 +1511,21 @@ tbl::KVOfst::operator tbl*()
 
 
 
+
+
+
+
+
+//union    HshType
+//{
+//  struct { u32 type : 6; u32 hash: 26; };
+//  u32 as_u32;
+//
+//  HshType() : 
+//    type(TblType::EMPTY),
+//    hash(0)
+//  {}
+//};
 
 //using   tu8   =  tbl<u8>;
 //using   tu16  =  tbl<u16>;

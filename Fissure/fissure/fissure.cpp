@@ -1747,16 +1747,17 @@ ENTRY_DECLARATION // main or winmain
 
   SECTION(tbl test)
   {
-    tbl t(10, (u8)0);
+    tbl t(10, (u64)0 );
     TO(t.size(),i){
       //t.operator[]<u8>(i) = (u8)i;
-      t[i] = (u8)i;
+      t[i] = (u64)i;
     }
     TO(t.size(),i){
       //u64 val = t.operator[]<u8>(i);
-      u8 val = t[i];
-      Println( (u64)val ); 
+      u64 val = t[i];
+      Println( val ); 
     }
+    Println("stride: ", t.stride() );
     Println("\n\n");
   }
 
