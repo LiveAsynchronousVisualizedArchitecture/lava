@@ -1755,44 +1755,50 @@ ENTRY_DECLARATION // main or winmain
 
     tbl t = {0ull,1ull,2ull,3ull,4ull,5ull,6ull,7ull,8ull,9ull};
     TO(t.size(),i){
-      //u64 val = t.operator[]<u8>(i);
       u64 val = t[i];
-      Println( val ); 
+      Print(val," "); 
     }
+    Println("\n");
 
     SECTION(test map with normal types)
     {
       t("wat")    = 800;
-      t("width")  = 4096ull;
-      t("height") = 2048ull;
-      t("chans")  = (u8)3;
-      int     wat = t("wat");
-      u64   width = t("width");
-      u64  height = t("height");
-      Println("wat: ", wat, " width: ", width, " height: ", height, " chans: ", (u64)(u8)t("chans") );
+      //t("width")  = 4096ull;
+      //t("height") = 2048ull;
+      //t("chans")  = (u8)3;
+      //int     wat = t("wat");
+      //u64   width = t("width");
+      //u64  height = t("height");
+      //Println("wat: ", wat, " width: ", width, " height: ", height, " chans: ", (u64)(u8)t("chans") );
     }
 
     SECTION(test map with other tables)
     {
       tbl t1 = {2,4,6,8,10};
       t("t1") = &t1;
-      //t.flatten();
-
+      t.flatten();
+    
       tbl tA = t("t1");
       TO(tA.size(),i){
         tA[i] = (i32)tA[i] * 2;
         Print( (int)tA[i]," ");
       }
       Println("\nOwned: ", tA.owned());
-
+    
       TO(t1.size(),i){
         Print( (int)t1[i]," ");
       }
       Println("\nOwned: ", t1.owned());
     }
 
+    Println("size: ", t.size() );
+    Println("front(), back(): ", (u64)t.front(), ",  ", (u64)t.back() );
     Println("sizeBytes: ", t.sizeBytes() );
     Println("stride: ", t.stride() );
+    TO(t.size(),i){
+      u64 val = t[i];
+      Print(val, " "); 
+    }
     Println("\n\n");
   }
 

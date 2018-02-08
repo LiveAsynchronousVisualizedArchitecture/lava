@@ -44,6 +44,8 @@
 // -todo: test sub tables
 // -todo: look over and clean up map section 
 // -todo: figure out why sizeBytes doesn't change when flattening - TABLE was no longer a type 
+// -todo: figure out why array is mangled - adding map elements mangles the array - reserving changes the array - elemStart() was not multing capacity() * stride()
+// -todo: figure out why back() doesn't work - array is mangled earlier 
 
 // todo: put back push 
 // todo: figure out what do about TABLE and CHILD types with assignments to and from tbl pointers
@@ -197,10 +199,6 @@ public:
     static const u8   BITS_16    =     1;                    // 16 bit depth - 0b01
     static const u8   BITS_32    =     2;                    // 32 bit depth - 0b10
     static const u8   BITS_64    =     3;                    // 64 bit depth - 0b11
-    //static const u8   BITS_8     =     0;                    // 2^3 is  8 for  8 bit depth - 0b00   -   first two bits used for the 4 different bit depths - 8,16,32,64
-    //static const u8   BITS_16    =     1;                    // 2^4 is 16 for 16 bit depth - 0b01
-    //static const u8   BITS_32    =  1<<1;                    // 2^5 is 32 for 32 bit depth - 0b10
-    //static const u8   BITS_64    =  1<<1 | 1;                // 2^6 is 64 for 64 bit depth - 0b11
     static const u8   BITS_MASK  =  BITS_64;                 // 0b11 - this will isolate the bits used to designate bit depth
     static const u8   CLEAR      =     0;                    // is this really needed? 
     static const u8   SPECIAL    =  ~INTEGER & ~SIGNED & ~TABLE & ~CHILD & MASK & ~BITS_MASK;                       // A value can't be a non-child non-table while also being a non-integer (float) and non-signed (floats are always signed), so any value with these flags can be used for a special type 
@@ -891,7 +889,7 @@ public:
   tbl& operator=(tbl&&      r){ mv(std::move(r)); return *this; }
   tbl& operator=(std::initializer_list<KV> lst){ initKV(lst); return *this; }
 
-  //tbl& operator=(std::initializer_list<T>  lst){   init(lst); return *this; }
+  template<class T> tbl& operator=(std::initializer_list<T>  lst){  init(lst); return *this; }
   
   tbl& operator=(const char* s){ init_cstr(s); return *this; }
 
@@ -1020,6 +1018,8 @@ public:
   //void       pop_back(){ pop(); }
   //T const&      front() const{ return (*this)[0]; }
   //T const&       back() const{ return (*this)[size()-1]; }
+  TblVal      front() const{ return (*this)[0]; }
+  TblVal       back() const{ return (*this)[size()-1]; }
 
   template<class N> bool insert(const char* key, N const& val)
   {
@@ -1092,8 +1092,8 @@ public:
   u64    map_capacity() const { return m_mem?  memStart()->mapcap   : 0; }
   u64          stride() const { return m_mem? memStart()->stride    : 0; }
   u8        arrayType() const { return m_mem? (u8)memStart()->arrayType : 0; }
-  auto      elemStart() ->KV* { return m_mem? (KV*)(data() + capacity()) : nullptr; }
-  auto      elemStart() const -> KV const* { return m_mem? (KV*)(data() + capacity()) : nullptr; }
+  auto      elemStart() ->KV* { return m_mem? (KV*)(data() + capacity()*stride() ) : nullptr; }
+  auto      elemStart() const -> KV const* { return m_mem? (KV*)(data() + capacity()*stride()) : nullptr; }
   void*       reserve(u64 count, u64 mapcap=0, u64 childcap=0)
   {
     if( !owned() ) return m_mem;
@@ -1513,6 +1513,21 @@ tbl::KVOfst::operator tbl*()
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+//static const u8   BITS_8     =     0;                    // 2^3 is  8 for  8 bit depth - 0b00   -   first two bits used for the 4 different bit depths - 8,16,32,64
+//static const u8   BITS_16    =     1;                    // 2^4 is 16 for 16 bit depth - 0b01
+//static const u8   BITS_32    =  1<<1;                    // 2^5 is 32 for 32 bit depth - 0b10
+//static const u8   BITS_64    =  1<<1 | 1;                // 2^6 is 64 for 64 bit depth - 0b11
 
 //u32  hsh  =  hh.hash;                                                 // make sure that the hash is being squeezed into the same bit depth as the hash in HshType
 //if(out_hash){ *out_hash = hsh; }
