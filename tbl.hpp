@@ -39,9 +39,10 @@
 // -todo: take HshType all the way out for real
 // -todo: build in release mode
 // -todo: test with a bigger number type
+// -todo: debug why multiple keys are returning the same value - default value of 0 for KV type was always empty - don't need to make a new KV to test the array KV
+// -todo: test hash map of tbl
 
-// todo: debug why multiple keys are returning the same value
-// todo: test hash map of tbl
+// todo: look over and clean up map section 
 // todo: test sub tables
 // todo: re-integrate new tbl into brandisher
 // todo: make the default type become a specific 'unknown' value 
@@ -1047,13 +1048,10 @@ public:
     u64 dist  =  0;
     for(;;++i,++dist)
     {
-      i %= mod;                                                                // get idx within map_capacity
-      //HshType eh = el[i].hsh;                                                  // eh is element hash
-      KV eh;
-      eh.hash = el[i].hash;                                                  // eh is element hash
-      if( eh.type == TblType::EMPTY || 
-           (hsh == eh.hash &&                                  // if the hashes aren't the same, the keys can't be the same
-           strncmp(el[i].key,key,sizeof(KV::Key)-1)==0) )
+      i %= mod;                                                                  // get idx within map_capacity
+      if( el[i].type == TblType::EMPTY || 
+          (hsh == el[i].hash &&                                  // if the hashes aren't the same, the keys can't be the same
+            strncmp(el[i].key,key,sizeof(KV::Key)-1)==0) )
       { 
         return &el[i];
       }else if(dist > wrapDist(el,i,mod) ){
@@ -1519,6 +1517,13 @@ tbl::KVOfst::operator tbl*()
 
 
 
+//HshType eh = el[i].hsh;                                                  // eh is element hash
+//KV eh;
+//eh.hash = el[i].hash;                                                     // eh is element hash
+//if( eh.type == TblType::EMPTY || 
+//     (hsh == eh.hash &&                                  // if the hashes aren't the same, the keys can't be the same
+//     strncmp(el[i].key,key,sizeof(KV::Key)-1)==0) )
+//{ 
 
 //bool isEmpty() const { return hsh.type==TblType::NONE || hsh.type==TblType::EMPTY; }
 //static KV&    empty_kv(){ static KV kv; kv.hsh.type = TblType::EMPTY; return kv; }

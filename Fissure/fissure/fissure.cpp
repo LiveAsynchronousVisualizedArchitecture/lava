@@ -1760,14 +1760,22 @@ ENTRY_DECLARATION // main or winmain
       Println( val ); 
     }
 
-    t("wat")    = 800;
-    t("width")  = 4096ull;
-    //t("height") = 2048ull;
-    int     wat = t("wat");
-    u64   width = t("width");
-    u64  height = t("height");
+    SECTION(test map with normal types)
+    {
+      t("wat")    = 800;
+      t("width")  = 4096ull;
+      t("height") = 2048ull;
+      t("chans")  = (u8)3;
+      int     wat = t("wat");
+      u64   width = t("width");
+      u64  height = t("height");
+      Println("wat: ", wat, " width: ", width, " height: ", height, " chans: ", (u64)(u8)t("chans") );
+    }
 
-    Println("wat: ", wat, " width: ", width, " height: ", height);
+    SECTION(test map with normal types)
+    {
+    }
+
     Println("stride: ", t.stride() );
     Println("\n\n");
   }
