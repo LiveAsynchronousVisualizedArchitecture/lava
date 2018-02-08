@@ -1001,18 +1001,30 @@ public:
   //}
   //template<class... V> bool emplace_back(V&&... val){ return emplace(std::forward<V>(val)...);  }
 
-  //bool           push(T const& val){ return emplace(val); }
-  //u64            push(std::initializer_list<T> lst)
-  //{
-  //  u64 cnt = 0;
-  //  for(auto const& v : lst){
-  //    bool ok = this->push(v);
-  //    if(!ok){ return cnt; }
-  //    ++cnt;
-  //  }
-  //
-  //  return cnt;
-  //}
+  template<class T> bool       push(T const& val)
+  { 
+    if(!m_mem){ init(0); }
+    
+    auto prevSz = size();
+    if( !(capacity()>prevSz) )
+      if(!expand(true, false)){ return false; }
+
+    size(prevSz+1);
+    (*this)[prevSz] = val;
+    
+    return true;
+  }
+  template<class T> u64        push(std::initializer_list<T> lst)
+  {
+    u64 cnt = 0;
+    for(auto const& v : lst){
+      bool ok = this->push(v);
+      if(!ok){ return cnt; }
+      ++cnt;
+    }
+  
+    return cnt;
+  }
   //bool      push_back(T const& value){ return emplace(value); }
   //void            pop(){ back()->T::~T(); set_size(size()-1); }
   //void       pop_back(){ pop(); }
@@ -1073,10 +1085,7 @@ public:
   u64  child_capacity() const
   {
     u64 szb = 0;
-    if(!m_mem || (szb=sizeBytes())==0 ) return 0;
-  
-    // todo: replace sizeof(T) with stride here
-    //return sizeBytes() - memberBytes() - capacity()*sizeof(T) - map_capacity()*sizeof(KV);
+    if(!m_mem || (szb=sizeBytes())==0 ){ return 0; }
     return sizeBytes() - memberBytes() - capacity()*stride() - map_capacity()*sizeof(KV);
   }
   bool          owned() const  
@@ -1523,6 +1532,8 @@ tbl::KVOfst::operator tbl*()
 
 
 
+// todo: replace sizeof(T) with stride here
+//return sizeBytes() - memberBytes() - capacity()*sizeof(T) - map_capacity()*sizeof(KV);
 
 //static const u8   BITS_8     =     0;                    // 2^3 is  8 for  8 bit depth - 0b00   -   first two bits used for the 4 different bit depths - 8,16,32,64
 //static const u8   BITS_16    =     1;                    // 2^4 is 16 for 16 bit depth - 0b01

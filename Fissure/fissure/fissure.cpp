@@ -1775,6 +1775,9 @@ ENTRY_DECLARATION // main or winmain
     SECTION(test map with other tables)
     {
       tbl t1 = {2,4,6,8,10};
+      t1.push(12);
+      t1.push(14);
+      t1.push({16,18,20,22,24});
       t("t1") = &t1;
       t.flatten();
     
