@@ -1759,6 +1759,15 @@ ENTRY_DECLARATION // main or winmain
       u64 val = t[i];
       Println( val ); 
     }
+
+    t("wat")    = 800;
+    t("width")  = 4096ull;
+    //t("height") = 2048ull;
+    int     wat = t("wat");
+    u64   width = t("width");
+    u64  height = t("height");
+
+    Println("wat: ", wat, " width: ", width, " height: ", height);
     Println("stride: ", t.stride() );
     Println("\n\n");
   }

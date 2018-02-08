@@ -40,6 +40,10 @@
 // -todo: build in release mode
 // -todo: test with a bigger number type
 
+// todo: debug why multiple keys are returning the same value
+// todo: test hash map of tbl
+// todo: test sub tables
+// todo: re-integrate new tbl into brandisher
 // todo: make the default type become a specific 'unknown' value 
 // todo: make sure if the type of a struct is labeled unknown, and if so check that the stride matches the struct size
 // todo: make a constructor out of an initializer list 
@@ -406,8 +410,9 @@ public:
     KV&  operator= (KV&&      r){ return cp(r); }
     template<class N> KV& operator=(N           const& n)
     {
-      hsh.type     = typenum< typecast<N>::type >::num;
-      auto castVal = (typecast<N>::type)n;
+      //hsh.type     = typenum< typecast<N>::type >::num;
+      type         = TblType::typenum< TblType::typecast<N>::type >::num;
+      auto castVal = (TblType::typecast<N>::type)n;
       memcpy(&val, &castVal, sizeof(u64));
       return *this;
     }
@@ -428,56 +433,56 @@ public:
     template<class N> operator N(){ return as<N>(); }
     template<class N> N as() const
     { 
-      using CAST = typecast<N>::type;                                                           // DES is the desired type 
+      using CAST = TblType::typecast<N>::type;                                                           // DES is the desired type 
 
-      if(hsh.type==typenum<CAST>::num){ 
+      if(type==TblType::typenum<CAST>::num){ 
         CAST* castptr =  (CAST*)&val;
         return (N)(*castptr);
       }
 
-      if( (hsh.type==TblType::NONE) || (hsh.type==TblType::ERR) ){
+      if( (type==TblType::NONE) || (type==TblType::ERR) ){
         tbl_msg_assert(
-          hsh.type==typenum<CAST>::num, 
+          type==TblType::typenum<CAST>::num, 
           "\n - tbl TYPE ERROR -\nInternal type: ", 
-          TblType::type_str((Type)hsh.type), 
+          TblType::type_str((Type)type), 
           "Desired type: ",
-          TblType::type_str((Type)typenum< typecast<CAST>::type >::num) );        
+          TblType::type_str((Type)TblType::typenum< TblType::typecast<CAST>::type >::num) );        
       } 
-      if( (hsh.type & TblType::SIGNED) && !(typenum<CAST>::num & TblType::SIGNED)  ){
+      if( (type & TblType::SIGNED) && !(TblType::typenum<CAST>::num & TblType::SIGNED)  ){
         tbl_msg_assert(
-          hsh.type==typenum<CAST>::num, 
+          type==TblType::typenum<CAST>::num, 
           "\n - tbl TYPE ERROR -\nSigned integers can not be implicitly cast to unsigned integers.\nInternal type: ", 
-          TblType::type_str((Type)hsh.type), 
+          TblType::type_str((Type)type), 
           "Desired type: ",
-          TblType::type_str((Type)typenum<CAST>::num) );
+          TblType::type_str((Type)TblType::typenum<CAST>::num) );
       }
-      if( !(hsh.type & TblType::INTEGER) && (typenum<CAST>::num & TblType::INTEGER) ){
+      if( !(type & TblType::INTEGER) && (TblType::typenum<CAST>::num & TblType::INTEGER) ){
         tbl_msg_assert(
-          hsh.type==typenum<CAST>::num, 
+          type==TblType::typenum<CAST>::num, 
           "\n - tbl TYPE ERROR -\nFloats can not be implicitly cast to integers.\nInternal type: ", 
-          TblType::type_str((Type)hsh.type), 
+          TblType::type_str((Type)type), 
           "Desired type: ",
-          TblType::type_str((Type)typenum<CAST>::num) );
+          TblType::type_str((Type)TblType::typenum<CAST>::num) );
       }
-      if( (hsh.type|typenum<CAST>::num) & TblType::TABLE ){
+      if( (type|TblType::typenum<CAST>::num) & TblType::TABLE ){
         tbl_msg_assert(
-          hsh.type==typenum<CAST>::num, 
+          type==TblType::typenum<CAST>::num, 
           "\n - tbl TYPE ERROR -\nTables can not be implicitly cast, even to a larger bit depth.\nInternal type: ", 
-          TblType::type_str((Type)hsh.type), 
+          TblType::type_str((Type)type), 
           "Desired type: ",
-          TblType::type_str((Type)typenum<CAST>::num) );
+          TblType::type_str((Type)TblType::typenum<CAST>::num) );
       }
 
-      switch(hsh.type){
+      switch(type){
       case   TblType::U64: return cast_mem<N,  u64>(&val); 
       case   TblType::I64: return cast_mem<N,  i64>(&val);
       case   TblType::F64: return cast_mem<N,  f64>(&val);
       }
 
       tbl_msg_assert(
-        hsh.type==typenum<N>::num, 
-        " - tbl TYPE ERROR -\nInternal type was: ", TblType::type_str((Type)hsh.type), 
-        "Desired  type was: ",                      TblType::type_str((Type)typenum<N>::num) );
+        type==TblType::typenum<N>::num, 
+        " - tbl TYPE ERROR -\nInternal type was: ", TblType::type_str((Type)type), 
+        "Desired  type was: ",                      TblType::type_str((Type)TblType::typenum<N>::num) );
 
       return N();
     }
