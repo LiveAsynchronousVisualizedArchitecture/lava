@@ -1772,10 +1772,26 @@ ENTRY_DECLARATION // main or winmain
       Println("wat: ", wat, " width: ", width, " height: ", height, " chans: ", (u64)(u8)t("chans") );
     }
 
-    SECTION(test map with normal types)
+    SECTION(test map with other tables)
     {
+      tbl t1 = {2,4,6,8,10};
+      t("t1") = &t1;
+      //t.flatten();
+
+      tbl tA = t("t1");
+      TO(tA.size(),i){
+        tA[i] = (i32)tA[i] * 2;
+        Print( (int)tA[i]," ");
+      }
+      Println("\nOwned: ", tA.owned());
+
+      TO(t1.size(),i){
+        Print( (int)t1[i]," ");
+      }
+      Println("\nOwned: ", t1.owned());
     }
 
+    Println("sizeBytes: ", t.sizeBytes() );
     Println("stride: ", t.stride() );
     Println("\n\n");
   }

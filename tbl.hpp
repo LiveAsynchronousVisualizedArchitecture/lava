@@ -41,9 +41,13 @@
 // -todo: test with a bigger number type
 // -todo: debug why multiple keys are returning the same value - default value of 0 for KV type was always empty - don't need to make a new KV to test the array KV
 // -todo: test hash map of tbl
+// -todo: test sub tables
+// -todo: look over and clean up map section 
+// -todo: figure out why sizeBytes doesn't change when flattening - TABLE was no longer a type 
 
-// todo: look over and clean up map section 
-// todo: test sub tables
+// todo: put back push 
+// todo: figure out what do about TABLE and CHILD types with assignments to and from tbl pointers
+// todo: work on copying a table into parent table on assignement
 // todo: re-integrate new tbl into brandisher
 // todo: make the default type become a specific 'unknown' value 
 // todo: make sure if the type of a struct is labeled unknown, and if so check that the stride matches the struct size
@@ -253,6 +257,8 @@ public:
     template<> struct typenum<f64>   { static const Type num = F64;     };
     template<> struct typenum<long>             { static const Type num = I64;   };
     template<> struct typenum<unsigned long>    { static const Type num = U64;   };
+    template<> struct typenum<tbl>   { static const Type num = TABLE;   };
+    template<> struct typenum<tbl*>  { static const Type num = TABLE;   };
 
     template<class C> struct typecast { using type = C;   };                               // cast types
     template<> struct typecast<i8>    { using type = i64; };
@@ -933,15 +939,11 @@ public:
 
       kv = get(key, &hsh);                                                               // if the expansion succeeded there has to be space now, but the keys will be reordered, so kv needs to be found again 
 
-      //auto type = kv->hsh.type;
       auto type = kv->type;
       if(type==TblType::EMPTY)
       {
         elems( elems()+1 );
-        //new (kv) KV(key, hsh);
         new (kv) KV(key);
-        //kv->hsh.hash = hsh;
-        //kv->hsh.type = TblType::NONE;
         kv->hash = hsh;
         kv->type = TblType::NONE;
         new (&ret) KVOfst(kv);
@@ -1037,28 +1039,25 @@ public:
   {
     KV hh;
     hh.hash   =  HashStr(key);
-    u32  hsh  =  hh.hash;                                                 // make sure that the hash is being squeezed into the same bit depth as the hash in HshType
-    if(out_hash){ *out_hash = hsh; }
+    if(out_hash){ *out_hash = hh.hash; }
     KV*   el  =  (KV*)elemStart();                                        // el is a pointer to the elements 
     u64  mod  =  map_capacity();
     if(mod==0) return nullptr;
 
-    u64    i  =  hsh % mod;
+    u64    i  =  hh.hash % mod;
     u64   en  =  prev(i,mod);
     u64 dist  =  0;
     for(;;++i,++dist)
     {
       i %= mod;                                                                  // get idx within map_capacity
       if( el[i].type == TblType::EMPTY || 
-          (hsh == el[i].hash &&                                  // if the hashes aren't the same, the keys can't be the same
+          (hh.hash == el[i].hash &&                                  // if the hashes aren't the same, the keys can't be the same
             strncmp(el[i].key,key,sizeof(KV::Key)-1)==0) )
       { 
         return &el[i];
       }else if(dist > wrapDist(el,i,mod) ){
-        //KV kv(key, hsh);
         KV kv(key);
-        //kv.hsh.hash = hsh;
-        kv.hash = hsh;
+        kv.hash = hh.hash;
         elems( elems()+1 );
         return &(place_rh(kv, el, i, dist, mod));
       }
@@ -1515,7 +1514,16 @@ tbl::KVOfst::operator tbl*()
 
 
 
+//u32  hsh  =  hh.hash;                                                 // make sure that the hash is being squeezed into the same bit depth as the hash in HshType
+//if(out_hash){ *out_hash = hsh; }
+//u64    i  =  hsh % mod;
+//KV kv(key, hsh);
+//kv.hsh.hash = hsh;
 
+//auto type = kv->hsh.type;
+//new (kv) KV(key, hsh);
+//kv->hsh.hash = hsh;
+//kv->hsh.type = TblType::NONE;
 
 //HshType eh = el[i].hsh;                                                  // eh is element hash
 //KV eh;
