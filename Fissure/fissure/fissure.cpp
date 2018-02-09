@@ -237,8 +237,8 @@
 // -todo: make packet visualization also include lighting up connections between slots
 // -todo: make packetSlots an unordered_set instead of a vector
 
-
-// todo: use new tbl.hpp to re-implement IdxVerts
+// todo: use new tbl.hpp to re-implement IdxVerts - don't use an array, use only named sub-tables
+// todo: test an IdxVerts tbl and put it into the fissure db to test with brandisher
 // todo: give LavaNode struct a description string
 // todo: make description strings show up in the status bar on mouse over
 // todo: implement sub tables in brandisher
@@ -1771,15 +1771,22 @@ ENTRY_DECLARATION // main or winmain
       //u64  height = t("height");
       //Println("wat: ", wat, " width: ", width, " height: ", height, " chans: ", (u64)(u8)t("chans") );
     }
-
     SECTION(test map with other tables)
     {
       tbl t1 = {2,4,6,8,10};
       t1.push(12);
       t1.push(14);
+      t1.push(14);
       t1.push({16,18,20,22,24});
+      t1.pop();
+      t1.pop();
+      t1.pop();
+      t1.pop();
       t("t1") = &t1;
-      t.flatten();
+      //t.flatten();
+
+      //t("t1") = t1;
+      //t.flatten();
     
       tbl tA = t("t1");
       TO(tA.size(),i){
@@ -1793,16 +1800,59 @@ ENTRY_DECLARATION // main or winmain
       }
       Println("\nOwned: ", t1.owned());
     }
-
-    Println("size: ", t.size() );
-    Println("front(), back(): ", (u64)t.front(), ",  ", (u64)t.back() );
-    Println("sizeBytes: ", t.sizeBytes() );
-    Println("stride: ", t.stride() );
-    TO(t.size(),i){
-      u64 val = t[i];
-      Print(val, " "); 
+    SECTION(print tbl attributes)
+    {
+      Println("size: ", t.size() );
+      Println("front(), back(): ", (u64)t.front(), ",  ", (u64)t.back() );
+      Println("sizeBytes: ", t.sizeBytes() );
+      Println("stride: ",    t.stride()    );
+      TO(t.size(),i){
+        u64 val = t[i];
+        Print(val, " "); 
+      }
+      Println("\n\n");
+      Println("KV size: ", sizeof(tbl::KV));
     }
-    Println("\n\n");
+
+    tbl iv;
+    SECTION(make IdxVerts with the new tbl)
+    {
+      tbl indices = {0u, 1u, 2u};
+      tbl      px = { -1.f,  -0.17f, -0.58f };
+      tbl      py = { -1.f,  -1.0f,  -1.0f  };
+      tbl      pz = {  0.f,   0.f,   -0.f   };
+      tbl      nx = {  0.f,   0.f,    0.f   };
+      tbl      ny = {  0.f,   0.f,    0.f   };
+      tbl      nz = { -1.f,  -1.f,   -1.f   };
+      tbl      cr = {  1.f,   1.f,    1.f   };
+      tbl      cg = {  1.f,   1.f,    1.f   };
+      tbl      cb = {  1.f,   1.f,    1.f   };
+      tbl      tx = {  0.f,   0.f,    0.f   };
+      tbl      ty = {  0.f,   0.f,    0.f   };
+
+      u64 typenum       =  *((u64*)"IdxVerts");
+      iv("type")        = typenum;
+      iv("mode")        = (u64)0x0004; // (u64)GL_TRIANGLES;  // #define GL_TRIANGLES 0x0004
+      iv("indices")     = &indices;
+      iv("positions x") = &px;
+      iv("positions y") = &py;
+      iv("positions z") = &pz;
+      iv("normals x")   = &nx;
+      iv("normals y")   = &ny;
+      iv("normals z")   = &nz;
+      iv("colors x")    = &cr;
+      iv("colors y")    = &cg;
+      iv("colors z")    = &cb;
+      iv("texture coordinates x") = &tx;
+      iv("texture coordinates y") = &ty;
+
+      iv.flatten();
+
+      Println("iv sizeBytes: ", iv.sizeBytes() );
+      Println("ind type: ", indices.typeStr() );
+
+      fisdb.put("indexed verts test", iv.memStart(), iv.sizeBytes() );
+    }
   }
 
 	NVGcontext* vg = NULL;

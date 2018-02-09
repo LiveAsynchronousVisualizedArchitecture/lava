@@ -190,5 +190,11 @@
     <ClInclude Include="flat_lockfree_map.hpp">
       <Filter>hpp</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\tbl.hpp">
+      <Filter>hpp</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\str_util.hpp">
+      <Filter>hpp</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

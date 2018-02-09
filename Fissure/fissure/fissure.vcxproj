@@ -194,6 +194,8 @@
     <ClCompile Include="unified.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\str_util.hpp" />
+    <ClInclude Include="..\..\tbl.hpp" />
     <ClInclude Include="..\LavaFlow.hpp" />
     <ClInclude Include="..\nanovg-master\src\fontstash.h" />
     <ClInclude Include="..\nanovg-master\src\nanovg.h" />

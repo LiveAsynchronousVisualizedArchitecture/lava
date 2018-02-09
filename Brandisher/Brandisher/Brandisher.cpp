@@ -72,6 +72,7 @@
 // -todo: make values below 0 face down, and values above 0 face upwards
 // -todo: make status show the array value being used at each pixel
 
+// todo: update brandisher to use new tbl
 // todo: show sub trees
 // todo: treat the array as a string if it is u8, i8, (or a string type?) - then show statistics for a string if the string is too long to fit in the gui
 // todo: make listing the keys of a db happen on expand

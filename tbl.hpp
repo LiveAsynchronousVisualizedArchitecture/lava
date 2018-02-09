@@ -46,10 +46,12 @@
 // -todo: figure out why sizeBytes doesn't change when flattening - TABLE was no longer a type 
 // -todo: figure out why array is mangled - adding map elements mangles the array - reserving changes the array - elemStart() was not multing capacity() * stride()
 // -todo: figure out why back() doesn't work - array is mangled earlier 
+// -todo: put back push 
+// -todo: work on copying a table into parent table on assignement - take address and flatten? - overloading only tbl const& seems to work to override the behavior of assigning a table 
+// -todo: figure out what do about TABLE and CHILD types with assignments to and from tbl pointers - seems to work for now, even if using an entire bit instead of a specific value for TABLE and TABLE|CHILD is inefficient
 
-// todo: put back push 
-// todo: figure out what do about TABLE and CHILD types with assignments to and from tbl pointers
-// todo: work on copying a table into parent table on assignement
+// todo: try taking base pointer out of KV and use the bytes elsewhere
+// todo: add type and typestr functions to tbl?
 // todo: re-integrate new tbl into brandisher
 // todo: make the default type become a specific 'unknown' value 
 // todo: make sure if the type of a struct is labeled unknown, and if so check that the stride matches the struct size
@@ -78,6 +80,10 @@
 // todo: make simdb convenience function to put in a tbl with a string key
 // todo: think about slices
 // todo: is it possible to hash a type with constexpr?
+// todo: think about arrays of values - go above 8 bytes for the value? 
+// todo: think about strings
+// todo: think about arrays of tables
+
 
 // todo: break out memory allocation from template - keep template as a wrapper for casting a typeless tbl
 // todo: make resize() - should there be a resize()? only affects array?
@@ -356,7 +362,6 @@ public:
     using   i64   =   int64_t;
     using   f32   =     float;
     using   f64   =    double;
-
     using  Type   =  TblType::Type;
 
     static const u32 HASH_MASK = 0x07FFFFFF;
@@ -365,12 +370,11 @@ public:
 
     using Key = char[43];
 
-    //HshType   hsh;
-    u32      type :  6;
-    u32      hash : 26;
-    Key       key;
-    u64       val;
-    u64      base;
+    u32      type :  6;      // The type of the value contained
+    u32      hash : 26;      // The hash of the key truncated to 26 bits
+    Key       key;           // The 43 character max string that makes up the key
+    u64       val;           // The value treated as an 8 byte unsigned 64 bit integer
+    tbl*     base;
 
     template<class N> KV& init(char* k, N v)
     {
@@ -393,16 +397,10 @@ public:
 
     KV() : hash(0), type(TblType::EMPTY), val(0), base(0) { 
       memset(key, 0, sizeof(Key));
-      //hsh.type = TblType::EMPTY;
     }
-    //KV() : hsh(), val(0), base(0) { 
-    //  memset(key, 0, sizeof(Key));
-    //  hsh.type = TblType::EMPTY;
-    //}
     KV(const char* key) : type(TblType::EMPTY)
     {
       memcpy(this->key, key, sizeof(KV::Key) );
-      //hsh.type = TblType::EMPTY;
     }
     KV(KV const& l){ cp(l); }
     KV(KV&&      r){ cp(r); }
@@ -426,12 +424,17 @@ public:
       return init(p);
     }
 
-    KV& operator=(tbl  const& n) = delete;
-    KV& operator=(tbl  const* const n)
+    //KV& operator=(tbl  const& t) = delete;
+    KV& operator=(tbl  const* const t)
     {
-      //hsh.type  =  TblType::typenum<tbl>::num;
       type  =  TblType::typenum<tbl>::num;
-      val   =  (u64)n;
+      val   =  (u64)t;
+      return *this;
+    }
+    KV& operator=(tbl const& t)
+    {
+      this->operator=( &t );
+      
       return *this;
     }
 
@@ -538,11 +541,65 @@ public:
     operator bool() const { return (bool)(kv); }
     template<class N> N as() const { return kv->as<N>(); }
 
-    operator tbl();
-    operator tbl*();
+    //operator tbl();
+    //operator tbl*();
+
+    operator tbl()
+    {   
+      using namespace std;
+
+      if(base){
+        tbl ret;
+
+        u64 chldSt = (u64)((tbl*)(base))->childData();                                   // chldSt is child start - the part of the tbl memory that contains the sub-tables
+        auto   fff = (tbl::fields*)(kv->val + (u64)chldSt);
+        ret.m_mem  = (u8*)(fff+1);
+
+        return ret;
+      }else{
+        return *((tbl*)kv->val);
+      }
+    }
+    operator tbl*()
+    {
+      tbl_msg_assert(
+        kv->type == TblType::typenum<tbl*>::num, 
+        " - tbl TYPE ERROR -\nInternal type: ", 
+        TblType::type_str((TblType::Type)kv->type),
+        "Desired type: ",
+        TblType::type_str((TblType::Type)TblType::typenum<tbl*>::num) );        
+
+      return (tbl*)kv->val;
+    }
 
     template<class N> operator N() { return (N)(*kv); }
-    template<class N> KVOfst& operator=(N const& n){ *kv = n; return *this; }
+
+    //template<class N> KVOfst& operator=(N const& n) = delete;
+
+    //KVOfst& operator=(tbl const* const t)
+    //{ 
+    //  *kv = t;
+    //  return *this; 
+    //}
+    //KVOfst& operator=(tbl* t)
+    //{ 
+    //  *kv = t;
+    //  return *this; 
+    //}
+
+    KVOfst& operator=(tbl const& t)
+    { 
+      *kv = t;
+      if(base){ 
+        ((tbl*)(base))->flatten();
+      }
+      return *this; 
+    }
+    template<class T> KVOfst& operator=(T n)
+    { 
+      *kv = n;
+      return *this; 
+    }
 
     KV* operator->(){ return  kv; }
     KV& operator* (){ return *kv; }
@@ -707,8 +764,13 @@ private:
   {
     init(count, sizeof(T));
   }
-  
+  template<class T> void init(std::initializer_list<T>  lst)
+  {
+    init(lst.size(), sizeof(T), TblType::typenum<T>::num);
 
+    auto i = 0;
+    for(auto const& n : lst){ (*this)[i++] = n; }
+  }
   void         initKV(std::initializer_list<KV> lst)
   {
     for(auto&& n : lst){ 
@@ -717,27 +779,6 @@ private:
       kv.type  =  n.type;
       //kv.hsh.type = n.hsh.type;
     }
-  }
-
-  //template<class T> void init(std::initializer_list<T>  lst)
-  //{
-  //  using namespace std;
-  //  
-  //  reserve(lst.size(),0,0);
-  //  initFields( sizeBytes(), lst.size() ); 
-  //
-  //  auto i = 0;
-  //  for(auto&& n : lst){ (*this)[i++] = move(n); }
-  //
-  //  //for(auto&& n : lst){ emplace(n); }
-  //}
-
-  template<class T> void init(std::initializer_list<T>  lst)
-  {
-    init(lst.size(), sizeof(T), TblType::typenum<T>::num);
-
-    auto i = 0;
-    for(auto const& n : lst){ (*this)[i++] = n; }
   }
 
   void      init_cstr(const char* s)
@@ -826,6 +867,7 @@ private:
 
     return ret;
   }
+
   //template<class OP> void op_asn(T   const& l, OP op)
   //{
   //  TO(size(),i) op( (*this)[i], l);
@@ -857,30 +899,18 @@ public:
     this->owned(_owned);
   }
   tbl(u64 count) : m_mem(nullptr) { init(count); }
+  tbl(std::initializer_list<KV> lst) : m_mem(nullptr)
+  { initKV(lst); }
+  tbl(const char* s) : m_mem(nullptr) { init_cstr(s); }
   template<class T> tbl(u64 count, T type_dummy)
   {
     init(count, sizeof(T), TblType::typenum<T>::num);
   }
-
-  //tbl(u64 count, u64 stride){ init(count, stride); };
-  //
-  // have to run default constructor here?
-  //tbl(u64 count, T const& value) : m_mem(nullptr)
-  //{
-  //  init(count);
-  //  TO(count, i){ (*this)[i] = value; }
-  //}
-
-  tbl(std::initializer_list<KV> lst) : m_mem(nullptr)
-  { initKV(lst); }
-  
   template<class T> tbl(std::initializer_list<T>  lst) : m_mem(nullptr)
   {
     //init(lst.size()); 
     init(lst); 
   }
-
-  tbl(const char* s) : m_mem(nullptr) { init_cstr(s); }
   ~tbl(){ destroy(); }
 
   tbl           (tbl const& l){ cp(l);                          }  // does this need to destroy the current table first?
@@ -919,14 +949,14 @@ public:
     return v;
   }
 
-  KVOfst  operator()(i32 k)
+  KVOfst      operator()(i32 k)
   {
     char key[sizeof(k)+1];
     memcpy(key, &k, sizeof(k));
     key[sizeof(k)] = '\0';
     return operator()(key);
   }
-  KVOfst  operator()(const char* key)
+  KVOfst      operator()(const char* key)
   {      
     KVOfst  ret;                                                                         // this will be set with placement new instead of operator= because operator= is templated and used for assigning to the KV pointed to by KVOfst::KV* -  this is so tbl("some key") = 85  can work correctly
     u32     hsh;
@@ -944,9 +974,10 @@ public:
         new (kv) KV(key);
         kv->hash = hsh;
         kv->type = TblType::NONE;
-        new (&ret) KVOfst(kv);
+        new (&ret) KVOfst(kv, this);
       }else if( (type&TblType::TABLE) && (type&TblType::CHILD) )
-        new (&ret) KVOfst(kv, this->childData());                           // (void*)memStart());
+        new (&ret) KVOfst(kv, this);                                                     // (void*)memStart());
+        //new (&ret) KVOfst(kv, this->childData());                                      // (void*)memStart());
       else
         new (&ret) KVOfst(kv);
     }else 
@@ -981,26 +1012,7 @@ public:
   //tbl     operator/ (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
   //tbl     operator% (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
 
-  template<class V> KVOfst put(const char* key, V val){ return this->operator()(key) = val; }
-
-  //template<class... V> bool emplace(V&&... val)
-  //{
-  //  using namespace std;
-  //  
-  //  if(!m_mem){ init(0); }
-  //
-  //  auto prevSz = size();
-  //  if( !(capacity()>prevSz) )
-  //    if(!expand(true, false)){ return false; }
-  //
-  //  T* p = (T*)(m_mem);
-  //  new (p+prevSz) T( forward<V>(val)... );
-  //  size(prevSz+1);
-  //
-  //  return true;
-  //}
-  //template<class... V> bool emplace_back(V&&... val){ return emplace(std::forward<V>(val)...);  }
-
+  template<class V> KVOfst      put(const char* key, V val){ return this->operator()(key) = val; }
   template<class T> bool       push(T const& val)
   { 
     if(!m_mem){ init(0); }
@@ -1025,13 +1037,9 @@ public:
   
     return cnt;
   }
-  //bool      push_back(T const& value){ return emplace(value); }
-  //void            pop(){ back()->T::~T(); set_size(size()-1); }
-  //void       pop_back(){ pop(); }
-  //T const&      front() const{ return (*this)[0]; }
-  //T const&       back() const{ return (*this)[size()-1]; }
-  TblVal      front() const{ return (*this)[0]; }
-  TblVal       back() const{ return (*this)[size()-1]; }
+  void            pop(){ size(size()-1); }
+  TblVal        front() const{ return (*this)[0]; }
+  TblVal         back() const{ return (*this)[size()-1]; }
 
   template<class N> bool insert(const char* key, N const& val)
   {
@@ -1101,6 +1109,7 @@ public:
   u64    map_capacity() const { return m_mem?  memStart()->mapcap   : 0; }
   u64          stride() const { return m_mem? memStart()->stride    : 0; }
   u8        arrayType() const { return m_mem? (u8)memStart()->arrayType : 0; }
+  auto        typeStr() const -> char const* { return TblType::type_str(arrayType()); };
   auto      elemStart() ->KV* { return m_mem? (KV*)(data() + capacity()*stride() ) : nullptr; }
   auto      elemStart() const -> KV const* { return m_mem? (KV*)(data() + capacity()*stride()) : nullptr; }
   void*       reserve(u64 count, u64 mapcap=0, u64 childcap=0)
@@ -1316,14 +1325,12 @@ public:
     auto      e = elemStart();
     auto mapcap = map_capacity();
     TO(mapcap,i)
-      //if(  (e[i].hsh.type & TblType::TABLE) && 
-      //    !(e[i].hsh.type & TblType::CHILD) ){                                 // if the table bit is set but the child bit is not set
       if(  (e[i].type & TblType::TABLE) && 
           !(e[i].type & TblType::CHILD) ){                                 // if the table bit is set but the child bit is not set
         //tbl<T>*  t  =  (tbl<T>*)e[i].val;
         tbl*  t  =  (tbl*)e[i].val;
         newcap  +=  t->sizeBytes();
-    }
+      }
     reserve(0,0, prevCap + newcap);
     e             =  elemStart();
     u64   chldst  =  (u64)childData();
@@ -1478,35 +1485,6 @@ public:
   }
 };
 
-tbl::KVOfst::operator tbl()
-{   
-  using namespace std;
-
-  if(base){
-    tbl ret;
-
-    auto  fff = (tbl::fields*)(kv->val + (u64)base);
-    ret.m_mem = (u8*)(fff+1);
-
-    return ret;
-  }else{
-    return *((tbl*)kv->val);
-  }
-}
-tbl::KVOfst::operator tbl*()
-{
-  tbl_msg_assert(
-    //kv->hsh.type == TblType::typenum<tbl*>::num, 
-    kv->type == TblType::typenum<tbl*>::num, 
-    " - tbl TYPE ERROR -\nInternal type: ", 
-    //TblType::type_str((TblType::Type)kv->hsh.type), 
-    TblType::type_str((TblType::Type)kv->type),
-    "Desired type: ",
-    TblType::type_str((TblType::Type)TblType::typenum<tbl*>::num) );        
-
-  return (tbl*)kv->val;
-}
-
 
 #endif
 
@@ -1527,10 +1505,90 @@ tbl::KVOfst::operator tbl*()
 
 
 
+//tbl::KVOfst::operator tbl()
+//{   
+//  using namespace std;
+//
+//  if(base){
+//    tbl ret;
+//
+//    auto  fff = (tbl::fields*)(kv->val + (u64)base);
+//    ret.m_mem = (u8*)(fff+1);
+//
+//    return ret;
+//  }else{
+//    return *((tbl*)kv->val);
+//  }
+//}
+//tbl::KVOfst::operator tbl*()
+//{
+//  tbl_msg_assert(
+//    //kv->hsh.type == TblType::typenum<tbl*>::num, 
+//    kv->type == TblType::typenum<tbl*>::num, 
+//    " - tbl TYPE ERROR -\nInternal type: ", 
+//    //TblType::type_str((TblType::Type)kv->hsh.type), 
+//    TblType::type_str((TblType::Type)kv->type),
+//    "Desired type: ",
+//    TblType::type_str((TblType::Type)TblType::typenum<tbl*>::num) );        
+//
+//  return (tbl*)kv->val;
+//}
 
+//if(  (e[i].hsh.type & TblType::TABLE) && 
+//    !(e[i].hsh.type & TblType::CHILD) ){                                 // if the table bit is set but the child bit is not set
 
+//template<class T> bool  push_back(T const& val){ return push(val); }
+//void       pop_back(){ pop(); }
 
+//template<class T> void init(std::initializer_list<T>  lst)
+//{
+//  using namespace std;
+//  
+//  reserve(lst.size(),0,0);
+//  initFields( sizeBytes(), lst.size() ); 
+//
+//  auto i = 0;
+//  for(auto&& n : lst){ (*this)[i++] = move(n); }
+//
+//  //for(auto&& n : lst){ emplace(n); }
+//}
 
+//hsh.type = TblType::EMPTY;
+//
+//KV() : hsh(), val(0), base(0) { 
+//  memset(key, 0, sizeof(Key));
+//  hsh.type = TblType::EMPTY;
+//}
+
+//tbl(u64 count, u64 stride){ init(count, stride); };
+//
+// have to run default constructor here?
+//tbl(u64 count, T const& value) : m_mem(nullptr)
+//{
+//  init(count);
+//  TO(count, i){ (*this)[i] = value; }
+//}
+
+//T const&      front() const{ return (*this)[0]; }
+//T const&       back() const{ return (*this)[size()-1]; }
+
+//template<class... V> bool emplace(V&&... val)
+//{
+//  using namespace std;
+//  
+//  if(!m_mem){ init(0); }
+//
+//  auto prevSz = size();
+//  if( !(capacity()>prevSz) )
+//    if(!expand(true, false)){ return false; }
+//
+//  T* p = (T*)(m_mem);
+//  new (p+prevSz) T( forward<V>(val)... );
+//  size(prevSz+1);
+//
+//  return true;
+//}
+//template<class... V> bool emplace_back(V&&... val){ return emplace(std::forward<V>(val)...);  }
 
 // todo: replace sizeof(T) with stride here
 //return sizeBytes() - memberBytes() - capacity()*sizeof(T) - map_capacity()*sizeof(KV);
