@@ -71,8 +71,13 @@
 // -todo: make all values cut off at 0
 // -todo: make values below 0 face down, and values above 0 face upwards
 // -todo: make status show the array value being used at each pixel
+// -todo: update brandisher to use new tbl - aliasing IvTbl to tbl works
 
-// todo: update brandisher to use new tbl
+// todo: use a const operator() in tbl to get the sub table by key
+// todo: visualize and get statistics of array with types
+// todo: sort elements alphabetically by key instead of using the hashed order 
+// todo: change all IvTbl to tbl
+// todo: make template to process array statistics - will it ultimatly need to give back a string?
 // todo: show sub trees
 // todo: treat the array as a string if it is u8, i8, (or a string type?) - then show statistics for a string if the string is too long to fit in the gui
 // todo: make listing the keys of a db happen on expand
@@ -111,13 +116,12 @@
 #include "../../tbl.hpp"
 #include "../../str_util.hpp"
 
-struct   vert { f32 p[3],n[3],c[4],tx[2]; };
 using     str = std::string;
 using vec_str = std::vector<str>;
 using  vec_u8 = std::vector<u8>;
 using vec_dbs = std::vector<simdb>;
 using    path = std::experimental::filesystem::path;         // why is this still experimental?
-using   IvTbl = tbl<vert>;
+using   IvTbl = tbl;
 
 struct IdxKey { bool subTbl; u32 idx; str key; };            // this represents an index into the db vector and a key  
 using TblKeys = std::unordered_map<str,IdxKey>;
@@ -138,7 +142,7 @@ std::ostream& operator<<(std::ostream& os, const nana::rectangle& r)
 f32       mx = -std::numeric_limits<float>::infinity(); 
 f32       mn =  std::numeric_limits<float>::infinity();
 f32                  msX=0, msY=0;
-IvTbl                       glblT;
+tbl                         glblT;
 vec_u8                     tblBuf;
 vec_str                       sel;
 vec_dbs                       dbs;
@@ -209,7 +213,7 @@ class  VizDraw : public nana::drawer_trigger
         }
     }
   }
-  void  drawTblGraph(IvTbl& t, nana::paint::graphics& g)
+  void  drawTblGraph(tbl& t, nana::paint::graphics& g)
   {
     using namespace std;
     using namespace nana;
@@ -310,13 +314,13 @@ Viz                           viz;
 
 namespace {
 
-void        insertTbl(str const& parentKey, IvTbl const& t)
+void        insertTbl(str const& parentKey, tbl const& t)
 {
   //tblKeys[parentKey] = parentKey;
   //tblKeys.insert(parentKey);
   SECTION(array visualization)
   {
-    str aszStr = toString("Array Size: ", t.size());
+    str aszStr = toString("Type: ", t.typeStr(), " Size: ", t.size());
     str aryKey = parentKey+"/ary"; 
     tree.insert(aryKey, aszStr);
 
@@ -325,24 +329,31 @@ void        insertTbl(str const& parentKey, IvTbl const& t)
   }
   SECTION(hash map elements)
   {
-    str elemKey = parentKey+"/elems";
-    tree.insert(elemKey, toString("Elements: ", t.elems()) );
+    str elemsTreeKey = parentKey+"/elems";
+    tree.insert(elemsTreeKey, toString("Elements: ", t.elems(), "  Map Capacity: ", t.map_capacity() ) );
 
     TO(t.map_capacity(),i)
     {
-      auto e = t.elemStart()[i];
-      if(e.isEmpty()) continue;
+      tbl::KV kv = t.elemStart()[i];
+      if(kv.isEmpty()) continue;
 
-      str     k = e.key;
-      str title = toString(k,":  ", e.val);
-      if(k == "type"){
+      str  elemKey = kv.key;
+      str    title = toString(elemKey,":  ", kv.val);
+      if(elemKey == "type"){
         char typeStr[9];
-        memcpy(typeStr, &e.val, 8);
+        memcpy(typeStr, &kv.val, 8);
         typeStr[8] = '\0';
-        title = toString(k,":  ", typeStr, "  -  (",e.val,")");
+        title = toString(elemKey,":  ", typeStr, "  -  (",kv.val,")");
       }
       
-      tree.insert( toString(elemKey,"/", k), title); // e.as<tbl<>::i64>()) ); 
+      str thsTreeKey = toString(elemsTreeKey,"/", elemKey);
+      tree.insert(thsTreeKey, title); // e.as<tbl<>::i64>()) ); 
+
+      if(kv.type & tbl::TblType::TABLE){
+        tbl elemTbl( ((u8*)t.childData()+kv.val) );
+        insertTbl( thsTreeKey, elemTbl );
+      }
+
     }
   }
 }
@@ -357,7 +368,7 @@ vec_u8   extractDbKey(simdb const& db, str key)
 
   return ret;
 }
-void      regenLabels(IvTbl const& t)
+void      regenLabels(tbl const& t)
 {
   SECTION(label captions)
   {
@@ -882,6 +893,10 @@ int  main()
 
 
 
+//struct   vert { f32 p[3],n[3],c[4],tx[2]; };
+//using   IvTbl = tbl<vert>;
+//
+//IvTbl                       glblT;
 
 //int i = 0;
 //for(auto& f : arg.files){

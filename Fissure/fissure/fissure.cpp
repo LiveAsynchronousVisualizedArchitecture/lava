@@ -236,9 +236,10 @@
 // -todo: make visualizing an input actually toggle visualization on the the output it is attached to
 // -todo: make packet visualization also include lighting up connections between slots
 // -todo: make packetSlots an unordered_set instead of a vector
+// -todo: use new tbl.hpp to re-implement IdxVerts - don't use an array, use only named sub-tables
+// -todo: test an IdxVerts tbl and put it into the fissure db to test with brandisher
 
-// todo: use new tbl.hpp to re-implement IdxVerts - don't use an array, use only named sub-tables
-// todo: test an IdxVerts tbl and put it into the fissure db to test with brandisher
+// todo: debug why mode is not showing up - being overwritten by another key before flattening
 // todo: give LavaNode struct a description string
 // todo: make description strings show up in the status bar on mouse over
 // todo: implement sub tables in brandisher
@@ -1745,116 +1746,6 @@ ENTRY_DECLARATION // main or winmain
     //Println("\n\n");
   }
 
-  SECTION(tbl test)
-  {
-    //tbl t(10, (u64)0 );
-    //TO(t.size(),i){
-    //  //t.operator[]<u8>(i) = (u8)i;
-    //  t[i] = (u64)i;
-    //}
-
-    tbl t = {0ull,1ull,2ull,3ull,4ull,5ull,6ull,7ull,8ull,9ull};
-    TO(t.size(),i){
-      u64 val = t[i];
-      Print(val," "); 
-    }
-    Println("\n");
-
-    SECTION(test map with normal types)
-    {
-      t("wat")    = 800;
-      //t("width")  = 4096ull;
-      //t("height") = 2048ull;
-      //t("chans")  = (u8)3;
-      //int     wat = t("wat");
-      //u64   width = t("width");
-      //u64  height = t("height");
-      //Println("wat: ", wat, " width: ", width, " height: ", height, " chans: ", (u64)(u8)t("chans") );
-    }
-    SECTION(test map with other tables)
-    {
-      tbl t1 = {2,4,6,8,10};
-      t1.push(12);
-      t1.push(14);
-      t1.push(14);
-      t1.push({16,18,20,22,24});
-      t1.pop();
-      t1.pop();
-      t1.pop();
-      t1.pop();
-      t("t1") = &t1;
-      //t.flatten();
-
-      //t("t1") = t1;
-      //t.flatten();
-    
-      tbl tA = t("t1");
-      TO(tA.size(),i){
-        tA[i] = (i32)tA[i] * 2;
-        Print( (int)tA[i]," ");
-      }
-      Println("\nOwned: ", tA.owned());
-    
-      TO(t1.size(),i){
-        Print( (int)t1[i]," ");
-      }
-      Println("\nOwned: ", t1.owned());
-    }
-    SECTION(print tbl attributes)
-    {
-      Println("size: ", t.size() );
-      Println("front(), back(): ", (u64)t.front(), ",  ", (u64)t.back() );
-      Println("sizeBytes: ", t.sizeBytes() );
-      Println("stride: ",    t.stride()    );
-      TO(t.size(),i){
-        u64 val = t[i];
-        Print(val, " "); 
-      }
-      Println("\n\n");
-      Println("KV size: ", sizeof(tbl::KV));
-    }
-
-    tbl iv;
-    SECTION(make IdxVerts with the new tbl)
-    {
-      tbl indices = {0u, 1u, 2u};
-      tbl      px = { -1.f,  -0.17f, -0.58f };
-      tbl      py = { -1.f,  -1.0f,  -1.0f  };
-      tbl      pz = {  0.f,   0.f,   -0.f   };
-      tbl      nx = {  0.f,   0.f,    0.f   };
-      tbl      ny = {  0.f,   0.f,    0.f   };
-      tbl      nz = { -1.f,  -1.f,   -1.f   };
-      tbl      cr = {  1.f,   1.f,    1.f   };
-      tbl      cg = {  1.f,   1.f,    1.f   };
-      tbl      cb = {  1.f,   1.f,    1.f   };
-      tbl      tx = {  0.f,   0.f,    0.f   };
-      tbl      ty = {  0.f,   0.f,    0.f   };
-
-      u64 typenum       =  *((u64*)"IdxVerts");
-      iv("type")        = typenum;
-      iv("mode")        = (u64)0x0004; // (u64)GL_TRIANGLES;  // #define GL_TRIANGLES 0x0004
-      iv("indices")     = &indices;
-      iv("positions x") = &px;
-      iv("positions y") = &py;
-      iv("positions z") = &pz;
-      iv("normals x")   = &nx;
-      iv("normals y")   = &ny;
-      iv("normals z")   = &nz;
-      iv("colors x")    = &cr;
-      iv("colors y")    = &cg;
-      iv("colors z")    = &cb;
-      iv("texture coordinates x") = &tx;
-      iv("texture coordinates y") = &ty;
-
-      iv.flatten();
-
-      Println("iv sizeBytes: ", iv.sizeBytes() );
-      Println("ind type: ", indices.typeStr() );
-
-      fisdb.put("indexed verts test", iv.memStart(), iv.sizeBytes() );
-    }
-  }
-
 	NVGcontext* vg = NULL;
   SECTION(initialization)
   {
@@ -2128,6 +2019,137 @@ ENTRY_DECLARATION // main or winmain
       //Println("get() as Value: ", (u64)tstMap.get(85),  "   ", tstMap.get(85).value);
       //Println();
       //print_flf_map(tstMap);
+    }
+  }
+
+  SECTION(tbl test)
+  {
+    //tbl t(10, (u64)0 );
+    //TO(t.size(),i){
+    //  //t.operator[]<u8>(i) = (u8)i;
+    //  t[i] = (u64)i;
+    //}
+
+    tbl t = {0ull,1ull,2ull,3ull,4ull,5ull,6ull,7ull,8ull,9ull};
+    TO(t.size(),i){
+      u64 val = t[i];
+      Print(val," "); 
+    }
+    Println("\n");
+
+    SECTION(test map with normal types)
+    {
+      t("wat")    = 800;
+      //t("width")  = 4096ull;
+      //t("height") = 2048ull;
+      //t("chans")  = (u8)3;
+      //int     wat = t("wat");
+      //u64   width = t("width");
+      //u64  height = t("height");
+      //Println("wat: ", wat, " width: ", width, " height: ", height, " chans: ", (u64)(u8)t("chans") );
+    }
+    SECTION(test map with other tables)
+    {
+      tbl t1 = {2,4,6,8,10};
+      t1.push(12);
+      t1.push(14);
+      t1.push(14);
+      t1.push({16,18,20,22,24});
+      t1.pop();
+      t1.pop();
+      t1.pop();
+      t1.pop();
+      t("t1") = &t1;
+      //t.flatten();
+
+      //t("t1") = t1;
+      //t.flatten();
+
+      tbl tA = t("t1");
+      TO(tA.size(),i){
+        tA[i] = (i32)tA[i] * 2;
+        Print( (int)tA[i]," ");
+      }
+      Println("\nOwned: ", tA.owned());
+
+      TO(t1.size(),i){
+        Print( (int)t1[i]," ");
+      }
+      Println("\nOwned: ", t1.owned());
+    }
+    SECTION(print tbl attributes)
+    {
+      Println("size: ", t.size() );
+      Println("front(), back(): ", (u64)t.front(), ",  ", (u64)t.back() );
+      Println("sizeBytes: ", t.sizeBytes() );
+      Println("stride: ",    t.stride()    );
+      TO(t.size(),i){
+        u64 val = t[i];
+        Print(val, " "); 
+      }
+      Println("\n\n");
+      Println("KV size: ", sizeof(tbl::KV));
+    }
+
+    tbl iv;
+    SECTION(make IdxVerts with the new tbl)
+    {
+      tbl indices = {0u, 1u, 2u};
+      tbl      px = { -1.f,  -0.17f, -0.58f };
+      tbl      py = { -1.f,  -1.0f,  -1.0f  };
+      tbl      pz = {  0.f,   0.f,   -0.f   };
+      tbl      nx = {  0.f,   0.f,    0.f   };
+      tbl      ny = {  0.f,   0.f,    0.f   };
+      tbl      nz = { -1.f,  -1.f,   -1.f   };
+      tbl      cr = {  1.f,   1.f,    1.f   };
+      tbl      cg = {  1.f,   1.f,    1.f   };
+      tbl      cb = {  1.f,   1.f,    1.f   };
+      tbl      tx = {  0.f,   0.f,    0.f   };
+      tbl      ty = {  0.f,   0.f,    0.f   };
+
+      u64    mode       = (u64)0x0004; // (u64)GL_TRIANGLES;  // #define GL_TRIANGLES 0x0004
+      u64 typenum       =  *((u64*)"IdxVerts");
+      iv("type")        = typenum;
+      iv("mode")        = mode;
+      iv("indices")     = &indices;
+      iv("positions x") = &px;
+
+      //mode          = iv("mode");
+
+      iv("positions y") = &py;
+      iv("positions z") = &pz;
+
+      //mode          = iv("mode");
+
+      iv("normals x")   = &nx;
+
+      //mode          = iv("mode");
+
+      iv("normals y")   = &ny;
+
+      //mode          = iv("mode");
+
+      iv("normals z")   = &nz;
+
+      //mode          = iv("mode");
+
+      iv("colors x")    = &cr;
+      iv("colors y")    = &cg;
+      iv("colors z")    = &cb;
+
+      //mode          = iv("mode");
+
+      iv("texture coordinates x") = &tx;
+      iv("texture coordinates y") = &ty;
+
+
+      iv.flatten();
+
+      Println("iv sizeBytes: ", iv.sizeBytes() );
+      Println("ind type: ", indices.typeStr() );
+
+      fisdb.put("indexed verts test", iv.memStart(), iv.sizeBytes() );
+
     }
   }
 

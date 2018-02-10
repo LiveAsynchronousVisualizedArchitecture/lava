@@ -50,6 +50,7 @@
 // -todo: work on copying a table into parent table on assignement - take address and flatten? - overloading only tbl const& seems to work to override the behavior of assigning a table 
 // -todo: figure out what do about TABLE and CHILD types with assignments to and from tbl pointers - seems to work for now, even if using an entire bit instead of a specific value for TABLE and TABLE|CHILD is inefficient
 
+// todo: make const version of operator()
 // todo: try taking base pointer out of KV and use the bytes elsewhere
 // todo: add type and typestr functions to tbl?
 // todo: re-integrate new tbl into brandisher
@@ -83,7 +84,6 @@
 // todo: think about arrays of values - go above 8 bytes for the value? 
 // todo: think about strings
 // todo: think about arrays of tables
-
 
 // todo: break out memory allocation from template - keep template as a wrapper for casting a typeless tbl
 // todo: make resize() - should there be a resize()? only affects array?
@@ -248,7 +248,8 @@ public:
 
     using Type = u8;
 
-    template<class N> struct typenum { static const Type num = UNKNOWN; };
+    //template<class N> struct typenum { static const Type num = UNKNOWN; };
+    template<class N> struct typenum { static const Type num = EMPTY; };
     template<> struct typenum<u8>    { static const Type num = U8;      };
     template<> struct typenum<i8>    { static const Type num = I8;      };
     template<> struct typenum<u16>   { static const Type num = U16;     };
@@ -958,6 +959,8 @@ public:
   }
   KVOfst      operator()(const char* key)
   {      
+    //if(!m_mem){ return KVOfst(); }
+
     KVOfst  ret;                                                                         // this will be set with placement new instead of operator= because operator= is templated and used for assigning to the KV pointed to by KVOfst::KV* -  this is so tbl("some key") = 85  can work correctly
     u32     hsh;
     KV*      kv = m_mem?  get(key, &hsh) : nullptr;
@@ -1058,10 +1061,11 @@ public:
   KV*             get(const char* key, u32* out_hash=nullptr)
   {
     KV hh;
-    hh.hash   =  HashStr(key);
+    hh.hash      =  HashStr(key);
     if(out_hash){ *out_hash = hh.hash; }
-    KV*   el  =  (KV*)elemStart();                                        // el is a pointer to the elements 
-    u64  mod  =  map_capacity();
+    KV*      el  =  (KV*)elemStart();                                        // el is a pointer to the elements 
+    u64     mod  =  map_capacity();
+    u64 elemCnt  =  elems();
     if(mod==0) return nullptr;
 
     u64    i  =  hh.hash % mod;
@@ -1075,10 +1079,10 @@ public:
             strncmp(el[i].key,key,sizeof(KV::Key)-1)==0) )
       { 
         return &el[i];
-      }else if(dist > wrapDist(el,i,mod) ){
+      }else if(elemCnt < mod && dist > wrapDist(el,i,mod) ){
         KV kv(key);
         kv.hash = hh.hash;
-        elems( elems()+1 );
+        //elems( elems()+1 );
         return &(place_rh(kv, el, i, dist, mod));
       }
 
@@ -1487,20 +1491,6 @@ public:
 
 
 #endif
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
