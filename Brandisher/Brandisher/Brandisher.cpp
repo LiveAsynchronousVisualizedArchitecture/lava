@@ -72,16 +72,17 @@
 // -todo: make values below 0 face down, and values above 0 face upwards
 // -todo: make status show the array value being used at each pixel
 // -todo: update brandisher to use new tbl - aliasing IvTbl to tbl works
+// -todo: show sub trees
+// -todo: don't make the tbl array string dynamic anymore
 
+// todo: change all IvTbl to tbl
 // todo: debug why isTableKey returns 0 for a sub table
 // todo: debug why the sub table size() is 0
 // todo: split out statistics of a tbl's array into its own function 
 // todo: use a const operator() in tbl to get the sub table by key
 // todo: visualize and get statistics of array with types
 // todo: sort elements alphabetically by key instead of using the hashed order 
-// todo: change all IvTbl to tbl
 // todo: make template to process array statistics - will it ultimatly need to give back a string?
-// todo: show sub trees
 // todo: treat the array as a string if it is u8, i8, (or a string type?) - then show statistics for a string if the string is too long to fit in the gui
 // todo: make listing the keys of a db happen on expand
 // todo: make insertion of tbls from a db key happen on expand
@@ -127,7 +128,8 @@ using        path = std::experimental::filesystem::path;         // why is this 
 using       IvTbl = tbl;
 using  vec_verstr = std::vector<simdb::VerStr>;
 struct IdxKey { bool subTbl; u32 idx; str key; };            // this represents an index into the db vector and a key  
-using TblKeys = std::unordered_map<str,IdxKey>;              // why do the TblKeys need indices with them? - To know which DB they came from
+//struct IdxKey { bool subTbl; u32 idx; vec_str path; };       // this represents an index into the db vector and a vector of keys to get the table from the   
+using TblKeys = std::unordered_map<str,IdxKey>;                // why do the TblKeys need indices with them? - To know which DB they came from
 
 std::ostream& operator<<(std::ostream& os, const nana::point&     p)
 {
@@ -313,7 +315,7 @@ private:
   }
 };
 
-Viz                           viz;
+Viz        viz;
 
 namespace {
 
@@ -404,7 +406,8 @@ void        insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
     str aryKey = parentKey+"/ary"; 
     tree.insert(aryKey, aszStr);
 
-    tree.insert(aryKey+"/arystr", "");
+    //tree.insert(aryKey+"/arystr", "");
+    tree.insert(aryKey+"/arystr", makeStatStr(t) );   // make the stat string immediatly
   }
   SECTION(hash map elements)
   {
@@ -430,13 +433,14 @@ void        insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
 
       if(kv.type & tbl::TblType::TABLE){  // if the element is a table, make a tbl out of it and recurse this function 
         tbl elemTbl( ((u8*)t.childData()+kv.val) );
+        ik.subTbl = true;
         insertTbl( thsTreeKey, elemTbl, ik);
       }
     }
   }
 
   //IdxKey ik;
-  ik.subTbl = true;
+  //ik.subTbl = true;
   //ik.idx    = idx;
   //ik.key    = elemKey;
   tblKeys[parentKey] = ik;
@@ -498,7 +502,7 @@ void     regenTblInfo()
         ik.idx    = i;
         ik.key    = key.str;
         insertTbl(tblKey, ivTbl, ik);
-        tblKeys[tblKey] = ik;
+        //tblKeys[tblKey] = ik;
       }
     }
   }
@@ -771,13 +775,16 @@ int  main()
       tree.events().expanded([](const arg_treebox& tbArg) mutable  // lambda captures by value are const by default, so mutable is used
       {
         if(tbArg.item.expanded())
-        {          
+        {
           str tblKey = getFullKey( tbArg.item.owner() );
+          //str tblKey = getFullKey( tbArg.item );
           if( isTableKey(tblKey) && 
               tbArg.item.key() == "ary"      &&
               tbArg.item.child().text() == "")
           {
-            auto    t = tblFromKey( tblKey );
+            auto    t = tblFromKey(getFullKey( tbArg.item.owner() ));
+
+            //auto    t = tblFromKey( tblKey );
 
             //auto flen = t.size() * 12;      // 12 floats in a vert struct
             //f32*    f = (float*)t.m_mem;
