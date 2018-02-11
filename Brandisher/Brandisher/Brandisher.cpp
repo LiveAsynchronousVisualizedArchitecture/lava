@@ -76,6 +76,7 @@
 // -todo: don't make the tbl array string dynamic anymore
 
 // todo: change all IvTbl to tbl
+// todo: make a full tbl cache on expand and clear on contract
 // todo: debug why isTableKey returns 0 for a sub table
 // todo: debug why the sub table size() is 0
 // todo: split out statistics of a tbl's array into its own function 
@@ -125,7 +126,7 @@ using     vec_str = std::vector<str>;
 using      vec_u8 = std::vector<u8>;
 using     vec_dbs = std::vector<simdb>;
 using        path = std::experimental::filesystem::path;         // why is this still experimental?
-using       IvTbl = tbl;
+//using       IvTbl = tbl;
 using  vec_verstr = std::vector<simdb::VerStr>;
 struct IdxKey { bool subTbl; u32 idx; str key; };            // this represents an index into the db vector and a key  
 //struct IdxKey { bool subTbl; u32 idx; vec_str path; };       // this represents an index into the db vector and a vector of keys to get the table from the   
@@ -254,7 +255,7 @@ class  VizDraw : public nana::drawer_trigger
           p.element.blue  = 0;
           f32     val = f[ (u64)(x/ratio) ];
           f32      re =  (val - mn) / rng;
-          f32   flipY = h - y - 1;
+          f32   flipY = h - y - 1.f;
           f32   rempY = remap(flipY,0.f,(f32)h,mn,mx);
           bool  inVal = false;
           if(val>=0 && rempY>=0 && rempY<=val){ inVal = true; }
@@ -495,11 +496,12 @@ void     regenTblInfo()
         tree.insert(tblKey, key.str);
 
         tblBuf     = extractDbKey(db, key.str);
-        IvTbl ivTbl(tblBuf.data());
+        //IvTbl ivTbl(tblBuf.data());
+        tbl ivTbl(tblBuf.data());
 
         IdxKey ik;
         ik.subTbl = false;
-        ik.idx    = i;
+        ik.idx    = (u32)i;
         ik.key    = key.str;
         insertTbl(tblKey, ivTbl, ik);
         //tblKeys[tblKey] = ik;
@@ -528,9 +530,9 @@ bool       isTableKey(nana::treebox::item_proxy const& ip)
 {
   return isTableKey( getFullKey(ip) );
 }
-IvTbl      tblFromKey(str key)
+tbl      tblFromKey(str key)
 {
-  IvTbl ret;
+  tbl ret;
   auto iter = tblKeys.find(key);
   if( iter == tblKeys.end() ) return ret;
 
@@ -539,12 +541,12 @@ IvTbl      tblFromKey(str key)
 
   auto buf = extractDbKey( dbs[ik.idx], ik.key );
 
-  if(buf.size() >= IvTbl::memberBytes() ){
-    ret = IvTbl(buf.data(),false,true);
+  if(buf.size() >= tbl::memberBytes() ){
+    ret = tbl(buf.data(),false,true);
     return ret;
   }else{ return ret; }
 }
-IvTbl*   setCurTblFromTreeKey(str key)  // set current table from tree key
+tbl*   setCurTblFromTreeKey(str key)  // set current table from tree key
 {
   //if( !isTableKey(key) ) return nullptr;
 
@@ -556,8 +558,8 @@ IvTbl*   setCurTblFromTreeKey(str key)  // set current table from tree key
 
   tblBuf = extractDbKey( dbs[ik.idx], ik.key );
 
-  if(tblBuf.size() >= IvTbl::memberBytes() ){
-    glblT  = IvTbl(tblBuf.data());
+  if(tblBuf.size() >= tbl::memberBytes() ){
+    glblT  = tbl(tblBuf.data());
     return &glblT;
   }else{ return nullptr; }
 }
@@ -644,10 +646,10 @@ int  main()
 
       viz.events().mouse_move([](arg_mouse const& arg)
       {
-        msX         = arg.pos.x;
-        msY         = arg.pos.y;
+        msX         = (f32)arg.pos.x;
+        msY         = (f32)arg.pos.y;
         auto    vsz = viz.size();
-        f32       h = vsz.height;
+        f32       h = (f32)vsz.height;
         auto&     t = glblT;
         if( t.m_mem && t.size()>0 ){
           auto   flen = t.size() * 12;      // 12 floats in a vert struct
@@ -720,7 +722,7 @@ int  main()
       if(!path) return;
 
       tblBuf = readFile(path);
-      glblT  = IvTbl(tblBuf.data(), false, false);
+      glblT  = tbl(tblBuf.data(), false, false);
       if(glblT.sizeBytes() > tblBuf.size()){
         glblT.m_mem = nullptr;
         tblBuf.resize(0);
@@ -891,7 +893,7 @@ int  main()
         bool isTbl = isTableKey(key);
         Println("isTableKey: ", isTbl);
 
-        IvTbl* curT = setCurTblFromTreeKey(key);
+        tbl* curT = setCurTblFromTreeKey(key);
         if(curT){
           regenLabels( *curT );
         }
