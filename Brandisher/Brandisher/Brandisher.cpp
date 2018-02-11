@@ -75,14 +75,14 @@
 // -todo: show sub trees
 // -todo: don't make the tbl array string dynamic anymore
 // -todo: change all IvTbl to tbl
+// -todo: make a full tbl cache on expand and clear on contract - just regular tbl cache so far
+// -todo: debug why isTableKey returns 0 for a sub table - sub table keys were not being put into the mapping between the gui tree's keys and the tbl sub-path keys
+// -todo: debug why the sub table size() is 0 - sub tables were hardcoded to put nullptr into the global table as a temporary measure
 
-// todo: make a full tbl cache on expand and clear on contract
-// todo: debug why isTableKey returns 0 for a sub table
-// todo: debug why the sub table size() is 0
+// todo: sort elements alphabetically by key instead of using the hashed order 
 // todo: split out statistics of a tbl's array into its own function 
 // todo: use a const operator() in tbl to get the sub table by key
 // todo: visualize and get statistics of array with types
-// todo: sort elements alphabetically by key instead of using the hashed order 
 // todo: make template to process array statistics - will it ultimatly need to give back a string?
 // todo: treat the array as a string if it is u8, i8, (or a string type?) - then show statistics for a string if the string is too long to fit in the gui
 // todo: make listing the keys of a db happen on expand
@@ -129,9 +129,9 @@ using        path = std::experimental::filesystem::path;         // why is this 
 //using       IvTbl = tbl;
 using  vec_verstr = std::vector<simdb::VerStr>;
 struct IdxKey { bool subTbl; u32 idx; str key; };            // this represents an index into the db vector and a key  
-//struct IdxKey { bool subTbl; u32 idx; vec_str path; };       // this represents an index into the db vector and a vector of keys to get the table from the   
 using TblKeys     = std::unordered_map<str,IdxKey>;                // why do the TblKeys need indices with them? - To know which DB they came from
 using TblCache    = std::vector< std::unordered_map<str,tbl> >;
+//struct IdxKey { bool subTbl; u32 idx; vec_str path; };       // this represents an index into the db vector and a vector of keys to get the table from the   
 
 std::ostream& operator<<(std::ostream& os, const nana::point&     p)
 {
@@ -417,12 +417,18 @@ void        insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
       if(kv.isEmpty()) continue;
 
       str  elemKey = kv.key;
-      str    title = toString(elemKey,":  ", kv.val);
-      if(elemKey == "type"){
+      str    title;
+      tbl  elemTbl;
+      if(kv.type & tbl::TblType::TABLE){  // if the element is a table, make a tbl out of it and recurse this function 
+        elemTbl = tbl( ((u8*)t.childData() + kv.val) );
+        title   = toString(elemKey," (", elemTbl.typeStr() ,"):   ", kv.val);
+      }else if(elemKey == "type"){
         char typeStr[9];
         memcpy(typeStr, &kv.val, 8);
         typeStr[8] = '\0';
         title = toString(elemKey,":  ", typeStr, "  -  (",kv.val,")");
+      }else{
+        title = toString(elemKey,":   ", kv.val);
       }
       
       str thsTreeKey = toString(elemsTreeKey,"/", elemKey);
