@@ -74,8 +74,8 @@
 // -todo: update brandisher to use new tbl - aliasing IvTbl to tbl works
 // -todo: show sub trees
 // -todo: don't make the tbl array string dynamic anymore
+// -todo: change all IvTbl to tbl
 
-// todo: change all IvTbl to tbl
 // todo: make a full tbl cache on expand and clear on contract
 // todo: debug why isTableKey returns 0 for a sub table
 // todo: debug why the sub table size() is 0
@@ -130,7 +130,8 @@ using        path = std::experimental::filesystem::path;         // why is this 
 using  vec_verstr = std::vector<simdb::VerStr>;
 struct IdxKey { bool subTbl; u32 idx; str key; };            // this represents an index into the db vector and a key  
 //struct IdxKey { bool subTbl; u32 idx; vec_str path; };       // this represents an index into the db vector and a vector of keys to get the table from the   
-using TblKeys = std::unordered_map<str,IdxKey>;                // why do the TblKeys need indices with them? - To know which DB they came from
+using TblKeys     = std::unordered_map<str,IdxKey>;                // why do the TblKeys need indices with them? - To know which DB they came from
+using TblCache    = std::vector< std::unordered_map<str,tbl> >;
 
 std::ostream& operator<<(std::ostream& os, const nana::point&     p)
 {
@@ -160,6 +161,7 @@ nana::paint::image         vizImg;
 nana::button              refresh;
 nana::place                   plc;
 nana::label sz, elems, szBytes, cap, mapcap, owned, status;
+TblCache                 tblCache;
 
 namespace { 
   template <class T> T remap(T val, T fromLo, T fromHi, T toLo, T toHi)
@@ -230,7 +232,7 @@ class  VizDraw : public nana::drawer_trigger
     }else
     {
       auto&    t = glblT;
-      auto  flen = t.size() * 12;      // 12 floats in a vert struct
+      auto  flen = t.size();      // 12 floats in a vert struct
       f32*     f = (float*)t.m_mem;
       mx = -numeric_limits<float>::infinity();
       mn =  numeric_limits<float>::infinity();
@@ -260,8 +262,6 @@ class  VizDraw : public nana::drawer_trigger
           bool  inVal = false;
           if(val>=0 && rempY>=0 && rempY<=val){ inVal = true; }
           else if(val<=0 && rempY<=0 && rempY>=val){ inVal = true; }
-          //bool inVal = (h-y)/(f32)h < re;
-          //if(h-y < val*hRatio){ // this flips the graph vertically, but increasing y goes down in screen space, so we want it flipped
           if( inVal ){ // this flips the graph vertically, but increasing y goes down in screen space, so we want it flipped
             p.element.red   = 255;
             p.element.green = 255;
@@ -271,10 +271,6 @@ class  VizDraw : public nana::drawer_trigger
 
           pxbuf[y*w + x] = p;
         }
-
-      //str mxStr = toString("Max: ", mx);
-      //g.bidi_string( {0,0}, mxStr.c_str(), mxStr.length() );
-      //g.string( {0,0}, mxStr, {255,255,255,255} );
     }
   }
 
@@ -434,7 +430,10 @@ void        insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
 
       if(kv.type & tbl::TblType::TABLE){  // if the element is a table, make a tbl out of it and recurse this function 
         tbl elemTbl( ((u8*)t.childData()+kv.val) );
-        ik.subTbl = true;
+        str subKey = ik.key + "/" + kv.key;
+        tblCache[ik.idx][subKey] = elemTbl;
+        ik.subTbl  = true;
+        ik.key     = subKey;
         insertTbl( thsTreeKey, elemTbl, ik);
       }
     }
@@ -444,6 +443,7 @@ void        insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
   //ik.subTbl = true;
   //ik.idx    = idx;
   //ik.key    = elemKey;
+
   tblKeys[parentKey] = ik;
 }
 vec_u8   extractDbKey(simdb const& db, str key)
@@ -480,7 +480,7 @@ void     regenTblInfo()
 
     simdb_error err;
     auto dbPths = simdb_listDBs(&err);
-
+    tblCache.resize( dbPths.size() );
     TO(dbPths.size(),i)
     {
       auto const& pth = dbPths[i];
@@ -489,6 +489,7 @@ void     regenTblInfo()
       dbs.emplace_back(pth.c_str(), 4096, 1 << 14);
       simdb&         db = dbs.back();
       vec_verstr dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
+      //tblCache[i].resize(dbKeys.size());
       TO(dbKeys.size(),j)
       {
         auto const& key = dbKeys[j];
@@ -498,6 +499,7 @@ void     regenTblInfo()
         tblBuf     = extractDbKey(db, key.str);
         //IvTbl ivTbl(tblBuf.data());
         tbl ivTbl(tblBuf.data());
+        tblCache[i][key.str] = tbl(ivTbl);
 
         IdxKey ik;
         ik.subTbl = false;
@@ -530,7 +532,7 @@ bool       isTableKey(nana::treebox::item_proxy const& ip)
 {
   return isTableKey( getFullKey(ip) );
 }
-tbl      tblFromKey(str key)
+tbl        tblFromKey(str key)
 {
   tbl ret;
   auto iter = tblKeys.find(key);
@@ -554,14 +556,17 @@ tbl*   setCurTblFromTreeKey(str key)  // set current table from tree key
   if( iter == tblKeys.end() ) return nullptr;
   
   IdxKey& ik = iter->second;
-  if( ik.subTbl ) return nullptr;
-
-  tblBuf = extractDbKey( dbs[ik.idx], ik.key );
-
-  if(tblBuf.size() >= tbl::memberBytes() ){
-    glblT  = tbl(tblBuf.data());
+  if( ik.subTbl ){
+    glblT = tblCache[ik.idx][ik.key];
     return &glblT;
-  }else{ return nullptr; }
+  }else{
+    tblBuf = extractDbKey( dbs[ik.idx], ik.key );
+
+    if(tblBuf.size() >= tbl::memberBytes() ){
+      glblT  = tbl(tblBuf.data());
+      return &glblT;
+    }else{ return nullptr; }
+  }
 }
 vec_u8       readFile(const char* path)
 {
@@ -902,13 +907,8 @@ int  main()
         refreshViz();
 
         auto&   t = *curT;
-        auto flen = t.size() * 12;      // 12 floats in a vert struct
+        auto flen = t.size();// * 12;      // 12 floats in a vert struct
         f32*    f = (float*)t.m_mem;
-
-        //vector<f32>  tst(512);
-        //TO(tst.size(),i){ tst[i] = rand() / (f32)RAND_MAX; }
-        //flen = 512;
-        //f = tst.data();
 
         mx = -numeric_limits<float>::infinity(); 
         mn =  numeric_limits<float>::infinity();
@@ -917,9 +917,6 @@ int  main()
           mn = min<f32>(mn, f[i]);
         }
         Println("\n Table Key mx: ",mx, " mn: ", mn, " \n" );
-
-        //vizImg.image_ptr_ = mempxbuf;
-        //viz.load(vizImg);
 
         plc.collocate();
         fm.collocate();
@@ -986,6 +983,26 @@ int  main()
 
 
 
+
+
+
+
+
+
+//bool inVal = (h-y)/(f32)h < re;
+//if(h-y < val*hRatio){ // this flips the graph vertically, but increasing y goes down in screen space, so we want it flipped
+//
+//str mxStr = toString("Max: ", mx);
+//g.bidi_string( {0,0}, mxStr.c_str(), mxStr.length() );
+//g.string( {0,0}, mxStr, {255,255,255,255} );
+
+//vector<f32>  tst(512);
+//TO(tst.size(),i){ tst[i] = rand() / (f32)RAND_MAX; }
+//flen = 512;
+//f = tst.data();
+
+//vizImg.image_ptr_ = mempxbuf;
+//viz.load(vizImg);
 
 //tblKeys[parentKey] = parentKey;
 //tblKeys.insert(parentKey);
