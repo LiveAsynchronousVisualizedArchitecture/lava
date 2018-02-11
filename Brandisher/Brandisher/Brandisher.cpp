@@ -78,8 +78,8 @@
 // -todo: make a full tbl cache on expand and clear on contract - just regular tbl cache so far
 // -todo: debug why isTableKey returns 0 for a sub table - sub table keys were not being put into the mapping between the gui tree's keys and the tbl sub-path keys
 // -todo: debug why the sub table size() is 0 - sub tables were hardcoded to put nullptr into the global table as a temporary measure
+// -todo: sort elements alphabetically by key instead of using the hashed order 
 
-// todo: sort elements alphabetically by key instead of using the hashed order 
 // todo: split out statistics of a tbl's array into its own function 
 // todo: use a const operator() in tbl to get the sub table by key
 // todo: visualize and get statistics of array with types
@@ -397,6 +397,8 @@ str       makeStatStr(tbl const& t)
 }
 void        insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
 {
+  using namespace std;
+  
   SECTION(array visualization)
   {
     str aszStr = toString("Type: ", t.typeStr(), " Size: ", t.size());
@@ -411,11 +413,22 @@ void        insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
     str elemsTreeKey = parentKey+"/elems";
     tree.insert(elemsTreeKey, toString("Elements: ", t.elems(), "  Map Capacity: ", t.map_capacity() ) );
 
+    vector<tbl::KV> kvs;
     TO(t.map_capacity(),i)
     {
       tbl::KV kv = t.elemStart()[i];
       if(kv.isEmpty()) continue;
 
+      kvs.push_back(kv);
+    }
+    sort(ALL(kvs), [](tbl::KV const& a, tbl::KV const& b){ return str(a.key) < str(b.key); });
+
+    //TO(t.map_capacity(),i)
+    //{
+    //  tbl::KV kv = t.elemStart()[i];
+    //  if(kv.isEmpty()) continue;
+    for(auto const& kv : kvs)
+    {
       str  elemKey = kv.key;
       str    title;
       tbl  elemTbl;
