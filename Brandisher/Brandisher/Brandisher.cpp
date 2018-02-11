@@ -333,9 +333,9 @@ template<class T> str statStr(tbl const& t)
   T median=0; 
   SECTION(calc mean and median)
   {
-    f64 total = 0;
-    TO(vlen,i){ mean += (T)v[i] / total; } // divide every number by the total first to avoid overflow, even though this will be slower
-    mean = total / vlen;
+    //f64 total = 0;
+    TO(vlen,i){ mean += (f64)((T)v[i]) / (f64)vlen; } // divide every number by the total first to avoid overflow, even though this will be slower
+    //mean = total / (f64)vlen;
 
     u64 mid = vlen / 2;
     median  = (T)v[mid];
