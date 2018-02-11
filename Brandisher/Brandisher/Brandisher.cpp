@@ -73,6 +73,9 @@
 // -todo: make status show the array value being used at each pixel
 // -todo: update brandisher to use new tbl - aliasing IvTbl to tbl works
 
+// todo: debug why isTableKey returns 0 for a sub table
+// todo: debug why the sub table size() is 0
+// todo: split out statistics of a tbl's array into its own function 
 // todo: use a const operator() in tbl to get the sub table by key
 // todo: visualize and get statistics of array with types
 // todo: sort elements alphabetically by key instead of using the hashed order 
@@ -116,15 +119,15 @@
 #include "../../tbl.hpp"
 #include "../../str_util.hpp"
 
-using     str = std::string;
-using vec_str = std::vector<str>;
-using  vec_u8 = std::vector<u8>;
-using vec_dbs = std::vector<simdb>;
-using    path = std::experimental::filesystem::path;         // why is this still experimental?
-using   IvTbl = tbl;
-
+using         str = std::string;
+using     vec_str = std::vector<str>;
+using      vec_u8 = std::vector<u8>;
+using     vec_dbs = std::vector<simdb>;
+using        path = std::experimental::filesystem::path;         // why is this still experimental?
+using       IvTbl = tbl;
+using  vec_verstr = std::vector<simdb::VerStr>;
 struct IdxKey { bool subTbl; u32 idx; str key; };            // this represents an index into the db vector and a key  
-using TblKeys = std::unordered_map<str,IdxKey>;
+using TblKeys = std::unordered_map<str,IdxKey>;              // why do the TblKeys need indices with them? - To know which DB they came from
 
 std::ostream& operator<<(std::ostream& os, const nana::point&     p)
 {
@@ -139,8 +142,8 @@ std::ostream& operator<<(std::ostream& os, const nana::rectangle& r)
   return os << "rect{" << r.position() << "," << r.dimension() << "}";
 }
 
-f32       mx = -std::numeric_limits<float>::infinity(); 
-f32       mn =  std::numeric_limits<float>::infinity();
+f32         mx = -std::numeric_limits<float>::infinity(); 
+f32         mn =  std::numeric_limits<float>::infinity();
 f32                  msX=0, msY=0;
 tbl                         glblT;
 vec_u8                     tblBuf;
@@ -314,17 +317,93 @@ Viz                           viz;
 
 namespace {
 
-void        insertTbl(str const& parentKey, tbl const& t)
+str       makeStatStr(tbl const& t)
 {
-  //tblKeys[parentKey] = parentKey;
-  //tblKeys.insert(parentKey);
+  using namespace std;
+  
+  auto flen = t.size();           // 12 floats in a vert struct
+  if(flen==0) return "";
+  if(flen==1) return toString( (f32)t[0] );
+  f32*    f = (f32*)t.data();
+  sort(f, f+flen);                // sort for both the median and the mode
+
+  f32 mean=0, median=0; 
+  SECTION(calc mean and median)
+  {
+    f32 total = 0;
+    TO(flen,i){ total += f[i]; }
+    mean = total / flen;
+
+    u64 mid = flen / 2;
+    median  = f[mid];
+
+    Println("\n");
+    TO(flen,i){
+      Print(f[i]," "); 
+    }
+    Println("\n");
+  }
+
+  f32 hiVal=0; u64 hiCnt=0;
+  SECTION(calc Mode - the value with the highest frequency)
+  {
+    f32 curVal=0;
+    u64 curCnt=0;
+    TO(flen,i){
+      if(f[i] == curVal){ ++curCnt; }
+      else if( curCnt > hiCnt ){
+        hiVal  = curVal;
+        hiCnt  = curCnt;
+        curVal = f[i];
+        curCnt = 0;
+      }
+    }
+    if( curCnt > hiCnt ){
+      hiVal = curVal;
+      hiCnt = curCnt;
+    }
+  }
+
+  f32 variance=0;
+  SECTION(calc variance)
+  {
+    f32 difSqr = 0;
+    TO(flen,i){
+      f32 dif  = f[i] - mean;
+      difSqr  += dif * dif;
+    }
+    variance = flen>1?  difSqr/(flen-1)  :   difSqr;  // length of the array needs to be at least 2 to use the n-1 'unbiased' variance  
+  }
+
+  f32 tmn, tmx;
+  SECTION(calc min and max)
+  {
+    tmx = -numeric_limits<float>::infinity(); 
+    tmn =  numeric_limits<float>::infinity();
+    TO(flen,i){
+      tmx = max<f32>(tmx, f[i]);
+      tmn = min<f32>(tmn, f[i]);
+    }
+  }
+
+  str txtStr = toString(
+    "Min: ",tmn,
+    "   Max: ",tmx,
+    "   Mean: ",mean,
+    "   Median: ",median,
+    "   Mode: ", hiVal, " (",hiCnt,
+    ")   Variance: ", variance);
+
+  return txtStr;
+}
+void        insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
+{
   SECTION(array visualization)
   {
     str aszStr = toString("Type: ", t.typeStr(), " Size: ", t.size());
     str aryKey = parentKey+"/ary"; 
     tree.insert(aryKey, aszStr);
 
-    //aryViz     = tree.insert(aryKey+"/arystr", "");
     tree.insert(aryKey+"/arystr", "");
   }
   SECTION(hash map elements)
@@ -349,13 +428,18 @@ void        insertTbl(str const& parentKey, tbl const& t)
       str thsTreeKey = toString(elemsTreeKey,"/", elemKey);
       tree.insert(thsTreeKey, title); // e.as<tbl<>::i64>()) ); 
 
-      if(kv.type & tbl::TblType::TABLE){
+      if(kv.type & tbl::TblType::TABLE){  // if the element is a table, make a tbl out of it and recurse this function 
         tbl elemTbl( ((u8*)t.childData()+kv.val) );
-        insertTbl( thsTreeKey, elemTbl );
+        insertTbl( thsTreeKey, elemTbl, ik);
       }
-
     }
   }
+
+  //IdxKey ik;
+  ik.subTbl = true;
+  //ik.idx    = idx;
+  //ik.key    = elemKey;
+  tblKeys[parentKey] = ik;
 }
 vec_u8   extractDbKey(simdb const& db, str key)
 {
@@ -398,22 +482,22 @@ void     regenTblInfo()
       tree.insert(pth, pth);
       
       dbs.emplace_back(pth.c_str(), 4096, 1 << 14);
-      simdb&   db = dbs.back();
-      auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
+      simdb&         db = dbs.back();
+      vec_verstr dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
       TO(dbKeys.size(),j)
       {
         auto const& key = dbKeys[j];
-        auto tblKey = pth+"/"+key.str;
+        auto     tblKey = pth+"/"+key.str;
         tree.insert(tblKey, key.str);
 
         tblBuf     = extractDbKey(db, key.str);
         IvTbl ivTbl(tblBuf.data());
-        insertTbl(tblKey, ivTbl);
 
         IdxKey ik;
         ik.subTbl = false;
         ik.idx    = i;
         ik.key    = key.str;
+        insertTbl(tblKey, ivTbl, ik);
         tblKeys[tblKey] = ik;
       }
     }
@@ -695,77 +779,79 @@ int  main()
           {
             auto    t = tblFromKey( tblKey );
 
-            auto flen = t.size() * 12;      // 12 floats in a vert struct
-            f32*    f = (float*)t.m_mem;
-            sort(f, f+flen);                // sort for both the median and the mode
+            //auto flen = t.size() * 12;      // 12 floats in a vert struct
+            //f32*    f = (float*)t.m_mem;
+            //sort(f, f+flen);                // sort for both the median and the mode
+            //
+            //f32 mean=0, median=0; 
+            //SECTION(calc mean and median)
+            //{
+            //  f32 total = 0;
+            //  TO(flen,i){ total += f[i]; }
+            //  mean = total / flen;
+            //
+            //  u64 mid = flen / 2;
+            //  median  = f[mid];
+            //
+            //  Println("\n");
+            //  TO(flen,i){
+            //    Print(f[i]," "); 
+            //  }
+            //  Println("\n");
+            //}
+            //
+            //f32 hiVal=0; u64 hiCnt=0;
+            //SECTION(calc Mode - the value with the highest frequency)
+            //{
+            //  f32 curVal=0;
+            //  u64 curCnt=0;
+            //  TO(flen,i){
+            //    if(f[i] == curVal){ ++curCnt; }
+            //    else if( curCnt > hiCnt ){
+            //      hiVal  = curVal;
+            //      hiCnt  = curCnt;
+            //      curVal = f[i];
+            //      curCnt = 0;
+            //    }
+            //  }
+            //  if( curCnt > hiCnt ){
+            //    hiVal = curVal;
+            //    hiCnt = curCnt;
+            //  }
+            //}
+            //
+            //f32 variance=0;
+            //SECTION(calc variance)
+            //{
+            //  f32 difSqr = 0;
+            //  TO(flen,i){
+            //    f32 dif  = f[i] - mean;
+            //    difSqr  += dif * dif;
+            //  }
+            //  variance = flen>1?  difSqr/(flen-1)  :   difSqr;  // length of the array needs to be at least 2 to use the n-1 'unbiased' variance  
+            //}
+            //
+            //f32 tmn, tmx;
+            //SECTION(calc min and max)
+            //{
+            //  tmx = -numeric_limits<float>::infinity(); 
+            //  tmn =  numeric_limits<float>::infinity();
+            //  TO(flen,i){
+            //    tmx = max<f32>(tmx, f[i]);
+            //    tmn = min<f32>(tmn, f[i]);
+            //  }
+            //}
+            //
+            //str txtStr = toString(
+            //  "Min: ",tmn,
+            //  "   Max: ",tmx,
+            //  "   Mean: ",mean,
+            //  "   Median: ",median,
+            //  "   Mode: ", hiVal, " (",hiCnt,
+            //  ")   Variance: ", variance);
 
-            f32 mean=0, median=0; 
-            SECTION(calc mean and median)
-            {
-              f32 total = 0;
-              TO(flen,i){ total += f[i]; }
-              mean = total / flen;
-
-              u64 mid = flen / 2;
-              median  = f[mid];
-
-              Println("\n");
-              TO(flen,i){
-                Print(f[i]," "); 
-              }
-              Println("\n");
-            }
-
-            f32 hiVal=0; u64 hiCnt=0;
-            SECTION(calc Mode - the value with the highest frequency)
-            {
-              f32 curVal=0;
-              u64 curCnt=0;
-              TO(flen,i){
-                if(f[i] == curVal){ ++curCnt; }
-                else if( curCnt > hiCnt ){
-                  hiVal  = curVal;
-                  hiCnt  = curCnt;
-                  curVal = f[i];
-                  curCnt = 0;
-                }
-              }
-              if( curCnt > hiCnt ){
-                hiVal = curVal;
-                hiCnt = curCnt;
-              }
-            }
-
-            f32 variance=0;
-            SECTION(calc variance)
-            {
-              f32 difSqr = 0;
-              TO(flen,i){
-                f32 dif  = f[i] - mean;
-                difSqr  += dif * dif;
-              }
-              variance = flen>1?  difSqr/(flen-1)  :   difSqr;  // length of the array needs to be at least 2 to use the n-1 'unbiased' variance  
-            }
-
-            f32 tmn, tmx;
-            SECTION(calc min and max)
-            {
-              tmx = -numeric_limits<float>::infinity(); 
-              tmn =  numeric_limits<float>::infinity();
-              TO(flen,i){
-                tmx = max<f32>(tmx, f[i]);
-                tmn = min<f32>(tmn, f[i]);
-              }
-            }
-
-            str txtStr = toString(
-              "Min: ",tmn,
-              "   Max: ",tmx,
-              "   Mean: ",mean,
-              "   Median: ",median,
-              "   Mode: ", hiVal, " (",hiCnt,
-              ")   Variance: ", variance);
-            tbArg.item.child().text(txtStr);
+            str statStr = makeStatStr(t);
+            tbArg.item.child().text(statStr);
           }
 
           Println("");
@@ -892,6 +978,10 @@ int  main()
 
 
 
+//tblKeys[parentKey] = parentKey;
+//tblKeys.insert(parentKey);
+//
+//aryViz     = tree.insert(aryKey+"/arystr", "");
 
 //struct   vert { f32 p[3],n[3],c[4],tx[2]; };
 //using   IvTbl = tbl<vert>;

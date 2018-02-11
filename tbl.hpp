@@ -50,6 +50,10 @@
 // -todo: work on copying a table into parent table on assignement - take address and flatten? - overloading only tbl const& seems to work to override the behavior of assigning a table 
 // -todo: figure out what do about TABLE and CHILD types with assignments to and from tbl pointers - seems to work for now, even if using an entire bit instead of a specific value for TABLE and TABLE|CHILD is inefficient
 
+// todo: make TblVal casts const
+// todo: make template function to get the array as a pointer of a certain type
+// todo: make a const find() method or adapt has() method 
+// todo: figure out how to deal with a const KVOfst that can only be read from 
 // todo: make const version of operator()
 // todo: try taking base pointer out of KV and use the bytes elsewhere
 // todo: add type and typestr functions to tbl?
@@ -328,7 +332,7 @@ public:
     void*      ary;
     u64        idx;
 
-    template<class T> inline operator T(){ return as<T>(); }
+    template<class T> inline operator T() const { return as<T>(); }
     template<class T> inline T as() const
     { 
       tbl_msg_assert(type == TblType::typenum<T>::num, 

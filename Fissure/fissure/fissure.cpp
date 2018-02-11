@@ -2113,43 +2113,23 @@ ENTRY_DECLARATION // main or winmain
       iv("mode")        = mode;
       iv("indices")     = &indices;
       iv("positions x") = &px;
-
-      //mode          = iv("mode");
-
       iv("positions y") = &py;
       iv("positions z") = &pz;
-
-      //mode          = iv("mode");
-
       iv("normals x")   = &nx;
-
-      //mode          = iv("mode");
-
       iv("normals y")   = &ny;
-
-      //mode          = iv("mode");
-
       iv("normals z")   = &nz;
-
-      //mode          = iv("mode");
-
       iv("colors x")    = &cr;
       iv("colors y")    = &cg;
       iv("colors z")    = &cb;
-
-      //mode          = iv("mode");
-
       iv("texture coordinates x") = &tx;
       iv("texture coordinates y") = &ty;
-
 
       iv.flatten();
 
       Println("iv sizeBytes: ", iv.sizeBytes() );
-      Println("ind type: ", indices.typeStr() );
+      Println("ind type: ",  indices.typeStr() );
 
       fisdb.put("indexed verts test", iv.memStart(), iv.sizeBytes() );
-
     }
   }
 
