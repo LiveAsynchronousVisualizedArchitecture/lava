@@ -79,14 +79,14 @@
 // -todo: debug why isTableKey returns 0 for a sub table - sub table keys were not being put into the mapping between the gui tree's keys and the tbl sub-path keys
 // -todo: debug why the sub table size() is 0 - sub tables were hardcoded to put nullptr into the global table as a temporary measure
 // -todo: sort elements alphabetically by key instead of using the hashed order 
+// -todo: make listing the keys of a db happen on expand - not important until a resource limitation is hit / shown
+// -todo: make insertion of tbls from a db key happen on expand - worry about this when it is actually solving a problem
 
 // todo: split out statistics of a tbl's array into its own function 
-// todo: use a const operator() in tbl to get the sub table by key
 // todo: visualize and get statistics of array with types
 // todo: make template to process array statistics - will it ultimatly need to give back a string?
 // todo: treat the array as a string if it is u8, i8, (or a string type?) - then show statistics for a string if the string is too long to fit in the gui
-// todo: make listing the keys of a db happen on expand
-// todo: make insertion of tbls from a db key happen on expand
+// todo: use a const operator() in tbl to get the sub table by key
 
 // idea: make switch case for fundamental types that the map elements can be - need the non-templated table
 // idea: make multiple selections additivly draw multiple colored lines?
@@ -95,10 +95,13 @@
 //       | editing a memory mapped table could edit the table on disk
 
 #include <cstdio>
+#include <cmath>
 #include <iostream>
 #include <algorithm>
 #include <unordered_map>
 #include <filesystem>
+
+#define NOMINMAX                                // to make sure windows headers don't define min and max
 #include <nana/gui.hpp>
 #include <nana/gui/dragger.hpp>
 #include <nana/gui/widgets/label.hpp>
@@ -146,8 +149,8 @@ std::ostream& operator<<(std::ostream& os, const nana::rectangle& r)
   return os << "rect{" << r.position() << "," << r.dimension() << "}";
 }
 
-f32         mx = -std::numeric_limits<float>::infinity(); 
-f32         mn =  std::numeric_limits<float>::infinity();
+f32         mx =  std::numeric_limits<f32>::max();     //::infinity(); 
+f32         mn =  std::numeric_limits<f32>::lowest();  //::infinity();
 f32                  msX=0, msY=0;
 tbl                         glblT;
 vec_u8                     tblBuf;
@@ -316,72 +319,73 @@ Viz        viz;
 
 namespace {
 
-str       makeStatStr(tbl const& t)
+template<class T> str statStr(tbl const& t)
 {
   using namespace std;
-  
-  auto flen = t.size();           // 12 floats in a vert struct
-  if(flen==0) return "";
-  if(flen==1) return toString( (f32)t[0] );
-  f32*    f = (f32*)t.data();
-  sort(f, f+flen);                // sort for both the median and the mode
 
-  f32 mean=0, median=0; 
+  u64 vlen = t.size();           // 12 floats in a vert struct
+  if(vlen==0) return "";
+  if(vlen==1) return toString( (T)t[0] );
+  T*     v = (T*)t.data();
+  sort(v, v+vlen);               // sort for both the median and the mode
+
+  f64 mean=0;
+  T median=0; 
   SECTION(calc mean and median)
   {
-    f32 total = 0;
-    TO(flen,i){ total += f[i]; }
-    mean = total / flen;
+    f64 total = 0;
+    TO(vlen,i){ mean += (T)v[i] / total; } // divide every number by the total first to avoid overflow, even though this will be slower
+    mean = total / vlen;
 
-    u64 mid = flen / 2;
-    median  = f[mid];
-
-    Println("\n");
-    TO(flen,i){
-      Print(f[i]," "); 
-    }
-    Println("\n");
+    u64 mid = vlen / 2;
+    median  = (T)v[mid];
   }
 
-  f32 hiVal=0; u64 hiCnt=0;
+  T hiVal=0; u64 hiCnt=0;
   SECTION(calc Mode - the value with the highest frequency)
   {
-    f32 curVal=0;
+    T   curVal=0;
     u64 curCnt=0;
-    TO(flen,i){
-      if(f[i] == curVal){ ++curCnt; }
-      else if( curCnt > hiCnt ){
+    TO(vlen,i)
+    {
+      if( (T)v[i] == curVal ){ ++curCnt; }
+      else{ 
+        curCnt = 1; 
+        curVal = (T)v[i];
+      }
+
+      if( curCnt > hiCnt ){
         hiVal  = curVal;
         hiCnt  = curCnt;
-        curVal = f[i];
-        curCnt = 0;
       }
+
     }
+
     if( curCnt > hiCnt ){
       hiVal = curVal;
       hiCnt = curCnt;
     }
   }
 
-  f32 variance=0;
+  f64 variance=0;
   SECTION(calc variance)
   {
-    f32 difSqr = 0;
-    TO(flen,i){
-      f32 dif  = f[i] - mean;
+    f64 difSqr = 0;
+    TO(vlen,i){
+      f64 dif  = (T)v[i] - mean;
       difSqr  += dif * dif;
     }
-    variance = flen>1?  difSqr/(flen-1)  :   difSqr;  // length of the array needs to be at least 2 to use the n-1 'unbiased' variance  
+    variance = sqrt( (f64)difSqr / (f64)vlen  );
   }
 
-  f32 tmn, tmx;
+  T tmn, tmx;
   SECTION(calc min and max)
   {
-    tmx = -numeric_limits<float>::infinity(); 
-    tmn =  numeric_limits<float>::infinity();
-    TO(flen,i){
-      tmx = max<f32>(tmx, f[i]);
-      tmn = min<f32>(tmn, f[i]);
+    tmx =  numeric_limits<T>::lowest(); 
+    tmn =  numeric_limits<T>::max();
+    TO(vlen,i){
+      tmx = max<T>(tmx, (T)v[i]);
+      tmn = min<T>(tmn, (T)v[i]);
     }
   }
 
@@ -395,6 +399,36 @@ str       makeStatStr(tbl const& t)
 
   return txtStr;
 }
+
+str       makeStatStr(tbl const& t)
+{
+  switch(t.arrayType())
+  {
+  case tbl::TblType::I8:
+    return statStr<i8>(t);
+  case tbl::TblType::I16:
+    return statStr<i16>(t);
+  case tbl::TblType::I32:
+    return statStr<i32>(t);
+  case tbl::TblType::I64:
+    return statStr<i64>(t);
+  case tbl::TblType::U8:
+    return statStr<u8>(t);
+  case tbl::TblType::U16:
+    return statStr<u16>(t);
+  case tbl::TblType::U32:
+    return statStr<u32>(t);
+  case tbl::TblType::U64:
+    return statStr<u64>(t);
+  case tbl::TblType::F32:
+    return statStr<f32>(t);
+  case tbl::TblType::F64:
+    return statStr<f64>(t);
+  default:
+    return "";
+  }
+}
+
 void        insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
 {
   using namespace std;
@@ -406,6 +440,7 @@ void        insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
     tree.insert(aryKey, aszStr);
 
     //tree.insert(aryKey+"/arystr", "");
+
     tree.insert(aryKey+"/arystr", makeStatStr(t) );   // make the stat string immediatly
   }
   SECTION(hash map elements)
@@ -451,9 +486,13 @@ void        insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
         tbl elemTbl( ((u8*)t.childData()+kv.val) );
         str subKey = ik.key + "/" + kv.key;
         tblCache[ik.idx][subKey] = elemTbl;
-        ik.subTbl  = true;
-        ik.key     = subKey;
-        insertTbl( thsTreeKey, elemTbl, ik);
+        //ik.subTbl  = true;
+        //ik.key     = subKey;
+        IdxKey subIk;
+        subIk.subTbl = true;
+        subIk.idx    = ik.idx;
+        subIk.key    = subKey;
+        insertTbl(thsTreeKey, elemTbl, subIk);
       }
     }
   }
@@ -899,7 +938,7 @@ int  main()
 
         Println("key:  ", tree.selected().key() );
         Println("selected: ", tbArg.item.key() );
-        Println("owner: ", tbArg.item.owner().key() );
+        Println("owner: ",    tbArg.item.owner().key() );
 
         auto* cur = &tbArg.item;
         do{
@@ -929,11 +968,12 @@ int  main()
         auto flen = t.size();// * 12;      // 12 floats in a vert struct
         f32*    f = (float*)t.m_mem;
 
-        mx = -numeric_limits<float>::infinity(); 
-        mn =  numeric_limits<float>::infinity();
+        mx =  numeric_limits<f32>::lowest(); 
+        mn =  numeric_limits<f32>::max();
         TO(flen,i){
-          mx = max<f32>(mx, f[i]);
-          mn = min<f32>(mn, f[i]);
+          Print( (f32)f[i], " " );
+          mx = max<f32>(mx, (f32)f[i] );
+          mn = min<f32>(mn, (f32)f[i] );
         }
         Println("\n Table Key mx: ",mx, " mn: ", mn, " \n" );
 
@@ -1007,6 +1047,99 @@ int  main()
 
 
 
+//variance = vlen>1?  difSqr/(vlen-1)  :   difSqr;  // length of the array needs to be at least 2 to use the n-1 'unbiased' variance  
+//variance = 1.0; //std::sqrt<double>( 2.0 );
+//variance = std::sqrt( (double)( ((double)difSqr) / ((double)vlen) ) );
+//variance = std::sqrt( 2.0 );
+
+//str       makeStatStr(tbl const& t)
+//{
+//  using namespace std;
+//  
+//  auto flen = t.size();           // 12 floats in a vert struct
+//  if(flen==0) return "";
+//  if(flen==1) return toString( (f32)t[0] );
+//  f32*    f = (f32*)t.data();
+//  sort(f, f+flen);                // sort for both the median and the mode
+//
+//  f32 mean=0, median=0; 
+//  SECTION(calc mean and median)
+//  {
+//    f32 total = 0;
+//    TO(flen,i){ total += f[i]; }
+//    mean = total / flen;
+//
+//    u64 mid = flen / 2;
+//    median  = f[mid];
+//
+//    Println("\n");
+//    TO(flen,i){
+//      Print(f[i]," "); 
+//    }
+//    Println("\n");
+//  }
+//
+//  f32 hiVal=0; u64 hiCnt=0;
+//  SECTION(calc Mode - the value with the highest frequency)
+//  {
+//    f32 curVal=0;
+//    u64 curCnt=0;
+//    TO(flen,i){
+//      if(f[i] == curVal){ ++curCnt; }
+//      else if( curCnt > hiCnt ){
+//        hiVal  = curVal;
+//        hiCnt  = curCnt;
+//        curVal = f[i];
+//        curCnt = 0;
+//      }
+//    }
+//    if( curCnt > hiCnt ){
+//      hiVal = curVal;
+//      hiCnt = curCnt;
+//    }
+//  }
+//
+//  f32 variance=0;
+//  SECTION(calc variance)
+//  {
+//    f32 difSqr = 0;
+//    TO(flen,i){
+//      f32 dif  = f[i] - mean;
+//      difSqr  += dif * dif;
+//    }
+//    variance = flen>1?  difSqr/(flen-1)  :   difSqr;  // length of the array needs to be at least 2 to use the n-1 'unbiased' variance  
+//  }
+//
+//  f32 tmn, tmx;
+//  SECTION(calc min and max)
+//  {
+//    tmx = -numeric_limits<float>::infinity(); 
+//    tmn =  numeric_limits<float>::infinity();
+//    TO(flen,i){
+//      tmx = max<f32>(tmx, f[i]);
+//      tmn = min<f32>(tmn, f[i]);
+//    }
+//  }
+//
+//  str txtStr = toString(
+//    "Min: ",tmn,
+//    "   Max: ",tmx,
+//    "   Mean: ",mean,
+//    "   Median: ",median,
+//    "   Mode: ", hiVal, " (",hiCnt,
+//    ")   Variance: ", variance);
+//
+//  return txtStr;
+//}
+
+//TO(vlen,i){ total += v[i]; }
+//mean = total / flen;
+
+//Println("\n");
+//TO(flen,i){
+//  Print(f[i]," "); 
+//}
+//Println("\n");
 
 //bool inVal = (h-y)/(f32)h < re;
 //if(h-y < val*hRatio){ // this flips the graph vertically, but increasing y goes down in screen space, so we want it flipped
