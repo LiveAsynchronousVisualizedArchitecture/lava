@@ -81,10 +81,13 @@
 // -todo: sort elements alphabetically by key instead of using the hashed order 
 // -todo: make listing the keys of a db happen on expand - not important until a resource limitation is hit / shown
 // -todo: make insertion of tbls from a db key happen on expand - worry about this when it is actually solving a problem
+// -todo: split out statistics of a tbl's array into its own function 
+// -todo: fix mode and mean statistics calculations 
+// -todo: make template to process array statistics - will it ultimatly need to give back a string?
+// -todo: fix index of mouse cursor in status bar - array size was still being multed by 12 
+// -todo: make switch case typed min max function 
 
-// todo: split out statistics of a tbl's array into its own function 
-// todo: visualize and get statistics of array with types
-// todo: make template to process array statistics - will it ultimatly need to give back a string?
+// todo: visualize arrays with proper types
 // todo: treat the array as a string if it is u8, i8, (or a string type?) - then show statistics for a string if the string is too long to fit in the gui
 // todo: use a const operator() in tbl to get the sub table by key
 
@@ -131,10 +134,26 @@ using     vec_dbs = std::vector<simdb>;
 using        path = std::experimental::filesystem::path;         // why is this still experimental?
 //using       IvTbl = tbl;
 using  vec_verstr = std::vector<simdb::VerStr>;
+
 struct IdxKey { bool subTbl; u32 idx; str key; };            // this represents an index into the db vector and a key  
 using TblKeys     = std::unordered_map<str,IdxKey>;                // why do the TblKeys need indices with them? - To know which DB they came from
 using TblCache    = std::vector< std::unordered_map<str,tbl> >;
 //struct IdxKey { bool subTbl; u32 idx; vec_str path; };       // this represents an index into the db vector and a vector of keys to get the table from the   
+
+template<class T> struct MnMx 
+{ 
+  T mn = std::numeric_limits<T>::max(); 
+  T mx = std::numeric_limits<T>::lowest();
+
+  operator MnMx<f64>()
+  {
+    MnMx<f64> ret;
+    ret.mn = (f64)mn;
+    ret.mx = (f64)mx;
+
+    return ret;
+  }
+};
 
 std::ostream& operator<<(std::ostream& os, const nana::point&     p)
 {
@@ -319,6 +338,19 @@ Viz        viz;
 
 namespace {
 
+template<class T> MnMx<T> calcMnMx(tbl const& t)
+{
+  using namespace std;
+
+  MnMx<T> ret;
+  TO(t.size(),i){
+    ret.mn = min<T>( ret.mn, (T)t[i] );
+    ret.mx = max<T>( ret.mx, (T)t[i] );
+  }
+
+  return ret;
+}
+
 template<class T> str statStr(tbl const& t)
 {
   using namespace std;
@@ -400,6 +432,34 @@ template<class T> str statStr(tbl const& t)
   return txtStr;
 }
 
+MnMx<f64>    makeMnMx(tbl const& t)
+{
+  switch(t.arrayType())
+  {
+  case tbl::TblType::I8:
+    return calcMnMx<i8>(t);
+  case tbl::TblType::I16:
+    return calcMnMx<i16>(t);
+  case tbl::TblType::I32:
+    return calcMnMx<i32>(t);
+  case tbl::TblType::I64:
+    return calcMnMx<i64>(t);
+  case tbl::TblType::U8:
+    return calcMnMx<u8>(t);
+  case tbl::TblType::U16:
+    return calcMnMx<u16>(t);
+  case tbl::TblType::U32:
+    return calcMnMx<u32>(t);
+  case tbl::TblType::U64:
+    return calcMnMx<u64>(t);
+  case tbl::TblType::F32:
+    return calcMnMx<f32>(t);
+  case tbl::TblType::F64:
+    return calcMnMx<f64>(t);
+  default:
+    return {0,0};
+  }
+}
 str       makeStatStr(tbl const& t)
 {
   switch(t.arrayType())
@@ -428,7 +488,6 @@ str       makeStatStr(tbl const& t)
     return "";
   }
 }
-
 void        insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
 {
   using namespace std;
@@ -715,13 +774,14 @@ int  main()
         f32       h = (f32)vsz.height;
         auto&     t = glblT;
         if( t.m_mem && t.size()>0 ){
-          auto   flen = t.size() * 12;      // 12 floats in a vert struct
-          f32*      f = (float*)t.m_mem;
-          f32   ratio = vsz.width  / (f32)flen;
-          f32     dif = mx - mn;
+          u64     len = t.size();                 // 12 floats in a vert struct
+          //f32*      f = (f32*)t.m_mem;
+          f64   ratio = vsz.width  / (f64)len;
+          auto   mnmx = makeMnMx(t);
+          f64     dif = mnmx.mx - mnmx.mn;
           f32  hRatio = vsz.height / dif;
           u64     idx = (u64)(msX/ratio);
-          auto    val = f[ idx ];
+          auto    val = (f32)t[idx];
           f32  remapY = (((h-msY)/h));
           remapY     *= dif;
           remapY     += mn;
