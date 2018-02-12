@@ -60,6 +60,9 @@
 // -todo: take out test db
 // -todo: take out nanovg visualization of tbl
 
+// todo: clean out comments in VizTfm.hpp
+// todo: convert to using non-templated tbl
+// todo: convert to using new IdxVerts format
 // todo: look in to keys from fissure dissapearing when being overwritten constantly
 // todo: investigate crash while visualizing multiple tables in a running graph
 // todo: change project name to visualizer
@@ -648,14 +651,15 @@ f32       drawStrs(NVGcontext* nvg, tblstr const& strs, tblv2 const& ofsts, f32 
 
   return h;
 }
-f32      drawGraph(NVGcontext* nvg, tblu   const&    t, bnd2f b)
+//f32      drawGraph(NVGcontext* nvg, tblu   const&    t, bnd2f b)
+f32      drawGraph(NVGcontext* nvg, tbl   const&    t, bnd2f b)
 {
   using namespace std;
 
   f32 mxf, inc, hgt;
 
   u64 mx = 0;
-  TO(t.size(),i){ mx = max(mx, t[i]);  }
+  TO(t.size(),i){ mx = max<u64>(mx, (u64)t[i]);  }
   mxf = (f32)mx;
   inc = (b.w()-4) / (f32)t.size();
   hgt = b.h()-4;
@@ -667,7 +671,7 @@ f32      drawGraph(NVGcontext* nvg, tblu   const&    t, bnd2f b)
   {
     f32 x = b.xmn + i*inc + 2;
     f32 y = b.ymx - 2;
-    f32 h = hgt * (t[i]/mxf);
+    f32 h = hgt * ( (u64)t[i] / mxf);
     nvgBeginPath(nvg);
       nvgRect(nvg, x, y-h, inc, h);
     nvgFill(nvg);
@@ -676,158 +680,161 @@ f32      drawGraph(NVGcontext* nvg, tblu   const&    t, bnd2f b)
 
   return b.ymx - b.ymn;
 }
-void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f, f32 y=0.f, f32 sz=50.f, f32 margin=5.f)
-{
-  using namespace std;
-  
-  f32 xo=0, yo=0;                                                    // xo is x offset   yo is y offset
-  f32 vizW = w - x - margin*2;
 
-  nvgFontSize(nvg,  sz);
-  nvgFontFace(nvg,  "sans");
-  nvgTextAlign(nvg, NVG_ALIGN_LEFT); // | NVG_ALIGN_MIDDLE);
-  nvgFillColor(nvg, nvgRGBAf(1.f, 1.f, .65f, 1.f));
+//void       drawTbl(NVGcontext* nvg, tblu   const&    t, f32 w, f32 h, f32 x=0.f, f32 y=0.f, f32 sz=50.f, f32 margin=5.f)
+//{
+//  using namespace std;
+//  
+//  f32 xo=0, yo=0;                                                    // xo is x offset   yo is y offset
+//  f32 vizW = w - x - margin*2;
+//
+//  nvgFontSize(nvg,  sz);
+//  nvgFontFace(nvg,  "sans");
+//  nvgTextAlign(nvg, NVG_ALIGN_LEFT); // | NVG_ALIGN_MIDDLE);
+//  nvgFillColor(nvg, nvgRGBAf(1.f, 1.f, .65f, 1.f));
+//
+//  tblstr labels;  labels.reserve(5);
+//  tblv2   ofsts;  ofsts.reserve(5);
+//
+//  v2      o = { x+margin, y+margin };                                                                    // o is offset
+//  f32  xrem = w; 
+//  f32   mxY = 0.f;
+//  f32    dh = 0.f;                                                                         // dh is draw height
+//  SECTION(draw fields)
+//  {
+//    labels.push_back( toString("sizeBytes:  ",     t.sizeBytes())      );
+//    labels.push_back( toString("capacity:  ",      t.capacity())       );
+//    labels.push_back( toString("size:  ",          t.size())           );
+//    labels.push_back( toString("map elems:  ",     t.elems())          );
+//    labels.push_back( toString("map capacity:  ",  t.map_capacity())   );
+//    labels.push_back( toString("child capcity:  ", t.child_capacity()) );
+//    TO(labels.size(),i){ ofsts.push_back( strOfst(nvg,labels[i]) ); }
+//    TO(ofsts.size(),i){ mxY = max<f32>(mxY, ofsts[i].y); }
+//
+//    dh = drawStrs(nvg, labels, ofsts, w, o.x, o.y, margin);
+//  }
+//
+//  o.x  = x+margin;
+//  o.y += dh + margin*2;                                                                   // o is offset
+//  drawLine(nvg, x, o.y-margin, w-x-margin*2);
+//  SECTION(draw key value pairs)
+//  {
+//    labels.clear();
+//    auto e = t.elemStart();
+//    TO(t.map_capacity(),i) if(!e[i].isEmpty()){
+//      labels.push_back( toString(e[i].key,":  ", e[i].val) );
+//    }
+//    sort( ALL(labels) );
+//    ofsts.clear();
+//    TO(labels.size(),i){ ofsts.push_back(strOfst(nvg, labels[i])); }
+//    mxY=0.f;
+//    TO(ofsts.size(),i){ mxY = max<f32>(mxY, ofsts[i].y); }
+//
+//    dh = drawStrs(nvg, labels, ofsts, w, o.x, o.y, margin);
+//  }
+//
+//  o.x   =  x+margin;
+//  o.y  +=  dh + margin*2;
+//  drawLine(nvg, o.x-margin, o.y-margin, w-x-margin*2);
+//  SECTION(draw array elements)
+//  {
+//    labels.clear();
+//    TO(t.size(),i){ labels.push_back( toString(i,":  ",t[i]) ); }
+//
+//    ofsts.clear();
+//    //new (&ofsts) tblv2;
+//    TO(labels.size(), i) { ofsts.push_back(strOfst(nvg, labels[i])); }
+//    mxY=0.f;
+//    TO(ofsts.size(),i){ mxY = max<f32>(mxY, ofsts[i].y); }
+//
+//    dh = drawStrs(nvg, labels, ofsts, w-margin, o.x, o.y, margin);
+//  }
+//
+//  o.x  =  x+margin;
+//  o.y +=  dh + margin*2;
+//  dh   =  drawGraph(nvg, t, {o.x, o.y, x+vizW-margin, o.y+100.f});
+//
+//  o.y  +=  dh + margin*2;
+//  nvgBeginPath(nvg);
+//    nvgRect(nvg, x, y, w-x-margin*2, o.y);
+//    nvgStrokeWidth(nvg, 1.f);
+//    nvgStrokeColor(nvg, nvgRGBAf(0,.1f,.6f, 1.f));
+//  nvgStroke(nvg);
+//
+//  //nvgRect(nvg, x, y, w-x-margin*2, o.y+dh);
+//}
 
-  tblstr labels;  labels.reserve(5);
-  tblv2   ofsts;  ofsts.reserve(5);
-
-  v2      o = { x+margin, y+margin };                                                                    // o is offset
-  f32  xrem = w; 
-  f32   mxY = 0.f;
-  f32    dh = 0.f;                                                                         // dh is draw height
-  SECTION(draw fields)
-  {
-    labels.push_back( toString("sizeBytes:  ",     t.sizeBytes())      );
-    labels.push_back( toString("capacity:  ",      t.capacity())       );
-    labels.push_back( toString("size:  ",          t.size())           );
-    labels.push_back( toString("map elems:  ",     t.elems())          );
-    labels.push_back( toString("map capacity:  ",  t.map_capacity())   );
-    labels.push_back( toString("child capcity:  ", t.child_capacity()) );
-    TO(labels.size(),i){ ofsts.push_back( strOfst(nvg,labels[i]) ); }
-    TO(ofsts.size(),i){ mxY = max<f32>(mxY, ofsts[i].y); }
-
-    dh = drawStrs(nvg, labels, ofsts, w, o.x, o.y, margin);
-  }
-
-  o.x  = x+margin;
-  o.y += dh + margin*2;                                                                   // o is offset
-  drawLine(nvg, x, o.y-margin, w-x-margin*2);
-  SECTION(draw key value pairs)
-  {
-    labels.clear();
-    auto e = t.elemStart();
-    TO(t.map_capacity(),i) if(!e[i].isEmpty()){
-      labels.push_back( toString(e[i].key,":  ", e[i].val) );
-    }
-    sort( ALL(labels) );
-    ofsts.clear();
-    TO(labels.size(),i){ ofsts.push_back(strOfst(nvg, labels[i])); }
-    mxY=0.f;
-    TO(ofsts.size(),i){ mxY = max<f32>(mxY, ofsts[i].y); }
-
-    dh = drawStrs(nvg, labels, ofsts, w, o.x, o.y, margin);
-  }
-
-  o.x   =  x+margin;
-  o.y  +=  dh + margin*2;
-  drawLine(nvg, o.x-margin, o.y-margin, w-x-margin*2);
-  SECTION(draw array elements)
-  {
-    labels.clear();
-    TO(t.size(),i){ labels.push_back( toString(i,":  ",t[i]) ); }
-
-    ofsts.clear();
-    //new (&ofsts) tblv2;
-    TO(labels.size(), i) { ofsts.push_back(strOfst(nvg, labels[i])); }
-    mxY=0.f;
-    TO(ofsts.size(),i){ mxY = max<f32>(mxY, ofsts[i].y); }
-
-    dh = drawStrs(nvg, labels, ofsts, w-margin, o.x, o.y, margin);
-  }
-
-  o.x  =  x+margin;
-  o.y +=  dh + margin*2;
-  dh   =  drawGraph(nvg, t, {o.x, o.y, x+vizW-margin, o.y+100.f});
-
-  o.y  +=  dh + margin*2;
-  nvgBeginPath(nvg);
-    nvgRect(nvg, x, y, w-x-margin*2, o.y);
-    nvgStrokeWidth(nvg, 1.f);
-    nvgStrokeColor(nvg, nvgRGBAf(0,.1f,.6f, 1.f));
-  nvgStroke(nvg);
-
-  //nvgRect(nvg, x, y, w-x-margin*2, o.y+dh);
 }
 
-}
+//static tblu tst;
+static tbl tst;
 
-static tblu tst;
-void       genTestGeo(simdb* db)
-{
-  using namespace std;
-  
-  static simdb db1("test1", 4096, 1 << 14);
-  //static simdb db2("test 2", 4096, 1 << 14);
-
-  //initSimDB("VizDefault");
-
-  // Create serialized IndexedVerts
-  size_t leftLen, rightLen, cubeLen;
-  //vec<u8>  leftData = makeTriangle(leftLen,   true);
-  //vec<u8> rightData = makeTriangle(rightLen, false);
-  //vec<u8>  cubeData = makeCube(cubeLen);
-  IvTbl  leftData = makeTriangle( leftLen,   true);
-  IvTbl rightData = makeTriangle(rightLen,  false);
-  IvTbl  cubeData =     makeCube( cubeLen);
-
-  vec<u8>  leftBytes( leftData.sizeBytes());
-  vec<u8> rightBytes(rightData.sizeBytes());
-  vec<u8>  cubeBytes( cubeData.sizeBytes());
-  memcpy( leftBytes.data(),   leftData.memStart(),  leftData.sizeBytes());
-  memcpy(rightBytes.data(),  rightData.memStart(), rightData.sizeBytes());
-  memcpy( cubeBytes.data(),   cubeData.memStart(),  cubeData.sizeBytes());
-
-  // Store serialized IndexedVerts in the db
-  str  leftTriangle = "leftTriangle";
-  str rightTriangle = "rightTriangle";
-  str          cube = "cube";
-
-  db1.put("1", leftBytes);
-  db1.put("2", rightBytes);
-  db1.put("3", cubeBytes);
-
-  //db2.put("one",    leftBytes);
-  //db2.put("two",   rightBytes);
-  //db2.put("three",  cubeBytes);
-  //db2.put("super long key name as a test", cubeBytes);
-
-  IvTbl lftTri = {             // array of vert structs
-   {{-1.0, -1.0f, 0.0f},       //pos
-    {0.0f, 0.0f, -1.0f},       //norm
-    {1.0f, 1.0f, 1.0f, 1.0f},  //color
-    {0.0f, 0.0f}},             //texCoord
-  
-   {{-0.17f, -1.0f, 0.0f},      //pos
-    {0.0f, 0.0f, -1.0f},        //norm
-    {1.0f, 1.0f, 1.0f, 1.0f},   //color
-    {0.0f, 0.0f}},              //texCoord
-
-   {{-0.58f, 1.0f, 0.0f},       //pos
-    {0.0f, 0.0f, -1.0f},        //norm
-    {1.0f, 1.0f, 1.0f, 1.0f},   //color
-    {0.0f, 0.0f}}               //texCoord
-  };
-  auto typenum    =  "IdxVerts";
-  lftTri("type")  =  *((u64*)typenum);
-  lftTri("mode")  =  (u64)GL_TRIANGLES;
-  tu32 ind        =  {0, 1, 2};
-  lftTri("IND")   =  &ind; 
-  lftTri.flatten();
-
-  auto f = lftTri.memStart();
-
-  //db->put("tb left triangle", lftTri.memStart(), lftTri.sizeBytes() );
-}
+//void       genTestGeo(simdb* db)
+//{
+//  using namespace std;
+//  
+//  static simdb db1("test1", 4096, 1 << 14);
+//  //static simdb db2("test 2", 4096, 1 << 14);
+//
+//  //initSimDB("VizDefault");
+//
+//  // Create serialized IndexedVerts
+//  size_t leftLen, rightLen, cubeLen;
+//  //vec<u8>  leftData = makeTriangle(leftLen,   true);
+//  //vec<u8> rightData = makeTriangle(rightLen, false);
+//  //vec<u8>  cubeData = makeCube(cubeLen);
+//  IvTbl  leftData = makeTriangle( leftLen,   true);
+//  IvTbl rightData = makeTriangle(rightLen,  false);
+//  IvTbl  cubeData =     makeCube( cubeLen);
+//
+//  vec<u8>  leftBytes( leftData.sizeBytes());
+//  vec<u8> rightBytes(rightData.sizeBytes());
+//  vec<u8>  cubeBytes( cubeData.sizeBytes());
+//  memcpy( leftBytes.data(),   leftData.memStart(),  leftData.sizeBytes());
+//  memcpy(rightBytes.data(),  rightData.memStart(), rightData.sizeBytes());
+//  memcpy( cubeBytes.data(),   cubeData.memStart(),  cubeData.sizeBytes());
+//
+//  // Store serialized IndexedVerts in the db
+//  str  leftTriangle = "leftTriangle";
+//  str rightTriangle = "rightTriangle";
+//  str          cube = "cube";
+//
+//  db1.put("1", leftBytes);
+//  db1.put("2", rightBytes);
+//  db1.put("3", cubeBytes);
+//
+//  //db2.put("one",    leftBytes);
+//  //db2.put("two",   rightBytes);
+//  //db2.put("three",  cubeBytes);
+//  //db2.put("super long key name as a test", cubeBytes);
+//
+//  IvTbl lftTri = {             // array of vert structs
+//   {{-1.0, -1.0f, 0.0f},       //pos
+//    {0.0f, 0.0f, -1.0f},       //norm
+//    {1.0f, 1.0f, 1.0f, 1.0f},  //color
+//    {0.0f, 0.0f}},             //texCoord
+//  
+//   {{-0.17f, -1.0f, 0.0f},      //pos
+//    {0.0f, 0.0f, -1.0f},        //norm
+//    {1.0f, 1.0f, 1.0f, 1.0f},   //color
+//    {0.0f, 0.0f}},              //texCoord
+//
+//   {{-0.58f, 1.0f, 0.0f},       //pos
+//    {0.0f, 0.0f, -1.0f},        //norm
+//    {1.0f, 1.0f, 1.0f, 1.0f},   //color
+//    {0.0f, 0.0f}}               //texCoord
+//  };
+//  auto typenum    =  "IdxVerts";
+//  lftTri("type")  =  *((u64*)typenum);
+//  lftTri("mode")  =  (u64)GL_TRIANGLES;
+//  tu32 ind        =  {0, 1, 2};
+//  lftTri("IND")   =  &ind; 
+//  lftTri.flatten();
+//
+//  auto f = lftTri.memStart();
+//
+//  //db->put("tb left triangle", lftTri.memStart(), lftTri.sizeBytes() );
+//}
 
 ENTRY_DECLARATION
 {
@@ -837,7 +844,7 @@ ENTRY_DECLARATION
   //genTestGeo(&db);
 
   //tbl<u8> pears<std::initializer_list<std::pair<char*,tbl<u8>::KV> >( { std::make_pair("wat",85) } );
-  tbl<u8> pears = { {"wat",85} };
+  //tbl<u8> pears = { {"wat",85} };
 
   //KV pear_kv("wat");
   //pear_kv = (i32)85;

@@ -13,6 +13,134 @@
 
 #include "VizData.hpp"
 
+//inline IvTbl  makeTriangle(size_t& byteLen, bool left)
+//{
+//  // Create triangle Vertex data
+//  IvTbl tri;
+//  if(left){
+//    tri = {
+//     {{-1.0, -1.0f, 0.0f},       //pos
+//      {0.0f, 0.0f, -1.0f},       //norm
+//      {1.0f, 1.0f, 1.0f, 1.0f},  //color
+//      {0.0f, 0.0f}},             //texCoord
+//
+//     {{-0.17f, -1.0f, 0.0f},     //pos
+//      {0.0f, 0.0f, -1.0f},       //norm
+//      {1.0f, 1.0f, 1.0f, 1.0f},  //color
+//      {0.0f, 0.0f}},             //texCoord
+//
+//     {{-0.58f, 1.0f, 0.0f},      //pos
+//      {0.0f, 0.0f, -1.0f},       //norm
+//      {1.0f, 1.0f, 1.0f, 1.0f},  //color
+//      {0.0f, 0.0f}},             //texCoord
+//    };
+//  }else{
+//    tri = {
+//     {{-0.17f, -1.0f, 0.0f},     //pos
+//      {0.0f, 0.0f, -1.0f},       //norm
+//      {1.0f, 1.0f, 1.0f, 1.0f},  //color
+//      {0.0f, 0.0f}},             //texCoord
+//
+//     {{0.66f, -1.0f, 0.0f},      //pos
+//      {0.0f, 0.0f, -1.0f},       //norm
+//      {1.0f, 1.0f, 1.0f, 1.0f},  //color
+//      {0.0f, 0.0f}},             //texCoord
+//
+//     {{0.25, 1.0f, 0.0f},        //pos
+//      {0.0f, 0.0f, -1.0f},       //norm
+//      {1.0f, 1.0f, 1.0f, 1.0f},  //color
+//      {0.0f, 0.0f}},             //texCoord
+//    };
+//  }
+//
+//  auto typenum   =  "IdxVerts";
+//  tri("type")    =  *((u64*)typenum);
+//  tri("mode")    =  (u64)GL_TRIANGLES;
+//  tu32 ind       =  {0, 1, 2};
+//  tri("IND")     =  &ind;
+//  tri.flatten();
+//
+//  return tri;
+//}
+//inline IvTbl        makeCube(size_t& byteLen)
+//{
+//  IvTbl cube = {                 // array of vert structs
+//    {{-0.5f, -0.5f, 0.5f},       //pos
+//     {0.0f, 0.0f, -1.0f},        //norm
+//     {1.0f, 0.0f, 0.0f, 1.0f},   //color
+//     {0.0f, 0.0f}},              //texCoord
+//
+//    {{0.5f, -0.5f, 0.5f},        //pos
+//     {0.0f, 0.0f, -1.0f},        //norm
+//     {0.0f, 1.0f, 0.0f, 1.0f},   //color
+//     {0.0f, 0.0f}},              //texCoord
+//
+//    {{0.5f, 0.5f, 0.5f},         //pos
+//     {0.0f, 0.0f, -1.0f},        //norm
+//     {0.0f, 0.0f, 1.0f, 1.0f},   //color
+//     {0.0f, 0.0f}},              //texCoord
+//
+//   {{-0.5f, 0.5f, 0.5f},        //pos
+//    {0.0f, 0.0f, -1.0f},        //norm
+//    {1.0f, 0.5f, 0.25f, 1.0f},  //color
+//    {0.0f, 0.0f}},              //texCoord
+//
+//   {{-0.5f, -0.5f, -0.5f},      //pos
+//    {0.0f, 0.0f, -1.0f},        //norm
+//    {1.0f, 0.0f, 0.0f, 1.0f},   //color
+//    {0.0f, 0.0f}},              //texCoord
+//
+//   {{0.5f, -0.5f, -0.5f},       //pos
+//    {0.0f, 0.0f, -1.0f},        //norm
+//    {0.0f, 1.0f, 0.0f, 1.0f},   //color
+//    {0.0f, 0.0f}},              //texCoord
+//
+//   {{0.5f, 0.5f, -0.5f},        //pos
+//    {0.0f, 0.0f, -1.0f},        //norm
+//    {0.0f, 0.0f, 1.0f, 1.0f},   //color
+//    {0.0f, 0.0f}},              //texCoord
+//
+//   {{-0.5f, 0.5f, -0.5f},       //pos
+//    {0.0f, 0.0f, -1.0f},        //norm
+//    {1.0f, 0.5f, 0.25f, 1.0f},  //color
+//    {0.0f, 0.0f}}              //texCoord
+//   };
+//    
+//  auto typenum   =  "IdxVerts";
+//  cube("type")   =  *((u64*)typenum);
+//  cube("mode")   =  (u64)GL_TRIANGLES;
+//  //tu32 ind     =  {0, 1, 2};
+//  tu32 cubeInd = {
+//    // front
+//    0, 1, 2,
+//    2, 3, 0,
+//    // top
+//    1, 5, 6,
+//    6, 2, 1,
+//    // back
+//    7, 6, 5,
+//    5, 4, 7,
+//    // bottom
+//    4, 0, 3,
+//    3, 7, 4,
+//    // left
+//    4, 5, 1,
+//    1, 0, 4,
+//    // right
+//    3, 2, 6,
+//    6, 7, 3,
+//  };
+//
+//  cube("IND")    =  &cubeInd; 
+//  cube.flatten();
+//
+//  return cube;
+//}
+
+
+#endif
+
+
 //inline vec<u8>      makeCube(size_t& byteLen)
 //{
 //  const unsigned int NUM_VERTICES = 8;
@@ -173,130 +301,3 @@
 //
 //  return bytes;
 //}
-
-inline IvTbl  makeTriangle(size_t& byteLen, bool left)
-{
-  // Create triangle Vertex data
-  IvTbl tri;
-  if(left){
-    tri = {
-     {{-1.0, -1.0f, 0.0f},       //pos
-      {0.0f, 0.0f, -1.0f},       //norm
-      {1.0f, 1.0f, 1.0f, 1.0f},  //color
-      {0.0f, 0.0f}},             //texCoord
-
-     {{-0.17f, -1.0f, 0.0f},     //pos
-      {0.0f, 0.0f, -1.0f},       //norm
-      {1.0f, 1.0f, 1.0f, 1.0f},  //color
-      {0.0f, 0.0f}},             //texCoord
-
-     {{-0.58f, 1.0f, 0.0f},      //pos
-      {0.0f, 0.0f, -1.0f},       //norm
-      {1.0f, 1.0f, 1.0f, 1.0f},  //color
-      {0.0f, 0.0f}},             //texCoord
-    };
-  }else{
-    tri = {
-     {{-0.17f, -1.0f, 0.0f},     //pos
-      {0.0f, 0.0f, -1.0f},       //norm
-      {1.0f, 1.0f, 1.0f, 1.0f},  //color
-      {0.0f, 0.0f}},             //texCoord
-
-     {{0.66f, -1.0f, 0.0f},      //pos
-      {0.0f, 0.0f, -1.0f},       //norm
-      {1.0f, 1.0f, 1.0f, 1.0f},  //color
-      {0.0f, 0.0f}},             //texCoord
-
-     {{0.25, 1.0f, 0.0f},        //pos
-      {0.0f, 0.0f, -1.0f},       //norm
-      {1.0f, 1.0f, 1.0f, 1.0f},  //color
-      {0.0f, 0.0f}},             //texCoord
-    };
-  }
-
-  auto typenum   =  "IdxVerts";
-  tri("type")    =  *((u64*)typenum);
-  tri("mode")    =  (u64)GL_TRIANGLES;
-  tu32 ind       =  {0, 1, 2};
-  tri("IND")     =  &ind;
-  tri.flatten();
-
-  return tri;
-}
-inline IvTbl        makeCube(size_t& byteLen)
-{
-  IvTbl cube = {                 // array of vert structs
-    {{-0.5f, -0.5f, 0.5f},       //pos
-     {0.0f, 0.0f, -1.0f},        //norm
-     {1.0f, 0.0f, 0.0f, 1.0f},   //color
-     {0.0f, 0.0f}},              //texCoord
-
-    {{0.5f, -0.5f, 0.5f},        //pos
-     {0.0f, 0.0f, -1.0f},        //norm
-     {0.0f, 1.0f, 0.0f, 1.0f},   //color
-     {0.0f, 0.0f}},              //texCoord
-
-    {{0.5f, 0.5f, 0.5f},         //pos
-     {0.0f, 0.0f, -1.0f},        //norm
-     {0.0f, 0.0f, 1.0f, 1.0f},   //color
-     {0.0f, 0.0f}},              //texCoord
-
-   {{-0.5f, 0.5f, 0.5f},        //pos
-    {0.0f, 0.0f, -1.0f},        //norm
-    {1.0f, 0.5f, 0.25f, 1.0f},  //color
-    {0.0f, 0.0f}},              //texCoord
-
-   {{-0.5f, -0.5f, -0.5f},      //pos
-    {0.0f, 0.0f, -1.0f},        //norm
-    {1.0f, 0.0f, 0.0f, 1.0f},   //color
-    {0.0f, 0.0f}},              //texCoord
-
-   {{0.5f, -0.5f, -0.5f},       //pos
-    {0.0f, 0.0f, -1.0f},        //norm
-    {0.0f, 1.0f, 0.0f, 1.0f},   //color
-    {0.0f, 0.0f}},              //texCoord
-
-   {{0.5f, 0.5f, -0.5f},        //pos
-    {0.0f, 0.0f, -1.0f},        //norm
-    {0.0f, 0.0f, 1.0f, 1.0f},   //color
-    {0.0f, 0.0f}},              //texCoord
-
-   {{-0.5f, 0.5f, -0.5f},       //pos
-    {0.0f, 0.0f, -1.0f},        //norm
-    {1.0f, 0.5f, 0.25f, 1.0f},  //color
-    {0.0f, 0.0f}}              //texCoord
-   };
-    
-  auto typenum   =  "IdxVerts";
-  cube("type")   =  *((u64*)typenum);
-  cube("mode")   =  (u64)GL_TRIANGLES;
-  //tu32 ind     =  {0, 1, 2};
-  tu32 cubeInd = {
-    // front
-    0, 1, 2,
-    2, 3, 0,
-    // top
-    1, 5, 6,
-    6, 2, 1,
-    // back
-    7, 6, 5,
-    5, 4, 7,
-    // bottom
-    4, 0, 3,
-    3, 7, 4,
-    // left
-    4, 5, 1,
-    1, 0, 4,
-    // right
-    3, 2, 6,
-    6, 7, 3,
-  };
-
-  cube("IND")    =  &cubeInd; 
-  cube.flatten();
-
-  return cube;
-}
-
-
-#endif

@@ -86,6 +86,7 @@
 // -todo: make template to process array statistics - will it ultimatly need to give back a string?
 // -todo: fix index of mouse cursor in status bar - array size was still being multed by 12 
 // -todo: make switch case typed min max function 
+// -todo: put types into normal value elements, not just sub tables - needed to make a typeStr() method in KV
 
 // todo: visualize arrays with proper types
 // todo: treat the array as a string if it is u8, i8, (or a string type?) - then show statistics for a string if the string is too long to fit in the gui
@@ -350,8 +351,7 @@ template<class T> MnMx<T> calcMnMx(tbl const& t)
 
   return ret;
 }
-
-template<class T> str statStr(tbl const& t)
+template<class T> str      statStr(tbl const& t)
 {
   using namespace std;
 
@@ -432,7 +432,7 @@ template<class T> str statStr(tbl const& t)
   return txtStr;
 }
 
-MnMx<f64>    makeMnMx(tbl const& t)
+MnMx<f64>      makeMnMx(tbl const& t)
 {
   switch(t.arrayType())
   {
@@ -460,7 +460,7 @@ MnMx<f64>    makeMnMx(tbl const& t)
     return {0,0};
   }
 }
-str       makeStatStr(tbl const& t)
+str         makeStatStr(tbl const& t)
 {
   switch(t.arrayType())
   {
@@ -488,7 +488,7 @@ str       makeStatStr(tbl const& t)
     return "";
   }
 }
-void        insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
+void          insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
 {
   using namespace std;
   
@@ -508,34 +508,36 @@ void        insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
     tree.insert(elemsTreeKey, toString("Elements: ", t.elems(), "  Map Capacity: ", t.map_capacity() ) );
 
     vector<tbl::KV> kvs;
-    TO(t.map_capacity(),i)
+    SECTION(extract the non empty key-value structs in the map segment and sort them)
     {
-      tbl::KV kv = t.elemStart()[i];
-      if(kv.isEmpty()) continue;
+      TO(t.map_capacity(),i)
+      {
+        tbl::KV kv = t.elemStart()[i];
+        if(kv.isEmpty()) continue;
 
-      kvs.push_back(kv);
+        kvs.push_back(kv);
+      }
+      sort(ALL(kvs), [](tbl::KV const& a, tbl::KV const& b){ return str(a.key) < str(b.key); });
     }
-    sort(ALL(kvs), [](tbl::KV const& a, tbl::KV const& b){ return str(a.key) < str(b.key); });
 
-    //TO(t.map_capacity(),i)
-    //{
-    //  tbl::KV kv = t.elemStart()[i];
-    //  if(kv.isEmpty()) continue;
     for(auto const& kv : kvs)
     {
-      str  elemKey = kv.key;
+      str  elemKey = kv.key; // get the key into a string so it can be compared to "type" easily
       str    title;
-      tbl  elemTbl;
-      if(kv.type & tbl::TblType::TABLE){  // if the element is a table, make a tbl out of it and recurse this function 
-        elemTbl = tbl( ((u8*)t.childData() + kv.val) );
-        title   = toString(elemKey," (", elemTbl.typeStr() ,"):   ", kv.val);
-      }else if(elemKey == "type"){
-        char typeStr[9];
-        memcpy(typeStr, &kv.val, 8);
-        typeStr[8] = '\0';
-        title = toString(elemKey,":  ", typeStr, "  -  (",kv.val,")");
-      }else{
-        title = toString(elemKey,":   ", kv.val);
+      SECTION(create the title which will include the key name, the type and the value)
+      {
+        tbl  elemTbl;
+        if(kv.type & tbl::TblType::TABLE){  // if the element is a table, make a tbl out of it and recurse this function 
+          elemTbl = tbl( ((u8*)t.childData() + kv.val) );
+          title   = toString(elemKey," (", elemTbl.typeStr() ,"):   ", kv.val);
+        }else if(elemKey == "type"){
+          char typeNumAsStr[9];                                                   // this is type number as a string - this is a special case for an element with the key "type", which can be a 64 bit number that can also be read as 8 characters 
+          memcpy(typeNumAsStr, &kv.val, 8);
+          typeNumAsStr[8] = '\0';                                                 // make the 9th character (offset 8) 0 so that it is the end of a C string 
+          title = toString(elemKey,":  ", typeNumAsStr, "  -  (",kv.val,")");
+        }else{
+          title = toString(elemKey," (", kv.typeStr() ,"):   ", kv.val);
+        }
       }
       
       str thsTreeKey = toString(elemsTreeKey,"/", elemKey);
@@ -545,8 +547,6 @@ void        insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
         tbl elemTbl( ((u8*)t.childData()+kv.val) );
         str subKey = ik.key + "/" + kv.key;
         tblCache[ik.idx][subKey] = elemTbl;
-        //ik.subTbl  = true;
-        //ik.key     = subKey;
         IdxKey subIk;
         subIk.subTbl = true;
         subIk.idx    = ik.idx;
@@ -556,14 +556,9 @@ void        insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
     }
   }
 
-  //IdxKey ik;
-  //ik.subTbl = true;
-  //ik.idx    = idx;
-  //ik.key    = elemKey;
-
   tblKeys[parentKey] = ik;
 }
-vec_u8   extractDbKey(simdb const& db, str key)
+vec_u8     extractDbKey(simdb const& db, str key)
 {
   u32     vlen = 0;
   u32  version = 0;
@@ -574,7 +569,7 @@ vec_u8   extractDbKey(simdb const& db, str key)
 
   return ret;
 }
-void      regenLabels(tbl const& t)
+void        regenLabels(tbl const& t)
 {
   SECTION(label captions)
   {
@@ -586,7 +581,7 @@ void      regenLabels(tbl const& t)
     owned.caption(  toString("Owned: ",         t.owned()? "True" : "False"));
   }
 }
-void     regenTblInfo()
+void       regenTblInfo()
 {
   SECTION(list simdb files and insert them at the top level of the tree)
   {
@@ -629,7 +624,7 @@ void     regenTblInfo()
   }
   regenLabels( glblT );
 }
-str        getFullKey(nana::treebox::item_proxy const& ip)
+str          getFullKey(nana::treebox::item_proxy const& ip)
 {
   auto* cur = &ip;
   str   key = cur->key();
@@ -640,16 +635,16 @@ str        getFullKey(nana::treebox::item_proxy const& ip)
 
   return key;
 }
-bool       isTableKey(str const& key)
+bool         isTableKey(str const& key)
 {
   auto iter = tblKeys.find(key);
   return iter != tblKeys.end();
 }
-bool       isTableKey(nana::treebox::item_proxy const& ip)
+bool         isTableKey(nana::treebox::item_proxy const& ip)
 {
   return isTableKey( getFullKey(ip) );
 }
-tbl        tblFromKey(str key)
+tbl          tblFromKey(str key)
 {
   tbl ret;
   auto iter = tblKeys.find(key);
@@ -665,7 +660,7 @@ tbl        tblFromKey(str key)
     return ret;
   }else{ return ret; }
 }
-tbl*   setCurTblFromTreeKey(str key)  // set current table from tree key
+tbl*     setCurTblFromTreeKey(str key)  // set current table from tree key
 {
   //if( !isTableKey(key) ) return nullptr;
 
@@ -685,7 +680,7 @@ tbl*   setCurTblFromTreeKey(str key)  // set current table from tree key
     }else{ return nullptr; }
   }
 }
-vec_u8       readFile(const char* path)
+vec_u8         readFile(const char* path)
 {
   vec_u8 ret;
 
@@ -705,11 +700,11 @@ vec_u8       readFile(const char* path)
   
   return ret;
 }
-void       refreshViz()
+void         refreshViz()
 {
   viz.caption("Setting this caption is the only way I know to refresh the component");
 }
-void        openFiles(vec_str const& files)
+void          openFiles(vec_str const& files)
 {
   int i = 0;
   for(auto& f : files){
@@ -779,17 +774,17 @@ int  main()
           f64   ratio = vsz.width  / (f64)len;
           auto   mnmx = makeMnMx(t);
           f64     dif = mnmx.mx - mnmx.mn;
-          f32  hRatio = vsz.height / dif;
+          //f64  hRatio = vsz.height / dif;
           u64     idx = (u64)(msX/ratio);
           auto    val = (f32)t[idx];
-          f32  remapY = (((h-msY)/h));
+          f64  remapY = (((h-msY)/h));
           remapY     *= dif;
           remapY     += mn;
           auto capStr = toString("  ",val,
           "   X: ",arg.pos.x,
           "   Y: ",arg.pos.y,
           "   Index: ",idx,
-          "   Remapped Y: ",remapY);
+          "   Remapped Y: ", (f32)remapY);
           status.caption( capStr );
         }
       });
@@ -1106,6 +1101,18 @@ int  main()
 
 
 
+//ik.subTbl  = true;
+//ik.key     = subKey;
+
+//IdxKey ik;
+//ik.subTbl = true;
+//ik.idx    = idx;
+//ik.key    = elemKey;
+
+//TO(t.map_capacity(),i)
+//{
+//  tbl::KV kv = t.elemStart()[i];
+//  if(kv.isEmpty()) continue;
 
 //variance = vlen>1?  difSqr/(vlen-1)  :   difSqr;  // length of the array needs to be at least 2 to use the n-1 'unbiased' variance  
 //variance = 1.0; //std::sqrt<double>( 2.0 );

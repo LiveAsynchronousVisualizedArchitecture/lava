@@ -50,6 +50,7 @@
 // -todo: work on copying a table into parent table on assignement - take address and flatten? - overloading only tbl const& seems to work to override the behavior of assigning a table 
 // -todo: figure out what do about TABLE and CHILD types with assignments to and from tbl pointers - seems to work for now, even if using an entire bit instead of a specific value for TABLE and TABLE|CHILD is inefficient
 
+// todo: return to map elements being only i64, u64, and f64 ? - typecast already causes this, should the types be more strict or should they cast automatically?
 // todo: make TblVal casts const
 // todo: make template function to get the array as a pointer of a certain type
 // todo: make a const find() method or adapt has() method 
@@ -501,6 +502,7 @@ public:
     }
 
     bool isEmpty() const { return type==TblType::NONE || type==TblType::EMPTY; }
+    auto typeStr() const -> const char* { return TblType::type_str((u8)type); }
 
     static KV&    empty_kv(){ static KV kv; kv.type = TblType::EMPTY; return kv; }
     static KV&     none_kv(){ static KV kv; kv.type = TblType::NONE;  return kv; }

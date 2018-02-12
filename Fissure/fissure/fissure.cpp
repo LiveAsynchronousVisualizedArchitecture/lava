@@ -238,8 +238,9 @@
 // -todo: make packetSlots an unordered_set instead of a vector
 // -todo: use new tbl.hpp to re-implement IdxVerts - don't use an array, use only named sub-tables
 // -todo: test an IdxVerts tbl and put it into the fissure db to test with brandisher
+// -todo: debug why mode is not showing up - being overwritten by another key before flattening
 
-// todo: debug why mode is not showing up - being overwritten by another key before flattening
+// todo: put image into IdxVerts
 // todo: give LavaNode struct a description string
 // todo: make description strings show up in the status bar on mouse over
 // todo: implement sub tables in brandisher
@@ -2107,7 +2108,7 @@ ENTRY_DECLARATION // main or winmain
       tbl      tx = {  0.f,   0.f,    0.f   };
       tbl      ty = {  0.f,   0.f,    0.f   };
 
-      u64    mode       = (u64)0x0004; // (u64)GL_TRIANGLES;  // #define GL_TRIANGLES 0x0004
+      u32    mode       = (u32)0x0004; // (u64)GL_TRIANGLES;  // #define GL_TRIANGLES 0x0004
       u64 typenum       =  *((u64*)"IdxVerts");
       iv("type")        = typenum;
       iv("mode")        = mode;
