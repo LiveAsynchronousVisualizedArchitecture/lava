@@ -156,12 +156,15 @@ inline Shape          tbl_to_shape(tbl& iv)  // todo: try to change this to a co
 
   //tu32  ind = t("IND");
   u32 mode = (u32)((u64)iv("mode"));
-  tbl const* ind;
-  tbl const* px, const* py, const* pz;
-  tbl const* nx, const* ny, const* nz;
-  tbl const* cr, const* cg, const* cb;
-  tbl const* tx, const* ty;
-  ind = iv("indices");
+
+  //const tbl* const ind;
+  //tbl const* px, const* py, const* pz;
+  //tbl const* nx, const* ny, const* nz;
+  //tbl const* cr, const* cg, const* cb;
+  //tbl const* tx, const* ty;
+  tbl px, py, pz, nx, ny, nz, cr, cg, cb, tx, ty;
+
+  tbl ind = iv("indices");
   px  = iv("positions x");
   py  = iv("positions y");
   pz  = iv("positions z");
@@ -176,7 +179,7 @@ inline Shape          tbl_to_shape(tbl& iv)  // todo: try to change this to a co
 
   shp.owner = true;
   shp.mode  = mode;
-  shp.indsz = ind->size();
+  shp.indsz = ind.size();
 
   //auto ff = ind->memStart();
 
@@ -192,24 +195,40 @@ inline Shape          tbl_to_shape(tbl& iv)  // todo: try to change this to a co
   glBindVertexArray(shp.vertary);
 
   //tbl px = t("positions x");
-  vec<Vertex> verts(px->size());
+  vec<Vertex> verts;
+  verts.resize(px.size());
   SECTION(convert/extract the individual component arrays into one array of Vertex structs)
   {
     TO(verts.size(),i){
-      verts[i].position[0] = px->at<f32>(i);
-      verts[i].position[1] = py->at<f32>(i);
-      verts[i].position[2] = pz->at<f32>(i);
+      verts[i].position[0] = px.at<f32>(i);
+      verts[i].position[1] = py.at<f32>(i);
+      verts[i].position[2] = pz.at<f32>(i);
 
-      verts[i].normal[0] = nx->at<f32>(i);
-      verts[i].normal[1] = ny->at<f32>(i);
-      verts[i].normal[2] = nz->at<f32>(i);
+      verts[i].normal[0] = nx.at<f32>(i);
+      verts[i].normal[1] = ny.at<f32>(i);
+      verts[i].normal[2] = nz.at<f32>(i);
 
-      verts[i].color[0] = cr->at<f32>(i);
-      verts[i].color[1] = cg->at<f32>(i);
-      verts[i].color[2] = cb->at<f32>(i);
+      verts[i].color[0] = cr.at<f32>(i);
+      verts[i].color[1] = cg.at<f32>(i);
+      verts[i].color[2] = cb.at<f32>(i);
 
-      verts[i].texCoord[0] = tx->at<f32>(i);
-      verts[i].texCoord[1] = ty->at<f32>(i);
+      verts[i].texCoord[0] = tx.at<f32>(i);
+      verts[i].texCoord[1] = ty.at<f32>(i);
+
+      //verts[i].position[0] = px->at<f32>(i);
+      //verts[i].position[1] = py->at<f32>(i);
+      //verts[i].position[2] = pz->at<f32>(i);
+
+      //verts[i].normal[0] = nx->at<f32>(i);
+      //verts[i].normal[1] = ny->at<f32>(i);
+      //verts[i].normal[2] = nz->at<f32>(i);
+
+      //verts[i].color[0] = cr->at<f32>(i);
+      //verts[i].color[1] = cg->at<f32>(i);
+      //verts[i].color[2] = cb->at<f32>(i);
+
+      //verts[i].texCoord[0] = tx->at<f32>(i);
+      //verts[i].texCoord[1] = ty->at<f32>(i);
     }
   }
 
@@ -217,7 +236,7 @@ inline Shape          tbl_to_shape(tbl& iv)  // todo: try to change this to a co
   glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * verts.size(), verts.data(), GL_STATIC_DRAW);
 
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shp.idxbuf);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t)*ind->size(), ind->data(), GL_STATIC_DRAW);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t)*ind.size(), ind.data(), GL_STATIC_DRAW);
 
   glVertexAttribPointer(POSITION, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);                      
   glVertexAttribPointer(NORMAL,   3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) *  3));

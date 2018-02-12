@@ -267,8 +267,9 @@ public:
     template<> struct typenum<f64>   { static const Type num = F64;     };
     template<> struct typenum<long>             { static const Type num = I64;   };
     template<> struct typenum<unsigned long>    { static const Type num = U64;   };
-    template<> struct typenum<tbl>   { static const Type num = TABLE;   };
-    template<> struct typenum<tbl*>  { static const Type num = TABLE;   };
+    template<> struct typenum<tbl>         { static const Type num = TABLE;   };
+    template<> struct typenum<const tbl>   { static const Type num = TABLE;   };
+    template<> struct typenum<const tbl*>  { static const Type num = TABLE;   };
 
     template<class C> struct typecast { using type = C;   };                               // cast types
     template<> struct typecast<i8>    { using type = i64; };
@@ -490,7 +491,7 @@ public:
       switch(type){
       case   TblType::U64: return cast_mem<N,  u64>(&val); 
       case   TblType::I64: return cast_mem<N,  i64>(&val);
-      case   TblType::F64: return cast_mem<N,  f64>(&val);
+      //case   TblType::F64: return cast_mem<N,  f64>(&val);
       }
 
       tbl_msg_assert(
@@ -548,9 +549,6 @@ public:
     operator bool() const { return (bool)(kv); }
     template<class N> N as() const { return kv->as<N>(); }
 
-    //operator tbl();
-    //operator tbl*();
-
     operator tbl()
     {   
       using namespace std;
@@ -567,19 +565,25 @@ public:
         return *((tbl*)kv->val);
       }
     }
-    operator tbl*()
-    {
-    // todo: does thsi assert that the table type is is a table but not a child?
-      tbl_msg_assert(
-        kv->type == TblType::typenum<tbl*>::num, 
-        " - tbl TYPE ERROR -\nInternal type: ", 
-        TblType::type_str((TblType::Type)kv->type),
-        "Desired type: ",
-        TblType::type_str((TblType::Type)TblType::typenum<tbl*>::num) );        
 
-      return (tbl*)kv->val;
-    }
-    operator tbl const*() const;
+    //operator tbl();
+    //operator tbl*();
+    //operator const tbl();
+    //operator tbl*();
+
+    //operator tbl*()
+    //{
+    //// todo: does thsi assert that the table type is is a table but not a child?
+    //  tbl_msg_assert(
+    //    kv->type == TblType::typenum<tbl*>::num, 
+    //    " - tbl TYPE ERROR -\nInternal type: ", 
+    //    TblType::type_str((TblType::Type)kv->type),
+    //    "Desired type: ",
+    //    TblType::type_str((TblType::Type)TblType::typenum<tbl*>::num) );        
+    //
+    //  return (tbl*)kv->val;
+    //}
+    //operator const tbl*() const;
     //{
     //  tbl_msg_assert(
     //    kv->type & TblType::TABLE,                        // can be a table pointer or a child table, so only need to check if it is a table at all
@@ -598,16 +602,16 @@ public:
 
     //template<class N> KVOfst& operator=(N const& n) = delete;
 
-    //KVOfst& operator=(tbl const* const t)
-    //{ 
-    //  *kv = t;
-    //  return *this; 
-    //}
-    //KVOfst& operator=(tbl* t)
-    //{ 
-    //  *kv = t;
-    //  return *this; 
-    //}
+    KVOfst& operator=(tbl const* const t)
+    { 
+      *kv = t;
+      return *this; 
+    }
+    KVOfst& operator=(tbl* t)
+    { 
+      *kv = t;
+      return *this; 
+    }
 
     KVOfst& operator=(tbl const& t)
     { 
@@ -784,6 +788,11 @@ private:
 
     initFields(szBytes, count, stride, typenum);
   }
+  void           init(KVOfst const& kvo)
+  {
+    u8* childTablesStart = (u8*)((tbl*)kvo.base)->childData();
+    m_mem = childTablesStart + kvo.kv->val + sizeof(tbl::TblFields);
+  }
   template<class T> void init(u64 count)
   {
     init(count, sizeof(T));
@@ -926,10 +935,7 @@ public:
   tbl(std::initializer_list<KV> lst) : m_mem(nullptr)
   { initKV(lst); }
   tbl(const char* s) : m_mem(nullptr) { init_cstr(s); }
-  tbl(KVOfst const& kvo)
-  {
-    *this = kvo.as<tbl>();
-  }
+  tbl(KVOfst const& kvo){ init(kvo); }
   template<class T> tbl(u64 count, T type_dummy)
   {
     init(count, sizeof(T), TblType::typenum<T>::num);
@@ -945,6 +951,7 @@ public:
   tbl& operator=(tbl const& l){ cp(l);            return *this; }
   tbl           (tbl&&      r){ mv(std::move(r));               }
   tbl& operator=(tbl&&      r){ mv(std::move(r)); return *this; }
+  tbl& operator=(KVOfst const& kvo){ init(kvo); return *this; }
   tbl& operator=(std::initializer_list<KV> lst){ initKV(lst); return *this; }
 
   template<class T> tbl& operator=(std::initializer_list<T>  lst){ init(lst); return *this; }
@@ -1516,21 +1523,45 @@ public:
 };
 
 
-tbl::KVOfst::operator tbl const*() const
-{ // this is separated out because it calls tbl::childData() and needs the full declaration of tbl to do so
-  tbl_msg_assert(
-    kv->type & TblType::TABLE,                        // can be a table pointer or a child table, so only need to check if it is a table at all
-    " - tbl TYPE ERROR -\nInternal type was not a TABLE or CHILD|TABLE: ", 
-    TblType::type_str((TblType::Type)kv->type),
-    "Desired type: ",
-    TblType::type_str((TblType::Type)TblType::typenum<tbl*>::num) );        
-
-  if(kv->type & TblType::CHILD){
-    u8* childTablesStart = (u8*)((tbl*)base)->childData();
-    return (tbl const*)( childTablesStart + kv->val);
-  }else
-    return (tbl const*)kv->val;
-}
+//tbl::KVOfst::operator tbl const*() const
+//tbl::KVOfst::operator tbl*()
+//{ // this is separated out because it calls tbl::childData() and needs the full declaration of tbl to do so
+//  tbl_msg_assert(
+//    kv->type & TblType::TABLE,                        // can be a table pointer or a child table, so only need to check if it is a table at all
+//    " - tbl TYPE ERROR -\nInternal type was not a TABLE or CHILD|TABLE: ", 
+//    TblType::type_str((TblType::Type)kv->type),
+//    "Desired type: ",
+//    TblType::type_str((TblType::Type)TblType::typenum<tbl*>::num) );        
+//
+//  if(kv->type & TblType::CHILD){
+//    u8* childTablesStart = (u8*)((tbl*)base)->childData();
+//    return (tbl*)( childTablesStart + kv->val + sizeof(tbl::TblFields) );
+//  }else
+//    return (tbl*)kv->val;
+//}
+//
+//tbl::KVOfst::operator const tbl()
+//{ // this is separated out because it calls tbl::childData() and needs the full declaration of tbl to do so
+//  using namespace std;
+//  
+//  tbl_msg_assert(
+//    kv->type & TblType::TABLE,                        // can be a table pointer or a child table, so only need to check if it is a table at all
+//    " - tbl TYPE ERROR -\nInternal type was not a TABLE or CHILD|TABLE: ", 
+//    TblType::type_str((TblType::Type)kv->type),
+//    "Desired type: ",
+//    TblType::type_str((TblType::Type)TblType::typenum<tbl*>::num) );        
+//
+//  tbl ret;
+//  if(kv->type & TblType::CHILD){
+//    u8* childTablesStart = (u8*)((tbl*)base)->childData();
+//    ret.m_mem = childTablesStart + kv->val + sizeof(tbl::TblFields);
+//    //return (tbl*)( childTablesStart + kv->val + sizeof(tbl::TblFields) );
+//  }else{
+//    ret.m_mem = (u8*)kv->val;
+//  }
+//
+//  return move(ret);
+//}
 
 
 #endif
