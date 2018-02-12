@@ -162,7 +162,7 @@ inline Shape          tbl_to_shape(tbl& iv)  // todo: try to change this to a co
   //tbl const* nx, const* ny, const* nz;
   //tbl const* cr, const* cg, const* cb;
   //tbl const* tx, const* ty;
-  tbl px, py, pz, nx, ny, nz, cr, cg, cb, tx, ty;
+  tbl px, py, pz, nx, ny, nz, cr, cg, cb, ca, tx, ty;
 
   tbl ind = iv("indices");
   px  = iv("positions x");
@@ -171,9 +171,10 @@ inline Shape          tbl_to_shape(tbl& iv)  // todo: try to change this to a co
   nx  = iv("normals x");
   ny  = iv("normals y");
   nz  = iv("normals z");
-  cr  = iv("colors x");
-  cg  = iv("colors y");
-  cb  = iv("colors z");
+  cr  = iv("colors red");
+  cg  = iv("colors green");
+  cb  = iv("colors blue");
+  ca  = iv("colors alpha");
   tx  = iv("texture coordinates x");
   ty  = iv("texture coordinates y");
 
@@ -211,6 +212,7 @@ inline Shape          tbl_to_shape(tbl& iv)  // todo: try to change this to a co
       verts[i].color[0] = cr.at<f32>(i);
       verts[i].color[1] = cg.at<f32>(i);
       verts[i].color[2] = cb.at<f32>(i);
+      verts[i].color[3] = ca.at<f32>(i);
 
       verts[i].texCoord[0] = tx.at<f32>(i);
       verts[i].texCoord[1] = ty.at<f32>(i);

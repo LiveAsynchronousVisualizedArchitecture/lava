@@ -265,11 +265,12 @@ public:
     template<> struct typenum<u64>   { static const Type num = U64;     };
     template<> struct typenum<i64>   { static const Type num = I64;     };
     template<> struct typenum<f64>   { static const Type num = F64;     };
-    template<> struct typenum<long>             { static const Type num = I64;   };
-    template<> struct typenum<unsigned long>    { static const Type num = U64;   };
+    //template<> struct typenum<long>             { static const Type num = I64;   };
+    //template<> struct typenum<unsigned long>    { static const Type num = U64;   };
     template<> struct typenum<tbl>         { static const Type num = TABLE;   };
-    template<> struct typenum<const tbl>   { static const Type num = TABLE;   };
-    template<> struct typenum<const tbl*>  { static const Type num = TABLE;   };
+    template<> struct typenum<tbl*>        { static const Type num = TABLE;   };
+    //template<> struct typenum<const tbl>   { static const Type num = TABLE;   };
+    //template<> struct typenum<const tbl*>  { static const Type num = TABLE;   };
 
     template<class C> struct typecast { using type = C;   };                               // cast types
     template<> struct typecast<i8>    { using type = i64; };
@@ -432,7 +433,7 @@ public:
     }
 
     //KV& operator=(tbl  const& t) = delete;
-    KV& operator=(tbl  const* const t)
+    KV& operator=(tbl* t)
     {
       type  =  TblType::typenum<tbl>::num;
       val   =  (u64)t;
@@ -602,7 +603,7 @@ public:
 
     //template<class N> KVOfst& operator=(N const& n) = delete;
 
-    KVOfst& operator=(tbl const* const t)
+    KVOfst& operator=(tbl const* t)
     { 
       *kv = t;
       return *this; 
@@ -790,8 +791,21 @@ private:
   }
   void           init(KVOfst const& kvo)
   {
-    u8* childTablesStart = (u8*)((tbl*)kvo.base)->childData();
-    m_mem = childTablesStart + kvo.kv->val + sizeof(tbl::TblFields);
+    //  if(kv->type & TblType::CHILD){
+    //    u8* childTablesStart = (u8*)((tbl*)base)->childData();
+    //    return (tbl*)( childTablesStart + kv->val + sizeof(tbl::TblFields) );
+    //  }else
+    //    return (tbl*)kv->val;
+
+    assert(kvo.kv->isEmpty() == false);
+
+    if(kvo.kv->type & TblType::CHILD){
+      u8* childTablesStart = (u8*)((tbl*)kvo.base)->childData();
+      m_mem = childTablesStart + kvo.kv->val + sizeof(tbl::TblFields);
+    }else{
+      //m_mem = ((tbl*)kvo.kv->val)->m_mem;
+      cp(  *((tbl*)kvo.kv->val)  );
+    }
   }
   template<class T> void init(u64 count)
   {
