@@ -50,6 +50,8 @@
 // -todo: work on copying a table into parent table on assignement - take address and flatten? - overloading only tbl const& seems to work to override the behavior of assigning a table 
 // -todo: figure out what do about TABLE and CHILD types with assignments to and from tbl pointers - seems to work for now, even if using an entire bit instead of a specific value for TABLE and TABLE|CHILD is inefficient
 
+// todo: make a templated at() method 
+// todo: make a constructor that takes a KVOfst
 // todo: return to map elements being only i64, u64, and f64 ? - typecast already causes this, should the types be more strict or should they cast automatically?
 // todo: make TblVal casts const
 // todo: make template function to get the array as a pointer of a certain type
@@ -197,9 +199,7 @@ public:
     u64     stride : 20;                            // this would allow strides of up to 1MB, which is probably way too big, so there are plenty of bits left for something else (like a subtype) 
     u64    version : 20;                            // The version of tbl, just in case the binary format changes
   };
-  using   fields  =  TblFields;
-
-  struct   TblType
+  struct    TblType
   {
     static const u8   MASK       =  0x3F;                    // first 6 bits set to 1 - 0b111111
     static const u8   CHILD      =  1<<5;                    // 6th bit designates if it is a child table - a child table is embedded in the table memory span instead of being simply a pointer to another table
@@ -325,7 +325,7 @@ public:
       }
     }
   };
-  struct    TblVal
+  struct     TblVal
   {
     #ifndef _NDEBUG
       u8      type;          // todo: change this just to a TblType when it is redone - also change it to debug only
@@ -356,7 +356,7 @@ public:
       return *this;
     }
   };
-  struct        KV
+  struct         KV
   {
     using    u8   =   uint8_t;
     using   u16   =  uint16_t;
@@ -536,10 +536,10 @@ public:
       return hsh & HASH_MASK;
     }
   };
-  struct    KVOfst  // KVOfst is key value offset 
+  struct     KVOfst  // KVOfst is key value offset 
   {
-    KV*         kv;
-    void*     base;
+    KV*          kv;
+    void*      base;
 
     KVOfst(KVOfst&  l) : kv(l.kv), base(l.base) {}
     KVOfst(KVOfst&& r) : kv(r.kv), base(r.base) {}
@@ -569,6 +569,7 @@ public:
     }
     operator tbl*()
     {
+    // todo: does thsi assert that the table type is is a table but not a child?
       tbl_msg_assert(
         kv->type == TblType::typenum<tbl*>::num, 
         " - tbl TYPE ERROR -\nInternal type: ", 
@@ -578,6 +579,20 @@ public:
 
       return (tbl*)kv->val;
     }
+    operator tbl const*() const;
+    //{
+    //  tbl_msg_assert(
+    //    kv->type & TblType::TABLE,                        // can be a table pointer or a child table, so only need to check if it is a table at all
+    //    " - tbl TYPE ERROR -\nInternal type was not a TABLE or CHILD|TABLE: ", 
+    //    TblType::type_str((TblType::Type)kv->type),
+    //    "Desired type: ",
+    //    TblType::type_str((TblType::Type)TblType::typenum<tbl*>::num) );        
+    //
+    //  if(kv->type & TblType::CHILD)
+    //    return (tbl const*)( ((tbl*)base)->childData() + kv->val);
+    //  else
+    //    return (tbl const*)kv->val;
+    //}
 
     template<class N> operator N() { return (N)(*kv); }
 
@@ -611,6 +626,8 @@ public:
     KV* operator->(){ return  kv; }
     KV& operator* (){ return *kv; }
   };
+
+  using   fields  =  TblFields;
 
 private:
   void      sizeBytes(u64  bytes){ memStart()->sizeBytes =  bytes; }
@@ -909,6 +926,10 @@ public:
   tbl(std::initializer_list<KV> lst) : m_mem(nullptr)
   { initKV(lst); }
   tbl(const char* s) : m_mem(nullptr) { init_cstr(s); }
+  tbl(KVOfst const& kvo)
+  {
+    *this = kvo.as<tbl>();
+  }
   template<class T> tbl(u64 count, T type_dummy)
   {
     init(count, sizeof(T), TblType::typenum<T>::num);
@@ -926,9 +947,9 @@ public:
   tbl& operator=(tbl&&      r){ mv(std::move(r)); return *this; }
   tbl& operator=(std::initializer_list<KV> lst){ initKV(lst); return *this; }
 
-  template<class T> tbl& operator=(std::initializer_list<T>  lst){  init(lst); return *this; }
+  template<class T> tbl& operator=(std::initializer_list<T>  lst){ init(lst); return *this; }
   
-  tbl& operator=(const char* s){ init_cstr(s); return *this; }
+  tbl&         operator=(const char* s){ init_cstr(s); return *this; }
 
   TblVal      operator[](u64 i)
   {
@@ -955,7 +976,6 @@ public:
     
     return v;
   }
-
   KVOfst      operator()(i32 k)
   {
     char key[sizeof(k)+1];
@@ -994,12 +1014,9 @@ public:
 
     return ret;
   }
+  tbl&      operator--(){ shrink_to_fit();    return *this; }
+  tbl&      operator++(){ expand(true,false); return *this; }
 
-  //tbl     operator>>(tbl const& l){ return tbl::concat_l(*this, l); }
-  //tbl     operator<<(tbl const& l){ return tbl::concat_r(*this, l); }
-
-  tbl&    operator--(){ shrink_to_fit();    return *this; }
-  tbl&    operator++(){ expand(true,false); return *this; }
   //void    operator+=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
   //void    operator-=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }
   //void    operator*=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a *= b; } ); }
@@ -1020,7 +1037,18 @@ public:
   //tbl     operator* (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a * b;}); }
   //tbl     operator/ (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a / b;}); }
   //tbl     operator% (T   const& l) const{ return bin_op(l,[](T const& a, T const& b){return a % b;}); }
+  //
+  //tbl     operator>>(tbl const& l){ return tbl::concat_l(*this, l); }
+  //tbl     operator<<(tbl const& l){ return tbl::concat_r(*this, l); }
 
+  template<class N> bool     insert(const char* key, N const& val)
+  {
+    KV& kv = (*this)(key, true);
+    if(kv.hsh.type==ERROR) return false;
+
+    kv = val;
+    return true;
+  }
   template<class V> KVOfst      put(const char* key, V val){ return this->operator()(key) = val; }
   template<class T> bool       push(T const& val)
   { 
@@ -1046,18 +1074,10 @@ public:
   
     return cnt;
   }
+  template<class T> T            at(u64 idx) const { return (T)((*this)[idx]); }
   void            pop(){ size(size()-1); }
   TblVal        front() const{ return (*this)[0]; }
   TblVal         back() const{ return (*this)[size()-1]; }
-
-  template<class N> bool insert(const char* key, N const& val)
-  {
-    KV& kv = (*this)(key, true);
-    if(kv.hsh.type==ERROR) return false;
-
-    kv = val;
-    return true;
-  }
   bool            has(const char* key)
   {
     KV const& kv = (*this)(key);
@@ -1494,6 +1514,23 @@ public:
     //auto st = ret.memStart();
   }
 };
+
+
+tbl::KVOfst::operator tbl const*() const
+{ // this is separated out because it calls tbl::childData() and needs the full declaration of tbl to do so
+  tbl_msg_assert(
+    kv->type & TblType::TABLE,                        // can be a table pointer or a child table, so only need to check if it is a table at all
+    " - tbl TYPE ERROR -\nInternal type was not a TABLE or CHILD|TABLE: ", 
+    TblType::type_str((TblType::Type)kv->type),
+    "Desired type: ",
+    TblType::type_str((TblType::Type)TblType::typenum<tbl*>::num) );        
+
+  if(kv->type & TblType::CHILD){
+    u8* childTablesStart = (u8*)((tbl*)base)->childData();
+    return (tbl const*)( childTablesStart + kv->val);
+  }else
+    return (tbl const*)kv->val;
+}
 
 
 #endif

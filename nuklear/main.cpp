@@ -666,7 +666,7 @@ f32      drawGraph(NVGcontext* nvg, tbl   const&    t, bnd2f b)
 
   nvgStrokeWidth(nvg, 1.f);
   nvgStrokeColor(nvg, nvgRGBAf(0,.8f,.25f, 1.f));
-  nvgFillColor(nvg, nvgRGBAf(0,.5f,.25f, .5f));
+  nvgFillColor(nvg,   nvgRGBAf(0,.5f,.25f, .5f));
   TO(t.size(),i)
   {
     f32 x = b.xmn + i*inc + 2;

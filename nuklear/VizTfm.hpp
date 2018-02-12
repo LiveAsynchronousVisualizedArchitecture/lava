@@ -140,28 +140,45 @@ inline Shape          ivbuf_to_shape(void* buf, u64 len)    //IndexedVerts* iv)
 
   return move(shp);
 }
-inline Shape          tbl_to_shape(IvTbl& t)  // todo: try to change this to a const reference
+inline Shape          tbl_to_shape(tbl& iv)  // todo: try to change this to a const reference
 {
   using namespace std;
   static float tmpImg[] = { 0.5f, 0.5f, 0.5f, 0.5f };
 
-  assert( t.m_mem != nullptr );   auto f = t.memStart();
-  assert( ((i8*)t.memStart())[0] = 't' );
-  assert( ((i8*)t.memStart())[1] = 'b' );
+  assert( iv.m_mem != nullptr );   auto f = iv.memStart();
+  assert( ((i8*)iv.memStart())[0] = 't' );
+  assert( ((i8*)iv.memStart())[1] = 'b' );
 
-  u64 typenum = t("type");
+  u64 typenum = iv("type");
   assert( memcmp(&typenum, (u64*)"IdxVerts", sizeof(u64))==0 );
 
   Shape shp;   // = {0,0,0,0,0};         // Shape of all 0s
 
   //tu32  ind = t("IND");
-  tbl   ind = t("indices");
-  shp.owner = true;
-  u32 mode  = (u32)((u64)t("mode"));
-  shp.mode  = mode;
-  shp.indsz = ind.size();
+  u32 mode = (u32)((u64)iv("mode"));
+  tbl const* ind;
+  tbl const* px, const* py, const* pz;
+  tbl const* nx, const* ny, const* nz;
+  tbl const* cr, const* cg, const* cb;
+  tbl const* tx, const* ty;
+  ind = iv("indices");
+  px  = iv("positions x");
+  py  = iv("positions y");
+  pz  = iv("positions z");
+  nx  = iv("normals x");
+  ny  = iv("normals y");
+  nz  = iv("normals z");
+  cr  = iv("colors x");
+  cg  = iv("colors y");
+  cb  = iv("colors z");
+  tx  = iv("texture coordinates x");
+  ty  = iv("texture coordinates y");
 
-  auto ff = ind.memStart();
+  shp.owner = true;
+  shp.mode  = mode;
+  shp.indsz = ind->size();
+
+  //auto ff = ind->memStart();
 
   glGenTextures(1, &shp.tx);
   glBindTexture(GL_TEXTURE_2D, shp.tx);
@@ -174,11 +191,33 @@ inline Shape          tbl_to_shape(IvTbl& t)  // todo: try to change this to a c
 
   glBindVertexArray(shp.vertary);
 
+  //tbl px = t("positions x");
+  vec<Vertex> verts(px->size());
+  SECTION(convert/extract the individual component arrays into one array of Vertex structs)
+  {
+    TO(verts.size(),i){
+      verts[i].position[0] = px->at<f32>(i);
+      verts[i].position[1] = py->at<f32>(i);
+      verts[i].position[2] = pz->at<f32>(i);
+
+      verts[i].normal[0] = nx->at<f32>(i);
+      verts[i].normal[1] = ny->at<f32>(i);
+      verts[i].normal[2] = nz->at<f32>(i);
+
+      verts[i].color[0] = cr->at<f32>(i);
+      verts[i].color[1] = cg->at<f32>(i);
+      verts[i].color[2] = cb->at<f32>(i);
+
+      verts[i].texCoord[0] = tx->at<f32>(i);
+      verts[i].texCoord[1] = ty->at<f32>(i);
+    }
+  }
+
   glBindBuffer(GL_ARRAY_BUFFER, shp.vertbuf);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * t.size(), t.data(), GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex) * verts.size(), verts.data(), GL_STATIC_DRAW);
 
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shp.idxbuf);
-  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t)*ind.size(), ind.data(), GL_STATIC_DRAW);
+  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t)*ind->size(), ind->data(), GL_STATIC_DRAW);
 
   glVertexAttribPointer(POSITION, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);                      
   glVertexAttribPointer(NORMAL,   3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) *  3));
