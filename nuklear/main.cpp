@@ -60,6 +60,7 @@
 // -todo: take out test db
 // -todo: take out nanovg visualization of tbl
 
+// todo: look back at Shape and if mv is actually deleting the openGL handles
 // todo: clean out comments in VizTfm.hpp
 // todo: convert to using non-templated tbl
 // todo: convert to using new IdxVerts format
@@ -401,7 +402,6 @@ GLFWwindow*          initGLFW(VizData* vd)
   return win;
 }
 
-
 void              RenderShape(Shape const& shp, mat4 const& m) // GLuint shaderId)
 {
   glUseProgram(shp.shader);  //shader.use();
@@ -457,10 +457,14 @@ vec_vs         shapesFromKeys(simdb const& db, vec_vs dbKeys, VizData* vd)  // v
 
       ivbuf.resize(vlen);
       db.get(vs.str.data(), (u32)vs.str.length(),  ivbuf.data(), vlen);
-      IvTbl iv(ivbuf.data(), false, false);
-      auto     f = iv.memStart();
+      //IvTbl iv(ivbuf.data(), false, false);
+      tbl iv(ivbuf.data(), false, false);
 
-      IvTbl ivcpy(iv);
+      //IvTbl ivcpy(iv);
+      //tbl ivcpy(iv);
+      tbl ivcpy = iv;
+
+      auto     f = ivcpy.memStart();
 
       Shape  s   = tbl_to_shape(ivcpy);      PRINT_GL_ERRORS
       //Shape  s   = tbl_to_shape(iv);      PRINT_GL_ERRORS
@@ -495,29 +499,6 @@ vec_vs       eraseMissingKeys(vec_vs dbKeys, KeyShapes* shps)           // vec<s
 
   return dbKeys;
   //return cnt;
-}
-bool                updateKey(simdb const& db, str const& key, u32 version, VizData* vd)
-{
-  using namespace std;
-
-  u32 dbVersion = 0;
-  u32      vlen = 0;
-  auto       len = db.len(key.data(), (u32)key.length(), &vlen, &dbVersion);
-
-  if(len>0 && dbVersion!=version){ //key.v){
-    vec<i8> ivbuf(vlen);
-    db.get(key.data(), (u32)key.length(), ivbuf.data(), (u32)ivbuf.size());
-
-    Shape  s  = ivbuf_to_shape(ivbuf.data(), len);
-    s.shader  = vd->shaderId;
-    s.active  = true;                     // because updates only happen when the shape is active, always setting an updated shape to active should work
-    s.version = dbVersion;
-    vd->shapes[key] = move(s);
-    
-    return true;
-  }
-
-  return false;
 }
 double                   nowd()
 {
@@ -1286,6 +1267,29 @@ ENTRY_DECLARATION
 
 
 
+//bool                updateKey(simdb const& db, str const& key, u32 version, VizData* vd)
+//{
+//  using namespace std;
+//
+//  u32 dbVersion = 0;
+//  u32      vlen = 0;
+//  auto       len = db.len(key.data(), (u32)key.length(), &vlen, &dbVersion);
+//
+//  if(len>0 && dbVersion!=version){ //key.v){
+//    vec<i8> ivbuf(vlen);
+//    db.get(key.data(), (u32)key.length(), ivbuf.data(), (u32)ivbuf.size());
+//
+//    Shape  s  = ivbuf_to_shape(ivbuf.data(), len);
+//    s.shader  = vd->shaderId;
+//    s.active  = true;                     // because updates only happen when the shape is active, always setting an updated shape to active should work
+//    s.version = dbVersion;
+//    vd->shapes[key] = move(s);
+//    
+//    return true;
+//  }
+//
+//  return false;
+//}
 
 // vd.ui.w / (f32)vd.ui.h);
 //drawTbl(vd.ui.nvg, tst("chld"), (f32)w, (f32)h, 25, 50, 20, 10);

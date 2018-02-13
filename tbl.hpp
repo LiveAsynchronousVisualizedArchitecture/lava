@@ -780,6 +780,7 @@ private:
     f->owned      =  1;
     f->arrayType  =  typenum;
     f->stride     =  stride;
+    f->version    =  0;
   }
   void           init(u64 count,     u64 stride=1, u64 typenum=TblType::U8)
   {
@@ -811,7 +812,8 @@ private:
   {
     init(count, sizeof(T));
   }
-  template<class T> void init(std::initializer_list<T>  lst)
+  template<class T> void 
+  init(std::initializer_list<T>  lst)
   {
     init(lst.size(), sizeof(T), TblType::typenum<T>::num);
 
@@ -1181,14 +1183,18 @@ public:
     u64     nxtBytes  =  memberBytes() + stride()*count +  sizeof(KV)*mapcap + childcap;
     void*     re;
     bool      fresh  = !m_mem;
-    if(fresh) re = malloc(nxtBytes);
-    else      re = realloc( (void*)memStart(), nxtBytes);
+    if(fresh){ re = malloc(nxtBytes);
+    }else{     re = realloc( (void*)memStart(), nxtBytes); }
 
     if(re){
       m_mem = ((u8*)re) + memberBytes();
+      if(fresh){
+        initFields(nxtBytes,count);
+      }else{
+        sizeBytes(nxtBytes);
+        capacity(count);
+      }
       //initFields(nxtBytes, count);
-      sizeBytes(nxtBytes);
-      capacity(count);
       this->mapcap(mapcap);
       if(re && fresh){
         auto f = memStart();

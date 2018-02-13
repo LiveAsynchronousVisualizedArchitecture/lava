@@ -18,7 +18,7 @@
 //#include "../nanovg_test/tbl.hpp"
 #include "../simdb.hpp"
 #include "../tbl.hpp"
-#include "IndexedVerts.h"
+//#include "IndexedVerts.h"
 
 //#include "../nanovg_test/tbl_test/tbl.hpp"
 //#include "../nanovg_test/nanovg_test/vec.hpp"
@@ -78,9 +78,14 @@ union bnd2f
   f32 h() const { return ymx - ymn; }
 };
 
-struct vert { f32 p[3],n[3],c[4],tx[2]; };
+struct vert { 
+  f32  p[3];
+  f32  n[3];
+  f32  c[4];
+  f32 tx[2];
+};
 //using IvTbl = tbl<vert>;
-using IvTbl = tbl;
+//using IvTbl = tbl;
 
 struct  Shape {                     // todo: make rvalue constructor - make all constructors?
 private:
@@ -88,19 +93,19 @@ private:
   {
     if (owner) {
       glDeleteVertexArrays(1, &vertary);
-      glDeleteBuffers(1, &vertbuf);
-      glDeleteBuffers(1, &idxbuf);
-      glDeleteTextures(1, &tx);
+      glDeleteBuffers(1,      &vertbuf);
+      glDeleteBuffers(1,       &idxbuf);
+      glDeleteTextures(1,          &tx);
     }
     owner = false;
   }
   void  mv(Shape&& rval)
   {
-    del();
+    //del();
 
     memcpy(this, &rval, sizeof(Shape));
     memset(&rval, 0, sizeof(Shape));
-    //rval.owner = false;
+    rval.owner = false;
   }
 
 public:
@@ -112,8 +117,10 @@ public:
 
   Shape() :
     owner(false),
-    version(0),
     active(0),
+    version(0),
+    mode(0),
+    indsz(0),
     vertbuf(0),
     vertary(0),
     idxbuf(0),

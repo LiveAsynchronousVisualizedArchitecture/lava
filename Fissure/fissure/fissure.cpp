@@ -2128,6 +2128,7 @@ ENTRY_DECLARATION // main or winmain
       iv("texture coordinates y") = &ty;
 
       iv.flatten();
+      auto fields = iv.memStart();
 
       Println("iv sizeBytes: ", iv.sizeBytes() );
       Println("ind type: ",  indices.typeStr() );
