@@ -2095,9 +2095,9 @@ ENTRY_DECLARATION // main or winmain
     tbl iv;
     SECTION(make IdxVerts with the new tbl)
     {
-      tbl indices = {0u, 1u, 2u};
+      tbl indices = {0u,       1u,       2u };
       tbl      px = { -1.f,  -0.17f, -0.58f };
-      tbl      py = { -1.f,  -1.0f,  -1.0f  };
+      tbl      py = { -1.f,  -1.0f,   1.0f  };
       tbl      pz = {  0.f,   0.f,   -0.f   };
       tbl      nx = {  0.f,   0.f,    0.f   };
       tbl      ny = {  0.f,   0.f,    0.f   };

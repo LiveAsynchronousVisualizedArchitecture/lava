@@ -59,11 +59,12 @@
 // -todo: fix crash while turning on second button - can't repeat this old note/bug
 // -todo: take out test db
 // -todo: take out nanovg visualization of tbl
+// -todo: look back at Shape and if mv is actually deleting the openGL handles - seems like it was
+// -todo: convert to using non-templated tbl
+// -todo: convert to using new IdxVerts format
 
-// todo: look back at Shape and if mv is actually deleting the openGL handles
+// todo: try drawing most basic shapes possible to get something to show up
 // todo: clean out comments in VizTfm.hpp
-// todo: convert to using non-templated tbl
-// todo: convert to using new IdxVerts format
 // todo: look in to keys from fissure dissapearing when being overwritten constantly
 // todo: investigate crash while visualizing multiple tables in a running graph
 // todo: change project name to visualizer
@@ -409,7 +410,7 @@ void              RenderShape(Shape const& shp, mat4 const& m) // GLuint shaderI
   GLint transformLoc = glGetUniformLocation(vd.shaderId, "transform");
   glUniformMatrix4fv(transformLoc, 1, GL_FALSE, value_ptr(m));
 
-  int size;
+  GLint size;
   glActiveTexture(GL_TEXTURE0);	// Activate the texture unit first before binding texture
   glBindTexture(GL_TEXTURE_2D, shp.tx);
   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -421,7 +422,7 @@ void              RenderShape(Shape const& shp, mat4 const& m) // GLuint shaderI
   auto loc = glGetUniformLocation(shp.shader, "tex0");
   glUniform1i(loc, 0);
 
-  glBindVertexArray(shp.vertary);
+  glBindVertexArray(shp.vertary);                                          PRINT_GL_ERRORS
   glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shp.idxbuf);                       PRINT_GL_ERRORS
   glGetBufferParameteriv(GL_ELEMENT_ARRAY_BUFFER, GL_BUFFER_SIZE, &size);  PRINT_GL_ERRORS   // todo: keep size with shape instead of querying it
   glDrawElements(shp.mode, shp.indsz, GL_UNSIGNED_INT, 0);                 PRINT_GL_ERRORS   // todo: can't use quads with glDrawElements?
@@ -510,10 +511,7 @@ double                   nowd()
   return nano.count() / 1000000000.0; 
 }
 void                refreshDB(VizData* vd)
-{
-  //if(db.mem() != nullptr)
-  //  printdb(db);
-  
+{  
   auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
   dbKeys      = shapesFromKeys(db, move(dbKeys), vd);
   dbKeys      = eraseMissingKeys(move(dbKeys), &vd->shapes);
@@ -1171,7 +1169,15 @@ ENTRY_DECLARATION
         for(auto& kv : vd.shapes){
           if(kv.second.active)
             RenderShape(kv.second, viewProj);
+            //RenderShape(kv.second, glm::mat4() );
         }
+
+        //glBegin(GL_POINTS);
+        //  glVertex2f(0,0);
+        //  glVertex2f(1,0);
+        //  glVertex2f(1,1);
+        //  glVertex2f(0,1);
+        //glEnd();
       }
 
       PRINT_GL_ERRORS
@@ -1266,6 +1272,8 @@ ENTRY_DECLARATION
 
 
 
+//if(db.mem() != nullptr)
+//  printdb(db);
 
 //bool                updateKey(simdb const& db, str const& key, u32 version, VizData* vd)
 //{

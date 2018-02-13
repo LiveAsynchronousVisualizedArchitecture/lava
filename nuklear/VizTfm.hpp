@@ -92,6 +92,7 @@ inline Shape          tbl_to_shape(tbl& iv)  // todo: try to change this to a co
   Shape shp;   // = {0,0,0,0,0};         // Shape of all 0s
 
   u32 mode = (u32)((u64)iv("mode"));
+  //mode = 0;
 
   tbl ind, px, py, pz, nx, ny, nz, cr, cg, cb, ca, tx, ty;
   ind = iv("indices");

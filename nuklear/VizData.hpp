@@ -66,7 +66,33 @@ void main(){ \
   //Ci        =  vec4(tClr.xyz*tClr.a,tClr.a) + ( (1-tClr.a)*fragC ); \n \
   //Ci        =  vec4(tClr.rgb*tClr.a,tClr.a) + ( (1-tClr.a)*fragC ); \n \
   Ci        =  tClr + ( (1-tClr.a)*fragC ); \n \
+  \
+  Ci = vec4(1,1,1,1); \
 }";
+
+//static const char*  fragShader = 
+//R"frag(
+//#version 330 core\n
+//
+//in vec3 fragN; 
+//in vec4 fragC; 
+//in vec2 fragUV;
+//
+//out vec4 Ci;
+//
+//uniform sampler2D tex0; \n
+//
+//void main()
+//{
+//  Ci = fragC; \n
+//  vec4 tClr =  texture(tex0, fragUV); \n
+//  //Ci        =  vec4(tClr.xyz*tClr.a,tClr.a) + ( (1-tClr.a)*fragC ); \n
+//  //Ci        =  vec4(tClr.rgb*tClr.a,tClr.a) + ( (1-tClr.a)*fragC ); \n
+//  Ci        =  tClr + ( (1-tClr.a)*fragC ); \n
+//
+//  Ci = vec4(1,1,1,1);
+//} 
+//)frag";
 
 static simdb    db;
 static VizData  vd;
