@@ -62,14 +62,17 @@
 // -todo: look back at Shape and if mv is actually deleting the openGL handles - seems like it was
 // -todo: convert to using non-templated tbl
 // -todo: convert to using new IdxVerts format
+// -todo: try drawing most basic shapes possible to get something to show up - triangle y positions were all -1, rendering as points showed the problem
+// -todo: fix tbl visualization cells going outside the bounds of bounding box - need to wrap sooner, possibly based on more margins - worry about table visualization later if at all, now done through Brandisher
+// -todo: put shaders back to normal
+// -todo: change shaders to use string literals 
+// -todo: make default image all 0s
+// -todo: clean out comments in VizTfm.hpp
 
-// todo: try drawing most basic shapes possible to get something to show up
-// todo: clean out comments in VizTfm.hpp
 // todo: look in to keys from fissure dissapearing when being overwritten constantly
 // todo: investigate crash while visualizing multiple tables in a running graph
 // todo: change project name to visualizer
 // todo: fix crash from VS execution in release mode
-// todo: fix tbl visualization cells going outside the bounds of bounding box - need to wrap sooner, possibly based on more margins
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
 //       |  visualize the fit position and camera frustum in real time to debug
@@ -261,11 +264,11 @@ void              keyCallback(GLFWwindow* window, int key, int scancode, int act
   case GLFW_KEY_J:
   case GLFW_KEY_F: {
     if(action==GLFW_RELEASE){
-      vec4   sph   =  shapes_to_bndsph(*vd);
-      vec3  cntr   =  vec3(sph.x,sph.y,sph.z);
-      vec3  ofst   =  cam.pos - cam.lookAt;
-      cam.lookAt   =  cntr;
-      cam.pos      =  cam.lookAt + ofst;
+      //vec4   sph   =  shapes_to_bndsph(*vd);
+      //vec3  cntr   =  vec3(sph.x,sph.y,sph.z);
+      //vec3  ofst   =  cam.pos - cam.lookAt;
+      //cam.lookAt   =  cntr;
+      //cam.pos      =  cam.lookAt + ofst;
     }
     //cam.dist     =  sph.r;
   } break;

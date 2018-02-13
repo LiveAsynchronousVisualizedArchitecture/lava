@@ -16,7 +16,6 @@
 #include "IndexedVerts.h"
 #include "VizData.hpp"
 
-
 namespace{
 
 void       print_gl_errors(int line)
@@ -80,7 +79,7 @@ inline GLuint  shadersrc_to_shaderid(const char* vert, const char* frag)
 inline Shape          tbl_to_shape(tbl& iv)  // todo: try to change this to a const reference
 {
   using namespace std;
-  static float tmpImg[] = { 0.5f, 0.5f, 0.5f, 0.5f };
+  static float tmpImg[] = { 0.f, 0.f, 0.f, 0.f };
 
   assert( iv.m_mem != nullptr );   auto f = iv.memStart();
   assert( ((i8*)iv.memStart())[0] = 't' );
@@ -89,11 +88,8 @@ inline Shape          tbl_to_shape(tbl& iv)  // todo: try to change this to a co
   u64 typenum = iv("type");
   assert( memcmp(&typenum, (u64*)"IdxVerts", sizeof(u64))==0 );
 
-  Shape shp;   // = {0,0,0,0,0};         // Shape of all 0s
-
+  Shape shp;
   u32 mode = (u32)((u64)iv("mode"));
-  //mode = 0;
-
   tbl ind, px, py, pz, nx, ny, nz, cr, cg, cb, ca, tx, ty;
   ind = iv("indices");
   px  = iv("positions x");
@@ -170,66 +166,83 @@ inline Shape          tbl_to_shape(tbl& iv)  // todo: try to change this to a co
   return move(shp);
 }
 inline mat4           camera_to_mat4(Camera const& cam, float w, float h)
-{
-  //using namespace glm;
-  
+{  
   const static auto XAXIS = vec4(1.f, 0.f, 0.f, 1.f);
   const static auto YAXIS = vec4(0.f, 1.f, 0.f, 1.f);
-  //const static auto YAXIS = vec3(0.f, 1.f, 0.f);
 
   mat4 look  =  lookAt(cam.pos, cam.lookAt, cam.up);
-  //mat4 view  =  glm::inverse(look);
   mat4 view  =  look;
         
-  //mat4 projection;
   mat4 projection = glm::perspective(cam.fov, (w/h), cam.nearClip, cam.farClip);
   return projection * view;
-  //camMtx = vd.camera.tfm * projection;
 }
-inline vec4         shapes_to_bndsph(VizData const& vd)
-{
-  f32  r = 0;
-  vec3 p(0,0,0);
 
-  for(auto& kv : vd.shapes)
-  {
-    if(!kv.second.active) continue;
+//inline vec4         shapes_to_bndsph(VizData const& vd)
+//{
+//  f32  r = 0;
+//  vec3 p(0,0,0);
+//
+//  for(auto& kv : vd.shapes)
+//  {
+//    if(!kv.second.active) continue;
+//
+//    auto&    key = kv.first;
+//    u32     vlen = 0;
+//    u32  version = 0;
+//    auto     len = db.len(key.data(), (u32)key.length(), &vlen, &version);          // todo: make ui64 as the input length
+//
+//    vec<i8> ivbuf(vlen);
+//    db.get(key.data(), (u32)key.length(), ivbuf.data(), (u32)ivbuf.size());
+//
+//    IndexedVerts* iv = (IndexedVerts*)IndexedVertsLoad(ivbuf.data());
+//    vec3*          v = (vec3*)iv->verts;
+//    TO(iv->vertsLen,i){
+//      f32 dist = distance(v[i], p); 
+//      p = (v[i] + p) / 2.f;
+//      r = (r + dist) / 2.f;
+//    }
+//    IndexedVertsDestroy(iv);
+//  }
+//  return vec4(p, r);
+//}
 
-    auto&    key = kv.first;
-    u32     vlen = 0;
-    u32  version = 0;
-    auto     len = db.len(key.data(), (u32)key.length(), &vlen, &version);          // todo: make ui64 as the input length
-
-    vec<i8> ivbuf(vlen);
-    db.get(key.data(), (u32)key.length(), ivbuf.data(), (u32)ivbuf.size());
-
-    IndexedVerts* iv = (IndexedVerts*)IndexedVertsLoad(ivbuf.data());
-    vec3*          v = (vec3*)iv->verts;
-    TO(iv->vertsLen,i){
-      f32 dist = distance(v[i], p); 
-      p = (v[i] + p) / 2.f;
-      r = (r + dist) / 2.f;
-    }
-    IndexedVertsDestroy(iv);
-  }
-  return vec4(p, r);
-
-
-  //Shape s = ivbuf_to_shape(ivbuf.data(), len);
-  //
-  //for(auto const& shp : shapes){
-  //  Shape const& s = shp.second;
-  //  if(s.active){
-  //    
-  //  }
-  //}
-}
 #endif
 
 
 
 
 
+
+
+
+
+
+
+
+
+
+//Shape s = ivbuf_to_shape(ivbuf.data(), len);
+//
+//for(auto const& shp : shapes){
+//  Shape const& s = shp.second;
+//  if(s.active){
+//    
+//  }
+//}
+
+//using namespace glm;
+//
+//const static auto YAXIS = vec3(0.f, 1.f, 0.f);
+//
+//mat4 view  =  glm::inverse(look);
+//
+//mat4 projection;
+//
+//camMtx = vd.camera.tfm * projection;
+
+//static float tmpImg[] = { 0.5f, 0.5f, 0.5f, 0.5f };
+// = {0,0,0,0,0};         // Shape of all 0s
+//mode = 0;  // GL_POINTS
 
 //inline Shape          ivbuf_to_shape(void* buf, u64 len)    //IndexedVerts* iv)
 //{
