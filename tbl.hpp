@@ -800,7 +800,11 @@ private:
     //  }else
     //    return (tbl*)kv->val;
 
-    assert(kvo.kv->isEmpty() == false);
+    //assert(kvo.kv->isEmpty() == false);
+    if(kvo.kv->isEmpty()){
+      m_mem = nullptr;
+      return;
+    }
 
     if(kvo.kv->type & TblType::CHILD){
       u8* childTablesStart = (u8*)((tbl*)kvo.base)->childData();
@@ -976,6 +980,7 @@ public:
   
   tbl&         operator=(const char* s){ init_cstr(s); return *this; }
 
+  operator bool(){ return (bool)m_mem; }
   TblVal      operator[](u64 i)
   {
     tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
@@ -1544,6 +1549,9 @@ public:
   }
 };
 
+#endif
+
+
 
 //tbl::KVOfst::operator tbl const*() const
 //tbl::KVOfst::operator tbl*()
@@ -1584,12 +1592,6 @@ public:
 //
 //  return move(ret);
 //}
-
-
-#endif
-
-
-
 
 //tbl::KVOfst::operator tbl()
 //{   

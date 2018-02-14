@@ -68,10 +68,12 @@
 // -todo: change shaders to use string literals 
 // -todo: make default image all 0s
 // -todo: clean out comments in VizTfm.hpp
+// -todo: deal with sub tables for vert components not being present in VizTfm.hpp index verts to shape - operator bool added to tbl, initialization of verts added to tbl_to_shape function
 
+// todo: change project name to Visualizer
+// todo: change project name to visualizer
 // todo: look in to keys from fissure dissapearing when being overwritten constantly
 // todo: investigate crash while visualizing multiple tables in a running graph
-// todo: change project name to visualizer
 // todo: fix crash from VS execution in release mode
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?

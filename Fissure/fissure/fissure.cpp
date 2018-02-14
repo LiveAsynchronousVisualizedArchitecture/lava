@@ -242,9 +242,10 @@
 // -todo: implement sub tables in brandisher
 // -todo: look in to turning tbl into class without a template
 // -todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array - can any heirarchy of initializer_lists be brought down to an array of the same types?
+// -todo: redo MakeCube with new tbl format
 
+// todo: test IdxVerts without non essential components like texture coordinates or colors
 // todo: put in more error checking on shared library loading
-// todo: redo MakeCube with new tbl format
 // todo: put image into IdxVerts
 // todo: give LavaNode struct a description string
 // todo: make description strings show up in the status bar on mouse over
@@ -2119,15 +2120,15 @@ ENTRY_DECLARATION // main or winmain
       iv("positions x")  = &px;
       iv("positions y")  = &py;
       iv("positions z")  = &pz;
-      iv("normals x")    = &nx;
-      iv("normals y")    = &ny;
-      iv("normals z")    = &nz;
-      iv("colors red")   = &cr;
-      iv("colors green") = &cg;
-      iv("colors blue")  = &cb;
-      iv("colors alpha") = &ca;
-      iv("texture coordinates x") = &tx;
-      iv("texture coordinates y") = &ty;
+      //iv("normals x")    = &nx;
+      //iv("normals y")    = &ny;
+      //iv("normals z")    = &nz;
+      //iv("colors red")   = &cr;
+      //iv("colors green") = &cg;
+      //iv("colors blue")  = &cb;
+      //iv("colors alpha") = &ca;
+      //iv("texture coordinates x") = &tx;
+      //iv("texture coordinates y") = &ty;
 
       iv.flatten();
       auto fields = iv.memStart();

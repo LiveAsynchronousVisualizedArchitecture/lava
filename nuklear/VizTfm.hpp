@@ -124,25 +124,30 @@ inline Shape          tbl_to_shape(tbl& iv)  // todo: try to change this to a co
 
   vec<vert> verts;
   verts.resize(px.size());
+  auto sz = verts.size();
   SECTION(convert/extract the individual component arrays into one array of Vertex structs)
   {
-    TO(verts.size(),i){
+    TO(sz,i){
+      verts[i] = { {0,0,0}, {0,0,0}, {1.f,0,0,1.f}, {0,0} };  // initialize - position (3 floats), normals (3 floats), colors (4 floats) and textures coordinates (2 floats) 
+    }
+
+    TO(sz,i){
       verts[i].p[0] = px.at<f32>(i);
       verts[i].p[1] = py.at<f32>(i);
       verts[i].p[2] = pz.at<f32>(i);
-
-      verts[i].n[0] = nx.at<f32>(i);
-      verts[i].n[1] = ny.at<f32>(i);
-      verts[i].n[2] = nz.at<f32>(i);
-
-      verts[i].c[0] = cr.at<f32>(i);
-      verts[i].c[1] = cg.at<f32>(i);
-      verts[i].c[2] = cb.at<f32>(i);
-      verts[i].c[3] = ca.at<f32>(i);
-
-      verts[i].tx[0] = tx.at<f32>(i);
-      verts[i].tx[1] = ty.at<f32>(i);
     }
+
+    if(nx) TO(sz,i) verts[i].n[0] = nx.at<f32>(i);
+    if(ny) TO(sz,i) verts[i].n[1] = ny.at<f32>(i);
+    if(nz) TO(sz,i) verts[i].n[2] = nz.at<f32>(i);
+
+    if(cr) TO(sz,i) verts[i].c[0] = cr.at<f32>(i);
+    if(cg) TO(sz,i) verts[i].c[1] = cg.at<f32>(i);
+    if(cb) TO(sz,i) verts[i].c[2] = cb.at<f32>(i);
+    if(ca) TO(sz,i) verts[i].c[3] = ca.at<f32>(i);
+
+    if(tx) TO(sz,i) verts[i].tx[0] = tx.at<f32>(i);
+    if(ty) TO(sz,i) verts[i].tx[1] = ty.at<f32>(i);
   }
 
   glBindBuffer(GL_ARRAY_BUFFER, shp.vertbuf);
