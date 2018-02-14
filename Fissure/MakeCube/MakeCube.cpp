@@ -35,39 +35,55 @@ extern "C"
 
     //if( hasRun.exchange(true) ) return 1;
 
-    //printf("\n MakeCube run \n");
+    tbl      iv;
+    tbl indices = {0u,       1u,       2u };
+    tbl      px = { -1.f,  -0.17f, -0.58f };
+    tbl      py = { -1.f,  -1.0f,   1.0f  };
+    tbl      pz = {  0.f,   0.f,   -0.f   };
+    tbl      nx = {  0.f,   0.f,    0.f   };
+    tbl      ny = {  0.f,   0.f,    0.f   };
+    tbl      nz = { -1.f,  -1.f,   -1.f   };
+    tbl      cr = {  1.f,   1.f,    1.f   };
+    tbl      cg = {  1.f,   1.f,    1.f   };
+    tbl      cb = {  1.f,   1.f,    1.f   };
+    tbl      ca = {  1.f,   1.f,    1.f   };
+    tbl      tx = {  0.f,   0.f,    0.f   };
+    tbl      ty = {  0.f,   0.f,    0.f   };
+    u32    mode        = (u32)0x0004; // (u64)GL_TRIANGLES;  // #define GL_TRIANGLES 0x0004
+    u64 typenum        =  *((u64*)"IdxVerts");
+    iv("type")         = typenum;
+    iv("mode")         = mode;
+    iv("indices")      = &indices;
+    iv("positions x")  = &px;
+    iv("positions y")  = &py;
+    iv("positions z")  = &pz;
+    iv("normals x")    = &nx;
+    iv("normals y")    = &ny;
+    iv("normals z")    = &nz;
+    iv("colors red")   = &cr;
+    iv("colors green") = &cg;
+    iv("colors blue")  = &cb;
+    iv("colors alpha") = &ca;
+    iv("texture coordinates x") = &tx;
+    iv("texture coordinates y") = &ty;
+    iv.flatten();
 
-    //tbl<f32> idxVerts = tbl<f32>::make_borrowed(inout_lp->mem_alloc, 
-    
-    // todo:  this will allocate using malloc and realloc - need to change tbl to use allocation, reallocation, and free functions in the type
-    IvTbl lftTri = {              // array of vert structs
-      {{-1.0, -1.0f, 0.0f},       //pos
-      {0.0f, 0.0f, -1.0f},        //norm
-      {1.0f, 1.0f, 1.0f, 1.0f},   //color
-      {0.0f, 0.0f}},              //texCoord
+    u64   flatSize = iv.sizeBytes();
+    void* outAlloc = inout_lp->mem_alloc(flatSize);
+    memcpy(outAlloc, iv.memStart(), flatSize);
 
-      {{-0.17f, -1.0f, 0.0f},     //pos
-      {0.0f, 0.0f, -1.0f},        //norm
-      {1.0f, 1.0f, 1.0f, 1.0f},   //color
-      {0.0f, 0.0f}},              //texCoord
-
-      {{-0.58f, 1.0f, 0.0f},      //pos
-      {0.0f, 0.0f, -1.0f},        //norm
-      {1.0f, 1.0f, 1.0f, 1.0f},   //color
-      {0.0f, 0.0f}}               //texCoord
-    };
-
-    auto typenum    =  "IdxVerts";
-    lftTri("type")  =  *((u64*)typenum);
-    lftTri("mode")  =  (u64)0x0004; // (u64)GL_TRIANGLES;  // #define GL_TRIANGLES 0x0004
-    tu32 ind        =  {0, 1, 2};
-    lftTri("IND")   =  &ind; 
-
-    lftTri.flatten();
-
-    auto lo = LavaTblToOut(inout_lp, lftTri);
+    LavaOut lo;
+    LavaVal lv;
+    lv.value    = (u64)outAlloc; //(u64)iv.memStart(); 
+    lv.type     = LavaArgType::MEMORY;
     lo.key.slot = 0;
+    lo.val      = lv;
     out->push(lo);
+
+    //lo.val  =  
+    //auto lo = LavaTblToOut(inout_lp, iv);
+    //lo.key.slot = 0;
+    //out->push(lo);
 
     return 1;
   }
@@ -101,6 +117,42 @@ extern "C"
 
 
 
+
+
+
+
+//printf("\n MakeCube run \n");
+//tbl<f32> idxVerts = tbl<f32>::make_borrowed(inout_lp->mem_alloc, 
+//
+// todo:  this will allocate using malloc and realloc - need to change tbl to use allocation, reallocation, and free functions in the type
+//IvTbl lftTri = {              // array of vert structs
+//  {{-1.0, -1.0f, 0.0f},       //pos
+//  {0.0f, 0.0f, -1.0f},        //norm
+//  {1.0f, 1.0f, 1.0f, 1.0f},   //color
+//  {0.0f, 0.0f}},              //texCoord
+//
+//  {{-0.17f, -1.0f, 0.0f},     //pos
+//  {0.0f, 0.0f, -1.0f},        //norm
+//  {1.0f, 1.0f, 1.0f, 1.0f},   //color
+//  {0.0f, 0.0f}},              //texCoord
+//
+//  {{-0.58f, 1.0f, 0.0f},      //pos
+//  {0.0f, 0.0f, -1.0f},        //norm
+//  {1.0f, 1.0f, 1.0f, 1.0f},   //color
+//  {0.0f, 0.0f}}               //texCoord
+//};
+//
+//auto typenum    =  "IdxVerts";
+//lftTri("type")  =  *((u64*)typenum);
+//lftTri("mode")  =  (u64)0x0004; // (u64)GL_TRIANGLES;  // #define GL_TRIANGLES 0x0004
+//tu32 ind        =  {0, 1, 2};
+//lftTri("IND")   =  &ind; 
+//
+//lftTri.flatten();
+//
+//auto lo = LavaTblToOut(inout_lp, lftTri);
+//lo.key.slot = 0;
+//out->push(lo);
 
 //
 //{nullptr, (uint64_t)LavaNode::NONE, nullptr, nullptr, nullptr, nullptr, nullptr, 0}

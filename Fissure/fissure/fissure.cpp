@@ -239,14 +239,16 @@
 // -todo: use new tbl.hpp to re-implement IdxVerts - don't use an array, use only named sub-tables
 // -todo: test an IdxVerts tbl and put it into the fissure db to test with brandisher
 // -todo: debug why mode is not showing up - being overwritten by another key before flattening
+// -todo: implement sub tables in brandisher
+// -todo: look in to turning tbl into class without a template
+// -todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array - can any heirarchy of initializer_lists be brought down to an array of the same types?
 
+// todo: put in more error checking on shared library loading
+// todo: redo MakeCube with new tbl format
 // todo: put image into IdxVerts
 // todo: give LavaNode struct a description string
 // todo: make description strings show up in the status bar on mouse over
-// todo: implement sub tables in brandisher
 // todo: think about design for constant variables into class - string, double, u64, i64, file (color? v2,v3,v4? ranged double?, ranged integer?) separate datatype from interface? make all constant inputs tables? how to embed interface queues into a table? make each constant a subtable with a value, an interface type and interface values? 
-// todo: look in to turning tbl into class without a template
-// todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array - can any heirarchy of initializer_lists be brought down to an array of the same types?
 // todo: design packet freezing and packet visualization interface - maybe have three states - neutral, visualized, and frozen
 // todo: make a settings file that is read on load if it in the same directory
 // todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets - use blue 'sunshine' lines going out from the center like a snowflake? 

@@ -49,26 +49,28 @@
 // -todo: put back push 
 // -todo: work on copying a table into parent table on assignement - take address and flatten? - overloading only tbl const& seems to work to override the behavior of assigning a table 
 // -todo: figure out what do about TABLE and CHILD types with assignments to and from tbl pointers - seems to work for now, even if using an entire bit instead of a specific value for TABLE and TABLE|CHILD is inefficient
+// -todo: make a templated at() method 
+// -todo: make a constructor that takes a KVOfst
+// -todo: add type and typestr functions to tbl
+// -todo: re-integrate new tbl into brandisher
+// -todo: make a constructor out of an initializer list 
+// -todo: make tbl structs local to the scope of the tbl
 
-// todo: make a templated at() method 
-// todo: make a constructor that takes a KVOfst
-// todo: return to map elements being only i64, u64, and f64 ? - typecast already causes this, should the types be more strict or should they cast automatically?
+// todo: make flatten take an optional memory allocation argument?
+// todo: figure out error condition for tables that don't exist
+// todo: figure out simpler memory allocation when used inside a shared libaray
 // todo: make TblVal casts const
 // todo: make template function to get the array as a pointer of a certain type
 // todo: make a const find() method or adapt has() method 
 // todo: figure out how to deal with a const KVOfst that can only be read from 
 // todo: make const version of operator()
+// todo: return to map elements being only i64, u64, and f64 ? - typecast already causes this, should the types be more strict or should they cast automatically?
 // todo: try taking base pointer out of KV and use the bytes elsewhere
-// todo: add type and typestr functions to tbl?
-// todo: re-integrate new tbl into brandisher
 // todo: make the default type become a specific 'unknown' value 
 // todo: make sure if the type of a struct is labeled unknown, and if so check that the stride matches the struct size
-// todo: make a constructor out of an initializer list 
 // todo: does a tbl need to store the address of a pointer to the function that should deallocate it? 
 // todo: fix kv of a sub tbl having a base and val that are 0 - should be 0 at that stage, since they haven't been set yet? 
 // todo: make owning of memory execute a copy in the tbl constructor that takes a void pointer
-// todo: make tbl structs local to the scope of the tbl
-// todo: once tbl is switched to not be an array, this might not need to be a template
 // todo: allocation template parameters might mean that a template is still neccesary
 // todo: A table type that has empty allocation parameters could mean an unowned type
 //       | the unowned type could have a constructor that takes any tbl and makes it unowned, treating it effectivly as a reference
