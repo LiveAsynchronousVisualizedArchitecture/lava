@@ -55,23 +55,24 @@
 // -todo: re-integrate new tbl into brandisher
 // -todo: make a constructor out of an initializer list 
 // -todo: make tbl structs local to the scope of the tbl
+// -todo: try taking base pointer out of KV and use the bytes elsewhere - needed to put u8 type next to the char array for them to be packed together efficiently
+// -todo: figure out error condition for tables that don't exist - cast the tables to bool with operator bool() and have it return false if m_mem is nullptr
+// -todo: make owning of memory execute a copy in the tbl constructor that takes a void pointer
+// -todo: allocation template parameters might mean that a template is still neccesary - still would need to magically know the type in both uses since the allocators would need to line up - this would defeat the purpose of portability - does this imply that pointers to memory allocators also can't be on the stack? - if the tbl is passed around inside a program, even to a shared library, it can be passed as 4 pointers in a struct instead of just one - this works because they are in the same memory space, which is where the function pointers will be relevant - if tbl is used between processes through shared memory or written to disk, the function pointers will not be a part of the format as well as being irrelevant to the data - this can also solve the problem of separating ownership from the table data itself
 
-// todo: make flatten take an optional memory allocation argument?
-// todo: figure out error condition for tables that don't exist
+// todo: make flatten take an optional memory allocation argument - this would mean that it will need to carry alloc, realloc and free pointers with it - should all these be on the stack?
 // todo: figure out simpler memory allocation when used inside a shared libaray
+// todo: make flatten() recursive 
+// todo: test recursive flatten() with visualization inside Brandisher
 // todo: make TblVal casts const
-// todo: make template function to get the array as a pointer of a certain type
 // todo: make a const find() method or adapt has() method 
 // todo: figure out how to deal with a const KVOfst that can only be read from 
 // todo: make const version of operator()
-// todo: return to map elements being only i64, u64, and f64 ? - typecast already causes this, should the types be more strict or should they cast automatically?
-// todo: try taking base pointer out of KV and use the bytes elsewhere
+// todo: make template function to get the array as a pointer of a certain type
 // todo: make the default type become a specific 'unknown' value 
 // todo: make sure if the type of a struct is labeled unknown, and if so check that the stride matches the struct size
 // todo: does a tbl need to store the address of a pointer to the function that should deallocate it? 
 // todo: fix kv of a sub tbl having a base and val that are 0 - should be 0 at that stage, since they haven't been set yet? 
-// todo: make owning of memory execute a copy in the tbl constructor that takes a void pointer
-// todo: allocation template parameters might mean that a template is still neccesary
 // todo: A table type that has empty allocation parameters could mean an unowned type
 //       | the unowned type could have a constructor that takes any tbl and makes it unowned, treating it effectivly as a reference
 //
@@ -83,13 +84,12 @@
 //       | if it exceeds the capacity of the extra key, the make it an offset in the tbl extra space
 //       | does this imply that there should be a separate array type or is specializing string enough? 
 // todo: make boolean argument to flatten() to destruct pointed to tables
-// todo: make flatten() recursive 
 // todo: make a const version of operator()
 // todo: should moving a table into a key flatten the tbl and automatically make that tbl a chld? - could work due to realloc - use a dedicated function that does its own realloc? 
 // todo: make sure moving a tmp tbl into a table works - will need to be destructed on flatten AND destructor - need to make moving a tbl in work - owned can still be set - will need a tbl type that isn't a pointer and isn't a child?
 // todo: make simdb convenience function to put in a tbl with a string key
 // todo: think about slices
-// todo: is it possible to hash a type with constexpr?
+// todo: return to map elements being only i64, u64, and f64 ? - typecast already causes this, should the types be more strict or should they cast automatically?
 // todo: think about arrays of values - go above 8 bytes for the value? 
 // todo: think about strings
 // todo: think about arrays of tables
@@ -378,13 +378,16 @@ public:
 
     template<class DEST, class SRC> static DEST cast_mem(u64 const* const src){ return (DEST)(*((SRC*)src)); }
 
-    using Key = char[43];
+    using Key = char[51];
 
-    u32      type :  6;      // The type of the value contained
-    u32      hash : 26;      // The hash of the key truncated to 26 bits
+    u8       type;           // The type of the value contained
     Key       key;           // The 43 character max string that makes up the key
+    u32      hash;           // The hash of the key truncated to 26 bits
     u64       val;           // The value treated as an 8 byte unsigned 64 bit integer
-    tbl*     base;
+    
+    //u32      type :  6;      // The type of the value contained
+    //u32      hash : 26;      // The hash of the key truncated to 26 bits
+    //tbl*     base;
 
     template<class N> KV& init(char* k, N v)
     {
@@ -400,12 +403,14 @@ public:
       type = l.type;
       hash = l.hash;
       val  = l.val;
-      base = l.base;
+      //base = l.base;
       memmove(key, l.key, sizeof(Key) );
       return *this;
     }
 
-    KV() : hash(0), type(TblType::EMPTY), val(0), base(0) { 
+    KV() : hash(0), type(TblType::EMPTY), val(0)
+      //base(0)
+    { 
       memset(key, 0, sizeof(Key));
     }
     KV(const char* key) : type(TblType::EMPTY)

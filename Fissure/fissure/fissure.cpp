@@ -2028,6 +2028,8 @@ ENTRY_DECLARATION // main or winmain
 
   SECTION(tbl test)
   {
+    Println("sizeof(tbl::KV): ", sizeof(tbl::KV) );
+   
     //tbl t(10, (u64)0 );
     //TO(t.size(),i){
     //  //t.operator[]<u8>(i) = (u8)i;
