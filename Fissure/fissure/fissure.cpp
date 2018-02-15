@@ -243,10 +243,12 @@
 // -todo: look in to turning tbl into class without a template
 // -todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array - can any heirarchy of initializer_lists be brought down to an array of the same types?
 // -todo: redo MakeCube with new tbl format
+// -todo: test IdxVerts without non essential components like texture coordinates or colors
 
-// todo: test IdxVerts without non essential components like texture coordinates or colors
 // todo: put in more error checking on shared library loading
 // todo: put image into IdxVerts
+// todo: use recursive tbls to make an image 
+// todo: make a card that has an image on it to test an IdxVerts with an image
 // todo: give LavaNode struct a description string
 // todo: make description strings show up in the status bar on mouse over
 // todo: think about design for constant variables into class - string, double, u64, i64, file (color? v2,v3,v4? ranged double?, ranged integer?) separate datatype from interface? make all constant inputs tables? how to embed interface queues into a table? make each constant a subtable with a value, an interface type and interface values? 

@@ -60,6 +60,7 @@
 // -todo: make owning of memory execute a copy in the tbl constructor that takes a void pointer
 // -todo: allocation template parameters might mean that a template is still neccesary - still would need to magically know the type in both uses since the allocators would need to line up - this would defeat the purpose of portability - does this imply that pointers to memory allocators also can't be on the stack? - if the tbl is passed around inside a program, even to a shared library, it can be passed as 4 pointers in a struct instead of just one - this works because they are in the same memory space, which is where the function pointers will be relevant - if tbl is used between processes through shared memory or written to disk, the function pointers will not be a part of the format as well as being irrelevant to the data - this can also solve the problem of separating ownership from the table data itself
 
+// todo: change kvo::base to be a tbl*
 // todo: make flatten take an optional memory allocation argument - this would mean that it will need to carry alloc, realloc and free pointers with it - should all these be on the stack?
 // todo: figure out simpler memory allocation when used inside a shared libaray
 // todo: make flatten() recursive 
@@ -168,8 +169,10 @@
 
 class tbl
 {
-public:                 
-  using AllocFunc = void* (*)(uint64_t bytes);
+public:
+  using AllocFunc   = void* (*)(uint64_t bytes);
+  using ReallocFunc = void* (*)(void* p, uint64_t bytes);
+  using FreeFunc    = void  (*)(void* p);
 
   using    u8   =   uint8_t;
   using   u16   =  uint16_t;
@@ -773,6 +776,12 @@ private:
     return cnt;
   }
   
+  void      initAlloc(AllocFunc a = malloc, ReallocFunc re = realloc, FreeFunc f = free)
+  {
+    m_alloc   = a;
+    m_realloc = re;
+    m_free    = f;
+  }
   void     initFields(u64 sizeBytes, u64 count, u64 stride=1, u64 typenum=TblType::U8)
   {
     auto   memst  =  this->memStart();
@@ -791,8 +800,11 @@ private:
   }
   void           init(u64 count,     u64 stride=1, u64 typenum=TblType::U8)
   {
+    initAlloc();
+
     u64    szBytes  =  tbl::size_bytes(count, stride);
-    u8*      memst  =  (u8*)malloc(szBytes);                 // memst is memory start
+    //u8*      memst  =  (u8*)malloc(szBytes);                 // memst is memory start
+    u8*      memst  =  (u8*)m_alloc(szBytes);                 // memst is memory start
     m_mem           =  memst + memberBytes();
 
     initFields(szBytes, count, stride, typenum);
@@ -806,16 +818,24 @@ private:
     //    return (tbl*)kv->val;
 
     //assert(kvo.kv->isEmpty() == false);
-    if(kvo.kv->isEmpty()){
+    if(kvo.kv->isEmpty()){                                                               // this will set the table to empty where it can be checked by the operator bool() cast to boolean - this lets keys that aren't in the table be checked after trying to get them, instead of needing to use has() which will be a separate query
       m_mem = nullptr;
       return;
     }
+
+    //if(l.owned()){
 
     if(kvo.kv->type & TblType::CHILD){
       u8* childTablesStart = (u8*)((tbl*)kvo.base)->childData();
       m_mem = childTablesStart + kvo.kv->val + sizeof(tbl::TblFields);
     }else{
       //m_mem = ((tbl*)kvo.kv->val)->m_mem;
+      //tbl* base = (tbl*)kvo.base;
+      //tbl cpTbl;
+      //cpTbl.m_mem     = 
+      //cpTbl.m_alloc   = base->m_alloc;
+      //cpTbl.m_realloc = base->m_realloc;
+      //cpTbl.m_free    = base->m_free;
       cp(  *((tbl*)kvo.kv->val)  );
     }
   }
@@ -833,6 +853,8 @@ private:
   }
   void         initKV(std::initializer_list<KV> lst)
   {
+    initAlloc();
+
     for(auto&& n : lst){ 
       KV& kv   =  *((*this)(n.key));
       kv.val   =  n.val;
@@ -844,7 +866,7 @@ private:
   void      init_cstr(const char* s)
   {
     auto len = strlen(s) + 1;
-    init(len);
+    init(len, 1, TblType::U8);                 // don't want to rely on default arguments here
     memcpy(data(), s, len);
   }
   void        destroy()
@@ -886,18 +908,30 @@ private:
     //  m_mem = l.m_mem;
     //} 
 
+     if(l.owned()){
+       if(!m_alloc)   m_alloc   = l.m_alloc;
+       if(!m_realloc) m_realloc = l.m_realloc;
+       //if(!m_free)    m_free    = l.m_free;
+     }else{
+       initAlloc();
+     }
+
      // try straight memcpy with ownership change here
      auto szBytes = l.sizeBytes();
-     u8*    memSt = (u8*)malloc(szBytes);
+     //u8*    memSt = (u8*)malloc(szBytes);
+     u8*    memSt = (u8*)m_alloc(szBytes);
      m_mem        = memSt + memberBytes();
      memcpy(memSt, l.memStart(), szBytes);
      owned(true);
   }
   void             cp(void* tblPtr)
   {
+    if(!m_alloc)   m_alloc   = malloc;
+    if(!m_realloc) m_realloc = realloc;
+
     TblFields* f = (TblFields*)tblPtr;
     auto szBytes = f->sizeBytes;
-    u8*    memSt = (u8*)malloc(szBytes);
+    u8*    memSt = (u8*)m_alloc(szBytes);
     m_mem        = memSt + memberBytes();
     memcpy(memSt, tblPtr, szBytes);
     owned(true);
@@ -905,8 +939,15 @@ private:
   void             mv(tbl&& r)
   {
     //tbl_PRNT("\n moved \n");
-    m_mem   = r.m_mem;
-    r.m_mem = nullptr;
+    m_mem     = r.m_mem;
+    m_alloc   = r.m_alloc;
+    m_realloc = r.m_realloc;
+    m_free    = r.m_free;
+    
+    r.m_mem     = nullptr;
+    r.m_alloc   = nullptr;
+    r.m_realloc = nullptr;
+    r.m_free    = nullptr;
   }
   template<class OP> void op_asn(tbl const& l, OP op)
   {
@@ -941,9 +982,13 @@ private:
   //}
 
 public:  
-  u8*     m_mem;                                                                         // the only member variable - everything else is a contiguous block of memory
- 
-  tbl() : m_mem(nullptr) {}
+  u8*          m_mem     = nullptr;                                                                         // the only member variable - everything else is a contiguous block of memory
+  AllocFunc    m_alloc   = nullptr;  
+  ReallocFunc  m_realloc = nullptr;  
+  FreeFunc     m_free    = nullptr;
+
+  //tbl() : m_mem(nullptr), m_alloc(malloc), m_realloc(realloc), m_free(free) {}
+  tbl() : m_mem(nullptr) { initAlloc(); }
   tbl(void* memst, bool _init=false, bool _owned=false, u64 _count=0) 
   : m_mem( ((u8*)memst)+memberBytes() )
   {
@@ -978,7 +1023,7 @@ public:
   tbl& operator=(tbl const& l){ cp(l);            return *this; }
   tbl           (tbl&&      r){ mv(std::move(r));               }
   tbl& operator=(tbl&&      r){ mv(std::move(r)); return *this; }
-  tbl& operator=(KVOfst const& kvo){ init(kvo); return *this; }
+  tbl& operator=(KVOfst const& kvo){ init(kvo);   return *this; }
   tbl& operator=(std::initializer_list<KV> lst){ initKV(lst); return *this; }
 
   template<class T> tbl& operator=(std::initializer_list<T>  lst){ init(lst); return *this; }
@@ -1195,8 +1240,11 @@ public:
     u64     nxtBytes  =  memberBytes() + stride()*count +  sizeof(KV)*mapcap + childcap;
     void*     re;
     bool      fresh  = !m_mem;
-    if(fresh){ re = malloc(nxtBytes);
-    }else{     re = realloc( (void*)memStart(), nxtBytes); }
+    if(fresh){ re = m_alloc(nxtBytes);
+    }else{     re = m_realloc( (void*)memStart(), nxtBytes); }
+
+    //if(fresh){ re = malloc(nxtBytes);
+    //}else{     re = realloc( (void*)memStart(), nxtBytes); }
 
     if(re){
       m_mem = ((u8*)re) + memberBytes();
@@ -1386,7 +1434,7 @@ public:
   //T*            begin(){ return  (T*)m_mem;           }
   //T*              end(){ return ((T*)m_mem) + size(); }
   
-  tbl         flatten()
+  auto         flatten() -> tbl const&
   {
     u64   memst = (u64)memStart();
     u64 prevCap = child_capacity();
@@ -1396,7 +1444,6 @@ public:
     TO(mapcap,i)
       if(  (e[i].type & TblType::TABLE) && 
           !(e[i].type & TblType::CHILD) ){                                 // if the table bit is set but the child bit is not set
-        //tbl<T>*  t  =  (tbl<T>*)e[i].val;
         tbl*  t  =  (tbl*)e[i].val;
         newcap  +=  t->sizeBytes();
       }
@@ -1406,20 +1453,15 @@ public:
     u8* curChild  =  (u8*)chldst + prevCap;
     TO(mapcap,i)
     {
-      //if(  (e[i].hsh.type & TblType::TABLE) && 
-      //    !(e[i].hsh.type & TblType::CHILD) ){                                 // if the table bit is set but the child bit is not set
       if(  (e[i].type & TblType::TABLE) && 
           !(e[i].type & TblType::CHILD) ){                                 // if the table bit is set but the child bit is not set
-        //tbl<T>*    t  =  (tbl<T>*)e[i].val;
-        tbl*    t  =  (tbl*)e[i].val;
+        tbl*       t  =  (tbl*)e[i].val;
         auto szbytes  =  t->sizeBytes();
 
         memcpy(curChild, t->memStart(), szbytes);
         auto   f = (fields*)curChild;
         f->owned = 0;
 
-        //e[i].hsh.type  |=  TblType::CHILD;
-        //e[i].hsh.type  |=  TblType::CHILD;                                     // turn on CHILD in this element's type by using a logical OR to always turn the bit on
         e[i].type   |=  TblType::CHILD;                                     // turn on CHILD in this element's type by using a logical OR to always turn the bit on
         e[i].val     =  (u64)curChild - chldst;                             // the memory start will likely have changed due to reallocation
         curChild    +=  szbytes;
@@ -1557,6 +1599,27 @@ public:
 #endif
 
 
+
+ 
+
+
+
+
+
+
+
+
+//
+//tbl<T>*  t  =  (tbl<T>*)e[i].val;
+//
+//
+//tbl<T>*    t  =  (tbl<T>*)e[i].val;
+
+//if(  (e[i].hsh.type & TblType::TABLE) && 
+//    !(e[i].hsh.type & TblType::CHILD) ){                                 // if the table bit is set but the child bit is not set
+//
+//e[i].hsh.type  |=  TblType::CHILD;
+//e[i].hsh.type  |=  TblType::CHILD;                                     // turn on CHILD in this element's type by using a logical OR to always turn the bit on
 
 //tbl::KVOfst::operator tbl const*() const
 //tbl::KVOfst::operator tbl*()
