@@ -76,7 +76,7 @@ inline GLuint  shadersrc_to_shaderid(const char* vert, const char* frag)
 
   return shaderProgramId;
 }
-inline Shape          tbl_to_shape(tbl& iv)  // todo: try to change this to a const reference
+inline Shape          tbl_to_shape(tbl const& iv)  // todo: try to change this to a const reference
 {
   using namespace std;
   static float tmpImg[] = { 0.f, 0.f, 0.f, 0.f };
@@ -108,8 +108,6 @@ inline Shape          tbl_to_shape(tbl& iv)  // todo: try to change this to a co
   shp.owner = true;
   shp.mode  = mode;
   shp.indsz = ind.size();
-
-
 
   glGenTextures(1, &shp.tx);
   glBindTexture(GL_TEXTURE_2D, shp.tx);

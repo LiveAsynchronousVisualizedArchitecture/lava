@@ -550,17 +550,15 @@ public:
   };
   struct     KVOfst  // KVOfst is key value offset 
   {
-    KV*          kv;
-    void*      base;
+    KV*          kv = nullptr;
+    tbl*       base = nullptr;
 
     KVOfst(KVOfst&  l) : kv(l.kv), base(l.base) {}
     KVOfst(KVOfst&& r) : kv(r.kv), base(r.base) {}
-    KVOfst(KV* _kv=nullptr, void* _base=nullptr) : kv(_kv), base(_base) {}
+    KVOfst(KV* _kv=nullptr, tbl* _base=nullptr) : kv(_kv), base(_base) {}
 
-    operator bool() const { return (bool)(kv); }
-    template<class N> N as() const { return kv->as<N>(); }
-
-    operator tbl()
+    //operator bool() const { return (bool)(kv); }
+    operator tbl() const
     {   
       using namespace std;
 
@@ -576,42 +574,8 @@ public:
         return *((tbl*)kv->val);
       }
     }
-
-    //operator tbl();
-    //operator tbl*();
-    //operator const tbl();
-    //operator tbl*();
-
-    //operator tbl*()
-    //{
-    //// todo: does thsi assert that the table type is is a table but not a child?
-    //  tbl_msg_assert(
-    //    kv->type == TblType::typenum<tbl*>::num, 
-    //    " - tbl TYPE ERROR -\nInternal type: ", 
-    //    TblType::type_str((TblType::Type)kv->type),
-    //    "Desired type: ",
-    //    TblType::type_str((TblType::Type)TblType::typenum<tbl*>::num) );        
-    //
-    //  return (tbl*)kv->val;
-    //}
-    //operator const tbl*() const;
-    //{
-    //  tbl_msg_assert(
-    //    kv->type & TblType::TABLE,                        // can be a table pointer or a child table, so only need to check if it is a table at all
-    //    " - tbl TYPE ERROR -\nInternal type was not a TABLE or CHILD|TABLE: ", 
-    //    TblType::type_str((TblType::Type)kv->type),
-    //    "Desired type: ",
-    //    TblType::type_str((TblType::Type)TblType::typenum<tbl*>::num) );        
-    //
-    //  if(kv->type & TblType::CHILD)
-    //    return (tbl const*)( ((tbl*)base)->childData() + kv->val);
-    //  else
-    //    return (tbl const*)kv->val;
-    //}
-
-    template<class N> operator N() { return (N)(*kv); }
-
-    //template<class N> KVOfst& operator=(N const& n) = delete;
+    template<class N> N as() const { return kv->as<N>(); }
+    template<class N> operator N() const { return (N)(*kv); }
 
     KVOfst& operator=(tbl const* t)
     { 
@@ -1062,10 +1026,17 @@ public:
         new (&ret) KVOfst(kv, this);                                                     // (void*)memStart());
         //new (&ret) KVOfst(kv, this->childData());                                      // (void*)memStart());
       else
-        new (&ret) KVOfst(kv);
+        new (&ret) KVOfst(kv,this);
     }else 
-      new (&ret) KVOfst(kv);                                                             // if the key wasn't found, kv will be a nullptr which is the same as an error KVOfst that will evaluate to false when cast to a boolean      
+      new (&ret) KVOfst(kv,this);                                                             // if the key wasn't found, kv will be a nullptr which is the same as an error KVOfst that will evaluate to false when cast to a boolean      
 
+    return ret;
+  }
+  auto        operator()(const char* key) const -> const KVOfst
+  {      
+    KVOfst  ret;                                                                         // this will be set with placement new instead of operator= because operator= is templated and used for assigning to the KV pointed to by KVOfst::KV* -  this is so tbl("some key") = 85  can work correctly
+    KV*      kv = m_mem? get(key) : nullptr;
+    new (&ret) KVOfst(kv, (tbl*)this);                      // if the key wasn't found, kv will be a nullptr which is the same as an error KVOfst that will evaluate to false when cast to a boolean      
     return ret;
   }
   tbl&      operator--(){ shrink_to_fit();    return *this; }
@@ -1159,13 +1130,39 @@ public:
             strncmp(el[i].key,key,sizeof(KV::Key)-1)==0) )
       { 
         return &el[i];
-      }else if(elemCnt < mod && dist > wrapDist(el,i,mod) ){
+      }else if(elemCnt < mod  &&  dist > wrapDist(el,i,mod) ){
         KV kv(key);
         kv.hash = hh.hash;
         //elems( elems()+1 );
         return &(place_rh(kv, el, i, dist, mod));
       }
 
+      if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
+    }
+
+    return nullptr; // no empty slots and the key was not found
+  }
+  KV*             get(const char* key, u32* out_hash=nullptr) const
+  {
+    KV hh;
+    hh.hash      =  HashStr(key);
+    if(out_hash){ *out_hash = hh.hash; }
+    KV*      el  =  (KV*)elemStart();                                        // el is a pointer to the elements 
+    u64     mod  =  map_capacity();
+    u64 elemCnt  =  elems();
+    if(mod==0) return nullptr;
+
+    u64    i  =  hh.hash % mod;
+    u64   en  =  prev(i,mod);
+    u64 dist  =  0;
+    for(;;++i,++dist)
+    {
+      i %= mod;                                                        // get idx within map_capacity
+      if( el[i].type == TblType::EMPTY || 
+        (hh.hash == el[i].hash &&                                      // if the hashes aren't the same, the keys can't be the same
+          strncmp(el[i].key,key,sizeof(KV::Key)-1)==0) ){ 
+        return &el[i];
+      }
       if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE
     }
 
@@ -1182,6 +1179,8 @@ public:
   }
   bool          owned() const  
   {
+    if(!m_mem && m_alloc) return true;
+    
     return m_mem && m_free? memStart()->owned : false;
   }
   void          owned(bool own){ memStart()->owned = own;  }
@@ -1581,6 +1580,43 @@ public:
 
 
 
+
+
+
+//operator tbl();
+//operator tbl*();
+//operator const tbl();
+//operator tbl*();
+
+//operator tbl*()
+//{
+//// todo: does thsi assert that the table type is is a table but not a child?
+//  tbl_msg_assert(
+//    kv->type == TblType::typenum<tbl*>::num, 
+//    " - tbl TYPE ERROR -\nInternal type: ", 
+//    TblType::type_str((TblType::Type)kv->type),
+//    "Desired type: ",
+//    TblType::type_str((TblType::Type)TblType::typenum<tbl*>::num) );        
+//
+//  return (tbl*)kv->val;
+//}
+//operator const tbl*() const;
+//{
+//  tbl_msg_assert(
+//    kv->type & TblType::TABLE,                        // can be a table pointer or a child table, so only need to check if it is a table at all
+//    " - tbl TYPE ERROR -\nInternal type was not a TABLE or CHILD|TABLE: ", 
+//    TblType::type_str((TblType::Type)kv->type),
+//    "Desired type: ",
+//    TblType::type_str((TblType::Type)TblType::typenum<tbl*>::num) );        
+//
+//  if(kv->type & TblType::CHILD)
+//    return (tbl const*)( ((tbl*)base)->childData() + kv->val);
+//  else
+//    return (tbl const*)kv->val;
+//}
+
+//
+//template<class N> KVOfst& operator=(N const& n) = delete;
 
 //if(l.owned()){
 //tbl_PRNT("\n full copy \n");

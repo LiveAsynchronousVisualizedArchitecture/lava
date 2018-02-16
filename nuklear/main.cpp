@@ -464,7 +464,7 @@ vec_vs         shapesFromKeys(simdb const& db, vec_vs dbKeys, VizData* vd)  // v
       ivbuf.resize(vlen);
       db.get(vs.str.data(), (u32)vs.str.length(),  ivbuf.data(), vlen);
       //IvTbl iv(ivbuf.data(), false, false);
-      tbl iv(ivbuf.data(), false, false);
+      const tbl iv(ivbuf.data(), false, false);
 
       //IvTbl ivcpy(iv);
       //tbl ivcpy(iv);
