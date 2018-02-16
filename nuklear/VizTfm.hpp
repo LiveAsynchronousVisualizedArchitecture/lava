@@ -92,7 +92,7 @@ inline Shape          tbl_to_shape(tbl& iv)  // todo: try to change this to a co
   u32 mode = (u32)((u64)iv("mode"));
   tbl ind, px, py, pz, nx, ny, nz, cr, cg, cb, ca, tx, ty;
   ind = iv("indices");
-  px  = iv("positions x");
+  px  = iv("positions x");  auto ff = px.memStart();
   py  = iv("positions y");
   pz  = iv("positions z");
   nx  = iv("normals x");
@@ -109,7 +109,7 @@ inline Shape          tbl_to_shape(tbl& iv)  // todo: try to change this to a co
   shp.mode  = mode;
   shp.indsz = ind.size();
 
-  auto ff = ind.memStart();
+
 
   glGenTextures(1, &shp.tx);
   glBindTexture(GL_TEXTURE_2D, shp.tx);

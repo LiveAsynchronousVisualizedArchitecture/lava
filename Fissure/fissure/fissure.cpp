@@ -2073,12 +2073,12 @@ ENTRY_DECLARATION // main or winmain
       //t("t1") = t1;
       //t.flatten();
 
-      tbl tA = t("t1");
-      TO(tA.size(),i){
-        tA[i] = (i32)tA[i] * 2;
-        Print( (int)tA[i]," ");
-      }
-      Println("\nOwned: ", tA.owned());
+      //tbl tA = t("t1");
+      //TO(tA.size(),i){
+      //  tA[i] = (i32)tA[i] * 2;
+      //  Print( (int)tA[i]," ");
+      //}
+      //Println("\nOwned: ", tA.owned());
 
       TO(t1.size(),i){
         Print( (int)t1[i]," ");

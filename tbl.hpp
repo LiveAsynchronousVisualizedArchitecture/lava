@@ -811,13 +811,10 @@ private:
   }
   void           init(KVOfst const& kvo)
   {
-    //  if(kv->type & TblType::CHILD){
-    //    u8* childTablesStart = (u8*)((tbl*)base)->childData();
-    //    return (tbl*)( childTablesStart + kv->val + sizeof(tbl::TblFields) );
-    //  }else
-    //    return (tbl*)kv->val;
+    m_alloc   = nullptr;
+    m_realloc = nullptr;
+    m_free    = nullptr;
 
-    //assert(kvo.kv->isEmpty() == false);
     if(kvo.kv->isEmpty()){                                                               // this will set the table to empty where it can be checked by the operator bool() cast to boolean - this lets keys that aren't in the table be checked after trying to get them, instead of needing to use has() which will be a separate query
       m_mem = nullptr;
       return;
@@ -836,15 +833,14 @@ private:
       //cpTbl.m_alloc   = base->m_alloc;
       //cpTbl.m_realloc = base->m_realloc;
       //cpTbl.m_free    = base->m_free;
-      cp(  *((tbl*)kvo.kv->val)  );
+      cp(  *((tbl*)kvo.kv->val)  );  // This is copying from a table that owns it's memory and so copies its allocation functions too
     }
   }
   template<class T> void init(u64 count)
   {
     init(count, sizeof(T));
   }
-  template<class T> void 
-  init(std::initializer_list<T>  lst)
+  template<class T> void init(std::initializer_list<T>  lst)
   {
     init(lst.size(), sizeof(T), TblType::typenum<T>::num);
 
@@ -880,34 +876,12 @@ private:
       //  a[i].T::~T();                                                                    // run the destructors manually before freeing the memory
       //}
       
-      free(memStart());
+      m_free(memStart());
       m_mem = nullptr;
     }
   }
   void             cp(tbl const& l)
   {    
-    //if(l.owned()){
-      //tbl_PRNT("\n full copy \n");
-      //
-      //tbl<T> prev;
-      //prev.m_mem = m_mem;                                                                // make a tbl for the old memory - this will be destructed at the end of this scope, which will free up the old memory. the old memory is not freed up first, since we could be copying from a child of this very same tbl 
-      //
-      //m_mem = nullptr;
-      //reserve(l.size(), l.elems(), l.child_capacity() );                                 // this will size the current table exactly because it starts from a nullptr - it also means however that realloc is not used and malloc is called for a brand new allocation
-      //TO(l.size(),i) push(l[i]); 
-    //
-      //auto e = l.elemStart();
-      //TO(l.map_capacity(),i) if( !e[i].isEmpty() ){
-      //  put(e[i].key, e[i].val);
-      //}
-      //
-      //memcpy(childData(), l.childData(), l.child_capacity() );                           // since this is a straight copy of the child memory, the values/offsets in the map's child table can stay the same
-      //
-    //}else{
-    //  //tbl_PRNT("\n shallow copy \n");
-    //  m_mem = l.m_mem;
-    //} 
-
      if(l.owned()){
        if(!m_alloc)   m_alloc   = l.m_alloc;
        if(!m_realloc) m_realloc = l.m_realloc;
@@ -982,9 +956,9 @@ private:
   //}
 
 public:  
-  u8*          m_mem     = nullptr;                                                                         // the only member variable - everything else is a contiguous block of memory
-  AllocFunc    m_alloc   = nullptr;  
-  ReallocFunc  m_realloc = nullptr;  
+  u8*          m_mem     = nullptr;                                                             // the only member variable - everything else is a contiguous block of memory
+  AllocFunc    m_alloc   = nullptr;
+  ReallocFunc  m_realloc = nullptr;
   FreeFunc     m_free    = nullptr;
 
   //tbl() : m_mem(nullptr), m_alloc(malloc), m_realloc(realloc), m_free(free) {}
@@ -1070,7 +1044,7 @@ public:
     KVOfst  ret;                                                                         // this will be set with placement new instead of operator= because operator= is templated and used for assigning to the KV pointed to by KVOfst::KV* -  this is so tbl("some key") = 85  can work correctly
     u32     hsh;
     KV*      kv = m_mem?  get(key, &hsh) : nullptr;
-    if(owned())
+    if(owned() && m_alloc)
     { 
       if( !map_expand(!kv) ) return KVOfst();                                            // if map_expand returns false, that means that memory expansion was tried but failed
 
@@ -1208,7 +1182,7 @@ public:
   }
   bool          owned() const  
   {
-    return m_mem? memStart()->owned : true; 
+    return m_mem && m_free? memStart()->owned : false;
   }
   void          owned(bool own){ memStart()->owned = own;  }
   auto       memStart() -> fields* { return m_mem? (fields*)(m_mem - memberBytes())  :  nullptr; }
@@ -1608,6 +1582,35 @@ public:
 
 
 
+//if(l.owned()){
+//tbl_PRNT("\n full copy \n");
+//
+//tbl<T> prev;
+//prev.m_mem = m_mem;                                                                // make a tbl for the old memory - this will be destructed at the end of this scope, which will free up the old memory. the old memory is not freed up first, since we could be copying from a child of this very same tbl 
+//
+//m_mem = nullptr;
+//reserve(l.size(), l.elems(), l.child_capacity() );                                 // this will size the current table exactly because it starts from a nullptr - it also means however that realloc is not used and malloc is called for a brand new allocation
+//TO(l.size(),i) push(l[i]); 
+//
+//auto e = l.elemStart();
+//TO(l.map_capacity(),i) if( !e[i].isEmpty() ){
+//  put(e[i].key, e[i].val);
+//}
+//
+//memcpy(childData(), l.childData(), l.child_capacity() );                           // since this is a straight copy of the child memory, the values/offsets in the map's child table can stay the same
+//
+//}else{
+//  //tbl_PRNT("\n shallow copy \n");
+//  m_mem = l.m_mem;
+//} 
+
+//  if(kv->type & TblType::CHILD){
+//    u8* childTablesStart = (u8*)((tbl*)base)->childData();
+//    return (tbl*)( childTablesStart + kv->val + sizeof(tbl::TblFields) );
+//  }else
+//    return (tbl*)kv->val;
+//
+//assert(kvo.kv->isEmpty() == false);
 
 //
 //tbl<T>*  t  =  (tbl<T>*)e[i].val;
