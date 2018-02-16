@@ -88,9 +88,9 @@
 // -todo: make switch case typed min max function 
 // -todo: put types into normal value elements, not just sub tables - needed to make a typeStr() method in KV
 // -todo: visualize arrays with proper types - just need to use a switch case to make a vector of f64? 
+// -todo: use a const operator() in tbl to get the sub table by key
 
 // todo: treat the array as a string if it is u8, i8, (or a string type?) - then show statistics for a string if the string is too long to fit in the gui
-// todo: use a const operator() in tbl to get the sub table by key
 
 // idea: make switch case for fundamental types that the map elements can be - need the non-templated table
 // idea: make multiple selections additivly draw multiple colored lines?

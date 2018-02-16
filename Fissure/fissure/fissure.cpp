@@ -244,12 +244,11 @@
 // -todo: convert tbl.hpp to no longer be a template - characters "u8", "iu8", "f64", for the type of array - can any heirarchy of initializer_lists be brought down to an array of the same types?
 // -todo: redo MakeCube with new tbl format
 // -todo: test IdxVerts without non essential components like texture coordinates or colors
+// -todo: put image into IdxVerts
+// -todo: use recursive tbls to make an image - actually it is only one tbl down, the img doesn't contain sub tables
 
-// todo: put in more error checking on shared library loading
-// todo: put image into IdxVerts
-// todo: use recursive tbls to make an image 
+// todo: make triangle test into a square
 // todo: make a card that has an image on it to test an IdxVerts with an image
-// todo: give LavaNode struct a description string
 // todo: make description strings show up in the status bar on mouse over
 // todo: think about design for constant variables into class - string, double, u64, i64, file (color? v2,v3,v4? ranged double?, ranged integer?) separate datatype from interface? make all constant inputs tables? how to embed interface queues into a table? make each constant a subtable with a value, an interface type and interface values? 
 // todo: design packet freezing and packet visualization interface - maybe have three states - neutral, visualized, and frozen
@@ -1634,11 +1633,11 @@ void        lavaPacketCallback(LavaPacket pkt)
   if( fd.vizIds.has(srcid.asInt) ){
     auto label  =  genDbKey(srcid);
     auto    lm  =  LavaMem::fromDataAddr(pkt.val.value);
-    bool    ok  =  fisdb.put(label.data(), label.size(), lm.data(), lm.sizeBytes() );
+    bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
   }else if( fd.vizIds.has(destid.asInt) ){
     auto label  =  genDbKey(destid);
     auto    lm  =  LavaMem::fromDataAddr(pkt.val.value);
-    bool    ok  =  fisdb.put(label.data(), label.size(), lm.data(), lm.sizeBytes() );
+    bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
   }
 }
 
@@ -2102,6 +2101,22 @@ ENTRY_DECLARATION // main or winmain
     tbl iv;
     SECTION(make IdxVerts with the new tbl)
     {
+      u32 w=16,h=16,chans=4;
+      tbl img(w*h*chans, 0.f);
+      img("type")       =  tbl::strToInt("Image");
+      img("width")      =  w;
+      img("height")     =  h;
+      img("channels")   =  chans;
+      img("dimensions") =  2;
+      TO(h,y) TO(w,x) TO(chans,c)
+      {
+        auto idx = y*w*chans + x*chans + c;
+        if(c==3) 
+          img[idx] = 1.f;
+        else
+          img[idx] = (f32)y / (2.f*h)  +  (f32)x / (2.f*w); 
+      }
+
       tbl indices = {0u,       1u,       2u };
       tbl      px = { -1.f,  -0.17f, -0.58f };
       tbl      py = { -1.f,  -1.0f,   1.0f  };
@@ -2124,6 +2139,7 @@ ENTRY_DECLARATION // main or winmain
       iv("positions x")  = &px;
       iv("positions y")  = &py;
       iv("positions z")  = &pz;
+      iv("image")        = &img;
       //iv("normals x")    = &nx;
       //iv("normals y")    = &ny;
       //iv("normals z")    = &nz;
@@ -2140,7 +2156,7 @@ ENTRY_DECLARATION // main or winmain
       Println("iv sizeBytes: ", iv.sizeBytes() );
       Println("ind type: ",  indices.typeStr() );
 
-      fisdb.put("indexed verts test", iv.memStart(), iv.sizeBytes() );
+      fisdb.put("indexed verts test", iv.memStart(), (u32)iv.sizeBytes() );
     }
   }
 

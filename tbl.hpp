@@ -62,6 +62,8 @@
 // -todo: change kvo::base to be a tbl*
 // -todo: figure out simpler memory allocation when used inside a shared libaray - allocation functions stored on the stack
 
+// todo: make static function to convert an 8 char string to an unsigned 64 bit integer
+// todo: make key finding and placement happen in KVOfst instead of tbl class 
 // todo: make sure destructors are run when assigning to a tbl that already owns memory
 // todo: make flatten take an optional memory allocation argument - this would mean that it will need to carry alloc, realloc and free pointers with it - should all these be on the stack?
 // todo: make flatten() recursive 
@@ -1403,12 +1405,7 @@ public:
     return true;
   }
   void          clear(){ if(m_mem){ destroy(); init(0); } }
-
-  // todo: these will likely have to be templates
-  //T*            begin(){ return  (T*)m_mem;           }
-  //T*              end(){ return ((T*)m_mem) + size(); }
-  
-  auto         flatten() -> tbl const&
+  auto        flatten() -> tbl const&
   {
     u64   memst = (u64)memStart();
     u64 prevCap = child_capacity();
@@ -1417,7 +1414,7 @@ public:
     auto mapcap = map_capacity();
     TO(mapcap,i)
       if(  (e[i].type & TblType::TABLE) && 
-          !(e[i].type & TblType::CHILD) ){                                 // if the table bit is set but the child bit is not set
+        !(e[i].type & TblType::CHILD) ){                                 // if the table bit is set but the child bit is not set
         tbl*  t  =  (tbl*)e[i].val;
         newcap  +=  t->sizeBytes();
       }
@@ -1428,7 +1425,7 @@ public:
     TO(mapcap,i)
     {
       if(  (e[i].type & TblType::TABLE) && 
-          !(e[i].type & TblType::CHILD) ){                                 // if the table bit is set but the child bit is not set
+        !(e[i].type & TblType::CHILD) ){                                 // if the table bit is set but the child bit is not set
         tbl*       t  =  (tbl*)e[i].val;
         auto szbytes  =  t->sizeBytes();
 
@@ -1455,6 +1452,12 @@ public:
     }
 
     return *this;
+  }
+  
+  static u64 strToInt(const char* shortStr)
+  {
+    assert( strlen(shortStr) <= 8 );
+    return *((u64*)shortStr);
   }
 
 private:
@@ -1583,6 +1586,15 @@ public:
 
 
 
+
+
+
+
+
+
+// todo: these will likely have to be templates
+//T*            begin(){ return  (T*)m_mem;           }
+//T*              end(){ return ((T*)m_mem) + size(); }
 
 //operator tbl();
 //operator tbl*();

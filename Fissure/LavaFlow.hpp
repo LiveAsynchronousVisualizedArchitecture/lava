@@ -1,4 +1,10 @@
 
+// -todo: put in structure of extra error checking for shared library loading
+
+// todo: put in more error states into LavaInst
+// todo: fill in error checking on shared library loading - need to make sure that the errors from nodes end up making it into their instances and ultimatly the GUI
+// todo: make Lava convenience function to make a tbl with the correct allocators
+// todo: give LavaNode struct a description string
 // todo: write about design of LavaQ including that it is lock free, uses contiguous memory, does not rely on pointers and small allocations, and doesn't need versions since the start and end only increment - when a reader is reading a value, it can be sure that the buffer underneath hasn't been switched twice, because that would require inserting more values, which would increment end.... but end isn't atomicly linked to the start index - does switching buffers need to add the absolute capacity to both start and end ? 
 // todo: use the capacity as a power of two exponent directly so that the modulo operator is avoided - would this mean masking with ~(0xFF << cap) to isolate the bits below the exponent as 0, then flipping all the bits so only the bit below the exponent are 1s, then applying bitwise AND to have only those bits from st and m_end ?
 
@@ -1750,6 +1756,16 @@ void                 LavaFree(uint64_t addr)
 
 namespace {
 
+template<class T> u64 countPtrList(T* p)
+{
+  u64 cnt = 0;
+  while(p && *p != 0){ 
+    ++cnt; 
+    ++p; 
+  }
+  return cnt;
+}
+
 #include "../str_util.hpp"
 void                printdb(simdb const& db)
 {
@@ -1920,6 +1936,29 @@ auto       GetFlowNodeLists(lava_hndlvec     const& hndls) -> lava_ptrsvec
 
   return ret;
 }
+void   ErrorCheckNodeLists(lava_ptrsvec* inout_ndLsts)
+{
+  auto& lsts = *inout_ndLsts;
+  auto    sz = lsts.size();
+  TO(sz,i)
+  {
+    LavaNode* lst = lsts[i];  
+    if(!lst){  }  // erase this node list if is a nullptr
+
+    for(; lst->func; ++lst)
+    {
+      if(!lst->func){}                                 // error because this node does not have a primary function
+      if(!lst->name){}                                 // error because this node does not have a name
+      
+      if( countPtrList(lst->in_names) != countPtrList(lst->in_types) )        // count input types and input names to make sure they line up
+      {}
+
+      if( countPtrList(lst->out_names) != countPtrList(lst->out_types) )        // do the same for output types and names - count them both to make sure there are the same number of each
+      {}
+    }
+
+  }
+}
 
 LavaInst::State exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaFrame* inFrame, lava_threadQ* outArgs) // LavaOut* outArgs)
 {
@@ -1997,6 +2036,9 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow)
 
   // extract the flow node lists from the handles
   lava_ptrsvec flowNdLists = GetFlowNodeLists(loadedHndls);
+
+  //auto ndErrs = ErrorCheckNodeLists( &flowndLists );
+  ErrorCheckNodeLists( &flowNdLists );
 
   // extract the flow nodes from the lists and put them into the multi-map
   TO(livePaths.size(),i)
