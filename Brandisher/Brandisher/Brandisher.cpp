@@ -87,8 +87,8 @@
 // -todo: fix index of mouse cursor in status bar - array size was still being multed by 12 
 // -todo: make switch case typed min max function 
 // -todo: put types into normal value elements, not just sub tables - needed to make a typeStr() method in KV
+// -todo: visualize arrays with proper types - just need to use a switch case to make a vector of f64? 
 
-// todo: visualize arrays with proper types
 // todo: treat the array as a string if it is u8, i8, (or a string type?) - then show statistics for a string if the string is too long to fit in the gui
 // todo: use a const operator() in tbl to get the sub table by key
 
@@ -131,6 +131,7 @@
 using         str = std::string;
 using     vec_str = std::vector<str>;
 using      vec_u8 = std::vector<u8>;
+using     vec_f64 = std::vector<f64>;
 using     vec_dbs = std::vector<simdb>;
 using        path = std::experimental::filesystem::path;         // why is this still experimental?
 //using       IvTbl = tbl;
@@ -169,9 +170,9 @@ std::ostream& operator<<(std::ostream& os, const nana::rectangle& r)
   return os << "rect{" << r.position() << "," << r.dimension() << "}";
 }
 
-f32         mx =  std::numeric_limits<f32>::max();     //::infinity(); 
-f32         mn =  std::numeric_limits<f32>::lowest();  //::infinity();
-f32                  msX=0, msY=0;
+f64         mn =  std::numeric_limits<f32>::lowest();  //::infinity();
+f64         mx =  std::numeric_limits<f32>::max();     //::infinity(); 
+f64                  msX=0, msY=0;
 tbl                         glblT;
 vec_u8                     tblBuf;
 vec_str                       sel;
@@ -193,11 +194,44 @@ namespace {
     auto norm = dif!=0?  (val - fromLo) / dif  :  0.f;
     return norm * (toHi - toLo) + toLo;
   }
+
+  template<class T> auto tblToVec(tbl const& t) -> std::vector<T>
+  {
+    auto sz = t.size();
+    std::vector<T> ret(sz);
+
+    switch(t.arrayType()){
+    case tbl::TblType::I8:
+      TO(sz,i){ ret[i] = (T)t.at<i8>(i);  } break;
+    case tbl::TblType::I16:
+      TO(sz,i){ ret[i] = (T)t.at<i16>(i); } break;
+    case tbl::TblType::I32:
+      TO(sz,i){ ret[i] = (T)t.at<i32>(i); } break;
+    case tbl::TblType::I64:
+      TO(sz,i){ ret[i] = (T)t.at<i64>(i); } break;
+    case tbl::TblType::U8:
+      TO(sz,i){ ret[i] = (T)t.at<u8>(i);  } break;
+    case tbl::TblType::U16:
+      TO(sz,i){ ret[i] = (T)t.at<u16>(i); } break;
+    case tbl::TblType::U32:
+      TO(sz,i){ ret[i] = (T)t.at<u32>(i); } break;
+    case tbl::TblType::U64:
+      TO(sz,i){ ret[i] = (T)t.at<u64>(i); } break;
+    case tbl::TblType::F32:
+      TO(sz,i){ ret[i] = (T)t.at<f32>(i); } break;
+    case tbl::TblType::F64:
+      TO(sz,i){ ret[i] = (T)t.at<f64>(i); } break;
+    default:
+      return ret;
+    }
+
+    return ret;                                               // this should invoke copy elision
+  }
 }
 
 class  VizDraw : public nana::drawer_trigger
 {
-  void  drawGradient(nana::paint::graphics& g)
+  void    drawGradient(nana::paint::graphics& g)
   {
     using namespace nana;
     using namespace nana::paint;
@@ -220,7 +254,7 @@ class  VizDraw : public nana::drawer_trigger
         }
     }
   }
-  void     drawBlack(nana::paint::graphics& g)
+  void       drawBlack(nana::paint::graphics& g)
   {
     using namespace nana;
     using namespace nana::paint;
@@ -244,7 +278,7 @@ class  VizDraw : public nana::drawer_trigger
         }
     }
   }
-  void  drawTblGraph(tbl& t, nana::paint::graphics& g)
+  void    drawTblGraph(tbl& t, nana::paint::graphics& g)
   {
     using namespace std;
     using namespace nana;
@@ -254,22 +288,25 @@ class  VizDraw : public nana::drawer_trigger
       drawBlack(g);
     }else
     {
-      auto&    t = glblT;
-      auto  flen = t.size();      // 12 floats in a vert struct
-      f32*     f = (float*)t.m_mem;
-      mx = -numeric_limits<float>::infinity();
-      mn =  numeric_limits<float>::infinity();
-      TO(flen,i){
-        mx = max<f32>(mx, f[i]);
-        mn = min<f32>(mn, f[i]);
+      //auto&    t = glblT;
+      auto  ary = tblToVec<f64>(t);
+      auto  len = ary.size();      // 12 floats in a vert struct
+      //f32*      f = (float*)t.m_mem;
+      //mx = -numeric_limits<f64>::infinity();
+      //mn =  numeric_limits<f64>::infinity();
+      mx =  numeric_limits<f64>::lowest();
+      mn =  numeric_limits<f64>::max(); // infinity();
+      TO(len,i){
+        mx = max<f64>(mx, ary[i]);
+        mn = min<f64>(mn, ary[i]);
       }
       if( !g.impl_ || !g.impl_->handle || !g.impl_->handle->pixbuf_ptr ) return;
       pixel_argb_t* pxbuf = g.impl_->handle->pixbuf_ptr;
       auto     w = g.width();
       auto     h = g.height();
-      f32  ratio = w / (f32)flen;
-      f32 hRatio = h / (mx-mn);
-      f32    rng = mx - mn;
+      f64  ratio = w / (f64)len;
+      f64 hRatio = h / (mx-mn);
+      f64    rng = mx - mn;
       //f32 hRemap = rng 
       for(unsigned int y=0; y<h; ++y)
         for(unsigned int x=0; x<w; ++x)
@@ -278,10 +315,11 @@ class  VizDraw : public nana::drawer_trigger
           p.element.red   = 0;
           p.element.green = 0;
           p.element.blue  = 0;
-          f32     val = f[ (u64)(x/ratio) ];
-          f32      re =  (val - mn) / rng;
-          f32   flipY = h - y - 1.f;
-          f32   rempY = remap(flipY,0.f,(f32)h,mn,mx);
+          //f32     val = f[ (u64)(x/ratio) ];
+          f64     val = ary[ (u64)(x/ratio) ];
+          f64      re =  (val - mn) / rng;
+          f64   flipY = h - y - 1.f;
+          f64   rempY = remap(flipY, 0., (f64)h, mn, mx);
           bool  inVal = false;
           if(val>=0 && rempY>=0 && rempY<=val){ inVal = true; }
           else if(val<=0 && rempY<=0 && rempY>=val){ inVal = true; }
@@ -768,15 +806,15 @@ int  main()
         auto    vsz = viz.size();
         f32       h = (f32)vsz.height;
         auto&     t = glblT;
-        if( t.m_mem && t.size()>0 ){
-          u64     len = t.size();                 // 12 floats in a vert struct
-          //f32*      f = (f32*)t.m_mem;
+        if( t.m_mem && t.size()>0 )
+        {
+          auto    ary = tblToVec<f64>(t);
+          u64     len = ary.size();                 // 12 floats in a vert struct
           f64   ratio = vsz.width  / (f64)len;
           auto   mnmx = makeMnMx(t);
           f64     dif = mnmx.mx - mnmx.mn;
-          //f64  hRatio = vsz.height / dif;
           u64     idx = (u64)(msX/ratio);
-          auto    val = (f32)t[idx];
+          auto    val = ary[idx];
           f64  remapY = (((h-msY)/h));
           remapY     *= dif;
           remapY     += mn;
@@ -784,7 +822,7 @@ int  main()
           "   X: ",arg.pos.x,
           "   Y: ",arg.pos.y,
           "   Index: ",idx,
-          "   Remapped Y: ", (f32)remapY);
+          "   Cursor Pos: ", (f32)remapY);
           status.caption( capStr );
         }
       });
@@ -1100,6 +1138,9 @@ int  main()
 
 
 
+//f32*      f = (f32*)t.m_mem;
+//f64  hRatio = vsz.height / dif;
+//auto    val = (f32)t[idx];
 
 //ik.subTbl  = true;
 //ik.key     = subKey;

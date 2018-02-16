@@ -59,10 +59,11 @@
 // -todo: figure out error condition for tables that don't exist - cast the tables to bool with operator bool() and have it return false if m_mem is nullptr
 // -todo: make owning of memory execute a copy in the tbl constructor that takes a void pointer
 // -todo: allocation template parameters might mean that a template is still neccesary - still would need to magically know the type in both uses since the allocators would need to line up - this would defeat the purpose of portability - does this imply that pointers to memory allocators also can't be on the stack? - if the tbl is passed around inside a program, even to a shared library, it can be passed as 4 pointers in a struct instead of just one - this works because they are in the same memory space, which is where the function pointers will be relevant - if tbl is used between processes through shared memory or written to disk, the function pointers will not be a part of the format as well as being irrelevant to the data - this can also solve the problem of separating ownership from the table data itself
+// -todo: change kvo::base to be a tbl*
+// -todo: figure out simpler memory allocation when used inside a shared libaray - allocation functions stored on the stack
 
-// todo: change kvo::base to be a tbl*
+// todo: make sure destructors are run when assigning to a tbl that already owns memory
 // todo: make flatten take an optional memory allocation argument - this would mean that it will need to carry alloc, realloc and free pointers with it - should all these be on the stack?
-// todo: figure out simpler memory allocation when used inside a shared libaray
 // todo: make flatten() recursive 
 // todo: test recursive flatten() with visualization inside Brandisher
 // todo: make TblVal casts const
