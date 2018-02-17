@@ -1,0 +1,13 @@
+
+Gauss Curve
+|  Create a message passing node that takes input from stdin
+|  Create a gauss curve in a message passing node as an IdxVerts model
+|  Show the "positions y" array in the brandisher, which should also show the gauss curve
+|  Reshape the window and show the array window redrawing/fitting
+|  Show the model in the visualizer
+|  Create stub .exe with a .json file that makes it into a stand alone program? 
+
+
+
+
+
