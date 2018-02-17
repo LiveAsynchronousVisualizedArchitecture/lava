@@ -246,9 +246,9 @@
 // -todo: test IdxVerts without non essential components like texture coordinates or colors
 // -todo: put image into IdxVerts
 // -todo: use recursive tbls to make an image - actually it is only one tbl down, the img doesn't contain sub tables
+// -todo: make triangle test into a square - right triangle is enough to show image
+// -todo: make a card that has an image on it to test an IdxVerts with an image - triangle with UVs is enough
 
-// todo: make triangle test into a square
-// todo: make a card that has an image on it to test an IdxVerts with an image
 // todo: make description strings show up in the status bar on mouse over
 // todo: think about design for constant variables into class - string, double, u64, i64, file (color? v2,v3,v4? ranged double?, ranged integer?) separate datatype from interface? make all constant inputs tables? how to embed interface queues into a table? make each constant a subtable with a value, an interface type and interface values? 
 // todo: design packet freezing and packet visualization interface - maybe have three states - neutral, visualized, and frozen
@@ -1792,7 +1792,7 @@ ENTRY_DECLARATION // main or winmain
         //glfwSetWindowIcon(win, 2, images);
       #endif
 
-      glfwSwapInterval(0); // turning this to 1 clamps the programs to the vertical sync rate and slows down the interactivity
+      glfwSwapInterval(1); // turning this to 1 clamps the programs to the vertical sync rate and slows down the interactivity, though setting it to 0 will use up a full core as the main loop will spin infinitely 
     }
     SECTION(init glew)
     {
@@ -2108,18 +2108,21 @@ ENTRY_DECLARATION // main or winmain
       img("height")     =  h;
       img("channels")   =  chans;
       img("dimensions") =  2;
-      TO(h,y) TO(w,x) TO(chans,c)
-      {
+      TO(h,y) TO(w,x) TO(chans,c){
         auto idx = y*w*chans + x*chans + c;
-        if(c==3) 
+
+        if(c==2)
+          img[idx] = 0.5f;
+        else if(c==3) 
           img[idx] = 1.f;
         else
           img[idx] = (f32)y / (2.f*h)  +  (f32)x / (2.f*w); 
+          //img[idx] = (f32)x/(w);
       }
 
-      tbl indices = {0u,       1u,       2u };
-      tbl      px = { -1.f,  -0.17f, -0.58f };
-      tbl      py = { -1.f,  -1.0f,   1.0f  };
+      tbl indices = {0u,1u,2u };
+      tbl      px = { -1.f,   0.f,    0.f   };
+      tbl      py = { -1.f,  -1.f,    1.f   };
       tbl      pz = {  0.f,   0.f,   -0.f   };
       tbl      nx = {  0.f,   0.f,    0.f   };
       tbl      ny = {  0.f,   0.f,    0.f   };
@@ -2128,8 +2131,8 @@ ENTRY_DECLARATION // main or winmain
       tbl      cg = {  1.f,   1.f,    1.f   };
       tbl      cb = {  1.f,   1.f,    1.f   };
       tbl      ca = {  1.f,   1.f,    1.f   };
-      tbl      tx = {  0.f,   0.f,    0.f   };
-      tbl      ty = {  0.f,   0.f,    0.f   };
+      tbl      tx = {  0.f,   1.f,    1.f   };
+      tbl      ty = {  0.f,   0.f,    1.f   };
 
       u32    mode        = (u32)0x0004; // (u64)GL_TRIANGLES;  // #define GL_TRIANGLES 0x0004
       u64 typenum        =  *((u64*)"IdxVerts");
@@ -2147,8 +2150,8 @@ ENTRY_DECLARATION // main or winmain
       //iv("colors green") = &cg;
       //iv("colors blue")  = &cb;
       //iv("colors alpha") = &ca;
-      //iv("texture coordinates x") = &tx;
-      //iv("texture coordinates y") = &ty;
+      iv("texture coordinates x") = &tx;
+      iv("texture coordinates y") = &ty;
 
       iv.flatten();
       auto fields = iv.memStart();

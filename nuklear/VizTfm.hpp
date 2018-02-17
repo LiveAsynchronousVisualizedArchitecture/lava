@@ -90,7 +90,7 @@ inline Shape          tbl_to_shape(tbl const& iv)  // todo: try to change this t
 
   Shape shp;
   u32 mode = (u32)((u64)iv("mode"));
-  tbl ind, px, py, pz, nx, ny, nz, cr, cg, cb, ca, tx, ty;
+  tbl ind, px, py, pz, nx, ny, nz, cr, cg, cb, ca, tx, ty, img;
   ind = iv("indices");
   px  = iv("positions x");  auto ff = px.memStart();
   py  = iv("positions y");
@@ -104,15 +104,26 @@ inline Shape          tbl_to_shape(tbl const& iv)  // todo: try to change this t
   ca  = iv("colors alpha");
   tx  = iv("texture coordinates x");
   ty  = iv("texture coordinates y");
+  img = iv("image");
 
   shp.owner = true;
   shp.mode  = mode;
   shp.indsz = ind.size();
 
-  glGenTextures(1, &shp.tx);
-  glBindTexture(GL_TEXTURE_2D, shp.tx);
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_FLOAT, tmpImg); 
-  glBindTexture(GL_TEXTURE_2D, 0);
+  SECTION(put the image in to shp.tx - if there was an image in the IdxVerts tbl, use that, if not, use a dummy img)
+  {
+    glGenTextures(1, &shp.tx);
+    glBindTexture(GL_TEXTURE_2D, shp.tx);
+     if(img){
+       u64 chans = img("channels");
+       u64     w = img("width");
+       u64     h = img("height");
+       if(chans==4 && w!=0 && h!=0 && img.arrayType()==tbl::TblType::F32)
+         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_FLOAT, img.data());
+     }else
+       glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_FLOAT, tmpImg); 
+    glBindTexture(GL_TEXTURE_2D, 0);
+  }
 
   glGenVertexArrays(1, &shp.vertary);
   glGenBuffers(1,      &shp.vertbuf);

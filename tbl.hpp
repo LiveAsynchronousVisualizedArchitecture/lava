@@ -62,6 +62,7 @@
 // -todo: change kvo::base to be a tbl*
 // -todo: figure out simpler memory allocation when used inside a shared libaray - allocation functions stored on the stack
 
+// todo: put TblType into just the tbl scope
 // todo: make static function to convert an 8 char string to an unsigned 64 bit integer
 // todo: make key finding and placement happen in KVOfst instead of tbl class 
 // todo: make sure destructors are run when assigning to a tbl that already owns memory
