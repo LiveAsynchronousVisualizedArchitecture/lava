@@ -250,9 +250,9 @@
 // -todo: make a card that has an image on it to test an IdxVerts with an image - triangle with UVs is enough
 // -todo: figure out if nanogui is taking characters as events so they don't get repeated as hotkeys in the node window - just need to check the bool of nanogui to see if the character was passed through to a component
 // -todo: make convenience function for next packet
+// -todo: fix duplicate loading of nodes - do the nodes just need to be cleared from nanogui when loading? - new buttons were not being added to the vector that holds them
 
 // todo: make easy creation for tables within nodes
-// todo: fix duplicate loading of nodes
 // todo: give Lava nodes description strings
 // todo: make description strings show up in the status bar on mouse over
 // todo: design packet freezing and packet visualization interface - maybe have three states - neutral, visualized, and frozen
@@ -268,7 +268,6 @@
 // todo: make shared libraries loaded after the GUI
 // todo: make shared libraries only try to load one per frame
 // todo: think about design for constant variables into class - string, double, u64, i64, file (color? v2,v3,v4? ranged double?, ranged integer?) separate datatype from interface? make all constant inputs tables? how to embed interface queues into a table? make each constant a subtable with a value, an interface type and interface values? 
-
 
 // todo: make input slots start at 0 - does there need to be a separation between input and out slots or does there need to be an offset so that the input frame starts at 0 
 // todo: convert tbl to use arrays of the data types smaller than 64 bits
@@ -1526,21 +1525,38 @@ bool            loadFile(str path, LavaGraph* out_g)
 }
 bool    reloadSharedLibs()
 {
+  //static bool tmp = true;
+
   bool newlibs = RefreshFlowLibs(fd.flow);
 
-  if(!newlibs) return false;
+  if(!newlibs){ return false; }
 
-  fd.ui.ndBtns.clear();                                          // delete interface buttons from the nanogui window
-
-  // redo interface node buttons
-  for(auto& kv : fd.flow.flow){
-    LavaNode*     fn = kv.second;                                // fn is flow node
-    auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
-    ndBtn->setCallback([fn](){ 
-      node_add(fn->name, Node(fn->name, (Node::Type)((u64)fn->node_type), {100,100}) );
-    });
+  //fd.ui.ndBtns[0]
+  SECTION(get the buttons out of the GUI and clear the button widgets from memory)
+  {
+    for(auto& b : fd.ui.ndBtns){
+      fd.ui.keyWin->removeChild(b);
+    }
+    fd.ui.ndBtns.clear();                                             // delete interface buttons from the nanogui window
   }
+
+  //if(tmp)
+  SECTION(redo interface node buttons)
+  {
+    for(auto& kv : fd.flow.flow)
+    {
+      LavaNode*     fn = kv.second;                                // fn is flow node
+      auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
+      ndBtn->setCallback([fn](){ 
+        node_add(fn->name, Node(fn->name, (Node::Type)((u64)fn->node_type), {100,100}) );
+      });
+      fd.ui.ndBtns.push_back(ndBtn);
+    }
+  }
+
   fd.ui.screen.performLayout();
+
+  //tmp=false;
 
   return true;
 }
