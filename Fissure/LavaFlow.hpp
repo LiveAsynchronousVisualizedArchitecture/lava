@@ -1,9 +1,14 @@
 
 // -todo: put in structure of extra error checking for shared library loading
+// -todo: once tbl is switched to not be an array, this might not need to be a template - tbl is now untemplated
+// -todo: allocation template parameters might mean that a template is still neccesary - tbl has allocation functions on the stack
+// -todo: make convenience functions to iterate through packets
 
+// todo: make a main node that takes command line arguments or have a way to designate a starting node
+// todo: clean up LavaOut and LavaVal to make outputing easier
+// todo: make Lava convenience function to make a tbl with the correct allocators
 // todo: put in more error states into LavaInst
 // todo: fill in error checking on shared library loading - need to make sure that the errors from nodes end up making it into their instances and ultimatly the GUI
-// todo: make Lava convenience function to make a tbl with the correct allocators
 // todo: give LavaNode struct a description string
 // todo: write about design of LavaQ including that it is lock free, uses contiguous memory, does not rely on pointers and small allocations, and doesn't need versions since the start and end only increment - when a reader is reading a value, it can be sure that the buffer underneath hasn't been switched twice, because that would require inserting more values, which would increment end.... but end isn't atomicly linked to the start index - does switching buffers need to add the absolute capacity to both start and end ? 
 // todo: use the capacity as a power of two exponent directly so that the modulo operator is avoided - would this mean masking with ~(0xFF << cap) to isolate the bits below the exponent as 0, then flipping all the bits so only the bit below the exponent are 1s, then applying bitwise AND to have only those bits from st and m_end ?
@@ -892,11 +897,8 @@ extern "C" __declspec(dllexport) LavaNode* GetLavaFlowNodes();   // prototype of
 using lava_memvec          =  std::vector<LavaMem, ThreadAllocator<LavaMem> >;
 
 // Lava Helper Functions
-//template<class T> LavaOut  LavaTblToOut(LavaParams const* lp, tbl<T> const& t)
-template<class T> LavaOut  LavaTblToOut(LavaParams const* lp, tbl const& t)
+LavaOut  LavaTblToOut(LavaParams const* lp, tbl const& t)
 {
-  // todo: once tbl is switched to not be an array, this might not need to be a template
-  // todo: allocation template parameters might mean that a template is still neccesary
   // todo: A table type that has empty allocation parameters could mean an unowned type
   //       | the unowned type could have a constructor that takes any tbl and makes it unowned, treating it effectivly as a reference
 
@@ -908,6 +910,18 @@ template<class T> LavaOut  LavaTblToOut(LavaParams const* lp, tbl const& t)
   o.val.type  = LavaArgType::MEMORY;
 
   return o;
+}
+
+bool      LavaNxtPckt(LavaFrame const* in, u32* currentIndex)
+{
+  if( *currentIndex < in->packets.size() &&
+       in->slotMask[*currentIndex]  )
+  {
+    ++(*currentIndex);
+    return true;
+  }else{
+    return false;
+  }
 }
 // End Lava Helper Functions
 
@@ -2287,3 +2301,9 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 #endif
 
+
+
+
+
+//template<class T> LavaOut  LavaTblToOut(LavaParams const* lp, tbl<T> const& t)
+//template<class T>

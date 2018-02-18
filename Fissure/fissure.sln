@@ -3,13 +3,15 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.27130.2010
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "fissure", "fissure\fissure.vcxproj", "{42362A99-8BF4-49DD-BD67-BFA435E65B79}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Fissure", "Fissure\Fissure.vcxproj", "{42362A99-8BF4-49DD-BD67-BFA435E65B79}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MakeCube", "MakeCube\MakeCube.vcxproj", "{2F79CE81-983B-4EB9-B390-5184014374AA}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ReadFile", "ReadFile\ReadFile.vcxproj", "{6F77CA43-083C-440C-AF01-CF24BAE5A7AD}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TfmCube", "TfmCube\TfmCube.vcxproj", "{51244A73-98D0-45BD-BACD-B58113E0A182}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CmdLineInput", "CmdLineInput\CmdLineInput.vcxproj", "{817FC15F-886E-4AB8-83E7-A2BD2FA313EF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -67,6 +69,16 @@ Global
 		{51244A73-98D0-45BD-BACD-B58113E0A182}.Release|Win32.ActiveCfg = Release|x64
 		{51244A73-98D0-45BD-BACD-B58113E0A182}.Release|x64.ActiveCfg = Release|x64
 		{51244A73-98D0-45BD-BACD-B58113E0A182}.Release|x64.Build.0 = Release|x64
+		{817FC15F-886E-4AB8-83E7-A2BD2FA313EF}.Debug|Mixed Platforms.ActiveCfg = Debug|x64
+		{817FC15F-886E-4AB8-83E7-A2BD2FA313EF}.Debug|Mixed Platforms.Build.0 = Debug|x64
+		{817FC15F-886E-4AB8-83E7-A2BD2FA313EF}.Debug|Win32.ActiveCfg = Debug|x64
+		{817FC15F-886E-4AB8-83E7-A2BD2FA313EF}.Debug|x64.ActiveCfg = Debug|x64
+		{817FC15F-886E-4AB8-83E7-A2BD2FA313EF}.Debug|x64.Build.0 = Debug|x64
+		{817FC15F-886E-4AB8-83E7-A2BD2FA313EF}.Release|Mixed Platforms.ActiveCfg = Release|x64
+		{817FC15F-886E-4AB8-83E7-A2BD2FA313EF}.Release|Mixed Platforms.Build.0 = Release|x64
+		{817FC15F-886E-4AB8-83E7-A2BD2FA313EF}.Release|Win32.ActiveCfg = Release|x64
+		{817FC15F-886E-4AB8-83E7-A2BD2FA313EF}.Release|x64.ActiveCfg = Release|x64
+		{817FC15F-886E-4AB8-83E7-A2BD2FA313EF}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

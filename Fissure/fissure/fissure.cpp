@@ -170,7 +170,7 @@
 // -todo: template LavaQ
 // -todo: test std::queue - about 3 times faster to only push() 100 million integers
 // -todo: compile with LavaQ instead of std::queue
-// -todo: integrate MakeCube into fissure to try out the new LavaQ
+// -todo: integrate MakeCube into Fissure to try out the new LavaQ
 // -todo: make packets be emitted (lava_send() ?) instead of simply returned
 // -todo: define a const LavaNodeEnd
 // -todo: make template visual studio project file
@@ -237,7 +237,7 @@
 // -todo: make packet visualization also include lighting up connections between slots
 // -todo: make packetSlots an unordered_set instead of a vector
 // -todo: use new tbl.hpp to re-implement IdxVerts - don't use an array, use only named sub-tables
-// -todo: test an IdxVerts tbl and put it into the fissure db to test with brandisher
+// -todo: test an IdxVerts tbl and put it into the Fissure db to test with brandisher
 // -todo: debug why mode is not showing up - being overwritten by another key before flattening
 // -todo: implement sub tables in brandisher
 // -todo: look in to turning tbl into class without a template
@@ -248,9 +248,13 @@
 // -todo: use recursive tbls to make an image - actually it is only one tbl down, the img doesn't contain sub tables
 // -todo: make triangle test into a square - right triangle is enough to show image
 // -todo: make a card that has an image on it to test an IdxVerts with an image - triangle with UVs is enough
+// -todo: figure out if nanogui is taking characters as events so they don't get repeated as hotkeys in the node window - just need to check the bool of nanogui to see if the character was passed through to a component
+// -todo: make convenience function for next packet
 
+// todo: make easy creation for tables within nodes
+// todo: fix duplicate loading of nodes
+// todo: give Lava nodes description strings
 // todo: make description strings show up in the status bar on mouse over
-// todo: think about design for constant variables into class - string, double, u64, i64, file (color? v2,v3,v4? ranged double?, ranged integer?) separate datatype from interface? make all constant inputs tables? how to embed interface queues into a table? make each constant a subtable with a value, an interface type and interface values? 
 // todo: design packet freezing and packet visualization interface - maybe have three states - neutral, visualized, and frozen
 // todo: make a settings file that is read on load if it in the same directory
 // todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets - use blue 'sunshine' lines going out from the center like a snowflake? 
@@ -263,6 +267,8 @@
 // todo: put each thread's owned memory vector into a global vector that other threads can access - can the LavaQ be used or broken into a single writer multi-reader array?
 // todo: make shared libraries loaded after the GUI
 // todo: make shared libraries only try to load one per frame
+// todo: think about design for constant variables into class - string, double, u64, i64, file (color? v2,v3,v4? ranged double?, ranged integer?) separate datatype from interface? make all constant inputs tables? how to embed interface queues into a table? make each constant a subtable with a value, an interface type and interface values? 
+
 
 // todo: make input slots start at 0 - does there need to be a separation between input and out slots or does there need to be an offset so that the input frame starts at 0 
 // todo: convert tbl to use arrays of the data types smaller than 64 bits
@@ -395,7 +401,6 @@
 //   | Node graph visualizations, tests and notes treated specially with the ability to be hidden
 //   | Packet queueing based on cache and memory heirarchies - look in a queue for the physical core, then whatever shares the L2 cache, L3 cache, and finally the same NUMA node - special queue structure needed that will automatically use this heirarchy by being specifically structured around it - need to weigh importance of having the absolute correct ordering versus using the memory heirarchy as effectivly as possible - maybe the memory heirarchy is the most important, but would out of order frames cause problems? possibly only if message passing nodes did not make sure to process the frames they recieve in order - would this end up being a tree structure of queues
 
-
 #include "FissureStatic.cpp"
 
 // glew might include windows.h
@@ -406,7 +411,7 @@
 #include "nanovg.h"
 
 #define NANOVG_GL3_IMPLEMENTATION   // Use GL2 implementation.
-//#include "nanovg_gl.h"  // nanogui includes this already
+//#include "nanovg_gl.h"              // nanogui includes this, not sure why it is needed now and wasn't in the past
 
 #define ENTRY_DECLARATION int main(void)
 #ifdef _MSC_VER
@@ -1542,12 +1547,13 @@ bool    reloadSharedLibs()
 
 void               keyCallback(GLFWwindow* win,    int key, int scancode, int action, int modbits)
 {
-  if(action==GLFW_RELEASE) return;
+  bool used = fd.ui.screen.keyCallbackEvent(key, scancode, action, modbits);
 
-  //char sngl[256]; // = {'\0', '\0'};
-  //memset(sngl, 0, 256);
-  //sngl[0] = key;
-  //glfwSetWindowTitle(win, sngl);
+  if(used) return;
+
+  //Println("used: ", used);
+
+  if(action==GLFW_RELEASE) return;
 
   switch(key){
   case 'J':{
@@ -1566,13 +1572,6 @@ void               keyCallback(GLFWwindow* win,    int key, int scancode, int ac
   default:
     ;
   }
-
-  //if(key==GLFW_KEY_BACKSPACE || key==GLFW_KEY_DELETE){
-  //  //fd.grph.delSelected();
-  //  sel_delete();
-  //}
-
-  fd.ui.screen.keyCallbackEvent(key, scancode, action, modbits);
 }
 void          mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 {
@@ -2742,6 +2741,17 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+//if(key==GLFW_KEY_BACKSPACE || key==GLFW_KEY_DELETE){
+//  //fd.grph.delSelected();
+//  sel_delete();
+//}
+
+//char sngl[256]; // = {'\0', '\0'};
+//memset(sngl, 0, 256);
+//sngl[0] = key;
+//glfwSetWindowTitle(win, sngl);
 
 //void print_flf_map(flf_map mp)
 //{

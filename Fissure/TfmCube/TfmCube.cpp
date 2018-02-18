@@ -4,7 +4,8 @@
 #include "../LavaFlow.hpp"
 
 struct vert { f32 p[3],n[3],c[4],tx[2]; };
-using IvTbl = tbl<vert>;
+//using IvTbl = tbl<vert>;
+using IvTbl = tbl;
 
 enum Slots
 {

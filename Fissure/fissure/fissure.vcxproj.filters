@@ -33,6 +33,9 @@
     <Filter Include="Source Files\unified">
       <UniqueIdentifier>{a55d09eb-6712-4ff5-b8dc-83653b78ee4e}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Source Files\naitive file dialog">
+      <UniqueIdentifier>{a0744f5e-6d7c-48b6-9ed9-613e4b5671f0}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="glew.c">
@@ -125,9 +128,6 @@
     <ClCompile Include="nanogui\src\window.cpp">
       <Filter>Source Files\nanogui</Filter>
     </ClCompile>
-    <ClCompile Include="fissure.cpp">
-      <Filter>Source Files\unified</Filter>
-    </ClCompile>
     <ClCompile Include="unified.cpp">
       <Filter>Source Files\unified</Filter>
     </ClCompile>
@@ -137,14 +137,17 @@
     <ClCompile Include="serial_files.c">
       <Filter>Source Files\unified</Filter>
     </ClCompile>
-    <ClCompile Include="nfd_win.cpp">
+    <ClCompile Include="..\nanovg\nanovg.c">
+      <Filter>Source Files\libs</Filter>
+    </ClCompile>
+    <ClCompile Include="Fissure.cpp">
       <Filter>Source Files\unified</Filter>
     </ClCompile>
     <ClCompile Include="nfd_common.c">
-      <Filter>Source Files\unified</Filter>
+      <Filter>Source Files\naitive file dialog</Filter>
     </ClCompile>
-    <ClCompile Include="..\nanovg\nanovg.c">
-      <Filter>Source Files\libs</Filter>
+    <ClCompile Include="nfd_win.cpp">
+      <Filter>Source Files\naitive file dialog</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>

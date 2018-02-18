@@ -5,7 +5,12 @@ Gauss Curve
 |  Show the "positions y" array in the brandisher, which should also show the gauss curve
 |  Reshape the window and show the array window redrawing/fitting
 |  Show the model in the visualizer
+
+
+Stand Alone
 |  Create stub .exe with a .json file that makes it into a stand alone program? 
+|  Create a .cpp file that has the connections hard coded and compile that? 
+
 
 
 
