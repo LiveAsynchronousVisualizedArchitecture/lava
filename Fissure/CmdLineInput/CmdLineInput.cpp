@@ -24,10 +24,8 @@ extern "C"
     u32 i=0;
     while( LavaNxtPckt(in, &i) )
     {
-      tbl  prompts( (void*)(in->packets[i].val.value) );
-      auto f = prompts.memStart();
+      tbl    prompts = LavaTblFromPckt(lp, in, i);
       tbl prmptsVals = prompts;
-
       for(auto& kv : prmptsVals)
       {
         str  scanType = "%d";                           // initialize all characters to 0
@@ -80,8 +78,8 @@ extern "C"
 
 
 
-
-
+//tbl  prompts( (void*)(in->packets[i].val.value) );
+//auto f = prompts.memStart();
 
 //auto    mapcap = prmptsVals.map_capacity();
 //auto       els = prmptsVals.elemStart();          // els is elements - a pointer to the start of the elements/key-values section of the tbl

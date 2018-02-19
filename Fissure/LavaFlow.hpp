@@ -1705,6 +1705,17 @@ tbl            LavaMakeTbl(LavaParams const* lp)
 
   return move(t);
 }
+tbl        LavaTblFromPckt(LavaParams const* lp, LavaFrame const* in, u64 i)
+{
+  using namespace std;
+
+  tbl t( (void*)(in->packets[i].val.value) );
+  //t.m_alloc   = lp->mem_alloc;
+  //t.m_realloc = lp->mem_realloc;
+  //t.m_free    = nullptr;
+
+  return move(t);
+}
 LavaOut       LavaTblToOut(tbl const& t, u32 slot)
 {
   LavaOut o;
