@@ -27,22 +27,20 @@ extern "C"
       tbl  prompts( (void*)(in->packets[i].val.value) );
       auto f = prompts.memStart();
       tbl prmptsVals = prompts;
-      auto    mapcap = prmptsVals.map_capacity();
-      auto       els = prmptsVals.elemStart();          // els is elements - a pointer to the start of the elements/key-values section of the tbl
-      TO(mapcap,e) if(!els[e].isEmpty()){
-        auto       el = els[e];
+
+      for(auto& kv : prmptsVals)
+      {
         str  scanType = "%d";                           // initialize all characters to 0
-        switch(el.type){
-          case tbl::TblType::F64:
-            scanType = "%lf"; 
-            break;
-          default: break;
+
+        switch(kv.type){
+         case tbl::TblType::F64:
+          scanType = "%lf"; 
+         break;
+         default: break;
         }
 
-        //str scnStr = els[e].key + str(": ") + scanType;         // need custom type string per type
-        //scanf(scnStr.c_str(), &el.val);
-        Print(els[e].key, ": ");
-        scanf(scanType.c_str(), &el.val);
+        Print(kv.key, ": ");
+        scanf(scanType.c_str(), &kv.val);
       }
 
       out->push( LavaTblToOut(prmptsVals,FILLED_PROMPT_VALUES_SLOT) );
@@ -80,6 +78,29 @@ extern "C"
 
 
 
+
+
+
+
+
+//auto    mapcap = prmptsVals.map_capacity();
+//auto       els = prmptsVals.elemStart();          // els is elements - a pointer to the start of the elements/key-values section of the tbl
+//TO(mapcap,e) if(!els[e].isEmpty()){
+//  auto       el = els[e];
+//  str  scanType = "%d";                           // initialize all characters to 0
+//  switch(el.type){
+//    case tbl::TblType::F64:
+//      scanType = "%lf"; 
+//      break;
+//    default: break;
+//  }
+//
+//  Print(els[e].key, ": ");
+//  scanf(scanType.c_str(), &el.val);
+//}
+
+//str scnStr = els[e].key + str(": ") + scanType;         // need custom type string per type
+//scanf(scnStr.c_str(), &el.val);
 
 //TO(in->packets.size(),i) if(in->slotMask[i])
 //

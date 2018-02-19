@@ -66,7 +66,7 @@
 // -todo: figure out how to deal with a const KVOfst that can only be read from 
 // -todo: make const version of operator()
 
-// todo: make something to iterate through elements
+// todo: make something to iterate through elements - use begin() and end() iterators
 // todo: make sure that the array can allocate if m_allocate is available 
 // todo: put TblType into just the tbl scope
 // todo: make key finding and placement happen in KVOfst instead of tbl class 
@@ -610,6 +610,29 @@ public:
 
     KV* operator->(){ return  kv; }
     KV& operator* (){ return *kv; }
+  };
+  struct    MapIter
+  {
+    KV*   en = nullptr;
+    KV*  cur = nullptr;
+
+    KV&        operator*(){ return *cur; }
+    MapIter&  operator++()
+    { 
+      do{
+        ++cur;
+      }while(cur!=en && cur->isEmpty());
+
+      return *this; 
+    }
+    bool      operator==(MapIter const& l)
+    {
+      return cur==l.cur && en==l.en;
+    }
+    bool      operator!=(MapIter const& l)
+    {
+      return !(this->operator==(l));
+    }
   };
 
   using   fields  =  TblFields;
@@ -1450,6 +1473,23 @@ public:
     return *this;
   }
   
+  MapIter begin()
+  {
+    MapIter iter;
+    iter.cur = elemStart();
+    iter.en  = elemStart() + map_capacity();
+
+    if(iter.cur->isEmpty()) ++iter;                                   // if the first map element slot is empty, increment to the first non empty slot
+
+    return iter;
+  }
+  MapIter   end()
+  {
+    MapIter iter;
+    iter.en = iter.cur = elemStart() + map_capacity();
+    return iter;
+  }
+
   static u64 strToInt(const char* shortStr)
   {
     assert( strlen(shortStr) <= 8 );

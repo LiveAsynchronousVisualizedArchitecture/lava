@@ -256,9 +256,11 @@
 // -todo: debug why brandisher shows prompts table incorrectly - lack of m_free function was making owned() return false, and keys weren't added - now allocation can happen if just m_alloc is not null
 // -todo: debug why scanf is not being hit - LavaNxtPckt not returning true - LavaNxtPckt needs to loop until finding the next true bit or the end 
 // -todo: debug why tbl is not the same once it goes into a new node - constructor passed a integer was being treated as count and not a pointer
+// -todo: debug why CmdLineInput is getting a table with elems() == 0  - sizeBytes is wrong, tbl is not the same when it comes through to CmdLineInput - wrong constructor was used
 
+// todo: make tbl have a begin and end that iterate through non-empty key-values in the map
 // todo: make Lava funtion to make a table from a packet
-// todo: debug why CmdLineInput is getting a table with elems() == 0  - sizeBytes is wrong, tbl is not the same when it comes through to CmdLineInput
+// todo: update template to just use lp and possibly put in constructor, destructor, input and output functions
 // todo: give Lava nodes description strings
 // todo: make description strings show up in the status bar on mouse over
 // todo: design packet freezing and packet visualization interface - maybe have three states - neutral, visualized, and frozen
