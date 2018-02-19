@@ -835,7 +835,7 @@ private:
   }
   void        destroy()
   { 
-    if( m_mem && owned() ){
+    //if( m_mem && owned() ){
       //tbl_PRNT("\n destruction \n");
       //
       //T*    a = (T*)m_mem;
@@ -843,7 +843,8 @@ private:
       //TO(sz,i){
       //  a[i].T::~T();                                                                    // run the destructors manually before freeing the memory
       //}
-      
+
+    if(m_free){
       m_free(memStart());
       m_mem = nullptr;
     }
@@ -1012,7 +1013,8 @@ public:
     KVOfst  ret;                                                                         // this will be set with placement new instead of operator= because operator= is templated and used for assigning to the KV pointed to by KVOfst::KV* -  this is so tbl("some key") = 85  can work correctly
     u32     hsh;
     KV*      kv = m_mem?  get(key, &hsh) : nullptr;
-    if(owned() && m_alloc)
+    //if(owned() && m_alloc)
+    if(m_alloc)
     { 
       if( !map_expand(!kv) ) return KVOfst();                                            // if map_expand returns false, that means that memory expansion was tried but failed
 

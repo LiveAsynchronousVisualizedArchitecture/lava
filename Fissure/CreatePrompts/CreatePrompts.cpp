@@ -21,8 +21,8 @@ extern "C"
     using namespace std;
 
     tbl prompts = LavaMakeTbl(lp);
-    prompts("Variance") = 0.f;
     prompts("Expected Value") = 0.f;
+    prompts("Variance") = 0.f;
 
     auto f = prompts.memStart();
 
