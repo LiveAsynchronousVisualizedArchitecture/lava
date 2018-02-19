@@ -65,8 +65,8 @@
 // -todo: make a const find() method or adapt has() method  - made const get()
 // -todo: figure out how to deal with a const KVOfst that can only be read from 
 // -todo: make const version of operator()
+// -todo: make something to iterate through elements - use begin() and end() iterators
 
-// todo: make something to iterate through elements - use begin() and end() iterators
 // todo: make sure that the array can allocate if m_allocate is available 
 // todo: put TblType into just the tbl scope
 // todo: make key finding and placement happen in KVOfst instead of tbl class 

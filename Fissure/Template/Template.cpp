@@ -15,14 +15,25 @@ enum Slots
 
 extern "C"
 {
-  const char*  InNames[]  = {"Template Slot In",   nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char*  InNames[]  = {"|_Name_| Slot In",   nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   const char*  InTypes[]  = {"IdxVerts",           nullptr};            // This array contains the type that each slot of the same index will accept as input.
-  const char* OutNames[]  = {"Template Slot Out",  nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char* OutNames[]  = {"|_Name_| Slot Out",  nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   const char* OutTypes[]  = {"IdxVerts",           nullptr};            // This array contains the types that are output in each slot of the same index
 
-  uint64_t TemplateTest(LavaParams* lp, LavaFrame* in, lava_threadQ* out) noexcept
+  uint64_t |_Name_|(LavaParams* lp, LavaFrame* in, lava_threadQ* out) noexcept
   {
     using namespace std;
+
+    u32 i=0;
+    while( LavaNxtPckt(in, &i) )
+    {
+      tbl inputTbl( (void*)(in->packets[i].val.value) );
+
+      for(auto& kv : inputTbl){  // this loop will iterate through non-empty map elements
+      }	
+
+      // out->push( LavaTblToOut(outputTbl, SLOT_0) );      // this will output a tbl into the first output slot
+    }
 
     return 1;
   }

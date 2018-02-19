@@ -4,9 +4,11 @@
 // -todo: allocation template parameters might mean that a template is still neccesary - tbl has allocation functions on the stack
 // -todo: make convenience functions to iterate through packets
 // -todo: make a main node that takes command line arguments or have a way to designate a starting node - might not need a main node since message nodes will be run anyway
+// -todo: clean up LavaOut and LavaVal to make outputing easier - just utility function for now
+// -todo: make Lava convenience function to make a tbl with the correct allocators
+// -todo: make a Lava convenience function to make a tbl from a packet
 
-// todo: clean up LavaOut and LavaVal to make outputing easier
-// todo: make Lava convenience function to make a tbl with the correct allocators
+// todo: separate input slots and output slots into two different indices
 // todo: put in more error states into LavaInst
 // todo: fill in error checking on shared library loading - need to make sure that the errors from nodes end up making it into their instances and ultimatly the GUI
 // todo: give LavaNode struct a description string
