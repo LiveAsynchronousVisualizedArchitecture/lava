@@ -5,7 +5,6 @@
 // -todo: make convenience functions to iterate through packets
 // -todo: make a main node that takes command line arguments or have a way to designate a starting node - might not need a main node since message nodes will be run anyway
 
-
 // todo: clean up LavaOut and LavaVal to make outputing easier
 // todo: make Lava convenience function to make a tbl with the correct allocators
 // todo: put in more error states into LavaInst
@@ -1715,14 +1714,21 @@ LavaOut       LavaTblToOut(tbl const& t, u32 slot)
 }
 bool           LavaNxtPckt(LavaFrame const* in, u32* currentIndex)
 {
-  if( *currentIndex < in->packets.size() &&
-    in->slotMask[*currentIndex]  )
-  {
+  do{ 
     ++(*currentIndex);
-    return true;
-  }else{
-    return false;
-  }
+    if( *currentIndex >= in->packets.size() ) return false;
+  }while( !in->slotMask[*currentIndex] );
+
+  return true;
+
+  //if( *currentIndex < in->packets.size() &&
+  //  in->slotMask[*currentIndex]  )
+  //{
+  //  ++(*currentIndex);
+  //  return true;
+  //}else{
+  //  return false;
+  //}
 }
 // End Lava Helper Functions
 

@@ -253,9 +253,12 @@
 // -todo: fix duplicate loading of nodes - do the nodes just need to be cleared from nanogui when loading? - new buttons were not being added to the vector that holds them
 // -todo: make easy creation for tables within nodes
 // -todo: debug why tables are not showing up in the brandisher - not being allocated correctly
+// -todo: debug why brandisher shows prompts table incorrectly - lack of m_free function was making owned() return false, and keys weren't added - now allocation can happen if just m_alloc is not null
+// -todo: debug why scanf is not being hit - LavaNxtPckt not returning true - LavaNxtPckt needs to loop until finding the next true bit or the end 
+// -todo: debug why tbl is not the same once it goes into a new node - constructor passed a integer was being treated as count and not a pointer
 
-// todo: debug why brandisher shows prompts table incorrectly
-// todo: debug why scanf is not being hit 
+// todo: make Lava funtion to make a table from a packet
+// todo: debug why CmdLineInput is getting a table with elems() == 0  - sizeBytes is wrong, tbl is not the same when it comes through to CmdLineInput
 // todo: give Lava nodes description strings
 // todo: make description strings show up in the status bar on mouse over
 // todo: design packet freezing and packet visualization interface - maybe have three states - neutral, visualized, and frozen

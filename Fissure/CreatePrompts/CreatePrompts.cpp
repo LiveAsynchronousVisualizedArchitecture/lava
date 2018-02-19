@@ -9,6 +9,8 @@ enum Slots
   PROMPTS = 0
 };
 
+static std::atomic<bool> hasRun = false;
+
 extern "C"
 {
   //const char*  InNames[]  = {"Template Slot In",   nullptr};           // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
@@ -16,9 +18,22 @@ extern "C"
   const char* OutNames[] = {"Prompts for values and their types, given by the key-values of the tbl",  nullptr};             // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   const char* OutTypes[] = {"Prompts",            nullptr};             // This array contains the types that are output in each slot of the same index
 
+  void CreatePrompts_construct()
+  {
+    hasRun = false;
+  }
+  void CreatePrompts_destruct()
+  {
+    hasRun = false;
+  }
+
   uint64_t CreatePrompts(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
   {
     using namespace std;
+
+    if( hasRun ){ return 1; }
+    
+    hasRun = true;
 
     tbl prompts = LavaMakeTbl(lp);
     prompts("Expected Value") = 0.f;
@@ -35,8 +50,8 @@ extern "C"
   {
     {
       CreatePrompts,                                 // function
-      nullptr,                                       // constructor
-      nullptr,                                       // destructor
+      CreatePrompts_construct,                       // constructor
+      CreatePrompts_destruct,                        // destructor
       LavaNode::MSG,                                 // node_type  
       "CreatePrompts",                               // name
       nullptr,                                       // in_names

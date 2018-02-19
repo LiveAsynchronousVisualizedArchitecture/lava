@@ -61,18 +61,20 @@
 // -todo: allocation template parameters might mean that a template is still neccesary - still would need to magically know the type in both uses since the allocators would need to line up - this would defeat the purpose of portability - does this imply that pointers to memory allocators also can't be on the stack? - if the tbl is passed around inside a program, even to a shared library, it can be passed as 4 pointers in a struct instead of just one - this works because they are in the same memory space, which is where the function pointers will be relevant - if tbl is used between processes through shared memory or written to disk, the function pointers will not be a part of the format as well as being irrelevant to the data - this can also solve the problem of separating ownership from the table data itself
 // -todo: change kvo::base to be a tbl*
 // -todo: figure out simpler memory allocation when used inside a shared libaray - allocation functions stored on the stack
+// -todo: make static function to convert an 8 char string to an unsigned 64 bit integer
+// -todo: make a const find() method or adapt has() method  - made const get()
+// -todo: figure out how to deal with a const KVOfst that can only be read from 
+// -todo: make const version of operator()
 
+// todo: make something to iterate through elements
+// todo: make sure that the array can allocate if m_allocate is available 
 // todo: put TblType into just the tbl scope
-// todo: make static function to convert an 8 char string to an unsigned 64 bit integer
 // todo: make key finding and placement happen in KVOfst instead of tbl class 
 // todo: make sure destructors are run when assigning to a tbl that already owns memory
 // todo: make flatten take an optional memory allocation argument - this would mean that it will need to carry alloc, realloc and free pointers with it - should all these be on the stack?
 // todo: make flatten() recursive 
 // todo: test recursive flatten() with visualization inside Brandisher
 // todo: make TblVal casts const
-// todo: make a const find() method or adapt has() method 
-// todo: figure out how to deal with a const KVOfst that can only be read from 
-// todo: make const version of operator()
 // todo: make template function to get the array as a pointer of a certain type
 // todo: make the default type become a specific 'unknown' value 
 // todo: make sure if the type of a struct is labeled unknown, and if so check that the stride matches the struct size
@@ -835,15 +837,6 @@ private:
   }
   void        destroy()
   { 
-    //if( m_mem && owned() ){
-      //tbl_PRNT("\n destruction \n");
-      //
-      //T*    a = (T*)m_mem;
-      //auto sz = size();
-      //TO(sz,i){
-      //  a[i].T::~T();                                                                    // run the destructors manually before freeing the memory
-      //}
-
     if(m_free){
       m_free(memStart());
       m_mem = nullptr;
@@ -1194,8 +1187,8 @@ public:
   auto       memStart() const -> fields const* { return (fields*)(m_mem - memberBytes()); }
   u64       sizeBytes() const { return m_mem? memStart()->sizeBytes : 0; }
   u64        capacity() const { return m_mem? memStart()->capacity  : 0; }
-  u64           elems() const { return m_mem?  memStart()->elems    : 0; }
-  u64    map_capacity() const { return m_mem?  memStart()->mapcap   : 0; }
+  u64           elems() const { return m_mem? memStart()->elems     : 0; }
+  u64    map_capacity() const { return m_mem? memStart()->mapcap    : 0; }
   u64          stride() const { return m_mem? memStart()->stride    : 0; }
   u8        arrayType() const { return m_mem? (u8)memStart()->arrayType : 0; }
   auto        typeStr() const -> char const* { return TblType::type_str(arrayType()); };
@@ -1594,6 +1587,14 @@ public:
 
 
 
+//if( m_mem && owned() ){
+//tbl_PRNT("\n destruction \n");
+//
+//T*    a = (T*)m_mem;
+//auto sz = size();
+//TO(sz,i){
+//  a[i].T::~T();                                                                    // run the destructors manually before freeing the memory
+//}
 
 // todo: these will likely have to be templates
 //T*            begin(){ return  (T*)m_mem;           }
