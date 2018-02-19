@@ -3,8 +3,9 @@
 // -todo: once tbl is switched to not be an array, this might not need to be a template - tbl is now untemplated
 // -todo: allocation template parameters might mean that a template is still neccesary - tbl has allocation functions on the stack
 // -todo: make convenience functions to iterate through packets
+// -todo: make a main node that takes command line arguments or have a way to designate a starting node - might not need a main node since message nodes will be run anyway
 
-// todo: make a main node that takes command line arguments or have a way to designate a starting node
+
 // todo: clean up LavaOut and LavaVal to make outputing easier
 // todo: make Lava convenience function to make a tbl with the correct allocators
 // todo: put in more error states into LavaInst
@@ -571,6 +572,8 @@ using lava_nameNodeMap   =  std::unordered_map<std::string, LavaNode*>;         
 using lava_threadQ       =  LavaQ<LavaOut>;
 
 extern "C" using       LavaAllocFunc  =  void* (*)(uint64_t);                             // custom allocation function passed in to each node call
+extern "C" using     LavaReallocFunc  =  void* (*)(void*, uint64_t);                      // custom allocation function passed in to each node call
+extern "C" using        LavaFreeFunc  =  void  (*)(void*);                                // custom allocation function passed in to each node call
 extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                                               // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
 //extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaFrame*, lava_threadQ*);       // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
 extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams const*, LavaFrame const*, lava_threadQ*);   // node function taking a LavaFrame in
@@ -683,10 +686,12 @@ union          LavaId                                            // this Id serv
 };
 struct     LavaParams
 {
-  u32              inputs;
-  u64               frame;
-  LavaId               id;
-  LavaAllocFunc mem_alloc;
+  u32                  inputs;
+  u64                   frame;
+  LavaId                   id;
+  LavaAllocFunc     mem_alloc;
+  LavaReallocFunc mem_realloc;
+  LavaFreeFunc       mem_free;
 
   //u32           outputs;
   //LavaPut           put;
@@ -698,9 +703,6 @@ struct        LavaVal
 };
 struct        LavaOut
 {
-  //// todo: change to LavaVal
-  //u64      type :  3;          // ArgType
-  //u64     value : 61;          // This will hold the address in memory - could also hold the starting block index in the database 
   LavaVal val;
 
   union {
@@ -895,35 +897,6 @@ extern "C" __declspec(dllexport) LavaNode* GetLavaFlowNodes();   // prototype of
 // end function declarations
 
 using lava_memvec          =  std::vector<LavaMem, ThreadAllocator<LavaMem> >;
-
-// Lava Helper Functions
-LavaOut  LavaTblToOut(LavaParams const* lp, tbl const& t)
-{
-  // todo: A table type that has empty allocation parameters could mean an unowned type
-  //       | the unowned type could have a constructor that takes any tbl and makes it unowned, treating it effectivly as a reference
-
-  void* outmem  =  lp->mem_alloc(t.sizeBytes());
-  memcpy(outmem, t.memStart(), t.sizeBytes());
-
-  LavaOut o;
-  o.val.value = (u64)outmem;
-  o.val.type  = LavaArgType::MEMORY;
-
-  return o;
-}
-
-bool      LavaNxtPckt(LavaFrame const* in, u32* currentIndex)
-{
-  if( *currentIndex < in->packets.size() &&
-       in->slotMask[*currentIndex]  )
-  {
-    ++(*currentIndex);
-    return true;
-  }else{
-    return false;
-  }
-}
-// End Lava Helper Functions
 
 class       LavaGraph                  // LavaGraph should specifically be about the connections between nodes
 {
@@ -1718,6 +1691,41 @@ public:
   //void          pauseLoop(){}
 };
 
+// Lava Helper Functions
+tbl            LavaMakeTbl(LavaParams const* lp)
+{
+  using namespace std;
+
+  tbl t;
+  t.m_alloc   = lp->mem_alloc;
+  t.m_realloc = lp->mem_realloc;
+  t.m_free    = nullptr;
+  //t.m_free    = lp->mem_free;
+
+  return move(t);
+}
+LavaOut       LavaTblToOut(tbl const& t, u32 slot)
+{
+  LavaOut o;
+  o.val.value = (u64)t.memStart();
+  o.val.type  = LavaArgType::MEMORY;
+  o.key.slot  = slot;
+
+  return o;
+}
+bool           LavaNxtPckt(LavaFrame const* in, u32* currentIndex)
+{
+  if( *currentIndex < in->packets.size() &&
+    in->slotMask[*currentIndex]  )
+  {
+    ++(*currentIndex);
+    return true;
+  }else{
+    return false;
+  }
+}
+// End Lava Helper Functions
+
 #if defined(__LAVAFLOW_IMPL__)
 
 //static __declspec(thread)  void*   lava_thread_heap     = nullptr;           // thread local handle for thread local heap allocations
@@ -1747,25 +1755,6 @@ BOOL WINAPI DllMain(
     ;
   }
   return true;
-}
-
-void*               LavaAlloc(uint64_t sizeBytes)
-{
-  uint64_t* mem = (uint64_t*)LavaHeapAlloc(sizeBytes + sizeof(uint64_t)*2);
-  mem[0]  =  0;              // reference count
-  mem[1]  =  sizeBytes;      // number of bytes of main allocation
-
-  LavaMem lm;
-  lm.ptr  =  mem;
-
-  lava_thread_ownedMem->push_back(lm);
-
-  return (void*)(mem + 2);   // sizeof(uint64_t)*2);
-}
-void                 LavaFree(uint64_t addr)
-{
-  void* p = (void*)(addr - sizeof(uint64_t)*2);
-  LavaHeapFree(p);
 }
 
 namespace {
@@ -1996,6 +1985,31 @@ LavaInst::State exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaFram
   return ret;
 }
 
+}
+
+void*            LavaAlloc(uint64_t sizeBytes)
+{
+  uint64_t* mem = (uint64_t*)LavaHeapAlloc(sizeBytes + sizeof(uint64_t)*2);
+  mem[0]  =  0;              // reference count
+  mem[1]  =  sizeBytes;      // number of bytes of main allocation
+
+  LavaMem lm;
+  lm.ptr  =  mem;
+
+  lava_thread_ownedMem->push_back(lm);
+
+  return (void*)(mem + 2);   // sizeof(uint64_t)*2);
+}
+void*            LavaRealloc(void* addr, uint64_t sizeBytes)
+{
+  void* realAddr = (u8*)addr - 16;
+  void*      mem = (uint64_t*)LavaHeapReAlloc(realAddr, sizeBytes + 16);
+  return mem;
+}
+void              LavaFree(void* addr)
+{
+  void* p = (void*)( (u8*)addr - 16 );  // 16 bytes for the reference count and sizeBytes
+  LavaHeapFree(p);
 }
 
 void               LavaInit()
@@ -2262,7 +2276,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
       auto  zeroRef  =  partition(ALL(ownedMem), [](auto a){return a.refCount() > 0;} );                           // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
       auto freeIter  =  zeroRef;
       for(; freeIter != end(ownedMem); ++freeIter){         // loop through the memory with zero references and free them
-        LavaFree( (uint64_t)freeIter->data() );
+        LavaFree( freeIter->data() );
       }
       ownedMem.erase(zeroRef, end(ownedMem));                                  // erase the now freed memory
 
@@ -2290,7 +2304,9 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
   lf.decThreadCount();
 }
+
 // end function implementations
+
 
 
 // priority queue of packets - sort by frame number, then dest node, then dest slot
@@ -2304,6 +2320,23 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+
+
+
+
+
+//LavaOut  LavaTblToOut(LavaParams const* lp, tbl const& t, u32 slot)
+//
+// todo: A table type that has empty allocation parameters could mean an unowned type
+//       | the unowned type could have a constructor that takes any tbl and makes it unowned, treating it effectivly as a reference
+//
+//void* outmem  =  lp->mem_alloc(t.sizeBytes());
+//memcpy(outmem, t.memStart(), t.sizeBytes());
+
+//// todo: change to LavaVal
+//u64      type :  3;          // ArgType
+//u64     value : 61;          // This will hold the address in memory - could also hold the starting block index in the database 
 
 //template<class T> LavaOut  LavaTblToOut(LavaParams const* lp, tbl<T> const& t)
 //template<class T>

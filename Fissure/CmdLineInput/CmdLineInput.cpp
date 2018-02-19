@@ -20,7 +20,6 @@ extern "C"
   {
     using namespace std;
 
-    //TO(in->packets.size(),i) if(in->slotMask[i])
     u32 i=0;
     while( LavaNxtPckt(in, &i) )
     {
@@ -41,11 +40,7 @@ extern "C"
         scanf(scnStr.c_str(), &el.val);
       }
 
-      LavaOut o;
-      o.key.slot  = FILLED_PROMPT_VALUES_SLOT;
-      o.val.value = (u64)prmptsVals.memStart();
-      o.val.type  = LavaArgType::MEMORY;
-      out->push(o);
+      out->push( LavaTblToOut(prmptsVals,FILLED_PROMPT_VALUES_SLOT) );
     }
 
     return 1;
@@ -74,3 +69,17 @@ extern "C"
     return (LavaNode*)LavaNodes;
   }
 }
+
+
+
+
+
+
+
+//TO(in->packets.size(),i) if(in->slotMask[i])
+//
+//LavaOut o;
+//o.key.slot  = FILLED_PROMPT_VALUES_SLOT;
+//o.val.value = (u64)prmptsVals.memStart();
+//o.val.type  = LavaArgType::MEMORY;
+//out->push(o);

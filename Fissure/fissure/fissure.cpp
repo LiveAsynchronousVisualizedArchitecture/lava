@@ -251,8 +251,11 @@
 // -todo: figure out if nanogui is taking characters as events so they don't get repeated as hotkeys in the node window - just need to check the bool of nanogui to see if the character was passed through to a component
 // -todo: make convenience function for next packet
 // -todo: fix duplicate loading of nodes - do the nodes just need to be cleared from nanogui when loading? - new buttons were not being added to the vector that holds them
+// -todo: make easy creation for tables within nodes
+// -todo: debug why tables are not showing up in the brandisher - not being allocated correctly
 
-// todo: make easy creation for tables within nodes
+// todo: debug why brandisher shows prompts table incorrectly
+// todo: debug why scanf is not being hit 
 // todo: give Lava nodes description strings
 // todo: make description strings show up in the status bar on mouse over
 // todo: design packet freezing and packet visualization interface - maybe have three states - neutral, visualized, and frozen
@@ -1785,7 +1788,7 @@ ENTRY_DECLARATION // main or winmain
       glfwWindowHint(GLFW_SAMPLES, 16);
       //glfwWindowHint(GLFW_DECORATED, GL_FALSE);
 
-      fd.win = glfwCreateWindow(1024, 768, "Fissure", NULL, NULL);        // assert(win!=nullptr);
+      fd.win = glfwCreateWindow(1536, 1024, "Fissure", NULL, NULL);        // assert(win!=nullptr);
       glfwMakeContextCurrent(fd.win);
 
       glfwSetKeyCallback(fd.win,                keyCallback);
@@ -1822,15 +1825,15 @@ ENTRY_DECLARATION // main or winmain
       fd.ui.screen.initialize(fd.win, false);
 
       fd.ui.keyLay   = new BoxLayout(Orientation::Horizontal, Alignment::Fill, 0,10);      //fd.ui.keyLay   = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
-      fd.ui.keyWin   = new Window(&fd.ui.screen,    "");
-      auto spcr1     = new  Label(fd.ui.keyWin,     "");
-      auto spcr2     = new  Label(fd.ui.keyWin,     "");
-      auto loadBtn   = new Button(fd.ui.keyWin,      "Load");
-      auto saveBtn   = new Button(fd.ui.keyWin,      "Save");
-      auto playBtn   = new Button(fd.ui.keyWin,    "Play >");
-      auto pauseBtn  = new Button(fd.ui.keyWin,  "Pause ||");
-      auto stopBtn   = new Button(fd.ui.keyWin,  "Stop |_|");
-      auto nodeBtn   = new Button(fd.ui.keyWin,  "Create Node");
+      fd.ui.keyWin   = new  Window(&fd.ui.screen,    "");
+      auto spcr1     = new   Label(fd.ui.keyWin,     "");
+      auto spcr2     = new   Label(fd.ui.keyWin,     "");
+      auto loadBtn   = new  Button(fd.ui.keyWin,      "Load");
+      auto saveBtn   = new  Button(fd.ui.keyWin,      "Save");
+      auto playBtn   = new  Button(fd.ui.keyWin,    "Play >");
+      auto pauseBtn  = new  Button(fd.ui.keyWin,  "Pause ||");
+      auto stopBtn   = new  Button(fd.ui.keyWin,  "Stop |_|");
+      auto nodeBtn   = new  Button(fd.ui.keyWin,  "Create Node");
       auto nodeTxt   = new TextBox(fd.ui.keyWin,  "");
 
       nodeTxt->setEditable(true);
@@ -2042,141 +2045,141 @@ ENTRY_DECLARATION // main or winmain
     }
   }
 
-  SECTION(tbl test)
-  {
-    Println("sizeof(tbl::KV): ", sizeof(tbl::KV) );
-   
-    //tbl t(10, (u64)0 );
-    //TO(t.size(),i){
-    //  //t.operator[]<u8>(i) = (u8)i;
-    //  t[i] = (u64)i;
-    //}
-
-    tbl t = {0ull,1ull,2ull,3ull,4ull,5ull,6ull,7ull,8ull,9ull};
-    TO(t.size(),i){
-      u64 val = t[i];
-      Print(val," "); 
-    }
-    Println("\n");
-
-    SECTION(test map with normal types)
-    {
-      t("wat")    = 800;
-      //t("width")  = 4096ull;
-      //t("height") = 2048ull;
-      //t("chans")  = (u8)3;
-      //int     wat = t("wat");
-      //u64   width = t("width");
-      //u64  height = t("height");
-      //Println("wat: ", wat, " width: ", width, " height: ", height, " chans: ", (u64)(u8)t("chans") );
-    }
-    SECTION(test map with other tables)
-    {
-      tbl t1 = {2,4,6,8,10};
-      t1.push(12);
-      t1.push(14);
-      t1.push(14);
-      t1.push({16,18,20,22,24});
-      t1.pop();
-      t1.pop();
-      t1.pop();
-      t1.pop();
-      t("t1") = &t1;
-      //t.flatten();
-
-      //t("t1") = t1;
-      //t.flatten();
-
-      //tbl tA = t("t1");
-      //TO(tA.size(),i){
-      //  tA[i] = (i32)tA[i] * 2;
-      //  Print( (int)tA[i]," ");
-      //}
-      //Println("\nOwned: ", tA.owned());
-
-      TO(t1.size(),i){
-        Print( (int)t1[i]," ");
-      }
-      Println("\nOwned: ", t1.owned());
-    }
-    SECTION(print tbl attributes)
-    {
-      Println("size: ", t.size() );
-      Println("front(), back(): ", (u64)t.front(), ",  ", (u64)t.back() );
-      Println("sizeBytes: ", t.sizeBytes() );
-      Println("stride: ",    t.stride()    );
-      TO(t.size(),i){
-        u64 val = t[i];
-        Print(val, " "); 
-      }
-      Println("\n\n");
-      Println("KV size: ", sizeof(tbl::KV));
-    }
-
-    tbl iv;
-    SECTION(make IdxVerts with the new tbl)
-    {
-      u32 w=16,h=16,chans=4;
-      tbl img(w*h*chans, 0.f);
-      img("type")       =  tbl::strToInt("Image");
-      img("width")      =  w;
-      img("height")     =  h;
-      img("channels")   =  chans;
-      img("dimensions") =  2;
-      TO(h,y) TO(w,x) TO(chans,c){
-        auto idx = y*w*chans + x*chans + c;
-
-        if(c==2)
-          img[idx] = 0.5f;
-        else if(c==3) 
-          img[idx] = 1.f;
-        else
-          img[idx] = (f32)y / (2.f*h)  +  (f32)x / (2.f*w); 
-          //img[idx] = (f32)x/(w);
-      }
-
-      tbl indices = {0u,1u,2u };
-      tbl      px = { -1.f,   0.f,    0.f   };
-      tbl      py = { -1.f,  -1.f,    1.f   };
-      tbl      pz = {  0.f,   0.f,   -0.f   };
-      tbl      nx = {  0.f,   0.f,    0.f   };
-      tbl      ny = {  0.f,   0.f,    0.f   };
-      tbl      nz = { -1.f,  -1.f,   -1.f   };
-      tbl      cr = {  1.f,   1.f,    1.f   };
-      tbl      cg = {  1.f,   1.f,    1.f   };
-      tbl      cb = {  1.f,   1.f,    1.f   };
-      tbl      ca = {  1.f,   1.f,    1.f   };
-      tbl      tx = {  0.f,   1.f,    1.f   };
-      tbl      ty = {  0.f,   0.f,    1.f   };
-
-      u32    mode        = (u32)0x0004; // (u64)GL_TRIANGLES;  // #define GL_TRIANGLES 0x0004
-      u64 typenum        =  *((u64*)"IdxVerts");
-      iv("type")         = typenum;
-      iv("mode")         = mode;
-      iv("indices")      = &indices;
-      iv("positions x")  = &px;
-      iv("positions y")  = &py;
-      iv("positions z")  = &pz;
-      iv("image")        = &img;
-      //iv("normals x")    = &nx;
-      //iv("normals y")    = &ny;
-      //iv("normals z")    = &nz;
-      //iv("colors red")   = &cr;
-      //iv("colors green") = &cg;
-      //iv("colors blue")  = &cb;
-      //iv("colors alpha") = &ca;
-      iv("texture coordinates x") = &tx;
-      iv("texture coordinates y") = &ty;
-
-      iv.flatten();
-      auto fields = iv.memStart();
-
-      Println("iv sizeBytes: ", iv.sizeBytes() );
-      Println("ind type: ",  indices.typeStr() );
-
-      fisdb.put("indexed verts test", iv.memStart(), (u32)iv.sizeBytes() );
-    }
-  }
+  //SECTION(tbl test)
+  //{
+  //  Println("sizeof(tbl::KV): ", sizeof(tbl::KV) );
+  // 
+  //  //tbl t(10, (u64)0 );
+  //  //TO(t.size(),i){
+  //  //  //t.operator[]<u8>(i) = (u8)i;
+  //  //  t[i] = (u64)i;
+  //  //}
+  //
+  //  tbl t = {0ull,1ull,2ull,3ull,4ull,5ull,6ull,7ull,8ull,9ull};
+  //  TO(t.size(),i){
+  //    u64 val = t[i];
+  //    Print(val," "); 
+  //  }
+  //  Println("\n");
+  //
+  //  SECTION(test map with normal types)
+  //  {
+  //    t("wat")    = 800;
+  //    //t("width")  = 4096ull;
+  //    //t("height") = 2048ull;
+  //    //t("chans")  = (u8)3;
+  //    //int     wat = t("wat");
+  //    //u64   width = t("width");
+  //    //u64  height = t("height");
+  //    //Println("wat: ", wat, " width: ", width, " height: ", height, " chans: ", (u64)(u8)t("chans") );
+  //  }
+  //  SECTION(test map with other tables)
+  //  {
+  //    tbl t1 = {2,4,6,8,10};
+  //    t1.push(12);
+  //    t1.push(14);
+  //    t1.push(14);
+  //    t1.push({16,18,20,22,24});
+  //    t1.pop();
+  //    t1.pop();
+  //    t1.pop();
+  //    t1.pop();
+  //    t("t1") = &t1;
+  //    //t.flatten();
+  //
+  //    //t("t1") = t1;
+  //    //t.flatten();
+  //
+  //    //tbl tA = t("t1");
+  //    //TO(tA.size(),i){
+  //    //  tA[i] = (i32)tA[i] * 2;
+  //    //  Print( (int)tA[i]," ");
+  //    //}
+  //    //Println("\nOwned: ", tA.owned());
+  //
+  //    TO(t1.size(),i){
+  //      Print( (int)t1[i]," ");
+  //    }
+  //    Println("\nOwned: ", t1.owned());
+  //  }
+  //  SECTION(print tbl attributes)
+  //  {
+  //    Println("size: ", t.size() );
+  //    Println("front(), back(): ", (u64)t.front(), ",  ", (u64)t.back() );
+  //    Println("sizeBytes: ", t.sizeBytes() );
+  //    Println("stride: ",    t.stride()    );
+  //    TO(t.size(),i){
+  //      u64 val = t[i];
+  //      Print(val, " "); 
+  //    }
+  //    Println("\n\n");
+  //    Println("KV size: ", sizeof(tbl::KV));
+  //  }
+  //
+  //  tbl iv;
+  //  SECTION(make IdxVerts with the new tbl)
+  //  {
+  //    u32 w=16,h=16,chans=4;
+  //    tbl img(w*h*chans, 0.f);
+  //    img("type")       =  tbl::strToInt("Image");
+  //    img("width")      =  w;
+  //    img("height")     =  h;
+  //    img("channels")   =  chans;
+  //    img("dimensions") =  2;
+  //    TO(h,y) TO(w,x) TO(chans,c){
+  //      auto idx = y*w*chans + x*chans + c;
+  //
+  //      if(c==2)
+  //        img[idx] = 0.5f;
+  //      else if(c==3) 
+  //        img[idx] = 1.f;
+  //      else
+  //        img[idx] = (f32)y / (2.f*h)  +  (f32)x / (2.f*w); 
+  //        //img[idx] = (f32)x/(w);
+  //    }
+  //
+  //    tbl indices = {0u,1u,2u };
+  //    tbl      px = { -1.f,   0.f,    0.f   };
+  //    tbl      py = { -1.f,  -1.f,    1.f   };
+  //    tbl      pz = {  0.f,   0.f,   -0.f   };
+  //    tbl      nx = {  0.f,   0.f,    0.f   };
+  //    tbl      ny = {  0.f,   0.f,    0.f   };
+  //    tbl      nz = { -1.f,  -1.f,   -1.f   };
+  //    tbl      cr = {  1.f,   1.f,    1.f   };
+  //    tbl      cg = {  1.f,   1.f,    1.f   };
+  //    tbl      cb = {  1.f,   1.f,    1.f   };
+  //    tbl      ca = {  1.f,   1.f,    1.f   };
+  //    tbl      tx = {  0.f,   1.f,    1.f   };
+  //    tbl      ty = {  0.f,   0.f,    1.f   };
+  //
+  //    u32    mode        = (u32)0x0004; // (u64)GL_TRIANGLES;  // #define GL_TRIANGLES 0x0004
+  //    u64 typenum        =  *((u64*)"IdxVerts");
+  //    iv("type")         = typenum;
+  //    iv("mode")         = mode;
+  //    iv("indices")      = &indices;
+  //    iv("positions x")  = &px;
+  //    iv("positions y")  = &py;
+  //    iv("positions z")  = &pz;
+  //    iv("image")        = &img;
+  //    //iv("normals x")    = &nx;
+  //    //iv("normals y")    = &ny;
+  //    //iv("normals z")    = &nz;
+  //    //iv("colors red")   = &cr;
+  //    //iv("colors green") = &cg;
+  //    //iv("colors blue")  = &cb;
+  //    //iv("colors alpha") = &ca;
+  //    iv("texture coordinates x") = &tx;
+  //    iv("texture coordinates y") = &ty;
+  //
+  //    iv.flatten();
+  //    auto fields = iv.memStart();
+  //
+  //    Println("iv sizeBytes: ", iv.sizeBytes() );
+  //    Println("ind type: ",  indices.typeStr() );
+  //
+  //    fisdb.put("indexed verts test", iv.memStart(), (u32)iv.sizeBytes() );
+  //  }
+  //}
 
   glfwSetTime(0);
   SECTION(main loop)
