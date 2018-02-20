@@ -90,6 +90,7 @@
 // -todo: visualize arrays with proper types - just need to use a switch case to make a vector of f64? 
 // -todo: use a const operator() in tbl to get the sub table by key
 
+// todo: take out debug printing
 // todo: treat the array as a string if it is u8, i8, (or a string type?) - then show statistics for a string if the string is too long to fit in the gui
 
 // idea: make switch case for fundamental types that the map elements can be - need the non-templated table
@@ -746,7 +747,7 @@ void          openFiles(vec_str const& files)
 {
   int i = 0;
   for(auto& f : files){
-    Println("file ", i, ": ", f);
+    //Println("file ", i, ": ", f);
     path p(f);
     auto fileBytes = readFile(f.c_str());
     auto  justName = p.filename().replace_extension().string();
@@ -785,7 +786,7 @@ int  main()
     fm.size({768, 768});
     fm.events().mouse_dropfiles([](const arg_dropfiles& arg)
     {
-      Println("drop file event");
+      //Println("drop file event");
 
       openFiles(arg.files);
     });
@@ -882,13 +883,13 @@ int  main()
       if(glblT.sizeBytes() > tblBuf.size()){
         glblT.m_mem = nullptr;
         tblBuf.resize(0);
-        Println("File size and tbl size did not match");
+        //Println("File size and tbl size did not match");
       }
       refreshViz();
 
       openFiles({path});
 
-      Println("File Opened");
+      //Println("File Opened");
     });
     fileMenu.append("&Save", [](auto& itmprxy)
     {
@@ -901,7 +902,7 @@ int  main()
         fwrite(glblT.memStart(), sizeof(u8), glblT.sizeBytes(), tblFile);
       fclose(tblFile);
 
-      Println("File Written");
+      //Println("File Written");
     });
 
     auto& helpMenu = mb.at(1);
@@ -935,103 +936,29 @@ int  main()
         if(tbArg.item.expanded())
         {
           str tblKey = getFullKey( tbArg.item.owner() );
-          //str tblKey = getFullKey( tbArg.item );
           if( isTableKey(tblKey) && 
               tbArg.item.key() == "ary"      &&
               tbArg.item.child().text() == "")
           {
             auto    t = tblFromKey(getFullKey( tbArg.item.owner() ));
 
-            //auto    t = tblFromKey( tblKey );
-
-            //auto flen = t.size() * 12;      // 12 floats in a vert struct
-            //f32*    f = (float*)t.m_mem;
-            //sort(f, f+flen);                // sort for both the median and the mode
-            //
-            //f32 mean=0, median=0; 
-            //SECTION(calc mean and median)
-            //{
-            //  f32 total = 0;
-            //  TO(flen,i){ total += f[i]; }
-            //  mean = total / flen;
-            //
-            //  u64 mid = flen / 2;
-            //  median  = f[mid];
-            //
-            //  Println("\n");
-            //  TO(flen,i){
-            //    Print(f[i]," "); 
-            //  }
-            //  Println("\n");
-            //}
-            //
-            //f32 hiVal=0; u64 hiCnt=0;
-            //SECTION(calc Mode - the value with the highest frequency)
-            //{
-            //  f32 curVal=0;
-            //  u64 curCnt=0;
-            //  TO(flen,i){
-            //    if(f[i] == curVal){ ++curCnt; }
-            //    else if( curCnt > hiCnt ){
-            //      hiVal  = curVal;
-            //      hiCnt  = curCnt;
-            //      curVal = f[i];
-            //      curCnt = 0;
-            //    }
-            //  }
-            //  if( curCnt > hiCnt ){
-            //    hiVal = curVal;
-            //    hiCnt = curCnt;
-            //  }
-            //}
-            //
-            //f32 variance=0;
-            //SECTION(calc variance)
-            //{
-            //  f32 difSqr = 0;
-            //  TO(flen,i){
-            //    f32 dif  = f[i] - mean;
-            //    difSqr  += dif * dif;
-            //  }
-            //  variance = flen>1?  difSqr/(flen-1)  :   difSqr;  // length of the array needs to be at least 2 to use the n-1 'unbiased' variance  
-            //}
-            //
-            //f32 tmn, tmx;
-            //SECTION(calc min and max)
-            //{
-            //  tmx = -numeric_limits<float>::infinity(); 
-            //  tmn =  numeric_limits<float>::infinity();
-            //  TO(flen,i){
-            //    tmx = max<f32>(tmx, f[i]);
-            //    tmn = min<f32>(tmn, f[i]);
-            //  }
-            //}
-            //
-            //str txtStr = toString(
-            //  "Min: ",tmn,
-            //  "   Max: ",tmx,
-            //  "   Mean: ",mean,
-            //  "   Median: ",median,
-            //  "   Mode: ", hiVal, " (",hiCnt,
-            //  ")   Variance: ", variance);
-
             str statStr = makeStatStr(t);
             tbArg.item.child().text(statStr);
           }
 
-          Println("");
-          Println("txt: ", tbArg.item.text(), " key: ", tbArg.item.key() );
-          Println("expanded: ", tbArg.item.expanded() );
-          Println("");
+          //Println("");
+          //Println("txt: ", tbArg.item.text(), " key: ", tbArg.item.key() );
+          //Println("expanded: ", tbArg.item.expanded() );
+          //Println("");
         }
       });
       tree.events().selected([](const arg_treebox& tbArg) mutable
       {
         sel.clear();
 
-        Println("key:  ", tree.selected().key() );
-        Println("selected: ", tbArg.item.key() );
-        Println("owner: ",    tbArg.item.owner().key() );
+        //Println("key:  ", tree.selected().key() );
+        //Println("selected: ", tbArg.item.key() );
+        //Println("owner: ",    tbArg.item.owner().key() );
 
         auto* cur = &tbArg.item;
         do{
@@ -1044,10 +971,10 @@ int  main()
           key += sel[i];
           if(i!=0) key += "/";
         }
-        Println(key);
+        //Println(key);
 
         bool isTbl = isTableKey(key);
-        Println("isTableKey: ", isTbl);
+        //Println("isTableKey: ", isTbl);
 
         tbl* curT = setCurTblFromTreeKey(key);
         if(curT){
@@ -1061,20 +988,20 @@ int  main()
         auto flen = t.size();// * 12;      // 12 floats in a vert struct
         f32*    f = (float*)t.m_mem;
 
-        mx =  numeric_limits<f32>::lowest(); 
-        mn =  numeric_limits<f32>::max();
+        mx = numeric_limits<f32>::lowest(); 
+        mn = numeric_limits<f32>::max();
         TO(flen,i){
-          Print( (f32)f[i], " " );
-          mx = max<f32>(mx, (f32)f[i] );
-          mn = min<f32>(mn, (f32)f[i] );
+          //Print( (f32)f[i], " " );
+          mx = max<f32>((f32)mx, (f32)f[i] );
+          mn = min<f32>((f32)mn, (f32)f[i] );
         }
-        Println("\n Table Key mx: ",mx, " mn: ", mn, " \n" );
+        //Println("\n Table Key mx: ",mx, " mn: ", mn, " \n" );
 
         plc.collocate();
         fm.collocate();
         fm.activate();
 
-        Println("\n\n");
+        //Println("\n\n");
       });
     }
   }
@@ -1136,7 +1063,80 @@ int  main()
 
 
 
+//str tblKey = getFullKey( tbArg.item );
+//
+//auto    t = tblFromKey( tblKey );
 
+//auto flen = t.size() * 12;      // 12 floats in a vert struct
+//f32*    f = (float*)t.m_mem;
+//sort(f, f+flen);                // sort for both the median and the mode
+//
+//f32 mean=0, median=0; 
+//SECTION(calc mean and median)
+//{
+//  f32 total = 0;
+//  TO(flen,i){ total += f[i]; }
+//  mean = total / flen;
+//
+//  u64 mid = flen / 2;
+//  median  = f[mid];
+//
+//  Println("\n");
+//  TO(flen,i){
+//    Print(f[i]," "); 
+//  }
+//  Println("\n");
+//}
+//
+//f32 hiVal=0; u64 hiCnt=0;
+//SECTION(calc Mode - the value with the highest frequency)
+//{
+//  f32 curVal=0;
+//  u64 curCnt=0;
+//  TO(flen,i){
+//    if(f[i] == curVal){ ++curCnt; }
+//    else if( curCnt > hiCnt ){
+//      hiVal  = curVal;
+//      hiCnt  = curCnt;
+//      curVal = f[i];
+//      curCnt = 0;
+//    }
+//  }
+//  if( curCnt > hiCnt ){
+//    hiVal = curVal;
+//    hiCnt = curCnt;
+//  }
+//}
+//
+//f32 variance=0;
+//SECTION(calc variance)
+//{
+//  f32 difSqr = 0;
+//  TO(flen,i){
+//    f32 dif  = f[i] - mean;
+//    difSqr  += dif * dif;
+//  }
+//  variance = flen>1?  difSqr/(flen-1)  :   difSqr;  // length of the array needs to be at least 2 to use the n-1 'unbiased' variance  
+//}
+//
+//f32 tmn, tmx;
+//SECTION(calc min and max)
+//{
+//  tmx = -numeric_limits<float>::infinity(); 
+//  tmn =  numeric_limits<float>::infinity();
+//  TO(flen,i){
+//    tmx = max<f32>(tmx, f[i]);
+//    tmn = min<f32>(tmn, f[i]);
+//  }
+//}
+//
+//str txtStr = toString(
+//  "Min: ",tmn,
+//  "   Max: ",tmx,
+//  "   Mean: ",mean,
+//  "   Median: ",median,
+//  "   Mode: ", hiVal, " (",hiCnt,
+//  ")   Variance: ", variance);
 
 //f32*      f = (f32*)t.m_mem;
 //f64  hRatio = vsz.height / dif;

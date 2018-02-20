@@ -26,19 +26,20 @@ extern "C"
     {
       tbl    prompts = LavaTblFromPckt(lp, in, i);
       tbl prmptsVals = prompts;
-      for(auto& kv : prmptsVals)
-      {
-        str  scanType = "%d";                           // initialize all characters to 0
-
+      for(auto& kv : prmptsVals){
+        Print(kv.key, ": ");
+        //str  scanType = "%d";                           // initialize all characters to 0
         switch(kv.type){
-         case tbl::TblType::F64:
-          scanType = "%lf"; 
-         break;
+         case tbl::TblType::F64: {
+           f64 in=0;
+           scanf("%lf", &in);
+           kv = in;
+          //scanType = "%lf"; 
+         } break;
          default: break;
         }
-
-        Print(kv.key, ": ");
-        scanf(scanType.c_str(), &kv.val);
+        //Print(kv.key, ": ");
+        //scanf(scanType.c_str(), &kv.val);
       }
 
       out->push( LavaTblToOut(prmptsVals,FILLED_PROMPT_VALUES_SLOT) );

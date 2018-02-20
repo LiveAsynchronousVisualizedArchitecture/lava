@@ -1,36 +1,34 @@
 
+
+
 #include "../../no_rt_util.h"
 #include "../../tbl.hpp"
 #include "../LavaFlow.hpp"
 
 enum Slots
-{
-  // This is an example enumeration that is meant to be helpful, though is not strictly neccesary. Referencing slots by a name will generally be less error prone than using their index and remembering what each index is for
-  
-  SLOT_0 = 0,        
-  SLOT_1 = 1
-  //SLOT_2 = 2,
-  //SLOT_3 = 3
+{  
+  GAUSS_IDXVERTS_OUT = 0
+
+  //GAUSS_PARAMS_IN    = 0,
+  //GAUSS_IDXVERTS_OUT = 1
 };
 
 extern "C"
 {
   const char*  InTypes[]  = {"IdxVerts",           nullptr};            // This array contains the type that each slot of the same index will accept as input.
-  const char*  InNames[]  = {"|_NAME_| Slot In",   nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char*  InNames[]  = {"Gaussian Slot In",   nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   const char* OutTypes[]  = {"IdxVerts",           nullptr};            // This array contains the types that are output in each slot of the same index
-  const char* OutNames[]  = {"|_NAME_| Slot Out",  nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char* OutNames[]  = {"Gaussian Slot Out",  nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
 
-  void |_NAME_|_construct(){ }
-  void |_NAME_|_destruct(){ }
-
-  uint64_t |_NAME_|(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
+  uint64_t Gaussian(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
   {
     using namespace std;
 
     u32 i=0;
     while( LavaNxtPckt(in, &i) )
     {
-      tbl inputTbl( (void*)(in->packets[i].val.value) );
+      //tbl inputTbl( (void*)(in->packets[i].val.value) );
+      tbl inputTbl = LavaTblFromPckt(lp, in, i);
 
       for(auto& kv : inputTbl){  // this loop demonstrates how to iterate through non-empty map elements
       }	
@@ -44,11 +42,11 @@ extern "C"
   LavaNode LavaNodes[] =
   {
     {
-      |_NAME_|,                                      // function
-      |_NAME_|_construct,                            // constructor - this can be set to nullptr if not needed
-      |_NAME_|_destruct,                             // destructor  - this can also be set to nullptr 
+      Gaussian,                                      // function
+      nullptr,                                       // constructor - this can be set to nullptr if not needed
+      nullptr,                                       // destructor  - this can also be set to nullptr 
       LavaNode::FLOW,                                // node_type   - this should be eighther LavaNode::MSG (will be run even without input packets) or LavaNode::FLOW (will be run only when at least one packet is available for input)
-      "|_NAME_|",                                    // name
+      "Gaussian",                                    // name
       InTypes,                                       // in_types    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
       InNames,                                       // in_names    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
       OutTypes,                                      // out_types   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 

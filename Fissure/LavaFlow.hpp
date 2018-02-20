@@ -576,7 +576,6 @@ extern "C" using       LavaAllocFunc  =  void* (*)(uint64_t);                   
 extern "C" using     LavaReallocFunc  =  void* (*)(void*, uint64_t);                      // custom allocation function passed in to each node call
 extern "C" using        LavaFreeFunc  =  void  (*)(void*);                                // custom allocation function passed in to each node call
 extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                                               // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
-//extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaFrame*, lava_threadQ*);       // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
 extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams const*, LavaFrame const*, lava_threadQ*);   // node function taking a LavaFrame in
 extern "C" using       ConstructFunc  =  void(*)();
 
@@ -1711,8 +1710,8 @@ tbl        LavaTblFromPckt(LavaParams const* lp, LavaFrame const* in, u64 i)
   using namespace std;
 
   tbl t( (void*)(in->packets[i].val.value) );
-  //t.m_alloc   = lp->mem_alloc;
-  //t.m_realloc = lp->mem_realloc;
+  t.m_alloc   = lp->mem_alloc;
+  t.m_realloc = lp->mem_realloc;
   //t.m_free    = nullptr;
 
   return move(t);
@@ -2023,7 +2022,8 @@ void*            LavaAlloc(uint64_t sizeBytes)
 void*            LavaRealloc(void* addr, uint64_t sizeBytes)
 {
   void* realAddr = (u8*)addr - 16;
-  void*      mem = (uint64_t*)LavaHeapReAlloc(realAddr, sizeBytes + 16);
+  u8*    realMem = (u8*)LavaHeapReAlloc(realAddr, sizeBytes + 16);
+  void*      mem = realMem + 16;
   return mem;
 }
 void              LavaFree(void* addr)
@@ -2196,11 +2196,13 @@ void               LavaLoop(LavaFlow& lf) noexcept
           {
             SECTION(create arguments and call function)
             {
-              LavaParams       lp;
-              lp.inputs      =   1;
-              lp.frame       =   lf.m_frame;
-              lp.id          =   LavaId(nodeId);
-              lp.mem_alloc   =   LavaAlloc;
+              LavaParams lp;
+              lp.inputs       =   1;
+              lp.frame        =   lf.m_frame;
+              lp.id           =   LavaId(nodeId);
+              lp.mem_alloc    =   LavaAlloc;
+              lp.mem_realloc  =   LavaRealloc;
+              lp.mem_free     =   LavaFree;
 
               auto stTime = high_resolution_clock::now();
               state         = exceptWrapper(func, lf, &lp, &runFrm, &outQ);
@@ -2345,6 +2347,10 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+
+//
+//extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaFrame*, lava_threadQ*);       // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
 
 //LavaOut  LavaTblToOut(LavaParams const* lp, tbl const& t, u32 slot)
 //

@@ -15,22 +15,30 @@
 // -todo: put names and descriptions together instead of ins and outs
 // -todo: give Lava nodes description strings
 // -todo: update template and current nodes with the reordering
+// -todo: fix type warnings in simdb
+// -todo: make LavaHeapFree use a thread local variable for the errors instead of a return value, so that it's signature will match with free
+// -todo: make create node clear the text input bar
+// -todo: debug why debug and release create node directories at different places - executed from different paths
+// -todo: update template with name in all caps for function
 
-// todo: make a gaussian flow node that outputs an IdxVerts tbl
-// todo: make description strings show up in the status bar on mouse over
-// todo: design packet freezing and packet visualization interface - maybe have three states - neutral, visualized, and frozen
+// todo: debug why output of CmdLineInput doesn't make it in to brandisher - sizeBytes is 0 - 
+// todo: debug why gaussian node crashes
+// todo: make a gaussian flow node that inputs a tbl with Expected Value and Variance then outputs an IdxVerts tbl
 // todo: make a settings file that is read on load if it in the same directory
-// todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets - use blue 'sunshine' lines going out from the center like a snowflake? 
+// todo: make description strings show up in the status bar on mouse over
 // todo: make list of nodes a side window, right click menu, hot box, etc
+// todo: make slots connected to the same node loop with a circle from one side to the other so they don't overlap
 // todo: make each variable in the graph individually double buffered or even multi-buffered according to readers?
 // todo: have exec() spinlock until readers of the opposite buffer drops to 0 - could also just skip the command buffer in the rare case that it catches readers as more than 0
-// todo: fix type warnings in simdb
-// todo: make LavaHeapFree use a thread local variable for the errors instead of a return value, so that it's signature will match with free
+// todo: make a step button that does one packet at a time, or make visualizing nodes while paused step to the visualized slots
 // todo: look into techniques for keeping data local to CPU cores, and CPU sockets
 // todo: put each thread's owned memory vector into a global vector that other threads can access - can the LavaQ be used or broken into a single writer multi-reader array?
+// todo: implement zoom in and out - will need to transform 2D view with a matrix as well as the mouse clicks
 // todo: make shared libraries loaded after the GUI
 // todo: make shared libraries only try to load one per frame
 // todo: think about design for constant variables into class - string, double, u64, i64, file (color? v2,v3,v4? ranged double?, ranged integer?) separate datatype from interface? make all constant inputs tables? how to embed interface queues into a table? make each constant a subtable with a value, an interface type and interface values? 
+// todo: design packet freezing and packet visualization interface - maybe have three states - neutral, visualized, and frozen
+// todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets - use blue 'sunshine' lines going out from the center like a snowflake? 
 
 // todo: make input slots start at 0 - does there need to be a separation between input and out slots or does there need to be an offset so that the input frame starts at 0 
 // todo: convert tbl to use arrays of the data types smaller than 64 bits
@@ -1596,7 +1604,7 @@ ENTRY_DECLARATION // main or winmain
       auto pauseBtn  = new  Button(fd.ui.keyWin,  "Pause ||");
       auto stopBtn   = new  Button(fd.ui.keyWin,  "Stop |_|");
       auto nodeBtn   = new  Button(fd.ui.keyWin,  "Create Node");
-      auto nodeTxt   = new TextBox(fd.ui.keyWin,  "");
+      TextBox* nodeTxt   = new TextBox(fd.ui.keyWin,  "");
 
       nodeTxt->setEditable(true);
       nodeTxt->setFixedWidth(250);
@@ -1689,8 +1697,6 @@ ENTRY_DECLARATION // main or winmain
         create_directory(nodeDir);
         str      cppPth = nodeDir+"/"+nodeName+".cpp";
         str   vcprojPth = nodeDir+"/"+nodeName+".vcxproj";
-        //str      cppPth = "../"+nodeName+"/"+nodeName+".cpp";
-        //str   vcprojPth = "../"+nodeName+"/"+nodeName+".vcxproj";
         
         FILE*    cppHndl = fopen(cppPth.c_str(),    "wb");
         if(!cppHndl) return;
@@ -1706,6 +1712,8 @@ ENTRY_DECLARATION // main or winmain
 
         fclose(cppHndl);
         fclose(vcprojHndl);
+
+        nodeTxt->setValue("");
       });
 
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
@@ -1749,8 +1757,6 @@ ENTRY_DECLARATION // main or winmain
       //
       //fd.ui.slot_rad = 15.f;
 
-      //reloadSharedLibs();
-
       //node_add("MakeCube",  Node("six",  Node::Type::MSG,  {200.f,200.f}) );
 
       //auto   inst0 = node_add("FileToString", Node("one",   Node::Type::FLOW, {400.f,300.f}) );
@@ -1774,6 +1780,8 @@ ENTRY_DECLARATION // main or winmain
     }
     SECTION(lava and db)
     {
+      reloadSharedLibs();
+
       new (&fisdb) simdb("Fissure", 256, 2<<10);
       new (&fd.vizIds) AtmSet( LavaId().asInt );
       fd.flow.packetCallback = lavaPacketCallback;
@@ -2523,6 +2531,8 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//str      cppPth = "../"+nodeName+"/"+nodeName+".cpp";
+//str   vcprojPth = "../"+nodeName+"/"+nodeName+".vcxproj";
 
 //if(key==GLFW_KEY_BACKSPACE || key==GLFW_KEY_DELETE){
 //  //fd.grph.delSelected();

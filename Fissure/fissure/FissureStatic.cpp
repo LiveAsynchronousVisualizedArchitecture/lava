@@ -82,6 +82,7 @@ static const char *const Template_vcxproj = R"ProjTemplate(<?xml version="1.0" e
 
 static const char *const Template_cpp = R"CppTemplate(
 
+
 #include "../../no_rt_util.h"
 #include "../../tbl.hpp"
 #include "../LavaFlow.hpp"
@@ -99,11 +100,14 @@ enum Slots
 extern "C"
 {
   const char*  InTypes[]  = {"IdxVerts",           nullptr};            // This array contains the type that each slot of the same index will accept as input.
-  const char*  InNames[]  = {"|_Name_| Slot In",   nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char*  InNames[]  = {"|_NAME_| Slot In",   nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   const char* OutTypes[]  = {"IdxVerts",           nullptr};            // This array contains the types that are output in each slot of the same index
-  const char* OutNames[]  = {"|_Name_| Slot Out",  nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char* OutNames[]  = {"|_NAME_| Slot Out",  nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
 
-  uint64_t |_Name_|(LavaParams* lp, LavaFrame* in, lava_threadQ* out) noexcept
+  void |_NAME_|_construct(){ }
+  void |_NAME_|_destruct(){ }
+
+  uint64_t |_NAME_|(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
   {
     using namespace std;
 
@@ -145,6 +149,7 @@ extern "C"
     return (LavaNode*)LavaNodes;
   }
 }
+
 
 )CppTemplate";
 
