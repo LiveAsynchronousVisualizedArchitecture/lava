@@ -10,10 +10,13 @@
 // -todo: make tbl have a begin and end that iterate through non-empty key-values in the map
 // -todo: update template to just use lp and possibly put in constructor, destructor, input and output functions
 // -todo: make Lava funtion to make a table from a packet
+// -todo: update template to put in constructor and destructor
+// -todo: update LavaNodeEnd constant
+// -todo: put names and descriptions together instead of ins and outs
+// -todo: give Lava nodes description strings
+// -todo: update template and current nodes with the reordering
 
-// todo: update template to put in constructor and destructor
 // todo: make a gaussian flow node that outputs an IdxVerts tbl
-// todo: give Lava nodes description strings
 // todo: make description strings show up in the status bar on mouse over
 // todo: design packet freezing and packet visualization interface - maybe have three states - neutral, visualized, and frozen
 // todo: make a settings file that is read on load if it in the same directory
@@ -1472,6 +1475,7 @@ ENTRY_DECLARATION // main or winmain
     //b.useA = 1;
     //Println(a.asInt,"   ",b.asInt);
 
+    //
     //LavaHeapInit();
 
     //Println("\n\n");
@@ -1504,9 +1508,9 @@ ENTRY_DECLARATION // main or winmain
     //  //PrintAB(q);
     //  //Println();
     //}
-
+    //
     //Println("left over size: ", q.size());
-
+    //
     //PrintAB(q, "Main Thread");
 
     //while( q.size() > 0 )
@@ -1523,6 +1527,7 @@ ENTRY_DECLARATION // main or winmain
     //  Print(val," ");
     //}
 
+    //
     //Println("\n\n");
   }
 
@@ -1744,9 +1749,9 @@ ENTRY_DECLARATION // main or winmain
       //
       //fd.ui.slot_rad = 15.f;
 
-      reloadSharedLibs();
+      //reloadSharedLibs();
 
-      node_add("MakeCube",  Node("six",  Node::Type::MSG,  {200.f,200.f}) );
+      //node_add("MakeCube",  Node("six",  Node::Type::MSG,  {200.f,200.f}) );
 
       //auto   inst0 = node_add("FileToString", Node("one",   Node::Type::FLOW, {400.f,300.f}) );
       //auto   inst1 = node_add("FileToString", Node("two",   Node::Type::FLOW, {200.f,500.f}) );

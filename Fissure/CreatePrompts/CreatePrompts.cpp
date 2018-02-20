@@ -13,8 +13,8 @@ static std::atomic<bool> hasRun = false;
 
 extern "C"
 {
+  const char* OutTypes[] = {"Prompts", nullptr};                        // This array contains the types that are output in each slot of the same index
   const char* OutNames[] = {"Prompts for values and their types, given by the key-values of the tbl",  nullptr};             // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
-  const char* OutTypes[] = {"Prompts",            nullptr};             // This array contains the types that are output in each slot of the same index
 
   void CreatePrompts_construct()
   {
@@ -49,10 +49,11 @@ extern "C"
       CreatePrompts_destruct,                        // destructor
       LavaNode::MSG,                                 // node_type  
       "CreatePrompts",                               // name
-      nullptr,                                       // in_names
-      OutNames,                                      // out_names
       nullptr,                                       // in_types 
+      nullptr,                                       // in_names
       OutTypes,                                      // out_types 
+      OutNames,                                      // out_names
+      "Outputs a tbl whose keys are to be used to prompt at stdin, with the input type being the value type",   // description
       0                                              // version 
     },                                             
 

@@ -98,10 +98,10 @@ enum Slots
 
 extern "C"
 {
-  const char*  InNames[]  = {"|_Name_| Slot In",   nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   const char*  InTypes[]  = {"IdxVerts",           nullptr};            // This array contains the type that each slot of the same index will accept as input.
-  const char* OutNames[]  = {"|_Name_| Slot Out",  nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char*  InNames[]  = {"|_Name_| Slot In",   nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   const char* OutTypes[]  = {"IdxVerts",           nullptr};            // This array contains the types that are output in each slot of the same index
+  const char* OutNames[]  = {"|_Name_| Slot Out",  nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
 
   uint64_t |_Name_|(LavaParams* lp, LavaFrame* in, lava_threadQ* out) noexcept
   {
@@ -127,12 +127,13 @@ extern "C"
       |_NAME_|,                                      // function
       |_NAME_|_construct,                            // constructor - this can be set to nullptr if not needed
       |_NAME_|_destruct,                             // destructor  - this can also be set to nullptr 
-      LavaNode::MSG,                                 // node_type   - this should be eighther LavaNode::MSG (will be run even without input packets) or LavaNode::FLOW (will be run only when at least one packet is available for input)
+      LavaNode::FLOW,                                // node_type   - this should be eighther LavaNode::MSG (will be run even without input packets) or LavaNode::FLOW (will be run only when at least one packet is available for input)
       "|_NAME_|",                                    // name
-      InNames,                                       // in_names    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
-      OutNames,                                      // out_names   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr
       InTypes,                                       // in_types    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+      InNames,                                       // in_names    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
       OutTypes,                                      // out_types   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+      OutNames,                                      // out_names   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr
+      nullptr,                                       // description
       0                                              // version 
     },                                             
 

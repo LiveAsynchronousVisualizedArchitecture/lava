@@ -12,10 +12,10 @@ enum Slots
 
 extern "C"
 {
-  const char*  InNames[]  = {"Command Prompts and Return Types",   nullptr};     // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   const char*  InTypes[]  = {"InTypes",                            nullptr};     // This array contains the type that each slot of the same index will accept as input.
-  const char* OutNames[]  = {"Command Prompt Values",              nullptr};     // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char*  InNames[]  = {"Command Prompts and Return Types",   nullptr};     // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   const char* OutTypes[]  = {"KeyVals",                            nullptr};     // This array contains the types that are output in each slot of the same index
+  const char* OutNames[]  = {"Command Prompt Values",              nullptr};     // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
 
   uint64_t CmdLineInput(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
   {
@@ -55,10 +55,11 @@ extern "C"
       nullptr,                                       // destructor
       LavaNode::FLOW,                                // node_type  
       "CmdLineInput",                                // name
-      InNames,                                       // in_names
-      OutNames,                                      // out_names
       InTypes,                                       // in_types 
+      InNames,                                       // in_names
       OutTypes,                                      // out_types 
+      OutNames,                                      // out_names
+      "Uses the input tbl's keys as prompts and value types and types for scanf.  Puts the typed input from stdin into the values and outputs a new tbl",  // description
       0                                              // version 
     },                                             
 

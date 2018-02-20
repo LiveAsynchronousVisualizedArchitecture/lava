@@ -792,10 +792,11 @@ struct       LavaNode
   ConstructFunc    destructor;
   uint64_t          node_type;
   const char*            name;
-  const char**       in_names;
-  const char**      out_names;
   const char**       in_types;
+  const char**       in_names;
   const char**      out_types;
+  const char**      out_names;
+  const char*     description;
   uint64_t            version;
 };
 struct       LavaInst
@@ -892,7 +893,7 @@ struct    LavaCommand
 };
 // end data types
 
-const LavaNode LavaNodeListEnd = {nullptr, nullptr, nullptr, (uint64_t)LavaNode::NONE, nullptr, nullptr, nullptr, nullptr, nullptr, 0};
+const LavaNode LavaNodeListEnd = {nullptr, nullptr, nullptr, (uint64_t)LavaNode::NONE, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0};
 
 extern "C" __declspec(dllexport) LavaNode* GetLavaFlowNodes();   // prototype of function to return static plugin loading struct
 // end function declarations
