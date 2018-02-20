@@ -527,6 +527,34 @@ str         makeStatStr(tbl const& t)
     return "";
   }
 }
+str         valStr(tbl::KV const& kv)
+{
+  switch(kv.type)
+  {
+  case tbl::TblType::I8:
+    return toString( *((i8*)&kv.val) );
+  case tbl::TblType::I16:
+    return toString( *((i16*)&kv.val) );
+  case tbl::TblType::I32:
+    return toString( *((i32*)&kv.val) );
+  case tbl::TblType::I64:
+    return toString( *((i64*)&kv.val) );
+  case tbl::TblType::U8:
+    return toString( *((u8*)&kv.val) );
+  case tbl::TblType::U16:
+    return toString( *((u16*)&kv.val) );
+  case tbl::TblType::U32:
+    return toString( *((u32*)&kv.val) );
+  case tbl::TblType::U64:
+    return toString( *((u64*)&kv.val) );
+  case tbl::TblType::F32:
+    return toString( *((f32*)&kv.val) );
+  case tbl::TblType::F64:
+    return toString( *((f64*)&kv.val) );
+  default:
+    return "";
+  }
+}
 void          insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
 {
   using namespace std;
@@ -575,7 +603,7 @@ void          insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
           typeNumAsStr[8] = '\0';                                                 // make the 9th character (offset 8) 0 so that it is the end of a C string 
           title = toString(elemKey,":  ", typeNumAsStr, "  -  (",kv.val,")");
         }else{
-          title = toString(elemKey," (", kv.typeStr() ,"):   ", kv.val);
+          title = toString(elemKey," (", kv.typeStr() ,"):   ", valStr(kv) );
         }
       }
       
