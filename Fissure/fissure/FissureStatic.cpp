@@ -112,10 +112,10 @@ extern "C"
     {
       tbl inputTbl( (void*)(in->packets[i].val.value) );
 
-      for(auto& kv : inputTbl){  // this loop will iterate through non-empty map elements
+      for(auto& kv : inputTbl){  // this loop demonstrates how to iterate through non-empty map elements
       }	
 
-      // out->push( LavaTblToOut(outputTbl, SLOT_0) );      // this will output a tbl into the first output slot
+      // out->push( LavaTblToOut(outputTbl, SLOT_0) );      // this demonstrates how to output a tbl into the first output slot
     }
 
     return 1;
@@ -125,6 +125,8 @@ extern "C"
   {
     {
       |_NAME_|,                                      // function
+      |_NAME_|_construct,                            // constructor
+      |_NAME_|_destruct,                             // destructor      
       LavaNode::MSG,                                 // node_type  
       "|_NAME_|",                                    // name
       InNames,                                       // in_names

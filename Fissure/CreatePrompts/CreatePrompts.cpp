@@ -13,8 +13,6 @@ static std::atomic<bool> hasRun = false;
 
 extern "C"
 {
-  //const char*  InNames[]  = {"Template Slot In",   nullptr};           // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
-  //const char*  InTypes[]  = {"IdxVerts",           nullptr};           // This array contains the type that each slot of the same index will accept as input.
   const char* OutNames[] = {"Prompts for values and their types, given by the key-values of the tbl",  nullptr};             // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   const char* OutTypes[] = {"Prompts",            nullptr};             // This array contains the types that are output in each slot of the same index
 
@@ -31,16 +29,13 @@ extern "C"
   {
     using namespace std;
 
-    if( hasRun ){ return 1; }
-    
+    if(hasRun){ return 1; }
     hasRun = true;
 
     tbl prompts = LavaMakeTbl(lp);
     prompts("Expected Value") = 0.f;
-    prompts("Variance") = 0.f;
-
-    auto f = prompts.memStart();
-
+    prompts("Variance")       = 0.f;
+    
     out->push( LavaTblToOut(prompts,PROMPTS) );
 
     return 1;
@@ -69,3 +64,12 @@ extern "C"
     return (LavaNode*)LavaNodes;
   }
 }
+
+
+
+
+//
+//auto f = prompts.memStart();
+
+//const char*  InNames[]  = {"Template Slot In",   nullptr};           // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+//const char*  InTypes[]  = {"IdxVerts",           nullptr};           // This array contains the type that each slot of the same index will accept as input.
