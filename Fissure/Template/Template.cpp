@@ -42,14 +42,14 @@ extern "C"
   {
     {
       |_NAME_|,                                      // function
-      |_NAME_|_construct,                            // constructor
-      |_NAME_|_destruct,                             // destructor      
-      LavaNode::MSG,                                 // node_type  
+      |_NAME_|_construct,                            // constructor - this can be set to nullptr if not needed
+      |_NAME_|_destruct,                             // destructor  - this can also be set to nullptr 
+      LavaNode::MSG,                                 // node_type   - this should be eighther LavaNode::MSG (will be run even without input packets) or LavaNode::FLOW (will be run only when at least one packet is available for input)
       "|_NAME_|",                                    // name
-      InNames,                                       // in_names
-      OutNames,                                      // out_names
-      InTypes,                                       // in_types 
-      OutTypes,                                      // out_types 
+      InNames,                                       // in_names    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+      OutNames,                                      // out_names   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr
+      InTypes,                                       // in_types    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+      OutTypes,                                      // out_types   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
       0                                              // version 
     },                                             
 
