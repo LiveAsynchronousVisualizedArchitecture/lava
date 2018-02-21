@@ -20,9 +20,19 @@
 // -todo: make create node clear the text input bar
 // -todo: debug why debug and release create node directories at different places - executed from different paths
 // -todo: update template with name in all caps for function
+// -todo: debug why output of CmdLineInput doesn't make it in to brandisher - sizeBytes is 0 - allocation functions were not getting put in LavaParams and handled by tbl correctly
+// -todo: debug why gaussian node crashes - wrong allocation functions with 
+// -todo: add local allocation tbl creation function to lava - would need to add local allocators to LavaParams and thread loop should clean up allocations anyway
+// -todo: add integer input to CmdLineInput
+// -todo: add vertex count to gaussian parameters and stdin prompts
+// -todo: give LavaParams ref_alloc and local_alloc
 
-// todo: debug why output of CmdLineInput doesn't make it in to brandisher - sizeBytes is 0 - 
-// todo: debug why gaussian node crashes
+// todo: make realloc work by allocating new memory, copying it over, and setting the old memory's reference count to 0?
+// todo: make tbl able to deal with not having a realloc function
+// todo: find way to add a tbl to a tbl by reference / direct assignment - should it immediatly copy and flatten()
+// todo: make play button highlighted while playing
+// todo: figure out crash when playing after saving
+// todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets - use blue 'sunshine' lines going out from the center like a snowflake
 // todo: make a gaussian flow node that inputs a tbl with Expected Value and Variance then outputs an IdxVerts tbl
 // todo: make a settings file that is read on load if it in the same directory
 // todo: make description strings show up in the status bar on mouse over
@@ -38,7 +48,7 @@
 // todo: make shared libraries only try to load one per frame
 // todo: think about design for constant variables into class - string, double, u64, i64, file (color? v2,v3,v4? ranged double?, ranged integer?) separate datatype from interface? make all constant inputs tables? how to embed interface queues into a table? make each constant a subtable with a value, an interface type and interface values? 
 // todo: design packet freezing and packet visualization interface - maybe have three states - neutral, visualized, and frozen
-// todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets - use blue 'sunshine' lines going out from the center like a snowflake? 
+// todo: test live reloading by compiling a shared lib while lava is running
 
 // todo: make input slots start at 0 - does there need to be a separation between input and out slots or does there need to be an offset so that the input frame starts at 0 
 // todo: convert tbl to use arrays of the data types smaller than 64 bits
@@ -1648,6 +1658,9 @@ ENTRY_DECLARATION // main or winmain
       });
       playBtn->setCallback([playBtn,pauseBtn,stopBtn](){
         playBtn->setEnabled(false);
+        playBtn->setTextColor( Color(e3f(0.f, 0.f, 0.f)) );
+        playBtn->setBackgroundColor(  Color(e3f(.2f, 1.f, .2f)) ); 
+
         pauseBtn->setEnabled(true);
         stopBtn->setEnabled(true);
         startFlowThreads(1);
@@ -1677,6 +1690,8 @@ ENTRY_DECLARATION // main or winmain
         fd.flow.runConstructors();
 
         playBtn->setEnabled(true);
+        playBtn->setTextColor( Color(e3f(.18f, .18f, .18f)) );
+        playBtn->setBackgroundColor(  Color(e3f(.15f, .2f,  .15f)) ); // set play button back to normal
         pauseBtn->setEnabled(false);
         stopBtn->setEnabled(false);
       });

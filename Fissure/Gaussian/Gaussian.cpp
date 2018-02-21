@@ -27,13 +27,41 @@ extern "C"
     u32 i=0;
     while( LavaNxtPckt(in, &i) )
     {
-      //tbl inputTbl( (void*)(in->packets[i].val.value) );
-      tbl inputTbl = LavaTblFromPckt(lp, in, i);
+      tbl gParams = LavaTblFromPckt(lp, in, i);
+      f32     var = gParams("Variance");
+      f32      ev = gParams("Expected Value");
+      u64   verts = gParams("Vertex Count");
+      //u32   verts = 8;
 
-      for(auto& kv : inputTbl){  // this loop demonstrates how to iterate through non-empty map elements
-      }	
+      tbl gcurve = LavaMakeTbl(lp);
+      gcurve("type") = tbl::strToInt("IdxVerts");
+      gcurve("mode") = 0; // GL_POINTS for now                                   // needs to be openGL lines - GL_LINES - 0x01
+      
+      tbl ind(verts*2 - 1, (u32)0u);
+      tbl  px(verts, 0.f);
+      tbl  py(verts, 0.f);
+      tbl  pz(verts, 0.f);
+      f32 vrecip = 1.f / verts;
+      f32 coeff  = 1.f / sqrtf(2*PIf*var);
+      TO(verts,i){
+        f32 x = i * vrecip * 2.f;  
+        f32 y = coeff * expf( (x*x) / (2.f*var) );
+        px[i] = x;
+        py[i] = y;
+      }
+      u64 indsz = ind.size();
+      for(u64 i=0; i < verts-1; ++i){
+        ind[i*2]   = (u32)i;
+        ind[i*2+1] = (u32)(i+1);
+      }
 
-      // out->push( LavaTblToOut(outputTbl, SLOT_0) );      // this demonstrates how to output a tbl into the first output slot
+      gcurve("positions x") = &px;
+      gcurve("positions y") = &py;
+      gcurve("positions z") = &pz;
+      gcurve("indices")     = &ind;
+      gcurve.flatten();
+
+      out->push( LavaTblToOut(gcurve, GAUSS_IDXVERTS_OUT) );      // this demonstrates how to output a tbl into the first output slot
     }
 
     return 1;
@@ -64,3 +92,7 @@ extern "C"
   }
 }
 
+//tbl inputTbl( (void*)(in->packets[i].val.value) );
+//
+//for(auto& kv : gaussParams){  // this loop demonstrates how to iterate through non-empty map elements
+//}	

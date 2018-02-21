@@ -69,9 +69,10 @@
 // -todo: make default image all 0s
 // -todo: clean out comments in VizTfm.hpp
 // -todo: deal with sub tables for vert components not being present in VizTfm.hpp index verts to shape - operator bool added to tbl, initialization of verts added to tbl_to_shape function
+// -todo: change project name to Visualizer
+// -todo: change project name to visualizer
 
-// todo: change project name to Visualizer
-// todo: change project name to visualizer
+// todo: make sure that a table has type IdxVerts before displaying it 
 // todo: look in to keys from fissure dissapearing when being overwritten constantly
 // todo: investigate crash while visualizing multiple tables in a running graph
 // todo: fix crash from VS execution in release mode

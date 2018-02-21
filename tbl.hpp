@@ -67,7 +67,8 @@
 // -todo: make const version of operator()
 // -todo: make something to iterate through elements - use begin() and end() iterators
 
-// todo: make sure that the array can allocate if m_allocate is available 
+// todo: make dummy type a default value for the array
+// todo: make sure that the array can allocate even if just m_allocate is available 
 // todo: put TblType into just the tbl scope
 // todo: make key finding and placement happen in KVOfst instead of tbl class 
 // todo: make sure destructors are run when assigning to a tbl that already owns memory
@@ -350,7 +351,7 @@ public:
     template<class T> inline T as() const
     { 
       tbl_msg_assert(type == TblType::typenum<T>::num, 
-        "Type mismatch:\nArray Type: ", 
+        "\nType mismatch on tbl array:\nArray Type: ", 
         TblType::type_str(type),
         "Desired Type: ", 
         TblType::type_str(TblType::typenum<T>::num) );
@@ -360,7 +361,7 @@ public:
     template<class T> inline TblVal& operator=(T const& n)
     {      
       tbl_msg_assert(type == TblType::typenum<T>::num, 
-        "Type mismatch:\nArray Type: ", 
+        "\nType mismatch on tbl array:\nArray Type: ", 
         TblType::type_str(type),
         "Given Type: ", 
         TblType::type_str(TblType::typenum<T>::num) );
@@ -980,9 +981,10 @@ public:
   { initKV(lst); }
   tbl(const char* s) : m_mem(nullptr) { init_cstr(s); }
   tbl(KVOfst const& kvo){ init(kvo); }
-  template<class T> tbl(u64 count, T type_dummy)
+  template<class T> tbl(u64 count, T defaultValue)
   {
     init(count, sizeof(T), TblType::typenum<T>::num);
+    TO(count,i) (*this)[i] = defaultValue;
   }
   template<class T> tbl(std::initializer_list<T>  lst) : m_mem(nullptr)
   {
@@ -1232,7 +1234,8 @@ public:
   auto      elemStart() const -> KV const* { return m_mem? (KV*)(data() + capacity()*stride()) : nullptr; }
   void*       reserve(u64 count, u64 mapcap=0, u64 childcap=0)
   {
-    if( !owned() ) return m_mem;
+    //if( !owned() ) return m_mem;
+    if( !(m_alloc && m_realloc) ) return m_mem;
 
     u64 prvChldCap = child_capacity();
     count     =  mx(count,          capacity() );
@@ -1244,13 +1247,14 @@ public:
     u64    prevBytes  =  sizeBytes();
     u64   prevMapCap  =  map_capacity();
     void*    prvChld  =  childData();
-    //u64     nxtBytes  =  memberBytes() + sizeof(T)*count +  sizeof(KV)*mapcap + childcap;
     u64     nxtBytes  =  memberBytes() + stride()*count +  sizeof(KV)*mapcap + childcap;
     void*     re;
     bool      fresh  = !m_mem;
     if(fresh){ re = m_alloc(nxtBytes);
-    }else{     re = m_realloc( (void*)memStart(), nxtBytes); }
-
+    }else    { re = m_realloc( (void*)memStart(), nxtBytes); }
+    
+    //}else if(m_realloc) { re = m_realloc( (void*)memStart(), nxtBytes); }
+    //
     //if(fresh){ re = malloc(nxtBytes);
     //}else{     re = realloc( (void*)memStart(), nxtBytes); }
 
@@ -1262,7 +1266,6 @@ public:
         sizeBytes(nxtBytes);
         capacity(count);
       }
-      //initFields(nxtBytes, count);
       this->mapcap(mapcap);
       if(re && fresh){
         auto f = memStart();
@@ -1639,6 +1642,9 @@ public:
 
 
 
+//u64     nxtBytes  =  memberBytes() + sizeof(T)*count +  sizeof(KV)*mapcap + childcap;
+//
+//initFields(nxtBytes, count);
 
 //if( m_mem && owned() ){
 //tbl_PRNT("\n destruction \n");

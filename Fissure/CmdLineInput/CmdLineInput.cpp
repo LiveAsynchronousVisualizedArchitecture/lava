@@ -28,18 +28,19 @@ extern "C"
       tbl prmptsVals = prompts;
       for(auto& kv : prmptsVals){
         Print(kv.key, ": ");
-        //str  scanType = "%d";                           // initialize all characters to 0
         switch(kv.type){
          case tbl::TblType::F64: {
            f64 in=0;
            scanf("%lf", &in);
            kv = in;
-          //scanType = "%lf"; 
+         } break;
+         case tbl::TblType::U64: {
+           u64 in=0;
+           scanf("%llu", &in);
+           kv = in;
          } break;
          default: break;
         }
-        //Print(kv.key, ": ");
-        //scanf(scanType.c_str(), &kv.val);
       }
 
       out->push( LavaTblToOut(prmptsVals,FILLED_PROMPT_VALUES_SLOT) );
@@ -79,6 +80,12 @@ extern "C"
 
 
 
+//str  scanType = "%d";                           // initialize all characters to 0
+//
+//scanType = "%lf"; 
+//
+//Print(kv.key, ": ");
+//scanf(scanType.c_str(), &kv.val);
 
 //tbl  prompts( (void*)(in->packets[i].val.value) );
 //auto f = prompts.memStart();

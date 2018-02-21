@@ -35,7 +35,8 @@ extern "C"
     tbl prompts = LavaMakeTbl(lp);
     prompts("Expected Value") = 0.f;
     prompts("Variance")       = 0.f;
-    
+    prompts("Vertex Count")   = (u64)0ul;
+
     out->push( LavaTblToOut(prompts,PROMPTS) );
 
     return 1;

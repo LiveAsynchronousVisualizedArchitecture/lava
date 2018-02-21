@@ -107,7 +107,7 @@ inline Shape          tbl_to_shape(tbl const& iv)  // todo: try to change this t
   img = iv("image");
 
   shp.owner = true;
-  shp.mode  = mode;
+  shp.mode  = mode; GL_POINTS;
   shp.indsz = ind.size();
 
   SECTION(put the image in to shp.tx - if there was an image in the IdxVerts tbl, use that, if not, use a dummy img)

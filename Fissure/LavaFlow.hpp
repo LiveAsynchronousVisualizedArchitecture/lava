@@ -686,15 +686,17 @@ union          LavaId                                            // this Id serv
 };
 struct     LavaParams
 {
-  u32                  inputs;
-  u64                   frame;
-  LavaId                   id;
-  LavaAllocFunc     mem_alloc;
-  LavaReallocFunc mem_realloc;
-  LavaFreeFunc       mem_free;
+  u32                    inputs;
+  u64                     frame;
+  LavaId                     id;
 
-  //u32           outputs;
-  //LavaPut           put;
+  LavaAllocFunc       ref_alloc;
+  LavaReallocFunc   ref_realloc;
+  LavaFreeFunc         ref_free;
+
+  LavaAllocFunc     local_alloc;
+  LavaReallocFunc local_realloc;
+  LavaFreeFunc       local_free;
 };
 struct        LavaVal
 {
@@ -1698,10 +1700,20 @@ tbl            LavaMakeTbl(LavaParams const* lp)
   using namespace std;
 
   tbl t;
-  t.m_alloc   = lp->mem_alloc;
-  t.m_realloc = lp->mem_realloc;
-  t.m_free    = nullptr;
-  //t.m_free    = lp->mem_free;
+  t.m_alloc    =  lp->ref_alloc;
+  t.m_realloc  =  lp->ref_realloc;
+  t.m_free     =  nullptr;
+
+  return move(t);
+}
+tbl           LavaLocalTbl(LavaParams const* lp)
+{
+  using namespace std;
+
+  tbl t;
+  t.m_alloc   = lp->local_alloc;
+  t.m_realloc = lp->local_realloc;
+  t.m_free    = lp->local_free;
 
   return move(t);
 }
@@ -1710,8 +1722,8 @@ tbl        LavaTblFromPckt(LavaParams const* lp, LavaFrame const* in, u64 i)
   using namespace std;
 
   tbl t( (void*)(in->packets[i].val.value) );
-  t.m_alloc   = lp->mem_alloc;
-  t.m_realloc = lp->mem_realloc;
+  t.m_alloc   = lp->ref_alloc;
+  t.m_realloc = lp->ref_realloc;
   //t.m_free    = nullptr;
 
   return move(t);
@@ -2006,7 +2018,7 @@ LavaInst::State exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaFram
 
 }
 
-void*            LavaAlloc(uint64_t sizeBytes)
+void*             LavaAlloc(uint64_t sizeBytes)
 {
   uint64_t* mem = (uint64_t*)LavaHeapAlloc(sizeBytes + sizeof(uint64_t)*2);
   mem[0]  =  0;              // reference count
@@ -2019,14 +2031,20 @@ void*            LavaAlloc(uint64_t sizeBytes)
 
   return (void*)(mem + 2);   // sizeof(uint64_t)*2);
 }
-void*            LavaRealloc(void* addr, uint64_t sizeBytes)
+void*           LavaRealloc(void* addr, uint64_t sizeBytes)
 {
-  void* realAddr = (u8*)addr - 16;
-  u8*    realMem = (u8*)LavaHeapReAlloc(realAddr, sizeBytes + 16);
-  void*      mem = realMem + 16;
-  return mem;
+  uint64_t* realAddr = (uint64_t*)addr - 2;
+  uint64_t prevSz    = realAddr[1];                                // get the previous sizeBytes so we know how much to copy
+  realAddr[0]--;                                                   // decrement the previous memory's references since we are no longer going to have it to decrement in the main loop 
+
+  void*       nxtMem = LavaAlloc(sizeBytes);                       // make a new allocation that is the requested size
+  memcpy(nxtMem, addr, prevSz);                                    // copy from the previous alloction to the new allocation
+  return nxtMem;
+
+  //u8*    realMem = (u8*)LavaHeapReAlloc(realAddr, sizeBytes + 16);
+  //void*      mem = realMem + 16;
 }
-void              LavaFree(void* addr)
+void               LavaFree(void* addr)
 {
   void* p = (void*)( (u8*)addr - 16 );  // 16 bytes for the reference count and sizeBytes
   LavaHeapFree(p);
@@ -2200,9 +2218,9 @@ void               LavaLoop(LavaFlow& lf) noexcept
               lp.inputs       =   1;
               lp.frame        =   lf.m_frame;
               lp.id           =   LavaId(nodeId);
-              lp.mem_alloc    =   LavaAlloc;
-              lp.mem_realloc  =   LavaRealloc;
-              lp.mem_free     =   LavaFree;
+              lp.ref_alloc    =   LavaAlloc;
+              lp.ref_realloc  =   LavaRealloc;
+              lp.ref_free     =   LavaFree;
 
               auto stTime = high_resolution_clock::now();
               state         = exceptWrapper(func, lf, &lp, &runFrm, &outQ);
@@ -2348,6 +2366,9 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+//u32           outputs;
+//LavaPut           put;
 
 //
 //extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaFrame*, lava_threadQ*);       // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
