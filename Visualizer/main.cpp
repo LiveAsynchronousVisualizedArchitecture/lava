@@ -71,11 +71,14 @@
 // -todo: deal with sub tables for vert components not being present in VizTfm.hpp index verts to shape - operator bool added to tbl, initialization of verts added to tbl_to_shape function
 // -todo: change project name to Visualizer
 // -todo: change project name to visualizer
+// -todo: fix crash from VS execution in release mode - no longer a problem for some reason
+// -todo: make IdxVerts to shape transformation not need positions by defaulting them to 0
+// -todo: make point and line size increase only happen on key down
 
-// todo: make sure that a table has type IdxVerts before displaying it 
+// todo: debug keys not being updated when changed
+// todo: make sure that a table has type IdxVerts before listing it on the side
 // todo: look in to keys from fissure dissapearing when being overwritten constantly
 // todo: investigate crash while visualizing multiple tables in a running graph
-// todo: fix crash from VS execution in release mode
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
 //       |  visualize the fit position and camera frustum in real time to debug
@@ -257,32 +260,35 @@ void              keyCallback(GLFWwindow* window, int key, int scancode, int act
 
   VizData* vd = (VizData*)glfwGetWindowUserPointer(window);
   auto&   cam = vd->camera;
-  switch(key)
-  {
-  case GLFW_KEY_K: {
-  } break; 
-  case GLFW_KEY_H: {
-    vd->camera = initCamera();
-  } break; 
-  case GLFW_KEY_J:
-  case GLFW_KEY_F: {
-    if(action==GLFW_RELEASE){
-      //vec4   sph   =  shapes_to_bndsph(*vd);
-      //vec3  cntr   =  vec3(sph.x,sph.y,sph.z);
-      //vec3  ofst   =  cam.pos - cam.lookAt;
-      //cam.lookAt   =  cntr;
-      //cam.pos      =  cam.lookAt + ofst;
+
+  if(action==GLFW_PRESS){
+    switch(key)
+    {
+    case GLFW_KEY_K: {
+    } break; 
+    case GLFW_KEY_H: {
+      vd->camera = initCamera();
+    } break; 
+    case GLFW_KEY_J:
+    case GLFW_KEY_F: {
+      //if(action==GLFW_RELEASE){
+      //  //vec4   sph   =  shapes_to_bndsph(*vd);
+      //  //vec3  cntr   =  vec3(sph.x,sph.y,sph.z);
+      //  //vec3  ofst   =  cam.pos - cam.lookAt;
+      //  //cam.lookAt   =  cntr;
+      //  //cam.pos      =  cam.lookAt + ofst;
+      //}
+      //cam.dist     =  sph.r;
+    } break;
+    case GLFW_KEY_PAGE_UP: {
+      vd->ui.ptSz *= 2;
+    } break;
+    case GLFW_KEY_PAGE_DOWN: {
+      vd->ui.ptSz /= 2;
+    } break;
+    default:
+      break;
     }
-    //cam.dist     =  sph.r;
-  } break;
-  case GLFW_KEY_PAGE_UP: {
-    vd->ui.ptSz *= 2;
-  } break;
-  case GLFW_KEY_PAGE_DOWN: {
-    vd->ui.ptSz /= 2;
-  } break;
-  default:
-    break;
   }
 
   vd->ui.screen.keyCallbackEvent(key, scancode, action, mods);

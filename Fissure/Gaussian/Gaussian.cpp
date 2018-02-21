@@ -31,7 +31,6 @@ extern "C"
       f32     var = gParams("Variance");
       f32      ev = gParams("Expected Value");
       u64   verts = gParams("Vertex Count");
-      //u32   verts = 8;
 
       tbl gcurve = LavaMakeTbl(lp);
       gcurve("type") = tbl::strToInt("IdxVerts");
@@ -40,13 +39,15 @@ extern "C"
       tbl ind(verts*2 - 1, (u32)0u);
       tbl  px(verts, 0.f);
       tbl  py(verts, 0.f);
-      tbl  pz(verts, 0.f);
+      tbl  cg(verts, 1.f);
+
       f32 vrecip = 1.f / verts;
       f32 coeff  = 1.f / sqrtf(2*PIf*var);
       TO(verts,i){
-        f32 x = i * vrecip * 2.f;  
-        f32 y = coeff * expf( (x*x) / (2.f*var) );
-        px[i] = x;
+        f32     x = ( (f32)i - (verts/2.f) ) * vrecip * 4.f;
+        f32  eExp = -( (x*x)/(2.f*var) ); 
+        f32     y = coeff * expf( eExp );
+        px[i] = x + ev;
         py[i] = y;
       }
       u64 indsz = ind.size();
@@ -55,10 +56,10 @@ extern "C"
         ind[i*2+1] = (u32)(i+1);
       }
 
-      gcurve("positions x") = &px;
-      gcurve("positions y") = &py;
-      gcurve("positions z") = &pz;
-      gcurve("indices")     = &ind;
+      gcurve("positions x")  = &px;
+      gcurve("positions y")  = &py;
+      gcurve("colors green") = &cg;
+      gcurve("indices")      = &ind;
       gcurve.flatten();
 
       out->push( LavaTblToOut(gcurve, GAUSS_IDXVERTS_OUT) );      // this demonstrates how to output a tbl into the first output slot
@@ -91,6 +92,20 @@ extern "C"
     return (LavaNode*)LavaNodes;
   }
 }
+
+
+
+
+
+
+
+
+
+//u32   verts = 8;
+//
+//tbl  pz(verts, 0.f);
+//
+//gcurve("positions z") = &pz;
 
 //tbl inputTbl( (void*)(in->packets[i].val.value) );
 //

@@ -26,9 +26,12 @@
 // -todo: add integer input to CmdLineInput
 // -todo: add vertex count to gaussian parameters and stdin prompts
 // -todo: give LavaParams ref_alloc and local_alloc
+// -todo: make realloc work by allocating new memory, copying it over, and setting the old memory's reference count to 0?
+// -todo: make tbl able to deal with not having a realloc function - not neccesary yet
+// -todo: make gauss shift by expected value
+// -todo: make gauss double sided
+// -todo: make gauss use indices
 
-// todo: make realloc work by allocating new memory, copying it over, and setting the old memory's reference count to 0?
-// todo: make tbl able to deal with not having a realloc function
 // todo: find way to add a tbl to a tbl by reference / direct assignment - should it immediatly copy and flatten()
 // todo: make play button highlighted while playing
 // todo: figure out crash when playing after saving
@@ -1659,7 +1662,7 @@ ENTRY_DECLARATION // main or winmain
       playBtn->setCallback([playBtn,pauseBtn,stopBtn](){
         playBtn->setEnabled(false);
         playBtn->setTextColor( Color(e3f(0.f, 0.f, 0.f)) );
-        playBtn->setBackgroundColor(  Color(e3f(.2f, 1.f, .2f)) ); 
+        playBtn->setBackgroundColor(  Color(e3f(.1f, 1.f, .1f)) ); 
 
         pauseBtn->setEnabled(true);
         stopBtn->setEnabled(true);

@@ -107,7 +107,7 @@ inline Shape          tbl_to_shape(tbl const& iv)  // todo: try to change this t
   img = iv("image");
 
   shp.owner = true;
-  shp.mode  = mode; GL_POINTS;
+  shp.mode  = mode;
   shp.indsz = ind.size();
 
   SECTION(put the image in to shp.tx - if there was an image in the IdxVerts tbl, use that, if not, use a dummy img)
@@ -140,11 +140,9 @@ inline Shape          tbl_to_shape(tbl const& iv)  // todo: try to change this t
       verts[i] = { {0,0,0}, {0,0,0}, {1.f,0,0,1.f}, {0,0} };  // initialize - position (3 floats), normals (3 floats), colors (4 floats) and textures coordinates (2 floats) 
     }
 
-    TO(sz,i){
-      verts[i].p[0] = px.at<f32>(i);
-      verts[i].p[1] = py.at<f32>(i);
-      verts[i].p[2] = pz.at<f32>(i);
-    }
+    if(px) TO(sz,i) verts[i].p[0] = px.at<f32>(i);
+    if(py) TO(sz,i) verts[i].p[1] = py.at<f32>(i);
+    if(pz) TO(sz,i) verts[i].p[2] = pz.at<f32>(i);
 
     if(nx) TO(sz,i) verts[i].n[0] = nx.at<f32>(i);
     if(ny) TO(sz,i) verts[i].n[1] = ny.at<f32>(i);
@@ -190,6 +188,18 @@ inline mat4           camera_to_mat4(Camera const& cam, float w, float h)
   mat4 projection = glm::perspective(cam.fov, (w/h), cam.nearClip, cam.farClip);
   return projection * view;
 }
+
+
+
+
+
+
+
+//TO(sz,i){
+//  verts[i].p[0] = px.at<f32>(i);
+//  verts[i].p[1] = py.at<f32>(i);
+//  verts[i].p[2] = pz.at<f32>(i);
+//}
 
 //inline vec4         shapes_to_bndsph(VizData const& vd)
 //{
