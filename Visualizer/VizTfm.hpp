@@ -76,17 +76,10 @@ inline GLuint  shadersrc_to_shaderid(const char* vert, const char* frag)
 
   return shaderProgramId;
 }
-inline Shape          tbl_to_shape(tbl const& iv)  // todo: try to change this to a const reference
+inline Shape            tbl_to_shape(tbl const& iv)  // todo: try to change this to a const reference
 {
   using namespace std;
   static float tmpImg[] = { 0.f, 0.f, 0.f, 0.f };
-
-  assert( iv.m_mem != nullptr );   auto f = iv.memStart();
-  assert( ((i8*)iv.memStart())[0] = 't' );
-  assert( ((i8*)iv.memStart())[1] = 'b' );
-
-  u64 typenum = iv("type");
-  assert( memcmp(&typenum, (u64*)"IdxVerts", sizeof(u64))==0 );
 
   Shape shp;
   u32 mode = (u32)((u64)iv("mode"));
@@ -177,6 +170,23 @@ inline Shape          tbl_to_shape(tbl const& iv)  // todo: try to change this t
 
   return move(shp);
 }
+inline Shape            tblbuf_to_shape(vec<u8> const& tblBuf)  // todo: try to change this to a const reference
+{
+  if( tblBuf.size() < sizeof(tbl::TblFields) ||
+      ((i8*)tblBuf.data())[0] != 't'         ||
+      ((i8*)tblBuf.data())[1] != 'b'
+    ){ 
+    return Shape();
+  }
+
+  tbl iv((void*)tblBuf.data(), false, false);
+
+  if( tbl::StrToInt("IdxVerts") != (u64)iv("type") ){
+    return Shape();
+  }
+
+  return tbl_to_shape(iv);
+}
 inline mat4           camera_to_mat4(Camera const& cam, float w, float h)
 {  
   const static auto XAXIS = vec4(1.f, 0.f, 0.f, 1.f);
@@ -194,6 +204,20 @@ inline mat4           camera_to_mat4(Camera const& cam, float w, float h)
 
 
 
+//assert( iv.m_mem != nullptr );   auto f = iv.memStart();
+//assert( ((i8*)iv.memStart())[0] = 't' );
+//assert( ((i8*)iv.memStart())[1] = 'b' );
+
+//if( iv.m_mem != nullptr               ||
+//    ((i8*)iv.memStart())[0]   == 't'  ||
+//    ((i8*)iv.memStart())[1]   == 'b'  ||
+//    tbl::StrToInt("IdxVerts") == (u64)iv("type")
+//  ){
+//  return Shape();
+//}
+
+//u64 typenum = iv("type");
+//assert( memcmp(&typenum, (u64*)"IdxVerts", sizeof(u64))==0 );
 
 //TO(sz,i){
 //  verts[i].p[0] = px.at<f32>(i);

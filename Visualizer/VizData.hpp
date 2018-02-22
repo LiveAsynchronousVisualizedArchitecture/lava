@@ -29,28 +29,6 @@ static const char* hotkeyGuideF =
 static const char* hotkeyGuidePage =
 " 'Page Up' and 'Page Down' :  Particle and line size.";
 
-//static const char*  vertShader   = 
-//"#version 330 core\n"
-//"\n"
-//"uniform mat4 transform; \n"
-//"\n"
-//"layout(location = 0) in vec3  P; \n"
-//"layout(location = 1) in vec3  N; \n"
-//"layout(location = 2) in vec4  C; \n"
-//"layout(location = 3) in vec2 UV; \n"
-//"\n"
-//"out vec3  fragN; \
-//out vec4  fragC; \
-//out vec2 fragUV; \
-//\
-//void main(){ \
-//  gl_Position = transform * vec4(P, 1.0f);  \
-//  fragN  =  N; \
-//  fragC  =  C; \
-//  fragUV = UV; \
-//}";
-
-
 static const char*  vertShader = 
 R"vert(
 #version 330 core
@@ -107,6 +85,30 @@ static VizData  vd;
 
 
 
+
+
+
+
+//static const char*  vertShader   = 
+//"#version 330 core\n"
+//"\n"
+//"uniform mat4 transform; \n"
+//"\n"
+//"layout(location = 0) in vec3  P; \n"
+//"layout(location = 1) in vec3  N; \n"
+//"layout(location = 2) in vec4  C; \n"
+//"layout(location = 3) in vec2 UV; \n"
+//"\n"
+//"out vec3  fragN; \
+//out vec4  fragC; \
+//out vec2 fragUV; \
+//\
+//void main(){ \
+//  gl_Position = transform * vec4(P, 1.0f);  \
+//  fragN  =  N; \
+//  fragC  =  C; \
+//  fragUV = UV; \
+//}";
 
 //static const char*  fragShader   = 
 //"#version 330 core\n"

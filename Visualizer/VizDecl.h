@@ -60,9 +60,6 @@ using   vecu = std::vector<u32>;
 using   veci = std::vector<i32>;
 using  vecv2 = std::vector<v2>;
 
-//using   tblu = tbl<u64>;
-//using  tblv2 = tbl<v2>;
-//using tblstr = tbl<str>;
 using tblstr = vecstr;
 using  tblv2 = vecv2;
 
@@ -84,8 +81,6 @@ struct vert {
   f32  c[4];
   f32 tx[2];
 };
-//using IvTbl = tbl<vert>;
-//using IvTbl = tbl;
 
 struct  Shape {                     // todo: make rvalue constructor - make all constructors?
 private:
@@ -206,7 +201,13 @@ struct VizData
 };
 
 
-
-
 #endif
 
+
+
+//using   tblu = tbl<u64>;
+//using  tblv2 = tbl<v2>;
+//using tblstr = tbl<str>;
+//
+//using IvTbl = tbl<vert>;
+//using IvTbl = tbl;

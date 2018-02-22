@@ -74,10 +74,13 @@
 // -todo: fix crash from VS execution in release mode - no longer a problem for some reason
 // -todo: make IdxVerts to shape transformation not need positions by defaulting them to 0
 // -todo: make point and line size increase only happen on key down
+// -todo: clean out comments 
+// -todo: debug keys not being updated when changed - need to build in mechanic for updates
+// -todo: make empty shapes erase from the Shapes map and delete their buttons - buttons are wiped out every time, but the shapes array was not being treated as the authority on buttons being recreated
+// -todo: make sure that a table has type IdxVerts before listing it on the side
+// -todo: put back updateKey to udate shapes every frame
 
-// todo: clean out comments 
-// todo: debug keys not being updated when changed - need to build in mechanic for updates
-// todo: make sure that a table has type IdxVerts before listing it on the side
+// todo: investigate memory leak on rapidly updating keys
 // todo: look in to keys from fissure dissapearing when being overwritten constantly
 // todo: investigate crash while visualizing multiple tables in a running graph
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
@@ -432,6 +435,36 @@ void              RenderShape(Shape const& shp, mat4 const& m) // GLuint shaderI
   glBindVertexArray(0);
   glBindTexture(GL_TEXTURE_2D, 0);
 }
+bool                updateKey(simdb const& db, str const& key, u32 version, VizData* vd)
+{
+  using namespace std;
+
+  u32 dbVersion = 0;
+  u32      vlen = 0;
+  auto      len = db.len(key.data(), (u32)key.length(), &vlen, &dbVersion);
+
+  if(len>0 && dbVersion!=version)
+  { 
+    vec<u8> ivbuf(vlen);
+    db.get(key.data(), (u32)key.length(), ivbuf.data(), (u32)ivbuf.size());
+
+    //Shape  s  = tbl_to_shape(iv);
+    Shape  s  = tblbuf_to_shape( move(ivbuf) );
+    if( !s.owner ){ return false; }
+    s.shader  = vd->shaderId;
+    s.active  = true;                     // because updates only happen when the shape is active, always setting an updated shape to active should work
+    s.version = dbVersion;
+    vd->shapes[key] = move(s);
+    
+    return true;
+  }
+
+  return false;
+
+  //key.v){
+  //
+  //Shape  s  = ivbuf_to_shape(iv, len);
+}
 vec_vs         shapesFromKeys(simdb const& db, vec_vs dbKeys, VizData* vd)  // vec<str> const& dbKeys
 {
   using namespace std;
@@ -441,31 +474,43 @@ vec_vs         shapesFromKeys(simdb const& db, vec_vs dbKeys, VizData* vd)  // v
     TO(dbKeys.size(),i)
     {
       auto& vs = dbKeys[i];
-      auto cur = vd->shapes.find(vs.str);
-      if(cur!=vd->shapes.end() && 
-         cur->second.version <= vs.ver
-      ){
-        continue;
+      SECTION(continue if the vs.str key name was found in shapes and the version is the same as the new version)
+      {
+        auto cur = vd->shapes.find(vs.str);
+        if(cur!=vd->shapes.end() &&               // if the vs.str key name was found in shapes and the version is the same as the new version, skip it
+           cur->second.version == vs.ver
+        ){
+          continue;
+        }
       }
 
-      u32     vlen = 0;
-      u32  version = 0;
-      auto     len = db.len(vs.str.data(), (u32)vs.str.length(), &vlen, &version);          // todo: make ui64 as the input length
-      if(len < sizeof(tbl::TblFields)){ continue; }
-      vs.ver = version;
+      u32 vlen = 0;
+      SECTION(get the length in bytes and version from the db)
+      {
+        auto     len = db.len(vs.str.data(), (u32)vs.str.length(), &vlen, &vs.ver);          // todo: make ui64 as the input length
+        if(len < sizeof(tbl::TblFields)){ continue; }
+      }
 
       ivbuf.resize(vlen);
-      db.get(vs.str.data(), (u32)vs.str.length(),  ivbuf.data(), vlen);
-      const tbl iv(ivbuf.data(), false, false);
+      SECTION(get the bytes from the db and check to make sure the read length is the same)
+      {
+        u32 readLen=0;
+        bool ok = db.get(vs.str.data(), (u32)vs.str.length(),  ivbuf.data(), vlen, &readLen);
+        if(!ok || readLen != vlen){
+          continue;
+        }
+      }
 
-      tbl  ivcpy = iv;
-      auto     f = ivcpy.memStart();
-
-      Shape  s   = tbl_to_shape(ivcpy);      PRINT_GL_ERRORS
-      s.shader   = vd->shaderId;
-      s.active   = vd->shapes[vs.str].active;
-      s.version  = version;
-      vd->shapes[vs.str] = move(s);                                                      // this should destruct the shape with the same name if there is one
+      Shape  s   = tblbuf_to_shape( move(ivbuf) );      PRINT_GL_ERRORS
+      if(!s.owner){ continue; }                                                          // if owner is false here then the conversion of the buffer to a shape must have failed 
+      
+      SECTION(finish the shape fields and move the shape into the global shape map)
+      {
+        s.shader   = vd->shaderId;
+        s.active   = vd->shapes[vs.str].active;
+        s.version  = vs.ver;
+        vd->shapes[vs.str] = move(s);                                                      // this should destruct the shape with the same name if there is one
+      }
     };
 
   return dbKeys;
@@ -487,8 +532,24 @@ vec_vs       eraseMissingKeys(vec_vs dbKeys, KeyShapes* shps)           // vec<s
     if( !isKeyInDb ){
       it = shps->erase(it);
       ++cnt;
-    }else ++it;
-  }
+    }else
+      ++it;
+    }
+
+    //if( !kv.second.owner ){
+    //  it = shps->erase(it);
+    //  ++cnt;
+    //}else{
+    //  bool isKeyInDb = binary_search(ALL(dbKeys),vs, [](VerStr const& a, VerStr const& b){ return a.str < b.str; } );
+    //  if( !isKeyInDb ){
+    //    it = shps->erase(it);
+    //    ++cnt;
+    //  }else
+    //    ++it;
+    //}
+    //else 
+      //++it;
+    //}
 
   return dbKeys;
 }
@@ -511,16 +572,26 @@ void                refreshDB(VizData* vd)
   FROM(vd->ui.dbIdxs.size(), i){ vd->ui.keyWin->removeChild(vd->ui.dbIdxs[i]); }
   vd->ui.dbIdxs.resize(0);
   vd->ui.dbIdxs.shrink_to_fit();
-  for(auto key : dbKeys)                                              // add the buttons back and keep track of their indices
+  for(auto const& kv : vd->shapes)                                              // add the buttons back and keep track of their indices
   {
-    auto b = new Button(vd->ui.keyWin, key.str);
+    auto b = new Button(vd->ui.keyWin, kv.first);
     int  i = vd->ui.keyWin->childIndex(b);
     if(i > -1){ vd->ui.dbIdxs.push_back(i); }
     b->setFlags(Button::ToggleButton);
-    b->setChangeCallback([k = key.str](bool pushed){ buttonCallback(k, pushed); });
-    b->setPushed(vd->shapes[key.str].active);
+    b->setChangeCallback([k = kv.first](bool pushed){ buttonCallback(k, pushed); });
+    b->setPushed(kv.second.active);
     b->setFixedHeight(25);
   }
+  //for(auto key : dbKeys)                                              // add the buttons back and keep track of their indices
+  //{
+  //  auto b = new Button(vd->ui.keyWin, key.str);
+  //  int  i = vd->ui.keyWin->childIndex(b);
+  //  if(i > -1){ vd->ui.dbIdxs.push_back(i); }
+  //  b->setFlags(Button::ToggleButton);
+  //  b->setChangeCallback([k = key.str](bool pushed){ buttonCallback(k, pushed); });
+  //  b->setPushed(vd->shapes[key.str].active);
+  //  b->setFixedHeight(25);
+  //}
   vd->ui.screen.performLayout();
 
   vd->keyRefreshClock -= vd->keyRefresh;
@@ -533,7 +604,11 @@ void                refreshDB(VizData* vd)
 
 void           buttonCallback(str key, bool pushed)
 {
-  vd.shapes[key].active = pushed;
+  auto it = vd.shapes.find(key);
+  if(it == vd.shapes.end()){ return; }
+
+  if(it->second.owner) it->second.active = pushed;
+  //vd.shapes[key].active = pushed;
 }
 void       dbLstPressCallback(int i)
 {
@@ -936,9 +1011,29 @@ ENTRY_DECLARATION
     SECTION(database)
     {
       if(vd.keyRefreshClock > vd.keyRefresh){
-        //glfwPollEvents();
         refreshDB(&vd);
-      } // end of updates to shapes 
+      }else{
+        for(auto const& kv : vd.shapes){ 
+          Shape const& s = kv.second;
+          if(s.active){
+            updateKey(db, kv.first, s.version, &vd);
+          }
+        }
+      }
+
+      //for(auto const& kv : vd.shapes){ 
+      //}
+
+      auto iter = vd.shapes.begin();
+      while(iter != vd.shapes.end()){
+        if( !iter->second.owner )
+          iter = vd.shapes.erase(iter);
+        else 
+          ++iter;
+      }
+
+      // end of updates to shapes 
+
       PRINT_GL_ERRORS
     }
     SECTION(input)
@@ -1010,22 +1105,10 @@ ENTRY_DECLARATION
       }
       SECTION(draw shapes)
       {
-        //for(auto& kv : vd.shapes){
-        //  kv.second.active = true;
-        //}
-
         for(auto& kv : vd.shapes){
-          if(kv.second.active)
+          if(kv.second.active && kv.second.owner)
             RenderShape(kv.second, viewProj);
-            //RenderShape(kv.second, glm::mat4() );
         }
-
-        //glBegin(GL_POINTS);
-        //  glVertex2f(0,0);
-        //  glVertex2f(1,0);
-        //  glVertex2f(1,1);
-        //  glVertex2f(0,1);
-        //glEnd();
       }
 
       PRINT_GL_ERRORS
@@ -1116,3 +1199,35 @@ ENTRY_DECLARATION
 }
 
 
+
+
+
+
+
+
+//u32  version = 0;
+//auto     len = db.len(vs.str.data(), (u32)vs.str.length(), &vlen, &version);          // todo: make ui64 as the input length
+//
+//vs.ver = version;
+//
+//s.version  = version;
+
+//const tbl iv(ivbuf.data(), false, false);
+//
+//tbl  ivcpy = iv;
+//auto     f = ivcpy.memStart();
+//
+//Shape  s   = tbl_to_shape(ivcpy);      PRINT_GL_ERRORS
+
+//for(auto& kv : vd.shapes){
+//  kv.second.active = true;
+//}
+//
+//RenderShape(kv.second, glm::mat4() );
+//
+//glBegin(GL_POINTS);
+//  glVertex2f(0,0);
+//  glVertex2f(1,0);
+//  glVertex2f(1,1);
+//  glVertex2f(0,1);
+//glEnd();

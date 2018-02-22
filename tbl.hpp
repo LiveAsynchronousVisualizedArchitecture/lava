@@ -1506,7 +1506,7 @@ public:
     return iter;
   }
 
-  static u64 strToInt(const char* shortStr)
+  static u64 StrToInt(const char* shortStr)
   {
     assert( strlen(shortStr) <= 8 );
     return *((u64*)shortStr);
