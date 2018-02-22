@@ -86,17 +86,17 @@ struct  Shape {                     // todo: make rvalue constructor - make all 
 private:
   void del()
   {
-    if (owner) {
+    if(owner) {
       glDeleteVertexArrays(1, &vertary);
       glDeleteBuffers(1,      &vertbuf);
       glDeleteBuffers(1,       &idxbuf);
       glDeleteTextures(1,          &tx);
     }
-    owner = false;
+    //owner = false;
   }
   void  mv(Shape&& rval)
   {
-    //del();
+    del();
 
     memcpy(this, &rval, sizeof(Shape));
     memset(&rval, 0, sizeof(Shape));

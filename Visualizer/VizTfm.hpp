@@ -169,9 +169,12 @@ inline Shape            tbl_to_shape(tbl const& iv)  // todo: try to change this
   glBindVertexArray(0);
 
   return move(shp);
+  //return Shape();
 }
-inline Shape            tblbuf_to_shape(vec<u8> const& tblBuf)  // todo: try to change this to a const reference
+inline Shape         tblbuf_to_shape(vec<u8> tblBuf)  // todo: try to change this to a const reference
 {
+  using namespace std;
+
   if( tblBuf.size() < sizeof(tbl::TblFields) ||
       ((i8*)tblBuf.data())[0] != 't'         ||
       ((i8*)tblBuf.data())[1] != 'b'
@@ -185,7 +188,8 @@ inline Shape            tblbuf_to_shape(vec<u8> const& tblBuf)  // todo: try to 
     return Shape();
   }
 
-  return tbl_to_shape(iv);
+  Shape ret = tbl_to_shape(iv);
+  return move(ret);
 }
 inline mat4           camera_to_mat4(Camera const& cam, float w, float h)
 {  

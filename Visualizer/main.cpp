@@ -79,8 +79,8 @@
 // -todo: make empty shapes erase from the Shapes map and delete their buttons - buttons are wiped out every time, but the shapes array was not being treated as the authority on buttons being recreated
 // -todo: make sure that a table has type IdxVerts before listing it on the side
 // -todo: put back updateKey to udate shapes every frame
+// -todo: investigate memory leak on rapidly updating keys - Shape class wasn't deleting current openGL handles when taking in another moved Shape
 
-// todo: investigate memory leak on rapidly updating keys
 // todo: look in to keys from fissure dissapearing when being overwritten constantly
 // todo: investigate crash while visualizing multiple tables in a running graph
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
@@ -448,7 +448,6 @@ bool                updateKey(simdb const& db, str const& key, u32 version, VizD
     vec<u8> ivbuf(vlen);
     db.get(key.data(), (u32)key.length(), ivbuf.data(), (u32)ivbuf.size());
 
-    //Shape  s  = tbl_to_shape(iv);
     Shape  s  = tblbuf_to_shape( move(ivbuf) );
     if( !s.owner ){ return false; }
     s.shader  = vd->shaderId;
@@ -460,10 +459,6 @@ bool                updateKey(simdb const& db, str const& key, u32 version, VizD
   }
 
   return false;
-
-  //key.v){
-  //
-  //Shape  s  = ivbuf_to_shape(iv, len);
 }
 vec_vs         shapesFromKeys(simdb const& db, vec_vs dbKeys, VizData* vd)  // vec<str> const& dbKeys
 {
@@ -926,7 +921,7 @@ ENTRY_DECLARATION
       vd.shaderId = shadersrc_to_shaderid(vertShader, fragShader);   PRINT_GL_ERRORS
 
       glfwSetWindowUserPointer(vd.win, &vd);
-      glfwSwapInterval(0);
+      glfwSwapInterval(1);
       glfwSwapBuffers(vd.win);
       glfwMakeContextCurrent(vd.win);
 
@@ -1024,13 +1019,13 @@ ENTRY_DECLARATION
       //for(auto const& kv : vd.shapes){ 
       //}
 
-      auto iter = vd.shapes.begin();
-      while(iter != vd.shapes.end()){
-        if( !iter->second.owner )
-          iter = vd.shapes.erase(iter);
-        else 
-          ++iter;
-      }
+      //auto iter = vd.shapes.begin();
+      //while(iter != vd.shapes.end()){
+      //  if( !iter->second.owner )
+      //    iter = vd.shapes.erase(iter);
+      //  else 
+      //    ++iter;
+      //}
 
       // end of updates to shapes 
 
@@ -1204,6 +1199,11 @@ ENTRY_DECLARATION
 
 
 
+//Shape  s  = tbl_to_shape(iv);
+//
+//key.v){
+//
+//Shape  s  = ivbuf_to_shape(iv, len);
 
 //u32  version = 0;
 //auto     len = db.len(vs.str.data(), (u32)vs.str.length(), &vlen, &version);          // todo: make ui64 as the input length
