@@ -31,10 +31,11 @@
 // -todo: make gauss shift by expected value
 // -todo: make gauss double sided
 // -todo: make gauss use indices
+// -todo: make play button highlighted while playing
 
-// todo: find way to add a tbl to a tbl by reference / direct assignment - should it immediatly copy and flatten()
-// todo: make play button highlighted while playing
+// todo: debug crash of gauss chain in release mode
 // todo: figure out crash when playing after saving
+// todo: find way to add a tbl to a tbl by reference / direct assignment - should it immediatly copy and flatten()
 // todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets - use blue 'sunshine' lines going out from the center like a snowflake
 // todo: make a gaussian flow node that inputs a tbl with Expected Value and Variance then outputs an IdxVerts tbl
 // todo: make a settings file that is read on load if it in the same directory

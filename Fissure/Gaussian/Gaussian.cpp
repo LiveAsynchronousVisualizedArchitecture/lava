@@ -34,7 +34,7 @@ extern "C"
 
       tbl gcurve = LavaMakeTbl(lp);
       gcurve("type") = tbl::strToInt("IdxVerts");
-      gcurve("mode") = 0; // GL_POINTS for now                                   // needs to be openGL lines - GL_LINES - 0x01
+      gcurve("mode") = (u64)0; // GL_POINTS for now                                   // needs to be openGL lines - GL_LINES - 0x01
       
       tbl ind(verts*2 - 1, (u32)0u);
       tbl  px(verts, 0.f);
