@@ -25,8 +25,6 @@ namespace RNG
   //void Init(int s);
   //void Destruct();
 
-  //extern __declspec(thread) rng_t*  m_genPtr;
-
   rng_t   gen(0);
   rng_t*  m_genPtr = &gen; //nullptr;
 
@@ -77,7 +75,7 @@ extern "C"
       //f32      ev = gParams("Expected Value");
       //u64   verts = gParams("Vertex Count");
 
-      f32     var = randomf(0.05f, 2.f);
+      f32     var = randomf(0.05f, 1.f);
       f32      ev = randomf(-0.2f, 0.2f);
       u64   verts = 128;
 

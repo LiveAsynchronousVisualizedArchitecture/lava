@@ -33,7 +33,10 @@
 // -todo: make gauss use indices
 // -todo: make play button highlighted while playing
 // -todo: move old tests to external files - /bak directory
+// -todo: fix crash when there are no msg nodes - just needed to check if nodeId != LavaId::NODE_NONE
+// -todo: make play button colors reset to normal on stop
 
+// todo: find and fix memory leak 
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: debug crash of gauss chain in release mode
 // todo: figure out crash when playing after saving
@@ -1628,6 +1631,7 @@ ENTRY_DECLARATION // main or winmain
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
 
       playBtn->setBackgroundColor(  Color(e3f(.15f, .2f,  .15f)) ); 
+      playBtn->setTextColor( Color(e3f(1.f, 1.f, 1.f)) );
       pauseBtn->setBackgroundColor( Color(e3f(.2f,  .2f,  .15f)) ); 
       pauseBtn->setEnabled(false);
       stopBtn->setBackgroundColor(  Color(e3f(.19f, .16f, .17f)) ); 
@@ -1664,7 +1668,7 @@ ENTRY_DECLARATION // main or winmain
       });
       playBtn->setCallback([playBtn,pauseBtn,stopBtn](){
         playBtn->setEnabled(false);
-        playBtn->setTextColor( Color(e3f(0.f, 0.f, 0.f)) );
+        playBtn->setTextColor( Color(e3f(1.f, 1.f, 1.f)) );
         playBtn->setBackgroundColor(  Color(e3f(.1f, 1.f, .1f)) ); 
 
         pauseBtn->setEnabled(true);
@@ -1696,7 +1700,7 @@ ENTRY_DECLARATION // main or winmain
         fd.flow.runConstructors();
 
         playBtn->setEnabled(true);
-        playBtn->setTextColor( Color(e3f(.18f, .18f, .18f)) );
+        playBtn->setTextColor( Color(e3f(1.f, 1.f, 1.f)) );
         playBtn->setBackgroundColor(  Color(e3f(.15f, .2f,  .15f)) ); // set play button back to normal
         pauseBtn->setEnabled(false);
         stopBtn->setEnabled(false);
@@ -1753,6 +1757,8 @@ ENTRY_DECLARATION // main or winmain
       fd.ui.statusLay = new BoxLayout(Orientation::Horizontal, Alignment::Fill, 0,0);
 
       fd.ui.statusWin->setLayout(fd.ui.statusLay);
+
+      auto txtclr = playBtn->textColor();
 
       fd.ui.screen.setVisible(true);
       fd.ui.screen.performLayout();
