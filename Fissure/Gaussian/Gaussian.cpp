@@ -1,6 +1,8 @@
 
 
 
+#include <random>
+
 #include "../../no_rt_util.h"
 #include "../../tbl.hpp"
 #include "../LavaFlow.hpp"
@@ -13,12 +15,55 @@ enum Slots
   //GAUSS_IDXVERTS_OUT = 1
 };
 
+namespace RNG
+{
+  using rng_t  = ::std::mt19937;
+  using urng_t = ::std::unique_ptr<rng_t>;
+
+  //extern __declspec(thread) rng_t*  m_genPtr;
+  //
+  //void Init(int s);
+  //void Destruct();
+
+  //extern __declspec(thread) rng_t*  m_genPtr;
+
+  rng_t   gen(0);
+  rng_t*  m_genPtr = &gen; //nullptr;
+
+  void Init(int s)
+  {
+    //if (m_genPtr == nullptr) {
+    //  m_genPtr = new rng_t(s);
+    //}
+  }
+  void Destruct()
+  {
+    //if(m_genPtr != nullptr) 
+    //  delete m_genPtr;
+  }
+}
+
+float     randomf(float lo, float hi)
+{
+  ::std::uniform_real_distribution<float> dis(lo, hi);
+  return dis(*RNG::m_genPtr);
+}
+
 extern "C"
 {
   const char*  InTypes[]  = {"IdxVerts",           nullptr};            // This array contains the type that each slot of the same index will accept as input.
   const char*  InNames[]  = {"Gaussian Slot In",   nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   const char* OutTypes[]  = {"IdxVerts",           nullptr};            // This array contains the types that are output in each slot of the same index
   const char* OutNames[]  = {"Gaussian Slot Out",  nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+
+  void GaussConstruct()
+  {
+    RNG::Init(0);
+  }
+  void GaussDestruct()
+  {
+    RNG::Destruct();
+  }
 
   uint64_t Gaussian(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
   {
@@ -28,9 +73,13 @@ extern "C"
     while( LavaNxtPckt(in, &i) )
     {
       tbl gParams = LavaTblFromPckt(lp, in, i);
-      f32     var = gParams("Variance");
-      f32      ev = gParams("Expected Value");
-      u64   verts = gParams("Vertex Count");
+      //f32     var = gParams("Variance");
+      //f32      ev = gParams("Expected Value");
+      //u64   verts = gParams("Vertex Count");
+
+      f32     var = randomf(0.05f, 2.f);
+      f32      ev = randomf(-0.2f, 0.2f);
+      u64   verts = 128;
 
       tbl gcurve = LavaMakeTbl(lp);
       gcurve("type") = tbl::strToInt("IdxVerts");
@@ -72,8 +121,8 @@ extern "C"
   {
     {
       Gaussian,                                      // function
-      nullptr,                                       // constructor - this can be set to nullptr if not needed
-      nullptr,                                       // destructor  - this can also be set to nullptr 
+      GaussConstruct,                                // constructor - this can be set to nullptr if not needed
+      GaussDestruct,                                 // destructor  - this can also be set to nullptr 
       LavaNode::FLOW,                                // node_type   - this should be eighther LavaNode::MSG (will be run even without input packets) or LavaNode::FLOW (will be run only when at least one packet is available for input)
       "Gaussian",                                    // name
       InTypes,                                       // in_types    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 

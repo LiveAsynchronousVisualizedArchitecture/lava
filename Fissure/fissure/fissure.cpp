@@ -32,7 +32,9 @@
 // -todo: make gauss double sided
 // -todo: make gauss use indices
 // -todo: make play button highlighted while playing
+// -todo: move old tests to external files - /bak directory
 
+// todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: debug crash of gauss chain in release mode
 // todo: figure out crash when playing after saving
 // todo: find way to add a tbl to a tbl by reference / direct assignment - should it immediatly copy and flatten()
@@ -1770,206 +1772,18 @@ ENTRY_DECLARATION // main or winmain
     }
     SECTION(test data init)
     {
-      //printf("Arg    size: %lld \n\n", sizeof(LavaVal));
-      //printf("Msg    size: %lld \n\n", sizeof(LavaMsg));
-      //printf("Packet size: %lld \n\n", sizeof(LavaPacket));
-      //
-      //fd.ui.slot_rad = 15.f;
-
-      //node_add("MakeCube",  Node("six",  Node::Type::MSG,  {200.f,200.f}) );
-
-      //auto   inst0 = node_add("FileToString", Node("one",   Node::Type::FLOW, {400.f,300.f}) );
-      //auto   inst1 = node_add("FileToString", Node("two",   Node::Type::FLOW, {200.f,500.f}) );
-      //auto   inst2 = node_add("FileToString", Node("three", Node::Type::FLOW, {700.f,500.f}) );
-      //auto   inst3 = node_add("FileToString", Node("four",  Node::Type::FLOW, {700.f,700.f}) );
-      //auto   inst4 = node_add("FilePathMsg",  Node("five",  Node::Type::MSG,  {200.f,200.f}) );
-      //auto   inst5 = node_add("MakeCube",  Node("six",  Node::Type::MSG,  {200.f,200.f}) );
-      
-      //LavaId s0 = slot_add( Slot(inst0, false)  );
-      //LavaId s1 = slot_add( Slot(inst1,  true)  );
-      //LavaId s2 = slot_add( Slot(inst2,  true)  );
-      //LavaId s3 = slot_add( Slot(inst3,  true)  );
-      //LavaId s4 = slot_add( Slot(inst0, false)  );
-      //LavaId s5 = slot_add( Slot(inst4, false)  );
-
-      //fd.lgrph.toggleCnct(s5, s1);
-      //fd.lgrph.toggleCnct(s0, s1);
-      //fd.lgrph.toggleCnct(s0, s2);
-      //fd.lgrph.toggleCnct(s0, s3);
     }
     SECTION(lava and db)
     {
       reloadSharedLibs();
 
-      new (&fisdb) simdb("Fissure", 256, 2<<10);
+      new (&fisdb)     simdb("Fissure", 256, 2<<10);
       new (&fd.vizIds) AtmSet( LavaId().asInt );
       fd.flow.packetCallback = lavaPacketCallback;
       LavaInit();
     }
-
-    SECTION(test flat lock free map)
-    {
-      // Println();
-      // flf_map  defaultMap;
-      // flf_map  tstMap(4);
-      // Println("Idx: ", sizeof(flf_map::Idx) 
-      //          );
-      //Print("List: ");
-      //u32* lst = tstMap.listStart( tstMap.capacity() );
-      //TO(tstMap.capacity(),i) Print(lst[i]," ");
-      //Println();
-      //Println("size: ", tstMap.size(), " capacity: ", tstMap.capacity() );
-      //Println();
-      //Println("put: ", tstMap.put(85, 101) );
-      //Println("put: ", tstMap.put(20, 40) );
-      //Println("put: ", tstMap.put(5, 7) );
-      ////Println("put: ", tstMap.put(11, 13) );
-      ////Println("put: ", tstMap.put(17, 19) );
-      //Println();
-      //print_flf_map(tstMap);
-      //Println("get() as bool: ",  (bool)tstMap.get(85), "   ", tstMap.get(85).ok);
-      //Println("get() as Value: ", (u64)tstMap.get(85),  "   ", tstMap.get(85).value);
-      //Println();
-      //print_flf_map(tstMap);
-    }
   }
-
-  //SECTION(tbl test)
-  //{
-  //  Println("sizeof(tbl::KV): ", sizeof(tbl::KV) );
-  // 
-  //  //tbl t(10, (u64)0 );
-  //  //TO(t.size(),i){
-  //  //  //t.operator[]<u8>(i) = (u8)i;
-  //  //  t[i] = (u64)i;
-  //  //}
-  //
-  //  tbl t = {0ull,1ull,2ull,3ull,4ull,5ull,6ull,7ull,8ull,9ull};
-  //  TO(t.size(),i){
-  //    u64 val = t[i];
-  //    Print(val," "); 
-  //  }
-  //  Println("\n");
-  //
-  //  SECTION(test map with normal types)
-  //  {
-  //    t("wat")    = 800;
-  //    //t("width")  = 4096ull;
-  //    //t("height") = 2048ull;
-  //    //t("chans")  = (u8)3;
-  //    //int     wat = t("wat");
-  //    //u64   width = t("width");
-  //    //u64  height = t("height");
-  //    //Println("wat: ", wat, " width: ", width, " height: ", height, " chans: ", (u64)(u8)t("chans") );
-  //  }
-  //  SECTION(test map with other tables)
-  //  {
-  //    tbl t1 = {2,4,6,8,10};
-  //    t1.push(12);
-  //    t1.push(14);
-  //    t1.push(14);
-  //    t1.push({16,18,20,22,24});
-  //    t1.pop();
-  //    t1.pop();
-  //    t1.pop();
-  //    t1.pop();
-  //    t("t1") = &t1;
-  //    //t.flatten();
-  //
-  //    //t("t1") = t1;
-  //    //t.flatten();
-  //
-  //    //tbl tA = t("t1");
-  //    //TO(tA.size(),i){
-  //    //  tA[i] = (i32)tA[i] * 2;
-  //    //  Print( (int)tA[i]," ");
-  //    //}
-  //    //Println("\nOwned: ", tA.owned());
-  //
-  //    TO(t1.size(),i){
-  //      Print( (int)t1[i]," ");
-  //    }
-  //    Println("\nOwned: ", t1.owned());
-  //  }
-  //  SECTION(print tbl attributes)
-  //  {
-  //    Println("size: ", t.size() );
-  //    Println("front(), back(): ", (u64)t.front(), ",  ", (u64)t.back() );
-  //    Println("sizeBytes: ", t.sizeBytes() );
-  //    Println("stride: ",    t.stride()    );
-  //    TO(t.size(),i){
-  //      u64 val = t[i];
-  //      Print(val, " "); 
-  //    }
-  //    Println("\n\n");
-  //    Println("KV size: ", sizeof(tbl::KV));
-  //  }
-  //
-  //  tbl iv;
-  //  SECTION(make IdxVerts with the new tbl)
-  //  {
-  //    u32 w=16,h=16,chans=4;
-  //    tbl img(w*h*chans, 0.f);
-  //    img("type")       =  tbl::strToInt("Image");
-  //    img("width")      =  w;
-  //    img("height")     =  h;
-  //    img("channels")   =  chans;
-  //    img("dimensions") =  2;
-  //    TO(h,y) TO(w,x) TO(chans,c){
-  //      auto idx = y*w*chans + x*chans + c;
-  //
-  //      if(c==2)
-  //        img[idx] = 0.5f;
-  //      else if(c==3) 
-  //        img[idx] = 1.f;
-  //      else
-  //        img[idx] = (f32)y / (2.f*h)  +  (f32)x / (2.f*w); 
-  //        //img[idx] = (f32)x/(w);
-  //    }
-  //
-  //    tbl indices = {0u,1u,2u };
-  //    tbl      px = { -1.f,   0.f,    0.f   };
-  //    tbl      py = { -1.f,  -1.f,    1.f   };
-  //    tbl      pz = {  0.f,   0.f,   -0.f   };
-  //    tbl      nx = {  0.f,   0.f,    0.f   };
-  //    tbl      ny = {  0.f,   0.f,    0.f   };
-  //    tbl      nz = { -1.f,  -1.f,   -1.f   };
-  //    tbl      cr = {  1.f,   1.f,    1.f   };
-  //    tbl      cg = {  1.f,   1.f,    1.f   };
-  //    tbl      cb = {  1.f,   1.f,    1.f   };
-  //    tbl      ca = {  1.f,   1.f,    1.f   };
-  //    tbl      tx = {  0.f,   1.f,    1.f   };
-  //    tbl      ty = {  0.f,   0.f,    1.f   };
-  //
-  //    u32    mode        = (u32)0x0004; // (u64)GL_TRIANGLES;  // #define GL_TRIANGLES 0x0004
-  //    u64 typenum        =  *((u64*)"IdxVerts");
-  //    iv("type")         = typenum;
-  //    iv("mode")         = mode;
-  //    iv("indices")      = &indices;
-  //    iv("positions x")  = &px;
-  //    iv("positions y")  = &py;
-  //    iv("positions z")  = &pz;
-  //    iv("image")        = &img;
-  //    //iv("normals x")    = &nx;
-  //    //iv("normals y")    = &ny;
-  //    //iv("normals z")    = &nz;
-  //    //iv("colors red")   = &cr;
-  //    //iv("colors green") = &cg;
-  //    //iv("colors blue")  = &cb;
-  //    //iv("colors alpha") = &ca;
-  //    iv("texture coordinates x") = &tx;
-  //    iv("texture coordinates y") = &ty;
-  //
-  //    iv.flatten();
-  //    auto fields = iv.memStart();
-  //
-  //    Println("iv sizeBytes: ", iv.sizeBytes() );
-  //    Println("ind type: ",  indices.typeStr() );
-  //
-  //    fisdb.put("indexed verts test", iv.memStart(), (u32)iv.sizeBytes() );
-  //  }
-  //}
-
+  
   glfwSetTime(0);
   SECTION(main loop)
   {

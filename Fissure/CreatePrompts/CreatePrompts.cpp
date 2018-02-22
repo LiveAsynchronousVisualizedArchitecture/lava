@@ -30,7 +30,7 @@ extern "C"
     using namespace std;
 
     if(hasRun){ return 1; }
-    hasRun = true;
+    //hasRun = true;
 
     tbl prompts = LavaMakeTbl(lp);
     prompts("Expected Value") = 0.f;
