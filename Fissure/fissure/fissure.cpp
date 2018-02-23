@@ -36,7 +36,7 @@
 // -todo: fix crash when there are no msg nodes - just needed to check if nodeId != LavaId::NODE_NONE
 // -todo: make play button colors reset to normal on stop
 
-// todo: find and fix memory leak 
+// todo: find and fix memory leak - ownedMem vector in Lava grows rapidly
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: debug crash of gauss chain in release mode
 // todo: figure out crash when playing after saving
@@ -411,19 +411,6 @@ void    startFlowThreads(u64 num=1)
 
   TO(num,i){
     fd.flowThreads.emplace_back([](){
-      //printf("\n LavaInst size: %d \n", (i32)sizeof(LavaInst) );
-      //printf("\n LavaNode size: %d \n", (i32)sizeof(LavaNode) );
-      //
-      //printf("\n running thread \n");
-      //
-      //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key) );
-      ////printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.bytes) );
-      //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.slot) );
-      //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.listIdx) );
-      //printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.frame) );
-      //printf("\n packet size: %d \n", (i32)sizeof(LavaPacket) );
-
-      //fd.flow.loop();
       LavaLoop(fd.flow);
     });
   }
@@ -1669,7 +1656,7 @@ ENTRY_DECLARATION // main or winmain
       playBtn->setCallback([playBtn,pauseBtn,stopBtn](){
         playBtn->setEnabled(false);
         playBtn->setTextColor( Color(e3f(1.f, 1.f, 1.f)) );
-        playBtn->setBackgroundColor(  Color(e3f(.1f, 1.f, .1f)) ); 
+        playBtn->setBackgroundColor( Color(e3f(.1f, 1.f, .1f)) ); 
 
         pauseBtn->setEnabled(true);
         stopBtn->setEnabled(true);
@@ -2369,6 +2356,21 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+//printf("\n LavaInst size: %d \n", (i32)sizeof(LavaInst) );
+//printf("\n LavaNode size: %d \n", (i32)sizeof(LavaNode) );
+//
+//printf("\n running thread \n");
+//
+//printf("\n union size: %d \n", (i32)sizeof(LavaOut::key) );
+////printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.bytes) );
+//printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.slot) );
+//printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.listIdx) );
+//printf("\n union size: %d \n", (i32)sizeof(LavaOut::key.frame) );
+//printf("\n packet size: %d \n", (i32)sizeof(LavaPacket) );
+
+//
+//fd.flow.loop();
 
 //str      cppPth = "../"+nodeName+"/"+nodeName+".cpp";
 //str   vcprojPth = "../"+nodeName+"/"+nodeName+".vcxproj";

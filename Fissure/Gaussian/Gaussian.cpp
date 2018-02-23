@@ -1,8 +1,7 @@
 
 
-
 #include <random>
-
+#include "../../str_util.hpp"
 #include "../../no_rt_util.h"
 #include "../../tbl.hpp"
 #include "../LavaFlow.hpp"
@@ -47,6 +46,28 @@ float     randomf(float lo, float hi)
   return dis(*RNG::m_genPtr);
 }
 
+void           PrintLavaMem(LavaMem lm)
+{
+  if(lm.ptr)
+    printf("\n addr: %llu  data addr: %llu  ref count: %llu   size bytes: %llu \n", 
+      (u64)(lm.ptr), (u64)(lm.data()), (u64)lm.refCount(), (u64)lm.sizeBytes() );
+}
+void           PrintTblMem(tbl const& t)
+{
+  if( !t.m_mem ){
+    printf("nullptr\n");
+    return;
+  }
+
+  LavaMem lm;
+  lm.ptr = (void*)( (u8*)t.memStart() - 16 );
+  PrintLavaMem(lm);
+
+  //assert(lm.refCount() < 1000);
+  //
+  //lm.fromDataAddr( (u64)t.memStart() );
+}
+
 extern "C"
 {
   const char*  InTypes[]  = {"IdxVerts",           nullptr};            // This array contains the type that each slot of the same index will accept as input.
@@ -80,9 +101,12 @@ extern "C"
       u64   verts = 128;
 
       tbl gcurve = LavaMakeTbl(lp);
+      //PrintTblMem(gcurve);
       gcurve("type") = tbl::StrToInt("IdxVerts");
+      //PrintTblMem(gcurve);
       gcurve("mode") = (u64)0; // GL_POINTS for now                                   // needs to be openGL lines - GL_LINES - 0x01
-      
+      //PrintTblMem(gcurve);
+
       tbl ind(verts*2 - 1, (u32)0u);
       tbl  px(verts, 0.f);
       tbl  py(verts, 0.f);
@@ -108,6 +132,7 @@ extern "C"
       gcurve("colors green") = &cg;
       gcurve("indices")      = &ind;
       gcurve.flatten();
+      //PrintTblMem(gcurve);
 
       out->push( LavaTblToOut(gcurve, GAUSS_IDXVERTS_OUT) );      // this demonstrates how to output a tbl into the first output slot
     }

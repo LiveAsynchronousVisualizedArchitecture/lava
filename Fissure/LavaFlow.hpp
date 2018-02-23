@@ -870,12 +870,18 @@ struct        LavaMem
   void*           data()     { return ((uint64_t*)ptr)+2;  }
 
   uint64_t      incRef()     { return ((au64*)ptr)->fetch_add( 1); }
-  uint64_t      decRef()     { return ((au64*)ptr)->fetch_add(-1); }
+  uint64_t      decRef()
+  { 
+    au64* ap = (au64*)ptr;
+    assert(ap->load() != 0);
+    return ap->fetch_add(-1);
+  }
 
   static LavaMem fromDataAddr(uint64_t addr)                                       // create a LavaMem struct from the address of the start of the data (after the reference count and sizeBytes at the start of the allocation)
   {
     LavaMem lm;
     lm.ptr =  (void*)(addr - sizeof(uint64_t)*2);
+    assert(lm.refCount() < 1000);
     return lm;
   }
 };
@@ -1822,9 +1828,11 @@ void                printdb(simdb const& db)
 }
 void           PrintLavaMem(LavaMem lm)
 {
-  if(lm.ptr)
+  if(lm.ptr){
     printf("\n addr: %llu  data addr: %llu  ref count: %llu   size bytes: %llu \n", 
       (u64)(lm.ptr), (u64)(lm.data()), (u64)lm.refCount(), (u64)lm.sizeBytes() );
+    assert(lm.refCount() < 1000);
+  }
 }
 
 auto       GetSharedLibPath() -> std::wstring
@@ -2035,7 +2043,8 @@ void*           LavaRealloc(void* addr, uint64_t sizeBytes)
 {
   uint64_t* realAddr = (uint64_t*)addr - 2;
   uint64_t prevSz    = realAddr[1];                                // get the previous sizeBytes so we know how much to copy
-  realAddr[0]--;                                                   // decrement the previous memory's references since we are no longer going to have it to decrement in the main loop 
+  if(realAddr[0] != 0)
+    realAddr[0]--;                                                 // decrement the previous memory's references since we are no longer going to have it to decrement in the main loop 
 
   void*       nxtMem = LavaAlloc(sizeBytes);                       // make a new allocation that is the requested size
   memcpy(nxtMem, addr, prevSz);                                    // copy from the previous alloction to the new allocation
@@ -2224,7 +2233,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
                 lp.ref_free     =   LavaFree;
 
                 auto stTime = high_resolution_clock::now();
-                state         = exceptWrapper(func, lf, &lp, &runFrm, &outQ);
+                state       = exceptWrapper(func, lf, &lp, &runFrm, &outQ);
                 if(state != LavaInst::NORMAL){
                   LavaOut o;                                                        // if there was an error, clear the queue of the produced data - there may be better ways of doing this, such as integrating it with the queue loop below, or building a specific method into the LavaQ
                   while(outQ.size()>0)
@@ -2269,7 +2278,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
                     for(; di!=diEn && di->first==src; ++di)
                     {                                                                   // loop through the 1 or more destination slots connected to this source
                       LavaId  pktId = di->second;
-                      pkt = basePkt;                                                    // pkt is packet
+                      pkt           = basePkt;                                          // pkt is packet
                       pkt.dest_node = pktId.nid;
                       pkt.dest_slot = pktId.sidx;
 
@@ -2279,7 +2288,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
                     }
                   }
                 }
-              } // SECTION(create packets and put them into packet queue)
+              }                                                      // SECTION(create packets and put them into packet queue)
             }
             else state = LavaInst::LOAD_ERROR;
           }
@@ -2312,30 +2321,15 @@ void               LavaLoop(LavaFlow& lf) noexcept
     SECTION(dealloction - partition owned allocations and free those with their reference count at 0)
     {
       for(auto const& lm : ownedMem){
-        //PrintLavaMem(lm);
+        PrintLavaMem(lm);
       }
 
       auto  zeroRef  =  partition(ALL(ownedMem), [](auto a){return a.refCount() > 0;} );                           // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
       auto freeIter  =  zeroRef;
-      for(; freeIter != end(ownedMem); ++freeIter){         // loop through the memory with zero references and free them
+      for(; freeIter != end(ownedMem); ++freeIter){                      // loop through the memory with zero references and free them
         LavaFree( freeIter->data() );
       }
       ownedMem.erase(zeroRef, end(ownedMem));                                  // erase the now freed memory
-
-      // only need to sort the memory with zero reference counts, and only need to sort them by address, since their references are already known to be zero
-      //sort(zeroRef, end(ownedMem), [](LavaMem a, LavaMem b)
-      //{
-      //  return (u64)a.ptr < (u64)b.ptr;
-      //});                           // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
-      //u64 lastFreed = 0;
-      //auto freeIter = zeroRef;
-      //for(; freeIter != end(ownedMem); ++freeIter){                                                              // loop through the memory with zero references and free them
-      //  
-      //  if((u64)freeIter->ptr != lastFreed){
-      //    LavaFree( (uint64_t)freeIter->data() );
-      //    lastFreed = (u64)freeIter->ptr;
-      //  }
-      //}
     }
   }
 
@@ -2368,6 +2362,22 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+
+// only need to sort the memory with zero reference counts, and only need to sort them by address, since their references are already known to be zero
+//sort(zeroRef, end(ownedMem), [](LavaMem a, LavaMem b)
+//{
+//  return (u64)a.ptr < (u64)b.ptr;
+//});                           // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
+//u64 lastFreed = 0;
+//auto freeIter = zeroRef;
+//for(; freeIter != end(ownedMem); ++freeIter){                                                              // loop through the memory with zero references and free them
+//  
+//  if((u64)freeIter->ptr != lastFreed){
+//    LavaFree( (uint64_t)freeIter->data() );
+//    lastFreed = (u64)freeIter->ptr;
+//  }
+//}
 
 //u32           outputs;
 //LavaPut           put;
