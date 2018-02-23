@@ -81,6 +81,7 @@
 // -todo: put back updateKey to udate shapes every frame
 // -todo: investigate memory leak on rapidly updating keys - Shape class wasn't deleting current openGL handles when taking in another moved Shape
 
+// todo: look at concurrency and possibly put in mutex while editing or drawing nanogui
 // todo: look in to keys from fissure dissapearing when being overwritten constantly
 // todo: investigate crash while visualizing multiple tables in a running graph
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 

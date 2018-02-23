@@ -35,11 +35,13 @@
 // -todo: move old tests to external files - /bak directory
 // -todo: fix crash when there are no msg nodes - just needed to check if nodeId != LavaId::NODE_NONE
 // -todo: make play button colors reset to normal on stop
+// -todo: find and fix memory leak - ownedMem vector in Lava grows rapidly - LavaRealloc was causing an underflow which was causing reference counts to be non-zero even if that memory never escaped as a packet
+// -todo: debug crash of gauss chain in release mode - possibly fixed
+// -todo: debug slot connections not showing up after loading a .lava file - needed to use the commands instead of direct manipulation
+// -todo: debug connections showing up on clean load of .lava file, but not after editing graph then loading .lava file - curren node id not being reset? - separate id was being used from FissureData and not the LavaGraph - that id was not being reset
 
-// todo: find and fix memory leak - ownedMem vector in Lava grows rapidly
-// todo: change slot placement so that output slots always point directly at the center average of their target nodes
-// todo: debug crash of gauss chain in release mode
 // todo: figure out crash when playing after saving
+// todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: find way to add a tbl to a tbl by reference / direct assignment - should it immediatly copy and flatten()
 // todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets - use blue 'sunshine' lines going out from the center like a snowflake
 // todo: make a gaussian flow node that inputs a tbl with Expected Value and Variance then outputs an IdxVerts tbl
@@ -58,6 +60,7 @@
 // todo: think about design for constant variables into class - string, double, u64, i64, file (color? v2,v3,v4? ranged double?, ranged integer?) separate datatype from interface? make all constant inputs tables? how to embed interface queues into a table? make each constant a subtable with a value, an interface type and interface values? 
 // todo: design packet freezing and packet visualization interface - maybe have three states - neutral, visualized, and frozen
 // todo: test live reloading by compiling a shared lib while lava is running
+// todo: integrate rapid json
 
 // todo: make input slots start at 0 - does there need to be a separation between input and out slots or does there need to be an offset so that the input frame starts at 0 
 // todo: convert tbl to use arrays of the data types smaller than 64 bits
@@ -562,7 +565,8 @@ auto            node_add(str node_name, Node n) -> uint64_t
     ln = pi->second;
     if(ln)
     {
-      instIdx = nxtId();
+      //instIdx = nxtId();
+      instIdx = fd.lgrph.nxtId();
 
       FisData::IdOrder ido;                                                          //ido is id order
       ido.id    = instIdx;
@@ -1184,10 +1188,6 @@ void          strToGraph(str const& s)
 {
   using namespace std;
 
-  //GraphDB g;
-  //fd.lgrph.clear();
-  //LavaGraph lg;
-
   graph_clear();
 
   Jzon::Parser prs;
@@ -1221,42 +1221,27 @@ void          strToGraph(str const& s)
     node_add( nd_func.get(i).toString(), n);
   }
 
-  //TO(sltSrcId.getCount(),i){
-  //  Id sltId;
-  //  sltId.nid  = sltSrcId.get(i).toInt();
-  //  sltId.sidx = sltSrcIdx.get(i).toInt();
-  //  Slot s(sltId.nid,false);
-  //
-  //  //g.addSlot(s, sltId.sidx);
-  //  slot_add(s);
-  //}
-  //TO(sltDestId.getCount(),i){
-  //  Id sltId;
-  //  sltId.nid  = sltDestId.get(i).toInt();
-  //  sltId.sidx = sltDestIdx.get(i).toInt();
-  //  Slot s(sltId.nid,true);
-  //  
-  //  //g.addSlot(s, sltId.sidx);
-  //  slot_add(s);
-  //}
-
   auto cnct_cnt = destId.getCount();
   TO(cnct_cnt,i){
-    //GraphDB::Id src, dest;
-    LavaId src, dest;
-    src.nid   = srcId.get(i).toInt();
-    src.sidx  = srcIdx.get(i).toInt();
-    dest.nid  = destId.get(i).toInt();
-    dest.sidx = destIdx.get(i).toInt();
+    LavaCommand::Arg  dest;
+    LavaCommand::Arg   src;
+    src.id.nid   = srcId.get(i).toInt();
+    src.id.sidx  = srcIdx.get(i).toInt();
+    dest.id.nid  = destId.get(i).toInt();
+    dest.id.sidx = destIdx.get(i).toInt();
+    fd.lgrph.put(LavaCommand::TGL_CNCT, dest, src);
 
+    //GraphDB::Id src, dest;
+    //LavaId src, dest;
+    //src.nid   = srcId.get(i).toInt();
+    //src.sidx  = srcIdx.get(i).toInt();
+    //dest.nid  = destId.get(i).toInt();
+    //dest.sidx = destIdx.get(i).toInt();
+    //
     //g.addCnct(src, dest);
     //g.toggleCnct(src, dest);
-    fd.lgrph.toggleCnct(src, dest);
+    //fd.lgrph.toggleCnct(src, dest);
   }
-
-  //fd.lgrph.setNextNodeId( fd.lgrph.maxId() );
-
-  //return move(fd.lgrph);
 }
 bool            saveFile(LavaGraph const& lg, str path)
 {
@@ -2356,6 +2341,32 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//GraphDB g;
+//fd.lgrph.clear();
+//LavaGraph lg;
+//
+//TO(sltSrcId.getCount(),i){
+//  Id sltId;
+//  sltId.nid  = sltSrcId.get(i).toInt();
+//  sltId.sidx = sltSrcIdx.get(i).toInt();
+//  Slot s(sltId.nid,false);
+//
+//  //g.addSlot(s, sltId.sidx);
+//  slot_add(s);
+//}
+//TO(sltDestId.getCount(),i){
+//  Id sltId;
+//  sltId.nid  = sltDestId.get(i).toInt();
+//  sltId.sidx = sltDestIdx.get(i).toInt();
+//  Slot s(sltId.nid,true);
+//  
+//  //g.addSlot(s, sltId.sidx);
+//  slot_add(s);
+//}
+//
+//fd.lgrph.setNextNodeId( fd.lgrph.maxId() );
+//
+//return move(fd.lgrph);
 
 //printf("\n LavaInst size: %d \n", (i32)sizeof(LavaInst) );
 //printf("\n LavaNode size: %d \n", (i32)sizeof(LavaNode) );

@@ -1023,7 +1023,7 @@ public:
     m_cnctsB     = lval.m_cnctsB; 
     m_destCnctsB = lval.m_destCnctsB;
   }
-  u64              nxt(){ return m_nxtId++; }
+  u64            nxtId(){ return m_nxtId++; }
 
   auto   nodeDestSlots(vec_nptrs const& nds) -> vec_ids
   {
@@ -1190,10 +1190,13 @@ public:
     curDestCncts().clear();
     curMsgNodes().clear();
 
+    while(m_cmdq.size()>0) m_cmdq.pop();
+    while(m_stk.size()>0) m_stk.pop();
+    
     init();
+    
     //m_ids.clear();
   }
-  //u64                 put(LavaCommand::Command cmd, LavaId A, LavaId B=LavaId())
   u64                  put(LavaCommand::Command cmd, LavaCommand::Arg A, LavaCommand::Arg B = LavaCommand::Arg() )
   {
     m_cmdq.push({cmd, A, B});
@@ -1292,7 +1295,7 @@ public:
   }
   uint64_t    addNode(LavaNode* ln, bool newId=true)
   {
-    u64 id = nxt();
+    u64 id = nxtId();
     if(ln->node_type == LavaNode::MSG)
       oppMsgNodes().insert(id);
 
@@ -2321,7 +2324,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
     SECTION(dealloction - partition owned allocations and free those with their reference count at 0)
     {
       for(auto const& lm : ownedMem){
-        PrintLavaMem(lm);
+        //PrintLavaMem(lm);
       }
 
       auto  zeroRef  =  partition(ALL(ownedMem), [](auto a){return a.refCount() > 0;} );                           // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
@@ -2363,6 +2366,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//
+//u64                 put(LavaCommand::Command cmd, LavaId A, LavaId B=LavaId())
 
 // only need to sort the memory with zero reference counts, and only need to sort them by address, since their references are already known to be zero
 //sort(zeroRef, end(ownedMem), [](LavaMem a, LavaMem b)
