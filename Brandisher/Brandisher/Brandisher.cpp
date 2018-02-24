@@ -90,9 +90,9 @@
 // -todo: visualize arrays with proper types - just need to use a switch case to make a vector of f64? 
 // -todo: use a const operator() in tbl to get the sub table by key
 // -todo: take out debug printing
+// -todo: change extractKey to use long form db.get() that will return the length
+// -todo: debug crashes from refreshing while db is written to rapidly - changes to reading seem to have fixed it
 
-// todo: change extractKey to use long form db.get() that will return the length
-// todo: debug crashes from refreshing while db is written to rapidly
 // todo: add ability to delete keys 
 // todo: delete with multi-selection and right click menu
 // todo: treat the array as a string if it is u8, i8, (or a string type?) - then show statistics for a string if the string is too long to fit in the gui
@@ -636,9 +636,11 @@ vec_u8     extractDbKey(simdb const& db, str key)
   u64      len = db.len(key, &vlen, &version);          // todo: make ui64 as the input length
 
   vec_u8 ret(vlen);
-  bool ok = db.get(key.c_str(), ret.data(), vlen);
+  u32 readLen = 0;
+  bool ok = db.get( (void*)key.c_str(), (u32)key.length(), ret.data(), vlen, &readLen);
+  //bool ok = db.get(key.c_str(), ret.data(), vlen);
 
-  if( !ok ) return vec_u8();
+  if( !ok  ||  readLen < vlen ) return vec_u8();
 
   return ret;
 }
