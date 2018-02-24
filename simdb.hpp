@@ -904,7 +904,7 @@ public:
 
     u32   curidx  =  blkIdx;
     VerIdx   nxt  =  nxtBlock(curidx);                              
-    if(nxt.version!=version){ return MATCH_WRONG_VERSION; }
+    //if(nxt.version!=version){ return MATCH_WRONG_VERSION; }
     
     u32    blksz  =  (u32)blockFreeSize();
     u8*   curbuf  =  (u8*)buf;

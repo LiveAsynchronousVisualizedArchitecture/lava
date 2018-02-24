@@ -184,7 +184,8 @@ public:
     void moveWindowToFront(Window *window);
     void drawWidgets();
 
-protected:
+//protected:
+public:
     GLFWwindow *mGLFWWindow;
     NVGcontext *mNVGContext;
     GLFWcursor *mCursors[(int) Cursor::CursorCount];

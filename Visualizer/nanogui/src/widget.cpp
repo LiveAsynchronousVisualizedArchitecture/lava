@@ -160,6 +160,8 @@ void Widget::removeChild(int index) {
     Widget *widget = mChildren[index];
     mChildren.erase(mChildren.begin() + index);
 
+    
+
     //auto cnt = widget->getRefCount();
     widget->decRef();     // sbassett - setting widget to nullptr is it will be deleted - would be better to do this at the ref / object level 
     //if(cnt==1){  }

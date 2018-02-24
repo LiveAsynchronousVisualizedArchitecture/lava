@@ -640,7 +640,7 @@ bool Screen::resizeCallbackEvent(int, int) {
 
 void Screen::updateFocus(Widget *widget){
     for(auto w: mFocusPath) {
-      if(!w /*|| !w->parent() */|| w->getRefCount()<=0 || !w->focused()) continue;            // sbassett - if the widget is deleted, can this be called with a nullptr?
+      if(!w || !w->parent() || w->getRefCount()<=0 || !w->focused()) continue;            // sbassett - if the widget is deleted, can this be called with a nullptr?
       
       w->focusEvent(false);
     }

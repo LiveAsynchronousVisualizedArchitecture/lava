@@ -86,11 +86,12 @@
 // -todo: try out tiny/nano file dialog for saving and loading of serialized data - brandisher can save files, no longer needed
 // -todo: make save button or menu to save serialized files 
 // -todo: make a load button or menu to load serialized files - would need to have a visualizer specific simdb that would keep the files? 
+// -todo: erase shapes based off of querys to db
+// -todo: investigate crash while visualizing multiple tables in a running graph
+// -todo: try querying keys to see if they are missing instead of using the keys vector from db.getKey  
+// -todo: move new types and statics to files made for them
 
-// todo: erase shapes based off of querys to db
-// todo: investigate crash while visualizing multiple tables in a running graph
-// todo: try querying keys to see if they are missing instead of using the keys vector from db.getKey  
-// todo: move new types and statics to files made for them
+// todo: test further for crashes
 
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
@@ -602,6 +603,9 @@ void                refreshDB(VizData* vd)
       b->setPushed(kv.second.active);
       b->setFixedHeight(25);
     }
+    vd->ui.screen.mDragActive = false;
+    vd->ui.screen.mDragWidget = nullptr;
+    //vd->ui.screen.mFocusPath.clear();
     vd->ui.screen.performLayout();
   }
 
@@ -909,7 +913,7 @@ ENTRY_DECLARATION
       vd.prev             =  vd.now;
       vd.verRefresh       =  1.0/144.0;
       vd.verRefreshClock  =  0.0;
-      vd.keyRefresh       =  0.1;
+      vd.keyRefresh       =  0.5;
       vd.keyRefreshClock  =  vd.keyRefresh;
       vd.camera           =  initCamera();
 
@@ -1019,26 +1023,27 @@ ENTRY_DECLARATION
     }
     SECTION(database)
     {
-      if(  vd.keyRefreshClock > vd.keyRefresh  && 
-          !vd.camera.leftButtonDown            &&
-          !vd.camera.rightButtonDown      )
-      {
-        uiChanged = true;
-        refreshDB(&vd);
-      }else
-      {
-        //vd.camera.mouseDelta = vec2(0,0);
-        //vd.camera.btn2Delta  = vec2(0,0);
-        //glfwPollEvents();                                             // PollEvents must be done after zeroing out the deltas
-        for(auto const& kv : vd.shapes){ 
-          Shape const& s = kv.second;
-          if(s.active){
-            //updateKey(db, kv.first, s.version, &vd);
+      if( !vd.camera.rightButtonDown && !vd.camera.leftButtonDown ){
+        if(vd.keyRefreshClock > vd.keyRefresh)
+        {
+          uiChanged = true;
+          refreshDB(&vd);
+        }else{
+          for(auto const& kv : vd.shapes){ 
+            Shape const& s = kv.second;
+            if(s.active){
+              updateKey(db, kv.first, s.version, &vd);
+            }
           }
+          uiChanged = false;
         }
-        uiChanged = false;
       }
+
       PRINT_GL_ERRORS
+
+      //vd.camera.mouseDelta = vec2(0,0);
+      //vd.camera.btn2Delta  = vec2(0,0);
+      //glfwPollEvents();                                             // PollEvents must be done after zeroing out the deltas
     }
     SECTION(input)
     {
