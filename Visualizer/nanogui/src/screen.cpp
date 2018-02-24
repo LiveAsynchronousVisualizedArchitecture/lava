@@ -262,6 +262,8 @@ Screen::Screen(const Vector2i &size, const std::string &caption, bool resizable,
 
 void Screen::initialize(GLFWwindow *window, bool shutdownGLFWOnDestruct) {
     mDragWidget = nullptr; // sbassett
+    mDragActive = false; // sbassett
+
     mGLFWWindow = window;
     mShutdownGLFWOnDestruct = shutdownGLFWOnDestruct;
     glfwGetWindowSize(mGLFWWindow, &mSize[0], &mSize[1]);
@@ -545,6 +547,7 @@ bool Screen::mouseButtonCallbackEvent(int button, int action, int modifiers) {
         }
 
         if (action == GLFW_PRESS && (button == GLFW_MOUSE_BUTTON_1 || button == GLFW_MOUSE_BUTTON_2)) {
+            // dragging taken out - sbassett
             mDragWidget = findWidget(mMousePos);
             if (mDragWidget == this)
                 mDragWidget = nullptr;

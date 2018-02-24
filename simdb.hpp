@@ -201,7 +201,7 @@
 #endif
 
 namespace {
-  enum Match { MATCH_FALSE=0, MATCH_TRUE=1, MATCH_REMOVED=-1  };
+  enum Match { MATCH_FALSE=0, MATCH_TRUE=1, MATCH_REMOVED = -1, MATCH_WRONG_VERSION = -2  };
 
   template<class T>
   class lava_noop
@@ -903,7 +903,9 @@ public:
     if(blklstHsh!=hash){ return MATCH_FALSE; }                         // vast majority of calls should end here
 
     u32   curidx  =  blkIdx;
-    VerIdx   nxt  =  nxtBlock(curidx);                              if(nxt.version!=version){ return MATCH_FALSE; }
+    VerIdx   nxt  =  nxtBlock(curidx);                              
+    if(nxt.version!=version){ return MATCH_WRONG_VERSION; }
+    
     u32    blksz  =  (u32)blockFreeSize();
     u8*   curbuf  =  (u8*)buf;
     auto    klen  =  s_bls[blkIdx].klen;                            if(klen!=len){ return MATCH_FALSE; }
@@ -1211,9 +1213,9 @@ public:
     {
       VerIdx vi = load(i);      
       if(vi.idx!=EMPTY && vi.idx!=DELETED){
+        if(out_version){ *out_version = vi.version; }
         Match m = m_csp->compare(vi.idx, vi.version, key, klen, hash);
         if(m==MATCH_TRUE){
-          if(out_version){ *out_version = vi.version; }
           return m_csp->len(vi.idx, vi.version, out_vlen);
         }        
       }

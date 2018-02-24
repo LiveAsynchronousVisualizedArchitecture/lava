@@ -52,6 +52,7 @@ using  glm::length;
 using  v2 = vec2;
 using  v3 = vec3;
 using  v4 = vec4;
+using  LockGuard = std::lock_guard<std::mutex>;
 
 using vec_vs = std::vector<VerStr>;
 using vecstr = std::vector<str>;

@@ -80,19 +80,21 @@
 // -todo: make sure that a table has type IdxVerts before listing it on the side
 // -todo: put back updateKey to udate shapes every frame
 // -todo: investigate memory leak on rapidly updating keys - Shape class wasn't deleting current openGL handles when taking in another moved Shape
+// -todo: look at concurrency and possibly put in mutex while editing or drawing nanogui - no concurrency going on, this shouldn't be the problem
+// -todo: look in to keys from fissure dissapearing when being overwritten constantly - possibly from the loop through the db to get its keys not being able to get a stable key list while the keys are rapidly shifting around - commenting out eraseMissingKeys fixes the issue but leaves a need to take care of missing keys
+// -todo: move and rename project to LavaViz or any non test name
+// -todo: try out tiny/nano file dialog for saving and loading of serialized data - brandisher can save files, no longer needed
+// -todo: make save button or menu to save serialized files 
+// -todo: make a load button or menu to load serialized files - would need to have a visualizer specific simdb that would keep the files? 
 
-// todo: look at concurrency and possibly put in mutex while editing or drawing nanogui
-// todo: look in to keys from fissure dissapearing when being overwritten constantly
+// todo: erase shapes based off of querys to db
 // todo: investigate crash while visualizing multiple tables in a running graph
+// todo: try querying keys to see if they are missing instead of using the keys vector from db.getKey  
+// todo: move new types and statics to files made for them
+
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
 //       |  visualize the fit position and camera frustum in real time to debug
-
-// todo: move and rename project to LavaViz or any non test name
-// todo: try out tiny/nano file dialog for saving and loading of serialized data 
-// todo: make save button or menu to save serialized files 
-// todo: make a load button or menu to load serialized files - would need to have a visualizer specific simdb that would keep the files? 
-// todo: make label switches not only turn keys on and off, but fade their transparency too?
 // todo: keep databases in memory after listing them?
 
 // idea: draw histogram from array
@@ -150,11 +152,9 @@
 #define MAX_VERTEX_BUFFER  512 * 1024
 #define MAX_ELEMENT_BUFFER 128 * 1024
 
-static tbl          tst;
+//static tbl          tst;
 static std::mutex   ui_mutex;
 static bool         uiChanged = false;
-
-using LockGuard = std::lock_guard<std::mutex>;
 
 namespace {  // functions that are a transform from one datatype to another are in VizTfm.hpp - functions here are more state based
 
@@ -539,24 +539,34 @@ vec_vs       eraseMissingKeys(vec_vs dbKeys, KeyShapes* shps)           // vec<s
       ++cnt;
     }else
       ++it;
-    }
-
-    //if( !kv.second.owner ){
-    //  it = shps->erase(it);
-    //  ++cnt;
-    //}else{
-    //  bool isKeyInDb = binary_search(ALL(dbKeys),vs, [](VerStr const& a, VerStr const& b){ return a.str < b.str; } );
-    //  if( !isKeyInDb ){
-    //    it = shps->erase(it);
-    //    ++cnt;
-    //  }else
-    //    ++it;
-    //}
-    //else 
-      //++it;
-    //}
+  }
 
   return dbKeys;
+}
+u32       eraseMissingKeys(KeyShapes* shps)
+{
+  u32 cnt = 0;
+  for(auto it = shps->begin();  it != shps->end(); )
+  {
+    u32    vlen = 0;
+    u32 version = 0;
+    i64     len = db.len(it->first, &vlen, &version);
+    if(version==0 && (len==0 || vlen==0) ){
+      it = shps->erase(it);
+      ++cnt;
+    }else
+      ++it;
+  }
+
+  return cnt;
+
+  //KeyShapes* shps = &vd->shapes;
+  //
+  //auto const& kv = *it;
+  //
+  //VerStr vs;
+  //vs.ver   = kv.second.version;
+  //vs.str   = kv.first;
 }
 double                   nowd()
 {
@@ -571,7 +581,8 @@ void                refreshDB(VizData* vd)
 {  
   auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
   dbKeys      = shapesFromKeys(db, move(dbKeys), vd);
-  dbKeys      = eraseMissingKeys(move(dbKeys), &vd->shapes);
+  u32 erased  = eraseMissingKeys(&vd->shapes);
+  //dbKeys      = eraseMissingKeys(move(dbKeys), &vd->shapes);
   sort(ALL(dbKeys));
   sort(ALL(vd->ui.dbIdxs));                                                  // sort the indices so the largest are removed first and the smaller indices don't change their position
 
@@ -925,7 +936,7 @@ ENTRY_DECLARATION
 
       glfwSetWindowUserPointer(vd.win, &vd);
       glfwSwapInterval(1);
-      glfwSwapBuffers(vd.win);
+      //glfwSwapBuffers(vd.win);
       glfwMakeContextCurrent(vd.win);
 
       PRINT_GL_ERRORS
@@ -1008,14 +1019,21 @@ ENTRY_DECLARATION
     }
     SECTION(database)
     {
-      if(vd.keyRefreshClock > vd.keyRefresh){
+      if(  vd.keyRefreshClock > vd.keyRefresh  && 
+          !vd.camera.leftButtonDown            &&
+          !vd.camera.rightButtonDown      )
+      {
         uiChanged = true;
         refreshDB(&vd);
-      }else{
+      }else
+      {
+        //vd.camera.mouseDelta = vec2(0,0);
+        //vd.camera.btn2Delta  = vec2(0,0);
+        //glfwPollEvents();                                             // PollEvents must be done after zeroing out the deltas
         for(auto const& kv : vd.shapes){ 
           Shape const& s = kv.second;
           if(s.active){
-            updateKey(db, kv.first, s.version, &vd);
+            //updateKey(db, kv.first, s.version, &vd);
           }
         }
         uiChanged = false;
@@ -1190,6 +1208,21 @@ ENTRY_DECLARATION
 
 
 
+
+//if( !kv.second.owner ){
+//  it = shps->erase(it);
+//  ++cnt;
+//}else{
+//  bool isKeyInDb = binary_search(ALL(dbKeys),vs, [](VerStr const& a, VerStr const& b){ return a.str < b.str; } );
+//  if( !isKeyInDb ){
+//    it = shps->erase(it);
+//    ++cnt;
+//  }else
+//    ++it;
+//}
+//else 
+//++it;
+//}
 
 //for(auto key : dbKeys)                                              // add the buttons back and keep track of their indices
 //{
