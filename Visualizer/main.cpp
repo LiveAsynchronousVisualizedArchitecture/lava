@@ -106,6 +106,7 @@
 
 #include <chrono>
 #include <memory>
+#include <mutex>
 #include <algorithm>
 #include <fstream>
 #include <sstream>
@@ -148,6 +149,12 @@
 
 #define MAX_VERTEX_BUFFER  512 * 1024
 #define MAX_ELEMENT_BUFFER 128 * 1024
+
+static tbl          tst;
+static std::mutex   ui_mutex;
+static bool         uiChanged = false;
+
+using LockGuard = std::lock_guard<std::mutex>;
 
 namespace {  // functions that are a transform from one datatype to another are in VizTfm.hpp - functions here are more state based
 
@@ -319,7 +326,9 @@ void         mouseBtnCallback(GLFWwindow* window, int button, int action, int mo
     }
   }
 
-  vd->ui.screen.mouseButtonCallbackEvent(button, action, mods);
+  if(!uiChanged)
+    vd->ui.screen.mouseButtonCallbackEvent(button, action, mods);
+
 }
 void        cursorPosCallback(GLFWwindow* window, double x, double y)
 {
@@ -483,7 +492,7 @@ vec_vs         shapesFromKeys(simdb const& db, vec_vs dbKeys, VizData* vd)  // v
       u32 vlen = 0;
       SECTION(get the length in bytes and version from the db)
       {
-        auto     len = db.len(vs.str.data(), (u32)vs.str.length(), &vlen, &vs.ver);          // todo: make ui64 as the input length
+        auto len = db.len(vs.str.data(), (u32)vs.str.length(), &vlen, &vs.ver);          // todo: make ui64 as the input length
         if(len < sizeof(tbl::TblFields)){ continue; }
       }
 
@@ -565,30 +574,25 @@ void                refreshDB(VizData* vd)
   dbKeys      = eraseMissingKeys(move(dbKeys), &vd->shapes);
   sort(ALL(dbKeys));
   sort(ALL(vd->ui.dbIdxs));                                                  // sort the indices so the largest are removed first and the smaller indices don't change their position
-  FROM(vd->ui.dbIdxs.size(), i){ vd->ui.keyWin->removeChild(vd->ui.dbIdxs[i]); }
-  vd->ui.dbIdxs.resize(0);
-  vd->ui.dbIdxs.shrink_to_fit();
-  for(auto const& kv : vd->shapes)                                              // add the buttons back and keep track of their indices
+
+  SECTION(lock the ui_mutex and update the ui with the new buttons)
   {
-    auto b = new Button(vd->ui.keyWin, kv.first);
-    int  i = vd->ui.keyWin->childIndex(b);
-    if(i > -1){ vd->ui.dbIdxs.push_back(i); }
-    b->setFlags(Button::ToggleButton);
-    b->setChangeCallback([k = kv.first](bool pushed){ buttonCallback(k, pushed); });
-    b->setPushed(kv.second.active);
-    b->setFixedHeight(25);
+  LockGuard ui_guard(ui_mutex);
+    FROM(vd->ui.dbIdxs.size(), i){ vd->ui.keyWin->removeChild(vd->ui.dbIdxs[i]); }
+    vd->ui.dbIdxs.resize(0);
+    vd->ui.dbIdxs.shrink_to_fit();
+    for(auto const& kv : vd->shapes)                                              // add the buttons back and keep track of their indices
+    {
+      auto b = new Button(vd->ui.keyWin, kv.first);
+      int  i = vd->ui.keyWin->childIndex(b);
+      if(i > -1){ vd->ui.dbIdxs.push_back(i); }
+      b->setFlags(Button::ToggleButton);
+      b->setChangeCallback([k = kv.first](bool pushed){ buttonCallback(k, pushed); });
+      b->setPushed(kv.second.active);
+      b->setFixedHeight(25);
+    }
+    vd->ui.screen.performLayout();
   }
-  //for(auto key : dbKeys)                                              // add the buttons back and keep track of their indices
-  //{
-  //  auto b = new Button(vd->ui.keyWin, key.str);
-  //  int  i = vd->ui.keyWin->childIndex(b);
-  //  if(i > -1){ vd->ui.dbIdxs.push_back(i); }
-  //  b->setFlags(Button::ToggleButton);
-  //  b->setChangeCallback([k = key.str](bool pushed){ buttonCallback(k, pushed); });
-  //  b->setPushed(vd->shapes[key.str].active);
-  //  b->setFixedHeight(25);
-  //}
-  vd->ui.screen.performLayout();
 
   vd->keyRefreshClock -= vd->keyRefresh;
   vd->verRefreshClock -= vd->verRefresh;
@@ -806,8 +810,6 @@ f32      drawGraph(NVGcontext* nvg, tbl   const&    t, bnd2f b)
 
 }
 
-static tbl tst;
-
 //void       genTestGeo(simdb* db)
 //{
 //  using namespace std;
@@ -896,7 +898,7 @@ ENTRY_DECLARATION
       vd.prev             =  vd.now;
       vd.verRefresh       =  1.0/144.0;
       vd.verRefreshClock  =  0.0;
-      vd.keyRefresh       =  0.5;
+      vd.keyRefresh       =  0.1;
       vd.keyRefreshClock  =  vd.keyRefresh;
       vd.camera           =  initCamera();
 
@@ -1007,6 +1009,7 @@ ENTRY_DECLARATION
     SECTION(database)
     {
       if(vd.keyRefreshClock > vd.keyRefresh){
+        uiChanged = true;
         refreshDB(&vd);
       }else{
         for(auto const& kv : vd.shapes){ 
@@ -1015,21 +1018,8 @@ ENTRY_DECLARATION
             updateKey(db, kv.first, s.version, &vd);
           }
         }
+        uiChanged = false;
       }
-
-      //for(auto const& kv : vd.shapes){ 
-      //}
-
-      //auto iter = vd.shapes.begin();
-      //while(iter != vd.shapes.end()){
-      //  if( !iter->second.owner )
-      //    iter = vd.shapes.erase(iter);
-      //  else 
-      //    ++iter;
-      //}
-
-      // end of updates to shapes 
-
       PRINT_GL_ERRORS
     }
     SECTION(input)
@@ -1127,11 +1117,11 @@ ENTRY_DECLARATION
 
       v2i   winsz = vd.ui.keyWin->size();
       v2i keyspos = v2i(vd.ui.screen.width() - winsz.x(), 0);
-      vd.ui.keyWin->setPosition(keyspos);
-      vd.ui.keyWin->setSize(v2i(winsz.x(), vd.ui.screen.height()));
-
-      vd.ui.screen.drawContents();
-      vd.ui.screen.drawWidgets();
+      LockGuard ui_guard(ui_mutex);
+        vd.ui.keyWin->setPosition(keyspos);
+        vd.ui.keyWin->setSize(v2i(winsz.x(), vd.ui.screen.height()));
+        vd.ui.screen.drawContents();
+        vd.ui.screen.drawWidgets();
     }
     SECTION(nanovg | tbl visualization, frames per second, color under cursor) 
     {
@@ -1199,6 +1189,31 @@ ENTRY_DECLARATION
 
 
 
+
+
+//for(auto key : dbKeys)                                              // add the buttons back and keep track of their indices
+//{
+//  auto b = new Button(vd->ui.keyWin, key.str);
+//  int  i = vd->ui.keyWin->childIndex(b);
+//  if(i > -1){ vd->ui.dbIdxs.push_back(i); }
+//  b->setFlags(Button::ToggleButton);
+//  b->setChangeCallback([k = key.str](bool pushed){ buttonCallback(k, pushed); });
+//  b->setPushed(vd->shapes[key.str].active);
+//  b->setFixedHeight(25);
+//}
+
+//for(auto const& kv : vd.shapes){ 
+//}
+//
+//auto iter = vd.shapes.begin();
+//while(iter != vd.shapes.end()){
+//  if( !iter->second.owner )
+//    iter = vd.shapes.erase(iter);
+//  else 
+//    ++iter;
+//}
+//
+// end of updates to shapes 
 
 //Shape  s  = tbl_to_shape(iv);
 //

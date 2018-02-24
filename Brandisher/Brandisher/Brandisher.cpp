@@ -91,6 +91,8 @@
 // -todo: use a const operator() in tbl to get the sub table by key
 // -todo: take out debug printing
 
+// todo: change extractKey to use long form db.get() that will return the length
+// todo: debug crashes from refreshing while db is written to rapidly
 // todo: add ability to delete keys 
 // todo: delete with multi-selection and right click menu
 // todo: treat the array as a string if it is u8, i8, (or a string type?) - then show statistics for a string if the string is too long to fit in the gui
@@ -634,7 +636,9 @@ vec_u8     extractDbKey(simdb const& db, str key)
   u64      len = db.len(key, &vlen, &version);          // todo: make ui64 as the input length
 
   vec_u8 ret(vlen);
-  db.get(key.c_str(), ret.data(), vlen);
+  bool ok = db.get(key.c_str(), ret.data(), vlen);
+
+  if( !ok ) return vec_u8();
 
   return ret;
 }
@@ -678,6 +682,9 @@ void       regenTblInfo()
         tree.insert(tblKey, key.str);
 
         tblBuf     = extractDbKey(db, key.str);
+        if(tblBuf.size() < sizeof(tbl::TblFields)){
+          continue;
+        }
         //IvTbl ivTbl(tblBuf.data());
         tbl ivTbl(tblBuf.data());
         tblCache[i][key.str] = tbl(ivTbl);
