@@ -96,9 +96,9 @@ extern "C"
       //f32      ev = gParams("Expected Value");
       //u64   verts = gParams("Vertex Count");
 
-      f32     var = randomf(0.05f, 1.f);
-      f32      ev = randomf(-0.2f, 0.2f);
-      u64   verts = 128;
+      f32     var = randomf(0.01f, 1.f);
+      f32      ev = 0.f;  //randomf(0f, 0.2f);
+      u64   verts = 1024;
 
       tbl gcurve = LavaMakeTbl(lp);
       //PrintTblMem(gcurve);
