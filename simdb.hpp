@@ -107,7 +107,9 @@
 
 */
 
-
+// todo: make simdb give a proper error if running out of space
+// todo: make simdb expand when eighther out of space or initialized with a larger amount of space
+// todo: make simdb len() and get() ignore version numbers for match and only return 
 // todo: make a get function that takes a key version struct
 // todo: make a get function that returns a tbl if tbl.hpp is included
 
@@ -904,7 +906,7 @@ public:
 
     u32   curidx  =  blkIdx;
     VerIdx   nxt  =  nxtBlock(curidx);                              
-    //if(nxt.version!=version){ return MATCH_WRONG_VERSION; }
+    if(nxt.version!=version){ return MATCH_FALSE; }
     
     u32    blksz  =  (u32)blockFreeSize();
     u8*   curbuf  =  (u8*)buf;

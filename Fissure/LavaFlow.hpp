@@ -720,7 +720,7 @@ struct        LavaOut
 };
 struct     LavaPacket
 {
-  u64    ref_count;                               // todo: is this used? 
+  //u64    ref_count;                               // todo: is this used? 
   u64        frame : 55;
   u64       framed :  1;
   u64     priority :  8;
@@ -2263,6 +2263,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
                   {
                     basePkt.frame       =   lf.m_frame;            // increment the frame on every major loop through both data and message nodes - how to know when a full cycle has passed? maybe purely by message nodes - only increment frame if data is created through a message node cycle
                     basePkt.framed      =   false;                 // would this go on the socket?
+                    basePkt.rangeStart  =   0;
+                    basePkt.rangeEnd    =   0;
                     basePkt.src_node    =   nodeId;
                     basePkt.src_slot    =   outArg.key.slot;
                     basePkt.id          =   0;

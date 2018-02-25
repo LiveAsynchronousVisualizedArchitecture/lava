@@ -41,8 +41,14 @@
 // -todo: debug connections showing up on clean load of .lava file, but not after editing graph then loading .lava file - curren node id not being reset? - separate id was being used from FissureData and not the LavaGraph - that id was not being reset
 // -todo: figure out crash when playing after saving
 // -todo: make a gaussian flow node that inputs a tbl with Expected Value and Variance then outputs an IdxVerts tbl
+// -todo: profile - overhead could be seen by taking total time - node times 
+// -todo: print child tables in table printing functions - not as important with the brandisher UI
+// -todo: make a UI element to select the number of threads
+// -todo: make thread UI element 
+// -todo: test with a full number of threads
 
-// todo: test with a full number of threads
+// todo: stop UI mouse events from being used in node graph
+// todo: debug crash with full number of threads - happens within simdb, is it runing out of space? - seems likely - even after initializing with larger blocks and more blocks, the remaining db was the same from being held by another process
 // todo: make sure that the nodes' time percentages are split proportionatly and not all 100%
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: find way to add a tbl to a tbl by reference / direct assignment - should it immediatly copy and flatten()
@@ -66,8 +72,6 @@
 
 // todo: make input slots start at 0 - does there need to be a separation between input and out slots or does there need to be an offset so that the input frame starts at 0 
 // todo: convert tbl to use arrays of the data types smaller than 64 bits
-// todo: profile
-// todo: print child tables in table printing functions
 // todo: make lava memory allocation aligned to 64 byte boundaries
 // todo: come up with locking system so that message nodes have their own threads that are only run when a looping thread visits them - how should memory allocation be done? passing the thread's allocator in the exact same way?
 // todo: prototype API for message nodes
@@ -1379,7 +1383,12 @@ void            scrollCallback(GLFWwindow* window, double xofst, double yofst)
 void         cursorPosCallback(GLFWwindow* window, double x, double y)
 {
   const static float _2PI = 2.f* PIf; //  pi<float>();
-  fd.ui.screen.cursorPosCallbackEvent(x,y);
+  
+  bool used = fd.ui.screen.cursorPosCallbackEvent(x,y);
+  if( !used ){
+    fd.mouse.pos.x = (f32)x;
+    fd.mouse.pos.y = (f32)y;
+  }
 }
 void              charCallback(GLFWwindow* window, unsigned int codepoint)
 {
@@ -1587,133 +1596,150 @@ ENTRY_DECLARATION // main or winmain
     {
       fd.ui.screen.initialize(fd.win, false);
 
-      fd.ui.keyLay   = new BoxLayout(Orientation::Horizontal, Alignment::Fill, 0,10);      //fd.ui.keyLay   = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
-      fd.ui.keyWin   = new  Window(&fd.ui.screen,    "");
-      auto spcr1     = new   Label(fd.ui.keyWin,     "");
-      auto spcr2     = new   Label(fd.ui.keyWin,     "");
-      auto loadBtn   = new  Button(fd.ui.keyWin,      "Load");
-      auto saveBtn   = new  Button(fd.ui.keyWin,      "Save");
-      auto playBtn   = new  Button(fd.ui.keyWin,    "Play >");
-      auto pauseBtn  = new  Button(fd.ui.keyWin,  "Pause ||");
-      auto stopBtn   = new  Button(fd.ui.keyWin,  "Stop |_|");
-      auto nodeBtn   = new  Button(fd.ui.keyWin,  "Create Node");
-      TextBox* nodeTxt   = new TextBox(fd.ui.keyWin,  "");
+      fd.ui.keyLay    = new BoxLayout(Orientation::Horizontal, Alignment::Fill, 0,10);      //fd.ui.keyLay   = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
+      fd.ui.keyWin    = new  Window(&fd.ui.screen,    "");
+      auto spcr1      = new   Label(fd.ui.keyWin,     "");
+      auto spcr2      = new   Label(fd.ui.keyWin,     "");
+      auto loadBtn    = new  Button(fd.ui.keyWin,      "Load");
+      auto saveBtn    = new  Button(fd.ui.keyWin,      "Save");
+      auto playBtn    = new  Button(fd.ui.keyWin,    "Play >");
+      auto pauseBtn   = new  Button(fd.ui.keyWin,  "Pause ||");
+      auto stopBtn    = new  Button(fd.ui.keyWin,  "Stop |_|");
+      auto nodeBtn    = new  Button(fd.ui.keyWin,  "Create Node");
+      auto nodeTxt    = new TextBox(fd.ui.keyWin,  "");
+      //auto thrdsCmbo  = new ComboBox(fd.ui.keyWin);
+      auto thrdsLabel = new   Label(fd.ui.keyWin, toString(fd.threadCount) );
+      auto thrdsSldr  = new  Slider(fd.ui.keyWin);
 
       nodeTxt->setEditable(true);
       nodeTxt->setFixedWidth(250);
       nodeTxt->setAlignment(TextBox::Alignment::Left);
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
 
-      playBtn->setBackgroundColor(  Color(e3f(.15f, .2f,  .15f)) ); 
-      playBtn->setTextColor( Color(e3f(1.f, 1.f, 1.f)) );
-      pauseBtn->setBackgroundColor( Color(e3f(.2f,  .2f,  .15f)) ); 
-      pauseBtn->setEnabled(false);
-      stopBtn->setBackgroundColor(  Color(e3f(.19f, .16f, .17f)) ); 
-      stopBtn->setEnabled(false);
-
-      loadBtn->setCallback([](){ 
-        //stopFlowThreads();
-
-        nfdchar_t *inPath = NULL;
-        nfdresult_t result = NFD_OpenDialog("lava", NULL, &inPath );
-
-        //printf("\n\nfile dialog: %d %s \n\n", result, inPath);
-
-        if(inPath){
-          //bool ok = loadFile(inPath, &fd.grph);
-          bool ok = loadFile(inPath, &fd.lgrph);
-          if(ok) printf("\nFile loaded from %s\n", inPath);
-          else   printf("\nLoad did not read successfully from %s\n", inPath);
-        }
-      });
-      saveBtn->setCallback([](){
-        //fd.grph.normalizeIndices();
-
-        nfdchar_t *outPath = NULL;
-        nfdresult_t result = NFD_SaveDialog("lava", NULL, &outPath );
-        //printf("\n\nfile dialog: %d %s \n\n", result, outPath);
-        if(outPath){
-          //stopFlowThreads();
-          normalizeIndices(); // todo: put this into the save function
-          bool ok = saveFile(fd.lgrph, outPath);
-          if(ok) printf("\nFile Written to %s\n", outPath);
-          else   printf("\nSave did not write successfully to %s\n", outPath);
-        }
-      });
-      playBtn->setCallback([playBtn,pauseBtn,stopBtn](){
-        playBtn->setEnabled(false);
-        playBtn->setTextColor( Color(e3f(1.f, 1.f, 1.f)) );
-        playBtn->setBackgroundColor( Color(e3f(.1f, 1.f, .1f)) ); 
-
-        pauseBtn->setEnabled(true);
-        stopBtn->setEnabled(true);
-        startFlowThreads(1);
-      });
-      pauseBtn->setCallback([playBtn,pauseBtn,stopBtn](){
-        stopFlowThreads();
-        playBtn->setEnabled(true);
-        pauseBtn->setEnabled(false);
-        stopBtn->setEnabled(false);
-      });
-      stopBtn->setCallback([playBtn,pauseBtn,stopBtn](){
-        stopFlowThreads();
-        fd.flow.m_curId.nid = LavaNode::NODE_ERROR;
-        auto         nInsts = fd.lgrph.nodes();
-        for(auto const& n : nInsts){
-          fd.lgrph.setState(n.id.nid, LavaInst::NORMAL);
-        }
-        fd.flow.m_qLck.lock();
-          if(fd.flow.q.size() > 0){
-            auto& pckt = fd.flow.q.top();
-            fd.graph.qPacketBytes = 0;
-            fd.graph.qPacketBytes += pckt.sz_bytes;
-            //fd.flow.q.pop();
-          }
-        fd.flow.m_qLck.unlock();
-        fd.flow.runDestructors();
-        fd.flow.runConstructors();
-
-        playBtn->setEnabled(true);
-        playBtn->setTextColor( Color(e3f(1.f, 1.f, 1.f)) );
-        playBtn->setBackgroundColor(  Color(e3f(.15f, .2f,  .15f)) ); // set play button back to normal
-        pauseBtn->setEnabled(false);
-        stopBtn->setEnabled(false);
-      });
-      nodeBtn->setCallback([nodeTxt]()
+      SECTION(initialize button colors and callbacks)
       {
-        Println("nodeTxt: ", nodeTxt->value());
+        playBtn->setBackgroundColor(  Color(e3f(.15f, .2f,  .15f)) ); 
+        playBtn->setTextColor( Color(e3f(1.f, 1.f, 1.f)) );
+        pauseBtn->setBackgroundColor( Color(e3f(.2f,  .2f,  .15f)) ); 
+        pauseBtn->setEnabled(false);
+        stopBtn->setBackgroundColor(  Color(e3f(.19f, .16f, .17f)) ); 
+        stopBtn->setEnabled(false);
 
-        regex whiteSpace("[ |\t]+");
-        regex whiteSpaceTrail("[ |\t]+$");
+        loadBtn->setCallback([](){ 
+          stopFlowThreads();
 
-        str nodeName = nodeTxt->value();
-        nodeName = regex_replace( nodeName, whiteSpaceTrail, ""); 
-        nodeName = regex_replace( nodeName, whiteSpace, "_"); 
+          nfdchar_t *inPath = NULL;
+          nfdresult_t result = NFD_OpenDialog("lava", NULL, &inPath );
 
-        nodeTxt->setValue( nodeName );
+          if(inPath){
+            bool ok = loadFile(inPath, &fd.lgrph);
+            if(ok) printf("\nFile loaded from %s\n", inPath);
+            else   printf("\nLoad did not read successfully from %s\n", inPath);
+          }
+        });
+        saveBtn->setCallback([](){
+          //fd.grph.normalizeIndices();
 
-        str     nodeDir = "../" + nodeName;
-        create_directory(nodeDir);
-        str      cppPth = nodeDir+"/"+nodeName+".cpp";
-        str   vcprojPth = nodeDir+"/"+nodeName+".vcxproj";
+          nfdchar_t *outPath = NULL;
+          nfdresult_t result = NFD_SaveDialog("lava", NULL, &outPath );
+          //printf("\n\nfile dialog: %d %s \n\n", result, outPath);
+          if(outPath){
+            //stopFlowThreads();
+            normalizeIndices(); // todo: put this into the save function
+            bool ok = saveFile(fd.lgrph, outPath);
+            if(ok) printf("\nFile Written to %s\n", outPath);
+            else   printf("\nSave did not write successfully to %s\n", outPath);
+          }
+        });
+        playBtn->setCallback([playBtn,pauseBtn,stopBtn](){
+          playBtn->setEnabled(false);
+          playBtn->setTextColor( Color(e3f(1.f, 1.f, 1.f)) );
+          playBtn->setBackgroundColor( Color(e3f(.1f, 1.f, .1f)) ); 
+
+          pauseBtn->setEnabled(true);
+          stopBtn->setEnabled(true);
+          startFlowThreads( fd.threadCount );
+        });
+        pauseBtn->setCallback([playBtn,pauseBtn,stopBtn](){
+          stopFlowThreads();
+          playBtn->setEnabled(true);
+          pauseBtn->setEnabled(false);
+          stopBtn->setEnabled(false);
+        });
+        stopBtn->setCallback([playBtn,pauseBtn,stopBtn](){
+          stopFlowThreads();
+          fd.flow.m_curId.nid = LavaNode::NODE_ERROR;
+          auto         nInsts = fd.lgrph.nodes();
+          for(auto const& n : nInsts){
+            fd.lgrph.setState(n.id.nid, LavaInst::NORMAL);
+          }
+          fd.flow.m_qLck.lock();
+            if(fd.flow.q.size() > 0){
+              auto& pckt = fd.flow.q.top();
+              fd.graph.qPacketBytes = 0;
+              fd.graph.qPacketBytes += pckt.sz_bytes;
+              //fd.flow.q.pop();
+            }
+          fd.flow.m_qLck.unlock();
+          fd.flow.runDestructors();
+          fd.flow.runConstructors();
+
+          playBtn->setEnabled(true);
+          playBtn->setTextColor( Color(e3f(1.f, 1.f, 1.f)) );
+          playBtn->setBackgroundColor(  Color(e3f(.15f, .2f,  .15f)) ); // set play button back to normal
+          pauseBtn->setEnabled(false);
+          stopBtn->setEnabled(false);
+        });
+        nodeBtn->setCallback([nodeTxt]()
+        {
+          Println("nodeTxt: ", nodeTxt->value());
+
+          regex whiteSpace("[ |\t]+");
+          regex whiteSpaceTrail("[ |\t]+$");
+
+          str nodeName = nodeTxt->value();
+          nodeName = regex_replace( nodeName, whiteSpaceTrail, ""); 
+          nodeName = regex_replace( nodeName, whiteSpace, "_"); 
+
+          nodeTxt->setValue( nodeName );
+
+          str     nodeDir = "../" + nodeName;
+          create_directory(nodeDir);
+          str      cppPth = nodeDir+"/"+nodeName+".cpp";
+          str   vcprojPth = nodeDir+"/"+nodeName+".vcxproj";
         
-        FILE*    cppHndl = fopen(cppPth.c_str(),    "wb");
-        if(!cppHndl) return;
+          FILE*    cppHndl = fopen(cppPth.c_str(),    "wb");
+          if(!cppHndl) return;
 
-        FILE* vcprojHndl = fopen(vcprojPth.c_str(), "wb");
-        if(!vcprojHndl) return;
+          FILE* vcprojHndl = fopen(vcprojPth.c_str(), "wb");
+          if(!vcprojHndl) return;
 
-        str    cppFile = regex_replace( Template_cpp,     regex("\\|_NAME_\\|"), nodeName);
-        str vcprojFile = regex_replace( Template_vcxproj, regex("\\|_NAME_\\|"), nodeName);
+          str    cppFile = regex_replace( Template_cpp,     regex("\\|_NAME_\\|"), nodeName);
+          str vcprojFile = regex_replace( Template_vcxproj, regex("\\|_NAME_\\|"), nodeName);
 
-        fwrite(cppFile.c_str(),     1, cppFile.length(),        cppHndl);                   // don't want to write the '\0' null character at the end of the string into the file
-        fwrite(vcprojFile.c_str(),  1, vcprojFile.length(),  vcprojHndl);
+          fwrite(cppFile.c_str(),     1, cppFile.length(),        cppHndl);                   // don't want to write the '\0' null character at the end of the string into the file
+          fwrite(vcprojFile.c_str(),  1, vcprojFile.length(),  vcprojHndl);
 
-        fclose(cppHndl);
-        fclose(vcprojHndl);
+          fclose(cppHndl);
+          fclose(vcprojHndl);
 
-        nodeTxt->setValue("");
-      });
+          nodeTxt->setValue("");
+        });
+      }
+      SECTION(initialize thread controls)
+      {
+        auto hardThreads = thread::hardware_concurrency();
+
+        thrdsSldr->setFixedWidth(200);
+        thrdsSldr->setRange( {1.f, (f32)hardThreads} );
+        thrdsSldr->setCallback( [thrdsLabel, thrdsSldr](f32 i){
+          if( (i32)i != fd.threadCount ){
+            fd.threadCount = (i32)i;
+            thrdsSldr->setValue( (f32)fd.threadCount );
+            thrdsLabel->setCaption( toString(fd.threadCount) );
+          }
+        });
+      }
 
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
 
@@ -1757,7 +1783,7 @@ ENTRY_DECLARATION // main or winmain
     {
       reloadSharedLibs();
 
-      new (&fisdb)     simdb("Fissure", 256, 2<<10);
+      new (&fisdb)     simdb("Fissure", 4096, 1<<16);     // 4096 * 65,536 = 268,435,456
       new (&fd.vizIds) AtmSet( LavaId().asInt );
       fd.flow.packetCallback = lavaPacketCallback;
       LavaInit();
@@ -1769,7 +1795,8 @@ ENTRY_DECLARATION // main or winmain
   {
     auto&      g = fd.lgrph;
     v2      pntr = {0,0};
-    f64 cx, cy, t, dt, avgFps=60, prevt=0, cpuTime=0;
+    //f64 cx, cy, t, dt, avgFps=60, prevt=0, cpuTime=0;
+    f64 t, dt, avgFps=60, prevt=0, cpuTime=0;
     f32 pxRatio;
     int fbWidth, fbHeight;
 
@@ -1792,10 +1819,11 @@ ENTRY_DECLARATION // main or winmain
       SECTION(input)
       {
         glfwPollEvents();                                             // PollEvents must be done after zeroing out the deltas
-  	    glfwGetCursorPos(fd.win, &cx, &cy);
+  	    //glfwGetCursorPos(fd.win, &cx, &cy);
 
         fd.ui.prevPntr = pntr;
-        pntr=Vec2((float)cx, (float)cy);
+        //pntr=Vec2((float)cx, (float)cy);
+        pntr = ms.pos;
 
 		    glfwGetWindowSize(fd.win, &fd.ui.w, &fd.ui.h);
 		    glfwGetFramebufferSize(fd.win, &fbWidth, &fbHeight);
@@ -2342,6 +2370,22 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+//vecstr labels;
+//TO(hardThreads, i){ 
+//  labels.push_back( toString("Threads: ",i+1) );
+//}
+//thrdsCmbo->setItems( labels );
+//thrdsCmbo->setCallback( [](int i){ fd.threadCount = i+1; } );
+//
+//auto preferSz = thrdsSldr->preferredSize();
+//preferSz.w() *= 2;
+//thrdsSldr->setWidth(300);
+
+//printf("\n\nfile dialog: %d %s \n\n", result, inPath);
+//
+//bool ok = loadFile(inPath, &fd.grph);
 
 //GraphDB g;
 //fd.lgrph.clear();

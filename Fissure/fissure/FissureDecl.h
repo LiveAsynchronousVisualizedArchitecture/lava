@@ -221,12 +221,13 @@ struct FisData
   using PacketSlots  =  std::unordered_set<LavaId, LavaId>;       // uses LavaId as the hashing function object
 
 
-  u64                 nxtId = 1;
+  u64                 nxtId = 1;                                  // todo: take out if not used
   GLFWwindow*           win = nullptr;                            // Platform 
   LavaFlow             flow;
   LavaGraph&          lgrph = flow.graph;
   vec_thrd      flowThreads;
   AtmSet             vizIds;
+  i32           threadCount = 1;
 
   struct Graph
   {
@@ -302,6 +303,8 @@ struct FisData
     bool            prevDrgbox = false;
     bool                 drgNd = false;
     Bnd                 drgbnd;
+
+    v2                     pos;
   }       mouse;
   struct 
   {

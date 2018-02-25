@@ -90,8 +90,9 @@
 // -todo: investigate crash while visualizing multiple tables in a running graph
 // -todo: try querying keys to see if they are missing instead of using the keys vector from db.getKey  
 // -todo: move new types and statics to files made for them
+// -todo: test further for crashes
 
-// todo: test further for crashes
+// todo: test with all threads running in fissure
 
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
@@ -586,14 +587,12 @@ void                refreshDB(VizData* vd)
   auto dbKeys = db.getKeyStrs();                                      // Get all keys in DB - this will need to be ran in the main loop, but not every frame
   dbKeys      = shapesFromKeys(db, move(dbKeys), vd);
   u32 erased  = eraseMissingKeys(&vd->shapes);
-  //dbKeys      = eraseMissingKeys(move(dbKeys), &vd->shapes);
   sort(ALL(dbKeys));
   sort(ALL(vd->ui.dbIdxs));                                                  // sort the indices so the largest are removed first and the smaller indices don't change their position
 
   SECTION(lock the ui_mutex and update the ui with the new buttons)
   {
   LockGuard ui_guard(ui_mutex);
-    //FROM(vd->ui.dbIdxs.size(), i){ vd->ui.keyWin->childAt(i)->setVisible(false);  }
     FROM(vd->ui.dbIdxs.size(), i){ 
       vd->ui.keyWin->childAt(i)->setVisible(false);
       vd->ui.keyWin->childAt(i)->setEnabled(false);
@@ -614,7 +613,6 @@ void                refreshDB(VizData* vd)
     }
     vd->ui.screen.mDragActive = false;
     vd->ui.screen.mDragWidget = nullptr;
-    //vd->ui.screen.mFocusPath.clear();
     vd->ui.keyWin->mDrag      = false;
     vd->ui.screen.performLayout();
   }
@@ -1050,10 +1048,6 @@ ENTRY_DECLARATION
       }
 
       PRINT_GL_ERRORS
-
-      //vd.camera.mouseDelta = vec2(0,0);
-      //vd.camera.btn2Delta  = vec2(0,0);
-      //glfwPollEvents();                                             // PollEvents must be done after zeroing out the deltas
     }
     SECTION(input)
     {
@@ -1223,6 +1217,14 @@ ENTRY_DECLARATION
 
 
 
+
+//vd.camera.mouseDelta = vec2(0,0);
+//vd.camera.btn2Delta  = vec2(0,0);
+//glfwPollEvents();                                             // PollEvents must be done after zeroing out the deltas
+
+//vd->ui.screen.mFocusPath.clear();
+//
+//dbKeys      = eraseMissingKeys(move(dbKeys), &vd->shapes);
 
 //if( !kv.second.owner ){
 //  it = shps->erase(it);

@@ -98,14 +98,11 @@ extern "C"
 
       f32     var = randomf(0.01f, 1.f);
       f32      ev = 0.f;  //randomf(0f, 0.2f);
-      u64   verts = 1024;
+      u64   verts = 16;
 
       tbl gcurve = LavaMakeTbl(lp);
-      //PrintTblMem(gcurve);
       gcurve("type") = tbl::StrToInt("IdxVerts");
-      //PrintTblMem(gcurve);
       gcurve("mode") = (u64)0; // GL_POINTS for now                                   // needs to be openGL lines - GL_LINES - 0x01
-      //PrintTblMem(gcurve);
 
       tbl ind(verts*2 - 1, (u32)0u);
       tbl  px(verts, 0.f);
@@ -132,7 +129,6 @@ extern "C"
       gcurve("colors green") = &cg;
       gcurve("indices")      = &ind;
       gcurve.flatten();
-      //PrintTblMem(gcurve);
 
       out->push( LavaTblToOut(gcurve, GAUSS_IDXVERTS_OUT) );      // this demonstrates how to output a tbl into the first output slot
     }
@@ -172,6 +168,8 @@ extern "C"
 
 
 
+//
+//PrintTblMem(gcurve);
 
 //u32   verts = 8;
 //
