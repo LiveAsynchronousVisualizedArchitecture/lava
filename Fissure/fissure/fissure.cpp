@@ -46,8 +46,8 @@
 // -todo: make a UI element to select the number of threads
 // -todo: make thread UI element 
 // -todo: test with a full number of threads
+// -todo: stop UI mouse events from being used in node graph
 
-// todo: stop UI mouse events from being used in node graph
 // todo: debug crash with full number of threads - happens within simdb, is it runing out of space? - seems likely - even after initializing with larger blocks and more blocks, the remaining db was the same from being held by another process
 // todo: make sure that the nodes' time percentages are split proportionatly and not all 100%
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
@@ -1607,7 +1607,6 @@ ENTRY_DECLARATION // main or winmain
       auto stopBtn    = new  Button(fd.ui.keyWin,  "Stop |_|");
       auto nodeBtn    = new  Button(fd.ui.keyWin,  "Create Node");
       auto nodeTxt    = new TextBox(fd.ui.keyWin,  "");
-      //auto thrdsCmbo  = new ComboBox(fd.ui.keyWin);
       auto thrdsLabel = new   Label(fd.ui.keyWin, toString(fd.threadCount) );
       auto thrdsSldr  = new  Slider(fd.ui.keyWin);
 
@@ -2371,6 +2370,9 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+//
+//auto thrdsCmbo  = new ComboBox(fd.ui.keyWin);
 
 //vecstr labels;
 //TO(hardThreads, i){ 
