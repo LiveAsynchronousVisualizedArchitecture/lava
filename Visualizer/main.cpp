@@ -315,21 +315,24 @@ void         mouseBtnCallback(GLFWwindow* window, int button, int action, int mo
 
   vd->ui.showGuide = false;
 
-  if(button==GLFW_MOUSE_BUTTON_LEFT){
-    if(action==GLFW_PRESS) vd->camera.leftButtonDown = true;
-    else if(action==GLFW_RELEASE) vd->camera.leftButtonDown = false;
-  }
+  bool used = false;
+  if(!uiChanged)
+    used = vd->ui.screen.mouseButtonCallbackEvent(button, action, mods);
 
-  if(button==GLFW_MOUSE_BUTTON_RIGHT){
-    if(action==GLFW_PRESS) vd->camera.rightButtonDown = true;
-    else if(action==GLFW_RELEASE){
-      vd->camera.rightButtonDown = false;
+  if( !used )
+  {
+    if(button==GLFW_MOUSE_BUTTON_LEFT){
+      if(action==GLFW_PRESS) vd->camera.leftButtonDown = true;
+      else if(action==GLFW_RELEASE) vd->camera.leftButtonDown = false;
+    }
+
+    if(button==GLFW_MOUSE_BUTTON_RIGHT){
+      if(action==GLFW_PRESS) vd->camera.rightButtonDown = true;
+      else if(action==GLFW_RELEASE){
+        vd->camera.rightButtonDown = false;
+      }
     }
   }
-
-  if(!uiChanged)
-    vd->ui.screen.mouseButtonCallbackEvent(button, action, mods);
-
 }
 void        cursorPosCallback(GLFWwindow* window, double x, double y)
 {
@@ -590,7 +593,13 @@ void                refreshDB(VizData* vd)
   SECTION(lock the ui_mutex and update the ui with the new buttons)
   {
   LockGuard ui_guard(ui_mutex);
-    FROM(vd->ui.dbIdxs.size(), i){ vd->ui.keyWin->removeChild(vd->ui.dbIdxs[i]); }
+    //FROM(vd->ui.dbIdxs.size(), i){ vd->ui.keyWin->childAt(i)->setVisible(false);  }
+    FROM(vd->ui.dbIdxs.size(), i){ 
+      vd->ui.keyWin->childAt(i)->setVisible(false);
+      vd->ui.keyWin->childAt(i)->setEnabled(false);
+      vd->ui.keyWin->removeChild(vd->ui.dbIdxs[i]);
+    }
+    
     vd->ui.dbIdxs.resize(0);
     vd->ui.dbIdxs.shrink_to_fit();
     for(auto const& kv : vd->shapes)                                              // add the buttons back and keep track of their indices
@@ -606,6 +615,7 @@ void                refreshDB(VizData* vd)
     vd->ui.screen.mDragActive = false;
     vd->ui.screen.mDragWidget = nullptr;
     //vd->ui.screen.mFocusPath.clear();
+    vd->ui.keyWin->mDrag      = false;
     vd->ui.screen.performLayout();
   }
 
