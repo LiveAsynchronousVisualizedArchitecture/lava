@@ -62,7 +62,7 @@ static float get_pixel_ratio(GLFWwindow *window) {
     if (GetDpiForMonitor_) {
         uint32_t dpiX, dpiY;
         if (GetDpiForMonitor_(monitor, 0 /* effective DPI */, &dpiX, &dpiY) == S_OK)
-            return std::round(dpiX / 96.0);
+            return (float)std::round(dpiX / 96.0); // sbassett cast to float to avoid warning
     }
     return 1.f;
 #elif defined(__linux__)
@@ -424,7 +424,7 @@ void Screen::drawWidgets() {
                 h = (int)( (bounds[2] - bounds[0]) / 2 );
             }
             nvgGlobalAlpha(mNVGContext,
-                           std::min(1.0, 2 * (elapsed - 0.5f)) * 0.8);
+                           (float)std::min(1.0, 2.f * (elapsed - 0.5f)) * 0.8f); // sbassett cast to float to avoid warning
 
             nvgBeginPath(mNVGContext);
             nvgFillColor(mNVGContext, Color(0, 255));

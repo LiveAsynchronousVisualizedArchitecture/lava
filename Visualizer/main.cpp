@@ -912,7 +912,7 @@ ENTRY_DECLARATION
     SECTION(static VizData)
     {
       vd.ui.w             = 1024; 
-      vd.ui.h             = 1024;
+      vd.ui.h             =  768;
       vd.ui.ptSz          =    0.25f;
       vd.ui.hudSz         =   16.0f;
       vd.ui.guideSz       =   32.0f;

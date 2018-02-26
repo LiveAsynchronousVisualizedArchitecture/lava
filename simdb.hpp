@@ -466,7 +466,9 @@ public:
     Head  curHead, nxtHead;
     curHead.asInt  =  s_h->load();
     do{
-      if(curHead.idx==LIST_END){return LIST_END;}
+      if(curHead.idx==LIST_END){
+        return LIST_END;
+      }
 
       nxtHead.idx  =  s_lv[curHead.idx];
       nxtHead.ver  =  curHead.ver==NXT_VER_SPECIAL? 1  :  curHead.ver+1;
@@ -604,13 +606,17 @@ public:
     BlkLst*     bl  =  &s_bls[blkIdx];
     au32* areaders  =  (au32*)&(bl->kr);
     cur.asInt       =  areaders->load();
+    if(bl->version!=version){ return false; }
     do{
       doDelete = false;
-      if(bl->version!=version){ return false; }
       nxt          = cur;
       if(del){
-        if(cur.readers==0 && !cur.isDeleted){ doDelete=true; }
-        nxt.isDeleted = true;
+        if(cur.isDeleted){ return true; }
+        if(cur.readers==0){
+          doDelete      = true; 
+          nxt.isDeleted = true;
+        }
+        //if(cur.readers==0 && !cur.isDeleted){ doDelete=true; }
       }else{
         if(cur.readers==1 &&  cur.isDeleted){ doDelete=true; }
         nxt.readers  -= 1;    
@@ -657,13 +663,24 @@ private:
   {
     u32 cur=blkIdx, prev=blkIdx;
     while(cur != LIST_END){
-      s_bls[prev].version = version;
       prev = cur;
+      s_bls[cur].version = version;
       cur  = s_bls[cur].idx;
     }
 
     return prev;
   }
+  //u32 findEndSetVersion(u32  blkIdx, u32 version)  const                  // find the last BlkLst slot in the linked list of blocks to free 
+  //{
+  //  u32 cur=blkIdx, prev=blkIdx;
+  //  while(cur != LIST_END){
+  //    s_bls[prev].version = version;
+  //    prev = cur;
+  //    cur  = s_bls[cur].idx;
+  //  }
+  //
+  //  return prev;
+  //}
   void           doFree(u32  blkIdx)  const                                                // frees a list/chain of blocks - don't need to zero out the memory of the blocks or reset any of the BlkLsts' variables since they will be re-initialized anyway
   {
     u32 listEnd  =  findEndSetVersion(blkIdx, 0); 
@@ -736,7 +753,11 @@ public:
       for(u32 i=0; i<blocks-1; ++i)
       {
         nxt = s_cl.nxt();
-        if(nxt==LIST_END){ free(st, ver); VerIdx empty={LIST_END,0}; return empty; } // todo: will this free the start  if the start was never set? - will it just reset the blocks but free the index?
+        if(nxt==LIST_END){ 
+          free(st, ver); 
+          VerIdx empty={LIST_END,0}; 
+          return empty; 
+        } // todo: will this free the start if the start was never set? - will it just reset the blocks but free the index?
 
         s_bls[cur] = BlkLst(false, 0, nxt, ver, size);
         cur        = nxt;

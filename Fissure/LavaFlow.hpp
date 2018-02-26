@@ -1816,6 +1816,8 @@ void                printdb(simdb const& db)
   
   Println("size: ", db.size());
 
+  
+
   std::vector<i8> memv(db.memsize(), 0);
   memcpy( (void*)memv.data(), db.mem(), db.memsize() );
 

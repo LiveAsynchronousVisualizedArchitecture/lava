@@ -49,6 +49,8 @@
 // -todo: stop UI mouse events from being used in node graph
 
 // todo: debug crash with full number of threads - happens within simdb, is it runing out of space? - seems likely - even after initializing with larger blocks and more blocks, the remaining db was the same from being held by another process
+//       | happens with only 2 threads but not 1 thread
+//       | seems to need the table size to exceed the block size of the db
 // todo: make sure that the nodes' time percentages are split proportionatly and not all 100%
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: find way to add a tbl to a tbl by reference / direct assignment - should it immediatly copy and flatten()
@@ -1738,6 +1740,7 @@ ENTRY_DECLARATION // main or winmain
             thrdsLabel->setCaption( toString(fd.threadCount) );
           }
         });
+        thrdsSldr->setValue(1.f);
       }
 
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
@@ -1782,7 +1785,10 @@ ENTRY_DECLARATION // main or winmain
     {
       reloadSharedLibs();
 
-      new (&fisdb)     simdb("Fissure", 4096, 1<<16);     // 4096 * 65,536 = 268,435,456
+      new (&fisdb)     simdb("Fissure", 256, 1<<5);     // 4096 * 65,536 = 268,435,456
+
+      printdb(fisdb);
+
       new (&fd.vizIds) AtmSet( LavaId().asInt );
       fd.flow.packetCallback = lavaPacketCallback;
       LavaInit();
@@ -2215,7 +2221,7 @@ ENTRY_DECLARATION // main or winmain
 
               if(cnt==1)
               {
-                Slot const& dest = fd.graph.slots.find(destIdx)->second;
+                Slot const& dest = fd.graph.slots.find(destIdx)->second; // todo: check for end() here?
                 f32 w = fd.graph.nds[destIdx.nid].b.w();
 
                 cnct_draw(vg, srcP, dest.P, srcN, dest.N, w/2);
@@ -2370,6 +2376,10 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+//thrdsSldr->requestFocus();
+//thrdsSldr->setFocused(true);
+//thrdsSldr->setVisible(true);
 
 //
 //auto thrdsCmbo  = new ComboBox(fd.ui.keyWin);
