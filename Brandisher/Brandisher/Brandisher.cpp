@@ -386,22 +386,30 @@ void   printdb(simdb const& db)
 {
   using namespace std;
 
-  Println("size: ", db.size());
+  Println("\n\nSize: ", db.size());
 
-  
-
-  std::vector<i8> memv(db.memsize(), 0);
-  memcpy( (void*)memv.data(), db.mem(), db.memsize() );
-
-  Println("\n");
-
-  u64 blksz = db.blockSize();
-  TO(memv.size(),i){ 
-    if(i % blksz == 0){
-      putc('|', stdout);
-    }
-    putc(memv[i] ,stdout);
+  TO(db.s_ch.size(),i){ 
+    simdb::VerIdx vi = db.s_ch.at( (u32)i );
+    if(vi.idx == simdb::EMPTY)
+      Print("|EMPTY ",vi.version,"|  ");
+    else if(vi.idx == simdb::DELETED)
+      Print("|DELETED ",vi.version,"|  ");
+    else
+      Print("|",vi.idx," ",vi.version,"|  ");
   }
+
+  //std::vector<i8> memv(db.memsize(), 0);
+  //memcpy( (void*)memv.data(), db.mem(), db.memsize() );
+
+  //Println("\n");
+
+  //u64 blksz = db.blockSize();
+  //TO(memv.size(),i){ 
+  //  if(i % blksz == 0){
+  //    putc('|', stdout);
+  //  }
+  //  putc(memv[i] ,stdout);
+  //}
 }
 
 template<class T> MnMx<T> calcMnMx(tbl const& t)

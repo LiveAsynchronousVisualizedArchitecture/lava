@@ -107,6 +107,7 @@
 
 */
 
+// todo: change the Match enum to be an bit bitfield with flags
 // todo: check what happens when the same key but different versions are inserted - do two different versions end up in the DB? does one version end up undeletable ? 
 // todo: check path of thread that deletes a key, make sure it replaces the index in the hash map - how do two conflicting indices in the hash map resolve? the thread that replaces needs to delete the old allocation using the version - is the version / deleted flag being changed atomically in the block list 
 // todo: make simdb give a proper error if running out of space
@@ -205,7 +206,7 @@
 #endif
 
 namespace {
-  enum Match { MATCH_FALSE=0, MATCH_TRUE=1, MATCH_REMOVED = -1, MATCH_WRONG_VERSION = -2  };
+  enum Match { MATCH_FALSE=0, MATCH_TRUE=1, MATCH_REMOVED = -1, MATCH_TRUE_WRONG_VERSION = -2  };
 
   template<class T>
   class lava_noop
@@ -951,18 +952,23 @@ public:
     if(blklstHsh!=hash){ return MATCH_FALSE; }                         // vast majority of calls should end here
 
     u32   curidx  =  blkIdx;
-    VerIdx   nxt  =  nxtBlock(curidx);                              
-    if(nxt.version!=version){ return MATCH_FALSE; }
+    VerIdx   nxt  =  nxtBlock(curidx);               
+    bool   verOk  =  nxt.version != version;
+    //if(nxt.version!=version){ return MATCH_FALSE; }
     
     u32    blksz  =  (u32)blockFreeSize();
     u8*   curbuf  =  (u8*)buf;
-    auto    klen  =  s_bls[blkIdx].klen;                            if(klen!=len){ return MATCH_FALSE; }
+    auto    klen  =  s_bls[blkIdx].klen;                            
+    if(klen!=len){ return MATCH_FALSE; }
+    
     auto  curlen  =  len;
     while(true)
     {
       auto p = blockFreePtr(curidx);
       if(blksz > curlen){
-        return memcmpBlk(curidx, version, curbuf, p, curlen);
+        Match cmpBlk = memcmpBlk(curidx, version, curbuf, p, curlen);                   // here was the only place where it could return true
+        if(cmpBlk != MATCH_TRUE) return MATCH_FALSE;
+        return verOk? MATCH_TRUE  :  MATCH_TRUE_WRONG_VERSION;
       }else{
         Match cmp = memcmpBlk(curidx, version, curbuf, p, blksz);   if(cmp!=MATCH_TRUE){ return cmp; }
       }
@@ -970,7 +976,10 @@ public:
       curbuf  +=  blksz;
       curlen  -=  blksz;
       curidx   =  nxt.idx;
-      nxt      =  nxtBlock(curidx);                                 if(nxt.version!=version){ return MATCH_FALSE; }
+      nxt      =  nxtBlock(curidx);                                 
+      
+      verOk   &=  nxt.version != version;
+      //if(nxt.version!=version){ return MATCH_FALSE; }
     }
   }
   u32           len(u32  blkIdx, u32 version, u32* out_vlen=nullptr) const
@@ -1156,12 +1165,13 @@ public:
         }                                                                                   // retry the same loop again if a good slot was found but it was changed by another thread between the load and the compare-exchange
       }                                                                                     // Either we just added the key, or another thread did.
 
-      if(m_csp->compare(vi.idx,vi.version,key,klen,hash) != MATCH_TRUE){
+      Match cmp = m_csp->compare(vi.idx,vi.version,key,klen,hash);
+      if(cmp==MATCH_FALSE || cmp==MATCH_REMOVED){
         if(i==en){return empty;}
         else{continue;}
       }
 
-      bool success = cmpex_vi(i, vi, desired);
+      bool success = cmpex_vi(i, vi, desired);  // this should be hit even when the the versions don't match, since m_csp->compare() will return MATCH_TRUE_WRONG_VERSION
       if(success){ 
         return vi;
       }else{ 
@@ -1321,7 +1331,6 @@ public:
     else       return VerIdx(lo32(cur), hi32(cur));
   }
   u32         nxtIdx(u32 i) const { return (i+1)%m_sz; }
-  //u32        prevIdx(u32 i) const { return std::min(i-1, m_sz-1); }        // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap
   u32        prevIdx(u32 i) const { using namespace std; return min(i-1, m_sz-1); }        // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap - syntax errors and possible windows min/max macros make this less problematic than std::min() 
 
 };
@@ -1545,7 +1554,7 @@ public:
   using  VerIdx  =  CncrHsh::VerIdx;
   using  string  =  std::string;
 
-private:
+//private:
   au32*      s_flags;
   au32*      s_cnt;
   au64*      s_blockSize;
@@ -1981,3 +1990,8 @@ public:
 #endif
 
 
+
+
+
+
+//u32        prevIdx(u32 i) const { return std::min(i-1, m_sz-1); }        // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap
