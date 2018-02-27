@@ -107,6 +107,8 @@
 
 */
 
+// todo: check what happens when the same key but different versions are inserted - do two different versions end up in the DB? does one version end up undeletable ? 
+// todo: check path of thread that deletes a key, make sure it replaces the index in the hash map - how do two conflicting indices in the hash map resolve? the thread that replaces needs to delete the old allocation using the version - is the version / deleted flag being changed atomically in the block list 
 // todo: make simdb give a proper error if running out of space
 // todo: make simdb expand when eighther out of space or initialized with a larger amount of space
 // todo: make simdb len() and get() ignore version numbers for match and only return 
@@ -476,6 +478,23 @@ public:
 
     return curHead.idx;
   }
+  u32        nxt(u32 prev)                                                             // moves forward in the list and return the previous index
+  {
+    Head  curHead, nxtHead;
+    curHead.asInt  =  s_h->load();
+    do{
+      if(curHead.idx==LIST_END){
+        return LIST_END;
+      }
+
+      nxtHead.idx  =  s_lv[curHead.idx];
+      nxtHead.ver  =  curHead.ver==NXT_VER_SPECIAL? 1  :  curHead.ver+1;
+    }while( !s_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
+
+    s_lv[prev] = curHead.idx;
+
+    return curHead.idx;
+  }
   u32        free(u32 idx)                                                    // not thread safe when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway, since the CncrHsh will already have the index taken out and the free will only be triggered after the last reader has read from it 
   {
     Head curHead, nxtHead; u32 retIdx;
@@ -685,6 +704,11 @@ private:
   {
     u32 listEnd  =  findEndSetVersion(blkIdx, 0); 
     s_cl.free(blkIdx, listEnd);
+
+    // doesn't work - LIST_END only works for allocation
+    //u32 cur = blkIdx;
+    //while(cur != LIST_END)
+    //  cur = s_cl.free(cur);
   }
   u32        writeBlock(u32  blkIdx, void const* const bytes, u32 len=0, u32 ofst=0)       // don't need to increment readers since write should be done before the block is exposed to any other threads
   {
@@ -752,7 +776,7 @@ public:
     {
       for(u32 i=0; i<blocks-1; ++i)
       {
-        nxt = s_cl.nxt();
+        nxt = s_cl.nxt(cur);
         if(nxt==LIST_END){ 
           free(st, ver); 
           VerIdx empty={LIST_END,0}; 
@@ -760,6 +784,7 @@ public:
         } // todo: will this free the start if the start was never set? - will it just reset the blocks but free the index?
 
         s_bls[cur] = BlkLst(false, 0, nxt, ver, size);
+        //s_cl[cur]  = nxt;
         cur        = nxt;
         ++cnt;
       }
@@ -1122,7 +1147,7 @@ public:
     {
       VerIdx vi = load(i);
       if(vi.idx>=DELETED){                                                                  // it is either deleted or empty
-        bool success = cmpex_vi(i, vi, desired);
+        bool success = cmpex_vi(i, vi, desired);           
         if(success){
           return vi;
         }else{ 

@@ -62,7 +62,8 @@ public:
 protected:
     /// Internal helper function to maintain nested window position values; overridden in \ref Popup
     virtual void refreshRelativePlacement();
-protected:
+//protected:
+public:  // sbassett
     std::string mTitle;
     Widget *mButtonPanel;
     bool mModal;

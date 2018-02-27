@@ -382,6 +382,28 @@ Viz        viz;
 
 namespace {
 
+void   printdb(simdb const& db)
+{
+  using namespace std;
+
+  Println("size: ", db.size());
+
+  
+
+  std::vector<i8> memv(db.memsize(), 0);
+  memcpy( (void*)memv.data(), db.mem(), db.memsize() );
+
+  Println("\n");
+
+  u64 blksz = db.blockSize();
+  TO(memv.size(),i){ 
+    if(i % blksz == 0){
+      putc('|', stdout);
+    }
+    putc(memv[i] ,stdout);
+  }
+}
+
 template<class T> MnMx<T> calcMnMx(tbl const& t)
 {
   using namespace std;
@@ -531,7 +553,7 @@ str         makeStatStr(tbl const& t)
     return "";
   }
 }
-str         valStr(tbl::KV const& kv)
+str              valStr(tbl::KV const& kv)
 {
   switch(kv.type)
   {
@@ -738,7 +760,7 @@ tbl          tblFromKey(str key)
     return ret;
   }else{ return ret; }
 }
-tbl*     setCurTblFromTreeKey(str key)  // set current table from tree key
+tbl*    setCurTblFromTreeKey(str key)  // set current table from tree key
 {
   //if( !isTableKey(key) ) return nullptr;
 
@@ -896,6 +918,7 @@ int  main()
     mb.create(fm);
     mb.push_back("&File");
     mb.push_back("&Help");
+    //mb.push_back("&Print Database");
     mb.caption("menu wat");
     mb.enabled(true);
 
@@ -948,6 +971,12 @@ int  main()
     helpMenu.append("&About", [](auto& itmprxy){
       cout << "About pressed" << endl;
     });
+
+    //auto& printMenu = mb.at(2);
+    helpMenu.append("&Print Database", [](auto& itmprxy){
+      printdb( dbs[1] );
+    });
+
 
     mb.show();
   }

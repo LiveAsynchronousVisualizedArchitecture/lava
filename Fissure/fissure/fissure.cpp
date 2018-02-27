@@ -47,12 +47,16 @@
 // -todo: make thread UI element 
 // -todo: test with a full number of threads
 // -todo: stop UI mouse events from being used in node graph
+// -todo: add tool tips to thread controls and node creation text box
 
+// todo: debug why visualizer shows no tables and brandisher shows only a key
 // todo: debug crash with full number of threads - happens within simdb, is it runing out of space? - seems likely - even after initializing with larger blocks and more blocks, the remaining db was the same from being held by another process
 //       | happens with only 2 threads but not 1 thread
 //       | seems to need the table size to exceed the block size of the db
+//       | possibly because concurrent lists were not being chained correctly when multiple threads might have broken up the original ordering
 // todo: make sure that the nodes' time percentages are split proportionatly and not all 100%
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
+// todo: add tool tips to node buttons containing the description string of the node
 // todo: find way to add a tbl to a tbl by reference / direct assignment - should it immediatly copy and flatten()
 // todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets - use blue 'sunshine' lines going out from the center like a snowflake
 // todo: make a settings file that is read on load if it in the same directory
@@ -256,6 +260,7 @@ static FisData    fd;
 static simdb   fisdb;
 
 namespace{
+
 
 float               lerp(float p, float lo, float hi)
 {
@@ -1612,11 +1617,14 @@ ENTRY_DECLARATION // main or winmain
       auto thrdsLabel = new   Label(fd.ui.keyWin, toString(fd.threadCount) );
       auto thrdsSldr  = new  Slider(fd.ui.keyWin);
 
-      nodeTxt->setEditable(true);
-      nodeTxt->setFixedWidth(250);
-      nodeTxt->setAlignment(TextBox::Alignment::Left);
-      fd.ui.keyWin->setLayout(fd.ui.keyLay);
-
+      SECTION(set up the text box that contains the name of a new node)
+      {
+        nodeTxt->setEditable(true);
+        nodeTxt->setFixedWidth(250);
+        nodeTxt->setAlignment(TextBox::Alignment::Left);
+        nodeTxt->setTooltip("The name of the created node");
+        //fd.ui.keyWin->setLayout(fd.ui.keyLay);
+      }
       SECTION(initialize button colors and callbacks)
       {
         playBtn->setBackgroundColor(  Color(e3f(.15f, .2f,  .15f)) ); 
@@ -1727,7 +1735,7 @@ ENTRY_DECLARATION // main or winmain
           nodeTxt->setValue("");
         });
       }
-      SECTION(initialize thread controls)
+      SECTION(initialize the thread slider and thread label)
       {
         auto hardThreads = thread::hardware_concurrency();
 
@@ -1741,26 +1749,32 @@ ENTRY_DECLARATION // main or winmain
           }
         });
         thrdsSldr->setValue(1.f);
+
+        thrdsSldr->setTooltip("Threads");
+        thrdsLabel->setTooltip("Threads");
       }
 
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
 
-      Theme* thm = fd.ui.keyWin->theme();
-      thm->mButtonFontSize      = 16;
-      thm->mTransparent         = e4f( .0f,  .0f,  .0f,    .0f );
-      thm->mWindowFillUnfocused = e4f( .2f,  .2f,  .225f,  .3f );
-      thm->mWindowFillFocused   = e4f( .3f,  .28f, .275f,  .3f );
-
-      fd.ui.statusWin = new  Window(&fd.ui.screen,    "");
-      fd.ui.statusTxt = new TextBox(fd.ui.statusWin,  "");
-      fd.ui.statusTxt->setEditable(false);
-      fd.ui.statusTxt->setDefaultValue("");
-      fd.ui.statusTxt->setValue("");
-      fd.ui.statusLay = new BoxLayout(Orientation::Horizontal, Alignment::Fill, 0,0);
-
-      fd.ui.statusWin->setLayout(fd.ui.statusLay);
-
-      auto txtclr = playBtn->textColor();
+      SECTION(set up theme for the window)
+      {
+        Theme* thm = fd.ui.keyWin->theme();
+        thm->mButtonFontSize      = 16;
+        thm->mTransparent         = e4f( .0f,  .0f,  .0f,    .0f );
+        thm->mWindowFillUnfocused = e4f( .2f,  .2f,  .225f,  .3f );
+        thm->mWindowFillFocused   = e4f( .3f,  .28f, .275f,  .3f );
+      }
+      SECTION(set up the status bar at the bottom of the screen)
+      {
+        fd.ui.statusWin = new  Window(&fd.ui.screen,    "");
+        fd.ui.statusTxt = new TextBox(fd.ui.statusWin,  "");
+        fd.ui.statusTxt->setEditable(false);
+        fd.ui.statusTxt->setDefaultValue("");
+        fd.ui.statusTxt->setValue("");
+        fd.ui.statusLay = new BoxLayout(Orientation::Horizontal, Alignment::Fill, 0,0);
+        fd.ui.statusWin->setLayout(fd.ui.statusLay);
+      }
+      //auto txtclr = playBtn->textColor();
 
       fd.ui.screen.setVisible(true);
       fd.ui.screen.performLayout();
@@ -1785,7 +1799,7 @@ ENTRY_DECLARATION // main or winmain
     {
       reloadSharedLibs();
 
-      new (&fisdb)     simdb("Fissure", 256, 1<<5);     // 4096 * 65,536 = 268,435,456
+      new (&fisdb)     simdb("Fissure", 128, 1<<5);     // 4096 * 65,536 = 268,435,456
 
       printdb(fisdb);
 
