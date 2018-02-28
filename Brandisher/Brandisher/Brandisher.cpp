@@ -386,7 +386,14 @@ void   printdb(simdb const& db)
 {
   using namespace std;
 
-  Println("\n\nSize: ", db.size());
+  Println("\n\nSize: ", db.size(),"\n");
+
+  Println("Key Strs: ");
+  auto keystrs = db.getKeyStrs();
+  TO(keystrs.size(),i){
+    Println("Version: ", keystrs[i].ver, "   |", keystrs[i].str,"|");
+  }
+  Println("\n");
 
   TO(db.s_ch.size(),i){ 
     simdb::VerIdx vi = db.s_ch.at( (u32)i );
@@ -396,6 +403,34 @@ void   printdb(simdb const& db)
       Print("|DELETED ",vi.version,"|  ");
     else
       Print("|",vi.idx," ",vi.version,"|  ");
+  }
+  Println("\n");
+
+  TO(db.s_ch.size(),i)
+  { 
+    simdb::VerIdx vi = db.s_ch.at( (u32)i );
+    if(vi.idx < simdb::DELETED){
+      Print("\n\n|",vi.idx," ",vi.version,"|   ");
+
+      u32   vlen = 0;
+      u32 readLen = 0;
+      u32 len = db.s_cs.len(vi.idx, vi.version, &vlen);
+
+      vec_u8 buf(len+1);
+      db.s_cs.get(vi.idx, vi.version, buf.data(), len, &readLen);
+      buf.back() = '\0';
+      
+      Println("Len: ", len,
+              "  Value Len: ", vlen,
+              "  Read Len: ", readLen,
+              "\n|");
+      
+      TO(buf.size(),i){
+        if(buf[i]==7) putc(' ',stdout); 
+        else          putc(buf[i],stdout);
+      }
+      putc('|',stdout);
+    }
   }
 
   //std::vector<i8> memv(db.memsize(), 0);

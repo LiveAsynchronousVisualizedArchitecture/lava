@@ -48,12 +48,14 @@
 // -todo: test with a full number of threads
 // -todo: stop UI mouse events from being used in node graph
 // -todo: add tool tips to thread controls and node creation text box
-
-// todo: debug why visualizer shows no tables and brandisher shows only a key
-// todo: debug crash with full number of threads - happens within simdb, is it runing out of space? - seems likely - even after initializing with larger blocks and more blocks, the remaining db was the same from being held by another process
+// -todo: debug why first single threaded put mangles the value - might not mangle the value, but why does Brandisher not see it as a valid table? - version comparison was flipped
+// -todo: debug why visualizer shows no tables and brandisher shows only a key - tbl / db value seems to be cut off prematurely or mangled - version comparison was flipped
+// -todo: debug crash with full number of threads - happens within simdb, is it runing out of space? - seems likely - even after initializing with larger blocks and more blocks, the remaining db was the same from being held by another process - links were not being made in the concurrent list, versions were being used to match as false
 //       | happens with only 2 threads but not 1 thread
 //       | seems to need the table size to exceed the block size of the db
 //       | possibly because concurrent lists were not being chained correctly when multiple threads might have broken up the original ordering
+
+// todo: debug why visualizer doesn't update when there are multiple threads running - does brandisher update? - database itself not updating? - is the db running out of space now?
 // todo: make sure that the nodes' time percentages are split proportionatly and not all 100%
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: add tool tips to node buttons containing the description string of the node
@@ -1799,7 +1801,7 @@ ENTRY_DECLARATION // main or winmain
     {
       reloadSharedLibs();
 
-      new (&fisdb)     simdb("Fissure", 128, 1<<5);     // 4096 * 65,536 = 268,435,456
+      new (&fisdb)     simdb("Fissure", 256, 1<<8);     // 4096 * 65,536 = 268,435,456
 
       printdb(fisdb);
 

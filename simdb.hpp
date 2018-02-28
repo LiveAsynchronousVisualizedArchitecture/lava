@@ -953,7 +953,7 @@ public:
 
     u32   curidx  =  blkIdx;
     VerIdx   nxt  =  nxtBlock(curidx);               
-    bool   verOk  =  nxt.version != version;
+    bool   verOk  =  nxt.version == version;
     //if(nxt.version!=version){ return MATCH_FALSE; }
     
     u32    blksz  =  (u32)blockFreeSize();

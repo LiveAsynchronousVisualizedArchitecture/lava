@@ -67,6 +67,8 @@
 // -todo: make const version of operator()
 // -todo: make something to iterate through elements - use begin() and end() iterators
 
+// todo: make array creation zero out memory so that garbage memory is never used/exposed to other processes or written in files
+// todo: make key assignment zero out the rest of the memory so that garbage memory is never used
 // todo: make dummy type a default value for the array
 // todo: make sure that the array can allocate even if just m_allocate is available 
 // todo: put TblType into just the tbl scope
@@ -425,7 +427,8 @@ public:
     }
     KV(const char* key) : type(TblType::EMPTY)
     {
-      memcpy(this->key, key, sizeof(KV::Key) );
+      strncpy(this->key, key, sizeof(KV::Key) ); // automatically pads the key with zeros so that there is no leftover memory
+      //memcpy(this->key, key, sizeof(KV::Key) );
     }
     KV(KV const& l){ cp(l); }
     KV(KV&&      r){ cp(r); }
