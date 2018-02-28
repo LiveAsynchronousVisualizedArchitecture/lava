@@ -436,12 +436,12 @@ public:
   static const u32        LIST_END = 0xFFFFFFFF;
   static const u32 NXT_VER_SPECIAL = 0xFFFFFFFF;
 
-private:
+//private:
   ListVec     s_lv;
   au64*        s_h;
 
 public:
-  static u64   sizeBytes(u32 size) { return ListVec::sizeBytes(size) + 128; }         // an extra 128 bytes so that Head can be placed
+  static u64   sizeBytes(u32 size) { return ListVec::sizeBytes(size) + 128; }         // an extra 128 bytes so that Head can be placed (why 128 bytes? so that the head can be aligned on its own cache line to avoid false sharing, since it is a potential bottleneck)
   static u32  incVersion(u32    v) { return v==NXT_VER_SPECIAL?  1  :  v+1; }
 
   CncrLst(){}
@@ -649,7 +649,7 @@ public:
     //return cur.isDeleted;
   }
 
-private:
+//private:
   // s_ variables are used to indicate data structures and memory that is in the shared memory, usually just a pointer on the stack and of course, nothing on the heap
   // The order of the shared memory as it is in the memory mapped file: Version, CncrLst, BlockLists, Blocks
   mutable CncrLst           s_cl;        // flat data structure - pointer to memory 
@@ -690,17 +690,6 @@ private:
 
     return prev;
   }
-  //u32 findEndSetVersion(u32  blkIdx, u32 version)  const                  // find the last BlkLst slot in the linked list of blocks to free 
-  //{
-  //  u32 cur=blkIdx, prev=blkIdx;
-  //  while(cur != LIST_END){
-  //    s_bls[prev].version = version;
-  //    prev = cur;
-  //    cur  = s_bls[cur].idx;
-  //  }
-  //
-  //  return prev;
-  //}
   void           doFree(u32  blkIdx)  const                                                // frees a list/chain of blocks - don't need to zero out the memory of the blocks or reset any of the BlkLsts' variables since they will be re-initialized anyway
   {
     u32 listEnd  =  findEndSetVersion(blkIdx, 0); 
@@ -1994,4 +1983,18 @@ public:
 
 
 
+
+//u32 findEndSetVersion(u32  blkIdx, u32 version)  const                  // find the last BlkLst slot in the linked list of blocks to free 
+//{
+//  u32 cur=blkIdx, prev=blkIdx;
+//  while(cur != LIST_END){
+//    s_bls[prev].version = version;
+//    prev = cur;
+//    cur  = s_bls[cur].idx;
+//  }
+//
+//  return prev;
+//}
+
+//
 //u32        prevIdx(u32 i) const { return std::min(i-1, m_sz-1); }        // clamp to m_sz-1 for the case that hash==0, which will result in an unsigned integer wrap

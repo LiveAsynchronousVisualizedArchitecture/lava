@@ -386,58 +386,83 @@ void   printdb(simdb const& db)
 {
   using namespace std;
 
-  Println("\n\nSize: ", db.size(),"\n");
+  SECTION(start off by printing the total size in bytes and all they key strings)
+  {
+    Println("\n\nSize: ", db.size(),"\n");
 
-  Println("Key Strs: ");
-  auto keystrs = db.getKeyStrs();
-  TO(keystrs.size(),i){
-    Println("Version: ", keystrs[i].ver, "   |", keystrs[i].str,"|");
-  }
-  Println("\n");
-
-  TO(db.s_ch.size(),i){ 
-    simdb::VerIdx vi = db.s_ch.at( (u32)i );
-    if(vi.idx == simdb::EMPTY)
-      Print("|EMPTY ",vi.version,"|  ");
-    else if(vi.idx == simdb::DELETED)
-      Print("|DELETED ",vi.version,"|  ");
-    else
-      Print("|",vi.idx," ",vi.version,"|  ");
-  }
-  Println("\n");
-
-  TO(db.s_ch.size(),i)
-  { 
-    simdb::VerIdx vi = db.s_ch.at( (u32)i );
-    if(vi.idx < simdb::DELETED){
-      Print("\n\n|",vi.idx," ",vi.version,"|   ");
-
-      u32   vlen = 0;
-      u32 readLen = 0;
-      u32 len = db.s_cs.len(vi.idx, vi.version, &vlen);
-
-      vec_u8 buf(len+1);
-      db.s_cs.get(vi.idx, vi.version, buf.data(), len, &readLen);
-      buf.back() = '\0';
-      
-      Println("Len: ", len,
-              "  Value Len: ", vlen,
-              "  Read Len: ", readLen,
-              "\n|");
-      
-      TO(buf.size(),i){
-        if(buf[i]==7) putc(' ',stdout); 
-        else          putc(buf[i],stdout);
-      }
-      putc('|',stdout);
+    Println("Key Strs: ");
+    auto keystrs = db.getKeyStrs();
+    TO(keystrs.size(),i){
+      Println("Version: ", keystrs[i].ver, "   |", keystrs[i].str,"|");
     }
+    Println("\n");
+  }
+  SECTION(print the hash map versioned index entries)
+  {
+    TO(db.s_ch.size(),i){ 
+      simdb::VerIdx vi = db.s_ch.at( (u32)i );
+      if(vi.idx == simdb::EMPTY)
+        Print("|EMPTY ",vi.version,"|  ");
+      else if(vi.idx == simdb::DELETED)
+        Print("|DELETED ",vi.version,"|  ");
+      else
+        Print("|",vi.idx," ",vi.version,"|  ");
+    }
+    Println("\n");
+  }
+  SECTION(go through the versioned index entries and print off any that arent empty)
+  {
+    TO(db.s_ch.size(),i)
+    { 
+      simdb::VerIdx vi = db.s_ch.at( (u32)i );
+      if(vi.idx < simdb::DELETED){
+        Print("\n\n|",vi.idx," ",vi.version,"|   ");
+
+        u32   vlen = 0;
+        u32 readLen = 0;
+        u32 len = db.s_cs.len(vi.idx, vi.version, &vlen);
+
+        vec_u8 buf(len+1);
+        db.s_cs.get(vi.idx, vi.version, buf.data(), len, &readLen);
+        buf.back() = '\0';
+      
+        Println("Len: ", len,
+                "  Value Len: ", vlen,
+                "  Read Len: ", readLen,
+                "\n|");
+      
+        TO(buf.size(),i){
+          if(buf[i]==7) putc(' ',stdout); 
+          else          putc(buf[i],stdout);
+        }
+        putc('|',stdout);
+      }
+    }
+  }
+  SECTION(loop through the concurrent list and print off all the chains)
+  {
+    Println("\n\nConcurrent List:");
+    auto&  lv = db.s_cs.s_cl.s_lv;
+    auto blks = db.blocks();
+    TO(blks,i){
+      auto cur = lv[i];
+      while(cur != simdb::LIST_END){
+        Print(cur,"-");
+        cur = lv[cur];
+
+        if(cur==(i+2)){ ++i; }
+      }
+      Println("LIST_END\n");
+    }
+    Println("\n");
+    //lv[i];
   }
 
   //std::vector<i8> memv(db.memsize(), 0);
   //memcpy( (void*)memv.data(), db.mem(), db.memsize() );
-
+  //
   //Println("\n");
-
+  //
   //u64 blksz = db.blockSize();
   //TO(memv.size(),i){ 
   //  if(i % blksz == 0){

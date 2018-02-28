@@ -98,7 +98,7 @@ extern "C"
 
       f32     var = randomf(0.01f, 1.f);
       f32      ev = 0.f;  //randomf(0f, 0.2f);
-      u64   verts = 12;
+      u64   verts = 8;
 
       tbl gcurve = LavaMakeTbl(lp);
       gcurve("type") = tbl::StrToInt("IdxVerts");

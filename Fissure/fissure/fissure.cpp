@@ -54,8 +54,12 @@
 //       | happens with only 2 threads but not 1 thread
 //       | seems to need the table size to exceed the block size of the db
 //       | possibly because concurrent lists were not being chained correctly when multiple threads might have broken up the original ordering
+// -todo: debug why visualizer doesn't update when there are multiple threads running - does brandisher update? - database itself not updating? - is the db running out of space now? - was running out of space, more space enabled 2 threads to work, but not more
 
-// todo: debug why visualizer doesn't update when there are multiple threads running - does brandisher update? - database itself not updating? - is the db running out of space now?
+// todo: add printing of concurrent list chains 
+// todo: add printing of block list chains
+// todo: debug why there can be multiple versions of the same key-value inserted, but getKeyStrs() will only return one of them 
+// todo: debug why more than two threads can cause the non-updating (non-inserting problem) and many threads can cause crashing while writing blocks 
 // todo: make sure that the nodes' time percentages are split proportionatly and not all 100%
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: add tool tips to node buttons containing the description string of the node
@@ -1801,9 +1805,9 @@ ENTRY_DECLARATION // main or winmain
     {
       reloadSharedLibs();
 
-      new (&fisdb)     simdb("Fissure", 256, 1<<8);     // 4096 * 65,536 = 268,435,456
+      new (&fisdb)     simdb("Fissure", 256, 1<<5);     // 4096 * 65,536 = 268,435,456
 
-      printdb(fisdb);
+      //printdb(fisdb);
 
       new (&fd.vizIds) AtmSet( LavaId().asInt );
       fd.flow.packetCallback = lavaPacketCallback;
