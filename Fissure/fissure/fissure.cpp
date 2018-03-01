@@ -56,11 +56,15 @@
 //       | possibly because concurrent lists were not being chained correctly when multiple threads might have broken up the original ordering
 // -todo: debug why visualizer doesn't update when there are multiple threads running - does brandisher update? - database itself not updating? - is the db running out of space now? - was running out of space, more space enabled 2 threads to work, but not more
 // -todo: add printing of concurrent list chains 
+// -todo: add printing of block list chains
 
-// todo: add printing of block list chains
+// todo: look back at previous single free technique
+// todo: try pure allocation stress test
+// todo: debug why the concurrent lists seem to become fragmented with more than one thread
 // todo: figure out why free(st,en) seems to be one off in the chain it is freeing
 // todo: debug why there can be multiple versions of the same key-value inserted, but getKeyStrs() will only return one of them 
 // todo: debug why more than two threads can cause the non-updating (non-inserting problem) and many threads can cause crashing while writing blocks 
+
 // todo: make sure that the nodes' time percentages are split proportionatly and not all 100%
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: add tool tips to node buttons containing the description string of the node

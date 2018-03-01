@@ -93,8 +93,9 @@
 // -todo: change extractKey to use long form db.get() that will return the length
 // -todo: debug crashes from refreshing while db is written to rapidly - changes to reading seem to have fixed it
 // -todo: print off concurrent list chain for every hash map entry
+// -todo: print off block list chain for every hash map entry
 
-// todo: print off block list chain for every hash map entry
+// todo: print off full block list 
 // todo: add ability to delete keys 
 // todo: delete with multi-selection and right click menu
 // todo: treat the array as a string if it is u8, i8, (or a string type?) - then show statistics for a string if the string is too long to fit in the gui

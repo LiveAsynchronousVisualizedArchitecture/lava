@@ -107,7 +107,8 @@
 
 */
 
-// todo: make a list cut itself off at the end by inserting LIST_END as the last value 
+// -todo: make a list cut itself off at the end by inserting LIST_END as the last value 
+
 // todo: check what happens when the same key but different versions are inserted - do two different versions end up in the DB? does one version end up undeletable ? 
 // todo: check path of thread that deletes a key, make sure it replaces the index in the hash map - how do two conflicting indices in the hash map resolve? the thread that replaces needs to delete the old allocation using the version - is the version / deleted flag being changed atomically in the block list 
 // todo: change the Match enum to be an bit bitfield with flags
@@ -425,6 +426,7 @@ class     CncrLst
 public:
   using     u32  =  uint32_t;
   using     u64  =  uint64_t;
+  using    au32  =  std::atomic<u32>;
   using    au64  =  std::atomic<u64>;
   using ListVec  =  lava_vec<u32>;
 
@@ -482,18 +484,22 @@ public:
   }
   u32        nxt(u32 prev)                                                             // moves forward in the list and return the previous index
   {
-    Head  curHead, nxtHead;
+    using namespace std;
+    
+    Head  curHead, nxtHead, prevHead;
     curHead.asInt  =  s_h->load();
     do{
       if(curHead.idx==LIST_END){
         return LIST_END;
       }
 
+      prevHead     =  curHead;
       nxtHead.idx  =  s_lv[curHead.idx];
       nxtHead.ver  =  curHead.ver==NXT_VER_SPECIAL? 1  :  curHead.ver+1;
     }while( !s_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
 
-    s_lv[prev] = curHead.idx;
+    //s_lv[prev] = curHead.idx;
+    atomic_store( (au32*)&s_lv[prev], curHead.idx);
 
     return curHead.idx;
   }
@@ -511,10 +517,14 @@ public:
   }
   u32        free(u32 st, u32 en)                                            // not thread safe when reading from the list, but it doesn't matter because you shouldn't be reading while freeing anyway, since the CncrHsh will already have the index taken out and the free will only be triggered after the last reader has read from it 
   {
+    using namespace std;
+  
     Head curHead, nxtHead; u32 retIdx;
     curHead.asInt = s_h->load();
     do{
-      retIdx = s_lv[en] = curHead.idx;
+      //retIdx = s_lv[en] = curHead.idx;
+      retIdx = curHead.idx;
+      atomic_store( (au32*)&s_lv[en], curHead.idx);
       nxtHead.idx  =  st;
       nxtHead.ver  =  curHead.ver + 1;
     }while( !s_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
@@ -682,17 +692,24 @@ public:
   }
   u32 findEndSetVersion(u32  blkIdx, u32 version)  const                  // find the last BlkLst slot in the linked list of blocks to free 
   {
-    u32 cur=blkIdx, prev=blkIdx;
+    u32 cur=blkIdx, prev=blkIdx;   // the first index will have its version set twice
     while(cur != LIST_END){
+      s_bls[prev].version = version;
       prev = cur;
-      //s_bls[cur].version = version;
       //assert(s_cl.s_lv[cur] == s_bls[cur].idx);
 
       //sim_assert(s_cl.s_lv[cur]==s_bls[cur].idx, s_cl.s_lv[cur], s_bls[cur].idx );
+
+      //auto lvIdx = s_cl.s_lv[cur];
+      //auto blsIdx = s_bls[cur].idx;
+      //sim_assert(lvIdx == blsIdx, lvIdx, blsIdx );
+
       cur  = s_bls[cur].idx;
     }
 
+    sim_assert(s_cl.s_lv[prev]==s_bls[prev].idx, s_cl.s_lv[prev], s_bls[prev].idx );
     return prev;
+    //return cur;
   }
   void           doFree(u32  blkIdx)  const                                                // frees a list/chain of blocks - don't need to zero out the memory of the blocks or reset any of the BlkLsts' variables since they will be re-initialized anyway
   {
