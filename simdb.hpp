@@ -107,9 +107,10 @@
 
 */
 
-// todo: change the Match enum to be an bit bitfield with flags
+// todo: make a list cut itself off at the end by inserting LIST_END as the last value 
 // todo: check what happens when the same key but different versions are inserted - do two different versions end up in the DB? does one version end up undeletable ? 
 // todo: check path of thread that deletes a key, make sure it replaces the index in the hash map - how do two conflicting indices in the hash map resolve? the thread that replaces needs to delete the old allocation using the version - is the version / deleted flag being changed atomically in the block list 
+// todo: change the Match enum to be an bit bitfield with flags
 // todo: make simdb give a proper error if running out of space
 // todo: make simdb expand when eighther out of space or initialized with a larger amount of space
 // todo: make simdb len() and get() ignore version numbers for match and only return 
@@ -684,7 +685,10 @@ public:
     u32 cur=blkIdx, prev=blkIdx;
     while(cur != LIST_END){
       prev = cur;
-      s_bls[cur].version = version;
+      //s_bls[cur].version = version;
+      //assert(s_cl.s_lv[cur] == s_bls[cur].idx);
+
+      //sim_assert(s_cl.s_lv[cur]==s_bls[cur].idx, s_cl.s_lv[cur], s_bls[cur].idx );
       cur  = s_bls[cur].idx;
     }
 
@@ -693,6 +697,10 @@ public:
   void           doFree(u32  blkIdx)  const                                                // frees a list/chain of blocks - don't need to zero out the memory of the blocks or reset any of the BlkLsts' variables since they will be re-initialized anyway
   {
     u32 listEnd  =  findEndSetVersion(blkIdx, 0); 
+
+    //sim_assert(s_lv[en], s_lv[en] == LIST_END, en);
+    //assert(s_cl.s_lv[listEnd] == LIST_END);
+
     s_cl.free(blkIdx, listEnd);
 
     // doesn't work - LIST_END only works for allocation
@@ -757,7 +765,6 @@ public:
       }
     }
 
-
     u32  ver = (u32)s_version->fetch_add(1);
     u32  cur = st;
     u32  nxt = 0;
@@ -769,8 +776,9 @@ public:
         nxt = s_cl.nxt(cur);
         if(nxt==LIST_END){ 
           free(st, ver); 
-          VerIdx empty={LIST_END,0}; 
-          return empty; 
+          return List_End();
+          //VerIdx empty={LIST_END,0};  // todo: use empty() for this? 
+          //return empty; 
         } // todo: will this free the start if the start was never set? - will it just reset the blocks but free the index?
 
         s_bls[cur] = BlkLst(false, 0, nxt, ver, size);
@@ -782,6 +790,7 @@ public:
 
     SECTION(add the last index into the list, set out_blocks and return the start index with its version)
     {      
+      s_cl.s_lv[cur] = LIST_END;
       s_bls[cur] = BlkLst(false,0,LIST_END,ver,size,0,0);       // if there is only one block needed, cur and st could be the same
 
       auto b = s_bls[st]; // debugging
@@ -789,7 +798,7 @@ public:
       s_bls[st].isKey = true;
       s_bls[st].hash  = hash;
       s_bls[st].len   = size;
-      s_bls[st].klen  = klen; // set deleted to false?
+      s_bls[st].klen  = klen;
       s_bls[st].isDeleted = false;
 
       if(out_blocks){

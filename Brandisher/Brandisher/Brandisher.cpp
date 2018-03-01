@@ -92,7 +92,9 @@
 // -todo: take out debug printing
 // -todo: change extractKey to use long form db.get() that will return the length
 // -todo: debug crashes from refreshing while db is written to rapidly - changes to reading seem to have fixed it
+// -todo: print off concurrent list chain for every hash map entry
 
+// todo: print off block list chain for every hash map entry
 // todo: add ability to delete keys 
 // todo: delete with multi-selection and right click menu
 // todo: treat the array as a string if it is u8, i8, (or a string type?) - then show statistics for a string if the string is too long to fit in the gui
@@ -382,7 +384,44 @@ Viz        viz;
 
 namespace {
 
-void   printdb(simdb const& db)
+void printDbList(simdb const& db, u64 idx)
+{
+  Println("\n\nList:");
+  auto&  lv = db.s_cs.s_cl.s_lv;
+  auto blks = db.blocks();
+  auto prev = idx;
+  auto  cur = lv[idx];
+  while(cur != simdb::LIST_END){
+    Print("|",prev," ",cur,"|-");
+    prev = cur;
+    cur  = lv[cur];
+  }
+  Println("|",prev," ","LIST_END|\n");
+}
+void printBlList(simdb const& db, u64 idx)
+{
+  Println("\n\nBlock List:");
+  auto&  bl = db.s_cs.s_bls;
+  auto blks = db.blocks();
+  //auto prev = idx;
+  auto  cur = bl[idx];
+  while(idx != simdb::LIST_END){
+    cur = bl[idx];
+    Println("|",idx,
+           " hash:",cur.hash,
+           " idx:",cur.idx,
+           " del:",cur.isDeleted,
+           " key:",cur.isKey,
+           " klen:",cur.klen, 
+           " len:",cur.len,
+           " readers:",cur.readers,
+           " ver:",cur.version,
+           " ");
+    idx = cur.idx;
+  }
+  Println("|",idx," ","LIST_END|\n");
+}
+void     printdb(simdb const& db)
 {
   using namespace std;
 
@@ -415,12 +454,16 @@ void   printdb(simdb const& db)
     TO(db.s_ch.size(),i)
     { 
       simdb::VerIdx vi = db.s_ch.at( (u32)i );
-      if(vi.idx < simdb::DELETED){
+      if(vi.idx < simdb::DELETED)
+      {
         Print("\n\n|",vi.idx," ",vi.version,"|   ");
 
-        u32   vlen = 0;
+        printDbList(db, vi.idx);
+        printBlList(db, vi.idx);
+
+        u32    vlen = 0;
         u32 readLen = 0;
-        u32 len = db.s_cs.len(vi.idx, vi.version, &vlen);
+        u32     len = db.s_cs.len(vi.idx, vi.version, &vlen);
 
         vec_u8 buf(len+1);
         db.s_cs.get(vi.idx, vi.version, buf.data(), len, &readLen);
@@ -443,20 +486,26 @@ void   printdb(simdb const& db)
   {
     Println("\n\nConcurrent List:");
     auto&  lv = db.s_cs.s_cl.s_lv;
+    auto&  bl = db.s_cs.s_bls;
     auto blks = db.blocks();
-    TO(blks,i){
-      auto cur = lv[i];
+    TO(blks,i)
+    {
+      auto prev = i;
+      auto  cur = lv[i];
       while(cur != simdb::LIST_END){
-        Print(cur,"-");
-        cur = lv[cur];
-
-        if(cur==(i+2)){ ++i; }
+        //if(prev==i){ ++i; }
+        Print("|",prev," ",cur,"|-");
+        prev = cur;
+        cur  = lv[cur];
       }
-      Println("LIST_END\n");
+      //if(prev==i){ ++i; }
+      Println("|",prev," ","LIST_END|\n");
     }
     Println("\n");
-    //lv[i];
   }
+
+  //
+  //if(cur==(i+2)){ ++i; }
 
   //std::vector<i8> memv(db.memsize(), 0);
   //memcpy( (void*)memv.data(), db.mem(), db.memsize() );
@@ -1044,7 +1093,6 @@ int  main()
     helpMenu.append("&Print Database", [](auto& itmprxy){
       printdb( dbs[1] );
     });
-
 
     mb.show();
   }

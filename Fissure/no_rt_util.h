@@ -94,7 +94,11 @@ using  ui64  =  uint64_t;
   #ifdef _DEBUG
     //#ifdef _MSC_VER
     //#define sim_assert(expL, comp, expR) if( (exp) (comp) (expR) ) { TELL((expL)) TELL((expR)) assert( (exp) (comp) (expR) ); }
-    #define sim_assert(exp, varA, varB) if( (exp) == false ) { assert( (exp) ); }
+    
+    #include <iomanip>
+    #include <iostream>
+    #define TELL(var)      ::std::cout<<::std::endl<<::std::setprecision(4)<<#var ## ": "<<::std::endl<<var<<::std::endl;::std::cout.flush();
+    #define sim_assert(exp, varA, varB) if( (exp) == false ) { TELL((varA)) TELL((varB)) assert( (exp) ); }
     #define func_assert(exp, FUNC) if( (exp) == false ) { FUNC assert( (exp) );  }
   #else
     //#define sim_assert(expL, comp, expR) 

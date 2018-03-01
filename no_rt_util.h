@@ -91,7 +91,8 @@ using  ui64  =  uint64_t;
 //#define DECLTYPE_ALLOCA(Var, Count) (decltype(Var)*)alloca( Count * sizeof(decltype(Var)) );
 
 #ifdef _MSC_VER
-  #ifdef _DEBUG
+  //#ifdef _DEBUG
+  #ifndef NDEBUG
     //#ifdef _MSC_VER
     //#define sim_assert(expL, comp, expR) if( (exp) (comp) (expR) ) { TELL((expL)) TELL((expR)) assert( (exp) (comp) (expR) ); }
     #define sim_assert(exp, varA, varB) if( (exp) == false ) { assert( (exp) ); }
