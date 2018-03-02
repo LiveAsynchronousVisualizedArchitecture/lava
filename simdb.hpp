@@ -108,8 +108,9 @@
 */
 
 // -todo: make a list cut itself off at the end by inserting LIST_END as the last value 
+// -todo: look into readers and matching - should two threads with the same key ever be able to double insert into the db? - MATCH_REMOVED was not re-looping on the current index
+// -todo: make MATCH_REMOVED restart the current index
 
-// todo: look into readers and matching - should two threads with the same key ever be able to double insert into the db?
 // todo: check what happens when the same key but different versions are inserted - do two different versions end up in the DB? does one version end up undeletable ? 
 // todo: check path of thread that deletes a key, make sure it replaces the index in the hash map - how do two conflicting indices in the hash map resolve? the thread that replaces needs to delete the old allocation using the version - is the version / deleted flag being changed atomically in the block list 
 // todo: change the Match enum to be an bit bitfield with flags
@@ -549,7 +550,8 @@ public:
     do{
       //retIdx = s_lv[en] = curHead.idx;
       retIdx = curHead.idx;
-      atomic_store( (au32*)&(s_lv[en]), curHead.idx);
+      atomic_store_explicit( (au32*)&(s_lv[en]), curHead.idx, memory_order_seq_cst);
+      //atomic_store( (au32*)&(s_lv[en]), curHead.idx);
       nxtHead.idx  =  st;
       nxtHead.ver  =  curHead.ver + 1;
     }while( !headCmpEx( &curHead.asInt, nxtHead.asInt) );
@@ -663,32 +665,47 @@ public:
     return empty.asInt == vi.asInt;
   }
 
+  bool           cmpEx(au32* val, u32* expected, u32 desired) const
+  {
+    using namespace std;
+    return atomic_compare_exchange_strong_explicit(
+      val, expected, desired,
+      memory_order_seq_cst, memory_order_seq_cst
+    );
+  }
   BlkLst    incReaders(u32 blkIdx, u32 version) const                                  // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
+    using namespace std;
+    
     KeyReaders cur, nxt;
     BlkLst*     bl  =  &s_bls[blkIdx];
     au32* areaders  =  (au32*)&(bl->kr);
-    cur.asInt       =  areaders->load();
+    //cur.asInt       =  areaders->load();
+    cur.asInt       =  atomic_load_explicit(areaders, memory_order_seq_cst);
     do{
       //if(bl->version!=version || cur.readers<0 || cur.isDeleted){ return BlkLst(); }
       if(cur.readers<0 || cur.isDeleted){ return BlkLst(); }
       nxt = cur;
       nxt.readers += 1;
-    }while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
-    
+    }while( !cmpEx(areaders, &cur.asInt, nxt.asInt) );
+    //}while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
+
     return *bl;  // after readers has been incremented this block list entry is not going away. The only thing that would change would be the readers and that doesn't matter to the calling function.
   }
   bool      decReadersOrDel(u32 blkIdx, u32 version, bool del=false) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
+    using namespace std;
+
     KeyReaders cur, nxt; bool doDelete;
 
     BlkLst*     bl  =  &s_bls[blkIdx];
     au32* areaders  =  (au32*)&(bl->kr);
-    cur.asInt       =  areaders->load();
+    //cur.asInt       =  areaders->load();
     //if(bl->version!=version){ return false; }
+    cur.asInt       =  atomic_load_explicit(areaders, memory_order_seq_cst);
     do{
       doDelete = false;
-      nxt          = cur;
+      nxt      = cur;
       if(del){
         if(cur.isDeleted){ return true; }
         if(cur.readers==0){
@@ -700,7 +717,8 @@ public:
         if(cur.readers==1 &&  cur.isDeleted){ doDelete=true; }
         nxt.readers  -= 1;    
       }
-    }while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
+    }while( !cmpEx(areaders, &cur.asInt, nxt.asInt) );
+    //}while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
     
     if(doDelete){ doFree(blkIdx); return false; }
 
@@ -761,7 +779,10 @@ public:
   }
   void           doFree(u32  blkIdx)  const                                                // frees a list/chain of blocks - don't need to zero out the memory of the blocks or reset any of the BlkLsts' variables since they will be re-initialized anyway
   {
+    using namespace std;
+
     u32 listEnd  =  findEndSetVersion(blkIdx, 0); 
+
 
     //sim_assert(s_lv[en], s_lv[en] == LIST_END, en);
     //assert(s_cl.s_lv[listEnd] == LIST_END);
@@ -1182,7 +1203,8 @@ private:
     if(odd) strVi = VerIdx(lo32(vi), hi32(vi));                                               // the odd numbers need to be swapped so that their indices are on the outer border of 128 bit alignment - the indices need to be on the border of the 128 bit boundary so they can be swapped with an unaligned 64 bit atomic operation
     else    strVi = VerIdx(hi32(vi), lo32(vi));
 
-    u64 prev = atomic_exchange<u64>( (au64*)(s_vis.data()+i), *((u64*)(&strVi)) );
+    u64 prev = atomic_exchange_explicit( (au64*)(s_vis.data()+i), *((u64*)(&strVi)), memory_order_seq_cst);
+    //u64 prev = atomic_exchange<u64>( (au64*)(s_vis.data()+i), *((u64*)(&strVi)) );
 
     if(odd) return VerIdx(lo32(prev), hi32(prev));
     else    return VerIdx(hi32(prev), lo32(prev));
@@ -1279,9 +1301,12 @@ public:
       }                                                                                     // Either we just added the key, or another thread did.
 
       Match cmp = m_csp->compare(vi.idx,vi.version,key,klen,hash);
-      if(cmp==MATCH_FALSE || cmp==MATCH_REMOVED){
+      if(cmp==MATCH_FALSE){
         if(i==en){return empty;}
         else{continue;}
+      }else if(cmp==MATCH_REMOVED){                                                         // if the block list is marked as deleted, try this index again, since the index must have changed first
+        i=prevIdx(i); 
+        continue;
       }
 
       bool success = cmpex_vi(i, vi, desired);  // this should be hit even when the the versions don't match, since m_csp->compare() will return MATCH_TRUE_WRONG_VERSION

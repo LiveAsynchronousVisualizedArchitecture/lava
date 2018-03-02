@@ -94,8 +94,9 @@
 // -todo: debug crashes from refreshing while db is written to rapidly - changes to reading seem to have fixed it
 // -todo: print off concurrent list chain for every hash map entry
 // -todo: print off block list chain for every hash map entry
+// -todo: print off full block list - can't if their default index is 0, it will create a loop
 
-// todo: print off full block list 
+// todo: print off all blocks
 // todo: add ability to delete keys 
 // todo: delete with multi-selection and right click menu
 // todo: treat the array as a string if it is u8, i8, (or a string type?) - then show statistics for a string if the string is too long to fit in the gui
@@ -385,7 +386,7 @@ Viz        viz;
 
 namespace {
 
-void printDbList(simdb const& db, u64 idx)
+void  printDbList(simdb const& db, u64 idx)
 {
   Println("\n\nList:");
   auto&  lv = db.s_cs.s_cl.s_lv;
@@ -399,7 +400,21 @@ void printDbList(simdb const& db, u64 idx)
   }
   Println("|",prev," ","LIST_END|\n");
 }
-void printBlList(simdb const& db, u64 idx)
+void   printBlock(u64 idx, CncrStr::BlkLst b)
+{
+  Println(
+    "|",         idx,
+    " hash:",    b.hash,
+    " idx:",     b.idx,
+    " del:",     b.isDeleted,
+    " key:",     b.isKey,
+    " klen:",    b.klen, 
+    " len:",     b.len,
+    " readers:", b.readers,
+    " ver:",     b.version,
+    " ");
+}
+void  printBlList(simdb const& db, u64 idx)
 {
   Println("\n\nBlock List:");
   auto&  bl = db.s_cs.s_bls;
@@ -408,16 +423,17 @@ void printBlList(simdb const& db, u64 idx)
   auto  cur = bl[idx];
   while(idx != simdb::LIST_END){
     cur = bl[idx];
-    Println("|",idx,
-           " hash:",cur.hash,
-           " idx:",cur.idx,
-           " del:",cur.isDeleted,
-           " key:",cur.isKey,
-           " klen:",cur.klen, 
-           " len:",cur.len,
-           " readers:",cur.readers,
-           " ver:",cur.version,
-           " ");
+    printBlock(idx, cur);
+    //Println("|",idx,
+    //       " hash:",cur.hash,
+    //       " idx:",cur.idx,
+    //       " del:",cur.isDeleted,
+    //       " key:",cur.isKey,
+    //       " klen:",cur.klen, 
+    //       " len:",cur.len,
+    //       " readers:",cur.readers,
+    //       " ver:",cur.version,
+    //       " ");
     idx = cur.idx;
   }
   Println("|",idx," ","LIST_END|\n");
@@ -492,37 +508,13 @@ void     printdb(simdb const& db)
     TO(blks,i)
     {
       printDbList(db, i);
-      //printBlList(db, i);
-    
-      //  auto prev = i;
-    //  auto  cur = lv[i];
-    //  while(cur != simdb::LIST_END){
-    //    //if(prev==i){ ++i; }
-    //    Print("|",prev," ",cur,"|-");
-    //    prev = cur;
-    //    cur  = lv[cur];
-    //  }
-    //  //if(prev==i){ ++i; }
-    //  Println("|",prev," ","LIST_END|\n");
     }
-    //Println("\n");
+    Println("\n");
+    TO(blks,i){
+      printBlock(i, bl[i]);
+    }
+    Println("\n");
   }
-
-  //
-  //if(cur==(i+2)){ ++i; }
-
-  //std::vector<i8> memv(db.memsize(), 0);
-  //memcpy( (void*)memv.data(), db.mem(), db.memsize() );
-  //
-  //Println("\n");
-  //
-  //u64 blksz = db.blockSize();
-  //TO(memv.size(),i){ 
-  //  if(i % blksz == 0){
-  //    putc('|', stdout);
-  //  }
-  //  putc(memv[i] ,stdout);
-  //}
 }
 
 template<class T> MnMx<T> calcMnMx(tbl const& t)
@@ -1250,6 +1242,35 @@ int  main()
 
 
 
+//
+//printBlList(db, i);
+
+//  auto prev = i;
+//  auto  cur = lv[i];
+//  while(cur != simdb::LIST_END){
+//    //if(prev==i){ ++i; }
+//    Print("|",prev," ",cur,"|-");
+//    prev = cur;
+//    cur  = lv[cur];
+//  }
+//  //if(prev==i){ ++i; }
+//  Println("|",prev," ","LIST_END|\n");
+
+//
+//if(cur==(i+2)){ ++i; }
+
+//std::vector<i8> memv(db.memsize(), 0);
+//memcpy( (void*)memv.data(), db.mem(), db.memsize() );
+//
+//Println("\n");
+//
+//u64 blksz = db.blockSize();
+//TO(memv.size(),i){ 
+//  if(i % blksz == 0){
+//    putc('|', stdout);
+//  }
+//  putc(memv[i] ,stdout);
+//}
 
 //str tblKey = getFullKey( tbArg.item );
 //
