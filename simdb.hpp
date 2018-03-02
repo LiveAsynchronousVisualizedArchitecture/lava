@@ -109,6 +109,7 @@
 
 // -todo: make a list cut itself off at the end by inserting LIST_END as the last value 
 
+// todo: look into readers and matching - should two threads with the same key ever be able to double insert into the db?
 // todo: check what happens when the same key but different versions are inserted - do two different versions end up in the DB? does one version end up undeletable ? 
 // todo: check path of thread that deletes a key, make sure it replaces the index in the hash map - how do two conflicting indices in the hash map resolve? the thread that replaces needs to delete the old allocation using the version - is the version / deleted flag being changed atomically in the block list 
 // todo: change the Match enum to be an bit bitfield with flags
@@ -426,8 +427,8 @@ class     CncrLst
 public:
   using     u32  =  uint32_t;
   using     u64  =  uint64_t;
-  using    au32  =  std::atomic<u32>;
-  using    au64  =  std::atomic<u64>;
+  using    au32  =  volatile std::atomic<u32>;
+  using    au64  =  volatile std::atomic<u64>;
   using ListVec  =  lava_vec<u32>;
 
   union Head
@@ -440,8 +441,8 @@ public:
   static const u32 NXT_VER_SPECIAL = 0xFFFFFFFF;
 
 //private:
-  ListVec     s_lv;
-  au64*        s_h;
+  ListVec         s_lv;
+  volatile au64*   s_h;
 
 public:
   static u64   sizeBytes(u32 size) { return ListVec::sizeBytes(size) + 128; }         // an extra 128 bytes so that Head can be placed (why 128 bytes? so that the head can be aligned on its own cache line to avoid false sharing, since it is a potential bottleneck)
@@ -467,6 +468,24 @@ public:
     }
   }
 
+  bool headCmpEx(u64* expected, au64 desired)
+  {
+    using namespace std;
+
+    //return atomic_compare_exchange_strong_explicit(
+    //  s_h, (volatile au64*)&expected, desired,
+    //  memory_order_seq_cst, memory_order_seq_cst
+    //  );
+
+    //return atomic_compare_exchange_strong(
+    //  s_h, (volatile au64*)&expected, desired
+    //);
+
+    return atomic_compare_exchange_strong_explicit(
+      s_h, expected, desired,
+      memory_order_seq_cst, memory_order_seq_cst
+    );
+  }
   u32        nxt()                                                             // moves forward in the list and return the previous index
   {
     Head  curHead, nxtHead;
@@ -478,7 +497,9 @@ public:
 
       nxtHead.idx  =  s_lv[curHead.idx];
       nxtHead.ver  =  curHead.ver==NXT_VER_SPECIAL? 1  :  curHead.ver+1;
-    }while( !s_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
+    }while( !headCmpEx( &curHead.asInt, nxtHead.asInt) );
+    //}while( !headCmpEx(curHead.asInt, nxtHead.asInt) );
+    //}while( !s_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
 
     return curHead.idx;
   }
@@ -496,7 +517,9 @@ public:
       prevHead     =  curHead;
       nxtHead.idx  =  s_lv[curHead.idx];
       nxtHead.ver  =  curHead.ver==NXT_VER_SPECIAL? 1  :  curHead.ver+1;
-    }while( !s_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
+    }while( !headCmpEx( &curHead.asInt, nxtHead.asInt) );
+    //}while( !headCmpEx(curHead.asInt, nxtHead.asInt) );
+    //}while( !s_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
 
     //s_lv[prev] = curHead.idx;
     atomic_store( (au32*)&s_lv[prev], curHead.idx);
@@ -511,7 +534,9 @@ public:
       retIdx = s_lv[idx] = curHead.idx;
       nxtHead.idx  =  idx;
       nxtHead.ver  =  curHead.ver + 1;
-    }while( !s_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
+    }while( !headCmpEx( &curHead.asInt, nxtHead.asInt) );
+    //}while( !headCmpEx(curHead.asInt, nxtHead.asInt) );
+    //}while( !s_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
 
     return retIdx;
   }
@@ -524,12 +549,34 @@ public:
     do{
       //retIdx = s_lv[en] = curHead.idx;
       retIdx = curHead.idx;
-      atomic_store( (au32*)&s_lv[en], curHead.idx);
+      atomic_store( (au32*)&(s_lv[en]), curHead.idx);
       nxtHead.idx  =  st;
       nxtHead.ver  =  curHead.ver + 1;
-    }while( !s_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
+    }while( !headCmpEx( &curHead.asInt, nxtHead.asInt) );
+    //}while( !headCmpEx(curHead.asInt, nxtHead.asInt) );
+    //}while( !s_h->compare_exchange_strong(curHead.asInt, nxtHead.asInt) );
 
     return retIdx;
+  }
+  u32       alloc(u32 count)
+  {
+    u32   st = nxt();
+    u32  cur = st;
+    if(st == LIST_END) return LIST_END;
+    else --count;
+
+    while( count > 0 ){
+      u32 nxtIdx = nxt(cur);
+      if(nxtIdx == LIST_END){
+        free(st,cur);
+        return LIST_END;
+      }
+      cur = nxtIdx;
+      --count;
+    }
+
+    //s_lv[cur] = LIST_END;
+    return st;
   }
   auto      count() const -> u32 { return ((Head*)s_h)->ver; }
   auto        idx() const -> u32
@@ -623,7 +670,8 @@ public:
     au32* areaders  =  (au32*)&(bl->kr);
     cur.asInt       =  areaders->load();
     do{
-      if(bl->version!=version || cur.readers<0 || cur.isDeleted){ return BlkLst(); }
+      //if(bl->version!=version || cur.readers<0 || cur.isDeleted){ return BlkLst(); }
+      if(cur.readers<0 || cur.isDeleted){ return BlkLst(); }
       nxt = cur;
       nxt.readers += 1;
     }while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
@@ -637,7 +685,7 @@ public:
     BlkLst*     bl  =  &s_bls[blkIdx];
     au32* areaders  =  (au32*)&(bl->kr);
     cur.asInt       =  areaders->load();
-    if(bl->version!=version){ return false; }
+    //if(bl->version!=version){ return false; }
     do{
       doDelete = false;
       nxt          = cur;
@@ -707,7 +755,7 @@ public:
       cur  = s_bls[cur].idx;
     }
 
-    sim_assert(s_cl.s_lv[prev]==s_bls[prev].idx, s_cl.s_lv[prev], s_bls[prev].idx );
+    //sim_assert(s_cl.s_lv[prev]==s_bls[prev].idx, s_cl.s_lv[prev], s_bls[prev].idx );
     return prev;
     //return cur;
   }
@@ -773,41 +821,32 @@ public:
   {
     u32  byteRem = 0;
     u32   blocks = blocksNeeded(size, &byteRem);
-    u32       st = s_cl.nxt();
-    SECTION(get the starting block index and handle errors)
-    {
+    u32       st = s_cl.alloc(blocks);
+    SECTION(handle allocation errors from the concurrent list){
       if(st==LIST_END){
-        if(out_blocks){ *out_blocks = {1, 0} ; } 
+        if(out_blocks){ *out_blocks = {true, 0} ; } 
         return List_End(); 
       }
     }
 
     u32  ver = (u32)s_version->fetch_add(1);
-    u32  cur = st;
-    u32  nxt = 0;
-    u32  cnt = 0;
+    u32  cur=st, cnt=0;
     SECTION(loop for the number of blocks needed and get new block and link it to the list)
     {
-      for(u32 i=0; i<blocks-1; ++i)
-      {
-        nxt = s_cl.nxt(cur);
-        if(nxt==LIST_END){ 
-          free(st, ver); 
-          return List_End();
-          //VerIdx empty={LIST_END,0};  // todo: use empty() for this? 
-          //return empty; 
-        } // todo: will this free the start if the start was never set? - will it just reset the blocks but free the index?
-
+      for(u32 i=0; i<blocks-1; ++i, ++cnt){
+        u32 nxt    = s_cl.s_lv[cur];
         s_bls[cur] = BlkLst(false, 0, nxt, ver, size);
-        //s_cl[cur]  = nxt;
         cur        = nxt;
-        ++cnt;
       }
     }
 
     SECTION(add the last index into the list, set out_blocks and return the start index with its version)
     {      
-      s_cl.s_lv[cur] = LIST_END;
+      if(out_blocks){
+        out_blocks->end = s_cl.s_lv[cur] == LIST_END;
+        out_blocks->cnt = cnt;
+      }     
+
       s_bls[cur] = BlkLst(false,0,LIST_END,ver,size,0,0);       // if there is only one block needed, cur and st could be the same
 
       auto b = s_bls[st]; // debugging
@@ -818,14 +857,69 @@ public:
       s_bls[st].klen  = klen;
       s_bls[st].isDeleted = false;
 
-      if(out_blocks){
-        out_blocks->end = nxt==LIST_END;
-        out_blocks->cnt = cnt;
-      }     
       VerIdx vi(st, ver);
       return vi;
     }
   }
+
+  //auto        alloc(u32    size, u32 klen, u32 hash, BlkCnt* out_blocks=nullptr) -> VerIdx    
+  //{
+  //  u32  byteRem = 0;
+  //  u32   blocks = blocksNeeded(size, &byteRem);
+  //  u32       st = s_cl.nxt();
+  //  SECTION(get the starting block index and handle errors)
+  //  {
+  //    if(st==LIST_END){
+  //      if(out_blocks){ *out_blocks = {1, 0} ; } 
+  //      return List_End(); 
+  //    }
+  //  }
+  //
+  //  u32  ver = (u32)s_version->fetch_add(1);
+  //  u32  cur = st;
+  //  u32  nxt = 0;
+  //  u32  cnt = 0;
+  //  SECTION(loop for the number of blocks needed and get new block and link it to the list)
+  //  {
+  //    for(u32 i=0; i<blocks-1; ++i)
+  //    {
+  //      nxt = s_cl.nxt(cur);
+  //      if(nxt==LIST_END){ 
+  //        free(st, ver); 
+  //        return List_End();
+  //        //VerIdx empty={LIST_END,0};  // todo: use empty() for this? 
+  //        //return empty; 
+  //      } // todo: will this free the start if the start was never set? - will it just reset the blocks but free the index?
+  //
+  //      s_bls[cur] = BlkLst(false, 0, nxt, ver, size);
+  //      //s_cl[cur]  = nxt;
+  //      cur        = nxt;
+  //      ++cnt;
+  //    }
+  //  }
+  //
+  //  SECTION(add the last index into the list, set out_blocks and return the start index with its version)
+  //  {      
+  //    s_cl.s_lv[cur] = LIST_END;
+  //    s_bls[cur] = BlkLst(false,0,LIST_END,ver,size,0,0);       // if there is only one block needed, cur and st could be the same
+  //
+  //    auto b = s_bls[st]; // debugging
+  //
+  //    s_bls[st].isKey = true;
+  //    s_bls[st].hash  = hash;
+  //    s_bls[st].len   = size;
+  //    s_bls[st].klen  = klen;
+  //    s_bls[st].isDeleted = false;
+  //
+  //    if(out_blocks){
+  //      out_blocks->end = nxt==LIST_END;
+  //      out_blocks->cnt = cnt;
+  //    }     
+  //    VerIdx vi(st, ver);
+  //    return vi;
+  //  }
+  //}
+
   bool         free(u32  blkIdx, u32 version)                                                             // doesn't always free a list/chain of blocks - it decrements the readers and when the readers gets below the value that it started at, only then it is deleted (by the first thread to take it below the starting number)
   {
     return decReadersOrDel(blkIdx, version, true);
@@ -965,10 +1059,11 @@ public:
     BlkLst     bl = s_bls[blkIdx];
     u32 blklstHsh = bl.hash;
     if(blklstHsh!=hash){ return MATCH_FALSE; }                         // vast majority of calls should end here
+    bool   verOk  =  bl.version == version;
 
     u32   curidx  =  blkIdx;
     VerIdx   nxt  =  nxtBlock(curidx);               
-    bool   verOk  =  nxt.version == version;
+    //bool   verOk  =  nxt.version == version;
     //if(nxt.version!=version){ return MATCH_FALSE; }
     
     u32    blksz  =  (u32)blockFreeSize();
@@ -981,11 +1076,13 @@ public:
     {
       auto p = blockFreePtr(curidx);
       if(blksz > curlen){
-        Match cmpBlk = memcmpBlk(curidx, version, curbuf, p, curlen);                   // here was the only place where it could return true
-        if(cmpBlk != MATCH_TRUE) return MATCH_FALSE;
+        Match cmpBlk = memcmpBlk(curidx, version, curbuf, p, curlen);                   // the end 
+        if(cmpBlk != MATCH_TRUE) return cmpBlk; //MATCH_FALSE;
+
         return verOk? MATCH_TRUE  :  MATCH_TRUE_WRONG_VERSION;
       }else{
-        Match cmp = memcmpBlk(curidx, version, curbuf, p, blksz);   if(cmp!=MATCH_TRUE){ return cmp; }
+        Match cmp = memcmpBlk(curidx, version, curbuf, p, blksz);   
+        if(cmp!=MATCH_TRUE){ return cmp; }
       }
 
       curbuf  +=  blksz;
@@ -1097,8 +1194,9 @@ private:
     u64     exp = i%2? swp32(expected.asInt) : expected.asInt;                                // if the index (i) is odd, swap the upper and lower 32 bits around
     u64    desi = i%2? swp32(desired.asInt) : desired.asInt;                                  // desi is desired int
     au64*  addr = (au64*)(s_vis.data()+i);
-    bool     ok = addr->compare_exchange_strong( exp, desi );
-    
+    //bool     ok = addr->compare_exchange_strong( exp, desi );
+    bool     ok = atomic_compare_exchange_strong_explicit(addr, &exp, desi, memory_order_seq_cst, memory_order_seq_cst);
+
     return ok;
   }
   void           doFree(u32 i)                 const
@@ -2009,6 +2107,28 @@ public:
 
 
 
+
+
+
+
+//s_cl.s_lv[cur] = LIST_END;
+//
+//u32       st = s_cl.nxt();
+//u32  nxt = 0;
+//
+//nxt = s_cl.nxt(cur);
+//if(nxt==LIST_END){ 
+//  free(st, ver); 
+//  return List_End();
+//} // todo: will this free the start if the start was never set? - will it just reset the blocks but free the index?
+//
+//s_bls[cur] = BlkLst(false, 0, nxt, ver, size);
+//cur        = nxt;
+
+//VerIdx empty={LIST_END,0};  // todo: use empty() for this? 
+//return empty; 
+//
+//s_cl[cur]  = nxt;
 
 //u32 findEndSetVersion(u32  blkIdx, u32 version)  const                  // find the last BlkLst slot in the linked list of blocks to free 
 //{

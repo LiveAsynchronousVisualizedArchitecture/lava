@@ -57,8 +57,9 @@
 // -todo: debug why visualizer doesn't update when there are multiple threads running - does brandisher update? - database itself not updating? - is the db running out of space now? - was running out of space, more space enabled 2 threads to work, but not more
 // -todo: add printing of concurrent list chains 
 // -todo: add printing of block list chains
+// -todo: look back at previous single free technique - old github copy still uses bulk free
+// -todo: try allocating all concurrent list indices at once, then initializing blocks
 
-// todo: look back at previous single free technique
 // todo: try pure allocation stress test
 // todo: debug why the concurrent lists seem to become fragmented with more than one thread
 // todo: figure out why free(st,en) seems to be one off in the chain it is freeing

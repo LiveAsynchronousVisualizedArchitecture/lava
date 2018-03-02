@@ -491,18 +491,21 @@ void     printdb(simdb const& db)
     auto blks = db.blocks();
     TO(blks,i)
     {
-      auto prev = i;
-      auto  cur = lv[i];
-      while(cur != simdb::LIST_END){
-        //if(prev==i){ ++i; }
-        Print("|",prev," ",cur,"|-");
-        prev = cur;
-        cur  = lv[cur];
-      }
-      //if(prev==i){ ++i; }
-      Println("|",prev," ","LIST_END|\n");
+      printDbList(db, i);
+      //printBlList(db, i);
+    
+      //  auto prev = i;
+    //  auto  cur = lv[i];
+    //  while(cur != simdb::LIST_END){
+    //    //if(prev==i){ ++i; }
+    //    Print("|",prev," ",cur,"|-");
+    //    prev = cur;
+    //    cur  = lv[cur];
+    //  }
+    //  //if(prev==i){ ++i; }
+    //  Println("|",prev," ","LIST_END|\n");
     }
-    Println("\n");
+    //Println("\n");
   }
 
   //
