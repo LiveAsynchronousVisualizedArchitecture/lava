@@ -1245,12 +1245,17 @@ private:
 
   template<class FUNC> 
   bool       runIfMatch(VerIdx vi, const void* const buf, u32 len, u32 hash, FUNC f) const 
-  { // todo: should this increment and decrement the readers, as well as doing something different if it was the thread that freed the blocks
-    //VerIdx kv = incReaders(vi.idx, vi.version);
+  { 
+    // todo: should this increment and decrement the readers, as well as doing something different if it was the thread that freed the blocks
+    auto b = m_csp->incReaders(vi.idx, vi.version);
       Match      m = m_csp->compare(vi.idx, vi.version, buf, len, hash);
       bool matched = false;                                                   // not inside a scope
-      if(m==MATCH_TRUE){ matched=true; f(vi); }
-    //decReaders(vi.idx, vi.version);    
+      if(m==MATCH_TRUE || m==MATCH_TRUE_WRONG_VERSION){
+        matched=true; 
+        f(vi); 
+      }
+    m_csp->decReadersOrDel(vi.idx, vi.version, false);
+    //m_csp->decReaders(vi.idx, vi.version);    
     //decReaders(i);
     
     return matched;
@@ -1440,12 +1445,12 @@ public:
     if(out_startBlock){ *out_startBlock = lstVi.idx; }
     if(lstVi.idx==LIST_END){ return false; }
 
-    m_csp->put(lstVi.idx, key, klen, val, vlen);
+    m_csp->put(lstVi.idx, key, klen, val, vlen);                                  // this writes the data into the blocks before exposing them to other threads through the hash map
 
-    VerIdx vi = putHashed(hash, lstVi, key, klen);
+    VerIdx vi = putHashed(hash, lstVi, key, klen);                                // put the versioned index in the hash map by swapping it for whatever is there - if there was another index already there, clean it up by freeing it's concurrent list indices and blocks
     if(vi.idx<DELETED){ 
       m_csp->free(vi.idx, vi.version);
-    }                         // putHashed returns the entry that was there before, which is the entry that was replaced. If it wasn't empty, we free it here. 
+    }                                                                             // putHashed returns the entry that was there before, which is the entry that was replaced. If it wasn't empty, we free it here. 
 
     return true;
   }
@@ -1458,7 +1463,7 @@ public:
 
     return doFree;
   }
-  VerIdx        load(u32 i)                    const
+  VerIdx        load(u32 i) const
   {    
     assert(i < m_sz);
 
