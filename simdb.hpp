@@ -111,6 +111,7 @@
 // -todo: look into readers and matching - should two threads with the same key ever be able to double insert into the db? - MATCH_REMOVED was not re-looping on the current index
 // -todo: make MATCH_REMOVED restart the current index
 
+// todo: make runIfMatch return a pair that includes the return value of the function it runs
 // todo: check what happens when the same key but different versions are inserted - do two different versions end up in the DB? does one version end up undeletable ? 
 // todo: check path of thread that deletes a key, make sure it replaces the index in the hash map - how do two conflicting indices in the hash map resolve? the thread that replaces needs to delete the old allocation using the version - is the version / deleted flag being changed atomically in the block list 
 // todo: change the Match enum to be an bit bitfield with flags
@@ -882,65 +883,6 @@ public:
       return vi;
     }
   }
-
-  //auto        alloc(u32    size, u32 klen, u32 hash, BlkCnt* out_blocks=nullptr) -> VerIdx    
-  //{
-  //  u32  byteRem = 0;
-  //  u32   blocks = blocksNeeded(size, &byteRem);
-  //  u32       st = s_cl.nxt();
-  //  SECTION(get the starting block index and handle errors)
-  //  {
-  //    if(st==LIST_END){
-  //      if(out_blocks){ *out_blocks = {1, 0} ; } 
-  //      return List_End(); 
-  //    }
-  //  }
-  //
-  //  u32  ver = (u32)s_version->fetch_add(1);
-  //  u32  cur = st;
-  //  u32  nxt = 0;
-  //  u32  cnt = 0;
-  //  SECTION(loop for the number of blocks needed and get new block and link it to the list)
-  //  {
-  //    for(u32 i=0; i<blocks-1; ++i)
-  //    {
-  //      nxt = s_cl.nxt(cur);
-  //      if(nxt==LIST_END){ 
-  //        free(st, ver); 
-  //        return List_End();
-  //        //VerIdx empty={LIST_END,0};  // todo: use empty() for this? 
-  //        //return empty; 
-  //      } // todo: will this free the start if the start was never set? - will it just reset the blocks but free the index?
-  //
-  //      s_bls[cur] = BlkLst(false, 0, nxt, ver, size);
-  //      //s_cl[cur]  = nxt;
-  //      cur        = nxt;
-  //      ++cnt;
-  //    }
-  //  }
-  //
-  //  SECTION(add the last index into the list, set out_blocks and return the start index with its version)
-  //  {      
-  //    s_cl.s_lv[cur] = LIST_END;
-  //    s_bls[cur] = BlkLst(false,0,LIST_END,ver,size,0,0);       // if there is only one block needed, cur and st could be the same
-  //
-  //    auto b = s_bls[st]; // debugging
-  //
-  //    s_bls[st].isKey = true;
-  //    s_bls[st].hash  = hash;
-  //    s_bls[st].len   = size;
-  //    s_bls[st].klen  = klen;
-  //    s_bls[st].isDeleted = false;
-  //
-  //    if(out_blocks){
-  //      out_blocks->end = nxt==LIST_END;
-  //      out_blocks->cnt = cnt;
-  //    }     
-  //    VerIdx vi(st, ver);
-  //    return vi;
-  //  }
-  //}
-
   bool         free(u32  blkIdx, u32 version)                                                             // doesn't always free a list/chain of blocks - it decrements the readers and when the readers gets below the value that it started at, only then it is deleted (by the first thread to take it below the starting number)
   {
     return decReadersOrDel(blkIdx, version, true);
@@ -1243,22 +1185,38 @@ private:
     return load(*out_idx);
   }
 
-  template<class FUNC> 
-  bool       runIfMatch(VerIdx vi, const void* const buf, u32 len, u32 hash, FUNC f) const 
+  //bool       runIfMatch(VerIdx vi, const void* const buf, u32 len, u32 hash, FUNC f) const 
+  //Match       runIfMatch(VerIdx vi, const void* const buf, u32 len, u32 hash, FUNC f) const 
+  template<class FUNC, class T>
+  auto       runIfMatch(VerIdx vi, const void* const buf, u32 len, u32 hash, FUNC f, T defaultRet = decltype(f(vi))() ) const -> std::pair<Match, T>   // std::pair<Match, decltype(f(vi))>
   { 
-    // todo: should this increment and decrement the readers, as well as doing something different if it was the thread that freed the blocks
     auto b = m_csp->incReaders(vi.idx, vi.version);
-      Match      m = m_csp->compare(vi.idx, vi.version, buf, len, hash);
-      bool matched = false;                                                   // not inside a scope
+      Match m;
+      m = m_csp->compare(vi.idx, vi.version, buf, len, hash);
+      T funcRet = defaultRet; // not inside a scope
       if(m==MATCH_TRUE || m==MATCH_TRUE_WRONG_VERSION){
-        matched=true; 
-        f(vi); 
+        funcRet = f(vi); 
       }
-    m_csp->decReadersOrDel(vi.idx, vi.version, false);
+    if( !m_csp->decReadersOrDel(vi.idx, vi.version, false) ){ 
+      m = MATCH_REMOVED;
+    }
+
+    return {m, funcRet};
+    
+    // todo: should this increment and decrement the readers, as well as doing something different if it was the thread that freed the blocks
+    //
+    //if(b.isDeleted){ m = MATCH_REMOVED; } 
+    //b.
+    //
+    //bool matched = false;  
+    //decltype(f(vi)) funcRet; // not inside a scope
+    //
+    //matched=true; 
+    //
     //m_csp->decReaders(vi.idx, vi.version);    
     //decReaders(i);
-    
-    return matched;
+    //
+    //return matched;
   }
 
 public:
@@ -1305,7 +1263,17 @@ public:
         }                                                                                   // retry the same loop again if a good slot was found but it was changed by another thread between the load and the compare-exchange
       }                                                                                     // Either we just added the key, or another thread did.
 
-      Match cmp = m_csp->compare(vi.idx,vi.version,key,klen,hash);
+      const auto ths = this;
+      auto         f = [ths,i,desired](VerIdx vi){
+        bool success = ths->cmpex_vi(i, vi, desired);                                            // this should be hit even when the the versions don't match, since m_csp->compare() will return MATCH_TRUE_WRONG_VERSION
+        return success;
+      };
+      //Match cmp = runIfMatch(vi, key, klen, hash, f);
+      auto cmpAndSuccess = runIfMatch(vi, key, klen, hash, f, false);
+      Match    cmp = cmpAndSuccess.first;
+      bool success = cmpAndSuccess.second;
+
+      //Match cmp = m_csp->compare(vi.idx,vi.version,key,klen,hash);
       if(cmp==MATCH_FALSE){
         if(i==en){return empty;}
         else{continue;}
@@ -1314,7 +1282,7 @@ public:
         continue;
       }
 
-      bool success = cmpex_vi(i, vi, desired);  // this should be hit even when the the versions don't match, since m_csp->compare() will return MATCH_TRUE_WRONG_VERSION
+      //bool success = cmpex_vi(i, vi, desired);  // this should be hit even when the the versions don't match, since m_csp->compare() will return MATCH_TRUE_WRONG_VERSION
       if(success){ 
         return vi;
       }else{ 
@@ -1326,8 +1294,8 @@ public:
     // return empty;  // should never be reached
   }
 
-  template<class FUNC> 
-  bool      runMatch(const void *const key, u32 klen, u32 hash, FUNC f)       const 
+  template<class FUNC, class T>
+  bool      runMatch(const void *const key, u32 klen, u32 hash, FUNC f, T defaultRet = decltype(f(vi))() )       const 
   {
     using namespace std;
     
@@ -1336,8 +1304,12 @@ public:
     for(;; i=nxtIdx(i) )
     {
       VerIdx vi = load(i);
-      if(vi.idx!=EMPTY && vi.idx!=DELETED && runIfMatch(vi,key,klen,hash,f) ){ return true; }
-      
+      if(vi.idx!=EMPTY && vi.idx!=DELETED){
+        Match match = runIfMatch(vi,key,klen,hash,f, defaultRet).first;
+
+        if(match==MATCH_TRUE || match==MATCH_TRUE_WRONG_VERSION){ return true; }
+      }
+
       if(i==en){ return false; }
     }
   }
@@ -1434,7 +1406,8 @@ public:
       return csp->get(vi.idx, vi.version, out_val, vlen, out_readlen);
     };
 
-    return runMatch(key, klen, hash, runFunc);
+    //Match m = runMatch(key, klen, hash, runFunc, 0);
+    return runMatch(key, klen, hash, runFunc, 0);
   }
   bool           put(const void *const key, u32 klen, const void *const val, u32 vlen, u32* out_startBlock=nullptr) 
   {
@@ -2140,6 +2113,63 @@ public:
 
 
 
+//auto        alloc(u32    size, u32 klen, u32 hash, BlkCnt* out_blocks=nullptr) -> VerIdx    
+//{
+//  u32  byteRem = 0;
+//  u32   blocks = blocksNeeded(size, &byteRem);
+//  u32       st = s_cl.nxt();
+//  SECTION(get the starting block index and handle errors)
+//  {
+//    if(st==LIST_END){
+//      if(out_blocks){ *out_blocks = {1, 0} ; } 
+//      return List_End(); 
+//    }
+//  }
+//
+//  u32  ver = (u32)s_version->fetch_add(1);
+//  u32  cur = st;
+//  u32  nxt = 0;
+//  u32  cnt = 0;
+//  SECTION(loop for the number of blocks needed and get new block and link it to the list)
+//  {
+//    for(u32 i=0; i<blocks-1; ++i)
+//    {
+//      nxt = s_cl.nxt(cur);
+//      if(nxt==LIST_END){ 
+//        free(st, ver); 
+//        return List_End();
+//        //VerIdx empty={LIST_END,0};  // todo: use empty() for this? 
+//        //return empty; 
+//      } // todo: will this free the start if the start was never set? - will it just reset the blocks but free the index?
+//
+//      s_bls[cur] = BlkLst(false, 0, nxt, ver, size);
+//      //s_cl[cur]  = nxt;
+//      cur        = nxt;
+//      ++cnt;
+//    }
+//  }
+//
+//  SECTION(add the last index into the list, set out_blocks and return the start index with its version)
+//  {      
+//    s_cl.s_lv[cur] = LIST_END;
+//    s_bls[cur] = BlkLst(false,0,LIST_END,ver,size,0,0);       // if there is only one block needed, cur and st could be the same
+//
+//    auto b = s_bls[st]; // debugging
+//
+//    s_bls[st].isKey = true;
+//    s_bls[st].hash  = hash;
+//    s_bls[st].len   = size;
+//    s_bls[st].klen  = klen;
+//    s_bls[st].isDeleted = false;
+//
+//    if(out_blocks){
+//      out_blocks->end = nxt==LIST_END;
+//      out_blocks->cnt = cnt;
+//    }     
+//    VerIdx vi(st, ver);
+//    return vi;
+//  }
+//}
 
 //s_cl.s_lv[cur] = LIST_END;
 //
