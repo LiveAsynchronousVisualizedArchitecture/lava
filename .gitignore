@@ -91,3 +91,6 @@ nuklear/nuklear_test/nanogui/
 nuklear/.VizDataStructures.hpp.swp
 
 
+# Git files
+.gitconfig
+
