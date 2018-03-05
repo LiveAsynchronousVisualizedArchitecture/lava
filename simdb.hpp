@@ -1489,8 +1489,8 @@ public:
 
     //assert(dif == __simdb_allocs - __simdb_deallocs);
     //Println("\nallocs: ", __simdb_allocs, " deallocs: ", __simdb_deallocs);
-    std::cout << std::this_thread::get_id();
-    printf(" allocs: %d  deallocs: %d DIFF: %d\n", __simdb_allocs, __simdb_deallocs, __simdb_allocs - __simdb_deallocs);
+    //std::cout << std::this_thread::get_id();
+    //printf(" allocs: %d  deallocs: %d DIFF: %d\n", __simdb_allocs, __simdb_deallocs, __simdb_allocs - __simdb_deallocs);
 
     return true;
   }
