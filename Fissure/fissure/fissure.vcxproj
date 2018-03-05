@@ -194,6 +194,7 @@
     <ClCompile Include="unified.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\simdb.hpp" />
     <ClInclude Include="..\..\str_util.hpp" />
     <ClInclude Include="..\..\tbl.hpp" />
     <ClInclude Include="..\LavaFlow.hpp" />

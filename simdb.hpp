@@ -110,8 +110,17 @@
 // -todo: make a list cut itself off at the end by inserting LIST_END as the last value 
 // -todo: look into readers and matching - should two threads with the same key ever be able to double insert into the db? - MATCH_REMOVED was not re-looping on the current index
 // -todo: make MATCH_REMOVED restart the current index
+// -todo: make runIfMatch return a pair that includes the return value of the function it runs
+// -todo: make sure version setting on free sets the version to 0 on the whole list
+// -todo: make sure incReaders and decReaders are using explicit sequential consistency - already done
+// -todo: make sure that if there is a version mismatch when comparing a block list, the block list version is still used when trying to swap the version+idx - would only the index actually be needed since a block list with incremented readers won't give up its index, thus it should be unique?
+// -todo: take version argument out of incReaders and decReaders
 
-// todo: make runIfMatch return a pair that includes the return value of the function it runs
+// todo: make a temporary thread_local variable for each thread to count how many allocations it has made and how many allocations it has freed
+// todo: make sure that the VerIdx being returned from putHashed is actually what was atomically swapped out
+// todo: try putting LIST_END at the end of the the concurrent lists
+// todo: debug why 2 threads inserting the same key seems to need all blocks instead of just 3 * 2 * 2 (three blocks per key * two threads * two block lists per thread)
+// todo: assert that the block list is never already deleted when being deleted from putHashed
 // todo: check what happens when the same key but different versions are inserted - do two different versions end up in the DB? does one version end up undeletable ? 
 // todo: check path of thread that deletes a key, make sure it replaces the index in the hash map - how do two conflicting indices in the hash map resolve? the thread that replaces needs to delete the old allocation using the version - is the version / deleted flag being changed atomically in the block list 
 // todo: change the Match enum to be an bit bitfield with flags
@@ -674,35 +683,37 @@ public:
       memory_order_seq_cst, memory_order_seq_cst
     );
   }
-  BlkLst    incReaders(u32 blkIdx, u32 version) const                                  // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
+  BlkLst    incReaders(u32 blkIdx) const //u32 version) const                                  // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
     using namespace std;
     
     KeyReaders cur, nxt;
     BlkLst*     bl  =  &s_bls[blkIdx];
     au32* areaders  =  (au32*)&(bl->kr);
-    //cur.asInt       =  areaders->load();
     cur.asInt       =  atomic_load_explicit(areaders, memory_order_seq_cst);
     do{
-      //if(bl->version!=version || cur.readers<0 || cur.isDeleted){ return BlkLst(); }
       if(cur.readers<0 || cur.isDeleted){ return BlkLst(); }
       nxt = cur;
       nxt.readers += 1;
     }while( !cmpEx(areaders, &cur.asInt, nxt.asInt) );
-    //}while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
 
     return *bl;  // after readers has been incremented this block list entry is not going away. The only thing that would change would be the readers and that doesn't matter to the calling function.
+
+    //cur.asInt       =  areaders->load();
+    //
+    //if(bl->version!=version || cur.readers<0 || cur.isDeleted){ return BlkLst(); }
+    //
+    //}while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
   }
-  bool      decReadersOrDel(u32 blkIdx, u32 version, bool del=false) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
+  //bool      decReadersOrDel(u32 blkIdx, u32 version, bool del=false) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
+  bool      decReadersOrDel(u32 blkIdx, bool del=false) const                   // BI is Block Index  increment the readers by one and return the previous kv from the successful swap 
   {
     using namespace std;
 
-    KeyReaders cur, nxt; bool doDelete;
+    KeyReaders cur, nxt; bool doDelete=false;
 
     BlkLst*     bl  =  &s_bls[blkIdx];
     au32* areaders  =  (au32*)&(bl->kr);
-    //cur.asInt       =  areaders->load();
-    //if(bl->version!=version){ return false; }
     cur.asInt       =  atomic_load_explicit(areaders, memory_order_seq_cst);
     do{
       doDelete = false;
@@ -713,17 +724,23 @@ public:
           doDelete      = true; 
           nxt.isDeleted = true;
         }
-        //if(cur.readers==0 && !cur.isDeleted){ doDelete=true; }
       }else{
         if(cur.readers==1 &&  cur.isDeleted){ doDelete=true; }
         nxt.readers  -= 1;    
       }
     }while( !cmpEx(areaders, &cur.asInt, nxt.asInt) );
-    //}while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
     
     if(doDelete){ doFree(blkIdx); return false; }
 
     return true;
+    
+    //cur.asInt       =  areaders->load();
+    //if(bl->version!=version){ return false; }
+    //
+    //if(cur.readers==0 && !cur.isDeleted){ doDelete=true; }
+    //
+    //}while( !areaders->compare_exchange_strong(cur.asInt, nxt.asInt) );
+    //
     //return cur.isDeleted;
   }
 
@@ -761,21 +778,22 @@ public:
   {
     u32 cur=blkIdx, prev=blkIdx;   // the first index will have its version set twice
     while(cur != LIST_END){
-      s_bls[prev].version = version;
+      s_bls[cur].version = version;
       prev = cur;
-      //assert(s_cl.s_lv[cur] == s_bls[cur].idx);
-
-      //sim_assert(s_cl.s_lv[cur]==s_bls[cur].idx, s_cl.s_lv[cur], s_bls[cur].idx );
-
-      //auto lvIdx = s_cl.s_lv[cur];
-      //auto blsIdx = s_bls[cur].idx;
-      //sim_assert(lvIdx == blsIdx, lvIdx, blsIdx );
-
       cur  = s_bls[cur].idx;
     }
-
-    //sim_assert(s_cl.s_lv[prev]==s_bls[prev].idx, s_cl.s_lv[prev], s_bls[prev].idx );
     return prev;
+
+    //assert(s_cl.s_lv[cur] == s_bls[cur].idx);
+    //
+    //sim_assert(s_cl.s_lv[cur]==s_bls[cur].idx, s_cl.s_lv[cur], s_bls[cur].idx );
+    //
+    //auto lvIdx = s_cl.s_lv[cur];
+    //auto blsIdx = s_bls[cur].idx;
+    //sim_assert(lvIdx == blsIdx, lvIdx, blsIdx );
+    //
+    //sim_assert(s_cl.s_lv[prev]==s_bls[prev].idx, s_cl.s_lv[prev], s_bls[prev].idx );
+    //
     //return cur;
   }
   void           doFree(u32  blkIdx)  const                                                // frees a list/chain of blocks - don't need to zero out the memory of the blocks or reset any of the BlkLsts' variables since they will be re-initialized anyway
@@ -807,12 +825,15 @@ public:
   }
   u32         readBlock(u32  blkIdx, u32 version, void *const bytes, u32 ofst=0, u32 len=0) const
   {
-    BlkLst bl = incReaders(blkIdx, version);               if(bl.version==0){ return 0; }
+    //BlkLst bl = incReaders(blkIdx, version);               
+    BlkLst bl = incReaders(blkIdx);
+      if(bl.version==0){ return 0; }
       u32   blkFree  =  blockFreeSize();
       u8*         p  =  blockFreePtr(blkIdx);
       u32    cpyLen  =  len==0?  blkFree-ofst  :  len;
       memcpy(bytes, p+ofst, cpyLen);
-    decReadersOrDel(blkIdx, version);
+    decReadersOrDel(blkIdx);
+    //decReadersOrDel(blkIdx, version);
 
     return cpyLen;
   }
@@ -885,7 +906,8 @@ public:
   }
   bool         free(u32  blkIdx, u32 version)                                                             // doesn't always free a list/chain of blocks - it decrements the readers and when the readers gets below the value that it started at, only then it is deleted (by the first thread to take it below the starting number)
   {
-    return decReadersOrDel(blkIdx, version, true);
+    //return decReadersOrDel(blkIdx, version, true);
+    return decReadersOrDel(blkIdx, true);
   }
   void          put(u32  blkIdx, void const *const kbytes, u32 klen, void const *const vbytes, u32 vlen)  // don't need version because this will only be used after allocating and therefore will only be seen by one thread until it is inserted into the ConcurrentHash
   {
@@ -927,8 +949,9 @@ public:
 
     if(blkIdx == LIST_END){ return 0; }
 
-    BlkLst bl = incReaders(blkIdx, version);
-    
+    //BlkLst bl = incReaders(blkIdx, version);
+    BlkLst bl = incReaders(blkIdx);
+
     u32 vlen = bl.len-bl.klen;
     if(bl.len==0 || vlen>maxlen ) return 0;
 
@@ -965,7 +988,8 @@ public:
     if(out_readlen){ *out_readlen = len; }
 
   read_failure:
-    decReadersOrDel(blkIdx, version);
+    decReadersOrDel(blkIdx, false);
+    //decReadersOrDel(blkIdx, version);
 
     return len;                                                                    // only one return after the top to make sure readers can be decremented - maybe it should be wrapped in a struct with a destructor
   }
@@ -973,8 +997,9 @@ public:
   {
     if(blkIdx == LIST_END){ return 0; }
 
-    BlkLst bl = incReaders(blkIdx, version);
-    
+    //BlkLst bl = incReaders(blkIdx, version);
+    BlkLst bl = incReaders(blkIdx);
+
     if(bl.len==0 || (bl.klen)>maxlen ) return 0;
 
     auto   kdiv = div((i64)bl.klen, (i64)blockFreeSize());
@@ -1000,20 +1025,23 @@ public:
     len   +=  rdLen;
 
   read_failure:
-    decReadersOrDel(blkIdx, version);
+    decReadersOrDel(blkIdx);
+    //decReadersOrDel(blkIdx, version);
 
     return len;                                           // only one return after the top to make sure readers can be decremented - maybe it should be wrapped in a struct with a destructor    
   }
   Match   memcmpBlk(u32  blkIdx, u32 version, void const *const buf1, void const *const buf2, u32 len) const    // todo: eventually take out the inc and dec readers and only do them when actually reading and dealing with the whole chain of blocks 
-  { // todo: take out inc and dec here, since the whole block list should be read and protected by start of the list
-    if(incReaders(blkIdx, version).len==0){ return MATCH_REMOVED; }
+  { 
+    // todo: take out inc and dec here, since the whole block list should be read and protected by start of the list
+    //if(incReaders(blkIdx, version).len==0){ return MATCH_REMOVED; }
       auto ret = memcmp(buf1, buf2, len);
-    bool freed = !decReadersOrDel(blkIdx, version);
+    //bool freed = !decReadersOrDel(blkIdx, version);
 
-    if(freed){       return MATCH_REMOVED; }
-    else if(ret==0){ return MATCH_TRUE;    }
+    //if(freed){       return MATCH_REMOVED; }
+    //else if(ret==0){ return MATCH_TRUE;    }
 
-    return MATCH_FALSE;
+    if(ret==0){  return MATCH_TRUE;  }
+    else      {  return MATCH_FALSE; }
   }
   Match     compare(u32  blkIdx, u32 version, void const *const buf, u32 len, u32 hash) const
   {
@@ -1190,14 +1218,25 @@ private:
   template<class FUNC, class T>
   auto       runIfMatch(VerIdx vi, const void* const buf, u32 len, u32 hash, FUNC f, T defaultRet = decltype(f(vi))() ) const -> std::pair<Match, T>   // std::pair<Match, decltype(f(vi))>
   { 
-    auto b = m_csp->incReaders(vi.idx, vi.version);
-      Match m;
-      m = m_csp->compare(vi.idx, vi.version, buf, len, hash);
-      T funcRet = defaultRet; // not inside a scope
-      if(m==MATCH_TRUE || m==MATCH_TRUE_WRONG_VERSION){
-        funcRet = f(vi); 
+    Match m;
+    T funcRet = defaultRet;                                                                   
+
+    //auto b = m_csp->incReaders(vi.idx, vi.version);
+    auto b = m_csp->incReaders(vi.idx);
+    SECTION(work on the now protected block list without returning until after the readers are decremented)
+    {
+      if(b.isDeleted){
+        m = MATCH_REMOVED;
+      }else{
+        m = m_csp->compare(vi.idx, vi.version, buf, len, hash);
+        if(m==MATCH_TRUE || m==MATCH_TRUE_WRONG_VERSION){
+          //funcRet = f(vi); 
+          funcRet = f( VerIdx(vi.idx, b.version) );
+        }
       }
-    if( !m_csp->decReadersOrDel(vi.idx, vi.version, false) ){ 
+    }
+    //if( !m_csp->decReadersOrDel(vi.idx, vi.version, false) ){ 
+   if( !m_csp->decReadersOrDel(vi.idx,false) ){ 
       m = MATCH_REMOVED;
     }
 
@@ -1263,28 +1302,28 @@ public:
         }                                                                                   // retry the same loop again if a good slot was found but it was changed by another thread between the load and the compare-exchange
       }                                                                                     // Either we just added the key, or another thread did.
 
+      VerIdx foundVi = empty_vi();
       const auto ths = this;
-      auto         f = [ths,i,desired](VerIdx vi){
+      auto         f = [ths,i,desired,&foundVi](VerIdx vi){
+        foundVi      = vi;
         bool success = ths->cmpex_vi(i, vi, desired);                                            // this should be hit even when the the versions don't match, since m_csp->compare() will return MATCH_TRUE_WRONG_VERSION
         return success;
       };
-      //Match cmp = runIfMatch(vi, key, klen, hash, f);
       auto cmpAndSuccess = runIfMatch(vi, key, klen, hash, f, false);
-      Match    cmp = cmpAndSuccess.first;
-      bool success = cmpAndSuccess.second;
+      Match          cmp = cmpAndSuccess.first;
+      bool       success = cmpAndSuccess.second;
 
-      //Match cmp = m_csp->compare(vi.idx,vi.version,key,klen,hash);
       if(cmp==MATCH_FALSE){
-        if(i==en){return empty;}
+        if(i==en){return empty;}  // todo: if this returns empty, allocation will not be deallocated when it returns
         else{continue;}
       }else if(cmp==MATCH_REMOVED){                                                         // if the block list is marked as deleted, try this index again, since the index must have changed first
         i=prevIdx(i); 
         continue;
       }
 
-      //bool success = cmpex_vi(i, vi, desired);  // this should be hit even when the the versions don't match, since m_csp->compare() will return MATCH_TRUE_WRONG_VERSION
       if(success){ 
-        return vi;
+        return foundVi;
+        //return vi;
       }else{ 
         i=prevIdx(i); 
         continue; 
@@ -1292,6 +1331,10 @@ public:
     }
 
     // return empty;  // should never be reached
+    //
+    //Match cmp = runIfMatch(vi, key, klen, hash, f);
+    //Match cmp = m_csp->compare(vi.idx,vi.version,key,klen,hash);
+    //bool success = cmpex_vi(i, vi, desired);  // this should be hit even when the the versions don't match, since m_csp->compare() will return MATCH_TRUE_WRONG_VERSION
   }
 
   template<class FUNC, class T>
@@ -2112,6 +2155,14 @@ public:
 
 
 
+
+//u32 cur=blkIdx, prev=blkIdx;   // the first index will have its version set twice
+//while(cur != LIST_END){
+//  s_bls[prev].version = version;
+//  prev = cur;
+//  cur  = s_bls[cur].idx;
+//}
+//return prev;
 
 //auto        alloc(u32    size, u32 klen, u32 hash, BlkCnt* out_blocks=nullptr) -> VerIdx    
 //{

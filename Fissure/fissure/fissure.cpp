@@ -62,8 +62,8 @@
 // -todo: change putHashed to restart the loop on the same index if it finds MATCH_REMOVED - seems to work well, but does not solve the problem of updates halting - might delay it - still seems like an index is being leaked somewhere
 // -todo: figure out why free(st,en) seems to be one off in the chain it is freeing - might not be the problem
 // -todo: debug why there can be multiple versions of the same key-value inserted, but getKeyStrs() will only return one of them - likely because one of the indices was MATCH_REMOVED
+// -todo: make sure reference increments surround the atomic compare and swap 
 
-// todo: make sure reference increments surround the atomic compare and swap 
 // todo: change loading and storing into the concurrent list to be explicit sequential consistency 
 // todo: figure out how there can be 1 index in the hash map, 5 allocations, and 0 block lists marked for deletion
 // todo: debug how more than 6 blocks can be used with a single thread and a 3 block key-value combination
