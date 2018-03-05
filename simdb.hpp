@@ -219,6 +219,11 @@
   typedef unsigned long ULONG;
 #endif
 
+//#ifndef NDEBUG
+  thread_local int __simdb_allocs   = 0;
+  thread_local int __simdb_deallocs = 0;
+//#endif
+
 namespace {
   enum Match { MATCH_FALSE=0, MATCH_TRUE=1, MATCH_REMOVED = -1, MATCH_TRUE_WRONG_VERSION = -2  };
 
@@ -722,8 +727,8 @@ public:
         if(cur.isDeleted){ return true; }
         if(cur.readers==0){
           doDelete      = true; 
-          nxt.isDeleted = true;
         }
+        nxt.isDeleted = true;
       }else{
         if(cur.readers==1 &&  cur.isDeleted){ doDelete=true; }
         nxt.readers  -= 1;    
@@ -807,6 +812,8 @@ public:
     //assert(s_cl.s_lv[listEnd] == LIST_END);
 
     s_cl.free(blkIdx, listEnd);
+
+    __simdb_deallocs += 1;
 
     // doesn't work - LIST_END only works for allocation
     //u32 cur = blkIdx;
@@ -899,6 +906,8 @@ public:
       s_bls[st].len   = size;
       s_bls[st].klen  = klen;
       s_bls[st].isDeleted = false;
+
+      __simdb_allocs += 1;
 
       VerIdx vi(st, ver);
       return vi;
@@ -1191,10 +1200,10 @@ private:
 
     return ok;
   }
-  void           doFree(u32 i)                 const
-  {
-    store_vi(i, empty_vi().asInt);
-  }
+  //void           doFree(u32 i)                 const
+  //{
+  //  store_vi(i, empty_vi().asInt);
+  //}
   VerIpd            ipd(u32 i, u32 blkIdx)     const                                          // ipd is Ideal Position Distance - it is the distance a CncrHsh index value is from the position that it gets hashed to 
   {
     BlkLst bl = m_csp->blkLst(blkIdx);
@@ -1284,16 +1293,17 @@ public:
 
   VerIdx   putHashed(u32 hash, VerIdx lstVi, const void *const key, u32 klen) const
   {
+    // This function needs to return the VerIdx it was given if there was not a place for the allocation, since it would neighther be stored in the hash map or swapped for another VerIdx that will be freed
     using namespace std;
     static const VerIdx empty   = empty_vi();
 
-    VerIdx desired = lstVi;
+    //VerIdx desired = lstVi;
     u32 i=hash%m_sz, en=prevIdx(i);
     for(;; i=nxtIdx(i) )
     {
       VerIdx vi = load(i);
       if(vi.idx>=DELETED){                                                                  // it is either deleted or empty
-        bool success = cmpex_vi(i, vi, desired);           
+        bool success = cmpex_vi(i, vi, lstVi);           
         if(success){
           return vi;
         }else{ 
@@ -1304,9 +1314,9 @@ public:
 
       VerIdx foundVi = empty_vi();
       const auto ths = this;
-      auto         f = [ths,i,desired,&foundVi](VerIdx vi){
+      auto         f = [ths,i,lstVi,&foundVi](VerIdx vi){
         foundVi      = vi;
-        bool success = ths->cmpex_vi(i, vi, desired);                                            // this should be hit even when the the versions don't match, since m_csp->compare() will return MATCH_TRUE_WRONG_VERSION
+        bool success = ths->cmpex_vi(i, vi, lstVi);                                            // this should be hit even when the the versions don't match, since m_csp->compare() will return MATCH_TRUE_WRONG_VERSION
         return success;
       };
       auto cmpAndSuccess = runIfMatch(vi, key, klen, hash, f, false);
@@ -1314,9 +1324,10 @@ public:
       bool       success = cmpAndSuccess.second;
 
       if(cmp==MATCH_FALSE){
-        if(i==en){return empty;}  // todo: if this returns empty, allocation will not be deallocated when it returns
-        else{continue;}
-      }else if(cmp==MATCH_REMOVED){                                                         // if the block list is marked as deleted, try this index again, since the index must have changed first
+        if(i==en){
+          return lstVi;                                                                      // By returning the given VerIdx, we say that there was no place for it found and it needs to be deallocated
+        }else{ continue; }
+      }else if(cmp==MATCH_REMOVED){                                                          // if the block list is marked as deleted, try this index again, since the index must have changed first
         i=prevIdx(i); 
         continue;
       }
@@ -1455,11 +1466,14 @@ public:
   bool           put(const void *const key, u32 klen, const void *const val, u32 vlen, u32* out_startBlock=nullptr) 
   {
     assert(klen>0);
+    auto dif = __simdb_allocs - __simdb_deallocs;
 
     u32     hash = CncrHsh::HashBytes(key, klen);
     VerIdx lstVi = m_csp->alloc(klen+vlen, klen, hash);                            // lstVi is block list versioned index
     if(out_startBlock){ *out_startBlock = lstVi.idx; }
-    if(lstVi.idx==LIST_END){ return false; }
+    if(lstVi.idx==LIST_END){ 
+      return false;
+    }
 
     m_csp->put(lstVi.idx, key, klen, val, vlen);                                  // this writes the data into the blocks before exposing them to other threads through the hash map
 
@@ -1467,6 +1481,16 @@ public:
     if(vi.idx<DELETED){ 
       m_csp->free(vi.idx, vi.version);
     }                                                                             // putHashed returns the entry that was there before, which is the entry that was replaced. If it wasn't empty, we free it here. 
+    else{
+      auto nxtDif = __simdb_allocs - __simdb_deallocs;
+      goto dummy;
+      dummy: ;
+    }
+
+    //assert(dif == __simdb_allocs - __simdb_deallocs);
+    //Println("\nallocs: ", __simdb_allocs, " deallocs: ", __simdb_deallocs);
+    std::cout << std::this_thread::get_id();
+    printf(" allocs: %d  deallocs: %d DIFF: %d\n", __simdb_allocs, __simdb_deallocs, __simdb_allocs - __simdb_deallocs);
 
     return true;
   }
