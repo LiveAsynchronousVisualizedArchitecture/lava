@@ -73,12 +73,17 @@
 // -todo: change bounding box of message passing nodes to encompass full circle
 // -todo: make sure that the nodes' time percentages are split proportionatly and not all 100% - percent was being maxed with 100 - sprintf formatting used to stabalize the status string length so it doesn't jitter
 // -todo: use a 2D matrix to scale the canvas while using the inverse to scale the mouse input - translate, scale, then translate by negative 
+// -todo: debug nodes not being affected by the initial transform
+// -todo: initialize fd.ui.grphCx and grphCy to width and height - initialized to 0.5 while the width and height are used to scale them further
 
-// todo: initialize fd.ui.grphCx and grphCy to width and height
+// todo: debug some nodes and slot graphics not being affected by transform
+// todo: make graph transform not apply to the frames per second and the selection box
 // todo: implement pan by changing graph center variables
 // todo: implement alternate zoom by holding down the right mouse button and moving to the right and/or up
 // todo: transform mouse clicks by the inverse of the transform 
-// todo: debug nodes not being affected by the initial transform
+// todo: transform selection box by the inverse of the transform
+// todo: make background grid fill the scaled graph canvas
+// todo: make sure zooming is affected by cursor placement
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: add tool tips to node buttons containing the description string of the node
 // todo: find way to add a tbl to a tbl by reference / direct assignment - should it immediatly copy and flatten()
@@ -488,6 +493,8 @@ void            slot_add(bool isDest)
 }
 void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState, f32 slot_rad=10.f)
 {
+  nvgSave(vg);
+
   nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
   nvgStrokeWidth(vg, 3.f);
 
@@ -525,8 +532,12 @@ void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState, f
   inrClr.b += 0.2f;
   nvgFillColor(vg, inrClr);
 
+  //f32 tfm[6];
+  //nvgCurrentTransform(vg, tfm);
+
   nvgBeginPath(vg);
-    nvgResetTransform(vg);
+
+    //nvgResetTransform(vg);
     nvgTranslate(vg, out.x, out.y);             // translate comes before rotate here because nanovg 'premultiplies' transformations instead of multiplying them in for some reason. this reverses the order of transformations and can be seen in the source for nanovg
     nvgRotate(vg, normalToAngle(N) + (s.in? PIf/2.f : -PIf/2) );
 
@@ -535,7 +546,9 @@ void           slot_draw(NVGcontext* vg, Slot const& s, Slot::State drawState, f
     nvgLineTo(vg,  0, triRad);
   nvgClosePath(vg);
   nvgFill(vg);
-  nvgResetTransform(vg);
+
+  nvgRestore(vg);
+  //nvgResetTransform(vg);
 }
 Slot*           slot_get(LavaId id)
 {
@@ -684,7 +697,9 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
 
   const float   rthk = 8.f;    // rw is rail thickness
 
-  nvgResetTransform(vg);
+  nvgSave(vg);
+
+  //nvgResetTransform(vg);
   nvgGlobalAlpha(vg, 1.f);
   
   float wMargin=50.f, hMargin=20.f;
@@ -847,6 +862,7 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
     //nvgStroke(vg);
   }
 
+  nvgRestore(vg);
   //return;
 }
 v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
@@ -2163,20 +2179,13 @@ ENTRY_DECLARATION // main or winmain
         SECTION(nanovg drawing - |node graph|)
         {
           //f32 tfm[6];
-          nvgBeginFrame(vg,  fd.ui.w,       fd.ui.h, pxRatio);
-          nvgTranslate(vg,   fd.ui.w/2.f,   fd.ui.h/2.f);
-          nvgScale(vg, fd.ui.grphTx, fd.ui.grphTy);
-          nvgTranslate(vg,  -fd.ui.w/2.f,  -fd.ui.h/2.f);
-          
-          //nvgTranslate(vg, -fd.ui.grphCx,  -fd.ui.grphCy);
-          
-          //nvgScale(vg, fd.ui.grphTx, fd.ui.grphTy);
-          //nvgTransformIdentity(tfm);
-          //nvgTransformTranslate(tfm, fd.ui.grphCx, fd.ui.grphCy);
-          //nvgTransformScale(tfm, fd.ui.grphTx, fd.ui.grphTy);
-          //nvgTransformTranslate(tfm, -fd.ui.grphCx, -fd.ui.grphCy);
-          //nvgTransform(vg, fd.ui.grphTx, fd.ui.grphTy, fd.ui.grphCx, fd.ui.grphCy);
-            //nvgTransformInverse();
+          f32 tx = fd.ui.grphTx * fd.ui.w;
+          f32 ty = fd.ui.grphTy * fd.ui.h;
+          nvgBeginFrame(vg,  fd.ui.w,   fd.ui.h, pxRatio);
+            nvgResetTransform(vg);
+            nvgTranslate(vg,   tx,    ty);
+            nvgScale(vg, fd.ui.grphTx, fd.ui.grphTy);
+            nvgTranslate(vg,  -tx,   -ty);          
             SECTION(background grid)
             {
               nvgStrokeWidth(vg, 1.f);
@@ -2367,6 +2376,7 @@ ENTRY_DECLARATION // main or winmain
                 }
               }
             }
+            nvgResetTransform(vg);
             SECTION(draw selection box)
             {
               if(fd.mouse.lftDn && fd.sel.pri==LavaNode::NODE_ERROR)
@@ -2442,6 +2452,15 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//nvgTranslate(vg, -fd.ui.grphCx,  -fd.ui.grphCy);
+//
+//nvgScale(vg, fd.ui.grphTx, fd.ui.grphTy);
+//nvgTransformIdentity(tfm);
+//nvgTransformTranslate(tfm, fd.ui.grphCx, fd.ui.grphCy);
+//nvgTransformScale(tfm, fd.ui.grphTx, fd.ui.grphTy);
+//nvgTransformTranslate(tfm, -fd.ui.grphCx, -fd.ui.grphCy);
+//nvgTransform(vg, fd.ui.grphTx, fd.ui.grphTy, fd.ui.grphCx, fd.ui.grphCy);
+//nvgTransformInverse();
 
 //thrdsSldr->requestFocus();
 //thrdsSldr->setFocused(true);
