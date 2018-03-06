@@ -98,7 +98,7 @@ extern "C"
 
       f32     var = randomf(0.01f, 1.f);
       f32      ev = 0.f;  //randomf(0f, 0.2f);
-      u64   verts = 8;
+      u64   verts = 512;
 
       tbl gcurve = LavaMakeTbl(lp);
       gcurve("type") = tbl::StrToInt("IdxVerts");
@@ -126,7 +126,8 @@ extern "C"
 
       gcurve("positions x")  = &px;
       gcurve("positions y")  = &py;
-      //gcurve("colors green") = &cg;
+      gcurve("colors green") = &cg;
+      gcurve("colors blue")  = &cg;
       gcurve("indices")      = &ind;
       gcurve.flatten();
 

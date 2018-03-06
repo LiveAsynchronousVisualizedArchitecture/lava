@@ -64,15 +64,15 @@
 // -todo: debug why there can be multiple versions of the same key-value inserted, but getKeyStrs() will only return one of them - likely because one of the indices was MATCH_REMOVED
 // -todo: make sure reference increments surround the atomic compare and swap 
 // -todo: change loading and storing into the concurrent list to be explicit sequential consistency 
+// -todo: figure out how there can be 1 index in the hash map, 5 allocations, and 0 block lists marked for deletion - deletion flag not always getting set due to bad compare exchange loop
+// -todo: debug how more than 6 blocks can be used with a single thread and a 3 block key-value combination - deletion flag not always getting set due to bad compare exchange loop
+// -todo: review free-ing procedure and memory barriers
+// -todo: try pure allocation stress test - not needed now
+// -todo: debug why the concurrent lists seem to become fragmented with more than one thread - - deletion flag not always getting set due to bad compare exchange loop
+// -todo: debug why more than two threads can cause the non-updating (non-inserting problem) and many threads can cause crashing while writing blocks - deletion flag not always getting set due to bad compare exchange loop
 
 // todo: make sure get() only increments and decrements the first/key block in the block list
 // todo: change bounding box of message passing nodes to encompass full circle
-// todo: figure out how there can be 1 index in the hash map, 5 allocations, and 0 block lists marked for deletion
-// todo: debug how more than 6 blocks can be used with a single thread and a 3 block key-value combination
-// todo: review free-ing procedure and memory barriers
-// todo: try pure allocation stress test
-// todo: debug why the concurrent lists seem to become fragmented with more than one thread
-// todo: debug why more than two threads can cause the non-updating (non-inserting problem) and many threads can cause crashing while writing blocks 
 
 // todo: make sure that the nodes' time percentages are split proportionatly and not all 100%
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
@@ -1818,7 +1818,7 @@ ENTRY_DECLARATION // main or winmain
     {
       reloadSharedLibs();
 
-      new (&fisdb)     simdb("Fissure", 256, 1<<5);     // 4096 * 65,536 = 268,435,456
+      new (&fisdb)     simdb("Fissure", 512, 1<<6);     // 4096 * 65,536 = 268,435,456
 
       //printdb(fisdb);
 

@@ -95,8 +95,8 @@
 // -todo: print off concurrent list chain for every hash map entry
 // -todo: print off block list chain for every hash map entry
 // -todo: print off full block list - can't if their default index is 0, it will create a loop
+// -todo: print off all blocks
 
-// todo: print off all blocks
 // todo: add ability to delete keys 
 // todo: delete with multi-selection and right click menu
 // todo: treat the array as a string if it is u8, i8, (or a string type?) - then show statistics for a string if the string is too long to fit in the gui

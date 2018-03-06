@@ -115,18 +115,18 @@
 // -todo: make sure incReaders and decReaders are using explicit sequential consistency - already done
 // -todo: make sure that if there is a version mismatch when comparing a block list, the block list version is still used when trying to swap the version+idx - would only the index actually be needed since a block list with incremented readers won't give up its index, thus it should be unique?
 // -todo: take version argument out of incReaders and decReaders
+// -todo: make a temporary thread_local variable for each thread to count how many allocations it has made and how many allocations it has freed - worked very well to narrow down the problem
+// -todo: make sure that the VerIdx being returned from putHashed is actually what was atomically swapped out
+// -todo: try putting LIST_END at the end of the the concurrent lists - not needed for now
+// -todo: debug why 2 threads inserting the same key seems to need all blocks instead of just 3 * 2 * 2 (three blocks per key * two threads * two block lists per thread) - delete flag in block lists was not always set
+// -todo: assert that the block list is never already deleted when being deleted from putHashed - that wasn't the problem
+// -todo: check what happens when the same key but different versions are inserted - do two different versions end up in the DB? does one version end up undeletable ?  - this was fixed by only comparing the key without the version
+// -todo: check path of thread that deletes a key, make sure it replaces the index in the hash map - how do two conflicting indices in the hash map resolve? the thread that replaces needs to delete the old allocation using the version - is the version / deleted flag being changed atomically in the block list 
+// -todo: change the Match enum to be an bit bitfield with flags - not needed for now
+// -todo: make simdb len() and get() ignore version numbers for match and only match keys
 
-// todo: make a temporary thread_local variable for each thread to count how many allocations it has made and how many allocations it has freed
-// todo: make sure that the VerIdx being returned from putHashed is actually what was atomically swapped out
-// todo: try putting LIST_END at the end of the the concurrent lists
-// todo: debug why 2 threads inserting the same key seems to need all blocks instead of just 3 * 2 * 2 (three blocks per key * two threads * two block lists per thread)
-// todo: assert that the block list is never already deleted when being deleted from putHashed
-// todo: check what happens when the same key but different versions are inserted - do two different versions end up in the DB? does one version end up undeletable ? 
-// todo: check path of thread that deletes a key, make sure it replaces the index in the hash map - how do two conflicting indices in the hash map resolve? the thread that replaces needs to delete the old allocation using the version - is the version / deleted flag being changed atomically in the block list 
-// todo: change the Match enum to be an bit bitfield with flags
 // todo: make simdb give a proper error if running out of space
 // todo: make simdb expand when eighther out of space or initialized with a larger amount of space
-// todo: make simdb len() and get() ignore version numbers for match and only return 
 // todo: make a get function that takes a key version struct
 // todo: make a get function that returns a tbl if tbl.hpp is included
 
@@ -1340,12 +1340,6 @@ public:
         continue; 
       }
     }
-
-    // return empty;  // should never be reached
-    //
-    //Match cmp = runIfMatch(vi, key, klen, hash, f);
-    //Match cmp = m_csp->compare(vi.idx,vi.version,key,klen,hash);
-    //bool success = cmpex_vi(i, vi, desired);  // this should be hit even when the the versions don't match, since m_csp->compare() will return MATCH_TRUE_WRONG_VERSION
   }
 
   template<class FUNC, class T>
@@ -2179,6 +2173,11 @@ public:
 
 
 
+// return empty;  // should never be reached
+//
+//Match cmp = runIfMatch(vi, key, klen, hash, f);
+//Match cmp = m_csp->compare(vi.idx,vi.version,key,klen,hash);
+//bool success = cmpex_vi(i, vi, desired);  // this should be hit even when the the versions don't match, since m_csp->compare() will return MATCH_TRUE_WRONG_VERSION
 
 //u32 cur=blkIdx, prev=blkIdx;   // the first index will have its version set twice
 //while(cur != LIST_END){

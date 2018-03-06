@@ -91,8 +91,7 @@
 // -todo: try querying keys to see if they are missing instead of using the keys vector from db.getKey  
 // -todo: move new types and statics to files made for them
 // -todo: test further for crashes
-
-// todo: test with all threads running in fissure
+// -todo: test with all threads running in fissure
 
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
