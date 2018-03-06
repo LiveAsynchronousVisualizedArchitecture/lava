@@ -110,7 +110,7 @@ extern "C"
       tbl  cg(verts, 1.f);
 
       f32 vrecip = 1.f / verts;
-      f32 coeff  = 1.f / sqrtf(2*PIf*var);
+      f32  coeff = 1.f / sqrtf(2*PIf*var);
       TO(verts,i){
         f32     x = ( (f32)i - (verts/2.f) ) * vrecip * 4.f;
         f32  eExp = -( (x*x)/(2.f*var) ); 

@@ -125,6 +125,7 @@
 // -todo: change the Match enum to be an bit bitfield with flags - not needed for now
 // -todo: make simdb len() and get() ignore version numbers for match and only match keys
 
+// todo: make sure get() only increments and decrements the first/key block in the block list
 // todo: make simdb give a proper error if running out of space
 // todo: make simdb expand when eighther out of space or initialized with a larger amount of space
 // todo: make a get function that takes a key version struct

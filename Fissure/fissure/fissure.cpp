@@ -70,11 +70,10 @@
 // -todo: try pure allocation stress test - not needed now
 // -todo: debug why the concurrent lists seem to become fragmented with more than one thread - - deletion flag not always getting set due to bad compare exchange loop
 // -todo: debug why more than two threads can cause the non-updating (non-inserting problem) and many threads can cause crashing while writing blocks - deletion flag not always getting set due to bad compare exchange loop
+// -todo: change bounding box of message passing nodes to encompass full circle
+// -todo: make sure that the nodes' time percentages are split proportionatly and not all 100% - percent was being maxed with 100 - sprintf formatting used to stabalize the status string length so it doesn't jitter
 
-// todo: make sure get() only increments and decrements the first/key block in the block list
-// todo: change bounding box of message passing nodes to encompass full circle
-
-// todo: make sure that the nodes' time percentages are split proportionatly and not all 100%
+// todo: use a 2D matrix to scale the canvas while using the inverse to scale the mouse input
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: add tool tips to node buttons containing the description string of the node
 // todo: find way to add a tbl to a tbl by reference / direct assignment - should it immediatly copy and flatten()
@@ -378,11 +377,20 @@ str       makeStatusText(u64 nid, f64 totalTime, vec_ndptrs const& nds, u64 nIdx
   using namespace std;
 
   auto&     n  =  fd.lgrph.node(nid);
-  f64 seconds  =  timeToSeconds(n.time);
-  f64 percent  =  totalTime>0?  (seconds/totalTime)*100  :  0;
-  percent      =  max(100.0, percent);
-  seconds      =  (int)(seconds*1000) / 1000.0;    // should clamp the seconds to 3 decimal places 
   
+  char percentStr[256] = {};
+  char secondsStr[256] = {};
+  SECTION(format the node run time percentage string)
+  {
+    f64 seconds  =  timeToSeconds(n.time);
+    f64 percent  =  totalTime>0?  (seconds/totalTime)*100  :  0;
+    seconds      =  (int)(seconds*1000) / 1000.0;    // should clamp the seconds to 3 decimal places 
+
+    sprintf(percentStr, "%0.2f", (f32)percent);
+    sprintf(secondsStr, "%0.2f", (f32)seconds);
+    //percent      =  max(100.0, percent);
+  }
+
   str     err;
   switch(n.getState())
   {
@@ -402,8 +410,8 @@ str       makeStatusText(u64 nid, f64 totalTime, vec_ndptrs const& nds, u64 nIdx
 
   auto status = toString(
     "Node [",nid,"]  ",nds[nIdx]->txt,
-    " | ",seconds," seconds  %",
-    percent,"   ",
+    " | ",secondsStr," seconds  %",
+    percentStr,"   ",
     err);
 
   return status;
@@ -634,7 +642,7 @@ Bnd             node_bnd(NVGcontext* vg, Node const&  n)
 {
   using namespace std;
   
-  //f32 x=n.P.x, y=n.P.y, w=n.b.w(), h=n.b.h();
+  f32 x=n.P.x, y=n.P.y; // w=n.b.w(), h=n.b.h();
   //Bnd b;
   //b = { x, y, x+w, y+h };
   //return b;
@@ -649,15 +657,15 @@ Bnd             node_bnd(NVGcontext* vg, Node const&  n)
   f32       w = max<float>(n.b.w(), tw + wMargin);
   f32       h = max<float>(n.b.h(), (txtBnds[3]-txtBnds[1]) + hMargin );  // nvgTextBounds puts minx, miny, maxx, maxy in the txtBnds float array
 
-  f32 x=n.P.x, y=n.P.y; // h=n.b.h();
   Bnd b;
-  b = { x, y, x+w, y+h };
+  if(n.type == LavaNode::MSG){
+    b = { x, y, x+w, y+w };
+  }else{
+    //f32 x=n.P.x, y=n.P.y; // h=n.b.h();
+    b = { x, y, x+w, y+h };
+  }
 
   return b;
-
-  //if(n.type==Node::MSG){
-  //  b = { x, y, x+w, x+w };
-  //}else
 }
 void           node_draw(NVGcontext* vg,      // drw_node is draw node
                             int preicon,

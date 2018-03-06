@@ -97,6 +97,7 @@
 // -todo: print off full block list - can't if their default index is 0, it will create a loop
 // -todo: print off all blocks
 
+// todo: take out print db menu item
 // todo: add ability to delete keys 
 // todo: delete with multi-selection and right click menu
 // todo: treat the array as a string if it is u8, i8, (or a string type?) - then show statistics for a string if the string is too long to fit in the gui
@@ -1031,7 +1032,6 @@ int  main()
     mb.create(fm);
     mb.push_back("&File");
     mb.push_back("&Help");
-    //mb.push_back("&Print Database");
     mb.caption("menu wat");
     mb.enabled(true);
 
@@ -1085,10 +1085,9 @@ int  main()
       cout << "About pressed" << endl;
     });
 
-    //auto& printMenu = mb.at(2);
-    helpMenu.append("&Print Database", [](auto& itmprxy){
-      printdb( dbs[1] );
-    });
+    //helpMenu.append("&Print Database", [](auto& itmprxy){
+    //  printdb( dbs[1] );
+    //});
 
     mb.show();
   }
