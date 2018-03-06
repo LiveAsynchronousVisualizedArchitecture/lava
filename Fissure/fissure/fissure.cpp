@@ -75,15 +75,16 @@
 // -todo: use a 2D matrix to scale the canvas while using the inverse to scale the mouse input - translate, scale, then translate by negative 
 // -todo: debug nodes not being affected by the initial transform
 // -todo: initialize fd.ui.grphCx and grphCy to width and height - initialized to 0.5 while the width and height are used to scale them further
+// -todo: debug some nodes and slot graphics not being affected by transform - needed to use save() and restore() to put transforms on a stack
+// -todo: make graph transform not apply to the frames per second and the selection box
+// -todo: implement pan by changing graph center variables
 
-// todo: debug some nodes and slot graphics not being affected by transform
-// todo: make graph transform not apply to the frames per second and the selection box
-// todo: implement pan by changing graph center variables
 // todo: implement alternate zoom by holding down the right mouse button and moving to the right and/or up
 // todo: transform mouse clicks by the inverse of the transform 
 // todo: transform selection box by the inverse of the transform
 // todo: make background grid fill the scaled graph canvas
 // todo: make sure zooming is affected by cursor placement
+
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: add tool tips to node buttons containing the description string of the node
 // todo: find way to add a tbl to a tbl by reference / direct assignment - should it immediatly copy and flatten()
@@ -1927,7 +1928,7 @@ ENTRY_DECLARATION // main or winmain
 
         //sort( ALL(slts) );
       }
-      SECTION(selection)
+      SECTION(selection and canvas movement)
       {
         // figure out all the information that needs to be known before figuring what to do with it
         bool lftClkDn  =   ms.lftDn && !ms.prevLftDn;      // lftClkDn is left click down
@@ -2105,6 +2106,7 @@ ENTRY_DECLARATION // main or winmain
       }
       SECTION(movement)
       {
+        v2 pntrDif = pntr - fd.ui.prevPntr;
         SECTION(node movement)
         {
           TO(sz,i)
@@ -2173,19 +2175,27 @@ ENTRY_DECLARATION // main or winmain
             }
           }
         }
+        SECTION(node graph canvas movement)
+        {
+          if(ms.dragging && ms.rtDn){
+            fd.ui.grphCx += pntrDif.x / fd.ui.w;
+            fd.ui.grphCy += pntrDif.y / fd.ui.h;
+          }
+        }
       }
       SECTION(drawing)
       {
         SECTION(nanovg drawing - |node graph|)
         {
           //f32 tfm[6];
-          f32 tx = fd.ui.grphTx * fd.ui.w;
-          f32 ty = fd.ui.grphTy * fd.ui.h;
+          f32 cx = fd.ui.grphCx * fd.ui.w;
+          f32 cy = fd.ui.grphCy * fd.ui.h;
           nvgBeginFrame(vg,  fd.ui.w,   fd.ui.h, pxRatio);
             nvgResetTransform(vg);
-            nvgTranslate(vg,   tx,    ty);
-            nvgScale(vg, fd.ui.grphTx, fd.ui.grphTy);
-            nvgTranslate(vg,  -tx,   -ty);          
+            nvgTranslate(vg,    fd.ui.w/2.f,      fd.ui.h/2.f);
+            nvgScale(vg,       fd.ui.grphTx,     fd.ui.grphTy);
+            nvgTranslate(vg,   -fd.ui.w/2.f,     -fd.ui.h/2.f);
+            nvgTranslate(vg,             cx,               cy);
             SECTION(background grid)
             {
               nvgStrokeWidth(vg, 1.f);
