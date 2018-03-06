@@ -5,10 +5,6 @@
       <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
       <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
     </Filter>
-    <Filter Include="Header Files">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
-    </Filter>
     <Filter Include="libh">
       <UniqueIdentifier>{c4768e6a-40b5-45b2-90a9-36cd6cdb8099}</UniqueIdentifier>
     </Filter>
@@ -21,12 +17,6 @@
     <Filter Include="Source Files\libs">
       <UniqueIdentifier>{e2df391f-1db1-41d0-ab93-1c39becde07b}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\libs">
-      <UniqueIdentifier>{c4607905-505b-4a58-90e9-43b23e88cd93}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\nanovg">
-      <UniqueIdentifier>{94c495f8-72c2-4c6e-96fe-8b4260fa02c5}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Source Files\nanogui">
       <UniqueIdentifier>{26939ba1-0e01-43f4-a07d-70a2fc3bc8d8}</UniqueIdentifier>
     </Filter>
@@ -35,6 +25,16 @@
     </Filter>
     <Filter Include="Source Files\naitive file dialog">
       <UniqueIdentifier>{a0744f5e-6d7c-48b6-9ed9-613e4b5671f0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="h">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="h\libs">
+      <UniqueIdentifier>{c4607905-505b-4a58-90e9-43b23e88cd93}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="h\nanovg">
+      <UniqueIdentifier>{94c495f8-72c2-4c6e-96fe-8b4260fa02c5}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -161,13 +161,13 @@
       <Filter>hpp</Filter>
     </ClInclude>
     <ClInclude Include="picojson.h">
-      <Filter>Header Files</Filter>
+      <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\Transform.h">
-      <Filter>Header Files</Filter>
+      <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="FissureDecl.h">
-      <Filter>Header Files</Filter>
+      <Filter>h</Filter>
     </ClInclude>
     <ClInclude Include="..\nanovg-master\src\stb_truetype.h">
       <Filter>libh</Filter>
@@ -176,16 +176,16 @@
       <Filter>libh</Filter>
     </ClInclude>
     <ClInclude Include="..\nanovg-master\src\nanovg.h">
-      <Filter>Header Files\nanovg</Filter>
+      <Filter>h\nanovg</Filter>
     </ClInclude>
     <ClInclude Include="..\nanovg-master\src\nanovg_gl.h">
-      <Filter>Header Files\nanovg</Filter>
+      <Filter>h\nanovg</Filter>
     </ClInclude>
     <ClInclude Include="..\nanovg-master\src\nanovg_gl_utils.h">
-      <Filter>Header Files\nanovg</Filter>
+      <Filter>h\nanovg</Filter>
     </ClInclude>
     <ClInclude Include="..\nanovg-master\src\fontstash.h">
-      <Filter>Header Files\nanovg</Filter>
+      <Filter>h\nanovg</Filter>
     </ClInclude>
     <ClInclude Include="..\LavaFlow.hpp">
       <Filter>hpp</Filter>

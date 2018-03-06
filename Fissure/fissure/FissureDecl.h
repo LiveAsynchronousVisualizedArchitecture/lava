@@ -275,6 +275,10 @@ struct FisData
     bool             prevLftDn = false;    // left mouse button down
 
     // drawing
+    f32              grphTx  =  1.0f;       // grphTx and grphTy are graph transform X and Y - these will determine how zoomed out or zoomed in the graph window is
+    f32              grphTy  =  1.0f;
+    f32              grphCx  =  0.0f;       // grphCx and grphCy are graph center X and Y 
+    f32              grphCy  =  0.0f;
     NVGcolor        lineClr  =  nvgRGBAf(.04f, .04f, .04f, 1.f);
     NVGcolor       nd_color  =  nvgRGBAf(.2f, .3f, .375f, 1.f);
     NVGcolor      nd_selclr  =  nvgRGBAf(.5f,.4f,.1f, 1.f);

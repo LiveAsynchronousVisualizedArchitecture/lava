@@ -72,8 +72,13 @@
 // -todo: debug why more than two threads can cause the non-updating (non-inserting problem) and many threads can cause crashing while writing blocks - deletion flag not always getting set due to bad compare exchange loop
 // -todo: change bounding box of message passing nodes to encompass full circle
 // -todo: make sure that the nodes' time percentages are split proportionatly and not all 100% - percent was being maxed with 100 - sprintf formatting used to stabalize the status string length so it doesn't jitter
+// -todo: use a 2D matrix to scale the canvas while using the inverse to scale the mouse input - translate, scale, then translate by negative 
 
-// todo: use a 2D matrix to scale the canvas while using the inverse to scale the mouse input
+// todo: initialize fd.ui.grphCx and grphCy to width and height
+// todo: implement pan by changing graph center variables
+// todo: implement alternate zoom by holding down the right mouse button and moving to the right and/or up
+// todo: transform mouse clicks by the inverse of the transform 
+// todo: debug nodes not being affected by the initial transform
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: add tool tips to node buttons containing the description string of the node
 // todo: find way to add a tbl to a tbl by reference / direct assignment - should it immediatly copy and flatten()
@@ -1393,6 +1398,9 @@ void               keyCallback(GLFWwindow* win,    int key, int scancode, int ac
 }
 void          mouseBtnCallback(GLFWwindow* window, int button, int action, int mods)
 {
+  bool used = fd.ui.screen.mouseButtonCallbackEvent(button, action, mods);
+  if(used){ return; }
+
   if(button==GLFW_MOUSE_BUTTON_LEFT){
     if(action==GLFW_PRESS) fd.mouse.lftDn = true;
     else if(action==GLFW_RELEASE) fd.mouse.lftDn = false;
@@ -1402,8 +1410,6 @@ void          mouseBtnCallback(GLFWwindow* window, int button, int action, int m
     if(action==GLFW_PRESS){ fd.mouse.rtDn = true; }
     else if(action==GLFW_RELEASE){ fd.mouse.rtDn = false; }
   }
-
-  fd.ui.screen.mouseButtonCallbackEvent(button, action, mods);
 }
 void             errorCallback(int e, const char *d) {
   printf("Error %d: %s\n", e, d);
@@ -1412,7 +1418,12 @@ void             errorCallback(int e, const char *d) {
 void            scrollCallback(GLFWwindow* window, double xofst, double yofst)
 {
   using namespace std;
-  fd.ui.screen.scrollCallbackEvent(xofst, yofst);
+  bool used = fd.ui.screen.scrollCallbackEvent(xofst, yofst);
+  if(used){ return; }
+
+  f32 scale2  = (f32)(1 + yofst/10);
+  fd.ui.grphTx  *= scale2;
+  fd.ui.grphTy  *= scale2;
 }
 void         cursorPosCallback(GLFWwindow* window, double x, double y)
 {
@@ -2151,229 +2162,243 @@ ENTRY_DECLARATION // main or winmain
       {
         SECTION(nanovg drawing - |node graph|)
         {
-          nvgBeginFrame(vg, fd.ui.w, fd.ui.h, pxRatio);
-          SECTION(background grid)
-          {
-            nvgStrokeWidth(vg, 1.f);
-            nvgStrokeColor(vg, nvgRGBAf( .12f, .12f, .12f, 1.f));
-
-            u32 lineCntX = (fd.ui.w / 100) + 1;
-            f32 lineIncX  = fd.ui.w / (f32)lineCntX;
-            f32    curX  = 0; 
-            TO(lineCntX,i){
-              nvgBeginPath(vg);
-                nvgMoveTo(vg, curX, 0);
-                nvgLineTo(vg, curX, (f32)fd.ui.h);
-              nvgStroke(vg);
-
-              curX += lineIncX;
-            }
-
-            u32 lineCntY = (fd.ui.h / 100) + 1;
-            f32 lineIncY  = fd.ui.h / (f32)lineCntY;
-            f32    curY  = 0; 
-            TO(lineCntY,i){
-              nvgBeginPath(vg);
-              nvgMoveTo(vg, 0, curY);
-              nvgLineTo(vg, (f32)fd.ui.w, curY);
-              nvgStroke(vg);
-
-              curY += lineIncY;
-            }
-          }
-          SECTION(current node highlights)
-          {
-            auto nid = fd.graph.curNode;
-            if(nid != LavaNode::NONE  &&
-               fd.graph.nds.count(nid) > 0)
+          //f32 tfm[6];
+          nvgBeginFrame(vg,  fd.ui.w,       fd.ui.h, pxRatio);
+          nvgTranslate(vg,   fd.ui.w/2.f,   fd.ui.h/2.f);
+          nvgScale(vg, fd.ui.grphTx, fd.ui.grphTy);
+          nvgTranslate(vg,  -fd.ui.w/2.f,  -fd.ui.h/2.f);
+          
+          //nvgTranslate(vg, -fd.ui.grphCx,  -fd.ui.grphCy);
+          
+          //nvgScale(vg, fd.ui.grphTx, fd.ui.grphTy);
+          //nvgTransformIdentity(tfm);
+          //nvgTransformTranslate(tfm, fd.ui.grphCx, fd.ui.grphCy);
+          //nvgTransformScale(tfm, fd.ui.grphTx, fd.ui.grphTy);
+          //nvgTransformTranslate(tfm, -fd.ui.grphCx, -fd.ui.grphCy);
+          //nvgTransform(vg, fd.ui.grphTx, fd.ui.grphTy, fd.ui.grphCx, fd.ui.grphCy);
+            //nvgTransformInverse();
+            SECTION(background grid)
             {
-              auto const& n = fd.graph.nds[nid];
-              node_draw_radial(n, vg, nvgRGBA(0,255,128,48));
-            }
-          }
-          SECTION(highlights behind visualized slots)
-          {
-            TO(fd.vizIds.sz,i)
-            {
-              LavaId id;
-              id.asInt  = fd.vizIds.load(i);
-              Slot*   s = nullptr;
-              if(id.asInt == fd.vizIds.null_val){ continue; }
-              s = slot_get(id);
-              if(!s){ continue; }
+              nvgStrokeWidth(vg, 1.f);
+              nvgStrokeColor(vg, nvgRGBAf( .12f, .12f, .12f, 1.f));
 
-              draw_radial(vg, nvgRGBA(0,128,228,255), 
-                s->P.x, s->P.y, fd.ui.slot_rad*5); 
-            }
-          }
-          SECTION(draw outstanding packets as circle segments around slots)
-          {
-            nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
-            nvgStrokeWidth(vg, 1.f);
-            nvgFillColor(vg, nvgRGBAf(1.f,1.f,0,.75f) );
-
-            auto const& slots = fd.graph.slots;
-            for(auto lid : fd.graph.packetSlots)
-            {
-              auto sIter = node_slots(lid.nid);
-              for(; sIter!=end(slots) && sIter->first.nid==lid.nid; ++sIter)
-              {
-                auto sIdx = sIter->first;                        // todo: needs to be redone
-                if(lid.sidx != sIdx.sidx){ continue; }
-                  
-                Slot const& s = sIter->second;
-
-                // draw a circle larger than the slot circle, which will show up as a sort of halo when the slot is drawn over it in the next section
+              u32 lineCntX = (fd.ui.w / 100) + 1;
+              f32 lineIncX  = fd.ui.w / (f32)lineCntX;
+              f32    curX  = 0; 
+              TO(lineCntX,i){
                 nvgBeginPath(vg);
-                  nvgCircle(vg, s.P.x, s.P.y, fd.ui.slot_rad+5.f);
-                  nvgFill(vg);
-                  nvgStroke(vg);
+                  nvgMoveTo(vg, curX, 0);
+                  nvgLineTo(vg, curX, (f32)fd.ui.h);
                 nvgStroke(vg);
-              }
-            }
-          }
-          SECTION(draw connections)
-          {
-            //nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
-            auto di = g.srcCnctsMap().begin();                                    // di is destination iterator
-            auto en = g.srcCnctsMap().end();
-            for(auto di = g.srcCnctsMap().begin(); di != en; )
-            {
-              LavaId  srcIdx = di->first;
-              LavaId destIdx = di->second;
 
-              auto pcktSltIter = find( ALL(fd.graph.packetSlots), srcIdx);  // todo: this is a linear search, it could be a hash lookup
-              //if(fd.vizIds.has(srcIdx.asInt)){
-              if( pcktSltIter !=  end(fd.graph.packetSlots) ){
-                nvgStrokeWidth(vg, 4.f);
-                nvgStrokeColor(vg, nvgRGBAf(1.f, .85f, 0, 0.8f));
-              }else{
-                nvgStrokeWidth(vg, 3.f);
-                nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+                curX += lineIncX;
               }
 
-              u64  cnt = 0; v2 srcP(0,0); v2 srcN(0,0);
-              auto const& si = fd.graph.slots.find(srcIdx);
-              if(si != fd.graph.slots.end()){
-                cnt  = g.destCnctCount(srcIdx);
-                srcP = si->second.P;
-                srcN = si->second.N;
-              }
-
-              if(cnt==1)
-              {
-                Slot const& dest = fd.graph.slots.find(destIdx)->second; // todo: check for end() here?
-                f32 w = fd.graph.nds[destIdx.nid].b.w();
-
-                cnct_draw(vg, srcP, dest.P, srcN, dest.N, w/2);
-                ++di;
-              }
-              else
-              {
-                v2 avgP=srcP; v2 avgN={0,0}; u32 cnt=0;
-                auto avgIter=di;
-                for(; avgIter!=en && avgIter->first==srcIdx; ++avgIter )
-                {    
-                  if(! slot_get(avgIter->second)){ continue; }
-
-                  Slot const& dest = *(slot_get(avgIter->second));
-                  avgP += dest.P;
-                  avgP += srcP;
-                  ++cnt;
-                }
-                avgP    /= (f32)(cnt*2+1);             // can't forget the first position for averaging - the src position - the avgP is weighted 1:1 with the srcP and all the destination positions combined
-                v2 midN  = norm(srcP - avgP);
-                f32   w  = fd.graph.nds[destIdx.nid].b.w();
-
-                cnct_draw(vg, srcP, avgP, srcN, midN, w/2);
-
-                for(auto dhIter=di; di!=en && di->first == srcIdx; ++di){        // dhIter is draw half iterator - this is where the the connections are drawn from the average position of all slots 
-                  const v2 hlfsz = fd.ui.slot_rad/2.f;
-
-                  Slot* dest = slot_get(di->second);
-
-                  if(dest) cnct_draw(vg, avgP, dest->P, -1.f*midN, dest->N, w/2);
-                }
-
+              u32 lineCntY = (fd.ui.h / 100) + 1;
+              f32 lineIncY  = fd.ui.h / (f32)lineCntY;
+              f32    curY  = 0; 
+              TO(lineCntY,i){
                 nvgBeginPath(vg);
-                  nvgCircle(vg, avgP.x, avgP.y, 6.f); 
-                  nvgFillColor(vg, nvgRGBAf(.18f, .18f, .18f, 1.f) );
-                  nvgStrokeWidth(vg, 3.f);
-                  nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f) );
+                nvgMoveTo(vg, 0, curY);
+                nvgLineTo(vg, (f32)fd.ui.w, curY);
                 nvgStroke(vg);
-                nvgFill(vg);
+
+                curY += lineIncY;
               }
             }
-          }
-          SECTION(draw nodes and slots)
-          {
-            auto const& slots = fd.graph.slots;
-            TO(sz,i)
+            SECTION(current node highlights)
             {
-              Node&     n = *(nds[i]);
-              bool selctd = n.id==fd.sel.pri || n.sel;
-
-              LavaInst::State state = fd.lgrph.getState(n.id);
-              if(state == LavaInst::RUN_ERROR){
-                node_draw_radial(n, vg, nvgRGBA(255,48,0,255));
-              }
-
-              bool highlight = isInNode && nIdx==i;
-              node_draw(vg, 0, n, 1.f, selctd, fd.ui.nd_border, highlight);
-
-              SECTION(draw node slots)
+              auto nid = fd.graph.curNode;
+              if(nid != LavaNode::NONE  &&
+                 fd.graph.nds.count(nid) > 0)
               {
-                nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
-                nvgStrokeWidth(vg, fd.ui.slot_border);
-                
-                auto sIter = node_slots(n.id);
-                for(; sIter!=end(slots) && sIter->first.nid==n.id; ++sIter)
+                auto const& n = fd.graph.nds[nid];
+                node_draw_radial(n, vg, nvgRGBA(0,255,128,48));
+              }
+            }
+            SECTION(highlights behind visualized slots)
+            {
+              TO(fd.vizIds.sz,i)
+              {
+                LavaId id;
+                id.asInt  = fd.vizIds.load(i);
+                Slot*   s = nullptr;
+                if(id.asInt == fd.vizIds.null_val){ continue; }
+                s = slot_get(id);
+                if(!s){ continue; }
+
+                draw_radial(vg, nvgRGBA(0,128,228,255), 
+                  s->P.x, s->P.y, fd.ui.slot_rad*5); 
+              }
+            }
+            SECTION(draw outstanding packets as circle segments around slots)
+            {
+              nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
+              nvgStrokeWidth(vg, 1.f);
+              nvgFillColor(vg, nvgRGBAf(1.f,1.f,0,.75f) );
+
+              auto const& slots = fd.graph.slots;
+              for(auto lid : fd.graph.packetSlots)
+              {
+                auto sIter = node_slots(lid.nid);
+                for(; sIter!=end(slots) && sIter->first.nid==lid.nid; ++sIter)
                 {
-                  auto     sIdx = sIter->first;                    // todo: needs to be redone
-                  //Slot const& s = *(grph.slot(sIdx));
+                  auto sIdx = sIter->first;                        // todo: needs to be redone
+                  if(lid.sidx != sIdx.sidx){ continue; }
+                  
                   Slot const& s = sIter->second;
-                  bool   inSlot = len(pntr - s.P) < fd.ui.slot_rad; //io_rad;
 
-                  Slot::State drawState = Slot::NORMAL;
-                  if(s.state==Slot::SELECTED) drawState = Slot::SELECTED;
-                  else if(inSlot)             drawState = Slot::HIGHLIGHTED;
-                  slot_draw(vg, s, drawState, fd.ui.slot_rad);
+                  // draw a circle larger than the slot circle, which will show up as a sort of halo when the slot is drawn over it in the next section
+                  nvgBeginPath(vg);
+                    nvgCircle(vg, s.P.x, s.P.y, fd.ui.slot_rad+5.f);
+                    nvgFill(vg);
+                    nvgStroke(vg);
+                  nvgStroke(vg);
                 }
               }
             }
-          }
-          SECTION(draw selection box)
-          {
-            if(fd.mouse.lftDn && fd.sel.pri==LavaNode::NODE_ERROR)
+            SECTION(draw connections)
             {
-              nvgBeginPath(vg);
-                float x,y,w,h;
-                x = min(ms.drgP.x, pntr.x); 
-                y = min(ms.drgP.y, pntr.y); 
-                w = abs(ms.drgP.x - pntr.x);
-                h = abs(ms.drgP.y - pntr.y);
-                nvgRect(vg, x,y, w,h);
-                nvgStrokeWidth(vg, 1.f);
-                nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, .75f));
-              nvgStroke(vg);
+              //nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+              auto di = g.srcCnctsMap().begin();                                    // di is destination iterator
+              auto en = g.srcCnctsMap().end();
+              for(auto di = g.srcCnctsMap().begin(); di != en; )
+              {
+                LavaId  srcIdx = di->first;
+                LavaId destIdx = di->second;
+
+                auto pcktSltIter = find( ALL(fd.graph.packetSlots), srcIdx);  // todo: this is a linear search, it could be a hash lookup
+                //if(fd.vizIds.has(srcIdx.asInt)){
+                if( pcktSltIter !=  end(fd.graph.packetSlots) ){
+                  nvgStrokeWidth(vg, 4.f);
+                  nvgStrokeColor(vg, nvgRGBAf(1.f, .85f, 0, 0.8f));
+                }else{
+                  nvgStrokeWidth(vg, 3.f);
+                  nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+                }
+
+                u64  cnt = 0; v2 srcP(0,0); v2 srcN(0,0);
+                auto const& si = fd.graph.slots.find(srcIdx);
+                if(si != fd.graph.slots.end()){
+                  cnt  = g.destCnctCount(srcIdx);
+                  srcP = si->second.P;
+                  srcN = si->second.N;
+                }
+
+                if(cnt==1)
+                {
+                  Slot const& dest = fd.graph.slots.find(destIdx)->second; // todo: check for end() here?
+                  f32 w = fd.graph.nds[destIdx.nid].b.w();
+
+                  cnct_draw(vg, srcP, dest.P, srcN, dest.N, w/2);
+                  ++di;
+                }
+                else
+                {
+                  v2 avgP=srcP; v2 avgN={0,0}; u32 cnt=0;
+                  auto avgIter=di;
+                  for(; avgIter!=en && avgIter->first==srcIdx; ++avgIter )
+                  {    
+                    if(! slot_get(avgIter->second)){ continue; }
+
+                    Slot const& dest = *(slot_get(avgIter->second));
+                    avgP += dest.P;
+                    avgP += srcP;
+                    ++cnt;
+                  }
+                  avgP    /= (f32)(cnt*2+1);             // can't forget the first position for averaging - the src position - the avgP is weighted 1:1 with the srcP and all the destination positions combined
+                  v2 midN  = norm(srcP - avgP);
+                  f32   w  = fd.graph.nds[destIdx.nid].b.w();
+
+                  cnct_draw(vg, srcP, avgP, srcN, midN, w/2);
+
+                  for(auto dhIter=di; di!=en && di->first == srcIdx; ++di){        // dhIter is draw half iterator - this is where the the connections are drawn from the average position of all slots 
+                    const v2 hlfsz = fd.ui.slot_rad/2.f;
+
+                    Slot* dest = slot_get(di->second);
+
+                    if(dest) cnct_draw(vg, avgP, dest->P, -1.f*midN, dest->N, w/2);
+                  }
+
+                  nvgBeginPath(vg);
+                    nvgCircle(vg, avgP.x, avgP.y, 6.f); 
+                    nvgFillColor(vg, nvgRGBAf(.18f, .18f, .18f, 1.f) );
+                    nvgStrokeWidth(vg, 3.f);
+                    nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f) );
+                  nvgStroke(vg);
+                  nvgFill(vg);
+                }
+              }
             }
-          }
-          SECTION(draw fps - frames per second counter)
-          {
-            avgFps *= 0.9;
-            avgFps += (1.0/dt)*0.1;
-            int fps = (int)avgFps;
+            SECTION(draw nodes and slots)
+            {
+              auto const& slots = fd.graph.slots;
+              TO(sz,i)
+              {
+                Node&     n = *(nds[i]);
+                bool selctd = n.id==fd.sel.pri || n.sel;
 
-            char fpsStr[TITLE_MAX_LEN];
-            sprintf(fpsStr, "%d", fps);
+                LavaInst::State state = fd.lgrph.getState(n.id);
+                if(state == LavaInst::RUN_ERROR){
+                  node_draw_radial(n, vg, nvgRGBA(255,48,0,255));
+                }
 
-            f32 tb = nvgTextBounds(vg, 10,0, fpsStr, NULL, NULL);
-            nvgFontSize(vg, 12.0f);
-            nvgFontFace(vg, "sans-bold");
-            nvgTextAlign(vg,  NVG_ALIGN_LEFT);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
-            nvgFillColor(vg, nvgRGBA(255,255,255,255));
-            nvgText(vg,  fd.ui.w - tb , 10, fpsStr, NULL);
-          }
+                bool highlight = isInNode && nIdx==i;
+                node_draw(vg, 0, n, 1.f, selctd, fd.ui.nd_border, highlight);
+
+                SECTION(draw node slots)
+                {
+                  nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
+                  nvgStrokeWidth(vg, fd.ui.slot_border);
+                
+                  auto sIter = node_slots(n.id);
+                  for(; sIter!=end(slots) && sIter->first.nid==n.id; ++sIter)
+                  {
+                    auto     sIdx = sIter->first;                    // todo: needs to be redone
+                    //Slot const& s = *(grph.slot(sIdx));
+                    Slot const& s = sIter->second;
+                    bool   inSlot = len(pntr - s.P) < fd.ui.slot_rad; //io_rad;
+
+                    Slot::State drawState = Slot::NORMAL;
+                    if(s.state==Slot::SELECTED) drawState = Slot::SELECTED;
+                    else if(inSlot)             drawState = Slot::HIGHLIGHTED;
+                    slot_draw(vg, s, drawState, fd.ui.slot_rad);
+                  }
+                }
+              }
+            }
+            SECTION(draw selection box)
+            {
+              if(fd.mouse.lftDn && fd.sel.pri==LavaNode::NODE_ERROR)
+              {
+                nvgBeginPath(vg);
+                  float x,y,w,h;
+                  x = min(ms.drgP.x, pntr.x); 
+                  y = min(ms.drgP.y, pntr.y); 
+                  w = abs(ms.drgP.x - pntr.x);
+                  h = abs(ms.drgP.y - pntr.y);
+                  nvgRect(vg, x,y, w,h);
+                  nvgStrokeWidth(vg, 1.f);
+                  nvgStrokeColor(vg, nvgRGBAf(1.f, .7f, 0, .75f));
+                nvgStroke(vg);
+              }
+            }
+            SECTION(draw fps - frames per second counter)
+            {
+              avgFps *= 0.9;
+              avgFps += (1.0/dt)*0.1;
+              int fps = (int)avgFps;
+
+              char fpsStr[TITLE_MAX_LEN];
+              sprintf(fpsStr, "%d", fps);
+
+              f32 tb = nvgTextBounds(vg, 10,0, fpsStr, NULL, NULL);
+              nvgFontSize(vg, 12.0f);
+              nvgFontFace(vg, "sans-bold");
+              nvgTextAlign(vg,  NVG_ALIGN_LEFT);  // NVG_ALIGN_LEFT|NVG_ALIGN_MIDDLE);
+              nvgFillColor(vg, nvgRGBA(255,255,255,255));
+              nvgText(vg,  fd.ui.w - tb , 10, fpsStr, NULL);
+            }
           nvgEndFrame(vg);
         }
         SECTION(nanogui)
