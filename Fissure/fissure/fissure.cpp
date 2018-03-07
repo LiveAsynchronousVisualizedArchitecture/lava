@@ -79,11 +79,11 @@
 // -todo: make graph transform not apply to the frames per second and the selection box
 // -todo: implement pan by changing graph center variables
 
+// todo: make background grid fill the scaled graph canvas
+// todo: make sure zooming is affected by cursor placement
 // todo: implement alternate zoom by holding down the right mouse button and moving to the right and/or up
 // todo: transform mouse clicks by the inverse of the transform 
 // todo: transform selection box by the inverse of the transform
-// todo: make background grid fill the scaled graph canvas
-// todo: make sure zooming is affected by cursor placement
 
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: add tool tips to node buttons containing the description string of the node
@@ -2187,7 +2187,7 @@ ENTRY_DECLARATION // main or winmain
       {
         SECTION(nanovg drawing - |node graph|)
         {
-          //f32 tfm[6];
+          f32 tfm[6];
           f32 cx = fd.ui.grphCx * fd.ui.w;
           f32 cy = fd.ui.grphCy * fd.ui.h;
           nvgBeginFrame(vg,  fd.ui.w,   fd.ui.h, pxRatio);
@@ -2201,25 +2201,37 @@ ENTRY_DECLARATION // main or winmain
               nvgStrokeWidth(vg, 1.f);
               nvgStrokeColor(vg, nvgRGBAf( .12f, .12f, .12f, 1.f));
 
-              u32 lineCntX = (fd.ui.w / 100) + 1;
-              f32 lineIncX  = fd.ui.w / (f32)lineCntX;
-              f32    curX  = 0; 
+              Bnd b = {0,0, (f32)fd.ui.w, (f32)fd.ui.h};
+              nvgCurrentTransform(vg, tfm);
+              nvgTransformPoint( &b.mn.x, &b.mn.y, tfm, b.mn.x, b.mn.y);   
+              nvgTransformPoint( &b.mx.x, &b.mx.y, tfm, b.mx.x, b.mx.y);   
+              //f32 grdW = fd.ui.w;
+              //f32 grdH = fd.ui.h;
+              //u32 lineCntX = (fd.ui.w / 100) + 1;
+              //f32 lineIncX = fd.ui.w / (f32)lineCntX;
+              f32      pxW = (f32)fd.ui.w;
+              f32      pxH = (f32)fd.ui.h;
+              u32 lineCntX = (u32)(pxW / 100.f) + 1;
+              f32 lineIncX = pxW / (f32)lineCntX;
+              f32     curX = b.mn.x;
               TO(lineCntX,i){
                 nvgBeginPath(vg);
-                  nvgMoveTo(vg, curX, 0);
-                  nvgLineTo(vg, curX, (f32)fd.ui.h);
+                 nvgMoveTo(vg, curX, b.mn.y);
+                 nvgLineTo(vg, curX, b.mx.y);
                 nvgStroke(vg);
 
                 curX += lineIncX;
               }
 
-              u32 lineCntY = (fd.ui.h / 100) + 1;
-              f32 lineIncY  = fd.ui.h / (f32)lineCntY;
-              f32    curY  = 0; 
+              //u32 lineCntY = (fd.ui.h / 100) + 1;
+              //f32 lineIncY  = fd.ui.h / (f32)lineCntY;
+              u32 lineCntY = (u32)(pxH / 100) + 1;
+              f32 lineIncY = pxH / (f32)lineCntY;
+              f32    curY  = b.mn.y; 
               TO(lineCntY,i){
                 nvgBeginPath(vg);
-                nvgMoveTo(vg, 0, curY);
-                nvgLineTo(vg, (f32)fd.ui.w, curY);
+                 nvgMoveTo(vg, b.mn.x, curY);
+                 nvgLineTo(vg, b.mx.x, curY);
                 nvgStroke(vg);
 
                 curY += lineIncY;
