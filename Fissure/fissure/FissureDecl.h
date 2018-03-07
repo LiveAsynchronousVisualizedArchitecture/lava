@@ -279,6 +279,8 @@ struct FisData
     f32              grphTy  =  1.0f;
     f32              grphCx  =  0.0f;       // grphCx and grphCy are graph center X and Y 
     f32              grphCy  =  0.0f;
+    f32              tfm[6]  =  {1.f,0,0,1.f,0,0};                         // calculated in the drawing loop - initialized as the top 6 values of a 3x3 identity matrix ordered according to nanovg
+    f32           invTfm[6]  =  {1.f,0,0,1.f,0,0};                         // calculated in the drawing loop 
     NVGcolor        lineClr  =  nvgRGBAf(.04f, .04f, .04f, 1.f);
     NVGcolor       nd_color  =  nvgRGBAf(.2f, .3f, .375f, 1.f);
     NVGcolor      nd_selclr  =  nvgRGBAf(.5f,.4f,.1f, 1.f);
