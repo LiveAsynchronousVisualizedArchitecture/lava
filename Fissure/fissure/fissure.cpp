@@ -81,8 +81,9 @@
 // -todo: get x grid lines with scale working first
 // -todo: make background grid fill the scaled graph canvas
 // -todo: make backgroung grid pan
+// -todo: make 'h' key reset zoom and pan
+// -todo: make a right button drag
 
-// todo: make a right button drag
 // todo: debug popping while panning while zoomed out
 // todo: make sure zooming is affected by cursor placement
 // todo: implement alternate zoom by holding down the right mouse button and moving to the right and/or up
@@ -1400,6 +1401,7 @@ void               keyCallback(GLFWwindow* win,    int key, int scancode, int ac
   if(action==GLFW_RELEASE) return;
 
   switch(key){
+  case 'H':
   case 'h':{
     nvgTransformIdentity( fd.ui.tfm );
     nvgTransformIdentity( fd.ui.invTfm );
@@ -1881,10 +1883,6 @@ ENTRY_DECLARATION // main or winmain
   SECTION(main loop)
   {
     auto&       g = fd.lgrph;
-    //f32    tfm[6] = {1.f,0,0,1.f,0,0};                         // calculated in the drawing loop - initialized as the top 6 values of a 3x3 identity matrix ordered according to nanovg
-    //f32 invTfm[6] = {1.f,0,0,1.f,0,0};                      // calculated in the drawing loop 
-    //v2      pntr = {0,0};
-    //f64 cx, cy, t, dt, avgFps=60, prevt=0, cpuTime=0;
     f64 t, dt, avgFps=60, prevt=0, cpuTime=0;
     f32 pxRatio;
     int fbWidth, fbHeight;
@@ -1906,8 +1904,7 @@ ENTRY_DECLARATION // main or winmain
 		    dt    = t - prevt;
 		    prevt = t;
       }
-      v2   pntr; // pntrDif;
-      //f32  cx,cy;
+      v2   pntr;
       SECTION(input)
       {
         glfwPollEvents();                                             // PollEvents must be done after zeroing out the deltas
@@ -1949,7 +1946,7 @@ ENTRY_DECLARATION // main or winmain
         //sort( ALL(slts) );
       }
 
-      SECTION(selection and canvas movement)
+      SECTION(selection)
       {
         // figure out all the information that needs to be known before figuring what to do with it
         bool lftClkDn  =   ms.lftDn && !ms.prevLftDn;      // lftClkDn is left click down
@@ -1998,6 +1995,11 @@ ENTRY_DECLARATION // main or winmain
           }
           ms.dragging  |=  lftClkDn;                             // only change from false to true - already true will stay true
           ms.drgbox    |=  !slotClk && !nodeClk && lftClkDn;     // only change from false to true - already true will stay true
+
+          if(!ms.rtDn){ 
+            ms.rtDragging = false;
+          }
+          ms.rtDragging  |=  rtClkDn;                            // only change from false to true - already true will stay true
 
           if(!ms.dragging){ ms.drgP = pntr; }                    // if not dragging, the drag pointer and pointer are the same
 
@@ -2198,7 +2200,7 @@ ENTRY_DECLARATION // main or winmain
         SECTION(node graph canvas movement)
         {
           v2 pntrDif = pntr - fd.ui.prevPntr;
-          if(ms.dragging && ms.rtDn){
+          if(ms.rtDragging){
             fd.ui.grphCx += pntrDif.x / fd.ui.w;
             fd.ui.grphCy += pntrDif.y / fd.ui.h;
           }
@@ -2503,7 +2505,13 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//
+//f32  cx,cy;
 
+//f32    tfm[6] = {1.f,0,0,1.f,0,0};                         // calculated in the drawing loop - initialized as the top 6 values of a 3x3 identity matrix ordered according to nanovg
+//f32 invTfm[6] = {1.f,0,0,1.f,0,0};                      // calculated in the drawing loop 
+//v2      pntr = {0,0};
+//f64 cx, cy, t, dt, avgFps=60, prevt=0, cpuTime=0;
 
 //f32     fullW = b.w() + lineRemW;
 //u32  lineCntX = (u32)(fullW / lineSpace) + 1;

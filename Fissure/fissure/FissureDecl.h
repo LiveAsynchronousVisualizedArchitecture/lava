@@ -305,6 +305,7 @@ struct FisData
     v2                    drgP;
     v2                 drgofst;
     bool              dragging = false;
+    bool            rtDragging = false;
     bool                drgbox = false;
     bool            prevDrgbox = false;
     bool                 drgNd = false;
