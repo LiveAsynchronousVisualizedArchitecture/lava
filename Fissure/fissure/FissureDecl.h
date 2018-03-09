@@ -312,6 +312,8 @@ struct FisData
     Bnd                 drgbnd;
 
     v2                     pos;
+    v2                 prevPos;
+    v2                  difPos;
   }       mouse;
   struct 
   {
