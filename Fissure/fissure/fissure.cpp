@@ -83,12 +83,12 @@
 // -todo: make backgroung grid pan
 // -todo: make 'h' key reset zoom and pan
 // -todo: make a right button drag
+// -todo: implement alternate zoom by holding down the right mouse button and moving to the right and/or up - both mouse buttons held down used to zoom
 
 // todo: debug popping while panning while zoomed out
-// todo: make sure zooming is affected by cursor placement
-// todo: implement alternate zoom by holding down the right mouse button and moving to the right and/or up
 // todo: transform mouse clicks by the inverse of the transform 
 // todo: transform selection box by the inverse of the transform
+// todo: make sure zooming is affected by cursor placement
 
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: add tool tips to node buttons containing the description string of the node
@@ -1896,7 +1896,7 @@ ENTRY_DECLARATION // main or winmain
       bool isInNode = false;
       LavaId    nid;
       u64      nIdx;
-
+      v2       pntr;
 
       SECTION(time)
       {
@@ -1904,7 +1904,6 @@ ENTRY_DECLARATION // main or winmain
 		    dt    = t - prevt;
 		    prevt = t;
       }
-      v2   pntr;
       SECTION(input)
       {
         glfwPollEvents();                                             // PollEvents must be done after zeroing out the deltas
@@ -1945,7 +1944,6 @@ ENTRY_DECLARATION // main or winmain
 
         //sort( ALL(slts) );
       }
-
       SECTION(selection)
       {
         // figure out all the information that needs to be known before figuring what to do with it
@@ -1989,17 +1987,21 @@ ENTRY_DECLARATION // main or winmain
 
         SECTION(mouse ui state)
         {
-          if(!ms.lftDn){ 
-            ms.dragging = false;
-            ms.drgbox   = false;
-          }
-          ms.dragging  |=  lftClkDn;                             // only change from false to true - already true will stay true
-          ms.drgbox    |=  !slotClk && !nodeClk && lftClkDn;     // only change from false to true - already true will stay true
-
           if(!ms.rtDn){ 
             ms.rtDragging = false;
           }
           ms.rtDragging  |=  rtClkDn;                            // only change from false to true - already true will stay true
+
+          if(ms.rtDragging){ ms.drgbox = false; }
+
+          if(!ms.lftDn){ 
+            ms.dragging = false;
+            ms.drgbox   = false;
+          }
+
+          ms.dragging  |=  lftClkDn;                             // only change from false to true - already true will stay true
+          ms.drgbox    |=  !slotClk && !nodeClk && lftClkDn;     // only change from false to true - already true will stay true
+
 
           if(!ms.dragging){ ms.drgP = pntr; }                    // if not dragging, the drag pointer and pointer are the same
 
@@ -2201,8 +2203,14 @@ ENTRY_DECLARATION // main or winmain
         {
           v2 pntrDif = pntr - fd.ui.prevPntr;
           if(ms.rtDragging){
-            fd.ui.grphCx += pntrDif.x / fd.ui.w;
-            fd.ui.grphCy += pntrDif.y / fd.ui.h;
+            if(ms.dragging){
+              f32 grphScale = (pntrDif.x + pntrDif.y) * 0.0025f;
+              fd.ui.grphTx *= 1.f + grphScale;
+              fd.ui.grphTy *= 1.f + grphScale;
+            }else{
+              fd.ui.grphCx += pntrDif.x / fd.ui.w;
+              fd.ui.grphCy += pntrDif.y / fd.ui.h;
+            }
           }
         }
       }
@@ -2218,10 +2226,12 @@ ENTRY_DECLARATION // main or winmain
             nvgTranslate(vg,    fd.ui.w/2.f,      fd.ui.h/2.f);
             nvgScale(vg,       fd.ui.grphTx,     fd.ui.grphTy);
             nvgTranslate(vg,   -fd.ui.w/2.f,     -fd.ui.h/2.f);
-            nvgTranslate(vg,             cx,               cy);
+            //nvgTranslate(vg,             cx,               cy);
             SECTION(background grid) // the lines will already be transformed, so they just need to wrap around and create the illusion of an infinite canvas
             {
-              Bnd b = {0,0, (f32)fd.ui.w, (f32)fd.ui.h};
+              //Bnd b = {0,0, (f32)fd.ui.w, (f32)fd.ui.h};
+              f32 grdSz = 0.05f;
+              Bnd     b = { 0, 0, (f32)fd.ui.w, (f32)fd.ui.h };
               nvgCurrentTransform(vg,           fd.ui.tfm);
               nvgTransformInverse(fd.ui.invTfm, fd.ui.tfm);
               nvgTransformPoint( &b.mn.x, &b.mn.y, fd.ui.invTfm, b.mn.x, b.mn.y);   
@@ -2230,39 +2240,80 @@ ENTRY_DECLARATION // main or winmain
               nvgSave(vg);
               nvgResetTransform(vg);
 
+              nvgStrokeWidth(vg, 3.f);
+              nvgStrokeColor(vg, nvgRGBAf( .3f, .3f, .3f, 1.f));
+              f32 hlfW = (f32)fd.ui.w / 2.f;
+              nvgBeginPath(vg);
+              nvgMoveTo(vg, hlfW, 0);
+              nvgLineTo(vg, hlfW, (f32)fd.ui.h);
+              nvgStroke(vg);
+
               nvgStrokeWidth(vg, 1.f);
               nvgStrokeColor(vg, nvgRGBAf( .18f, .18f, .18f, 1.f));
 
+
+
               //f32  lineRemW = fmodf( b.w(), lineSpace);
 
-              f32       sx = 1.f / fd.ui.grphTx;
-              f32    fullW = sx * fd.ui.w;
-              f32     remX = fmodf( fullW, lineSpace*sx ) / 2.f;
-              u32 lineCntX = (u32)(fullW / lineSpace);   // + 1;
-              f32 lineIncX = fd.ui.w / (f32)lineCntX;
-              f32     curX = fmod( remX/2 + cx, lineSpace*sx ); /*lineSpace -*/
-              TO(lineCntX+1,i){
+              //f32 lineCntX = (b.w() / lineSpace);
+              //f32     curX = -lineSpace;
+              //f32 curX = b.mn.x + (lineSpace - fmodf( hlfW - b.mn.x, lineSpace));
+              f32 curX = b.mn.x + (fmodf(b.w()/2.f,lineSpace));
+              while(curX < b.mx.x){
+                f32 reX = remap(curX, b.mn.x, b.mx.x, 0, (f32)fd.ui.w);
                 nvgBeginPath(vg);
-                 nvgMoveTo(vg, curX, 0);
-                 nvgLineTo(vg, curX, (f32)fd.ui.h);
+                 nvgMoveTo(vg, reX, 0);
+                 nvgLineTo(vg, reX, (f32)fd.ui.h);
                 nvgStroke(vg);
-                curX += lineIncX;
+                curX += lineSpace;
               }
 
-              f32       sy = 1.f / fd.ui.grphTy;
-              f32    fullH = sy * fd.ui.h;
-              f32     remY = fmodf( fullH, lineSpace*sy ) / 2.f;
-              u32 lineCntY = (u32)(fullH / lineSpace);   // + 1;
-              f32 lineIncY = fd.ui.h / (f32)lineCntY;
-              //f32     curY = remY/2;
-              f32     curY = fmod( remY/2 + cy, lineSpace*sy );
-              TO(lineCntY+1,i){
-                nvgBeginPath(vg);
-                nvgMoveTo(vg,            0, curY);
-                nvgLineTo(vg, (f32)fd.ui.w, curY);
-                nvgStroke(vg);
-                curY += lineIncY;
+              SECTION(NDC try)
+              {
+                //f32 lineCntX = (b.w() / grdSz);
+                //f32 lineIncX = 1.f / lineCntX;
+                //f32     curX = -lineIncX;
+                //for( ; curX < lineCntX+2.f; ){
+                //  f32 reX = remap(curX, 0, 1.f, b.mn.x, b.mx.x) * fd.ui.w; 
+                //  nvgBeginPath(vg);
+                //   nvgMoveTo(vg, reX, 0);
+                //   nvgLineTo(vg, reX, (f32)fd.ui.h);
+                //  nvgStroke(vg);
+                //  curX += lineIncX;
+                //}
               }
+
+              //f32       sx = 1.f / fd.ui.grphTx;
+              //f32   grdSzX = lineSpace * sx;
+              //f32    fullW = sx * fd.ui.w;
+              //f32 lineCntX = fullW / lineSpace + 1.f;
+              //f32 lineIncX = (f32)fd.ui.w / (f32)lineCntX;
+              //f32     remX = fmodf( fullW, grdSzX ) / 2.f;
+              ////f32     curX = fmodf( remX/2.f + cx, grdSzX );     /*lineSpace -*/
+              ////f32     curX = fmodf( remX/2.f, grdSzX );
+              //f32     curX = 0.f;
+              //for(; curX < (f32)fd.ui.w; ){
+              //  nvgBeginPath(vg);
+              //   nvgMoveTo(vg, curX, 0);
+              //   nvgLineTo(vg, curX, (f32)fd.ui.h);
+              //  nvgStroke(vg);
+              //  curX += lineIncX;
+              //}
+
+              //f32       sy = 1.f / fd.ui.grphTy;
+              //f32    fullH = sy * fd.ui.h;
+              //f32     remY = fmodf( fullH, lineSpace*sy ) / 2.f;
+              //u32 lineCntY = (u32)(fullH / lineSpace);   // + 1;
+              //f32 lineIncY = fd.ui.h / (f32)lineCntY;
+              ////f32     curY = remY/2;
+              //f32     curY = fmod( remY/2 + cy, lineSpace*sy );
+              //TO(lineCntY+1,i){
+              //  nvgBeginPath(vg);
+              //  nvgMoveTo(vg,            0, curY);
+              //  nvgLineTo(vg, (f32)fd.ui.w, curY);
+              //  nvgStroke(vg);
+              //  curY += lineIncY;
+              //}
 
               nvgRestore(vg);
             }
