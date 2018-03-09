@@ -88,11 +88,13 @@
 // -todo: transform a bounding box and use that to calculate the start of the lines
 // -todo: remap lines from the bounding box to screen space pixels
 // -todo: copy X grid implementation to Y
+// -todo: remap center crosshair from the bounding box to pixel space
+// -todo: make panning offset relative to the current scale
 
-// todo: remap center crosshair from the bounding box to pixel space
 // todo: transform mouse clicks by the inverse of the transform 
 // todo: transform selection box by the inverse of the transform
 // todo: make sure zooming is affected by cursor placement
+// todo: build 'play pause' button to process a single packet -   "||>"  or  ":> ||"
 
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: add tool tips to node buttons containing the description string of the node
@@ -2212,8 +2214,8 @@ ENTRY_DECLARATION // main or winmain
               fd.ui.grphTx *= 1.f + grphScale;
               fd.ui.grphTy *= 1.f + grphScale;
             }else{
-              fd.ui.grphCx += pntrDif.x / fd.ui.w;
-              fd.ui.grphCy += pntrDif.y / fd.ui.h;
+              fd.ui.grphCx += (pntrDif.x/fd.ui.w) / fd.ui.grphTx;
+              fd.ui.grphCy += (pntrDif.y/fd.ui.h) / fd.ui.grphTy;
             }
           }
         }
@@ -2244,14 +2246,11 @@ ENTRY_DECLARATION // main or winmain
               nvgTransformPoint( &b.mn.x, &b.mn.y, fd.ui.invTfm, b.mn.x, b.mn.y);   
               nvgTransformPoint( &b.mx.x, &b.mx.y, fd.ui.invTfm, b.mx.x, b.mx.y);
 
-
               f32    hlfW = (f32)fd.ui.w / 2.f;
               f32    hlfH = (f32)fd.ui.h / 2.f;
               f32 cntrX, cntrY;
               nvgTransformPoint( &cntrX, &cntrY, fd.ui.tfm, hlfW, hlfH);
 
-              //f32 hlfW = remap( (b.mn.x+b.mx.x)/2, b.mn.x, b.mx.x, 0, (f32)fd.ui.w);
-              //f32 hlfH = remap( (b.mn.y+b.mx.y)/2, b.mn.y, b.mx.y, 0, (f32)fd.ui.h);
               SECTION(draw centered grid lines)
               {
                 nvgStrokeWidth(vg, 2.f);
@@ -2299,6 +2298,9 @@ ENTRY_DECLARATION // main or winmain
               }
 
               nvgRestore(vg);
+
+              //f32 hlfW = remap( (b.mn.x+b.mx.x)/2, b.mn.x, b.mx.x, 0, (f32)fd.ui.w);
+              //f32 hlfH = remap( (b.mn.y+b.mx.y)/2, b.mn.y, b.mx.y, 0, (f32)fd.ui.h);
             }
             SECTION(current node highlights)
             {
