@@ -2226,7 +2226,7 @@ ENTRY_DECLARATION // main or winmain
             nvgTranslate(vg,    fd.ui.w/2.f,      fd.ui.h/2.f);
             nvgScale(vg,       fd.ui.grphTx,     fd.ui.grphTy);
             nvgTranslate(vg,   -fd.ui.w/2.f,     -fd.ui.h/2.f);
-            //nvgTranslate(vg,             cx,               cy);
+            nvgTranslate(vg,             cx,               cy);
             SECTION(background grid) // the lines will already be transformed, so they just need to wrap around and create the illusion of an infinite canvas
             {
               //Bnd b = {0,0, (f32)fd.ui.w, (f32)fd.ui.h};
@@ -2258,7 +2258,9 @@ ENTRY_DECLARATION // main or winmain
               //f32 lineCntX = (b.w() / lineSpace);
               //f32     curX = -lineSpace;
               //f32 curX = b.mn.x + (lineSpace - fmodf( hlfW - b.mn.x, lineSpace));
-              f32 curX = b.mn.x + (fmodf(b.w()/2.f,lineSpace));
+              //f32 hlfBndW = b.w() / 2.f;
+              f32   ofstX = (b.mx.x+b.mn.x)/2.f - hlfW;
+              f32    curX = b.mn.x + fmodf(b.w()/2.f - ofstX,lineSpace);
               while(curX < b.mx.x){
                 f32 reX = remap(curX, b.mn.x, b.mx.x, 0, (f32)fd.ui.w);
                 nvgBeginPath(vg);
