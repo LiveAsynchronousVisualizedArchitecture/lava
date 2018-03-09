@@ -91,10 +91,12 @@
 // -todo: remap center crosshair from the bounding box to pixel space
 // -todo: make panning offset relative to the current scale
 // -todo: transform mouse clicks by the inverse of the transform 
+// -todo: transform selection box by the inverse of the transform
+// -todo: make UI 'play pause' button to process a single packet -   "||>"  or  ":> ||"
 
-// todo: transform selection box by the inverse of the transform
+// todo: make node default position be 0,0
+// todo: use nodeTxt UI element display and allow changes to the node instance names
 // todo: make sure zooming center is affected by cursor placement
-// todo: build 'play pause' button to process a single packet -   "||>"  or  ":> ||"
 
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: add tool tips to node buttons containing the description string of the node
@@ -646,6 +648,8 @@ auto            node_add(str node_name, Node n) -> uint64_t
       n.txt   = "New: " +  node_name;
       n.id    = instIdx;
       n.order = ido.order;
+      n.P.x   = fd.ui.w/2.f - n.b.w()/2.f;
+      n.P.y   = fd.ui.h/2.f - n.b.h()/2.f; 
       fd.graph.nds[instIdx] = move(n);
 
       LavaCommand::Arg A,B;
@@ -1684,9 +1688,10 @@ ENTRY_DECLARATION // main or winmain
       auto spcr2      = new   Label(fd.ui.keyWin,     "");
       auto loadBtn    = new  Button(fd.ui.keyWin,      "Load");
       auto saveBtn    = new  Button(fd.ui.keyWin,      "Save");
-      auto playBtn    = new  Button(fd.ui.keyWin,    "Play >");
-      auto pauseBtn   = new  Button(fd.ui.keyWin,  "Pause ||");
-      auto stopBtn    = new  Button(fd.ui.keyWin,  "Stop |_|");
+      auto stepBtn    = new  Button(fd.ui.keyWin,    "Step  ||>");
+      auto playBtn    = new  Button(fd.ui.keyWin,    "Play  >");
+      auto pauseBtn   = new  Button(fd.ui.keyWin,  "Pause  ||");
+      auto stopBtn    = new  Button(fd.ui.keyWin,  "Stop  |_|");
       auto nodeBtn    = new  Button(fd.ui.keyWin,  "Create Node");
       auto nodeTxt    = new TextBox(fd.ui.keyWin,  "");
       auto thrdsLabel = new   Label(fd.ui.keyWin, toString(fd.threadCount) );
@@ -1703,10 +1708,15 @@ ENTRY_DECLARATION // main or winmain
       }
       SECTION(initialize button colors and callbacks)
       {
-        playBtn->setBackgroundColor(  Color(e3f(.15f, .2f,  .15f)) ); 
+        playBtn->setBackgroundColor(  Color(e3f(.15f, .25f,  .15f)) ); 
         playBtn->setTextColor( Color(e3f(1.f, 1.f, 1.f)) );
+
+        stepBtn->setBackgroundColor(  Color(e3f(.2f, .25f,  .2f)) ); 
+        stepBtn->setTextColor( Color(e3f(1.f, 1.f, 1.f)) );
+        
         pauseBtn->setBackgroundColor( Color(e3f(.2f,  .2f,  .15f)) ); 
         pauseBtn->setEnabled(false);
+        
         stopBtn->setBackgroundColor(  Color(e3f(.19f, .16f, .17f)) ); 
         stopBtn->setEnabled(false);
 
@@ -2051,8 +2061,13 @@ ENTRY_DECLARATION // main or winmain
         {
           if(ms.drgbox) TO(sz,i)
           {
+            Bnd tfmBnd;
+            nvgTransformPoint( &tfmBnd.mn.x, &tfmBnd.mn.y, fd.ui.invTfm, ms.drgbnd.mn.x, ms.drgbnd.mn.y );
+            nvgTransformPoint( &tfmBnd.mx.x, &tfmBnd.mx.y, fd.ui.invTfm, ms.drgbnd.mx.x, ms.drgbnd.mx.y );
+
             Node& n       =  *(nds[i]);
-            bool inside   =  isIn(n.b, ms.drgbnd);
+            //bool inside   =  isIn(n.b, ms.drgbnd);
+            bool inside   =  isIn(n.b, tfmBnd);
             n.sel        |=  inside;
             //anyInside    |=  inside;
           }
