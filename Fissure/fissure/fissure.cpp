@@ -93,8 +93,9 @@
 // -todo: transform mouse clicks by the inverse of the transform 
 // -todo: transform selection box by the inverse of the transform
 // -todo: make UI 'play pause' button to process a single packet -   "||>"  or  ":> ||"
+// -todo: make node start at the center point of the grid
 
-// todo: make node default position be 0,0
+// todo: re-orient nodes on resize of the window so they line up with the grid in the same place - maybe the scale and pan need to be changed instead
 // todo: use nodeTxt UI element display and allow changes to the node instance names
 // todo: make sure zooming center is affected by cursor placement
 

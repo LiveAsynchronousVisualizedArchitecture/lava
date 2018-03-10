@@ -12,7 +12,19 @@ Stand Alone
 |  Create a .cpp file that has the connections hard coded and compile that? 
 
 
+Gauss Curve 2
+|  Make a message passing node create the parameters
+|  Use the command prompt node to fill in parameters
+|  Make a node that fills in the parameters randomly
 
 
+Ray Tracing
+|  Make an obj loader node
+|  Make a node to create an embree BVH
+|  Make a node that creates large batches of rays
+|  make a node that traces the rays with embree
+|  make a node that runs a brdf on the rays and give another batch of rays
+|  visualize the rays colored by the brdf with alpha of 0 so that they are additive
+|  visualize the rays generated from the brdf
 
 
