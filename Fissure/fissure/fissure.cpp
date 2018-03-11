@@ -95,10 +95,13 @@
 // -todo: make UI 'play pause' button to process a single packet -   "||>"  or  ":> ||"
 // -todo: make node start at the center point of the grid
 // -todo: debug crash on deletion of a node - just needed to reorder the sequence of polling for events, applying commands to the graph, and getting the vector of nodes in the nodes graph
+// -todo: fix overlapping nodes when loading .lava file - node_add() was not the place to make new nodes start in the center, since it is used by file loading as well as node creation buttons
+// -todo: make a file path node to feed an obj loader node 
+// -todo: make an obj Loader that takes a file path and outputs an IdxVert packet
 
+// todo: repeat crash when loading .lava file - doesn't crash with single FilePath node - doesn't crash with FilePath and LoadObj nodes linked together, but does not get their positions correct
+// todo: debug why grid movement now does not work 
 // todo: debug why there is no output that makes it to brandisher or the visualizer
-// todo: make a file path node to feed an obj loader node 
-// todo: make an obj Loader that takes a file path and outputs an IdxVert packet
 // todo: re-orient nodes on resize of the window so they line up with the grid in the same place - maybe the scale and pan need to be changed instead
 // todo: use nodeTxt UI element display and allow changes to the node instance names
 // todo: make sure zooming center is affected by cursor placement
@@ -657,8 +660,8 @@ auto            node_add(str node_name, Node n) -> uint64_t
       n.txt   = "New: " +  node_name;
       n.id    = instIdx;
       n.order = ido.order;
-      n.P.x   = fd.ui.w/2.f - n.b.w()/2.f;
-      n.P.y   = fd.ui.h/2.f - n.b.h()/2.f; 
+      //n.P.x   = fd.ui.w/2.f - n.b.w()/2.f;
+      //n.P.y   = fd.ui.h/2.f - n.b.h()/2.f; 
       fd.graph.nds[instIdx] = move(n);
 
       LavaCommand::Arg A,B;
@@ -1089,35 +1092,15 @@ void         graph_clear()
 void         graph_apply(LavaGraph::ArgVec args)
 {
   using namespace std;
-  //auto ni = fd.graph.nds.find(a.id.nid);
 
   for(auto& a : args){
     if(a.id.sidx == LavaId::SLOT_NONE && a.id.nid != LavaId::NODE_NONE)
     {
-      //LavaInst li = fd.lgrph.node(a.id.nid);
-      //
-      //FisData::IdOrder ido;                                                          //ido is id order
-      //ido.id    = a.id.nid;
-      //ido.order = node_nxtOrder();
-      //fd.graph.ordr.insert(ido);
-      //
-      //Node n = move(fd.graph.nds[a.id.nid]);
-      //
-      //if(n.txt=="") { n.txt = "New: " + str(li.node->name); }
-      //n.id    = a.id.nid;
-      //n.order = ido.order;
-      //
-      //fd.graph.nds[a.id.nid] = move(n);
 
-      //n.txt   = "New: " +  node_name;
-      //n.id    = instIdx;
-      //n.order = ido.order;
-      //fd.graph.nds[instIdx] = move(n);
     }else if(a.id.sidx != LavaId::SLOT_NONE){
       LavaFlowSlot* ls = fd.lgrph.slot(a.id);
       if(ls){
         Slot s(a.id.nid,ls->in);
-        //LavaId sid = a.id;
         fd.graph.slots.insert({a.id, s});
       }
     }
@@ -1396,7 +1379,9 @@ bool    reloadSharedLibs()
       LavaNode*     fn = kv.second;                                // fn is flow node
       auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
       ndBtn->setCallback([fn](){ 
-        node_add(fn->name, Node(fn->name, (Node::Type)((u64)fn->node_type), {100,100}) );
+        //v2 stPos = {fd.ui.w/2.f - n.b.w()/2.f,  fd.ui.h/2.f - n.b.h()/2.f};
+        v2 stPos = {fd.ui.w/2.f,  fd.ui.h/2.f};                                                // stPos is starting position
+        node_add(fn->name, Node(fn->name, (Node::Type)((u64)fn->node_type), stPos) );
       });
       fd.ui.ndBtns.push_back(ndBtn);
     }
@@ -2573,6 +2558,29 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//auto ni = fd.graph.nds.find(a.id.nid);
+//
+//LavaInst li = fd.lgrph.node(a.id.nid);
+//
+//FisData::IdOrder ido;                                                          //ido is id order
+//ido.id    = a.id.nid;
+//ido.order = node_nxtOrder();
+//fd.graph.ordr.insert(ido);
+//
+//Node n = move(fd.graph.nds[a.id.nid]);
+//
+//if(n.txt=="") { n.txt = "New: " + str(li.node->name); }
+//n.id    = a.id.nid;
+//n.order = ido.order;
+//
+//fd.graph.nds[a.id.nid] = move(n);
+//
+//n.txt   = "New: " +  node_name;
+//n.id    = instIdx;
+//n.order = ido.order;
+//fd.graph.nds[instIdx] = move(n);
+//
+//LavaId sid = a.id;
 
 //glfwPollEvents();
 //LavaGraph::ArgVec av = fd.lgrph.exec();
