@@ -206,6 +206,8 @@ struct  AtmSet
 
 struct FisData
 {
+  enum FisEvent { COMMIT_GRAPH_COMMANDS };
+
   struct IdOrder {
     u64      id = 0;
     u64   order = 0;
@@ -219,7 +221,7 @@ struct FisData
   using    vec_thrd  =  std::vector<std::thread>;
   using     vec_slt  =  std::vector<LavaId>;
   using PacketSlots  =  std::unordered_set<LavaId, LavaId>;       // uses LavaId as the hashing function object
-
+  using      EventQ  =  std::queue<FisEvent>;
 
   u64                 nxtId = 1;                                  // todo: take out if not used
   GLFWwindow*           win = nullptr;                            // Platform 

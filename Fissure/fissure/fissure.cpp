@@ -94,7 +94,11 @@
 // -todo: transform selection box by the inverse of the transform
 // -todo: make UI 'play pause' button to process a single packet -   "||>"  or  ":> ||"
 // -todo: make node start at the center point of the grid
+// -todo: debug crash on deletion of a node - just needed to reorder the sequence of polling for events, applying commands to the graph, and getting the vector of nodes in the nodes graph
 
+// todo: debug why there is no output that makes it to brandisher or the visualizer
+// todo: make a file path node to feed an obj loader node 
+// todo: make an obj Loader that takes a file path and outputs an IdxVert packet
 // todo: re-orient nodes on resize of the window so they line up with the grid in the same place - maybe the scale and pan need to be changed instead
 // todo: use nodeTxt UI element display and allow changes to the node instance names
 // todo: make sure zooming center is affected by cursor placement
@@ -1437,6 +1441,7 @@ void               keyCallback(GLFWwindow* win,    int key, int scancode, int ac
   case GLFW_KEY_BACKSPACE:
   case GLFW_KEY_DELETE: {
     sel_delete();
+    sel_clear();
   }break;
   default:
     ;
@@ -1910,6 +1915,10 @@ ENTRY_DECLARATION // main or winmain
 
     while(!glfwWindowShouldClose(fd.win))
     {
+      glfwPollEvents();                                             // PollEvents must be done after zeroing out the deltas
+      LavaGraph::ArgVec av = fd.lgrph.exec();
+      graph_apply(move(av));
+
       auto&      ms = fd.mouse;
       bool    rtClk = (ms.rtDn  && !ms.prevRtDn);  // todo: take this out
       auto      nds = node_getPtrs();
@@ -1929,8 +1938,6 @@ ENTRY_DECLARATION // main or winmain
       {
         ms.prevPos = ms.pos;
 
-        glfwPollEvents();                                             // PollEvents must be done after zeroing out the deltas
-  	    
         //glfwGetCursorPos(fd.win, &cx, &cy);
 
         fd.ui.prevPntr = pntr;
@@ -2549,10 +2556,6 @@ ENTRY_DECLARATION // main or winmain
       fd.mouse.prevLftDn = fd.mouse.lftDn;
 
       glfwSwapBuffers(fd.win);
-      //glfwPollEvents();
-      LavaGraph::ArgVec av = fd.lgrph.exec();
-      graph_apply(move(av));
-      //fd.flow.udpateMsgIdxCache();
     }
   }
   SECTION(shutdown)
@@ -2570,3 +2573,8 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+//glfwPollEvents();
+//LavaGraph::ArgVec av = fd.lgrph.exec();
+//graph_apply(move(av));
+//fd.flow.udpateMsgIdxCache();
