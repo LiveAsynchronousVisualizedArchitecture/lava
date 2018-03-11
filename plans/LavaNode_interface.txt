@@ -83,6 +83,12 @@ Emit Packets using a function instead of outputting into an array:
 Display text of the file inside a node
 |  Have a window inside a node that can show the directory, or the text of the main file
 
+
+Statics
+|  Have a second struct list of structs looked for that contains 'statics'
+|  LavaStatic or LavaConst?
+|  Type, length, then array of bytes
+
 -------------------------------------------------------------------------------------------
 Simplicity does not precede complexity, but follows it.
 

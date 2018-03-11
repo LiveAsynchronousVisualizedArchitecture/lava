@@ -17,6 +17,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CreatePrompts", "CreateProm
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Gaussian", "Gaussian\Gaussian.vcxproj", "{C2E066C0-4EB3-4729-8168-8DB8F3F52878}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "LoadObj", "LoadObj\LoadObj.vcxproj", "{857554B2-016A-4984-B75D-522B39D87C37}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Mixed Platforms = Debug|Mixed Platforms
@@ -103,6 +105,16 @@ Global
 		{C2E066C0-4EB3-4729-8168-8DB8F3F52878}.Release|Win32.ActiveCfg = Release|x64
 		{C2E066C0-4EB3-4729-8168-8DB8F3F52878}.Release|x64.ActiveCfg = Release|x64
 		{C2E066C0-4EB3-4729-8168-8DB8F3F52878}.Release|x64.Build.0 = Release|x64
+		{857554B2-016A-4984-B75D-522B39D87C37}.Debug|Mixed Platforms.ActiveCfg = Debug|x64
+		{857554B2-016A-4984-B75D-522B39D87C37}.Debug|Mixed Platforms.Build.0 = Debug|x64
+		{857554B2-016A-4984-B75D-522B39D87C37}.Debug|Win32.ActiveCfg = Debug|x64
+		{857554B2-016A-4984-B75D-522B39D87C37}.Debug|x64.ActiveCfg = Debug|x64
+		{857554B2-016A-4984-B75D-522B39D87C37}.Debug|x64.Build.0 = Debug|x64
+		{857554B2-016A-4984-B75D-522B39D87C37}.Release|Mixed Platforms.ActiveCfg = Release|x64
+		{857554B2-016A-4984-B75D-522B39D87C37}.Release|Mixed Platforms.Build.0 = Release|x64
+		{857554B2-016A-4984-B75D-522B39D87C37}.Release|Win32.ActiveCfg = Release|x64
+		{857554B2-016A-4984-B75D-522B39D87C37}.Release|x64.ActiveCfg = Release|x64
+		{857554B2-016A-4984-B75D-522B39D87C37}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -98,6 +98,10 @@
 // todo: re-orient nodes on resize of the window so they line up with the grid in the same place - maybe the scale and pan need to be changed instead
 // todo: use nodeTxt UI element display and allow changes to the node instance names
 // todo: make sure zooming center is affected by cursor placement
+// todo: build in data type visualization - part needs to be lava, part needs to be UI
+// todo: make reloaded nodes have highlights until the next event
+// todo: make an overlay that has hotkeys until the first event
+// todo: organize nodes by types in a contex menu or side bar
 
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: add tool tips to node buttons containing the description string of the node
