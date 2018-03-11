@@ -98,17 +98,27 @@
 // -todo: fix overlapping nodes when loading .lava file - node_add() was not the place to make new nodes start in the center, since it is used by file loading as well as node creation buttons
 // -todo: make a file path node to feed an obj loader node 
 // -todo: make an obj Loader that takes a file path and outputs an IdxVert packet
+// -todo: debug why grid movement now does not work - mouse previous position needed to be set before polling for events (where the mouse position would be set)
+// -todo: debug why there is no output that makes it to brandisher or the visualizer - needed a MSG node to actually execute
+// -todo: make an overlay that has hotkeys until the first event - could be done with a note node on a new file
 
-// todo: repeat crash when loading .lava file - doesn't crash with single FilePath node - doesn't crash with FilePath and LoadObj nodes linked together, but does not get their positions correct
-// todo: debug why grid movement now does not work 
-// todo: debug why there is no output that makes it to brandisher or the visualizer
-// todo: re-orient nodes on resize of the window so they line up with the grid in the same place - maybe the scale and pan need to be changed instead
+// todo: fix tbl using realloc and crashing 
+// todo: debug why the connection isn't found when loading the file to obj graph - possibly because of missing input slot on a node which throws off fragile slot handling - connection does work when the node has an input, even though that input is unused
+// todo: cull bad connections on save - could be part of normalizing the graph Ids
 // todo: use nodeTxt UI element display and allow changes to the node instance names
+// todo: repeat crash when loading .lava file - doesn't crash with single FilePath node - doesn't crash with FilePath and LoadObj nodes linked together, but does not get their positions correct
+// todo: repeat and debug crash when saving back over a file
+// todo: re-orient nodes on resize of the window so they line up with the grid in the same place - maybe the scale and pan need to be changed instead
 // todo: make sure zooming center is affected by cursor placement
 // todo: build in data type visualization - part needs to be lava, part needs to be UI
 // todo: make reloaded nodes have highlights until the next event
-// todo: make an overlay that has hotkeys until the first event
 // todo: organize nodes by types in a contex menu or side bar
+// todo: should flow nodes with no inputs be run once at the start of the program for easy data flow?
+// todo: should the big difference in MSG nodes as opposed to data flow nodes be that they are always run from the same thread that unlocks? 
+// todo: make note nodes that are drawn over the grid but behind nodes 
+// todo: make a modal window that will set the text for a note 
+// todo: make a note node that will show the hotkeys and thus can be deleted at any time
+// todo: make loading a file use the node shared lib type instead of embedding FLOW or MSG into the file format
 
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: add tool tips to node buttons containing the description string of the node
@@ -1299,17 +1309,6 @@ void          strToGraph(str const& s)
     dest.id.nid  = destId.get(i).toInt();
     dest.id.sidx = destIdx.get(i).toInt();
     fd.lgrph.put(LavaCommand::TGL_CNCT, dest, src);
-
-    //GraphDB::Id src, dest;
-    //LavaId src, dest;
-    //src.nid   = srcId.get(i).toInt();
-    //src.sidx  = srcIdx.get(i).toInt();
-    //dest.nid  = destId.get(i).toInt();
-    //dest.sidx = destIdx.get(i).toInt();
-    //
-    //g.addCnct(src, dest);
-    //g.toggleCnct(src, dest);
-    //fd.lgrph.toggleCnct(src, dest);
   }
 }
 bool            saveFile(LavaGraph const& lg, str path)
@@ -1900,11 +1899,12 @@ ENTRY_DECLARATION // main or winmain
 
     while(!glfwWindowShouldClose(fd.win))
     {
+      auto&   ms = fd.mouse;
+      ms.prevPos = ms.pos;
       glfwPollEvents();                                             // PollEvents must be done after zeroing out the deltas
       LavaGraph::ArgVec av = fd.lgrph.exec();
       graph_apply(move(av));
 
-      auto&      ms = fd.mouse;
       bool    rtClk = (ms.rtDn  && !ms.prevRtDn);  // todo: take this out
       auto      nds = node_getPtrs();
       auto       sz = nds.size();
@@ -1921,7 +1921,6 @@ ENTRY_DECLARATION // main or winmain
       }
       SECTION(input and pointer transform)
       {
-        ms.prevPos = ms.pos;
 
         //glfwGetCursorPos(fd.win, &cx, &cy);
 
@@ -2379,7 +2378,8 @@ ENTRY_DECLARATION // main or winmain
               //nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
               auto di = g.srcCnctsMap().begin();                                    // di is destination iterator
               auto en = g.srcCnctsMap().end();
-              for(auto di = g.srcCnctsMap().begin(); di != en; )
+              //for(auto di = g.srcCnctsMap().begin(); di != en; )
+              while(di != en)
               {
                 LavaId  srcIdx = di->first;
                 LavaId destIdx = di->second;
@@ -2404,10 +2404,12 @@ ENTRY_DECLARATION // main or winmain
 
                 if(cnt==1)
                 {
-                  Slot const& dest = fd.graph.slots.find(destIdx)->second; // todo: check for end() here?
-                  f32 w = fd.graph.nds[destIdx.nid].b.w();
-
-                  cnct_draw(vg, srcP, dest.P, srcN, dest.N, w/2);
+                  auto sltIter = fd.graph.slots.find(destIdx);
+                  if(sltIter != fd.graph.slots.end()){
+                    Slot const& dest = sltIter->second; // todo: check for end() here?
+                    f32 w = fd.graph.nds[destIdx.nid].b.w();
+                    cnct_draw(vg, srcP, dest.P, srcN, dest.N, w/2);
+                  }
                   ++di;
                 }
                 else
@@ -2557,6 +2559,16 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//GraphDB::Id src, dest;
+//LavaId src, dest;
+//src.nid   = srcId.get(i).toInt();
+//src.sidx  = srcIdx.get(i).toInt();
+//dest.nid  = destId.get(i).toInt();
+//dest.sidx = destIdx.get(i).toInt();
+//
+//g.addCnct(src, dest);
+//g.toggleCnct(src, dest);
+//fd.lgrph.toggleCnct(src, dest);
 
 //auto ni = fd.graph.nds.find(a.id.nid);
 //

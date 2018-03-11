@@ -268,7 +268,7 @@ public:
     using Type = u8;
 
     //template<class N> struct typenum { static const Type num = UNKNOWN; };
-    template<class N> struct typenum { static const Type num = EMPTY; };
+    template<class N> struct typenum { static const Type num = EMPTY;   };
     template<> struct typenum<u8>    { static const Type num = U8;      };
     template<> struct typenum<i8>    { static const Type num = I8;      };
     template<> struct typenum<u16>   { static const Type num = U16;     };
@@ -279,6 +279,7 @@ public:
     template<> struct typenum<u64>   { static const Type num = U64;     };
     template<> struct typenum<i64>   { static const Type num = I64;     };
     template<> struct typenum<f64>   { static const Type num = F64;     };
+    template<> struct typenum<char>  { static const Type num =  I8;     };
     //template<> struct typenum<long>             { static const Type num = I64;   };
     //template<> struct typenum<unsigned long>    { static const Type num = U64;   };
     template<> struct typenum<tbl>         { static const Type num = TABLE;   };

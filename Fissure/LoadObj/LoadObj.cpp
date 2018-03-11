@@ -42,9 +42,17 @@ extern "C"
       LoadObj( &attrib, &shapes, &materials, &err, (const char*)objFile.data(), nullptr, true);
 
       tbl ind = LavaMakeTbl(lp);
+      ind.reserve(1,0);
+      ind.memStart()->arrayType = tbl::TblType::I32;
       tbl  px = LavaMakeTbl(lp);
+      px.reserve(1,0);
+      px.memStart()->arrayType = tbl::TblType::F32;
       tbl  py = LavaMakeTbl(lp);
+      py.reserve(1,0);
+      py.memStart()->arrayType = tbl::TblType::F32;
       tbl  pz = LavaMakeTbl(lp);
+      pz.reserve(1,0);
+      pz.memStart()->arrayType = tbl::TblType::F32;
       for(auto const& s : shapes){
         auto vrtCnt = attrib.vertices.size() / 3;
         TO(vrtCnt,i){
@@ -54,7 +62,7 @@ extern "C"
           pz.push( attrib.vertices[idx+2] );
         }
         TO(s.mesh.indices.size(),i){
-          ind.push( s.mesh.indices[i] ); 
+          ind.push( s.mesh.indices[i].vertex_index ); 
         }
 
         tbl idxVerts = LavaMakeTbl(lp);
