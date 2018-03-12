@@ -577,11 +577,13 @@ public:
   using   fields  =  TblFields;
 
 private:
-  void      sizeBytes(u64  bytes){ memStart()->sizeBytes =  bytes; }
-  void           size(u64   size){ memStart()->size      =   size; }
-  void       capacity(u64    cap){ memStart()->capacity  =    cap; }
-  void          elems(u64  elems){ memStart()->elems     =  elems; }
-  void         mapcap(u64 mapcap){ memStart()->mapcap    = mapcap; }
+  void      sizeBytes(u64  bytes){ memStart()->sizeBytes  =  bytes; }
+  void           size(u64   size){ memStart()->size       =   size; }
+  void       capacity(u64    cap){ memStart()->capacity   =    cap; }
+  void          elems(u64  elems){ memStart()->elems      =  elems; }
+  void         mapcap(u64 mapcap){ memStart()->mapcap     = mapcap; }
+  void         stride(u64 stride){ memStart()->stride     = stride; }
+  void      arrayType(u64   type){ memStart()->arrayType  =   type; }
   bool     map_expand(bool force=false)
   {  
     u64 mapcap = map_capacity();
@@ -1039,7 +1041,7 @@ public:
   //tbl     operator>>(tbl const& l){ return tbl::concat_l(*this, l); }
   //tbl     operator<<(tbl const& l){ return tbl::concat_r(*this, l); }
 
-  template<class N> bool     insert(const char* key, N const& val)
+  template<class N> bool        insert(const char* key, N const& val)
   {
     KV& kv = (*this)(key, true);
     if(kv.hsh.type==ERROR) return false;
@@ -1047,8 +1049,15 @@ public:
     kv = val;
     return true;
   }
-  template<class V> KVOfst      put(const char* key, V val){ return this->operator()(key) = val; }
-  template<class T> bool       push(T const& val)
+  template<class V> KVOfst         put(const char* key, V val){ return this->operator()(key) = val; }
+  template<class T> void  setArrayType()
+  {
+    if(!m_mem){ reserve(0); }
+
+    arrayType( TblType::typenum<T>::num );
+    stride( sizeof(T) );
+  }
+  template<class T> bool          push(T const& val)
   { 
     if(!m_mem){ init(0); }
     
@@ -1061,7 +1070,7 @@ public:
     
     return true;
   }
-  template<class T> u64        push(std::initializer_list<T> lst)
+  template<class T> u64           push(std::initializer_list<T> lst)
   {
     u64 cnt = 0;
     for(auto const& v : lst){
@@ -1072,7 +1081,7 @@ public:
   
     return cnt;
   }
-  template<class T> T            at(u64 idx) const { return (T)((*this)[idx]); }
+  template<class T> T               at(u64 idx) const { return (T)((*this)[idx]); }
   void            pop(){ size(size()-1); }
   TblVal        front() const{ return (*this)[0]; }
   TblVal         back() const{ return (*this)[size()-1]; }

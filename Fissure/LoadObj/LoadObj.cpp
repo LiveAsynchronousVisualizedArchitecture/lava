@@ -42,17 +42,21 @@ extern "C"
       LoadObj( &attrib, &shapes, &materials, &err, (const char*)objFile.data(), nullptr, true);
 
       tbl ind = LavaMakeTbl(lp);
-      ind.reserve(1,0);
-      ind.memStart()->arrayType = tbl::TblType::I32;
+      ind.setArrayType<f32>();
+      //ind.reserve(1,0);
+      //ind.memStart()->arrayType = tbl::TblType::I32;
       tbl  px = LavaMakeTbl(lp);
-      px.reserve(1,0);
-      px.memStart()->arrayType = tbl::TblType::F32;
+      px.setArrayType<f32>();
+      //px.reserve(1,0);
+      //px.memStart()->arrayType = tbl::TblType::F32;
       tbl  py = LavaMakeTbl(lp);
-      py.reserve(1,0);
-      py.memStart()->arrayType = tbl::TblType::F32;
+      py.setArrayType<f32>();
+      //py.reserve(1,0);
+      //py.memStart()->arrayType = tbl::TblType::F32;
       tbl  pz = LavaMakeTbl(lp);
-      pz.reserve(1,0);
-      pz.memStart()->arrayType = tbl::TblType::F32;
+      pz.setArrayType<f32>();
+      //pz.reserve(1,0);
+      //pz.memStart()->arrayType = tbl::TblType::F32;
       for(auto const& s : shapes){
         auto vrtCnt = attrib.vertices.size() / 3;
         TO(vrtCnt,i){
@@ -72,6 +76,7 @@ extern "C"
         idxVerts("positions z") = &pz;
         idxVerts("mode")        = (u32)0;
         idxVerts("type")        = tbl::StrToInt("IdxVerts");
+        idxVerts.flatten();
 
         out->push( LavaTblToOut(idxVerts, IDXVERTS_OUT) );
       }
