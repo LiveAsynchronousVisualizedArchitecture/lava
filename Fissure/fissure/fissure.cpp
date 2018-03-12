@@ -102,6 +102,7 @@
 // -todo: debug why there is no output that makes it to brandisher or the visualizer - needed a MSG node to actually execute
 // -todo: make an overlay that has hotkeys until the first event - could be done with a note node on a new file
 
+// todo: possibly use tbl for thread memory vector
 // todo: fix tbl using realloc and crashing 
 // todo: debug why the connection isn't found when loading the file to obj graph - possibly because of missing input slot on a node which throws off fragile slot handling - connection does work when the node has an input, even though that input is unused
 // todo: cull bad connections on save - could be part of normalizing the graph Ids

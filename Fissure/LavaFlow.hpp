@@ -905,7 +905,8 @@ const LavaNode LavaNodeListEnd = {nullptr, nullptr, nullptr, (uint64_t)LavaNode:
 extern "C" __declspec(dllexport) LavaNode* GetLavaFlowNodes();   // prototype of function to return static plugin loading struct
 // end function declarations
 
-using lava_memvec          =  std::vector<LavaMem, ThreadAllocator<LavaMem> >;
+//using lava_memvec          =  std::vector<LavaMem, ThreadAllocator<LavaMem> >;
+using lava_memvec          =  std::vector<LavaMem>;
 
 class       LavaGraph                  // LavaGraph should specifically be about the connections between nodes
 {
@@ -1769,7 +1770,8 @@ bool           LavaNxtPckt(LavaFrame const* in, u32* currentIndex)
 #if defined(__LAVAFLOW_IMPL__)
 
 //static __declspec(thread)  void*   lava_thread_heap     = nullptr;           // thread local handle for thread local heap allocations
-static __declspec(thread)  lava_memvec*  lava_thread_ownedMem = nullptr;       // thread local handle for thread local heap allocations
+//static __declspec(thread)  lava_memvec*  lava_thread_ownedMem = nullptr;       // thread local handle for thread local heap allocations
+static thread_local lava_memvec*  lava_thread_ownedMem = nullptr;       // thread local handle for thread local heap allocations
 
 // function implementations
 BOOL WINAPI DllMain(
