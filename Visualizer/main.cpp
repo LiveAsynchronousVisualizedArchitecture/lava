@@ -505,7 +505,7 @@ vec_vs         shapesFromKeys(simdb const& db, vec_vs dbKeys, VizData* vd)  // v
       {
         u32 readLen=0;
         bool ok = db.get(vs.str.data(), (u32)vs.str.length(),  ivbuf.data(), vlen, &readLen);
-        if(!ok || readLen != vlen){
+        if(!ok || readLen==0 || readLen != vlen){
           continue;
         }
       }
@@ -832,79 +832,10 @@ f32      drawGraph(NVGcontext* nvg, tbl   const&    t, bnd2f b)
 
 }
 
-//void       genTestGeo(simdb* db)
-//{
-//  using namespace std;
-//  
-//  static simdb db1("test1", 4096, 1 << 14);
-//  //static simdb db2("test 2", 4096, 1 << 14);
-//
-//  //initSimDB("VizDefault");
-//
-//  // Create serialized IndexedVerts
-//  size_t leftLen, rightLen, cubeLen;
-//  //vec<u8>  leftData = makeTriangle(leftLen,   true);
-//  //vec<u8> rightData = makeTriangle(rightLen, false);
-//  //vec<u8>  cubeData = makeCube(cubeLen);
-//  IvTbl  leftData = makeTriangle( leftLen,   true);
-//  IvTbl rightData = makeTriangle(rightLen,  false);
-//  IvTbl  cubeData =     makeCube( cubeLen);
-//
-//  vec<u8>  leftBytes( leftData.sizeBytes());
-//  vec<u8> rightBytes(rightData.sizeBytes());
-//  vec<u8>  cubeBytes( cubeData.sizeBytes());
-//  memcpy( leftBytes.data(),   leftData.memStart(),  leftData.sizeBytes());
-//  memcpy(rightBytes.data(),  rightData.memStart(), rightData.sizeBytes());
-//  memcpy( cubeBytes.data(),   cubeData.memStart(),  cubeData.sizeBytes());
-//
-//  // Store serialized IndexedVerts in the db
-//  str  leftTriangle = "leftTriangle";
-//  str rightTriangle = "rightTriangle";
-//  str          cube = "cube";
-//
-//  db1.put("1", leftBytes);
-//  db1.put("2", rightBytes);
-//  db1.put("3", cubeBytes);
-//
-//  //db2.put("one",    leftBytes);
-//  //db2.put("two",   rightBytes);
-//  //db2.put("three",  cubeBytes);
-//  //db2.put("super long key name as a test", cubeBytes);
-//
-//  IvTbl lftTri = {             // array of vert structs
-//   {{-1.0, -1.0f, 0.0f},       //pos
-//    {0.0f, 0.0f, -1.0f},       //norm
-//    {1.0f, 1.0f, 1.0f, 1.0f},  //color
-//    {0.0f, 0.0f}},             //texCoord
-//  
-//   {{-0.17f, -1.0f, 0.0f},      //pos
-//    {0.0f, 0.0f, -1.0f},        //norm
-//    {1.0f, 1.0f, 1.0f, 1.0f},   //color
-//    {0.0f, 0.0f}},              //texCoord
-//
-//   {{-0.58f, 1.0f, 0.0f},       //pos
-//    {0.0f, 0.0f, -1.0f},        //norm
-//    {1.0f, 1.0f, 1.0f, 1.0f},   //color
-//    {0.0f, 0.0f}}               //texCoord
-//  };
-//  auto typenum    =  "IdxVerts";
-//  lftTri("type")  =  *((u64*)typenum);
-//  lftTri("mode")  =  (u64)GL_TRIANGLES;
-//  tu32 ind        =  {0, 1, 2};
-//  lftTri("IND")   =  &ind; 
-//  lftTri.flatten();
-//
-//  auto f = lftTri.memStart();
-//
-//  //db->put("tb left triangle", lftTri.memStart(), lftTri.sizeBytes() );
-//}
-
 ENTRY_DECLARATION
 {
   using namespace std;
   using namespace nanogui;
-
-  //genTestGeo(&db);
 
   SECTION(initialization)
   {
@@ -1216,6 +1147,74 @@ ENTRY_DECLARATION
 
 
 
+//genTestGeo(&db);
+//
+//void       genTestGeo(simdb* db)
+//{
+//  using namespace std;
+//  
+//  static simdb db1("test1", 4096, 1 << 14);
+//  //static simdb db2("test 2", 4096, 1 << 14);
+//
+//  //initSimDB("VizDefault");
+//
+//  // Create serialized IndexedVerts
+//  size_t leftLen, rightLen, cubeLen;
+//  //vec<u8>  leftData = makeTriangle(leftLen,   true);
+//  //vec<u8> rightData = makeTriangle(rightLen, false);
+//  //vec<u8>  cubeData = makeCube(cubeLen);
+//  IvTbl  leftData = makeTriangle( leftLen,   true);
+//  IvTbl rightData = makeTriangle(rightLen,  false);
+//  IvTbl  cubeData =     makeCube( cubeLen);
+//
+//  vec<u8>  leftBytes( leftData.sizeBytes());
+//  vec<u8> rightBytes(rightData.sizeBytes());
+//  vec<u8>  cubeBytes( cubeData.sizeBytes());
+//  memcpy( leftBytes.data(),   leftData.memStart(),  leftData.sizeBytes());
+//  memcpy(rightBytes.data(),  rightData.memStart(), rightData.sizeBytes());
+//  memcpy( cubeBytes.data(),   cubeData.memStart(),  cubeData.sizeBytes());
+//
+//  // Store serialized IndexedVerts in the db
+//  str  leftTriangle = "leftTriangle";
+//  str rightTriangle = "rightTriangle";
+//  str          cube = "cube";
+//
+//  db1.put("1", leftBytes);
+//  db1.put("2", rightBytes);
+//  db1.put("3", cubeBytes);
+//
+//  //db2.put("one",    leftBytes);
+//  //db2.put("two",   rightBytes);
+//  //db2.put("three",  cubeBytes);
+//  //db2.put("super long key name as a test", cubeBytes);
+//
+//  IvTbl lftTri = {             // array of vert structs
+//   {{-1.0, -1.0f, 0.0f},       //pos
+//    {0.0f, 0.0f, -1.0f},       //norm
+//    {1.0f, 1.0f, 1.0f, 1.0f},  //color
+//    {0.0f, 0.0f}},             //texCoord
+//  
+//   {{-0.17f, -1.0f, 0.0f},      //pos
+//    {0.0f, 0.0f, -1.0f},        //norm
+//    {1.0f, 1.0f, 1.0f, 1.0f},   //color
+//    {0.0f, 0.0f}},              //texCoord
+//
+//   {{-0.58f, 1.0f, 0.0f},       //pos
+//    {0.0f, 0.0f, -1.0f},        //norm
+//    {1.0f, 1.0f, 1.0f, 1.0f},   //color
+//    {0.0f, 0.0f}}               //texCoord
+//  };
+//  auto typenum    =  "IdxVerts";
+//  lftTri("type")  =  *((u64*)typenum);
+//  lftTri("mode")  =  (u64)GL_TRIANGLES;
+//  tu32 ind        =  {0, 1, 2};
+//  lftTri("IND")   =  &ind; 
+//  lftTri.flatten();
+//
+//  auto f = lftTri.memStart();
+//
+//  //db->put("tb left triangle", lftTri.memStart(), lftTri.sizeBytes() );
+//}
 
 //vd.camera.mouseDelta = vec2(0,0);
 //vd.camera.btn2Delta  = vec2(0,0);

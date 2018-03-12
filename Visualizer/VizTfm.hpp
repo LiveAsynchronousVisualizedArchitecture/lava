@@ -184,7 +184,8 @@ inline Shape         tblbuf_to_shape(vec<u8> tblBuf)  // todo: try to change thi
 
   tbl iv((void*)tblBuf.data(), false, false);
 
-  if( tbl::StrToInt("IdxVerts") != (u64)iv("type") ){
+  if( !iv.has("type") || 
+      tbl::StrToInt("IdxVerts")!=(u64)iv("type") ) {
     return Shape();
   }
 

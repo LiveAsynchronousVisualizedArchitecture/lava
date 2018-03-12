@@ -128,6 +128,7 @@ public:
   using   f32   =     float;
   using   f64   =    double;
 
+
   struct  TblFields 
   {
     using u64 = uint64_t;
@@ -374,6 +375,13 @@ public:
     bool operator==(KV const& l){ return hash==l.hash && strncmp(l.key,key,sizeof(KV::Key)-1)==0; }
     KV&  operator= (KV const& l){ return cp(l); }
     KV&  operator= (KV&&      r){ return cp(r); }
+    //KV&  operator= (KVOfst const& l)
+    //{
+    //  if(l.kv)
+    //    (*this) = *(l.kv);
+    //  else
+    //    init("\0", (u8)0 );
+    //}
     template<class N> KV& operator=(N           const& n)
     {
       //hsh.type     = typenum< typecast<N>::type >::num;
@@ -1087,9 +1095,10 @@ public:
   TblVal         back() const{ return (*this)[size()-1]; }
   bool            has(const char* key)
   {
-    KV const& kv = (*this)(key);
-    return kv.type != TblType::EMPTY;
-    //return kv.hsh.type != TblType::EMPTY;
+    KVOfst kvo = (*this)(key);
+    if(!kvo.kv) return false; 
+
+    return kvo.kv->type != TblType::EMPTY;
   }
   KV*             get(const char* key, u32* out_hash=nullptr)
   {
@@ -1586,3 +1595,13 @@ public:
 #endif
 
 
+
+
+
+
+//KV const kv = (*this)(key);
+//
+//KV ret = kvo.kv? *kvo.kv  :  KV::empty_kv();
+//kv.type != TblType::EMPTY;
+//
+//return kv.hsh.type != TblType::EMPTY;

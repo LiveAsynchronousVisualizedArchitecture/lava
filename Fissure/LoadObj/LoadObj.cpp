@@ -33,7 +33,6 @@ extern "C"
     while( LavaNxtPckt(in, &i) )
     {
       tbl objFile( (void*)(in->packets[i].val.value) );
-      //str fileStr(  );
 
       attrib_t              attrib;
       vector<shape_t>       shapes;
@@ -42,21 +41,17 @@ extern "C"
       LoadObj( &attrib, &shapes, &materials, &err, (const char*)objFile.data(), nullptr, true);
 
       tbl ind = LavaMakeTbl(lp);
-      ind.setArrayType<f32>();
-      //ind.reserve(1,0);
-      //ind.memStart()->arrayType = tbl::TblType::I32;
+      ind.setArrayType<int>();
+
       tbl  px = LavaMakeTbl(lp);
       px.setArrayType<f32>();
-      //px.reserve(1,0);
-      //px.memStart()->arrayType = tbl::TblType::F32;
+
       tbl  py = LavaMakeTbl(lp);
       py.setArrayType<f32>();
-      //py.reserve(1,0);
-      //py.memStart()->arrayType = tbl::TblType::F32;
+
       tbl  pz = LavaMakeTbl(lp);
       pz.setArrayType<f32>();
-      //pz.reserve(1,0);
-      //pz.memStart()->arrayType = tbl::TblType::F32;
+
       for(auto const& s : shapes){
         auto vrtCnt = attrib.vertices.size() / 3;
         TO(vrtCnt,i){
@@ -74,17 +69,12 @@ extern "C"
         idxVerts("positions x") = &px;
         idxVerts("positions y") = &py;
         idxVerts("positions z") = &pz;
-        idxVerts("mode")        = (u32)0;
+        idxVerts("mode")        = (u32)4;
         idxVerts("type")        = tbl::StrToInt("IdxVerts");
         idxVerts.flatten();
 
         out->push( LavaTblToOut(idxVerts, IDXVERTS_OUT) );
       }
-
-      //for(auto& kv : inputTbl){  // this loop demonstrates how to iterate through non-empty map elements
-      //}	
-      //
-      // out->push( LavaTblToOut(outputTbl, SLOT_0) );      // this demonstrates how to output a tbl into the first output slot
     }
 
     return 1;
@@ -116,3 +106,27 @@ extern "C"
 }
 
 
+
+
+
+
+
+
+//for(auto& kv : inputTbl){  // this loop demonstrates how to iterate through non-empty map elements
+//}	
+//
+// out->push( LavaTblToOut(outputTbl, SLOT_0) );      // this demonstrates how to output a tbl into the first output slot
+
+//str fileStr(  );
+//
+//ind.reserve(1,0);
+//ind.memStart()->arrayType = tbl::TblType::I32;
+//
+//px.reserve(1,0);
+//px.memStart()->arrayType = tbl::TblType::F32;
+//
+//py.reserve(1,0);
+//py.memStart()->arrayType = tbl::TblType::F32;
+//
+//pz.reserve(1,0);
+//pz.memStart()->arrayType = tbl::TblType::F32;
