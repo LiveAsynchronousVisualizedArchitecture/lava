@@ -101,10 +101,14 @@
 // -todo: debug why grid movement now does not work - mouse previous position needed to be set before polling for events (where the mouse position would be set)
 // -todo: debug why there is no output that makes it to brandisher or the visualizer - needed a MSG node to actually execute
 // -todo: make an overlay that has hotkeys until the first event - could be done with a note node on a new file
+// -todo: debug why the connection isn't found when loading the file to obj graph - possibly because of missing input slot on a node which throws off fragile slot handling - connection does work when the node has an input, even though that input is unused
+// -todo: change tbl to work around a lack of a realloc function - copies old allocation to new memory and frees the old allocation if there is a free function available
 
+// todo: debug why tbl::push() ruins the heap alloction
+// todo: try moving the LavaHeapAlloc functions into the implementation section 
+// todo: print owned mem spans
+// todo: fix tbl using realloc and crashing - when realloc is called, is it then calling a version of LavaAlloc that is linked in to the .dll and not the LavaAlloc from the main executable? - is the lava_mem_vec causing a problem by calling the .dll malloc and realloc ? - doesn't seem to be the case
 // todo: possibly use tbl for thread memory vector
-// todo: fix tbl using realloc and crashing 
-// todo: debug why the connection isn't found when loading the file to obj graph - possibly because of missing input slot on a node which throws off fragile slot handling - connection does work when the node has an input, even though that input is unused
 // todo: cull bad connections on save - could be part of normalizing the graph Ids
 // todo: use nodeTxt UI element display and allow changes to the node instance names
 // todo: repeat crash when loading .lava file - doesn't crash with single FilePath node - doesn't crash with FilePath and LoadObj nodes linked together, but does not get their positions correct

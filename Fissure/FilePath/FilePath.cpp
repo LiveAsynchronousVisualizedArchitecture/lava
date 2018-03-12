@@ -34,13 +34,15 @@ extern "C"
       return 1;
     }
 
+    // tbl filePath;
+
     tbl filePath = LavaMakeTbl(lp);
-    filePath.reserve(1,0);
+    filePath.reserve(64,0);
     filePath.memStart()->arrayType = tbl::TblType::I8;
     str      pth = "H:\\projects\\lava\\obj\\Base.obj";
-    TO(pth.length(),i){ 
-      filePath.push( pth[i] ); 
-    }
+    //TO(pth.length(),i){ 
+    //  filePath.push( pth[i] ); 
+    //}
 
     out->push( LavaTblToOut(filePath, FILE_PATH_OUT) );      // this demonstrates how to output a tbl into the first output slot
 

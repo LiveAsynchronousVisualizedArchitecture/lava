@@ -436,7 +436,9 @@ static inline u64 popcount64(u64 x)
 #if defined(_WIN32)
   static const std::string  liveExt(".live.dll");
 #endif
-static __declspec(thread)       void*   lava_thread_heap = nullptr;       // thread local handle for thread local heap allocations
+
+//static __declspec(thread)       void*   lava_thread_heap = nullptr;       // thread local handle for thread local heap allocations
+thread_local       void*   lava_thread_heap = nullptr;       // thread local handle for thread local heap allocations
 // end data segment data
 
 // function declarations
@@ -484,9 +486,10 @@ inline void       LavaHeapFree(void* memptr)
 {
   void* thread_heap = LavaHeapInit();
 
-  void* ret = nullptr;
+  //void* ret = nullptr;
+  bool ret = false;
   if(thread_heap && memptr) {
-    auto ret = HeapFree(thread_heap, HEAP_NO_SERIALIZE, memptr);
+    ret = HeapFree(thread_heap, HEAP_NO_SERIALIZE, memptr);
     //return ret;
   }//else{ return 0; }
 }
@@ -1711,7 +1714,8 @@ tbl            LavaMakeTbl(LavaParams const* lp)
 
   tbl t;
   t.m_alloc    =  lp->ref_alloc;
-  t.m_realloc  =  lp->ref_realloc;
+  //t.m_realloc  =  lp->ref_realloc;
+  t.m_realloc  =  nullptr;
   t.m_free     =  nullptr;
 
   return move(t);
@@ -2056,13 +2060,11 @@ void*           LavaRealloc(void* addr, uint64_t sizeBytes)
   void*       nxtMem = LavaAlloc(sizeBytes);                       // make a new allocation that is the requested size
   memcpy(nxtMem, addr, prevSz);                                    // copy from the previous alloction to the new allocation
   return nxtMem;
-
-  //u8*    realMem = (u8*)LavaHeapReAlloc(realAddr, sizeBytes + 16);
-  //void*      mem = realMem + 16;
 }
 void               LavaFree(void* addr)
 {
-  void* p = (void*)( (u8*)addr - 16 );  // 16 bytes for the reference count and sizeBytes
+  //void* p = (void*)( (u8*)addr - 16 );  // 16 bytes for the reference count and sizeBytes
+  void* p = (void*)( (uint64_t*)addr - 2 );
   LavaHeapFree(p);
 }
 
@@ -2336,7 +2338,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
       auto  zeroRef  =  partition(ALL(ownedMem), [](auto a){return a.refCount() > 0;} );                           // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
       auto freeIter  =  zeroRef;
       for(; freeIter != end(ownedMem); ++freeIter){                      // loop through the memory with zero references and free them
-        LavaFree( freeIter->data() );
+        LavaFree( freeIter->data() );                                    // LavaFree will subtract 16 bytes from the  pointer given to it - ->data() should give the address at the start of the memory meant to be used, then LavaFree will subtract 16 from that
       }
       ownedMem.erase(zeroRef, end(ownedMem));                                  // erase the now freed memory
     }
@@ -2371,6 +2373,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//u8*    realMem = (u8*)LavaHeapReAlloc(realAddr, sizeBytes + 16);
+//void*      mem = realMem + 16;
 
 //
 //u64                 put(LavaCommand::Command cmd, LavaId A, LavaId B=LavaId())
