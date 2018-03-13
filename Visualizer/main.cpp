@@ -92,7 +92,9 @@
 // -todo: move new types and statics to files made for them
 // -todo: test further for crashes
 // -todo: test with all threads running in fissure
+// -todo: make mouse up events not be stopped even if they happen in the nanoui areas
 
+// todo: do something to bound the clip planes to the current visible models tighter - hopefully this would fix the z-fighting 
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
 //       |  visualize the fit position and camera frustum in real time to debug
@@ -319,18 +321,23 @@ void         mouseBtnCallback(GLFWwindow* window, int button, int action, int mo
   if(!uiChanged)
     used = vd->ui.screen.mouseButtonCallbackEvent(button, action, mods);
 
+  if(action==GLFW_RELEASE){ vd->camera.leftButtonDown  = false; }  // do mouse release events no matter what, so that the camera movement doesn't become locked to the mouse movement if the mouse up happens over the nanogui 
+  if(action==GLFW_RELEASE){ vd->camera.rightButtonDown = false; }
+
   if( !used )
   {
     if(button==GLFW_MOUSE_BUTTON_LEFT){
       if(action==GLFW_PRESS) vd->camera.leftButtonDown = true;
-      else if(action==GLFW_RELEASE) vd->camera.leftButtonDown = false;
+
+      //else if(action==GLFW_RELEASE) vd->camera.leftButtonDown = false;
     }
 
     if(button==GLFW_MOUSE_BUTTON_RIGHT){
       if(action==GLFW_PRESS) vd->camera.rightButtonDown = true;
-      else if(action==GLFW_RELEASE){
-        vd->camera.rightButtonDown = false;
-      }
+
+      //else if(action==GLFW_RELEASE){
+      //  vd->camera.rightButtonDown = false;
+      //}
     }
   }
 }

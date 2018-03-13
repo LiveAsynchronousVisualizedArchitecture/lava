@@ -12,9 +12,9 @@ static std::atomic<bool> hasRun = false;
 
 extern "C"
 {
-  const char*  InTypes[]  = {"temp", nullptr};                               // This array contains the type that each slot of the same index will accept as input.
-  const char*  InNames[]  = {"temp slot", nullptr};                               // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
-  const char* OutTypes[]  = {"IdxVerts",           nullptr};         // This array contains the types that are output in each slot of the same index
+  const char*  InTypes[]  = {"temp",               nullptr};                               // This array contains the type that each slot of the same index will accept as input.
+  const char*  InNames[]  = {"temp slot",          nullptr};                               // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char* OutTypes[]  = {"ASCII",              nullptr};         // This array contains the types that are output in each slot of the same index
   const char* OutNames[]  = {"FilePath Slot Out",  nullptr};         // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
 
   void FilePath_construct()
@@ -34,12 +34,9 @@ extern "C"
       return 1;
     }
 
-    // tbl filePath;
-
     tbl filePath = LavaMakeTbl(lp);
     filePath.setArrayType<char>();
     filePath.reserve(64,0);
-    //filePath.memStart()->arrayType = tbl::TblType::I8;
     str      pth = "H:\\projects\\lava\\obj\\Craftsman.obj";
     TO(pth.length(),i){ 
       filePath.push( pth[i] ); 
@@ -77,6 +74,9 @@ extern "C"
 }
 
 
+
+//
+//filePath.memStart()->arrayType = tbl::TblType::I8;
 
 //u32 i=0;
 //while( LavaNxtPckt(in, &i) )

@@ -109,9 +109,10 @@
 // -todo: fix has() crashing on an EMPTY KV - now tests the KVOfst's KV pointer
 // -todo: add normals and use normals for colors initially
 // -todo: test with a larger .obj file - maybe the craftsman - great success
+// -todo: debug crash when pushing load button - only happens when run with the debugger attached, possibly a new exception being caught after turning on all C++ and win32 exceptions - some RPC exception that isn't in visual studio's list of win32 exceptions was being caught by the debugger
+// -todo: try moving the LavaHeapAlloc functions into the implementation section - not now, may have to sort out the thread allocator later
 
-// todo: debug crash when pushing load button
-// todo: try moving the LavaHeapAlloc functions into the implementation section 
+// todo: keep track of loops through message nodes that don't generate any packets - if a thread goes through 2 empty loops, sleep - maybe sleep 1ms longer for each empty loop, up to 100ms
 // todo: cull bad connections on save - could be part of normalizing the graph Ids
 // todo: use nodeTxt UI element display and allow changes to the node instance names
 // todo: repeat crash when loading .lava file - doesn't crash with single FilePath node - doesn't crash with FilePath and LoadObj nodes linked together, but does not get their positions correct
@@ -184,6 +185,7 @@
 //       |  use a union of bytes that is filled with the frame, slot, list index?
 //       |  use malloc addresses initially
 
+// idea: keep track of both time speht in a node and the memory allocations it uses
 // idea: make packets visualize on slots circles stack as concentric circles or as portions/segments of a single circle 
 // idea: make errors in the directory creation give an error in the status bar 
 // idea: make right click or space bar open up a text box that can contain the build command, stats and/or hotbox

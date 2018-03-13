@@ -16,7 +16,7 @@ enum Slots
 
 extern "C"
 {
-  const char*  InTypes[]  = {"ASCIISTR",           nullptr};            // This array contains the type that each slot of the same index will accept as input.
+  const char*  InTypes[]  = {"ASCII",              nullptr};            // This array contains the type that each slot of the same index will accept as input.
   const char*  InNames[]  = {"Path of .obj File",  nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   const char* OutTypes[]  = {"IdxVerts",           nullptr};            // This array contains the types that are output in each slot of the same index
   const char* OutNames[]  = {"Indexed Verts",      nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
@@ -32,13 +32,16 @@ extern "C"
     u32 i=0;
     while( LavaNxtPckt(in, &i) )
     {
-      tbl objFile( (void*)(in->packets[i].val.value) );
-
       attrib_t              attrib;
       vector<shape_t>       shapes;
-      vector<material_t> materials;
-      string                   err;
-      LoadObj( &attrib, &shapes, &materials, &err, (const char*)objFile.data(), nullptr, true);
+      SECTION(use the LoadObj lib to get the attribs and shapes we need)
+      {
+        tbl objFile( (void*)(in->packets[i].val.value) );
+
+        vector<material_t> materials;
+        string                   err;
+        LoadObj( &attrib, &shapes, &materials, &err, (const char*)objFile.data(), nullptr, true);
+      }
 
       tbl ind = LavaMakeTbl(lp);
       tbl  px = LavaMakeTbl(lp);
@@ -48,45 +51,72 @@ extern "C"
       tbl  ny = LavaMakeTbl(lp);
       tbl  nz = LavaMakeTbl(lp);
 
-      ind.setArrayType<int>();
-      px.setArrayType<f32>();
-      py.setArrayType<f32>();
-      pz.setArrayType<f32>();
-      nx.setArrayType<f32>();
-      ny.setArrayType<f32>();
-      nz.setArrayType<f32>();
+      SECTION(set the array types for each vertex component)
+      {
+        ind.setArrayType<int>();
+        px.setArrayType<f32>();
+        py.setArrayType<f32>();
+        pz.setArrayType<f32>();
+        nx.setArrayType<f32>();
+        ny.setArrayType<f32>();
+        nz.setArrayType<f32>();
+      }
+      SECTION(loop through the shapes and emit an IdxVerts packet for each one)
+      {
+        for(auto const& s : shapes)
+        {
+          SECTION(clear out the component tbls so they can be reused on each iteration)
+          {
+            px.clear();
+            py.clear();
+            pz.clear();
+            nx.clear();
+            ny.clear();
+            nz.clear();
+          }
+          SECTION(loop through the vertices, assuming the floats are orders xyz, then make the ind array)
+          {
+            auto vrtCnt = attrib.vertices.size() / 3;
+            TO(vrtCnt,i){
+              auto idx = i * 3;
+              px.push( attrib.vertices[idx+0] );
+              py.push( attrib.vertices[idx+1] );
+              pz.push( attrib.vertices[idx+2] );
 
-      for(auto const& s : shapes){
-        auto vrtCnt = attrib.vertices.size() / 3;
-        TO(vrtCnt,i){
-          auto idx = i * 3;
-          px.push( attrib.vertices[idx+0] );
-          py.push( attrib.vertices[idx+1] );
-          pz.push( attrib.vertices[idx+2] );
-          nx.push( attrib.normals[idx+0]  );
-          ny.push( attrib.normals[idx+1]  );
-          nz.push( attrib.normals[idx+2]  );
+              f32 x,y,z;
+              x = attrib.normals[idx+0];
+              y = attrib.normals[idx+1];
+              z = attrib.normals[idx+2];
+              f32 len = sqrtf(x*x + y*y + z*z);
+              nx.push( x / len );
+              ny.push( y / len );
+              nz.push( z / len );
+            }
+            TO(s.mesh.indices.size(),i){
+              ind.push( s.mesh.indices[i].vertex_index ); 
+            }
+          }
+
+          tbl idxVerts = LavaMakeTbl(lp);
+          SECTION(add all the component tables to the IdxVerts tbl and flatten it)
+          {
+            idxVerts("indices")      = &ind;
+            idxVerts("positions x")  = &px;
+            idxVerts("positions y")  = &py;
+            idxVerts("positions z")  = &pz;
+            idxVerts("normals x")    = &nx;
+            idxVerts("normals y")    = &ny;
+            idxVerts("normals z")    = &nz;
+            idxVerts("colors red")   = &nx;
+            idxVerts("colors green") = &ny;
+            idxVerts("colors blue")  = &nz;
+            idxVerts("mode")         = (u32)4;
+            idxVerts("type")         = tbl::StrToInt("IdxVerts");
+            idxVerts.flatten();
+          }
+
+          out->push( LavaTblToOut(idxVerts, IDXVERTS_OUT) );
         }
-        TO(s.mesh.indices.size(),i){
-          ind.push( s.mesh.indices[i].vertex_index ); 
-        }
-
-        tbl idxVerts = LavaMakeTbl(lp);
-        idxVerts("indices")      = &ind;
-        idxVerts("positions x")  = &px;
-        idxVerts("positions y")  = &py;
-        idxVerts("positions z")  = &pz;
-        idxVerts("normals x")    = &nx;
-        idxVerts("normals y")    = &ny;
-        idxVerts("normals z")    = &nz;
-        idxVerts("colors red")   = &nx;
-        idxVerts("colors green") = &ny;
-        idxVerts("colors blue")  = &nz;
-        idxVerts("mode")         = (u32)4;
-        idxVerts("type")         = tbl::StrToInt("IdxVerts");
-        idxVerts.flatten();
-
-        out->push( LavaTblToOut(idxVerts, IDXVERTS_OUT) );
       }
     }
 

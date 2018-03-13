@@ -860,12 +860,6 @@ struct        LavaMem
    
   void*  ptr = nullptr;
 
-  //struct Header
-  //{
-  //  refCount;
-  //  sizeBytes;
-  //};
-
   uint64_t    refCount()const{ return ((uint64_t*)ptr)[0]; }
   uint64_t   sizeBytes()const{ return ((uint64_t*)ptr)[1]; }
   uint64_t&   refCount()     { return ((uint64_t*)ptr)[0]; }
@@ -908,8 +902,8 @@ const LavaNode LavaNodeListEnd = {nullptr, nullptr, nullptr, (uint64_t)LavaNode:
 extern "C" __declspec(dllexport) LavaNode* GetLavaFlowNodes();   // prototype of function to return static plugin loading struct
 // end function declarations
 
-//using lava_memvec          =  std::vector<LavaMem, ThreadAllocator<LavaMem> >;
-using lava_memvec          =  std::vector<LavaMem>;
+using lava_memvec          =  std::vector<LavaMem, ThreadAllocator<LavaMem> >;
+//using lava_memvec          =  std::vector<LavaMem>;
 
 class       LavaGraph                  // LavaGraph should specifically be about the connections between nodes
 {
@@ -2341,6 +2335,10 @@ void               LavaLoop(LavaFlow& lf) noexcept
         LavaFree( freeIter->data() );                                    // LavaFree will subtract 16 bytes from the  pointer given to it - ->data() should give the address at the start of the memory meant to be used, then LavaFree will subtract 16 from that
       }
       ownedMem.erase(zeroRef, end(ownedMem));                                  // erase the now freed memory
+
+      if(ownedMem.size() <= ownedMem.capacity()/4 ){
+        ownedMem.shrink_to_fit();
+      }
     }
   }
 
@@ -2372,6 +2370,11 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//struct Header
+//{
+//  refCount;
+//  sizeBytes;
+//};
 
 //u8*    realMem = (u8*)LavaHeapReAlloc(realAddr, sizeBytes + 16);
 //void*      mem = realMem + 16;

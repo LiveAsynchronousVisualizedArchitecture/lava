@@ -1406,7 +1406,8 @@ public:
 
     return true;
   }
-  void          clear(){ if(m_mem){ destroy(); init(0); } }
+  //void          clear(){ if(m_mem){ destroy(); init(0); } }
+  void          clear(){ size(0); }
   auto        flatten() -> tbl const&
   {
     u64   memst = (u64)memStart();
