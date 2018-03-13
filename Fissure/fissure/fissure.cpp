@@ -107,8 +107,9 @@
 // -todo: possibly use tbl for thread memory vector - may not have been the problem, even with the thread local heap
 // -todo: fix tbl using realloc and crashing - when realloc is called, is it then calling a version of LavaAlloc that is linked in to the .dll and not the LavaAlloc from the main executable? - is the lava_mem_vec causing a problem by calling the .dll malloc and realloc ? - doesn't seem to be the case - push() was ruining the heap since stride was not set
 // -todo: fix has() crashing on an EMPTY KV - now tests the KVOfst's KV pointer
+// -todo: add normals and use normals for colors initially
+// -todo: test with a larger .obj file - maybe the craftsman - great success
 
-// todo: test with a larger .obj file - maybe the craftsman
 // todo: debug crash when pushing load button
 // todo: try moving the LavaHeapAlloc functions into the implementation section 
 // todo: cull bad connections on save - could be part of normalizing the graph Ids
