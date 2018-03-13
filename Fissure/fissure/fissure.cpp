@@ -1886,7 +1886,7 @@ ENTRY_DECLARATION // main or winmain
     {
       reloadSharedLibs();
 
-      new (&fisdb)     simdb("Fissure", 512, 1<<6);     // 4096 * 65,536 = 268,435,456
+      new (&fisdb)     simdb("Fissure", 4096, 1<<16);     // 4096 * 65,536 = 268,435,456
 
       //printdb(fisdb);
 

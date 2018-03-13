@@ -40,7 +40,7 @@ extern "C"
     filePath.setArrayType<char>();
     filePath.reserve(64,0);
     //filePath.memStart()->arrayType = tbl::TblType::I8;
-    str      pth = "H:\\projects\\lava\\obj\\Base.obj";
+    str      pth = "H:\\projects\\lava\\obj\\Craftsman.obj";
     TO(pth.length(),i){ 
       filePath.push( pth[i] ); 
     }
