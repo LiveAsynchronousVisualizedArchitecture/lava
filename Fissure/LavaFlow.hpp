@@ -794,7 +794,8 @@ struct       LavaNode
   FlowFunc               func;
   ConstructFunc   constructor;
   ConstructFunc    destructor;
-  uint64_t          node_type;
+  //uint64_t          node_type;
+  Type              node_type;
   const char*            name;
   const char**       in_types;
   const char**       in_names;
@@ -897,7 +898,8 @@ struct    LavaCommand
 };
 // end data types
 
-const LavaNode LavaNodeListEnd = {nullptr, nullptr, nullptr, (uint64_t)LavaNode::NONE, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0};
+//const LavaNode LavaNodeListEnd = {nullptr, nullptr, nullptr, (uint64_t)LavaNode::NONE, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0};
+const LavaNode LavaNodeListEnd = {nullptr, nullptr, nullptr, LavaNode::NONE, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0};
 
 extern "C" __declspec(dllexport) LavaNode* GetLavaFlowNodes();   // prototype of function to return static plugin loading struct
 // end function declarations
@@ -912,7 +914,7 @@ public:
   union      Arg { LavaId id; u64 val; LavaNode* ndptr; };
   struct Command { Cmd cmd; Arg A; Arg B; };
 
-  struct NodeInstance { uint64_t id; LavaNode* nd; };                  // a struct used for returning an instance of a node - the Nodes map of ids and LavaFlowNode pointers  
+  struct NodeInstance { uint64_t id; LavaNode* nd; };                  // not used? - a struct used for returning an instance of a node - the Nodes map of ids and LavaFlowNode pointers  
 
   using abool         =  std::atomic<bool>;
   using au32          =  std::atomic<uint32_t>;

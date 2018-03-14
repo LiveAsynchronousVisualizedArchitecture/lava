@@ -114,12 +114,13 @@
 // -todo: repeat and debug crash when saving back over a file - may be fixed or a different problem
 // -todo: debug new node label not saving and reloading correctly - text name makes it in to the .lava file just fine - node_add() was overwriting the txt from the incoming node
 // -todo: use nodeTxt UI element display and allow changes to the node instance names
+// -todo: make loading a file use the node shared lib type instead of embedding FLOW or MSG into the file format
+// -todo: make adding a node set the initial node txt to an empty string so it will be marked as new in the name by default
 
-// todo: put thread pointers into message node instances and work out how to lock and unlock them
 // todo: convert lava to have separated input slots and output slots with their own indices
 // todo: cull bad connections on save - could be part of normalizing the graph Ids
 // todo: repeat crash when loading .lava file - doesn't crash with single FilePath node - doesn't crash with FilePath and LoadObj nodes linked together, but does not get their positions correct - could have been due 
-// todo: make loading a file use the node shared lib type instead of embedding FLOW or MSG into the file format
+// todo: put thread pointers into message node instances and work out how to lock and unlock them
 // todo: should flow nodes with no inputs be run once at the start of the program for easy data flow?
 // todo: make fissure or lava be able to incrementally load shared libraries
 // todo: re-orient nodes on resize of the window so they line up with the grid in the same place - maybe the scale and pan need to be changed instead
@@ -1118,7 +1119,7 @@ void         graph_apply(LavaGraph::ArgVec args)
   for(auto& a : args){
     if(a.id.sidx == LavaId::SLOT_NONE && a.id.nid != LavaId::NODE_NONE)
     {
-
+      fd.graph.nds[a.id.nid].type = fd.lgrph.node(a.id.nid).node->node_type;                                      // node arg, not a slot arg - need to check the type
     }else if(a.id.sidx != LavaId::SLOT_NONE){
       LavaFlowSlot* ls = fd.lgrph.slot(a.id);
       if(ls){
@@ -1175,9 +1176,6 @@ str           graphToStr(LavaGraph const& lg)
     auto    lnds = lg.nodes();         // lnds is Lava Nodes
     auto      sz = lnds.size();
 
-    //auto  sz  = lg.nsz();
-    //TO(sz,i) nd_func.add(lnds[i].nd->name);
-
     Jzon::Node  nd_func = Jzon::array();
     TO(sz,i) nd_func.add( lg.node(nps[i]->id).node->name );
 
@@ -1193,45 +1191,17 @@ str           graphToStr(LavaGraph const& lg)
     Jzon::Node     nd_y = Jzon::array();
     TO(sz,i) nd_y.add(nps[i]->P.y);
 
-    Jzon::Node nd_type = Jzon::array();
-    TO(sz,i) nd_type.add(nps[i]->type);
+    //Jzon::Node nd_type = Jzon::array();
+    //TO(sz,i) nd_type.add(nps[i]->type);
 
     jnodes.add("function", nd_func);
     jnodes.add("id",         nd_id);
     jnodes.add("txt",       nd_txt);
     jnodes.add("x",           nd_x);
     jnodes.add("y",           nd_y);
-    jnodes.add("type",     nd_type);
+    //jnodes.add("type",     nd_type);
   }
-  //Jzon::Node jslots = Jzon::object();
-  //SECTION(slots)
-  //{
-  //  Jzon::Node srcId   = Jzon::array();
-  //  Jzon::Node srcIdx  = Jzon::array();
-  //  Jzon::Node destId  = Jzon::array();
-  //  Jzon::Node destIdx = Jzon::array();
-  //
-  //  //for(auto kv : g.slots()){
-  //  //for(auto kv : lg.slots())
-  //  for(auto const& kv : fd.graph.slots)
-  //  {
-  //    //GraphDB::Id  sid = kv.first;
-  //    LavaId sid = kv.first;
-  //    auto const& s = kv.second;
-  //    if(s.in){
-  //      destId.add(sid.nid);
-  //      destIdx.add(sid.sidx);
-  //    }else{
-  //      srcId.add(sid.nid);
-  //      srcIdx.add(sid.sidx);
-  //    }
-  //  }
-  //
-  //  jslots.add("destId",   destId);
-  //  jslots.add("destIdx", destIdx);
-  //  jslots.add("srcId",     srcId);
-  //  jslots.add("srcIdx",   srcIdx);
-  //}
+
   Jzon::Node jcncts = Jzon::object();
   SECTION(connections)
   {
@@ -1289,7 +1259,7 @@ void          strToGraph(str const& s)
   auto nd_txt     = graph.get("nodes").get("txt");
   auto nd_x       = graph.get("nodes").get("x");
   auto nd_y       = graph.get("nodes").get("y");
-  auto nd_type    = graph.get("nodes").get("type");
+  //auto nd_type    = graph.get("nodes").get("type");
   auto ordr       = graph.get("nodes").get("order");
   auto destId     = graph.get("connections").get("destId");
   auto destIdx    = graph.get("connections").get("destIdx");
@@ -1307,7 +1277,7 @@ void          strToGraph(str const& s)
     n.txt  = nd_txt.get(i).toString();
     n.P.x  = nd_x.get(i).toFloat();
     n.P.y  = nd_y.get(i).toFloat();
-    n.type = (Node::Type)nd_type.get(i).toInt();
+    //n.type = (Node::Type)nd_type.get(i).toInt();
 
     node_add( nd_func.get(i).toString(), n);
   }
@@ -1390,9 +1360,8 @@ bool    reloadSharedLibs()
       LavaNode*     fn = kv.second;                                // fn is flow node
       auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
       ndBtn->setCallback([fn](){ 
-        //v2 stPos = {fd.ui.w/2.f - n.b.w()/2.f,  fd.ui.h/2.f - n.b.h()/2.f};
         v2 stPos = {fd.ui.w/2.f,  fd.ui.h/2.f};                                                // stPos is starting position
-        node_add(fn->name, Node(fn->name, (Node::Type)((u64)fn->node_type), stPos) );
+        node_add(fn->name, Node("", (Node::Type)((u64)fn->node_type), stPos) );
       });
       fd.ui.ndBtns.push_back(ndBtn);
     }
@@ -1708,7 +1677,35 @@ ENTRY_DECLARATION // main or winmain
 
       //fd.ui.nodeTxtId = fd.ui.keyWin->childIndex(nodeTxt);
 
+      SECTION(load and save callbacks)
+      {
+        loadBtn->setCallback([](){ 
+          stopFlowThreads();
 
+          nfdchar_t *inPath = NULL;
+          nfdresult_t result = NFD_OpenDialog("lava", NULL, &inPath );
+
+          if(inPath){
+            bool ok = loadFile(inPath, &fd.lgrph);
+            if(ok) printf("\nFile loaded from %s\n", inPath);
+            else   printf("\nLoad did not read successfully from %s\n", inPath);
+          }
+        });
+        saveBtn->setCallback([](){
+          //fd.grph.normalizeIndices();
+
+          nfdchar_t *outPath = NULL;
+          nfdresult_t result = NFD_SaveDialog("lava", NULL, &outPath );
+          //printf("\n\nfile dialog: %d %s \n\n", result, outPath);
+          if(outPath){
+            //stopFlowThreads();
+            normalizeIndices(); // todo: put this into the save function
+            bool ok = saveFile(fd.lgrph, outPath);
+            if(ok) printf("\nFile Written to %s\n", outPath);
+            else   printf("\nSave did not write successfully to %s\n", outPath);
+          }
+        });
+      }
       SECTION(set up the text box that contains the name of a new node)
       {
         nodeTxt->setEditable(true);
@@ -1736,32 +1733,6 @@ ENTRY_DECLARATION // main or winmain
         stopBtn->setBackgroundColor(  Color(e3f(.19f, .16f, .17f)) ); 
         stopBtn->setEnabled(false);
 
-        loadBtn->setCallback([](){ 
-          stopFlowThreads();
-
-          nfdchar_t *inPath = NULL;
-          nfdresult_t result = NFD_OpenDialog("lava", NULL, &inPath );
-
-          if(inPath){
-            bool ok = loadFile(inPath, &fd.lgrph);
-            if(ok) printf("\nFile loaded from %s\n", inPath);
-            else   printf("\nLoad did not read successfully from %s\n", inPath);
-          }
-        });
-        saveBtn->setCallback([](){
-          //fd.grph.normalizeIndices();
-
-          nfdchar_t *outPath = NULL;
-          nfdresult_t result = NFD_SaveDialog("lava", NULL, &outPath );
-          //printf("\n\nfile dialog: %d %s \n\n", result, outPath);
-          if(outPath){
-            //stopFlowThreads();
-            normalizeIndices(); // todo: put this into the save function
-            bool ok = saveFile(fd.lgrph, outPath);
-            if(ok) printf("\nFile Written to %s\n", outPath);
-            else   printf("\nSave did not write successfully to %s\n", outPath);
-          }
-        });
         playBtn->setCallback([playBtn,pauseBtn,stopBtn](){
           playBtn->setEnabled(false);
           playBtn->setTextColor( Color(e3f(1.f, 1.f, 1.f)) );
@@ -1923,9 +1894,12 @@ ENTRY_DECLARATION // main or winmain
     {
       auto&   ms = fd.mouse;
       ms.prevPos = ms.pos;
-      glfwPollEvents();                                             // PollEvents must be done after zeroing out the deltas
-      LavaGraph::ArgVec av = fd.lgrph.exec();
-      graph_apply(move(av));
+      SECTION(poll events through glfw and apply commands to the graph)
+      {
+        glfwPollEvents();                                             // PollEvents must be done after zeroing out the deltas
+        LavaGraph::ArgVec av = fd.lgrph.exec();
+        graph_apply(move(av));
+      }
 
       bool    rtClk = (ms.rtDn  && !ms.prevRtDn);  // todo: take this out
       auto      nds = node_getPtrs();
@@ -2584,6 +2558,42 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+//
+//v2 stPos = {fd.ui.w/2.f - n.b.w()/2.f,  fd.ui.h/2.f - n.b.h()/2.f};
+
+//auto  sz  = lg.nsz();
+//TO(sz,i) nd_func.add(lnds[i].nd->name);
+//
+//Jzon::Node jslots = Jzon::object();
+//SECTION(slots)
+//{
+//  Jzon::Node srcId   = Jzon::array();
+//  Jzon::Node srcIdx  = Jzon::array();
+//  Jzon::Node destId  = Jzon::array();
+//  Jzon::Node destIdx = Jzon::array();
+//
+//  //for(auto kv : g.slots()){
+//  //for(auto kv : lg.slots())
+//  for(auto const& kv : fd.graph.slots)
+//  {
+//    //GraphDB::Id  sid = kv.first;
+//    LavaId sid = kv.first;
+//    auto const& s = kv.second;
+//    if(s.in){
+//      destId.add(sid.nid);
+//      destIdx.add(sid.sidx);
+//    }else{
+//      srcId.add(sid.nid);
+//      srcIdx.add(sid.sidx);
+//    }
+//  }
+//
+//  jslots.add("destId",   destId);
+//  jslots.add("destIdx", destIdx);
+//  jslots.add("srcId",     srcId);
+//  jslots.add("srcIdx",   srcIdx);
+//}
 
 //n.P.x   = fd.ui.w/2.f - n.b.w()/2.f;
 //n.P.y   = fd.ui.h/2.f - n.b.h()/2.f; 
