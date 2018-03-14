@@ -102,6 +102,8 @@
 // todo: delete with multi-selection and right click menu
 // todo: treat the array as a string if it is u8, i8, (or a string type?) - then show statistics for a string if the string is too long to fit in the gui
 
+// idea: make each pixel a value when visualizing arrays larger than the number of horizontal pixels - can use stb rectangle packer
+// idea: make box heirarchy that visualizes the sizes of each sub table relative to each other
 // idea: make switch case for fundamental types that the map elements can be - need the non-templated table
 // idea: make multiple selections additivly draw multiple colored lines?
 // idea: should tbls exist as either files, memory, or sub tables?

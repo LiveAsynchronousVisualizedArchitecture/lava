@@ -116,8 +116,9 @@
 // -todo: use nodeTxt UI element display and allow changes to the node instance names
 // -todo: make loading a file use the node shared lib type instead of embedding FLOW or MSG into the file format
 // -todo: make adding a node set the initial node txt to an empty string so it will be marked as new in the name by default
+// -todo: convert lava to have separated input slots and output slots with their own indices
 
-// todo: convert lava to have separated input slots and output slots with their own indices
+// todo: fix wrong selection of slots when clicking
 // todo: cull bad connections on save - could be part of normalizing the graph Ids
 // todo: repeat crash when loading .lava file - doesn't crash with single FilePath node - doesn't crash with FilePath and LoadObj nodes linked together, but does not get their positions correct - could have been due 
 // todo: put thread pointers into message node instances and work out how to lock and unlock them
@@ -1123,7 +1124,7 @@ void         graph_apply(LavaGraph::ArgVec args)
     }else if(a.id.sidx != LavaId::SLOT_NONE){
       LavaFlowSlot* ls = fd.lgrph.slot(a.id);
       if(ls){
-        Slot s(a.id.nid,ls->in);
+        Slot s(a.id.nid, ls->in);
         fd.graph.slots.insert({a.id, s});
       }
     }
@@ -1905,9 +1906,9 @@ ENTRY_DECLARATION // main or winmain
       auto      nds = node_getPtrs();
       auto       sz = nds.size();
       bool isInNode = false;
-      LavaId    nid;
-      u64      nIdx;
+      u64      nIdx = LavaId::NODE_NONE;
       v2       pntr;
+      LavaId    nid;                                           // has a default constructor
 
       SECTION(time)
       {
@@ -1917,14 +1918,8 @@ ENTRY_DECLARATION // main or winmain
       }
       SECTION(input and pointer transform)
       {
-
-        //glfwGetCursorPos(fd.win, &cx, &cy);
-
         fd.ui.prevPntr = pntr;
         nvgTransformPoint(&pntr.x, &pntr.y, fd.ui.invTfm, ms.pos.x, ms.pos.y);
-        //pntr=Vec2((float)cx, (float)cy);
-        //pntr    = ms.pos;
-        //pntrDif = pntr - fd.ui.prevPntr;
 
 		    glfwGetWindowSize(fd.win, &fd.ui.w, &fd.ui.h);
 		    glfwGetFramebufferSize(fd.win, &fbWidth, &fbHeight);
@@ -2117,8 +2112,8 @@ ENTRY_DECLARATION // main or winmain
         }
         SECTION(nanogui status bar)
         {
+          str    status = "";
           f64 totalTime = timeToSeconds(fd.lgrph.totalTime());
-
           if(isInSlot)
           {
             str slotName; str slotType;
@@ -2136,17 +2131,17 @@ ENTRY_DECLARATION // main or winmain
                 slotType = n->in_types[sid.sidx - li.outputs];
               }
             }
-            auto status = toString("Slot [",sid.nid,":",sid.sidx,"]    ",slotName,"  <",slotType,">");
+            status = toString("Slot [",sid.nid,":",sid.sidx,"]    ",slotName,"  <",slotType,">");
             fd.ui.statusTxt->setValue( status );
           }else if(nid.nid == LavaId::NODE_NONE){
             fd.ui.statusTxt->setValue( toString("Queued Packets: ",fd.graph.qPacketBytes," bytes") );
           }else if(slotRtClk){
             fd.ui.statusTxt->setValue( toString(" right click on slot ") );
           }else if(isInNode){
-            auto status = makeStatusText(nid.nid, totalTime, nds, nIdx);
+            status = makeStatusText(nid.nid, totalTime, nds, nIdx);
             fd.ui.statusTxt->setValue( status );
           }else if(fd.sel.pri != LavaNode::NODE_ERROR){
-            auto status = makeStatusText(nid.nid, totalTime, nds, nIdx);
+            //status = makeStatusText(nid.nid, totalTime, nds, nIdx);
             fd.ui.statusTxt->setValue( status );
           }else{
             fd.ui.statusTxt->setValue("");
@@ -2492,10 +2487,6 @@ ENTRY_DECLARATION // main or winmain
               {
                 nvgBeginPath(vg);
                   float x,y,w,h;
-                  //x = min(ms.drgP.x, pntr.x); 
-                  //y = min(ms.drgP.y, pntr.y); 
-                  //w = abs(ms.drgP.x - pntr.x);
-                  //h = abs(ms.drgP.y - pntr.y);
                   x = min(ms.drgP.x, ms.pos.x); 
                   y = min(ms.drgP.y, ms.pos.y); 
                   w = abs(ms.drgP.x - ms.pos.x);
@@ -2558,6 +2549,18 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+//glfwGetCursorPos(fd.win, &cx, &cy);
+//
+//pntr=Vec2((float)cx, (float)cy);
+//pntr    = ms.pos;
+//pntrDif = pntr - fd.ui.prevPntr;
+
+//x = min(ms.drgP.x, pntr.x); 
+//y = min(ms.drgP.y, pntr.y); 
+//w = abs(ms.drgP.x - pntr.x);
+//h = abs(ms.drgP.y - pntr.y);
 
 //
 //v2 stPos = {fd.ui.w/2.f - n.b.w()/2.f,  fd.ui.h/2.f - n.b.h()/2.f};

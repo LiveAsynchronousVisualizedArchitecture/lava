@@ -670,13 +670,15 @@ union          LavaId                                            // this Id serv
   static  const u64 SLOT_NONE = 0xFFFF;                          // 16 bits all set
 
   struct { 
-    u64  nid : 48;                                       // id is the node id number - This is a unique number for each node that doesn't change. It can refer back to a node since it doesn't represent an ordering or an index into an array 
-    u64 sidx : 16;                                       // idx is the index of the LavaFlowSlot - for a node this is 0
+    u64  isIn :  1;
+    u64  sidx : 16;                                       // idx is the index of the LavaFlowSlot - for a node this is 0 - todo: convert to SLOT_NONE
+    u64   nid : 47;                                       // id is the node id number - This is a unique number for each node that doesn't change. It can refer back to a node since it doesn't represent an ordering or an index into an array 
   };
   u64 asInt;
 
   LavaId() : nid(NODE_NONE), sidx(SLOT_NONE) {}
-  LavaId(u64 _id, u64 _idx=SLOT_NONE) : nid(_id), sidx(_idx) {}
+  LavaId(u64 _id, u64 _idx=SLOT_NONE, u64 _isIn=1) : 
+    nid(_id), sidx(_idx), isIn(_isIn) {}
 
   bool   operator==(LavaId  r) const { return nid==r.nid && sidx==r.sidx; }
   bool    operator<(LavaId const& r)   const {
@@ -845,15 +847,12 @@ struct       LavaInst
 };
 struct   LavaFlowSlot
 { 
-  enum State { NORMAL=0, HIGHLIGHTED, SELECTED, SLOT_ERROR };
+  enum State { NORMAL=0, HIGHLIGHTED, SELECTED, SLOT_ERROR };  // todo: highlighted and selected should be moved to the UI, NORMAL and SLOT_ERROR should stay
 
   LavaId id; bool in=false; State state=NORMAL;
 
   LavaFlowSlot(){}
   LavaFlowSlot(LavaId Id, bool In=false) : id(Id), in(In), state(NORMAL) {}
-
-  //u64 nid; bool in=false; State state=NORMAL;
-  //LavaFlowSlot(u64 nId, bool In=false) : nid(nId), in(In), state(NORMAL) {}
 };
 struct        LavaMem
 {
@@ -948,14 +947,18 @@ private:
   //MsgIds          m_msgNodesA;
 
   NodeInsts           m_nodesA;
-  Slots               m_slotsA;
+  //Slots               m_slotsA;
+  Slots             m_inSlotsA;
+  Slots            m_outSlotsA;
   CnctMap             m_cnctsA;
   SrcMap          m_destCnctsA;
   MsgIds           m_msgNodesA;
   MsgCache         m_msgCacheA;
 
   NodeInsts           m_nodesB;
-  Slots               m_slotsB;
+  //Slots               m_slotsB;
+  Slots             m_inSlotsB;
+  Slots            m_outSlotsB;
   CnctMap             m_cnctsB;
   SrcMap          m_destCnctsB;
   MsgIds           m_msgNodesB;
@@ -963,25 +966,33 @@ private:
 
 public:
   NodeInsts&            curNodes(){ return m_useA.load()?  m_nodesA     : m_nodesB;     }
-  Slots&                curSlots(){ return m_useA.load()?  m_slotsA     : m_slotsB;     }
+  //Slots&                curSlots(){ return m_useA.load()?  m_slotsA     : m_slotsB;     }
+  Slots&              curInSlots(){ return m_useA.load()?  m_inSlotsA     : m_inSlotsB;     }
+  Slots&             curOutSlots(){ return m_useA.load()?  m_outSlotsA     : m_outSlotsB;     }
   CnctMap&              curCncts(){ if(m_useA.load()) return m_cnctsA; else return m_cnctsB; }
   SrcMap&           curDestCncts(){ return m_useA.load()?  m_destCnctsA : m_destCnctsB; }
   MsgIds&            curMsgNodes(){ return m_useA.load()?  m_msgNodesA  : m_msgNodesB;  }
   MsgCache&          curMsgCache(){ return m_useA.load()?  m_msgCacheA  : m_msgCacheB;  }
   NodeInsts const&      curNodes()const{ return m_useA.load()?  m_nodesA     : m_nodesB;     }
-  Slots     const&      curSlots()const{ return m_useA.load()?  m_slotsA     : m_slotsB;     }
+  //Slots     const&      curSlots()const{ return m_useA.load()?  m_slotsA     : m_slotsB;     }
+  Slots const&        curInSlots()const{ return m_useA.load()?  m_inSlotsA     : m_inSlotsB;     }
+  Slots const&       curOutSlots()const{ return m_useA.load()?  m_outSlotsA     : m_outSlotsB;     }
   CnctMap   const&      curCncts()const{ return m_useA.load()?  m_cnctsA     : m_cnctsB;     }
   SrcMap    const&  curDestCncts()const{ return m_useA.load()?  m_destCnctsA : m_destCnctsB; }
   MsgIds    const&   curMsgNodes()const{ return m_useA.load()?  m_msgNodesA  : m_msgNodesB;  }
 
   NodeInsts&            oppNodes(){ return !m_useA.load()?  m_nodesA     : m_nodesB;     }
-  Slots&                oppSlots(){ return !m_useA.load()?  m_slotsA     : m_slotsB;     }
+  //Slots&                oppSlots(){ return !m_useA.load()?  m_slotsA     : m_slotsB;     }
+  Slots&              oppInSlots(){ return !m_useA.load()?  m_inSlotsA     : m_inSlotsB;     }
+  Slots&             oppOutSlots(){ return !m_useA.load()?  m_outSlotsA     : m_outSlotsB;     }
   CnctMap&              oppCncts(){ if(!m_useA.load()) return m_cnctsA; else return m_cnctsB; }
   SrcMap&           oppDestCncts(){ return !m_useA.load()?  m_destCnctsA : m_destCnctsB; }
   MsgIds&            oppMsgNodes(){ return !m_useA.load()?  m_msgNodesA  : m_msgNodesB;  }
   MsgCache&          oppMsgCache(){ return !m_useA.load()?  m_msgCacheA  : m_msgCacheB;  }
   NodeInsts const&      oppNodes()const{ return !m_useA.load()?  m_nodesA     : m_nodesB;     }
-  Slots     const&      oppSlots()const{ return !m_useA.load()?  m_slotsA     : m_slotsB;     }
+  //Slots     const&      oppSlots()const{ return !m_useA.load()?  m_slotsA     : m_slotsB;     }
+  Slots     const&    oppInSlots()const{ return !m_useA.load()?  m_inSlotsA   : m_inSlotsB;   }
+  Slots     const&   oppOutSlots()const{ return !m_useA.load()?  m_outSlotsA  : m_outSlotsB;  }
   CnctMap   const&      oppCncts()const{ return !m_useA.load()?  m_cnctsA     : m_cnctsB;     }
   SrcMap    const&  oppDestCncts()const{ return !m_useA.load()?  m_destCnctsA : m_destCnctsB; }
   MsgIds    const&   oppMsgNodes()const{ return !m_useA.load()?  m_msgNodesA  : m_msgNodesB;  }
@@ -997,12 +1008,16 @@ public:
     using namespace std;
 
     m_nodesA     = move(rval.m_nodesA); 
-    m_slotsA     = move(rval.m_slotsA); 
+    //m_slotsA     = move(rval.m_slotsA); 
+    m_inSlotsA   = move(rval.m_inSlotsA); 
+    m_outSlotsA  = move(rval.m_outSlotsA); 
     m_cnctsA     = move(rval.m_cnctsA); 
     m_destCnctsA = move(rval.m_destCnctsA);
 
     m_nodesB     = move(rval.m_nodesB); 
-    m_slotsB     = move(rval.m_slotsB); 
+    //m_slotsB     = move(rval.m_slotsB); 
+    m_inSlotsB   = move(rval.m_inSlotsB); 
+    m_outSlotsB  = move(rval.m_outSlotsB);
     m_cnctsB     = move(rval.m_cnctsB); 
     m_destCnctsB = move(rval.m_destCnctsB);
 
@@ -1014,12 +1029,16 @@ public:
     using namespace std;
 
     m_nodesA     = lval.m_nodesA;
-    m_slotsA     = lval.m_slotsA; 
+    //m_slotsA     = lval.m_slotsA; 
+    m_inSlotsA   = lval.m_inSlotsA; 
+    m_outSlotsA  = lval.m_outSlotsA; 
     m_cnctsA     = lval.m_cnctsA; 
     m_destCnctsA = lval.m_destCnctsA;
 
     m_nodesB     = lval.m_nodesB;
-    m_slotsB     = lval.m_slotsB; 
+    //m_slotsB     = lval.m_slotsB;
+    m_inSlotsB   = lval.m_inSlotsB; 
+    m_outSlotsB  = lval.m_outSlotsB;
     m_cnctsB     = lval.m_cnctsB; 
     m_destCnctsB = lval.m_destCnctsB;
   }
@@ -1031,11 +1050,17 @@ public:
 
     vec_ids sidxs;                                            // sidxs is slot indexes
     for(auto ni : nds){                                       // ni is Node Instance np is node pointer and nds is nodes
-      auto si = lower_bound(ALL(curSlots()), LavaId(ni.id.nid), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
-      if(si != end(curSlots())  &&  si->first.nid == ni.id.nid){
+      auto si = lower_bound(ALL(curInSlots()), LavaId(ni.id.nid), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
+      if(si != end(curInSlots())  &&  si->first.nid == ni.id.nid){
         LavaFlowSlot& s = si->second;
-        if(s.in) sidxs.push_back(si->first);
+        sidxs.push_back(si->first);
       }
+
+      //auto si = lower_bound(ALL(curSlots()), LavaId(ni.id.nid), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
+      //if(si != end(curSlots())  &&  si->first.nid == ni.id.nid){
+      //  LavaFlowSlot& s = si->second;
+      //  if(s.in) sidxs.push_back(si->first);
+      //}
     }
     return sidxs;                                        // RVO
   }
@@ -1044,12 +1069,25 @@ public:
     using namespace std;
 
     vec_ids sidxs;                                            // sidxs is LavaFlowSlot indexes
-    for(auto ni : nds){                                       // np is node pointer and nds is nodes
-      auto si = lower_bound(ALL(curSlots()), LavaId(ni.id.nid), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
-      if(si != end(curSlots())  &&  si->first.nid == ni.id.nid){
-        LavaFlowSlot& s = si->second;
-        sidxs.push_back(si->first);        
+    for(auto ni : nds)
+    {                                       // np is node pointer and nds is nodes
+      auto inSi = lower_bound(ALL(curInSlots()), LavaId(ni.id.nid), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
+      if(inSi != end(curInSlots())  &&  inSi->first.nid == ni.id.nid){
+        LavaFlowSlot& s = inSi->second;
+        sidxs.push_back(inSi->first);
       }
+
+      auto outSi = lower_bound(ALL(curOutSlots()), LavaId(ni.id.nid), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
+      if(outSi != end(curOutSlots())  &&  outSi->first.nid == ni.id.nid){
+        LavaFlowSlot& s = outSi->second;
+        sidxs.push_back(outSi->first);
+      }
+
+      //auto si = lower_bound(ALL(curSlots()), LavaId(ni.id.nid), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
+      //if(si != end(curSlots())  &&  si->first.nid == ni.id.nid){
+      //  LavaFlowSlot& s = si->second;
+      //  sidxs.push_back(si->first);        
+      //}
     }
     return sidxs;                                        // RVO
   }
@@ -1064,11 +1102,25 @@ public:
     return ERR_INST;
   }
   
-  u64          nxtSlot(u64 nid) // non-const, part of writing, and needs to use the opposite buffer
+  //u64          nxtSlot(u64 nid) // non-const, part of writing, and needs to use the opposite buffer
+  //{
+  //  auto si = nodeSlots(nid);                   // si is slot iterator
+  //  i64 cur = -1;
+  //  while(si != end(oppSlots())   && 
+  //    si->first.nid  == nid && 
+  //    si->first.sidx <= (u64)(cur+1) ){
+  //    //cur = si->first.idx;
+  //    ++cur; ++si; 
+  //  }
+  //  //return cur;
+  //
+  //  return cur + 1;
+  //}
+  u64        nxtInSlot(u64 nid) // non-const, part of writing, and needs to use the opposite buffer
   {
-    auto si = nodeSlots(nid);                   // si is slot iterator
+    auto si = nodeInSlots(nid);                   // si is slot iterator
     i64 cur = -1;
-    while(si != end(oppSlots())   && 
+    while(si != end(oppInSlots())   && 
       si->first.nid  == nid && 
       si->first.sidx <= (u64)(cur+1) ){
       //cur = si->first.idx;
@@ -1078,7 +1130,21 @@ public:
 
     return cur + 1;
   }
-  u32       countSlots(const char** typeList)
+  u64       nxtOutSlot(u64 nid) // non-const, part of writing, and needs to use the opposite buffer
+  {
+    auto si = nodeOutSlots(nid);                   // si is slot iterator
+    i64 cur = -1;
+    while(si != end(oppOutSlots())   && 
+      si->first.nid  == nid && 
+      si->first.sidx <= (u64)(cur+1) ){
+      //cur = si->first.idx;
+      ++cur; ++si; 
+    }
+    //return cur;
+
+    return cur + 1;
+  }
+  u32       countSlots(const char** typeList)  // todo: make this static
   {
     u32 cnt=0;
     for(; typeList  &&  *typeList; ++typeList){ 
@@ -1142,17 +1208,46 @@ public:
     curDestCncts() = move(nxtDestCncts);
 
     // slots
-    Slots nxtSlots;
-    for(auto& kv : curSlots()){
-      LavaId nxtId  = kv.first;
-      nxtId.nid     = nids[nxtId.nid];
-      LavaFlowSlot nxtS = kv.second;
-      auto nxtSltId = nids[nxtS.id.nid];
-      nxtS.id.nid   = nxtSltId;
-      nxtS.id.sidx  = nxtS.id.sidx;
-      nxtSlots.insert({nxtId, nxtS});
+    //Slots nxtSlots;
+    //for(auto& kv : curSlots()){
+    //  LavaId nxtId  = kv.first;
+    //  nxtId.nid     = nids[nxtId.nid];
+    //  LavaFlowSlot nxtS = kv.second;
+    //  auto nxtSltId = nids[nxtS.id.nid];
+    //  nxtS.id.nid   = nxtSltId;
+    //  nxtS.id.sidx  = nxtS.id.sidx;
+    //  nxtSlots.insert({nxtId, nxtS});
+    //}
+    //curSlots() = move(nxtSlots);
+
+    SECTION(in slots)
+    {
+      Slots nxtSlots;
+      for(auto& kv : curInSlots()){
+        LavaId nxtId  = kv.first;
+        nxtId.nid     = nids[nxtId.nid];
+        LavaFlowSlot nxtS = kv.second;
+        auto nxtSltId = nids[nxtS.id.nid];
+        nxtS.id.nid   = nxtSltId;
+        nxtS.id.sidx  = nxtS.id.sidx;
+        nxtSlots.insert({nxtId, nxtS});
+      }
+      curInSlots() = move(nxtSlots);
     }
-    curSlots() = move(nxtSlots);
+    SECTION(out slots)
+    {
+      Slots nxtSlots;
+      for(auto& kv : curOutSlots()){
+        LavaId nxtId  = kv.first;
+        nxtId.nid     = nids[nxtId.nid];
+        LavaFlowSlot nxtS = kv.second;
+        auto nxtSltId = nids[nxtS.id.nid];
+        nxtS.id.nid   = nxtSltId;
+        nxtS.id.sidx  = nxtS.id.sidx;
+        nxtSlots.insert({nxtId, nxtS});
+      }
+      curOutSlots() = move(nxtSlots);
+    }
 
     // node ids 
     NodeInsts nxtNds;
@@ -1185,7 +1280,9 @@ public:
   void              clear()
   {
     curNodes().clear();
-    curSlots().clear();
+    //curSlots().clear();
+    curInSlots().clear();
+    curOutSlots().clear();
     curCncts().clear();
     curDestCncts().clear();
     curMsgNodes().clear();
@@ -1212,14 +1309,18 @@ public:
     {
       if(m_useA.load()){
         m_nodesB     = m_nodesA;
-        m_slotsB     = m_slotsA; 
+        //m_slotsB     = m_slotsA; 
+        m_inSlotsB   = m_inSlotsA; 
+        m_outSlotsB  = m_outSlotsA; 
         m_cnctsB     = m_cnctsA; 
         m_destCnctsB = m_destCnctsA;
         m_msgNodesB  = m_msgNodesA;
         m_msgCacheB  = m_msgCacheA;
       }else{
         m_nodesA     = m_nodesB;
-        m_slotsA     = m_slotsB; 
+        //m_slotsA     = m_slotsB; 
+        m_inSlotsA   = m_inSlotsB; 
+        m_outSlotsA  = m_outSlotsB; 
         m_cnctsA     = m_cnctsB; 
         m_destCnctsA = m_destCnctsB;
         m_msgNodesA  = m_msgNodesB;
@@ -1305,25 +1406,53 @@ public:
   bool        delNode(uint64_t nid)
   {
     // erase any connects that go with the slots here
-    auto     si = this->nodeSlots(nid);                       // si is slot iterator
-    auto siCnct = si; 
-    for(; siCnct!=end(oppSlots())  &&  siCnct->first.nid==nid; ++siCnct ){
-      if(siCnct->second.in) this->delDestCnct(nid);
-      else                  this->delSrcCncts(nid);
+    //auto     si = this->nodeSlots(nid);                       // si is slot iterator
+    //auto siCnct = si; 
+    //for(; siCnct!=end(oppSlots())  &&  siCnct->first.nid==nid; ++siCnct ){
+    //  if(siCnct->second.in) this->delDestCnct(nid);
+    //  else                  this->delSrcCncts(nid);
+    //}
+
+    SECTION(in slots and destination connections)
+    {
+      auto     si = this->nodeInSlots(nid);                       // si is slot iterator
+      auto siCnct = si; 
+      for(; siCnct!=end(oppInSlots())  &&  siCnct->first.nid==nid; ++siCnct ){
+        this->delDestCnct(nid);
+      }
+    }
+    SECTION(out slots and source connections)
+    {
+      auto     si = this->nodeOutSlots(nid);                       // si is slot iterator
+      auto siCnct = si; 
+      for(; siCnct!=end(oppOutSlots())  &&  siCnct->first.nid==nid; ++siCnct ){
+        this->delSrcCncts(nid);
+      }
     }
 
-    auto slcnt = oppSlots().erase(nid);                         // slcnt is slot count
-    auto   cnt = oppNodes().erase(nid);
+    auto  inSltCnt = oppInSlots().erase(nid);                         // slcnt is slot count
+    auto outSltCnt = oppOutSlots().erase(nid);                        // slcnt is slot count
+    auto       cnt = oppNodes().erase(nid);
     oppMsgNodes().erase(nid);
 
-    return (cnt+slcnt) > 0;                                  // return true if 1 or more elements were erased, return false if no elements were erasedm
+    return (cnt + inSltCnt + outSltCnt) > 0;                                  // return true if 1 or more elements were erased, return false if no elements were erasedm
   }
-  LavaId      addSlot(LavaFlowSlot  s, u64 sidx=0)
+  LavaId      addSlot(LavaFlowSlot  s, u64 sidx=LavaId::SLOT_NONE)
   {
-    LavaId id(s.id.nid, sidx);
-    id.sidx = sidx? sidx  :  nxtSlot(s.id.nid);
-    s.id    = id;
-    oppSlots().insert({id, s});
+    LavaId id(s.id.nid, sidx, s.in);
+    if(id.sidx==LavaId::SLOT_NONE){
+      id.sidx =  s.in? nxtInSlot(s.id.nid)  :  nxtOutSlot(s.id.nid);
+    }else{ id.sidx = sidx; }
+    
+    s.id = id;
+    if(s.in) oppInSlots().insert({id, s});
+    else     oppOutSlots().insert({id, s});
+
+
+    //LavaId id(s.id.nid, sidx);
+    //id.sidx = sidx? sidx  :  nxtSlot(s.id.nid);
+    //s.id    = id;
+    //oppSlots().insert({id, s});
 
     return id;
   }
@@ -1439,40 +1568,82 @@ public:
   }
 
   // slots
-  auto           slot(LavaId   id) -> LavaFlowSlot*
+  auto          inSlot(LavaId   id) -> LavaFlowSlot*
   {
-    auto si = curSlots().find(id);
-    if(si == curSlots().end()) 
+    auto si = curInSlots().find(id);
+    if(si == curInSlots().end()) 
       return nullptr;
 
     return &si->second;
   }
-  auto      nodeSlots(u64     nid) const -> decltype(curSlots().cbegin())
+  auto         outSlot(LavaId   id) -> LavaFlowSlot*
   {
-    return lower_bound(ALL(curSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
+    auto si = curOutSlots().find(id);
+    if(si == curOutSlots().end()) 
+      return nullptr;
+
+    return &si->second;
   }
-  auto      nodeSlots(u64     nid) -> decltype(oppSlots().begin())
+  auto         slot(LavaId   id) -> LavaFlowSlot*
   {
-    return lower_bound(ALL(oppSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
+    if(id.isIn) return  inSlot(id);
+    else        return outSlot(id);
   }
-  auto          slots() -> Slots& { return curSlots(); }
-  auto          slots() const -> Slots const& { return curSlots();  }
-  auto       getSlots() -> Slots& { return curSlots(); }
-  auto        srcSlot(LavaId destId) -> LavaFlowSlot* 
+
+  //auto      nodeSlots(u64     nid) const -> decltype(curSlots().cbegin())
+  //{
+  //  return lower_bound(ALL(curSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
+  //}
+  //auto      nodeSlots(u64     nid) -> decltype(oppSlots().begin())
+  //{
+  //  return lower_bound(ALL(oppSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
+  //}
+  auto      nodeInSlots(u64     nid) const -> decltype(curInSlots().cbegin())
+  {
+    return lower_bound(ALL(curInSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
+  }
+  auto      nodeInSlots(u64     nid) -> decltype(oppInSlots().begin())
+  {
+    return lower_bound(ALL(oppInSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
+  }
+  auto      nodeOutSlots(u64    nid) const -> decltype(curOutSlots().cbegin())
+  {
+    return lower_bound(ALL(curInSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
+  }
+  auto      nodeOutSlots(u64    nid) -> decltype(oppOutSlots().begin())
+  {
+    return lower_bound(ALL(oppOutSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
+  }
+  //auto          slots() -> Slots& { return curSlots(); }
+  //auto          slots() const -> Slots const& { return curSlots();  }
+  //auto       getSlots() -> Slots& { return curSlots(); }
+  auto          inSlots()  -> Slots& { return curInSlots(); }
+  auto          inSlots() const -> Slots const& { return curInSlots();  }
+  auto       getInSlots()  -> Slots& { return curInSlots(); }
+  auto         outSlots() -> Slots& { return curOutSlots(); }
+  auto         outSlots() const -> Slots const& { return curOutSlots();  }
+  auto      getOutSlots() -> Slots& { return curOutSlots(); }
+
+  auto          srcSlot(LavaId destId) -> LavaFlowSlot* 
   {
     auto ci = curCncts().find(destId);
     if(ci != curCncts().end()){
-      LavaFlowSlot* s = slot(ci->second);
+      //LavaFlowSlot* s = slot(ci->second);
+      LavaFlowSlot* s = outSlot(ci->second);
       return s;
     }else 
       return nullptr;
   }
-  auto      destSlots(LavaId  srcId) -> decltype(curDestCncts().find(srcId))
+  auto        destSlots(LavaId  srcId) -> decltype(curDestCncts().find(srcId))
   {
     return curDestCncts().find(srcId);
   }
-  auto        slotEnd() -> decltype(curSlots().end()) { return curSlots().end(); }
-  u64             ssz() const { return curSlots().size(); }
+  //auto        slotEnd() -> decltype(curSlots().end()) { return curSlots().end(); }
+  //u64             ssz() const { return curSlots().size(); }
+  auto        inSlotEnd() -> decltype(curInSlots().end()) { return curInSlots().end(); }
+  u64           inSltSz() const { return curInSlots().size(); }
+  auto       outSlotEnd() -> decltype(curOutSlots().end()) { return curOutSlots().end(); }
+  u64          outSltSz() const { return curOutSlots().size(); }
 
   // connections
   u32     delSrcCncts(LavaId  src)
@@ -1521,7 +1692,8 @@ public:
   u32         delCnct(LavaId id)
   {
     u32 cnt = 0;
-    LavaFlowSlot* s = this->slot(id);
+    //LavaFlowSlot* s = this->slot(id);
+    LavaFlowSlot* s =  id.isIn? inSlot(id)  :  outSlot(id);
     if(!s) return 0;
 
     if(s->in){
@@ -2371,6 +2543,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//u64 nid; bool in=false; State state=NORMAL;
+//LavaFlowSlot(u64 nId, bool In=false) : nid(nId), in(In), state(NORMAL) {}
 
 //struct Header
 //{
