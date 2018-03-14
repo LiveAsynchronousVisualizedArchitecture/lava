@@ -111,23 +111,26 @@
 // -todo: test with a larger .obj file - maybe the craftsman - great success
 // -todo: debug crash when pushing load button - only happens when run with the debugger attached, possibly a new exception being caught after turning on all C++ and win32 exceptions - some RPC exception that isn't in visual studio's list of win32 exceptions was being caught by the debugger
 // -todo: try moving the LavaHeapAlloc functions into the implementation section - not now, may have to sort out the thread allocator later
+// -todo: repeat and debug crash when saving back over a file - may be fixed or a different problem
+// -todo: debug new node label not saving and reloading correctly - text name makes it in to the .lava file just fine - node_add() was overwriting the txt from the incoming node
+// -todo: use nodeTxt UI element display and allow changes to the node instance names
 
-// todo: keep track of loops through message nodes that don't generate any packets - if a thread goes through 2 empty loops, sleep - maybe sleep 1ms longer for each empty loop, up to 100ms
+// todo: put thread pointers into message node instances and work out how to lock and unlock them
+// todo: convert lava to have separated input slots and output slots with their own indices
 // todo: cull bad connections on save - could be part of normalizing the graph Ids
-// todo: use nodeTxt UI element display and allow changes to the node instance names
-// todo: repeat crash when loading .lava file - doesn't crash with single FilePath node - doesn't crash with FilePath and LoadObj nodes linked together, but does not get their positions correct
-// todo: repeat and debug crash when saving back over a file
+// todo: repeat crash when loading .lava file - doesn't crash with single FilePath node - doesn't crash with FilePath and LoadObj nodes linked together, but does not get their positions correct - could have been due 
+// todo: make loading a file use the node shared lib type instead of embedding FLOW or MSG into the file format
+// todo: should flow nodes with no inputs be run once at the start of the program for easy data flow?
+// todo: make fissure or lava be able to incrementally load shared libraries
 // todo: re-orient nodes on resize of the window so they line up with the grid in the same place - maybe the scale and pan need to be changed instead
 // todo: make sure zooming center is affected by cursor placement
 // todo: build in data type visualization - part needs to be lava, part needs to be UI
-// todo: make reloaded nodes have highlights until the next event
-// todo: organize nodes by types in a contex menu or side bar
-// todo: should flow nodes with no inputs be run once at the start of the program for easy data flow?
-// todo: should the big difference in MSG nodes as opposed to data flow nodes be that they are always run from the same thread that unlocks? 
-// todo: make note nodes that are drawn over the grid but behind nodes 
-// todo: make a modal window that will set the text for a note 
 // todo: make a note node that will show the hotkeys and thus can be deleted at any time
-// todo: make loading a file use the node shared lib type instead of embedding FLOW or MSG into the file format
+// todo: keep track of loops through message nodes that don't generate any packets - if a thread goes through 2 empty loops, sleep - maybe sleep 1ms longer for each empty loop, up to 100ms
+// todo: organize nodes by types in a contex menu or side bar
+// todo: make reloaded nodes have highlights until the next event
+// todo: make a modal window that will set the text for a note 
+// todo: make note nodes that are drawn over the grid but behind nodes 
 
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: add tool tips to node buttons containing the description string of the node
@@ -185,6 +188,7 @@
 //       |  use a union of bytes that is filled with the frame, slot, list index?
 //       |  use malloc addresses initially
 
+// idea: should the big difference in MSG nodes as opposed to data flow nodes be that they are always run from the same thread that unlocks? 
 // idea: keep track of both time speht in a node and the memory allocations it uses
 // idea: make packets visualize on slots circles stack as concentric circles or as portions/segments of a single circle 
 // idea: make errors in the directory creation give an error in the status bar 
@@ -677,11 +681,9 @@ auto            node_add(str node_name, Node n) -> uint64_t
       ido.order = node_nxtOrder();
       fd.graph.ordr.insert(ido);
       
-      n.txt   = "New: " +  node_name;
+      if(n.txt==""){ n.txt = "New: " + node_name; }
       n.id    = instIdx;
       n.order = ido.order;
-      //n.P.x   = fd.ui.w/2.f - n.b.w()/2.f;
-      //n.P.y   = fd.ui.h/2.f - n.b.h()/2.f; 
       fd.graph.nds[instIdx] = move(n);
 
       LavaCommand::Arg A,B;
@@ -1446,9 +1448,11 @@ void          mouseBtnCallback(GLFWwindow* window, int button, int action, int m
   bool used = fd.ui.screen.mouseButtonCallbackEvent(button, action, mods);
   if(used){ return; }
 
+  //fd.ui.nodeTxt->setValue("");
+
   if(button==GLFW_MOUSE_BUTTON_LEFT){
-    if(action==GLFW_PRESS) fd.mouse.lftDn = true;
-    else if(action==GLFW_RELEASE) fd.mouse.lftDn = false;
+    if(action==GLFW_PRESS){ fd.mouse.lftDn = true; }
+    else if(action==GLFW_RELEASE){ fd.mouse.lftDn = false; }
   }
 
   if(button==GLFW_MOUSE_BUTTON_RIGHT){
@@ -1697,9 +1701,13 @@ ENTRY_DECLARATION // main or winmain
       auto pauseBtn   = new  Button(fd.ui.keyWin,  "Pause  ||");
       auto stopBtn    = new  Button(fd.ui.keyWin,  "Stop  |_|");
       auto nodeBtn    = new  Button(fd.ui.keyWin,  "Create Node");
-      auto nodeTxt    = new TextBox(fd.ui.keyWin,  "");
       auto thrdsLabel = new   Label(fd.ui.keyWin, toString(fd.threadCount) );
       auto thrdsSldr  = new  Slider(fd.ui.keyWin);
+
+      auto nodeTxt = fd.ui.nodeTxt = new TextBox(fd.ui.keyWin,  "");
+
+      //fd.ui.nodeTxtId = fd.ui.keyWin->childIndex(nodeTxt);
+
 
       SECTION(set up the text box that contains the name of a new node)
       {
@@ -1707,10 +1715,14 @@ ENTRY_DECLARATION // main or winmain
         nodeTxt->setFixedWidth(250);
         nodeTxt->setAlignment(TextBox::Alignment::Left);
         nodeTxt->setTooltip("The name of the created node");
+        nodeTxt->setCallback([](str const& s){
+          fd.graph.nds[ fd.sel.pri ].txt = s;
+          return true;
+        });
         //nodeTxt->set setBackgroundColor( Color(e3f(.2f,  .2f,  .15f)) ); 
         //fd.ui.keyWin->setLayout(fd.ui.keyLay);
       }
-      SECTION(initialize button colors and callbacks)
+      SECTION(initialize flow control button colors and callbacks)
       {
         playBtn->setBackgroundColor(  Color(e3f(.15f, .25f,  .15f)) ); 
         playBtn->setTextColor( Color(e3f(1.f, 1.f, 1.f)) );
@@ -2061,6 +2073,8 @@ ENTRY_DECLARATION // main or winmain
             nds         =  node_getPtrs();                    // move to the front will invalidate some pointers in the nds array so it needs to be remade
             fd.sel.pri  =  n->id;
             ms.drgP     =  ms.pos; //pntr;
+
+            fd.ui.nodeTxt->setValue( n->txt );
           }
         }
         SECTION(select from drg box)
@@ -2098,6 +2112,7 @@ ENTRY_DECLARATION // main or winmain
            if(lftClkDn && !slotClk && !nodeClk){
              sel_clear();
              fd.ui.statusTxt->setValue("");
+             fd.ui.nodeTxt->setValue("");
            }
         }
         SECTION(slot visualization output simdb writing)
@@ -2568,6 +2583,10 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+//n.P.x   = fd.ui.w/2.f - n.b.w()/2.f;
+//n.P.y   = fd.ui.h/2.f - n.b.h()/2.f; 
 
 //GraphDB::Id src, dest;
 //LavaId src, dest;

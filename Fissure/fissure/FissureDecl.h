@@ -266,6 +266,7 @@ struct FisData
     Window*      statusWin = nullptr;
     BoxLayout*   statusLay = nullptr;
     TextBox*     statusTxt = nullptr;
+    TextBox*       nodeTxt = nullptr;
     vec_btn         ndBtns;
 
 
