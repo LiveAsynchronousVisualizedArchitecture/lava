@@ -122,16 +122,16 @@
 // todo: repeat crash when loading .lava file - doesn't crash with single FilePath node - doesn't crash with FilePath and LoadObj nodes linked together, but does not get their positions correct - could have been due 
 // todo: put thread pointers into message node instances and work out how to lock and unlock them
 // todo: should flow nodes with no inputs be run once at the start of the program for easy data flow?
-// todo: make fissure or lava be able to incrementally load shared libraries
 // todo: re-orient nodes on resize of the window so they line up with the grid in the same place - maybe the scale and pan need to be changed instead
 // todo: make sure zooming center is affected by cursor placement
 // todo: build in data type visualization - part needs to be lava, part needs to be UI
 // todo: make a note node that will show the hotkeys and thus can be deleted at any time
-// todo: keep track of loops through message nodes that don't generate any packets - if a thread goes through 2 empty loops, sleep - maybe sleep 1ms longer for each empty loop, up to 100ms
 // todo: organize nodes by types in a contex menu or side bar
 // todo: make reloaded nodes have highlights until the next event
 // todo: make a modal window that will set the text for a note 
 // todo: make note nodes that are drawn over the grid but behind nodes 
+// todo: make fissure or lava be able to incrementally load shared libraries
+// todo: keep track of loops through message nodes that don't generate any packets - if a thread goes through 2 empty loops, sleep - maybe sleep 1ms longer for each empty loop, up to 100ms
 
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: add tool tips to node buttons containing the description string of the node
