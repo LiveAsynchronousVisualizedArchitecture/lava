@@ -118,9 +118,12 @@
 // -todo: make adding a node set the initial node txt to an empty string so it will be marked as new in the name by default
 // -todo: convert lava to have separated input slots and output slots with their own indices
 // -todo: need to split graph slot data structure into two
+// -todo: redo slot movement
+// -todo: fix wrong selection of slots when clicking - clicking either slot selects the output / src slot - second slot check was overriding previous boolean that tracks whether the cursor is inside a slot
+// -todo: fix connections not being formed - no connection appears in the .lava file after saving - need to fix the selection of outputs first
 
-// todo: redo slot movement
-// todo: fix wrong selection of slots when clicking - clicking either slot selects the output / src slot
+// todo: test outputs in Lava and node indices in the GUI - do the names of the slots now need to have their in or out flag in the string?
+// todo: test node graph with new slots + loading and saving
 // todo: cull bad connections on save - could be part of normalizing the graph Ids
 // todo: repeat crash when loading .lava file - doesn't crash with single FilePath node - doesn't crash with FilePath and LoadObj nodes linked together, but does not get their positions correct - could have been due 
 // todo: put thread pointers into message node instances and work out how to lock and unlock them
@@ -2050,7 +2053,7 @@ ENTRY_DECLARATION // main or winmain
           //  }
           //}
 
-          for(auto& kv : fd.graph.outSlots){
+          for(auto& kv : fd.graph.inSlots){
             Slot&    s  =  kv.second;
             isInSlot    =  len(pntr - s.P) < fd.ui.slot_rad;
             if(isInSlot){ 
@@ -2058,7 +2061,8 @@ ENTRY_DECLARATION // main or winmain
               break;
             }
           }
-          for(auto& kv : fd.graph.inSlots){
+          
+          if(!isInSlot) for(auto& kv : fd.graph.outSlots){
             Slot&    s  =  kv.second;
             isInSlot    =  len(pntr - s.P) < fd.ui.slot_rad;
             if(isInSlot){ 
@@ -2571,17 +2575,14 @@ ENTRY_DECLARATION // main or winmain
             }
             SECTION(draw connections)
             {
-              //nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
               auto di = g.srcCnctsMap().begin();                                    // di is destination iterator
               auto en = g.srcCnctsMap().end();
-              //for(auto di = g.srcCnctsMap().begin(); di != en; )
               while(di != en)
               {
                 LavaId  srcIdx = di->first;
                 LavaId destIdx = di->second;
 
                 auto pcktSltIter = find( ALL(fd.graph.packetSlots), srcIdx);  // todo: this is a linear search, it could be a hash lookup
-                //if(fd.vizIds.has(srcIdx.asInt)){
                 if( pcktSltIter !=  end(fd.graph.packetSlots) ){
                   nvgStrokeWidth(vg, 4.f);
                   nvgStrokeColor(vg, nvgRGBAf(1.f, .85f, 0, 0.8f));
@@ -2591,8 +2592,8 @@ ENTRY_DECLARATION // main or winmain
                 }
 
                 u64  cnt = 0; v2 srcP(0,0); v2 srcN(0,0);
-                auto const& si = fd.graph.slots.find(srcIdx);
-                if(si != fd.graph.slots.end()){
+                auto const& si = fd.graph.outSlots.find(srcIdx);     // si is source iterator - iterates over output slots
+                if(si != fd.graph.outSlots.end()){
                   cnt  = g.destCnctCount(srcIdx);
                   srcP = si->second.P;
                   srcN = si->second.N;
@@ -2600,8 +2601,8 @@ ENTRY_DECLARATION // main or winmain
 
                 if(cnt==1)
                 {
-                  auto sltIter = fd.graph.slots.find(destIdx);
-                  if(sltIter != fd.graph.slots.end()){
+                  auto sltIter = fd.graph.inSlots.find(destIdx);
+                  if(sltIter != fd.graph.inSlots.end()){
                     Slot const& dest = sltIter->second; // todo: check for end() here?
                     f32 w = fd.graph.nds[destIdx.nid].b.w();
                     cnct_draw(vg, srcP, dest.P, srcN, dest.N, w/2);
@@ -2647,7 +2648,6 @@ ENTRY_DECLARATION // main or winmain
             }
             SECTION(draw nodes and slots)
             {
-              auto const& slots = fd.graph.slots;
               TO(sz,i)
               {
                 Node&     n = *(nds[i]);
@@ -2661,18 +2661,61 @@ ENTRY_DECLARATION // main or winmain
                 bool highlight = isInNode && nIdx==i;
                 node_draw(vg, 0, n, 1.f, selctd, fd.ui.nd_border, highlight);
 
-                SECTION(draw node slots)
+                //SECTION(draw node slots)
+                //{
+                //  auto const& slots = fd.graph.slots;
+                //
+                //  nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
+                //  nvgStrokeWidth(vg, fd.ui.slot_border);
+                //
+                //  auto sIter = node_slots(n.id);
+                //  for(; sIter!=end(slots) && sIter->first.nid==n.id; ++sIter)
+                //  {
+                //    auto     sIdx = sIter->first;                    // todo: needs to be redone
+                //    //Slot const& s = *(grph.slot(sIdx));
+                //    Slot const& s = sIter->second;
+                //    bool   inSlot = len(pntr - s.P) < fd.ui.slot_rad; //io_rad;
+                //
+                //    Slot::State drawState = Slot::NORMAL;
+                //    if(s.state==Slot::SELECTED) drawState = Slot::SELECTED;
+                //    else if(inSlot)             drawState = Slot::HIGHLIGHTED;
+                //    slot_draw(vg, s, drawState, fd.ui.slot_rad);
+                //  }
+                //}
+
+                SECTION(draw input / dest node slots)
                 {
+                  auto const& slots = fd.graph.inSlots;
+
                   nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
                   nvgStrokeWidth(vg, fd.ui.slot_border);
-                
-                  auto sIter = node_slots(n.id);
+
+                  auto sIter = node_slotsIn(n.id);
                   for(; sIter!=end(slots) && sIter->first.nid==n.id; ++sIter)
                   {
                     auto     sIdx = sIter->first;                    // todo: needs to be redone
-                    //Slot const& s = *(grph.slot(sIdx));
                     Slot const& s = sIter->second;
-                    bool   inSlot = len(pntr - s.P) < fd.ui.slot_rad; //io_rad;
+                    bool   inSlot = len(pntr - s.P) < fd.ui.slot_rad;
+
+                    Slot::State drawState = Slot::NORMAL;
+                    if(s.state==Slot::SELECTED) drawState = Slot::SELECTED;
+                    else if(inSlot)             drawState = Slot::HIGHLIGHTED;
+                    slot_draw(vg, s, drawState, fd.ui.slot_rad);
+                  }
+                }
+                SECTION(draw output / src node slots)
+                {
+                  auto const& slots = fd.graph.outSlots;
+
+                  nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
+                  nvgStrokeWidth(vg, fd.ui.slot_border);
+
+                  auto sIter = node_slotsOut(n.id);
+                  for(; sIter!=end(slots) && sIter->first.nid==n.id; ++sIter)
+                  {
+                    auto     sIdx = sIter->first;                         // todo: needs to be redone
+                    Slot const& s = sIter->second;
+                    bool   inSlot = len(pntr - s.P) < fd.ui.slot_rad;
 
                     Slot::State drawState = Slot::NORMAL;
                     if(s.state==Slot::SELECTED) drawState = Slot::SELECTED;
@@ -2752,6 +2795,13 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+//
+//if(fd.vizIds.has(srcIdx.asInt)){
+
+//nvgStrokeColor(vg, nvgRGBAf(.7f, 1.f, .9f, .5f));
+//
+//for(auto di = g.srcCnctsMap().begin(); di != en; )
 
 //glfwGetCursorPos(fd.win, &cx, &cy);
 //
