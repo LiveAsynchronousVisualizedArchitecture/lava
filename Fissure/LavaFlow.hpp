@@ -680,7 +680,7 @@ union          LavaId                                            // this Id serv
   LavaId(u64 _id, u64 _idx=SLOT_NONE, u64 _isIn=1) : 
     nid(_id), sidx(_idx), isIn(_isIn) {}
 
-  bool   operator==(LavaId  r) const { return nid==r.nid && sidx==r.sidx; }
+  bool   operator==(LavaId  r) const { return nid==r.nid && sidx==r.sidx && isIn==r.isIn; }
   bool    operator<(LavaId const& r)   const {
     if(nid==r.nid) return sidx < r.sidx;
     else         return nid  < r.nid;

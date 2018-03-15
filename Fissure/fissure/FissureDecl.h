@@ -235,7 +235,9 @@ struct FisData
   {
     NodeMap             nds;       // nds  is nodes
     NodeOrder          ordr;       // ordr is orders 
-    Slots             slots;       // 
+    //Slots             slots;       // 
+    Slots           inSlots;       // 
+    Slots          outSlots;       // 
 
     u64             curNode = LavaNode::NODE_ERROR;              // information from the running lava graph for visualization in the GUI
     u64        qPacketBytes = 0;
