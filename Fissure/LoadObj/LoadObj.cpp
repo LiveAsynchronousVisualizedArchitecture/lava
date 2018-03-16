@@ -10,8 +10,8 @@
 
 enum Slots
 {  
-  IDXVERTS_OUT = 0,
-  FILE_PATH_IN = 1
+  FILE_PATH_IN = 0,
+  IDXVERTS_OUT = 0
 };
 
 extern "C"
@@ -147,11 +147,6 @@ extern "C"
     return (LavaNode*)LavaNodes;
   }
 }
-
-
-
-
-
 
 
 

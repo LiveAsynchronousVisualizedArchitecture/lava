@@ -940,14 +940,7 @@ private:
   CmdQ                  m_cmdq;
   RetStk                 m_stk;
 
-  //NodeInsts          m_nodesA;
-  //Slots              m_slotsA;
-  //CnctMap            m_cnctsA;
-  //SrcMap         m_destCnctsA;
-  //MsgIds          m_msgNodesA;
-
   NodeInsts           m_nodesA;
-  //Slots               m_slotsA;
   Slots             m_inSlotsA;
   Slots            m_outSlotsA;
   CnctMap             m_cnctsA;
@@ -956,7 +949,6 @@ private:
   MsgCache         m_msgCacheA;
 
   NodeInsts           m_nodesB;
-  //Slots               m_slotsB;
   Slots             m_inSlotsB;
   Slots            m_outSlotsB;
   CnctMap             m_cnctsB;
@@ -1921,21 +1913,10 @@ LavaOut       LavaTblToOut(tbl const& t, u32 slot)
 }
 bool           LavaNxtPckt(LavaFrame const* in, u32* currentIndex)
 {
-  do{ 
-    ++(*currentIndex);
-    if( *currentIndex >= in->packets.size() ) return false;
-  }while( !in->slotMask[*currentIndex] );
-
-  return true;
-
-  //if( *currentIndex < in->packets.size() &&
-  //  in->slotMask[*currentIndex]  )
-  //{
-  //  ++(*currentIndex);
-  //  return true;
-  //}else{
-  //  return false;
-  //}
+  for( ; *currentIndex < in->packets.size() ; ++(*currentIndex) ){
+    if( in->slotMask[*currentIndex] ) return true;
+  }
+  return false;
 }
 // End Lava Helper Functions
 
@@ -2450,7 +2431,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
                   SECTION(make a packet for each connection, increment their reference count and put in the main packet queue)
                   {
                     // route the packet using the graph - the packet may be copied multiple times and go to multiple destination slots
-                    LavaId     src  =  { nodeId, outArg.key.slot };
+                    LavaId     src  =  { nodeId, outArg.key.slot, false };
                     auto        di  =  lf.graph.destCncts(src);                         // di is destination iterator
                     auto     diCnt  =  di;                                              // diCnt is destination iterator counter - used to count the number of destination slots this packet will be copied to so that the reference count can be set correctly
                     auto      diEn  =  lf.graph.destCnctEnd();
@@ -2542,6 +2523,33 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+
+//do{ 
+//  ++(*currentIndex);
+//  if( *currentIndex >= in->packets.size() ) return false;
+//}while( !in->slotMask[*currentIndex] );
+//
+//return true;
+
+//if( *currentIndex < in->packets.size() &&
+//  in->slotMask[*currentIndex]  )
+//{
+//  ++(*currentIndex);
+//  return true;
+//}else{
+//  return false;
+//}
+
+//NodeInsts          m_nodesA;
+//Slots              m_slotsA;
+//CnctMap            m_cnctsA;
+//SrcMap         m_destCnctsA;
+//MsgIds          m_msgNodesA;
+//
+//Slots               m_slotsA;
+//
+//Slots               m_slotsB;
 
 //u64 nid; bool in=false; State state=NORMAL;
 //LavaFlowSlot(u64 nId, bool In=false) : nid(nId), in(In), state(NORMAL) {}

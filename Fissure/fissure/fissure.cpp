@@ -122,10 +122,15 @@
 // -todo: fix wrong selection of slots when clicking - clicking either slot selects the output / src slot - second slot check was overriding previous boolean that tracks whether the cursor is inside a slot
 // -todo: fix connections not being formed - no connection appears in the .lava file after saving - need to fix the selection of outputs first
 
+// todo: make node creation start both slot types at 0
+// todo: make sure lava does not have to subtract the number of input slots from the output slot index 
 // todo: test outputs in Lava and node indices in the GUI - do the names of the slots now need to have their in or out flag in the string?
 // todo: test node graph with new slots + loading and saving
 // todo: cull bad connections on save - could be part of normalizing the graph Ids
 // todo: repeat crash when loading .lava file - doesn't crash with single FilePath node - doesn't crash with FilePath and LoadObj nodes linked together, but does not get their positions correct - could have been due 
+// todo: make message nodes resize whenever their text changes
+// todo: lessen the boundaries around the message node text
+// todo: make message node's text split to new lines on white space
 // todo: put thread pointers into message node instances and work out how to lock and unlock them
 // todo: should flow nodes with no inputs be run once at the start of the program for easy data flow?
 // todo: re-orient nodes on resize of the window so they line up with the grid in the same place - maybe the scale and pan need to be changed instead
@@ -539,11 +544,6 @@ v2              out_cntr(Node const& n, f32 r)
 
 void            slot_add(bool isDest)
 {
-  //LavaFlowSlot ls;
-  //ls.id      = s.nid;
-  //ls.in      = s.in;
-  //ls.state   = (LavaFlowSlot::State)(s.state);
-
   LavaCommand::Arg arg;
   arg.slotDest = isDest;
   fd.lgrph.put(LavaCommand::ADD_SLOT, arg);
@@ -1563,8 +1563,8 @@ str                   genDbKey(LavaId     sid)            // genDbKey is generat
 }
 void        lavaPacketCallback(LavaPacket pkt)
 {
-  LavaId srcid(pkt.src_node, pkt.src_slot);
-  LavaId destid(pkt.dest_node, pkt.dest_slot);
+  LavaId srcid(pkt.src_node, pkt.src_slot, false);
+  LavaId destid(pkt.dest_node, pkt.dest_slot, true);
   if( fd.vizIds.has(srcid.asInt) ){
     auto label  =  genDbKey(srcid);
     auto    lm  =  LavaMem::fromDataAddr(pkt.val.value);
@@ -2795,6 +2795,10 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//LavaFlowSlot ls;
+//ls.id      = s.nid;
+//ls.in      = s.in;
+//ls.state   = (LavaFlowSlot::State)(s.state);
 
 //
 //if(fd.vizIds.has(srcIdx.asInt)){
