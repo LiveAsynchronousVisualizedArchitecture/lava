@@ -1913,10 +1913,18 @@ LavaOut       LavaTblToOut(tbl const& t, u32 slot)
 }
 bool           LavaNxtPckt(LavaFrame const* in, u32* currentIndex)
 {
-  for( ; *currentIndex < in->packets.size() ; ++(*currentIndex) ){
-    if( in->slotMask[*currentIndex] ) return true;
+  while(*currentIndex < in->packets.size()){
+    if( in->slotMask[ (*currentIndex)++ ] ){ return true; }
   }
   return false;
+
+  //for( ; *currentIndex < in->packets.size() ; ++(*currentIndex) ){
+  //  if( in->slotMask[*currentIndex] ){
+  //    ++(*currentIndex);
+  //    return true;
+  //  }
+  //}
+  //return false;
 }
 // End Lava Helper Functions
 

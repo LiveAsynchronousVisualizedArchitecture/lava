@@ -36,7 +36,7 @@ extern "C"
       vector<shape_t>       shapes;
       SECTION(use the LoadObj lib to get the attribs and shapes we need)
       {
-        tbl objFile( (void*)(in->packets[i].val.value) );
+        tbl objFile( (void*)(in->packets[i-1].val.value) );
 
         vector<material_t> materials;
         string                   err;

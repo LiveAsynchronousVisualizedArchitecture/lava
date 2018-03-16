@@ -121,8 +121,9 @@
 // -todo: redo slot movement
 // -todo: fix wrong selection of slots when clicking - clicking either slot selects the output / src slot - second slot check was overriding previous boolean that tracks whether the cursor is inside a slot
 // -todo: fix connections not being formed - no connection appears in the .lava file after saving - need to fix the selection of outputs first
+// -todo: make node creation start both slot types at 0
 
-// todo: make node creation start both slot types at 0
+// todo: debug why connections from a loaded file work in debug mode but not in release mode - output connection doesn't show up in release mode - slots in/out flag probably needs to be written to the file now
 // todo: make sure lava does not have to subtract the number of input slots from the output slot index 
 // todo: test outputs in Lava and node indices in the GUI - do the names of the slots now need to have their in or out flag in the string?
 // todo: test node graph with new slots + loading and saving
