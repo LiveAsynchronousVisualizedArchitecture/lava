@@ -929,7 +929,8 @@ public:
   using vec_ids       =  std::vector<LavaId>;
   using MsgIds        =  std::unordered_set<LavaId, LavaId>;           // LavaId has an operator() to hash itself
   using MsgCache      =  std::vector<LavaId>;                          // LavaId has an operator() to hash itself
-  using NormalizeMap  =  std::unordered_map<uint64_t, uint64_t>;
+  //using NormalizeMap  =  std::unordered_map<uint64_t, uint64_t>;
+  using NormalizeMap  =  std::map<uint64_t, uint64_t>;
   using CmdQ          =  std::queue<LavaCommand>;
   using RetStk        =  std::stack<LavaCommand::Arg>;
   using ArgVec        =  std::vector<LavaCommand::Arg>;
@@ -1173,11 +1174,25 @@ public:
     using namespace std;
 
     // create a mapping of old node Ids to new ones, new ones will be their position + 1
+    // todo: make a sorted map here so that the node Ids don't get reordered, only moved back down to start from 1
+
+    vector<LavaId> sortedNodeIds;
+    SECTION(create a vector of node ids and sort them)
+    {
+      //u64 curSrtNid = 0;
+      for(auto& kv : curNodes()){
+        sortedNodeIds.push_back(kv.first);
+      }
+      sort( ALL(sortedNodeIds) );
+    }
+
     NormalizeMap nids;
-    nids.reserve(curNodes().size());
-    u64 cur = 1;
-    for(auto& kv : curNodes()){
-      nids[kv.first] = cur++;
+    SECTION(make a map of node ids moved to start at 1 and be continuous)
+    {
+      u64 cur = 1;
+      for(auto const& id : sortedNodeIds){
+        nids[id.nid] = cur++;
+      }
     }
 
     // connections 
@@ -1253,6 +1268,13 @@ public:
     curNodes() = move(nxtNds);
 
     return nids;
+
+
+    ////nids.reserve(curNodes().size());
+    //u64 cur = 1;
+    //for(auto& kv : curNodes()){
+    //  nids[kv.first] = cur++;
+    //}
   }
   void      setNextNodeId(u64 nxt){ m_nxtId = nxt; }
   u64           totalTime()
