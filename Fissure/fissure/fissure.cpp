@@ -132,8 +132,9 @@
 // -todo: debug input slots not following their node - only happens after the create prompts node that does not have an output - slot isn't found in inSlots - in slots section needed to be querying the out slots 
 // -todo: make sure connections aren't drawn twice - only loops through the src connections, should be fine - otherwise multi-connections would be less opaque then single conncections
 // -todo: cull bad connections on save - could be part of normalizing the graph Ids - delay until an actual problem crops up
+// -todo: debug why creating, saving, and loading cycle does not work - slots may not be getting cleared - seems to have something to do with connections - opposite buffers were not getting cleared in LavaGraph::clear()
+// -todo: test loading and saving files
 
-// todo: test loading and saving files
 // todo: get gaussian test to work again
 // todo: make message nodes resize whenever their text changes
 // todo: lessen the boundaries around the message node text

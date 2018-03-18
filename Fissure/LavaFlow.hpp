@@ -1303,6 +1303,13 @@ public:
     curDestCncts().clear();
     curMsgNodes().clear();
 
+    oppNodes().clear();
+    oppInSlots().clear();
+    oppOutSlots().clear();
+    oppCncts().clear();
+    oppDestCncts().clear();
+    oppMsgNodes().clear();
+
     while(m_cmdq.size()>0) m_cmdq.pop();
     while(m_stk.size()>0) m_stk.pop();
     
@@ -1310,12 +1317,12 @@ public:
     
     //m_ids.clear();
   }
-  u64                  put(LavaCommand::Command cmd, LavaCommand::Arg A, LavaCommand::Arg B = LavaCommand::Arg() )
+  u64                 put(LavaCommand::Command cmd, LavaCommand::Arg A, LavaCommand::Arg B = LavaCommand::Arg() )
   {
     m_cmdq.push({cmd, A, B});
     return m_cmdq.size();
   }
-  auto                exec() -> ArgVec
+  auto               exec() -> ArgVec
   {
     using namespace std;
     
@@ -1522,7 +1529,7 @@ public:
 
     return nIter->second;
   }
-  auto          nodes() const -> vec_insts
+  auto          nodes()       const -> vec_insts
   {
     vec_insts nds;
     nds.reserve(curNodes().size());
@@ -1556,8 +1563,8 @@ public:
 
     //for(auto kv : m_ids){ mx = max(mx, kv.first); }
   }
-  u64             nsz() const { return curNodes().size(); }
-  auto       msgNodes() const -> MsgIds const&
+  u64             nsz()       const { return curNodes().size(); }
+  auto       msgNodes()       const -> MsgIds const&
   {
     return curMsgNodes();
   }
@@ -1584,7 +1591,7 @@ public:
   }
 
   // slots
-  auto          inSlot(LavaId   id) -> LavaFlowSlot*
+  auto         inSlot(LavaId   id) -> LavaFlowSlot*
   {
     auto si = curInSlots().find(id);
     if(si == curInSlots().end()) 
@@ -1592,7 +1599,7 @@ public:
 
     return &si->second;
   }
-  auto         outSlot(LavaId   id) -> LavaFlowSlot*
+  auto        outSlot(LavaId   id) -> LavaFlowSlot*
   {
     auto si = curOutSlots().find(id);
     if(si == curOutSlots().end()) 
@@ -1600,7 +1607,7 @@ public:
 
     return &si->second;
   }
-  auto         slot(LavaId   id) -> LavaFlowSlot*
+  auto           slot(LavaId   id) -> LavaFlowSlot*
   {
     if(id.isIn) return  inSlot(id);
     else        return outSlot(id);
@@ -1622,11 +1629,11 @@ public:
   {
     return lower_bound(ALL(oppInSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
   }
-  auto      nodeOutSlots(u64    nid) const -> decltype(curOutSlots().cbegin())
+  auto     nodeOutSlots(u64     nid) const -> decltype(curOutSlots().cbegin())
   {
     return lower_bound(ALL(curInSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
   }
-  auto      nodeOutSlots(u64    nid) -> decltype(oppOutSlots().begin())
+  auto     nodeOutSlots(u64     nid) -> decltype(oppOutSlots().begin())
   {
     return lower_bound(ALL(oppOutSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
   }
