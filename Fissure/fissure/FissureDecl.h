@@ -84,7 +84,7 @@ struct    Node
   using Type = LavaNode::Type;
 
   LavaNode* lfn;                                     // lfn is Lava Flow Node
-  u64       id  =  0;
+  u64       id  =  LavaNode::NODE_ERROR; //0;
   u64    order  =  0;
   v2         P  =  {0,0};
   bool     sel  =  false;                            // sel is selected
@@ -270,7 +270,6 @@ struct FisData
     TextBox*     statusTxt = nullptr;
     TextBox*       nodeTxt = nullptr;
     vec_btn         ndBtns;
-
 
     // mouse
     v2                prevPntr;

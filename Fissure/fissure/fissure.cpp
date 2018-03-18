@@ -126,11 +126,15 @@
 // -todo: test node graph with new slots + loading and saving - play back now works, loading and saving still problematic
 // -todo: repeat crash when loading .lava file - doesn't crash with single FilePath node - doesn't crash with FilePath and LoadObj nodes linked together, but does not get their positions correct - could have been due  - probably different now that slots have been re-tooled
 // -todo: debug why connections from a loaded file work in debug mode but not in release mode - output connection doesn't show up in release mode - slots in/out flag probably needs to be written to the file now - slots not written to the file at all - connection is there in file and in movement of slots, but not visible, along with the output slot of the message node - looks like a bug in link time optimization (again)
+// -todo: debug why node ids get switched when writing out file - node instance is coming from Lava in node_add and becomes order dependent  - normalization function in lava was not sorting the node ids 
+// -todo: make sure lava does not have to subtract the number of input slots from the output slot index - where did this happen again? in the node graph connection drawing?
+// -todo: figure out why all nodes are overwriting each other on creation - node Id was defaulting to 0 and node LavaId::NODE_ERROR, so it wasn't taking the next id from LavaGraph
+// -todo: debug input slots not following their node - only happens after the create prompts node that does not have an output - slot isn't found in inSlots - in slots section needed to be querying the out slots 
+// -todo: make sure connections aren't drawn twice - only loops through the src connections, should be fine - otherwise multi-connections would be less opaque then single conncections
+// -todo: cull bad connections on save - could be part of normalizing the graph Ids - delay until an actual problem crops up
 
-// todo: debug why node ids get switched when writing out file - node instance is coming from Lava in node_add and becomes order dependent 
-// todo: make sure lava does not have to subtract the number of input slots from the output slot index - where did this happen again? in the node graph connection drawing?
-// todo: make sure connections aren't drawn twice
-// todo: cull bad connections on save - could be part of normalizing the graph Ids
+// todo: test loading and saving files
+// todo: get gaussian test to work again
 // todo: make message nodes resize whenever their text changes
 // todo: lessen the boundaries around the message node text
 // todo: make message node's text split to new lines on white space
@@ -2291,11 +2295,14 @@ ENTRY_DECLARATION // main or winmain
 
               LavaFlowSlot* src = g.srcSlot(nid);
               if(src){
-                auto srcIter = fd.graph.inSlots.find(src->id);
-                if(srcIter != fd.graph.inSlots.end() ){
+                auto srcIter = fd.graph.outSlots.find(src->id);
+                if(srcIter != fd.graph.outSlots.end() ){
                   auto  srcNdP = fd.graph.nds[src->id.nid].P;
                   s.P = node_border(n, srcNdP - nP, &nrml);
                   s.N = nrml;
+                }else{
+                  s.P = node_border(n, {0,-1.f}, &nrml);
+                  s.N = {0,-1.f};
                 }
               }else{
                 s.P = node_border(n, {0,-1.f}, &nrml);
@@ -2303,7 +2310,6 @@ ENTRY_DECLARATION // main or winmain
               }
             }
           }
-
           SECTION(output / src slots)
           {
             for(auto& kv : fd.graph.outSlots)
@@ -2326,8 +2332,8 @@ ENTRY_DECLARATION // main or winmain
                 {
                   if(!fd.lgrph.outSlot(ci->second)){ cnt -= 1; continue; }   // todo: does this need to subtract 1 from count?
 
-                  auto si = fd.graph.outSlots.find(ci->second);
-                  if(si != fd.graph.outSlots.end()){
+                  auto si = fd.graph.inSlots.find(ci->second);
+                  if(si != fd.graph.inSlots.end()){
                     auto curP  =  si->second.P;
                     destP     +=  curP; 
                     destN     +=  norm(curP - nP);
@@ -2342,63 +2348,6 @@ ENTRY_DECLARATION // main or winmain
             }
           }
         }
-
-        //SECTION(slot movement)
-        //{
-        //  for(auto& kv : fd.graph.slots)
-        //  {
-        //    LavaId    nid = kv.first;
-        //    Slot&       s = kv.second;
-        //    Node const& n = fd.graph.nds[nid.nid];
-        //    v2 wh = n.b.wh();
-        //    v2 nP = n.P + wh/2; //NODE_SZ/2; // n.b.mx; // w()/2; // NODE_SZ/2;
-        //    v2 nrml;
-        //
-        //    if(s.in)
-        //    {                                                 // dest / in / blue slots
-        //      LavaFlowSlot* src = g.srcSlot(nid);
-        //      if(src){
-        //        auto srcIter = fd.graph.slots.find(src->id);
-        //        if(srcIter != fd.graph.slots.end() ){
-        //          auto  srcNdP = fd.graph.nds[src->id.nid].P;
-        //          s.P = node_border(n, srcNdP - nP, &nrml);
-        //          s.N = nrml;
-        //        }
-        //      }else{
-        //        s.P = node_border(n, {0,-1.f}, &nrml);
-        //        s.N = {0,-1.f};
-        //      }
-        //    }else
-        //    {
-        //      auto ci = fd.lgrph.destSlots(kv.first);
-        //      if(ci==fd.lgrph.destCnctEnd()){
-        //        s.P = node_border(n, v2(0,1.f), &nrml);
-        //        s.N = nrml;
-        //      }else{
-        //        v2  destP={0,0}, destN={0,0};
-        //        int   cnt = 0;
-        //        for(; ci != fd.lgrph.destCnctEnd() && ci->first==nid; ++ci)
-        //        {
-        //          if(!fd.lgrph.slot(ci->second)){ cnt -= 1; continue; }   // todo: does this need to subtract 1 from count?
-        //                  
-        //          auto si = fd.graph.slots.find(ci->second);
-        //          if(si != fd.graph.slots.end()){
-        //            auto curP  =  si->second.P;
-        //            destP     +=  curP; 
-        //            destN     +=  norm(curP - nP);
-        //            ++cnt;
-        //          }
-        //        }
-        //        destP /= (f32)cnt;
-        //        destN /= (f32)cnt;
-        //        s.N = norm(destN);
-        //        s.P = node_border(n, s.N);
-        //      }
-        //    }
-        //  }
-        //}
-
-
         SECTION(node graph canvas movement)
         {
           //v2 pntrDif = pntr - fd.ui.prevPntr;
@@ -2806,6 +2755,64 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+
+
+//SECTION(slot movement)
+//{
+//  for(auto& kv : fd.graph.slots)
+//  {
+//    LavaId    nid = kv.first;
+//    Slot&       s = kv.second;
+//    Node const& n = fd.graph.nds[nid.nid];
+//    v2 wh = n.b.wh();
+//    v2 nP = n.P + wh/2; //NODE_SZ/2; // n.b.mx; // w()/2; // NODE_SZ/2;
+//    v2 nrml;
+//
+//    if(s.in)
+//    {                                                 // dest / in / blue slots
+//      LavaFlowSlot* src = g.srcSlot(nid);
+//      if(src){
+//        auto srcIter = fd.graph.slots.find(src->id);
+//        if(srcIter != fd.graph.slots.end() ){
+//          auto  srcNdP = fd.graph.nds[src->id.nid].P;
+//          s.P = node_border(n, srcNdP - nP, &nrml);
+//          s.N = nrml;
+//        }
+//      }else{
+//        s.P = node_border(n, {0,-1.f}, &nrml);
+//        s.N = {0,-1.f};
+//      }
+//    }else
+//    {
+//      auto ci = fd.lgrph.destSlots(kv.first);
+//      if(ci==fd.lgrph.destCnctEnd()){
+//        s.P = node_border(n, v2(0,1.f), &nrml);
+//        s.N = nrml;
+//      }else{
+//        v2  destP={0,0}, destN={0,0};
+//        int   cnt = 0;
+//        for(; ci != fd.lgrph.destCnctEnd() && ci->first==nid; ++ci)
+//        {
+//          if(!fd.lgrph.slot(ci->second)){ cnt -= 1; continue; }   // todo: does this need to subtract 1 from count?
+//                  
+//          auto si = fd.graph.slots.find(ci->second);
+//          if(si != fd.graph.slots.end()){
+//            auto curP  =  si->second.P;
+//            destP     +=  curP; 
+//            destN     +=  norm(curP - nP);
+//            ++cnt;
+//          }
+//        }
+//        destP /= (f32)cnt;
+//        destN /= (f32)cnt;
+//        s.N = norm(destN);
+//        s.P = node_border(n, s.N);
+//      }
+//    }
+//  }
+//}
 
 //LavaFlowSlot ls;
 //ls.id      = s.nid;
