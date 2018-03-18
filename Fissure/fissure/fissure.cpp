@@ -122,13 +122,15 @@
 // -todo: fix wrong selection of slots when clicking - clicking either slot selects the output / src slot - second slot check was overriding previous boolean that tracks whether the cursor is inside a slot
 // -todo: fix connections not being formed - no connection appears in the .lava file after saving - need to fix the selection of outputs first
 // -todo: make node creation start both slot types at 0
+// -todo: test outputs in Lava and node indices in the GUI - do the names of the slots now need to have their in or out flag in the string?
+// -todo: test node graph with new slots + loading and saving - play back now works, loading and saving still problematic
+// -todo: repeat crash when loading .lava file - doesn't crash with single FilePath node - doesn't crash with FilePath and LoadObj nodes linked together, but does not get their positions correct - could have been due  - probably different now that slots have been re-tooled
+// -todo: debug why connections from a loaded file work in debug mode but not in release mode - output connection doesn't show up in release mode - slots in/out flag probably needs to be written to the file now - slots not written to the file at all - connection is there in file and in movement of slots, but not visible, along with the output slot of the message node - looks like a bug in link time optimization (again)
 
-// todo: debug why connections from a loaded file work in debug mode but not in release mode - output connection doesn't show up in release mode - slots in/out flag probably needs to be written to the file now
-// todo: make sure lava does not have to subtract the number of input slots from the output slot index 
-// todo: test outputs in Lava and node indices in the GUI - do the names of the slots now need to have their in or out flag in the string?
-// todo: test node graph with new slots + loading and saving
+// todo: debug why node ids get switched when writing out file - node instance is coming from Lava in node_add and becomes order dependent 
+// todo: make sure lava does not have to subtract the number of input slots from the output slot index - where did this happen again? in the node graph connection drawing?
+// todo: make sure connections aren't drawn twice
 // todo: cull bad connections on save - could be part of normalizing the graph Ids
-// todo: repeat crash when loading .lava file - doesn't crash with single FilePath node - doesn't crash with FilePath and LoadObj nodes linked together, but does not get their positions correct - could have been due 
 // todo: make message nodes resize whenever their text changes
 // todo: lessen the boundaries around the message node text
 // todo: make message node's text split to new lines on white space
@@ -201,6 +203,7 @@
 //       |  use a union of bytes that is filled with the frame, slot, list index?
 //       |  use malloc addresses initially
 
+// idea: make optional inputs yellowish and optional outputs purpleish
 // idea: should the big difference in MSG nodes as opposed to data flow nodes be that they are always run from the same thread that unlocks? 
 // idea: keep track of both time speht in a node and the memory allocations it uses
 // idea: make packets visualize on slots circles stack as concentric circles or as portions/segments of a single circle 
@@ -675,7 +678,7 @@ auto            node_add(str node_name, Node n) -> uint64_t
   using namespace std;
 
   auto          pi = fd.flow.nameToPtr.find( node_name );                               // pi is pointer iterator
-  uint64_t instIdx = LavaNode::NODE_ERROR;
+  uint64_t instIdx = n.id; //LavaNode::NODE_ERROR;
   LavaNode*     ln = nullptr;
   if( pi != end(fd.flow.nameToPtr) )
   {
@@ -683,7 +686,8 @@ auto            node_add(str node_name, Node n) -> uint64_t
     if(ln)
     {
       //instIdx = nxtId();
-      instIdx = fd.lgrph.nxtId();
+      if(instIdx == LavaNode::NODE_ERROR) 
+        instIdx = fd.lgrph.nxtId();
 
       FisData::IdOrder ido;                                                          //ido is id order
       ido.id    = instIdx;
@@ -1188,6 +1192,7 @@ void         graph_apply(LavaGraph::ArgVec args)
       LavaFlowSlot* ls = fd.lgrph.slot(a.id);
       if(ls){
         Slot s(a.id.nid, ls->in);
+        s.P = {0,0};
         //fd.graph.slots.insert({a.id, s});
         if(ls->in) fd.graph.inSlots.insert({a.id, s});
         else       fd.graph.outSlots.insert({a.id, s});
@@ -1257,9 +1262,11 @@ str           graphToStr(LavaGraph const& lg)
   Jzon::Node jnodes = Jzon::object();
   SECTION(nodes)
   {
-    auto     nps = node_getPtrs();     // fg.nds;
-    auto    lnds = lg.nodes();         // lnds is Lava Nodes
-    auto      sz = lnds.size();
+    vec_ndptrs   nps = node_getPtrs();     // fg.nds;
+    auto        lnds = lg.nodes();         // lnds is Lava Nodes
+    auto          sz = lnds.size();
+
+    //sort(ALL(lnds));
 
     Jzon::Node  nd_func = Jzon::array();
     TO(sz,i) nd_func.add( lg.node(nps[i]->id).node->name );
@@ -1364,7 +1371,9 @@ void          strToGraph(str const& s)
     n.P.y  = nd_y.get(i).toFloat();
     //n.type = (Node::Type)nd_type.get(i).toInt();
 
-    node_add( nd_func.get(i).toString(), n);
+    str funcName = nd_func.get(i).toString();
+
+    node_add( funcName, n);
   }
 
   auto cnct_cnt = destId.getCount();
@@ -1373,8 +1382,10 @@ void          strToGraph(str const& s)
     LavaCommand::Arg   src;
     src.id.nid   = srcId.get(i).toInt();
     src.id.sidx  = srcIdx.get(i).toInt();
+    src.id.isIn  = false;
     dest.id.nid  = destId.get(i).toInt();
     dest.id.sidx = destIdx.get(i).toInt();
+    dest.id.isIn = true;
     fd.lgrph.put(LavaCommand::TGL_CNCT, dest, src);
   }
 }

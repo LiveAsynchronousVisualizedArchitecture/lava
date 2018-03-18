@@ -822,6 +822,8 @@ struct       LavaInst
   mutable u64   frame = 0;  // todo: make this atomic 
   mutable u64    time = 0;  // todo: make this atomic / make functions to add time and get the current time
 
+  bool operator<(LavaInst const& lval){ return id < lval.id; }
+
   u64   fetchIncFrame() const
   {
     return std::atomic_fetch_add( (au64*)(&frame), 1);
