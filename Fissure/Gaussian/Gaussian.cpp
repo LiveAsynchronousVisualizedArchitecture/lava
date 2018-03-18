@@ -91,7 +91,7 @@ extern "C"
     u32 i=0;
     while( LavaNxtPckt(in, &i) )
     {
-      tbl gParams = LavaTblFromPckt(lp, in, i);
+      tbl gParams = LavaTblFromPckt(lp, in, i-1);
       //f32     var = gParams("Variance");
       //f32      ev = gParams("Expected Value");
       //u64   verts = gParams("Vertex Count");
