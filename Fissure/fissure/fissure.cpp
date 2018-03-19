@@ -134,8 +134,9 @@
 // -todo: cull bad connections on save - could be part of normalizing the graph Ids - delay until an actual problem crops up
 // -todo: debug why creating, saving, and loading cycle does not work - slots may not be getting cleared - seems to have something to do with connections - opposite buffers were not getting cleared in LavaGraph::clear()
 // -todo: test loading and saving files
+// -todo: get gaussian test to work again - just needed to subtract 1 from the index
+// -todo: update template to have enum that starts at 0 and to have 
 
-// todo: get gaussian test to work again
 // todo: make message nodes resize whenever their text changes
 // todo: lessen the boundaries around the message node text
 // todo: make message node's text split to new lines on white space
@@ -740,8 +741,10 @@ Bnd             node_bnd(NVGcontext* vg, Node const&  n)
   nvgFontFace(vg, "sans-bold");
   f32 txtBnds[4];
   f32      tw = nvgTextBounds(vg, 0,0, n.txt.c_str(), NULL, txtBnds);
-  f32       w = max<float>(n.b.w(), tw + wMargin);
-  f32       h = max<float>(n.b.h(), (txtBnds[3]-txtBnds[1]) + hMargin );  // nvgTextBounds puts minx, miny, maxx, maxy in the txtBnds float array
+  f32       w = tw + wMargin;
+  f32       h = (txtBnds[3]-txtBnds[1]) + hMargin;  // nvgTextBounds puts minx, miny, maxx, maxy in the txtBnds float array
+  //f32       w = max<float>(n.b.w(), tw + wMargin);
+  //f32       h = max<float>(n.b.h(), (txtBnds[3]-txtBnds[1]) + hMargin );  // nvgTextBounds puts minx, miny, maxx, maxy in the txtBnds float array
 
   Bnd b;
   if(n.type == LavaNode::MSG){
@@ -1817,6 +1820,7 @@ ENTRY_DECLARATION // main or winmain
           fd.graph.nds[ fd.sel.pri ].txt = s;
           return true;
         });
+
         //nodeTxt->set setBackgroundColor( Color(e3f(.2f,  .2f,  .15f)) ); 
         //fd.ui.keyWin->setLayout(fd.ui.keyLay);
       }

@@ -148,8 +148,6 @@ extern "C"
   }
 }
 
-
-
 //for(auto& kv : inputTbl){  // this loop demonstrates how to iterate through non-empty map elements
 //}	
 //

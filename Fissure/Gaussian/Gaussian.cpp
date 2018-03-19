@@ -164,11 +164,6 @@ extern "C"
 
 
 
-
-
-
-
-
 //
 //PrintTblMem(gcurve);
 

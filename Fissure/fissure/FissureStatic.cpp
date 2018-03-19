@@ -82,7 +82,6 @@ static const char *const Template_vcxproj = R"ProjTemplate(<?xml version="1.0" e
 
 static const char *const Template_cpp = R"CppTemplate(
 
-
 #include "../../no_rt_util.h"
 #include "../../tbl.hpp"
 #include "../LavaFlow.hpp"
@@ -90,11 +89,8 @@ static const char *const Template_cpp = R"CppTemplate(
 enum Slots
 {
   // This is an example enumeration that is meant to be helpful, though is not strictly neccesary. Referencing slots by a name will generally be less error prone than using their index and remembering what each index is for
-  
-  SLOT_0 = 0,        
-  SLOT_1 = 1
-  //SLOT_2 = 2,
-  //SLOT_3 = 3
+  SLOT_IN  = 0,        
+  SLOT_OUT = 0
 };
 
 extern "C"
@@ -114,12 +110,12 @@ extern "C"
     u32 i=0;
     while( LavaNxtPckt(in, &i) )
     {
-      tbl inputTbl( (void*)(in->packets[i].val.value) );
+      tbl inputTbl( (void*)(in->packets[i-1].val.value) );
 
       for(auto& kv : inputTbl){  // this loop demonstrates how to iterate through non-empty map elements
       }	
 
-      // out->push( LavaTblToOut(outputTbl, SLOT_0) );      // this demonstrates how to output a tbl into the first output slot
+      // out->push( LavaTblToOut(outputTbl, SLOT_OUT) );      // this demonstrates how to output a tbl into the first output slot
     }
 
     return 1;
@@ -149,7 +145,6 @@ extern "C"
     return (LavaNode*)LavaNodes;
   }
 }
-
 
 )CppTemplate";
 

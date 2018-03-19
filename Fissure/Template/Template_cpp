@@ -6,11 +6,8 @@
 enum Slots
 {
   // This is an example enumeration that is meant to be helpful, though is not strictly neccesary. Referencing slots by a name will generally be less error prone than using their index and remembering what each index is for
-  
-  SLOT_0 = 0,        
-  SLOT_1 = 1
-  //SLOT_2 = 2,
-  //SLOT_3 = 3
+  SLOT_IN  = 0,
+  SLOT_OUT = 0        
 };
 
 extern "C"
