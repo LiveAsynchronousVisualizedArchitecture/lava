@@ -49,6 +49,8 @@
 *.psess
 *.vsp
 *.db*
+# profiling report files
+*.vspx*
 
 # intel compiler nonsense
 *.amplxeproj
