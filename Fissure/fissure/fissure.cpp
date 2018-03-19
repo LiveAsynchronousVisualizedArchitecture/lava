@@ -136,23 +136,33 @@
 // -todo: test loading and saving files
 // -todo: get gaussian test to work again - just needed to subtract 1 from the index
 // -todo: update template to have enum that starts at 0 and to have 
+// -todo: make message nodes resize whenever their text changes
+// -todo: lessen the boundaries around the message node text
+// -todo: wrap background grid drawing in to a function so that it can be called in the initialization too
+// -todo: debug why bg grid only draws when used before initialization - grid_draw() was not being called
+// -todo: optimize time to first draw - drawing during initialization does make a big difference to percieved loading speed
+//       | first call to reload libs seems to take some time 
+//       | drawing the first openGL frame with the grey color that is not black or white, makes the startup more interactive by showing an intentional frame sooner
+//       | drawing nanogui components before reloading libs helps
+//       | can the background grid be drawn before realoding libs too? - yes
+// -todo: profile startup - seems to be largely weighed down by actual openGL / glfw initialization - first call to reloadLibs makes a large difference
+// -todo: try to swap buffers once after glfw initialization to draw startup window faster 
 
-// todo: make message nodes resize whenever their text changes
-// todo: lessen the boundaries around the message node text
-// todo: make message node's text split to new lines on white space
+// todo: turn up zoom sensitivity
+// todo: re-orient nodes on resize of the window so they line up with the grid in the same place - maybe the scale and pan need to be changed instead
 // todo: put thread pointers into message node instances and work out how to lock and unlock them
 // todo: should flow nodes with no inputs be run once at the start of the program for easy data flow?
-// todo: re-orient nodes on resize of the window so they line up with the grid in the same place - maybe the scale and pan need to be changed instead
-// todo: make sure zooming center is affected by cursor placement
 // todo: build in data type visualization - part needs to be lava, part needs to be UI
-// todo: make a note node that will show the hotkeys and thus can be deleted at any time
 // todo: organize nodes by types in a contex menu or side bar
+// todo: make sure zooming center is affected by cursor placement
+// todo: make fissure or lava be able to incrementally load shared libraries
+// todo: make message node's text split to new lines on white space
+
+// todo: make a note node that will show the hotkeys and thus can be deleted at any time
 // todo: make reloaded nodes have highlights until the next event
 // todo: make a modal window that will set the text for a note 
 // todo: make note nodes that are drawn over the grid but behind nodes 
-// todo: make fissure or lava be able to incrementally load shared libraries
 // todo: keep track of loops through message nodes that don't generate any packets - if a thread goes through 2 empty loops, sleep - maybe sleep 1ms longer for each empty loop, up to 100ms
-
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: add tool tips to node buttons containing the description string of the node
 // todo: find way to add a tbl to a tbl by reference / direct assignment - should it immediatly copy and flatten()
@@ -1076,6 +1086,73 @@ void           cnct_draw(NVGcontext* vg, v2 srcP, v2 destP, v2 srcN, v2 destN, f
   nvgStroke(vg);
 }
 
+void grid_draw(NVGcontext* vg, f32 lineSpace = 128.f)
+{
+  // the lines will already be transformed, so they just need to wrap around and create the illusion of an infinite canvas
+  
+  //f32 grdSz = 0.05f;
+  Bnd     b = { 0, 0, (f32)fd.ui.w, (f32)fd.ui.h };
+  nvgCurrentTransform(vg,           fd.ui.tfm);
+
+  nvgSave(vg);
+    nvgResetTransform(vg);
+    nvgTransformInverse(fd.ui.invTfm, fd.ui.tfm);
+    nvgTransformPoint( &b.mn.x, &b.mn.y, fd.ui.invTfm, b.mn.x, b.mn.y);   
+    nvgTransformPoint( &b.mx.x, &b.mx.y, fd.ui.invTfm, b.mx.x, b.mx.y);
+
+    f32    hlfW = (f32)fd.ui.w / 2.f;
+    f32    hlfH = (f32)fd.ui.h / 2.f;
+    f32 cntrX, cntrY;
+    nvgTransformPoint( &cntrX, &cntrY, fd.ui.tfm, hlfW, hlfH);
+
+    SECTION(draw centered grid lines)
+    {
+      nvgStrokeWidth(vg, 2.f);
+      nvgStrokeColor(vg, nvgRGBAf( .18f, .18f, .18f, 1.f));
+
+      nvgBeginPath(vg);
+      nvgMoveTo(vg, cntrX,   0);
+      nvgLineTo(vg, cntrX,   (f32)fd.ui.h);
+      nvgStroke(vg);
+
+      nvgBeginPath(vg);
+      nvgMoveTo(vg, 0,            cntrY);
+      nvgLineTo(vg, (f32)fd.ui.w, cntrY);
+      nvgStroke(vg);
+    }
+
+    nvgStrokeWidth(vg, 1.f);
+    nvgStrokeColor(vg, nvgRGBAf( .12f, .12f, .12f, 1.f));
+
+    SECTION(draw X)
+    {
+      f32   ofstX = (b.mx.x+b.mn.x)/2.f - hlfW;
+      f32    curX = b.mn.x + fmodf(b.w()/2.f - ofstX,lineSpace);
+      while(curX < b.mx.x){
+        f32 reX = remap(curX, b.mn.x, b.mx.x, 0, (f32)fd.ui.w);
+        nvgBeginPath(vg);
+        nvgMoveTo(vg, reX, 0);
+        nvgLineTo(vg, reX, (f32)fd.ui.h);
+        nvgStroke(vg);
+        curX += lineSpace;
+      }
+    }
+    SECTION(draw Y)
+    {
+      f32   ofstY = (b.mx.y+b.mn.y)/2.f - hlfH;
+      f32    curY = b.mn.y + fmodf(b.h()/2.f - ofstY,lineSpace);
+      while(curY < b.mx.y){
+        f32 reY = remap(curY, b.mn.y, b.mx.y, 0, (f32)fd.ui.h);
+        nvgBeginPath(vg);
+        nvgMoveTo(vg, 0,            reY);
+        nvgLineTo(vg, (f32)fd.ui.w, reY);
+        nvgStroke(vg);
+        curY += lineSpace;
+      }
+    }
+  nvgRestore(vg);
+}
+
 auto           sel_nodes() -> vec_ndptrs
 {
   vec_ndptrs nds;                                      // nids is node ids
@@ -1642,72 +1719,6 @@ ENTRY_DECLARATION // main or winmain
   using namespace std;
   using namespace fs;
   
-  SECTION(LavaQ test)
-  {
-    //Println("sizeof(LavaQ::StEnBuf): ", sizeof(LavaQ<int>::StBuf));
-    //LavaQ<int>::StBuf a, b;
-    //a.st   = 0;
-    //a.useA = 1;
-    //b.st   = 2000;
-    //b.useA = 1;
-    //Println(a.asInt,"   ",b.asInt);
-
-    //
-    //LavaHeapInit();
-
-    //Println("\n\n");
-    ////LavaQ q(malloc, free);
-    //queue<int> stdQ;
-    //LavaQ<int> q(LavaHeapAlloc, LavaHeapFree);
-    //bool running = true; 
-    //vector<thread> qthrds;
-    //TO(1,i)
-    //{
-    //  qthrds.emplace_back([i, &q, &running](){
-    //    while( running )
-    //    {
-    //      int val;
-    //      bool ok = q.pop(val);
-    //      if(ok){
-    //        //PrintAB(q, toString("thread ",i) );
-    //        //Println(i,": ",val,"\n");
-    //        //assert(val > 0);
-    //      }
-    //      //this_thread::sleep_for( 0ms );
-    //    }
-    //  });
-    //}
-    //TO(10,i){
-    //  q.push(i);
-
-    //  //stdQ.push(i);
-
-    //  //PrintAB(q);
-    //  //Println();
-    //}
-    //
-    //Println("left over size: ", q.size());
-    //
-    //PrintAB(q, "Main Thread");
-
-    //while( q.size() > 0 )
-    //  this_thread::sleep_for( 0ms );
-
-    //running = false;
-    //for(auto& t : qthrds){
-    //  t.join();
-    //}
-
-    //int val = 0;
-    //while( q.size() > 0 ){
-    //  bool ok = q.pop( val );
-    //  Print(val," ");
-    //}
-
-    //
-    //Println("\n\n");
-  }
-
 	NVGcontext* vg = NULL;
   SECTION(initialization)
   {
@@ -1727,8 +1738,11 @@ ENTRY_DECLARATION // main or winmain
       glfwWindowHint(GLFW_SAMPLES, 16);
       //glfwWindowHint(GLFW_DECORATED, GL_FALSE);
 
-      fd.win = glfwCreateWindow(1536, 1024, "Fissure", NULL, NULL);        // assert(win!=nullptr);
+      //fd.win = glfwCreateWindow(1536, 1024, "Fissure", NULL, NULL);        // assert(win!=nullptr);
+      fd.win = glfwCreateWindow(fd.ui.w, fd.ui.h, "Fissure", NULL, NULL);        // assert(win!=nullptr);
+      glfwSwapBuffers(fd.win);
       glfwMakeContextCurrent(fd.win);
+      glfwSwapBuffers(fd.win);
 
       glfwSetKeyCallback(fd.win,                keyCallback);
       glfwSetMouseButtonCallback(fd.win,   mouseBtnCallback);
@@ -1750,6 +1764,12 @@ ENTRY_DECLARATION // main or winmain
       #endif
 
       glfwSwapInterval(1); // turning this to 1 clamps the programs to the vertical sync rate and slows down the interactivity, though setting it to 0 will use up a full core as the main loop will spin infinitely 
+      
+      glfwPollEvents();
+      glViewport(0, 0, fd.ui.w, fd.ui.h);
+      glClearColor(.075f, .075f, .075f, 1.0f);
+      glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
+      glfwSwapBuffers(fd.win);
     }
     SECTION(init glew)
     {
@@ -1956,6 +1976,11 @@ ENTRY_DECLARATION // main or winmain
 
       fd.ui.screen.setVisible(true);
       fd.ui.screen.performLayout();
+
+      glfwPollEvents();
+      fd.ui.screen.drawContents();
+      fd.ui.screen.drawWidgets();
+      glfwSwapBuffers(fd.win);
     }
     SECTION(init nanovg and font)
     {
@@ -1969,6 +1994,31 @@ ENTRY_DECLARATION // main or winmain
 		    printf("Could not add font bold.\n");
 		    return -1;
 	    }
+
+      SECTION(draw the grid and nanogui for more immediate window loading feedback)
+      {
+        glfwPollEvents();
+
+        SECTION(draw grid for the first time)
+        {
+          f32 cx = fd.ui.grphCx * fd.ui.w;
+          f32 cy = fd.ui.grphCy * fd.ui.h;
+          nvgBeginFrame(vg,  fd.ui.w,   fd.ui.h, 1.f);
+            nvgResetTransform(vg);
+            nvgTranslate(vg,    fd.ui.w/2.f,      fd.ui.h/2.f);
+            nvgScale(vg,       fd.ui.grphTx,     fd.ui.grphTy);
+            nvgTranslate(vg,   -fd.ui.w/2.f,     -fd.ui.h/2.f);
+            nvgTranslate(vg,             cx,               cy);
+
+            grid_draw(vg, fd.graph.gridSpace);
+          nvgEndFrame(vg);
+        }
+
+        fd.ui.screen.drawContents();
+        fd.ui.screen.drawWidgets();
+
+        glfwSwapBuffers(fd.win);
+      }
     }
     SECTION(test data init)
     {
@@ -1984,6 +2034,9 @@ ENTRY_DECLARATION // main or winmain
       new (&fd.vizIds) AtmSet( LavaId().asInt );
       fd.flow.packetCallback = lavaPacketCallback;
       LavaInit();
+
+      glfwPollEvents();
+      glfwSwapBuffers(fd.win);
     }
   }
   
@@ -1995,6 +2048,7 @@ ENTRY_DECLARATION // main or winmain
     f32 pxRatio;
     int fbWidth, fbHeight;
 
+    //while(false)
     while(!glfwWindowShouldClose(fd.win))
     {
       auto&   ms = fd.mouse;
@@ -2373,7 +2427,7 @@ ENTRY_DECLARATION // main or winmain
       {
         SECTION(nanovg drawing - |node graph|)
         {
-          f32 lineSpace = 100.f;
+          //f32 lineSpace = 100.f;
           f32 cx = fd.ui.grphCx * fd.ui.w;
           f32 cy = fd.ui.grphCy * fd.ui.h;
           nvgBeginFrame(vg,  fd.ui.w,   fd.ui.h, pxRatio);
@@ -2382,75 +2436,75 @@ ENTRY_DECLARATION // main or winmain
             nvgScale(vg,       fd.ui.grphTx,     fd.ui.grphTy);
             nvgTranslate(vg,   -fd.ui.w/2.f,     -fd.ui.h/2.f);
             nvgTranslate(vg,             cx,               cy);
-            SECTION(background grid) // the lines will already be transformed, so they just need to wrap around and create the illusion of an infinite canvas
-            {
-              f32 grdSz = 0.05f;
-              Bnd     b = { 0, 0, (f32)fd.ui.w, (f32)fd.ui.h };
-              nvgCurrentTransform(vg,           fd.ui.tfm);
 
-              nvgSave(vg);
-              nvgResetTransform(vg);
+            grid_draw(vg, fd.graph.gridSpace);
 
-              nvgTransformInverse(fd.ui.invTfm, fd.ui.tfm);
-              nvgTransformPoint( &b.mn.x, &b.mn.y, fd.ui.invTfm, b.mn.x, b.mn.y);   
-              nvgTransformPoint( &b.mx.x, &b.mx.y, fd.ui.invTfm, b.mx.x, b.mx.y);
-
-              f32    hlfW = (f32)fd.ui.w / 2.f;
-              f32    hlfH = (f32)fd.ui.h / 2.f;
-              f32 cntrX, cntrY;
-              nvgTransformPoint( &cntrX, &cntrY, fd.ui.tfm, hlfW, hlfH);
-
-              SECTION(draw centered grid lines)
-              {
-                nvgStrokeWidth(vg, 2.f);
-                nvgStrokeColor(vg, nvgRGBAf( .18f, .18f, .18f, 1.f));
-
-                nvgBeginPath(vg);
-                  nvgMoveTo(vg, cntrX,   0);
-                  nvgLineTo(vg, cntrX,   (f32)fd.ui.h);
-                nvgStroke(vg);
-
-                nvgBeginPath(vg);
-                  nvgMoveTo(vg, 0,            cntrY);
-                  nvgLineTo(vg, (f32)fd.ui.w, cntrY);
-                nvgStroke(vg);
-              }
-
-              nvgStrokeWidth(vg, 1.f);
-              nvgStrokeColor(vg, nvgRGBAf( .12f, .12f, .12f, 1.f));
-
-              SECTION(draw X)
-              {
-                f32   ofstX = (b.mx.x+b.mn.x)/2.f - hlfW;
-                f32    curX = b.mn.x + fmodf(b.w()/2.f - ofstX,lineSpace);
-                while(curX < b.mx.x){
-                  f32 reX = remap(curX, b.mn.x, b.mx.x, 0, (f32)fd.ui.w);
-                  nvgBeginPath(vg);
-                   nvgMoveTo(vg, reX, 0);
-                   nvgLineTo(vg, reX, (f32)fd.ui.h);
-                  nvgStroke(vg);
-                  curX += lineSpace;
-                }
-              }
-              SECTION(draw Y)
-              {
-                f32   ofstY = (b.mx.y+b.mn.y)/2.f - hlfH;
-                f32    curY = b.mn.y + fmodf(b.h()/2.f - ofstY,lineSpace);
-                while(curY < b.mx.y){
-                  f32 reY = remap(curY, b.mn.y, b.mx.y, 0, (f32)fd.ui.h);
-                  nvgBeginPath(vg);
-                  nvgMoveTo(vg, 0,            reY);
-                  nvgLineTo(vg, (f32)fd.ui.w, reY);
-                  nvgStroke(vg);
-                  curY += lineSpace;
-                }
-              }
-
-              nvgRestore(vg);
-
-              //f32 hlfW = remap( (b.mn.x+b.mx.x)/2, b.mn.x, b.mx.x, 0, (f32)fd.ui.w);
-              //f32 hlfH = remap( (b.mn.y+b.mx.y)/2, b.mn.y, b.mx.y, 0, (f32)fd.ui.h);
-            }
+            //SECTION(background grid) // the lines will already be transformed, so they just need to wrap around and create the illusion of an infinite canvas
+            //{
+            //  f32 grdSz = 0.05f;
+            //  Bnd     b = { 0, 0, (f32)fd.ui.w, (f32)fd.ui.h };
+            //  nvgCurrentTransform(vg,           fd.ui.tfm);
+            //
+            //  nvgSave(vg);
+            //  nvgResetTransform(vg);
+            //
+            //  nvgTransformInverse(fd.ui.invTfm, fd.ui.tfm);
+            //  nvgTransformPoint( &b.mn.x, &b.mn.y, fd.ui.invTfm, b.mn.x, b.mn.y);   
+            //  nvgTransformPoint( &b.mx.x, &b.mx.y, fd.ui.invTfm, b.mx.x, b.mx.y);
+            //
+            //  f32    hlfW = (f32)fd.ui.w / 2.f;
+            //  f32    hlfH = (f32)fd.ui.h / 2.f;
+            //  f32 cntrX, cntrY;
+            //  nvgTransformPoint( &cntrX, &cntrY, fd.ui.tfm, hlfW, hlfH);
+            //
+            //  SECTION(draw centered grid lines)
+            //  {
+            //    nvgStrokeWidth(vg, 2.f);
+            //    nvgStrokeColor(vg, nvgRGBAf( .18f, .18f, .18f, 1.f));
+            //
+            //    nvgBeginPath(vg);
+            //      nvgMoveTo(vg, cntrX,   0);
+            //      nvgLineTo(vg, cntrX,   (f32)fd.ui.h);
+            //    nvgStroke(vg);
+            //
+            //    nvgBeginPath(vg);
+            //      nvgMoveTo(vg, 0,            cntrY);
+            //      nvgLineTo(vg, (f32)fd.ui.w, cntrY);
+            //    nvgStroke(vg);
+            //  }
+            //
+            //  nvgStrokeWidth(vg, 1.f);
+            //  nvgStrokeColor(vg, nvgRGBAf( .12f, .12f, .12f, 1.f));
+            //
+            //  SECTION(draw X)
+            //  {
+            //    f32   ofstX = (b.mx.x+b.mn.x)/2.f - hlfW;
+            //    f32    curX = b.mn.x + fmodf(b.w()/2.f - ofstX,lineSpace);
+            //    while(curX < b.mx.x){
+            //      f32 reX = remap(curX, b.mn.x, b.mx.x, 0, (f32)fd.ui.w);
+            //      nvgBeginPath(vg);
+            //       nvgMoveTo(vg, reX, 0);
+            //       nvgLineTo(vg, reX, (f32)fd.ui.h);
+            //      nvgStroke(vg);
+            //      curX += lineSpace;
+            //    }
+            //  }
+            //  SECTION(draw Y)
+            //  {
+            //    f32   ofstY = (b.mx.y+b.mn.y)/2.f - hlfH;
+            //    f32    curY = b.mn.y + fmodf(b.h()/2.f - ofstY,lineSpace);
+            //    while(curY < b.mx.y){
+            //      f32 reY = remap(curY, b.mn.y, b.mx.y, 0, (f32)fd.ui.h);
+            //      nvgBeginPath(vg);
+            //      nvgMoveTo(vg, 0,            reY);
+            //      nvgLineTo(vg, (f32)fd.ui.w, reY);
+            //      nvgStroke(vg);
+            //      curY += lineSpace;
+            //    }
+            //  }
+            //
+            //  nvgRestore(vg);
+            //}
             SECTION(current node highlights)
             {
               auto nid = fd.graph.curNode;
@@ -2763,6 +2817,8 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//f32 hlfW = remap( (b.mn.x+b.mx.x)/2, b.mn.x, b.mx.x, 0, (f32)fd.ui.w);
+//f32 hlfH = remap( (b.mn.y+b.mx.y)/2, b.mn.y, b.mx.y, 0, (f32)fd.ui.h);
 
 //SECTION(slot movement)
 //{

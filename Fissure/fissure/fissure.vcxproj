@@ -132,6 +132,7 @@
       <AdditionalIncludeDirectories>H:\projects\LAVA\lava\Fissure\Fissure\nanogui\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <AdditionalOptions>
       </AdditionalOptions>
+      <DebugInformationFormat>None</DebugInformationFormat>
     </ClCompile>
     <Link>
       <GenerateDebugInformation>true</GenerateDebugInformation>

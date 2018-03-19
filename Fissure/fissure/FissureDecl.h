@@ -246,8 +246,11 @@ struct FisData
 
     // text
     f32            textSize  =  18.f;  //18.f;
-    f32         textMarginW  =  55.f; 
+    f32         textMarginW  =  50.f; 
     f32         textMarginH  =  35.f; 
+
+    // grid
+    f32           gridSpace  =  128.f;
 
     // graph colors
     NVGcolor        lineClr  =  nvgRGBAf(.04f, .04f, .04f, 1.f);
@@ -260,16 +263,18 @@ struct FisData
   } graph;
   struct
   {
-    int w=0, h=0;
-    Screen          screen;
-    Window*         keyWin = nullptr;
-    Window*          dbWin = nullptr;
-    BoxLayout*      keyLay = nullptr;
-    Window*      statusWin = nullptr;
-    BoxLayout*   statusLay = nullptr;
-    TextBox*     statusTxt = nullptr;
-    TextBox*       nodeTxt = nullptr;
-    vec_btn         ndBtns;
+    int                  w  = 1536;
+    int                  h  = 1024;
+
+    Screen         screen;
+    Window*         keyWin  = nullptr;
+    Window*          dbWin  = nullptr;
+    BoxLayout*      keyLay  = nullptr;
+    Window*      statusWin  = nullptr;
+    BoxLayout*   statusLay  = nullptr;
+    TextBox*     statusTxt  = nullptr;
+    TextBox*       nodeTxt  = nullptr;
+    vec_btn        ndBtns;
 
     // mouse
     v2                prevPntr;
