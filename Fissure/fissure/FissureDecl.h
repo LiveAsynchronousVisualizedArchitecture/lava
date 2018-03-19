@@ -283,6 +283,8 @@ struct FisData
     bool              prevRtDn = false;    // right mouse button down
     bool             prevLftDn = false;    // left mouse button down
 
+    f32        zoomSensitivity = 0.005f;
+
     // drawing
     f32              grphTx  =  1.0f;       // grphTx and grphTy are graph transform X and Y - these will determine how zoomed out or zoomed in the graph window is
     f32              grphTy  =  1.0f;
