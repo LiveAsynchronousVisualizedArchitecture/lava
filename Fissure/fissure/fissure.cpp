@@ -153,9 +153,13 @@
 // -todo: put node description into the status bar
 // -todo: look at drag and drop in glfw - already put in 
 // -todo: make drag and drop of a lava file into the gui work
+// -todo: fix input slots taking output slots description - was using slot index offsets and not the slot isIn boolean directly yet
+// -todo: get Tracer shared library to load inside fissure and execute without errors
+// -todo: debug why filepath is crashing Fissure - probably dereferencing a nullptr description - seems so
+// -todo: debug why loading a node then adding a node overwrites the first node - probably not setting the nxt node of the LavaGraph - seems to have been the case
 
-// todo: fix input slots taking output slots description
-// todo: get Tracer shared library to load inside fissure and execute without errors
+// todo: build BVH with embree using input IdxVerts
+// todo: try making the embree vector a union with a float array inside
 // todo: redo atomic bitset now that slots are separated and inputs should be packed together
 // todo: add cursor member variable to LavaFrame
 // todo: put thread pointers into message node instances and work out how to lock and unlock them
@@ -518,8 +522,11 @@ str       makeStatusText(u64 nid, f64 totalTime, vec_ndptrs const& nds, u64 nIdx
     "Node [",nid,"]  ",nds[nIdx]->txt,
     " | ",secondsStr," seconds  %",
     percentStr,"   ",
-    err,"  -  ",
-    n.node->description);
+    err);
+    
+    if(n.node->description){ 
+      status += toString(" -  ", n.node->description);
+    }
 
   return status;
 }
@@ -1456,10 +1463,13 @@ void          strToGraph(str const& s)
   auto sltSrcId   = graph.get("slots").get("srcId");
   auto sltSrcIdx  = graph.get("slots").get("srcIdx");
 
-  auto cnt = nd_id.getCount();
+  auto   cnt = nd_id.getCount();
+  u64 mxNdId = 0;
   TO(cnt,i){        
     Node n;
     n.id   = nd_id.get(i).toInt();
+    mxNdId = max(mxNdId, n.id);
+
     n.txt  = nd_txt.get(i).toString();
     n.P.x  = nd_x.get(i).toFloat();
     n.P.y  = nd_y.get(i).toFloat();
@@ -1482,6 +1492,8 @@ void          strToGraph(str const& s)
     dest.id.isIn = true;
     fd.lgrph.put(LavaCommand::TGL_CNCT, dest, src);
   }
+
+  fd.lgrph.setNextNodeId(mxNdId + 1);
 }
 bool            saveFile(LavaGraph const& lg, str path)
 {
@@ -2140,7 +2152,7 @@ ENTRY_DECLARATION // main or winmain
         bool lftClkUp  =  !ms.lftDn &&  ms.prevLftDn;      // lftClkDn is left click up
         bool rtClkDn   =   ms.rtDn  && !ms.prevRtDn;       // rtClkDn is right click down
 
-        LavaId    sid;                                     // sid is slot id
+        LavaId   sid;                                      // sid is slot id
         bool isInSlot = false;
         SECTION(slot inside check: if inside a slot, early exit on the first found) // todo: does this need to loop through in the node ordr ? 
         {
@@ -2310,25 +2322,24 @@ ENTRY_DECLARATION // main or winmain
             }
           }
         }
-        SECTION(nanogui status bar)
+        SECTION(nanogui status bar text)
         {
           str    status = "";
           f64 totalTime = timeToSeconds(fd.lgrph.totalTime());
           if(isInSlot)
           {
-            str slotName; str slotType;
+            str slotName; 
+            str slotType;
             SECTION(figure out slot name)
             {
               LavaInst&   li  =  fd.lgrph.node(sid.nid);
-              bool outputSlt  =  sid.sidx < li.outputs;
               LavaNode*    n  =  li.node;
-            
-              if(outputSlt){ 
+              if(sid.isIn){
+                slotName = n->in_names[sid.sidx];
+                slotType = n->in_types[sid.sidx];
+              }else{
                 slotName = n->out_names[sid.sidx];
                 slotType = n->out_types[sid.sidx];
-              }else{
-                slotName = n->in_names[sid.sidx - li.outputs];
-                slotType = n->in_types[sid.sidx - li.outputs];
               }
             }
             status = toString("Slot [",sid.nid,":",sid.sidx,"]    ",slotName,"  <",slotType,">");
@@ -2341,7 +2352,6 @@ ENTRY_DECLARATION // main or winmain
             status = makeStatusText(nid.nid, totalTime, nds, nIdx);
             fd.ui.statusTxt->setValue( status );
           }else if(fd.sel.pri != LavaNode::NODE_ERROR){
-            //status = makeStatusText(nid.nid, totalTime, nds, nIdx);
             fd.ui.statusTxt->setValue( status );
           }else{
             fd.ui.statusTxt->setValue("");
@@ -2780,6 +2790,19 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+
+
+
+//bool outputSlt  =  sid.sidx < li.outputs;
+//
+//if(outputSlt){
+//
+//slotName = n->in_names[sid.sidx - li.outputs];
+//slotType = n->in_types[sid.sidx - li.outputs];
+//
+//status = makeStatusText(nid.nid, totalTime, nds, nIdx);
 
 //static bool tmp = true;
 //

@@ -5,6 +5,7 @@
 #include "../../no_rt_util.h"
 #include "../../tbl.hpp"
 #include "../LavaFlow.hpp"
+#include "../shared/vec.hpp"
 
 enum Slots
 {
@@ -13,7 +14,10 @@ enum Slots
   SLOT_OUT = 0
 };
 
-RTCDevice g_device;
+struct Triangle { int v0, v1, v2; };
+
+RTCDevice g_device = nullptr;
+RTCScene   g_scene = nullptr;
 
 extern "C"
 {
@@ -34,7 +38,7 @@ extern "C"
     //rtcSetDeviceErrorFunction(g_device,error_handler,nullptr);
 
     /* create scene */
-    //g_scene = rtcNewScene(g_device);
+    g_scene = rtcNewScene(g_device);
 
     /* add cube */
     //addCube(g_scene);
@@ -58,19 +62,43 @@ extern "C"
   {
     using namespace std;
 
-    //SECTION(input packet loop)
-    //{
-    //  u32 i=0;
-    //  while( LavaNxtPckt(in, &i) )
-    //  {
-    //    tbl inputTbl( (void*)(in->packets[i-1].val.value) );
-    //
-    //    for(auto& kv : inputTbl){  // this loop demonstrates how to iterate through non-empty map elements
-    //    }	
-    //
-    //    // out->push( LavaTblToOut(outputTbl, SLOT_OUT) );      // this demonstrates how to output a tbl into the first output slot
-    //  }
-    //}
+    SECTION(input packet loop)
+    {
+      u32 i=0;
+      while( LavaNxtPckt(in, &i) )
+      {
+        tbl idxVerts( (void*)(in->packets[i-1].val.value) );
+    
+        RTCGeometry mesh = rtcNewGeometry(g_device, RTC_GEOMETRY_TYPE_TRIANGLE);
+
+        //Vertex* vertices = (Vertex*) rtcSetNewGeometryBuffer(mesh,RTC_BUFFER_TYPE_VERTEX,0,RTC_FORMAT_FLOAT3,sizeof(Vertex),8);
+        //int tri = 0;
+
+        tbl      px = idxVerts("positions x");
+        u64 vertCnt = px.size();
+        v4f*  verts = (v4f*)rtcSetNewGeometryBuffer(mesh,RTC_BUFFER_TYPE_VERTEX,0,RTC_FORMAT_FLOAT3,sizeof(v4f),vertCnt);
+
+        tbl     ind = idxVerts("indices");
+        u64  triCnt = (u64)ind.size() / 3;
+        Triangle* triangles = (Triangle*)rtcSetNewGeometryBuffer(mesh,RTC_BUFFER_TYPE_INDEX,0,RTC_FORMAT_UINT3, sizeof(Triangle), (int)triCnt);
+
+        // geometry attribute for vert colors
+        //rtcSetGeometryVertexAttributeCount(mesh,1);
+        //rtcSetSharedGeometryBuffer(mesh,RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE,0,RTC_FORMAT_FLOAT3,vertex_colors,0,sizeof(Vec3fa),8);
+
+        rtcCommitGeometry(mesh);
+
+        u32 geomID = rtcAttachGeometry(g_scene, mesh);
+        rtcReleaseGeometry(mesh);
+
+        //return geomID;
+
+        //for(auto& kv : inputTbl){  // this loop demonstrates how to iterate through non-empty map elements
+        //}	
+    
+        // out->push( LavaTblToOut(outputTbl, SLOT_OUT) );      // this demonstrates how to output a tbl into the first output slot
+      }
+    }
 
     return 1;
   }
