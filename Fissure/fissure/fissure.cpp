@@ -150,14 +150,18 @@
 // -todo: turn up zoom sensitivity
 // -todo: move zoom sensitivity to FisData and calibrate it between the scroll wheel and double mouse button methods
 
-// todo: re-orient nodes on resize of the window so they line up with the grid in the same place - maybe the scale and pan need to be changed instead
 // todo: put thread pointers into message node instances and work out how to lock and unlock them
 // todo: should flow nodes with no inputs be run once at the start of the program for easy data flow?
 // todo: build in data type visualization - part needs to be lava, part needs to be UI
-// todo: organize nodes by types in a contex menu or side bar
-// todo: make sure zooming center is affected by cursor placement
 // todo: make fissure or lava be able to incrementally load shared libraries
 // todo: make message node's text split to new lines on white space
+// todo: make sure zooming center is affected by cursor placement
+// todo: organize nodes by types in a contex menu or side bar
+// todo: change node colors to be based off of profiling information while holding 'p' key
+// todo: re-orient nodes on resize of the window so they line up with the grid in the same place 
+//       | maybe the scale and pan need to be changed instead 
+//       | if the window size is simply shrinking closer to 0, maybe the center point needs to be normalized according to where it was in the window
+//       | might just need to shift the pan by the change in the center point
 
 // todo: make a note node that will show the hotkeys and thus can be deleted at any time
 // todo: make reloaded nodes have highlights until the next event
@@ -1513,13 +1517,10 @@ bool            loadFile(str path, LavaGraph* out_g)
 }
 bool    reloadSharedLibs()
 {
-  //static bool tmp = true;
-
   bool newlibs = RefreshFlowLibs(fd.flow);
 
   if(!newlibs){ return false; }
 
-  //fd.ui.ndBtns[0]
   SECTION(get the buttons out of the GUI and clear the button widgets from memory)
   {
     for(auto& b : fd.ui.ndBtns){
@@ -1527,8 +1528,6 @@ bool    reloadSharedLibs()
     }
     fd.ui.ndBtns.clear();                                             // delete interface buttons from the nanogui window
   }
-
-  //if(tmp)
   SECTION(redo interface node buttons)
   {
     for(auto& kv : fd.flow.flow)
@@ -1544,8 +1543,6 @@ bool    reloadSharedLibs()
   }
 
   fd.ui.screen.performLayout();
-
-  //tmp=false;
 
   return true;
 }
@@ -1642,6 +1639,15 @@ void              dropCallback(GLFWwindow* window, int count, const char** filen
 void   framebufferSizeCallback(GLFWwindow* window, int w, int h)
 {
   fd.ui.screen.resizeCallbackEvent(w, h);
+
+  //fd.ui.grphCx  +=  ((f32)wdif / (f32)fd.ui.w) * .5f;
+  //fd.ui.grphCy  +=  ((f32)hdif / (f32)fd.ui.h) * .5f;
+
+  //f32 wdif = (f32)(w - fd.ui.w); 
+  //f32 hdif = (f32)(h - fd.ui.h);
+  //f32 difAvg = ((wdif/fd.ui.w)+(hdif/fd.ui.h)) / 2.f;
+  //fd.ui.grphTx  *=  1.f + difAvg;
+  //fd.ui.grphTy  *=  1.f + difAvg;
 }
 
 str                   genDbKey(LavaId     sid)            // genDbKey is generate database key, sid is slot Id
@@ -2020,7 +2026,7 @@ ENTRY_DECLARATION // main or winmain
     }
     SECTION(lava and db)
     {
-      //reloadSharedLibs();
+      reloadSharedLibs();
 
       new (&fisdb)     simdb("Fissure", 4096, 1<<16);     // 4096 * 65,536 = 268,435,456
 
@@ -2043,6 +2049,7 @@ ENTRY_DECLARATION // main or winmain
     f32 pxRatio;
     int fbWidth, fbHeight;
 
+    //while(false)
     while(!glfwWindowShouldClose(fd.win))
     {
       auto&   ms = fd.mouse;
@@ -2748,6 +2755,15 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+//static bool tmp = true;
+//
+//fd.ui.ndBtns[0]
+//
+//if(tmp)
+//
+//tmp=false;
 
 //
 //fd.ui.nodeTxt->setValue("");

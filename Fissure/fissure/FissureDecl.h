@@ -287,7 +287,7 @@ struct FisData
 
     // drawing
     f32              grphTx  =  1.0f;       // grphTx and grphTy are graph transform X and Y - these will determine how zoomed out or zoomed in the graph window is
-    f32              grphTy  =  1.0f;
+    f32              grphTy  =  1.0f;       // todo: make these scale instead of transform
     f32              grphCx  =  0.0f;       // grphCx and grphCy are graph center X and Y 
     f32              grphCy  =  0.0f;
     f32              tfm[6]  =  {1.f,0,0,1.f,0,0};                         // calculated in the drawing loop - initialized as the top 6 values of a 3x3 identity matrix ordered according to nanovg
