@@ -149,7 +149,13 @@
 // -todo: try to swap buffers once after glfw initialization to draw startup window faster 
 // -todo: turn up zoom sensitivity
 // -todo: move zoom sensitivity to FisData and calibrate it between the scroll wheel and double mouse button methods
+// -todo: get Tracer to compile and link with embree3
+// -todo: put node description into the status bar
 
+// todo: fix input slots taking output slots description
+// todo: get Tracer shared library to load inside fissure and execute without errors
+// todo: redo atomic bitset now that slots are separated and inputs should be packed together
+// todo: add cursor member variable to LavaFrame
 // todo: put thread pointers into message node instances and work out how to lock and unlock them
 // todo: should flow nodes with no inputs be run once at the start of the program for easy data flow?
 // todo: build in data type visualization - part needs to be lava, part needs to be UI
@@ -162,6 +168,7 @@
 //       | maybe the scale and pan need to be changed instead 
 //       | if the window size is simply shrinking closer to 0, maybe the center point needs to be normalized according to where it was in the window
 //       | might just need to shift the pan by the change in the center point
+// todo: make nodes have their own scale that dictates the text size and not the other way around
 
 // todo: make a note node that will show the hotkeys and thus can be deleted at any time
 // todo: make reloaded nodes have highlights until the next event
@@ -509,7 +516,8 @@ str       makeStatusText(u64 nid, f64 totalTime, vec_ndptrs const& nds, u64 nIdx
     "Node [",nid,"]  ",nds[nIdx]->txt,
     " | ",secondsStr," seconds  %",
     percentStr,"   ",
-    err);
+    err,"  -  ",
+    n.node->description);
 
   return status;
 }
