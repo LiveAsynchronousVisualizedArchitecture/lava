@@ -151,6 +151,8 @@
 // -todo: move zoom sensitivity to FisData and calibrate it between the scroll wheel and double mouse button methods
 // -todo: get Tracer to compile and link with embree3
 // -todo: put node description into the status bar
+// -todo: look at drag and drop in glfw - already put in 
+// -todo: make drag and drop of a lava file into the gui work
 
 // todo: fix input slots taking output slots description
 // todo: get Tracer shared library to load inside fissure and execute without errors
@@ -1640,9 +1642,23 @@ void              charCallback(GLFWwindow* window, unsigned int codepoint)
 }
 void              dropCallback(GLFWwindow* window, int count, const char** filenames)
 {
-  FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
+  //FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
+  //bool   used = fd->ui.screen.dropCallbackEvent(count, filenames);
 
-  fd->ui.screen.dropCallbackEvent(count, filenames);
+  bool   used = fd.ui.screen.dropCallbackEvent(count, filenames);
+
+  Println("Dropped Files:");
+  TO(count,i){
+    bool ok = loadFile(filenames[i], &fd.lgrph);
+    Println(filenames[i]);
+  }
+  Println();
+
+  if(count>0){
+    bool ok = loadFile(filenames[0], &fd.lgrph);
+    Println(filenames[0], " loaded ",  ok? "successfully"  :  "unsuccessfully");
+  }
+
 }
 void   framebufferSizeCallback(GLFWwindow* window, int w, int h)
 {
@@ -1815,7 +1831,7 @@ ENTRY_DECLARATION // main or winmain
         loadBtn->setCallback([](){ 
           stopFlowThreads();
 
-          nfdchar_t *inPath = NULL;
+          nfdchar_t  *inPath = NULL;
           nfdresult_t result = NFD_OpenDialog("lava", NULL, &inPath );
 
           if(inPath){
