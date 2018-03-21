@@ -158,9 +158,10 @@
 // -todo: debug why filepath is crashing Fissure - probably dereferencing a nullptr description - seems so
 // -todo: debug why loading a node then adding a node overwrites the first node - probably not setting the nxt node of the LavaGraph - seems to have been the case
 // -todo: debug why Tracer crashes - is the frame not getting zeroed out? why does it run twice? - runFrm needed to be changed in scope to be within the loop
+// -todo: output and visualize the bounding box of the embree scene
+// -todo: make bounding box into openGL lines
 
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
-// todo: output and visualize the bounding box of the embree scene
 // todo: build BVH with embree using input IdxVerts
 // todo: visualize a single ray
 // todo: trace a single ray through the embree scene and visualize it 

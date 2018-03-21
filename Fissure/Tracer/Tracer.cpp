@@ -10,7 +10,7 @@
 enum Slots
 {
   // This is an example enumeration that is meant to be helpful, though is not strictly neccesary. Referencing slots by a name will generally be less error prone than using their index and remembering what each index is for
-  SLOT_IN  = 0,        
+  SLOT_IN          = 0,        
   BOUNDING_BOX_OUT = 0
 };
 
@@ -31,8 +31,13 @@ tbl bndToIdxVerts(LavaParams const* lp, RTCBounds const& b)
 
   px.setArrayType<f32>();
   py.setArrayType<f32>();
+  pz.setArrayType<f32>();
 
   px.push(b.lower_x);
+  px.push(b.upper_x);
+  px.push(b.upper_x);
+  px.push(b.lower_x);
+  px.push(b.lower_x); //
   px.push(b.upper_x);
   px.push(b.upper_x);
   px.push(b.lower_x);
@@ -41,9 +46,50 @@ tbl bndToIdxVerts(LavaParams const* lp, RTCBounds const& b)
   py.push(b.lower_y);
   py.push(b.upper_y);
   py.push(b.upper_y);
+  py.push(b.lower_y); //
+  py.push(b.lower_y);
+  py.push(b.upper_y);
+  py.push(b.upper_y);
+
+  pz.push(b.lower_z);
+  pz.push(b.lower_z);
+  pz.push(b.lower_z);
+  pz.push(b.lower_z);
+  pz.push(b.upper_z); //
+  pz.push(b.upper_z);
+  pz.push(b.upper_z);
+  pz.push(b.upper_z);
 
   tbl ind = LavaMakeTbl(lp);
   ind.setArrayType<u32>();
+
+  ind.push( 0u ); 
+  ind.push( 1u );
+  ind.push( 1u );
+  ind.push( 2u );
+  ind.push( 2u );
+  ind.push( 3u );
+  ind.push( 3u );
+  ind.push( 0u );
+
+  ind.push( 0u ); 
+  ind.push( 4u );
+  ind.push( 1u );
+  ind.push( 5u );
+  ind.push( 2u );
+  ind.push( 6u );
+  ind.push( 3u );
+  ind.push( 7u );
+
+  ind.push( 4u ); 
+  ind.push( 5u );
+  ind.push( 5u );
+  ind.push( 6u );
+  ind.push( 6u );
+  ind.push( 7u );
+  ind.push( 7u );
+  ind.push( 4u );
+
   TO(8,i){ 
     ind.push( (u32)i ); 
   };
@@ -57,7 +103,7 @@ tbl bndToIdxVerts(LavaParams const* lp, RTCBounds const& b)
   //py[1] =  b.lower_y;
   //py[2] =  b.upper_y;
   //py[3] =  b.upper_y;
-
+  //
   //TO(4,i){
   //  px[i]   = b.lower_x;
   //  px[i+4] = b.upper_x;
@@ -70,23 +116,22 @@ tbl bndToIdxVerts(LavaParams const* lp, RTCBounds const& b)
   iv("indices")     = &ind;
   iv("positions x") = &px;
   iv("positions y") = &py;
-  iv("mode")        = 0;
+  iv("positions z") = &pz;
+  iv("mode")        = 1;            // 0 should be points, 1 should be lines
   iv("type")        = tbl::StrToInt("IdxVerts");
-  //iv("positions z") = &pz;
   iv.flatten();
 
   return move(iv);
 }
 
-// Embree3 Scene Message Node
-extern "C"
+extern "C"          // Embree3 Scene Message Node
 {
   const char* description = "Takes in geometry that will be sorted into an acceleration structure and ultimatly used to trace rays";                                     // description
 
   const char*  InTypes[]  = {"IdxVerts",               nullptr};          // This array contains the type that each slot of the same index will accept as input.
   const char*  InNames[]  = {"Input Scene Geometry",   nullptr};          // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   const char* OutTypes[]  = {"IdxVerts",               nullptr};          // This array contains the types that are output in each slot of the same index
-  const char* OutNames[]  = {"Traced Rays",            nullptr};          // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char* OutNames[]  = {"Scene Bounds",           nullptr};          // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
 
   void Tracer_construct()
   {
@@ -168,6 +213,9 @@ extern "C"
         u32 geomID = rtcAttachGeometry(g_scene, mesh);
         rtcReleaseGeometry(mesh);
     
+        rtcCommitScene(g_scene);
+
+        rtcGetSceneBounds(g_scene, &g_bnd);
         tbl bndIV = bndToIdxVerts(lp, g_bnd);
         out->push( LavaTblToOut(move(bndIV),BOUNDING_BOX_OUT) );           // this demonstrates how to output a tbl into the first output slot
       }
