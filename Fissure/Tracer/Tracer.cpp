@@ -27,23 +27,31 @@ tbl rayHitToIdxVerts(LavaParams const* lp, RTCRayHit const& rh)
   tbl  px = LavaMakeTbl(lp);
   tbl  py = LavaMakeTbl(lp);
   tbl  pz = LavaMakeTbl(lp);
+  tbl  cr = LavaMakeTbl(lp);
+  tbl  cg = LavaMakeTbl(lp);
   tbl ind = LavaMakeTbl(lp);
   tbl  iv = LavaMakeTbl(lp);
 
   px.setArrayType<f32>();
   py.setArrayType<f32>();
   pz.setArrayType<f32>();
+  cr.setArrayType<f32>();
+  cg.setArrayType<f32>();
   ind.setArrayType<u32>();
   iv.setArrayType<i8>();
 
+  px.push( rh.ray.org_x  );
+  py.push( rh.ray.org_y  );
+  pz.push( rh.ray.org_z  );
 
-  px.push( rh.ray.org_x * rh.ray.dir_x * rh.ray.tnear );
-  py.push( rh.ray.org_y * rh.ray.dir_y * rh.ray.tnear );
-  pz.push( rh.ray.org_z * rh.ray.dir_z * rh.ray.tnear );
+  px.push( rh.ray.org_x + (rh.ray.dir_x*rh.ray.tfar) );
+  py.push( rh.ray.org_y + (rh.ray.dir_y*rh.ray.tfar) );
+  pz.push( rh.ray.org_z + (rh.ray.dir_z*rh.ray.tfar) );
 
-  px.push( rh.ray.org_x * rh.ray.dir_x * rh.ray.tfar );
-  py.push( rh.ray.org_y * rh.ray.dir_y * rh.ray.tfar );
-  pz.push( rh.ray.org_z * rh.ray.dir_z * rh.ray.tfar );
+  cr.push(0.5f);
+  cr.push(1.0f);
+  cg.push(0.0f);
+  cg.push(1.0f);
 
   ind.push(0u);
   ind.push(1u);
@@ -51,9 +59,9 @@ tbl rayHitToIdxVerts(LavaParams const* lp, RTCRayHit const& rh)
   iv("positions x")  = &px;
   iv("positions y")  = &py;
   iv("positions z")  = &pz;
-  iv("colors red")   = &px;
-  iv("colors green") = &py;
-  iv("colors blue")  = &pz;
+  iv("colors red")   = &cr;
+  iv("colors green") = &cg;
+  //iv("colors blue")  = &pz;
   iv("indices")      = &ind;
   iv("mode")         = 1;            // 0 should be points, 1 should be lines
   iv("type")         = tbl::StrToInt("IdxVerts");
@@ -278,12 +286,13 @@ extern "C"          // Embree3 Scene Message Node
 
         RTCRayHit rh;
         rh.ray.mask   =   -1;
-        rh.ray.time   =    0;
         rh.ray.id     =    RTC_INVALID_GEOMETRY_ID;
+        rh.ray.flags  =    0;
+        rh.ray.time   =    0;
         rh.ray.tnear  =   0.f;
-        rh.ray.tfar   =   20.f;
+        rh.ray.tfar   =   numeric_limits<float>::infinity();
         rh.ray.org_x  =   0.f;
-        rh.ray.org_y  =   0.f;
+        rh.ray.org_y  =   1.f;
         rh.ray.org_z  =   8.f;
         rh.ray.dir_x  =   0.f;
         rh.ray.dir_y  =   0.f;
