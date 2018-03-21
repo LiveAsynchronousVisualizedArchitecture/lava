@@ -166,6 +166,7 @@
 // -todo: visualize a single ray
 // -todo: color ray start as red and end as yellow
 
+// todo: build visualized slots into .lava file format
 // todo: make multiple unconnected output slots not overlap in a message node
 // todo: make sure multiple message slots can be connected
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue

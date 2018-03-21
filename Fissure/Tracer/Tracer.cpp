@@ -1,5 +1,5 @@
 
-
+#include <random>
 #include "rtcore.h"
 #include "../../no_rt_util.h"
 #include "../../tbl.hpp"
@@ -16,9 +16,25 @@ enum Slots
 
 struct Triangle { int v0, v1, v2; };
 
+using vec_ray = std::vector<RTCRayHit>;
+
 RTCDevice g_device = nullptr;
 RTCScene   g_scene = nullptr;
 RTCBounds    g_bnd;
+
+namespace RNG
+{
+  using rng_t  = ::std::mt19937;
+  using urng_t = ::std::unique_ptr<rng_t>;
+
+  rng_t   gen(0);
+  rng_t*  m_genPtr = &gen;
+}
+float     randomf(float lo, float hi)
+{
+  ::std::uniform_real_distribution<float> dis(lo, hi);
+  return dis(*RNG::m_genPtr);
+}
 
 tbl rayHitToIdxVerts(LavaParams const* lp, RTCRayHit const& rh)
 {
@@ -62,6 +78,62 @@ tbl rayHitToIdxVerts(LavaParams const* lp, RTCRayHit const& rh)
   iv("colors red")   = &cr;
   iv("colors green") = &cg;
   //iv("colors blue")  = &pz;
+  iv("indices")      = &ind;
+  iv("mode")         = 1;            // 0 should be points, 1 should be lines
+  iv("type")         = tbl::StrToInt("IdxVerts");
+  iv.flatten();
+
+  return move(iv);
+}
+tbl   raysToIdxVerts(LavaParams const* lp, RTCRayHit* rh, u32 rayCnt)
+{
+  using namespace std;
+
+  tbl  px = LavaMakeTbl(lp);
+  tbl  py = LavaMakeTbl(lp);
+  tbl  pz = LavaMakeTbl(lp);
+  tbl  cr = LavaMakeTbl(lp);
+  tbl  cg = LavaMakeTbl(lp);
+  tbl  ca = LavaMakeTbl(lp);
+  tbl ind = LavaMakeTbl(lp);
+  tbl  iv = LavaMakeTbl(lp);
+
+  px.setArrayType<f32>();
+  py.setArrayType<f32>();
+  pz.setArrayType<f32>();
+  cr.setArrayType<f32>();
+  cg.setArrayType<f32>();
+  ca.setArrayType<f32>();
+  ind.setArrayType<u32>();
+  iv.setArrayType<i8>();
+
+  TO(rayCnt,i){
+    px.push( rh[i].ray.org_x  );
+    py.push( rh[i].ray.org_y  );
+    pz.push( rh[i].ray.org_z  );
+
+    px.push( rh[i].ray.org_x + (rh[i].ray.dir_x*rh[i].ray.tfar) );
+    py.push( rh[i].ray.org_y + (rh[i].ray.dir_y*rh[i].ray.tfar) );
+    pz.push( rh[i].ray.org_z + (rh[i].ray.dir_z*rh[i].ray.tfar) );
+
+    cr.push(0.5f);
+    cr.push(1.0f);
+    cg.push(0.0f);
+    cg.push(1.0f);
+    ca.push(0.1f);
+    ca.push(0.2f);
+
+    ind.push( (u32)(i*2+0) );
+    ind.push( (u32)(i*2+1) );
+  }
+
+  iv("positions x")  = &px;
+  iv("positions y")  = &py;
+  iv("positions z")  = &pz;
+  iv("colors red")   = &cr;
+  iv("colors green") = &cg;
+  //iv("colors blue")  = &pz;
+  iv("colors alpha") = &ca;
   iv("indices")      = &ind;
   iv("mode")         = 1;            // 0 should be points, 1 should be lines
   iv("type")         = tbl::StrToInt("IdxVerts");
@@ -278,12 +350,6 @@ extern "C"          // Embree3 Scene Message Node
         RTCIntersectContext context;
         rtcInitIntersectContext(&context);
 
-        //RTCRay r;
-        //r.org_x = 0.f;   // (Vec3fa(camera.xfm.p), Vec3fa(normalize(x*camera.xfm.l.vx + y*camera.xfm.l.vy + camera.xfm.l.vz)), 0.0f, inf);
-        //r.org_y = 0.f;
-        //r.org_z = 0.f;
-        //RTCHit h;
-
         RTCRayHit rh;
         rh.ray.mask   =   -1;
         rh.ray.id     =    RTC_INVALID_GEOMETRY_ID;
@@ -293,16 +359,28 @@ extern "C"          // Embree3 Scene Message Node
         rh.ray.tfar   =   numeric_limits<float>::infinity();
         rh.ray.org_x  =   0.f;
         rh.ray.org_y  =   1.f;
-        rh.ray.org_z  =   8.f;
+        rh.ray.org_z  =   4.f;
         rh.ray.dir_x  =   0.f;
         rh.ray.dir_y  =   0.f;
         rh.ray.dir_z  =  -1.f;
 
-        rtcIntersect1(g_scene, &context, &rh);
-        //RayStats_addRay(stats);
+        int rayCnt = 100000;
+        vec_ray rays(rayCnt);
+        TO(rayCnt,i){
+          rays[i] = rh;
+          rays[i].ray.org_x = randomf(-2.f, 3.f);
+          rays[i].ray.org_y = randomf(-2.f, 4.f);
+        }
 
-        tbl rayIV = rayHitToIdxVerts(lp, rh);
-        out->push( LavaTblToOut(move(rayIV), RAYS_OUT) );                // this demonstrates how to output a tbl into the first output slot
+        TO(rayCnt,i){
+          rtcIntersect1(g_scene, &context, &rays[i] );
+        }
+
+        tbl raysIV = raysToIdxVerts(lp, rays.data(), rays.size());
+        out->push( LavaTblToOut(move(raysIV), RAYS_OUT) );
+
+        //tbl rayIV = rayHitToIdxVerts(lp, rh);
+        //out->push( LavaTblToOut(move(rayIV), RAYS_OUT) );                // this demonstrates how to output a tbl into the first output slot
         //out->push( LavaTblToOut(move(rayIV), BOUNDING_BOX_OUT ) );                // this demonstrates how to output a tbl into the first output slot
       }
     }
@@ -338,7 +416,14 @@ extern "C"          // Embree3 Scene Message Node
 
 
 
+//RTCRay r;
+//r.org_x = 0.f;   // (Vec3fa(camera.xfm.p), Vec3fa(normalize(x*camera.xfm.l.vx + y*camera.xfm.l.vy + camera.xfm.l.vz)), 0.0f, inf);
+//r.org_y = 0.f;
+//r.org_z = 0.f;
+//RTCHit h;
 
+//tbl rayHitToIdxVerts(LavaParams const* lp, RTCRayHit const& rh)
+//tbl rayHitToIdxVerts(LavaParams const* lp, RTCRayHit* rh, u32 sz)
 
 //Vertex* vertices = (Vertex*) rtcSetNewGeometryBuffer(mesh,RTC_BUFFER_TYPE_VERTEX,0,RTC_FORMAT_FLOAT3,sizeof(Vertex),8);
 //int tri = 0;
