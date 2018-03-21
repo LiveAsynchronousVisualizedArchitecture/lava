@@ -11,13 +11,72 @@ enum Slots
 {
   // This is an example enumeration that is meant to be helpful, though is not strictly neccesary. Referencing slots by a name will generally be less error prone than using their index and remembering what each index is for
   SLOT_IN  = 0,        
-  SLOT_OUT = 0
+  BOUNDING_BOX_OUT = 0
 };
 
 struct Triangle { int v0, v1, v2; };
 
 RTCDevice g_device = nullptr;
 RTCScene   g_scene = nullptr;
+RTCBounds    g_bnd;
+
+tbl bndToIdxVerts(LavaParams const* lp, RTCBounds const& b)
+{
+  using namespace std;
+    
+  tbl  px = LavaMakeTbl(lp);
+  tbl  py = LavaMakeTbl(lp);
+  tbl  pz = LavaMakeTbl(lp);
+  tbl  iv = LavaMakeTbl(lp);
+
+  px.setArrayType<f32>();
+  py.setArrayType<f32>();
+
+  px.push(b.lower_x);
+  px.push(b.upper_x);
+  px.push(b.upper_x);
+  px.push(b.lower_x);
+
+  py.push(b.lower_y);
+  py.push(b.lower_y);
+  py.push(b.upper_y);
+  py.push(b.upper_y);
+
+  tbl ind = LavaMakeTbl(lp);
+  ind.setArrayType<u32>();
+  TO(8,i){ 
+    ind.push( (u32)i ); 
+  };
+
+  //px[0] = b.lower_x;
+  //px[1] = b.upper_x;
+  //px[2] = b.upper_x;
+  //px[3] = b.lower_x;
+  //
+  //py[0] =  b.lower_y;
+  //py[1] =  b.lower_y;
+  //py[2] =  b.upper_y;
+  //py[3] =  b.upper_y;
+
+  //TO(4,i){
+  //  px[i]   = b.lower_x;
+  //  px[i+4] = b.upper_x;
+  //}
+  //TO(4,i){
+  //  py[i*2]  =  b.lower_y;
+  //  py[i+4]  =  b.upper_y;
+  //}
+
+  iv("indices")     = &ind;
+  iv("positions x") = &px;
+  iv("positions y") = &py;
+  iv("mode")        = 0;
+  iv("type")        = tbl::StrToInt("IdxVerts");
+  //iv("positions z") = &pz;
+  iv.flatten();
+
+  return move(iv);
+}
 
 // Embree3 Scene Message Node
 extern "C"
@@ -31,6 +90,13 @@ extern "C"
 
   void Tracer_construct()
   {
+    g_bnd.lower_x = 0.f;
+    g_bnd.lower_y = 0.f;
+    g_bnd.lower_z = 0.f;
+    g_bnd.upper_x = 1.f;
+    g_bnd.upper_y = 1.f;
+    g_bnd.upper_z = 1.f;
+
     /* create new Embree device */
     g_device = rtcNewDevice("");
     //error_handler(nullptr,rtcGetDeviceError(g_device));
@@ -73,9 +139,6 @@ extern "C"
     
         RTCGeometry mesh = rtcNewGeometry(g_device, RTC_GEOMETRY_TYPE_TRIANGLE);
 
-        //Vertex* vertices = (Vertex*) rtcSetNewGeometryBuffer(mesh,RTC_BUFFER_TYPE_VERTEX,0,RTC_FORMAT_FLOAT3,sizeof(Vertex),8);
-        //int tri = 0;
-
         tbl      px = idxVerts("positions x");
         tbl      py = idxVerts("positions y");
         tbl      pz = idxVerts("positions z");
@@ -100,21 +163,13 @@ extern "C"
           triangles[i].v2  =  ind[idx + 2];
         }
         
-        // geometry attribute for vert colors
-        //rtcSetGeometryVertexAttributeCount(mesh,1);
-        //rtcSetSharedGeometryBuffer(mesh,RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE,0,RTC_FORMAT_FLOAT3,vertex_colors,0,sizeof(Vec3fa),8);
-
         rtcCommitGeometry(mesh);
 
         u32 geomID = rtcAttachGeometry(g_scene, mesh);
         rtcReleaseGeometry(mesh);
-
-        //return geomID;
-
-        //for(auto& kv : inputTbl){  // this loop demonstrates how to iterate through non-empty map elements
-        //}	
     
-        // out->push( LavaTblToOut(outputTbl, SLOT_OUT) );      // this demonstrates how to output a tbl into the first output slot
+        tbl bndIV = bndToIdxVerts(lp, g_bnd);
+        out->push( LavaTblToOut(move(bndIV),BOUNDING_BOX_OUT) );           // this demonstrates how to output a tbl into the first output slot
       }
     }
 
@@ -124,7 +179,7 @@ extern "C"
   LavaNode LavaNodes[] =
   {
     {
-      Tracer,                                       // function
+      Tracer,                                      // function
       Tracer_construct,                            // constructor - this can be set to nullptr if not needed
       Tracer_destruct,                             // destructor  - this can also be set to nullptr 
       LavaNode::MSG,                               // node_type   - this should be eighther LavaNode::MSG (will be run even without input packets) or LavaNode::FLOW (will be run only when at least one packet is available for input)
@@ -137,7 +192,7 @@ extern "C"
       0                                            // version 
     },                                             
 
-    LavaNodeListEnd                                  // This is a constant that has all the members of the LavaNode struct set to 0 or nullptr - it is used as a special value that ends the static list of LavaNodes. This negates the need for a separate static variable that gives the size of the list, which would be have to be kept in sync and therefore be error prone.
+    LavaNodeListEnd                                // This is a constant that has all the members of the LavaNode struct set to 0 or nullptr - it is used as a special value that ends the static list of LavaNodes. This negates the need for a separate static variable that gives the size of the list, which would be have to be kept in sync and therefore be error prone.
   };
 
   __declspec(dllexport) LavaNode* GetLavaNodes()
@@ -146,3 +201,19 @@ extern "C"
   }
 }
 
+
+
+
+
+
+//Vertex* vertices = (Vertex*) rtcSetNewGeometryBuffer(mesh,RTC_BUFFER_TYPE_VERTEX,0,RTC_FORMAT_FLOAT3,sizeof(Vertex),8);
+//int tri = 0;
+//
+// geometry attribute for vert colors
+//rtcSetGeometryVertexAttributeCount(mesh,1);
+//rtcSetSharedGeometryBuffer(mesh,RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE,0,RTC_FORMAT_FLOAT3,vertex_colors,0,sizeof(Vec3fa),8);
+//
+//return geomID;
+//
+//for(auto& kv : inputTbl){  // this loop demonstrates how to iterate through non-empty map elements
+//}	
