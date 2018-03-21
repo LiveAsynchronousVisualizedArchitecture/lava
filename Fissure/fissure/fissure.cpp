@@ -159,8 +159,12 @@
 // -todo: debug why loading a node then adding a node overwrites the first node - probably not setting the nxt node of the LavaGraph - seems to have been the case
 // -todo: debug why Tracer crashes - is the frame not getting zeroed out? why does it run twice? - runFrm needed to be changed in scope to be within the loop
 
+// todo: change constructor to happen on play
 // todo: build BVH with embree using input IdxVerts
+// todo: visualize a single ray
+// todo: trace a single ray through the embree scene and visualize it 
 // todo: try making the embree vector a union with a float array inside
+// todo: make nodes with no input slots work
 // todo: redo atomic bitset now that slots are separated and inputs should be packed together
 // todo: add cursor member variable to LavaFrame
 // todo: put thread pointers into message node instances and work out how to lock and unlock them

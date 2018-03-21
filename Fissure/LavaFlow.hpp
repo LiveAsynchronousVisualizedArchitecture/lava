@@ -1613,14 +1613,6 @@ public:
     else        return outSlot(id);
   }
 
-  //auto      nodeSlots(u64     nid) const -> decltype(curSlots().cbegin())
-  //{
-  //  return lower_bound(ALL(curSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
-  //}
-  //auto      nodeSlots(u64     nid) -> decltype(oppSlots().begin())
-  //{
-  //  return lower_bound(ALL(oppSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
-  //}
   auto      nodeInSlots(u64     nid) const -> decltype(curInSlots().cbegin())
   {
     return lower_bound(ALL(curInSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
@@ -1637,9 +1629,6 @@ public:
   {
     return lower_bound(ALL(oppOutSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
   }
-  //auto          slots() -> Slots& { return curSlots(); }
-  //auto          slots() const -> Slots const& { return curSlots();  }
-  //auto       getSlots() -> Slots& { return curSlots(); }
   auto          inSlots()  -> Slots& { return curInSlots(); }
   auto          inSlots() const -> Slots const& { return curInSlots();  }
   auto       getInSlots()  -> Slots& { return curInSlots(); }
@@ -1661,8 +1650,6 @@ public:
   {
     return curDestCncts().find(srcId);
   }
-  //auto        slotEnd() -> decltype(curSlots().end()) { return curSlots().end(); }
-  //u64             ssz() const { return curSlots().size(); }
   auto        inSlotEnd() -> decltype(curInSlots().end()) { return curInSlots().end(); }
   u64           inSltSz() const { return curInSlots().size(); }
   auto       outSlotEnd() -> decltype(curOutSlots().end()) { return curOutSlots().end(); }
@@ -2558,6 +2545,23 @@ void               LavaLoop(LavaFlow& lf) noexcept
 #endif
 
 
+
+
+//auto      nodeSlots(u64     nid) const -> decltype(curSlots().cbegin())
+//{
+//  return lower_bound(ALL(curSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
+//}
+//auto      nodeSlots(u64     nid) -> decltype(oppSlots().begin())
+//{
+//  return lower_bound(ALL(oppSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
+//}
+//
+//auto          slots() -> Slots& { return curSlots(); }
+//auto          slots() const -> Slots const& { return curSlots();  }
+//auto       getSlots() -> Slots& { return curSlots(); }
+//
+//auto        slotEnd() -> decltype(curSlots().end()) { return curSlots().end(); }
+//u64             ssz() const { return curSlots().size(); }
 
 //do{ 
 //  ++(*currentIndex);

@@ -19,6 +19,7 @@ struct Triangle { int v0, v1, v2; };
 RTCDevice g_device = nullptr;
 RTCScene   g_scene = nullptr;
 
+// Embree3 Scene Message Node
 extern "C"
 {
   const char* description = "Takes in geometry that will be sorted into an acceleration structure and ultimatly used to trace rays";                                     // description
@@ -55,6 +56,7 @@ extern "C"
   }
   void Tracer_destruct()
   {
+    rtcReleaseScene(g_scene);
     rtcReleaseDevice(g_device);
   }
 
@@ -75,13 +77,29 @@ extern "C"
         //int tri = 0;
 
         tbl      px = idxVerts("positions x");
+        tbl      py = idxVerts("positions y");
+        tbl      pz = idxVerts("positions z");
         u64 vertCnt = px.size();
         v4f*  verts = (v4f*)rtcSetNewGeometryBuffer(mesh,RTC_BUFFER_TYPE_VERTEX,0,RTC_FORMAT_FLOAT3,sizeof(v4f),vertCnt);
+
+        TO(vertCnt,i){
+          verts[i].x  =  px[i];
+          verts[i].y  =  py[i];
+          verts[i].z  =  pz[i];
+          verts[i].a  =  1.f;
+        }
 
         tbl     ind = idxVerts("indices");
         u64  triCnt = (u64)ind.size() / 3;
         Triangle* triangles = (Triangle*)rtcSetNewGeometryBuffer(mesh,RTC_BUFFER_TYPE_INDEX,0,RTC_FORMAT_UINT3, sizeof(Triangle), (int)triCnt);
 
+        TO(triCnt,i){
+          auto idx = i * 3;
+          triangles[i].v0  =  ind[idx + 0];
+          triangles[i].v1  =  ind[idx + 1];
+          triangles[i].v2  =  ind[idx + 2];
+        }
+        
         // geometry attribute for vert colors
         //rtcSetGeometryVertexAttributeCount(mesh,1);
         //rtcSetSharedGeometryBuffer(mesh,RTC_BUFFER_TYPE_VERTEX_ATTRIBUTE,0,RTC_FORMAT_FLOAT3,vertex_colors,0,sizeof(Vec3fa),8);
