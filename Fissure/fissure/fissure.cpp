@@ -160,10 +160,14 @@
 // -todo: debug why Tracer crashes - is the frame not getting zeroed out? why does it run twice? - runFrm needed to be changed in scope to be within the loop
 // -todo: output and visualize the bounding box of the embree scene
 // -todo: make bounding box into openGL lines
+// -todo: compile, link and test embree scene in release mode
+// -todo: add color to bounding box wire frame based on world space position
+// -todo: build BVH with embree using input IdxVerts
+// -todo: visualize a single ray
 
+// todo: make multiple unconected output slots not overlap in a message node
+// todo: make sure multiple message slots can be connected
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
-// todo: build BVH with embree using input IdxVerts
-// todo: visualize a single ray
 // todo: trace a single ray through the embree scene and visualize it 
 // todo: try making the embree vector a union with a float array inside
 // todo: make nodes with no input slots work
