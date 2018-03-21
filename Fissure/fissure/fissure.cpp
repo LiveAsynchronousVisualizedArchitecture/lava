@@ -157,6 +157,7 @@
 // -todo: get Tracer shared library to load inside fissure and execute without errors
 // -todo: debug why filepath is crashing Fissure - probably dereferencing a nullptr description - seems so
 // -todo: debug why loading a node then adding a node overwrites the first node - probably not setting the nxt node of the LavaGraph - seems to have been the case
+// -todo: debug why Tracer crashes - is the frame not getting zeroed out? why does it run twice? - runFrm needed to be changed in scope to be within the loop
 
 // todo: build BVH with embree using input IdxVerts
 // todo: try making the embree vector a union with a float array inside

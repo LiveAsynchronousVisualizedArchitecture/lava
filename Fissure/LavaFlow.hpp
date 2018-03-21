@@ -2343,7 +2343,6 @@ void               LavaLoop(LavaFlow& lf) noexcept
   lava_threadQ     outQ;                              // queue of the output arguments
   lava_memvec  ownedMem;
   LavaFrame     inFrame;
-  LavaFrame      runFrm;
   LavaVal        inArgs[LAVA_ARG_COUNT]={};           // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
   lava_thread_ownedMem = &ownedMem;                   // move the pointer out to a global scope for the thread, so that the allocation function passed to the shared library can add the pointer the owned memory of the thread
   LavaHeapInit();
@@ -2351,6 +2350,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
   while(lf.m_running)
   {    
+    LavaFrame      runFrm;
+
     SECTION(make a frame from a packet or run a message node)
     {
       LavaPacket    pckt;
