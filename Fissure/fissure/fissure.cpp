@@ -165,10 +165,15 @@
 // -todo: build BVH with embree using input IdxVerts
 // -todo: visualize a single ray
 // -todo: color ray start as red and end as yellow
+// -todo: make multiple unconnected output slots not overlap in a message node
+// -todo: build visualized slots into .lava file format
 
-// todo: build visualized slots into .lava file format
-// todo: make multiple unconnected output slots not overlap in a message node
+// todo: make visualized slots load in the vizIds set
+// todo: put in a camera node that outputs its viewing frustrum
+// todo: make camera generate rays
+// todo: make unconnected slots use rotation instead of translation offset
 // todo: make sure multiple message slots can be connected
+// todo: try tiny libc in a node 
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
 // todo: trace a single ray through the embree scene and visualize it 
 // todo: try making the embree vector a union with a float array inside
@@ -1419,25 +1424,61 @@ str           graphToStr(LavaGraph const& lg)
     Jzon::Node srcIdx  = Jzon::array();
     Jzon::Node destId  = Jzon::array();
     Jzon::Node destIdx = Jzon::array();
+    //Jzon::Node vizFlag = Jzon::array();
 
     //for(auto kv : g.cncts()){
+    //
+    //LavaId srcId(kv.second.asInt, kv.second.sidx
     for(auto const& kv : lg.cncts()){
       destId.add(kv.first.nid);
       destIdx.add(kv.first.sidx);
       srcId.add(kv.second.nid);
       srcIdx.add(kv.second.sidx);
+
+      //if(fd.vizIds.has(kv.second.asInt))
+      //  vizFlag.add(1);
+      //else
+      //  vizFlag.add(0);
     }
 
-    jcncts.add("destId",   destId);
-    jcncts.add("destIdx", destIdx);
-    jcncts.add("srcId",     srcId);
-    jcncts.add("srcIdx",   srcIdx);
+    jcncts.add("destId",    destId);
+    jcncts.add("destIdx",  destIdx);
+    jcncts.add("srcId",      srcId);
+    jcncts.add("srcIdx",    srcIdx);
+    //jcncts.add("vizFlag",  vizFlag);
+  }
+
+  Jzon::Node jViz = Jzon::object();
+  SECTION(slot visualization) // because some slots might be visualized even though they aren't connected, the slot visualization needs to be separate - because they should all be output, isIn shouldn't be needed
+  {
+    Jzon::Node vizNids  = Jzon::array();
+    Jzon::Node vizSlts  = Jzon::array();
+    //Jzon::Node vizIsIn  = Jzon::array();
+    TO(fd.vizIds.sz,i){
+      if(fd.vizIds.buf[i] != fd.vizIds.null_val ){
+        LavaId id;
+        id.asInt = fd.vizIds.buf[i];
+        vizNids.add(id.nid);
+        vizSlts.add(id.sidx);
+        //vizIsIn.add(id.isIn);
+      }
+      //else{
+      //}
+    }
+  
+    //vizSlts.add("sltIdx", vizSlts);
+    jViz.add("vizNids", vizNids);
+    jViz.add("vizSlts", vizSlts);
+    //jViz.add("vizIsIn", vizIsIn);
   }
 
   Jzon::Node graph = Jzon::object();
-  graph.add("nodes", jnodes);
-  //graph.add("slots", jslots);
+  graph.add("nodes",       jnodes);
   graph.add("connections", jcncts);
+  graph.add("visualize",     jViz);
+
+  //graph.add("slots", jslots);
+  //graph.add("VizSlots", vizSlts);
 
   //Jzon::Format format;
   //format.newline    = true;
@@ -2390,6 +2431,8 @@ ENTRY_DECLARATION // main or winmain
         }
         SECTION(slot movement)
         {
+          auto sltThick = (fd.ui.slot_rad + fd.ui.slot_border) * 2;
+
           SECTION(input / dest slots)
           {
             for(auto& kv : fd.graph.inSlots)
@@ -2429,14 +2472,19 @@ ENTRY_DECLARATION // main or winmain
               v2 nP = n.P + wh/2; //NODE_SZ/2; // n.b.mx; // w()/2; // NODE_SZ/2;
               v2 nrml;
 
-              auto ci = fd.lgrph.destSlots(kv.first);
-              if(ci==fd.lgrph.destCnctEnd()){
-                s.P = node_border(n, v2(0,1.f), &nrml);
+              auto cnctEn = fd.lgrph.destCnctEnd();
+              auto     ci = fd.lgrph.destSlots(kv.first);              // queries the destination / input connection map for possible connections
+              //if(ci==fd.lgrph.destCnctEnd()){
+              if(ci==cnctEn){
+                //s.P = node_border(n, v2(0,1.f), &nrml);
+                f32 sltOfst = nid.sidx * sltThick*2;                   // sltOfst is slot offset - this is to make sure output slots with no connections don't overlap each other
+                s.P = node_border(n, v2(sltOfst,1.f), &nrml);
                 s.N = nrml;
               }else{
                 v2  destP={0,0}, destN={0,0};
                 int   cnt = 0;
-                for(; ci != fd.lgrph.destCnctEnd() && ci->first==nid; ++ci)
+                //for(; ci != fd.lgrph.destCnctEnd() && ci->first==nid; ++ci)
+                for(; ci != cnctEn && ci->first==nid; ++ci)
                 {
                   if(!fd.lgrph.outSlot(ci->second)){ cnt -= 1; continue; }   // todo: does this need to subtract 1 from count?
 
@@ -2663,28 +2711,6 @@ ENTRY_DECLARATION // main or winmain
                 bool highlight = isInNode && nIdx==i;
                 node_draw(vg, 0, n, 1.f, selctd, fd.ui.nd_border, highlight);
 
-                //SECTION(draw node slots)
-                //{
-                //  auto const& slots = fd.graph.slots;
-                //
-                //  nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
-                //  nvgStrokeWidth(vg, fd.ui.slot_border);
-                //
-                //  auto sIter = node_slots(n.id);
-                //  for(; sIter!=end(slots) && sIter->first.nid==n.id; ++sIter)
-                //  {
-                //    auto     sIdx = sIter->first;                    // todo: needs to be redone
-                //    //Slot const& s = *(grph.slot(sIdx));
-                //    Slot const& s = sIter->second;
-                //    bool   inSlot = len(pntr - s.P) < fd.ui.slot_rad; //io_rad;
-                //
-                //    Slot::State drawState = Slot::NORMAL;
-                //    if(s.state==Slot::SELECTED) drawState = Slot::SELECTED;
-                //    else if(inSlot)             drawState = Slot::HIGHLIGHTED;
-                //    slot_draw(vg, s, drawState, fd.ui.slot_rad);
-                //  }
-                //}
-
                 SECTION(draw input / dest node slots)
                 {
                   auto const& slots = fd.graph.inSlots;
@@ -2808,6 +2834,27 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//SECTION(draw node slots)
+//{
+//  auto const& slots = fd.graph.slots;
+//
+//  nvgStrokeColor(vg, nvgRGBAf(0,0,0,1.f));
+//  nvgStrokeWidth(vg, fd.ui.slot_border);
+//
+//  auto sIter = node_slots(n.id);
+//  for(; sIter!=end(slots) && sIter->first.nid==n.id; ++sIter)
+//  {
+//    auto     sIdx = sIter->first;                    // todo: needs to be redone
+//    //Slot const& s = *(grph.slot(sIdx));
+//    Slot const& s = sIter->second;
+//    bool   inSlot = len(pntr - s.P) < fd.ui.slot_rad; //io_rad;
+//
+//    Slot::State drawState = Slot::NORMAL;
+//    if(s.state==Slot::SELECTED) drawState = Slot::SELECTED;
+//    else if(inSlot)             drawState = Slot::HIGHLIGHTED;
+//    slot_draw(vg, s, drawState, fd.ui.slot_rad);
+//  }
+//}
 
 //bool outputSlt  =  sid.sidx < li.outputs;
 //
