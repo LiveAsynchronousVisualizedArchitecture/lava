@@ -167,10 +167,11 @@
 // -todo: color ray start as red and end as yellow
 // -todo: make multiple unconnected output slots not overlap in a message node
 // -todo: build visualized slots into .lava file format
+// -todo: make visualized slots load in the vizIds set
 
-// todo: make visualized slots load in the vizIds set
 // todo: put in a camera node that outputs its viewing frustrum
-// todo: make camera generate rays
+// todo: make camera generate rays into a tbl ray format
+// todo: try tracing rays with streams or chunks of multiple rays
 // todo: make unconnected slots use rotation instead of translation offset
 // todo: make sure multiple message slots can be connected
 // todo: try tiny libc in a node 
@@ -1417,35 +1418,24 @@ str           graphToStr(LavaGraph const& lg)
   Jzon::Node jcncts = Jzon::object();
   SECTION(connections)
   {
-    //auto sz = g.cnctsz();
     auto sz = lg.cnctsz();
 
     Jzon::Node srcId   = Jzon::array();
     Jzon::Node srcIdx  = Jzon::array();
     Jzon::Node destId  = Jzon::array();
     Jzon::Node destIdx = Jzon::array();
-    //Jzon::Node vizFlag = Jzon::array();
 
-    //for(auto kv : g.cncts()){
-    //
-    //LavaId srcId(kv.second.asInt, kv.second.sidx
     for(auto const& kv : lg.cncts()){
       destId.add(kv.first.nid);
       destIdx.add(kv.first.sidx);
       srcId.add(kv.second.nid);
       srcIdx.add(kv.second.sidx);
-
-      //if(fd.vizIds.has(kv.second.asInt))
-      //  vizFlag.add(1);
-      //else
-      //  vizFlag.add(0);
     }
 
     jcncts.add("destId",    destId);
     jcncts.add("destIdx",  destIdx);
     jcncts.add("srcId",      srcId);
     jcncts.add("srcIdx",    srcIdx);
-    //jcncts.add("vizFlag",  vizFlag);
   }
 
   Jzon::Node jViz = Jzon::object();
@@ -1453,23 +1443,17 @@ str           graphToStr(LavaGraph const& lg)
   {
     Jzon::Node vizNids  = Jzon::array();
     Jzon::Node vizSlts  = Jzon::array();
-    //Jzon::Node vizIsIn  = Jzon::array();
     TO(fd.vizIds.sz,i){
       if(fd.vizIds.buf[i] != fd.vizIds.null_val ){
         LavaId id;
         id.asInt = fd.vizIds.buf[i];
         vizNids.add(id.nid);
         vizSlts.add(id.sidx);
-        //vizIsIn.add(id.isIn);
       }
-      //else{
-      //}
     }
-  
-    //vizSlts.add("sltIdx", vizSlts);
+
     jViz.add("vizNids", vizNids);
     jViz.add("vizSlts", vizSlts);
-    //jViz.add("vizIsIn", vizIsIn);
   }
 
   Jzon::Node graph = Jzon::object();
@@ -1517,6 +1501,8 @@ void          strToGraph(str const& s)
   auto sltDestIdx = graph.get("slots").get("destIdx");
   auto sltSrcId   = graph.get("slots").get("srcId");
   auto sltSrcIdx  = graph.get("slots").get("srcIdx");
+  auto vizNids    = graph.get("visualize").get("vizNids");
+  auto vizSlts    = graph.get("visualize").get("vizSlts");
 
   auto   cnt = nd_id.getCount();
   u64 mxNdId = 0;
@@ -1546,6 +1532,14 @@ void          strToGraph(str const& s)
     dest.id.sidx = destIdx.get(i).toInt();
     dest.id.isIn = true;
     fd.lgrph.put(LavaCommand::TGL_CNCT, dest, src);
+  }
+
+  auto viz_cnt = vizNids.getCount();
+  TO(viz_cnt,i){
+    LavaId id;
+    id.nid  = vizNids.get(i).toInt();
+    id.sidx = vizSlts.get(i).toInt();
+    fd.vizIds.put(id.asInt);
   }
 
   fd.lgrph.setNextNodeId(mxNdId + 1);
@@ -2833,6 +2827,28 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//auto sz = g.cnctsz();
+//
+//Jzon::Node vizFlag = Jzon::array();
+//
+//for(auto kv : g.cncts()){
+//
+//LavaId srcId(kv.second.asInt, kv.second.sidx
+//
+//if(fd.vizIds.has(kv.second.asInt))
+//  vizFlag.add(1);
+//else
+//  vizFlag.add(0);
+//
+//jcncts.add("vizFlag",  vizFlag);
+//
+//Jzon::Node vizIsIn  = Jzon::array();
+//
+//vizIsIn.add(id.isIn);
+//
+//vizSlts.add("sltIdx", vizSlts);
+//
+//jViz.add("vizIsIn", vizIsIn);
 
 //SECTION(draw node slots)
 //{
