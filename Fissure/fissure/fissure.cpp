@@ -170,12 +170,13 @@
 // -todo: make visualized slots load in the vizIds set
 // -todo: make sure node deletion deletes the node from the lava graph - needed to run exec() before and after deletion
 // -todo: clear any visualized slots when deleting nodes
+// -todo: reposition slots with angles
+// -todo: put in a camera node that outputs its viewing frustrum
+// -todo: make unconnected slots use rotation instead of translation offset
+// -todo: make sure multiple message slots can be connected - seems to be fine now
 
-// todo: put in a camera node that outputs its viewing frustrum
 // todo: make camera generate rays into a tbl ray format
 // todo: try tracing rays with streams or chunks of multiple rays
-// todo: make unconnected slots use rotation instead of translation offset
-// todo: make sure multiple message slots can be connected
 // todo: try tiny libc in a node 
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
 // todo: trace a single ray through the embree scene and visualize it 
@@ -2422,6 +2423,7 @@ ENTRY_DECLARATION // main or winmain
         SECTION(slot movement)
         {
           auto sltThick = (fd.ui.slot_rad + fd.ui.slot_border) * 2;
+          //f32   slotRot = 
 
           SECTION(input / dest slots)
           {
@@ -2459,7 +2461,7 @@ ENTRY_DECLARATION // main or winmain
               Slot&       s = kv.second;
               Node const& n = fd.graph.nds[nid.nid];
               v2 wh = n.b.wh();
-              v2 nP = n.P + wh/2; //NODE_SZ/2; // n.b.mx; // w()/2; // NODE_SZ/2;
+              v2 nP = n.P + wh/2;             //NODE_SZ/2; // n.b.mx; // w()/2; // NODE_SZ/2;
               v2 nrml;
 
               auto cnctEn = fd.lgrph.destCnctEnd();
@@ -2467,8 +2469,12 @@ ENTRY_DECLARATION // main or winmain
               //if(ci==fd.lgrph.destCnctEnd()){
               if(ci==cnctEn){
                 //s.P = node_border(n, v2(0,1.f), &nrml);
-                f32 sltOfst = nid.sidx * sltThick*2;                   // sltOfst is slot offset - this is to make sure output slots with no connections don't overlap each other
-                s.P = node_border(n, v2(sltOfst,1.f), &nrml);
+                f32 sltOfst = nid.sidx * sltThick;                         // sltOfst is slot offset - this is to make sure output slots with no connections don't overlap each other
+                //f32 slotRot = (PIf/2.f) + ( (PIf/4.f) * nid.sidx);        // slotRot is slot rotation
+                f32 slotRot = (-PIf/3.f) + ((PIf/3.f) * nid.sidx);         // slotRot is slot rotation
+                //auto    dir = v2( cosf(slotRot), sinf(slotRot) );
+                auto    dir = v2( sinf(slotRot), cosf(slotRot) );
+                s.P = node_border(n, dir, &nrml);
                 s.N = nrml;
               }else{
                 v2  destP={0,0}, destN={0,0};

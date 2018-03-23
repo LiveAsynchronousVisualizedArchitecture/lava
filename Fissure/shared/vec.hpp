@@ -7,6 +7,7 @@
 #define __VEC_HEADER_GUARD__
 
 #include <cstdint>
+#include <algorithm>
 #include "../no_rt_util.h"
 
 union  vec4
