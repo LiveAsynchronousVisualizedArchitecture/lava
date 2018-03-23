@@ -976,7 +976,8 @@ public:
   SrcMap    const&  curDestCncts()const{ return m_useA.load()?  m_destCnctsA : m_destCnctsB; }
   MsgIds    const&   curMsgNodes()const{ return m_useA.load()?  m_msgNodesA  : m_msgNodesB;  }
 
-  NodeInsts&            oppNodes(){ return !m_useA.load()?  m_nodesA     : m_nodesB;     }
+  NodeInsts&            oppNodes(){ 
+    return !m_useA.load()?  m_nodesA     : m_nodesB;     }
   //Slots&                oppSlots(){ return !m_useA.load()?  m_slotsA     : m_slotsB;     }
   Slots&              oppInSlots(){ return !m_useA.load()?  m_inSlotsA     : m_inSlotsB;     }
   Slots&             oppOutSlots(){ return !m_useA.load()?  m_outSlotsA     : m_outSlotsB;     }

@@ -168,6 +168,8 @@
 // -todo: make multiple unconnected output slots not overlap in a message node
 // -todo: build visualized slots into .lava file format
 // -todo: make visualized slots load in the vizIds set
+// -todo: make sure node deletion deletes the node from the lava graph - needed to run exec() before and after deletion
+// -todo: clear any visualized slots when deleting nodes
 
 // todo: put in a camera node that outputs its viewing frustrum
 // todo: make camera generate rays into a tbl ray format
@@ -1048,15 +1050,27 @@ auto          node_slots(vec_ndptrs const& nds) -> vec_ids
 {
   using namespace std;
 
-  auto& inSlots = fd.graph.inSlots;
+  auto&  inSlots = fd.graph.inSlots;
+  auto& outSlots = fd.graph.outSlots;
   vec_ids sidxs;                                            // sidxs is slot indexes
-  for(auto np : nds){                                       // np is node pointer and nds is nodes
-    //auto si = lower_bound(ALL(slots), Id(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
-    
-    auto si = node_slotsIn(np->id);    
-    for(; si != end(inSlots)  &&  si->first.nid==np->id; ++si){
-      Slot& s = si->second;
-      sidxs.push_back(si->first);     
+  for(auto np : nds){                                       // np is node pointer and nds is nodes    
+    SECTION(in slots)
+    {
+      auto si = node_slotsIn(np->id);    
+      for(; si != end(inSlots)  &&  si->first.nid==np->id; ++si){
+        auto id = si->first;
+        id.isIn = true;
+        sidxs.push_back(id);     
+      }
+    }
+    SECTION(out slots)
+    {
+      auto si = node_slotsOut(np->id);    
+      for(; si != end(outSlots)  &&  si->first.nid==np->id; ++si){
+        auto id = si->first;
+        id.isIn = false;
+        sidxs.push_back(id);     
+      }
     }
   }
   return sidxs;                                        // RVO
@@ -1225,14 +1239,14 @@ u64           sel_delete()
 
   // delete slots
   for(auto id : ids){                  // are LavaGraph slots deleted when deleting their node?
-    //fd.graph.slots.erase(id);
     if(id.isIn) fd.graph.inSlots.erase(id);
     else        fd.graph.outSlots.erase(id);
+    
+    fd.vizIds.del(id.asInt);
   }
 
   // delete nodes
   for(auto n : nds){  // does deleting from the graph.nds unordered map invalidate the pointers? - standard says no - how is memory reclaimed? - rehash()
-    //m_ids.erase(n->id);
     auto  nid = n->id;
     auto ordr = n->order;
     fd.graph.ordr.erase({nid, ordr});
@@ -1242,17 +1256,6 @@ u64           sel_delete()
   fd.graph.nds.reserve( fd.graph.nds.size() * 2 );
 
   return cnt;
-
-  //for(auto sidx : sidxs){ fd.graph.slots.erase(sidx); }
-  //
-  //auto sidxs = node_slots(nds);       // accumulate dest slots  // accumulate slots
-  //
-  //for(auto sidx : sidxs){             // delete cncts with dest slots
-  //
-  //auto s = slot_get(sidx);
-  //
-  //if(s->in) fd.lgrph.delDestCnct(sidx);  //){ ++cnt; }
-  //else      fd.lgrph.delSrcCncts(sidx);
 }
 void           sel_clear()
 {
@@ -1387,8 +1390,6 @@ str           graphToStr(LavaGraph const& lg)
     auto        lnds = lg.nodes();         // lnds is Lava Nodes
     auto          sz = lnds.size();
 
-    //sort(ALL(lnds));
-
     Jzon::Node  nd_func = Jzon::array();
     TO(sz,i) nd_func.add( lg.node(nps[i]->id).node->name );
 
@@ -1404,15 +1405,11 @@ str           graphToStr(LavaGraph const& lg)
     Jzon::Node     nd_y = Jzon::array();
     TO(sz,i) nd_y.add(nps[i]->P.y);
 
-    //Jzon::Node nd_type = Jzon::array();
-    //TO(sz,i) nd_type.add(nps[i]->type);
-
     jnodes.add("function", nd_func);
     jnodes.add("id",         nd_id);
     jnodes.add("txt",       nd_txt);
     jnodes.add("x",           nd_x);
     jnodes.add("y",           nd_y);
-    //jnodes.add("type",     nd_type);
   }
 
   Jzon::Node jcncts = Jzon::object();
@@ -1460,9 +1457,6 @@ str           graphToStr(LavaGraph const& lg)
   graph.add("nodes",       jnodes);
   graph.add("connections", jcncts);
   graph.add("visualize",     jViz);
-
-  //graph.add("slots", jslots);
-  //graph.add("VizSlots", vizSlts);
 
   //Jzon::Format format;
   //format.newline    = true;
@@ -1649,7 +1643,9 @@ void               keyCallback(GLFWwindow* win,    int key, int scancode, int ac
   }break;
   case GLFW_KEY_BACKSPACE:
   case GLFW_KEY_DELETE: {
+    fd.lgrph.exec(); // todo: might have to deal with the returned argument vector here
     sel_delete();
+    fd.lgrph.exec(); // todo: might have to deal with the returned argument vector here
     sel_clear();
   }break;
   default:
@@ -2823,9 +2819,33 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//
+//auto si = lower_bound(ALL(slots), Id(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
 
+//fd.graph.slots.erase(id);
+//
+//m_ids.erase(n->id);
+//
+//for(auto sidx : sidxs){ fd.graph.slots.erase(sidx); }
+//
+//auto sidxs = node_slots(nds);       // accumulate dest slots  // accumulate slots
+//
+//for(auto sidx : sidxs){             // delete cncts with dest slots
+//
+//auto s = slot_get(sidx);
+//
+//if(s->in) fd.lgrph.delDestCnct(sidx);  //){ ++cnt; }
+//else      fd.lgrph.delSrcCncts(sidx);
 
+//graph.add("slots", jslots);
+//graph.add("VizSlots", vizSlts);
 
+//sort(ALL(lnds));
+//
+//Jzon::Node nd_type = Jzon::array();
+//TO(sz,i) nd_type.add(nps[i]->type);
+//
+//jnodes.add("type",     nd_type);
 
 //auto sz = g.cnctsz();
 //

@@ -23,6 +23,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FilePath", "FilePath\FilePa
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Tracer", "Tracer\Tracer.vcxproj", "{CF2647DC-7390-429C-87AB-1FA2199B16F4}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Camera", "Camera\Camera.vcxproj", "{BEA5B6C6-BE6F-43A3-A2A5-3F6CA01E416D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Mixed Platforms = Debug|Mixed Platforms
@@ -139,6 +141,16 @@ Global
 		{CF2647DC-7390-429C-87AB-1FA2199B16F4}.Release|Win32.ActiveCfg = Release|x64
 		{CF2647DC-7390-429C-87AB-1FA2199B16F4}.Release|x64.ActiveCfg = Release|x64
 		{CF2647DC-7390-429C-87AB-1FA2199B16F4}.Release|x64.Build.0 = Release|x64
+		{BEA5B6C6-BE6F-43A3-A2A5-3F6CA01E416D}.Debug|Mixed Platforms.ActiveCfg = Debug|x64
+		{BEA5B6C6-BE6F-43A3-A2A5-3F6CA01E416D}.Debug|Mixed Platforms.Build.0 = Debug|x64
+		{BEA5B6C6-BE6F-43A3-A2A5-3F6CA01E416D}.Debug|Win32.ActiveCfg = Debug|x64
+		{BEA5B6C6-BE6F-43A3-A2A5-3F6CA01E416D}.Debug|x64.ActiveCfg = Debug|x64
+		{BEA5B6C6-BE6F-43A3-A2A5-3F6CA01E416D}.Debug|x64.Build.0 = Debug|x64
+		{BEA5B6C6-BE6F-43A3-A2A5-3F6CA01E416D}.Release|Mixed Platforms.ActiveCfg = Release|x64
+		{BEA5B6C6-BE6F-43A3-A2A5-3F6CA01E416D}.Release|Mixed Platforms.Build.0 = Release|x64
+		{BEA5B6C6-BE6F-43A3-A2A5-3F6CA01E416D}.Release|Win32.ActiveCfg = Release|x64
+		{BEA5B6C6-BE6F-43A3-A2A5-3F6CA01E416D}.Release|x64.ActiveCfg = Release|x64
+		{BEA5B6C6-BE6F-43A3-A2A5-3F6CA01E416D}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
