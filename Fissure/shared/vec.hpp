@@ -173,6 +173,14 @@ inline vec3   operator/(vec3 const& a, vec3 const& b)
   ret.z = a.z / b.z;
   return ret;
 }
+inline vec3   operator/(vec3 const& a, float const& b)
+{
+  vec3 ret;
+  ret.x = a.x / b;
+  ret.y = a.y / b;
+  ret.z = a.z / b;
+  return ret;
+}
 inline bool   operator<(vec3 const& a, vec3 const& b)
 {
   if(a.x<b.x) return true; if(a.x>b.x) return false;
@@ -185,11 +193,11 @@ inline bool   operator==(vec3 const& a, vec3 const& b)
   if(a.x!=b.x || a.y!=b.y || a.z!=b.z) return false;
   return true;
 }
-inline float  dot(vec3 const& a, vec3 const& b)
+inline float     dot(vec3 const& a, vec3 const& b)
 {
   return a[0]*b[0] + a[1]*b[1] + a[2]*b[2];
 }
-inline vec3   cross(vec3 const& a, vec3 const& b)
+inline vec3    cross(vec3 const& a, vec3 const& b)
 {
   vec3 v; 
   v.x = (a.y*b.z - a.z*b.y);
@@ -215,9 +223,13 @@ inline float  sqrlen(vec3 const& a)
 {
   return dot(a,a);
 }
-inline float  length(vec3 const& a)
+inline float     len(vec3 const& a)
 {
   return sqrtf(dot(a,a));
+}
+inline vec3     norm(vec3 const& a)
+{
+  return a / len(a);
 }
 inline vec3   PtOnLine(vec3 pt, vec3 AA, vec3 BB, float* t=nullptr)
 {

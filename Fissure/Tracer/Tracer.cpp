@@ -335,6 +335,7 @@ extern "C"          // Embree3 Scene Message Node
             triangles[i].v2  =  ind[idx + 2];
           }
         
+          rtcSetGeometryBuildQuality(mesh, RTC_BUILD_QUALITY_HIGH);
           rtcCommitGeometry(mesh);
 
           u32 geomID = rtcAttachGeometry(g_scene, mesh);
