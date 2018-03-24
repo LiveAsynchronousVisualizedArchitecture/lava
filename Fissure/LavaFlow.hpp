@@ -2361,7 +2361,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
                 bool slotTaken = frm.slotMask[sIdx];
                 if(!slotTaken){
-                  frm.packets[sIdx] = pckt;
+                  //frm.packets[sIdx] = pckt;
+                  frm.putSlot(sIdx, pckt);
                 }
 
                 if( frm.allFilled() ){                                  // If all the slots are filled, copy the frame out and erase it

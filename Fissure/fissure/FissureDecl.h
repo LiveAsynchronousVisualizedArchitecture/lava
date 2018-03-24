@@ -298,8 +298,8 @@ struct FisData
     NVGcolor       nd_hilgt  =  nvgRGBAf(1.f,1.f,1.f, 0.025f);
     NVGcolor    msgnd_color  =  nvgRGBAf(.2f, .3f, .375f, 1.f);
     NVGcolor   msgnd_selclr  =  nvgRGBAf(.5f,.4f,.1f, .75f);
-    NVGcolor   msgnd_gradst  =  nvgRGBAf(.3f, .3f, .3f, .5f);
-    NVGcolor   msgnd_graden  =  nvgRGBAf(.15f, .15f, .15f, .45f); 
+    NVGcolor   msgnd_gradst  =  nvgRGBAf(.3f, .3f, .3f, .7f);
+    NVGcolor   msgnd_graden  =  nvgRGBAf(.15f, .15f, .15f, .65f); 
 
     f32           nd_border  =   3.5f;
     f32            slot_rad  =   15.f;

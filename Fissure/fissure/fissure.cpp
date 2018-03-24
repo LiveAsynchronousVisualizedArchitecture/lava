@@ -176,10 +176,11 @@
 // -todo: make sure multiple message slots can be connected - seems to be fine now
 // -todo: make camera generate rays into a tbl ray format
 // -todo: trace a single ray through the embree scene and visualize it 
+// -todo: debug why rays are not getting in to the tracer message node - RAYS slot is never filled - does the packet get stuck in a frame without ever being touched again?  - frame was not using the putSlot() function which sets the slot flag as well as copying the packet in
+// -todo: send camera rays in to embree scene node and trace them against the geometry there
+// -todo: try tracing rays with streams or chunks of multiple rays
 
-// todo: debug why rays are not getting in to the tracer message node - RAYS slot is never filled - does the packet get stuck in a frame without ever being touched again? 
-// todo: send camera rays in to embree scene node and trace them against the geometry there
-// todo: try tracing rays with streams or chunks of multiple rays
+// todo: build in resize function into tbl so that arrays can be allocated just once
 // todo: put slot name in db key - maybe the name should have two lines
 // todo: try tiny libc in a node 
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
@@ -201,6 +202,7 @@
 //       | if the window size is simply shrinking closer to 0, maybe the center point needs to be normalized according to where it was in the window
 //       | might just need to shift the pan by the change in the center point
 // todo: make nodes have their own scale that dictates the text size and not the other way around
+// todo: draw slots that are framed together as one blob with multiple slots in the UI
 
 // todo: make a note node that will show the hotkeys and thus can be deleted at any time
 // todo: make reloaded nodes have highlights until the next event

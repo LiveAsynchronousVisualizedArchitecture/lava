@@ -475,15 +475,36 @@ extern "C"          // Embree3 Scene Message Node
 
       vecf zeros(rayCnt, 0.f);
       vecf  infs(rayCnt, numeric_limits<f32>::infinity() );
-      vec_u32 ids(rayCnt);
+      vec_u32  mask(rayCnt, -1);
+      vec_u32 flags(rayCnt,  0);
+      vec_u32   ids(rayCnt);
       TO(rayCnt,i){ ids[i] = (u32)i; }
 
       rh.ray.time  = zeros.data();
       rh.ray.tnear = zeros.data();
       rh.ray.tfar  = infs.data();
       rh.ray.id    = ids.data();
-      rh.ray.mask  = nullptr;
-      rh.ray.flags = nullptr;
+      rh.ray.mask  = mask.data();
+      rh.ray.flags = flags.data();
+
+      vec_u32 geomID(rayCnt, 0);
+      vec_u32 instID(rayCnt, 0);
+      vec_u32 primID(rayCnt, 0);
+      vecf    Nx(rayCnt, 0.f);
+      vecf    Ny(rayCnt, 0.f);
+      vecf    Nz(rayCnt, 0.f);
+      vecf     u(rayCnt, 0.f);
+      vecf     v(rayCnt, 0.f);
+
+      rh.hit.geomID = geomID.data();
+      //rh.hit.instID = instID.data();
+      rh.hit.primID = primID.data();
+      rh.hit.Ng_x   = Nx.data();
+      rh.hit.Ng_y   = Ny.data();
+      rh.hit.Ng_z   = Nz.data();
+      rh.hit.u      =  u.data();
+      rh.hit.v      =  v.data();
+      TO(RTC_MAX_INSTANCE_LEVEL_COUNT,i){ rh.hit.instID[i] = 0; }
 
       rtcIntersectNp(g_scene, &context, &rh, rayCnt);
 
