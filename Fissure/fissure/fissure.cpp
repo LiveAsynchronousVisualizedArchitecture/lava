@@ -174,8 +174,9 @@
 // -todo: put in a camera node that outputs its viewing frustrum
 // -todo: make unconnected slots use rotation instead of translation offset
 // -todo: make sure multiple message slots can be connected - seems to be fine now
+// -todo: make camera generate rays into a tbl ray format
 
-// todo: make camera generate rays into a tbl ray format
+// todo: send camera rays in to embree scene node and trace them against the geometry there
 // todo: try tracing rays with streams or chunks of multiple rays
 // todo: try tiny libc in a node 
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue

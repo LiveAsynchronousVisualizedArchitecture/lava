@@ -8,15 +8,17 @@
 
 enum Slots
 {
-  // This is an example enumeration that is meant to be helpful, though is not strictly neccesary. Referencing slots by a name will generally be less error prone than using their index and remembering what each index is for
-  SLOT_IN          = 0,        
-  BOUNDING_BOX_OUT = 0,
-  RAYS_OUT         = 1
+  IN_GEOMETRY       = 0,
+  IN_RAYS           = 1,
+
+  OUT_BOUNDING_BOX  = 0,
+  OUT_RAYS          = 1
 };
 
 struct Triangle { int v0, v1, v2; };
 
 using vec_ray = std::vector<RTCRayHit>;
+using    vecf = std::vector<f32>;
 
 RTCDevice g_device = nullptr;
 RTCScene   g_scene = nullptr;
@@ -252,10 +254,10 @@ extern "C"          // Embree3 Scene Message Node
 {
   const char* description = "Takes in geometry that will be sorted into an acceleration structure and ultimatly used to trace rays";                                     // description
 
-  const char*  InTypes[]  = {"IdxVerts",              nullptr};              // This array contains the type that each slot of the same index will accept as input.
-  const char*  InNames[]  = {"Input Scene Geometry",  nullptr};              // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
-  const char* OutTypes[]  = {"IdxVerts",      "IdxVerts",     nullptr};      // This array contains the types that are output in each slot of the same index
-  const char* OutNames[]  = {"Scene Bounds",  "Traced Rays",  nullptr};      // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char*  InTypes[]  = {"IdxVerts",       "Rays",           nullptr};          // This array contains the type that each slot of the same index will accept as input.
+  const char*  InNames[]  = {"Scene Geometry", "Rays To Trace",  nullptr};          // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char* OutTypes[]  = {"IdxVerts",       "IdxVerts",       nullptr};          // This array contains the types that are output in each slot of the same index
+  const char* OutNames[]  = {"Scene Bounds",   "Traced Rays",    nullptr};          // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
 
   void Tracer_construct()
   {
@@ -302,13 +304,12 @@ extern "C"          // Embree3 Scene Message Node
 
     SECTION(input packet loop)
     {
-      u32 i=0;
-      while( LavaNxtPckt(in, &i) )
+      if( in->slotMask[IN_GEOMETRY] )
       {
         SECTION(create geometry from input and put it in the embree scene)
         {
-          tbl idxVerts( (void*)(in->packets[i-1].val.value) );
-    
+          tbl idxVerts( (void*)(in->packets[IN_GEOMETRY].val.value) );
+
           RTCGeometry mesh = rtcNewGeometry(g_device, RTC_GEOMETRY_TYPE_TRIANGLE);
 
           tbl      px = idxVerts("positions x");
@@ -334,20 +335,53 @@ extern "C"          // Embree3 Scene Message Node
             triangles[i].v1  =  ind[idx + 1];
             triangles[i].v2  =  ind[idx + 2];
           }
-        
+
           rtcSetGeometryBuildQuality(mesh, RTC_BUILD_QUALITY_HIGH);
           rtcCommitGeometry(mesh);
 
           u32 geomID = rtcAttachGeometry(g_scene, mesh);
           rtcReleaseGeometry(mesh);
         }
-
         rtcCommitScene(g_scene);
+      }
 
-        rtcGetSceneBounds(g_scene, &g_bnd);
-        tbl bndIV = bndToIdxVerts(lp, g_bnd);
-        out->push( LavaTblToOut(move(bndIV),BOUNDING_BOX_OUT) );           // this demonstrates how to output a tbl into the first output slot
+      rtcGetSceneBounds(g_scene, &g_bnd);
+      tbl bndIV = bndToIdxVerts(lp, g_bnd);
+      out->push( LavaTblToOut(move(bndIV),OUT_BOUNDING_BOX) );           // this demonstrates how to output a tbl into the first output slot
 
+      if( in->slotMask[IN_RAYS] )
+      {
+        RTCIntersectContext context;
+        rtcInitIntersectContext(&context);
+
+        tbl rays = LavaTblFromPckt(lp, in, IN_RAYS);
+        tbl   ox = rays("origin x");
+        tbl   oy = rays("origin y");
+        tbl   oz = rays("origin z");
+        tbl   dx = rays("direction x");
+        tbl   dy = rays("direction y");
+        tbl   dz = rays("direction z");
+
+        RTCRayNp r;
+        r.org_x = (f32*)ox.data();
+        r.org_y = (f32*)oy.data();
+        r.org_z = (f32*)oz.data();
+
+        r.dir_x = (f32*)dx.data();
+        r.dir_y = (f32*)dy.data();
+        r.dir_z = (f32*)dz.data();
+
+        vecf zeros(ox.size(), 0.f);
+        vecf  infs(ox.size(), numeric_limits<f32>::infinity() );
+
+        r.time  = zeros.data();
+        r.tnear = zeros.data();
+        r.tfar  = infs.data();
+      }
+
+      u32 i=0;
+      while( LavaNxtPckt(in, &i) )
+      {
         RTCIntersectContext context;
         rtcInitIntersectContext(&context);
 
@@ -378,7 +412,7 @@ extern "C"          // Embree3 Scene Message Node
         }
 
         tbl raysIV = raysToIdxVerts(lp, rays.data(), rays.size());
-        out->push( LavaTblToOut(move(raysIV), RAYS_OUT) );
+        out->push( LavaTblToOut(move(raysIV), OUT_RAYS) );
 
         //tbl rayIV = rayHitToIdxVerts(lp, rh);
         //out->push( LavaTblToOut(move(rayIV), RAYS_OUT) );                // this demonstrates how to output a tbl into the first output slot

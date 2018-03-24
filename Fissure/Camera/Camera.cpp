@@ -21,9 +21,9 @@ enum Slots
 
 const f32     fovAngle  =  55.f;
 const f32  asepctRatio  =   1.f;
-const u64       rayCnt  =  1000;
-const f32    origin[3]  =  {0, 0,  0};
-const f32    camDir[3]  =  {0, 0, -1.f};
+const u64       rayCnt  =  1000; 
+const f32    origin[3]  =  {0, 2.f,  5.f};
+const f32    camDir[3]  =  {0, 0,   -1.f};
 
 namespace RNG
 {
@@ -86,9 +86,9 @@ tbl raysToIdxVerts(LavaParams const* lp, tbl const& rays)
     py.push<f32>( (f32)oy[i] );
     pz.push<f32>( (f32)oz[i] );
 
-    px.push<f32>( (f32)dx[i] );
-    py.push<f32>( (f32)dy[i] );
-    pz.push<f32>( (f32)dz[i] );
+    px.push<f32>( (f32)ox[i] + (f32)dx[i] );
+    py.push<f32>( (f32)oy[i] + (f32)dy[i] );
+    pz.push<f32>( (f32)oz[i] + (f32)dz[i] );
 
     cr.push(0.5f);
     cr.push(1.0f);
@@ -162,11 +162,11 @@ extern "C"
 
         f32   x = lerp(mnWin.x, mxWin.x, randomf(0, 1.f) );
         f32   y = lerp(mnWin.y, mxWin.y, randomf(0, 1.f) );
-        v3f dir = {x,y,1.f};
+        v3f dir = {x,y, 1.f };
         dir     = norm(dir);
-        dx.push<f32>( dir.x );
-        dy.push<f32>( dir.y );
-        dz.push<f32>( dir.z );
+        dx.push<f32>(  dir.x );
+        dy.push<f32>(  dir.y );
+        dz.push<f32>( -dir.z );
       }
 
       rays("origin x")    = &ox;
@@ -179,7 +179,8 @@ extern "C"
 
       tbl rayIV = raysToIdxVerts(lp, rays);
       out->push( LavaTblToOut(rayIV,CAMERA_VIZ_OUT) );      // this demonstrates how to output a tbl into the first output slot
-      //out->push( LavaTblToOut(rays,RAYS_OUT) );          // this demonstrates how to output a tbl into the first output slot
+      
+      out->push( LavaTblToOut(rays,RAYS_OUT) );               // this demonstrates how to output a tbl into the first output slot
     }
     SECTION(make idx verts to visualize camera position and frustrum)
     {
@@ -233,7 +234,7 @@ extern "C"
       iv("type")         = tbl::StrToInt("IdxVerts");
       iv.flatten();
 
-      //out->push( LavaTblToOut(iv,CAMERA_VIZ_OUT) );      // this demonstrates how to output a tbl into the first output slot
+     // out->push( LavaTblToOut(iv,CAMERA_VIZ_OUT) );      // this demonstrates how to output a tbl into the first output slot
     }
     
     return 1;
