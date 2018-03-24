@@ -178,64 +178,65 @@ extern "C"
       rays.flatten();
 
       tbl rayIV = raysToIdxVerts(lp, rays);
-      out->push( LavaTblToOut(rayIV,CAMERA_VIZ_OUT) );      // this demonstrates how to output a tbl into the first output slot
-      
-      out->push( LavaTblToOut(rays,RAYS_OUT) );               // this demonstrates how to output a tbl into the first output slot
+      out->push( LavaTblToOut(rayIV,CAMERA_VIZ_OUT) );
+
+      out->push( LavaTblToOut(rays,RAYS_OUT) );
     }
-    SECTION(make idx verts to visualize camera position and frustrum)
-    {
-      tbl   iv = LavaMakeTbl(lp);
-      tbl   px = LavaMakeTbl(lp);
-      tbl   py = LavaMakeTbl(lp);
-      tbl   pz = LavaMakeTbl(lp);
-      tbl  ind = LavaMakeTbl(lp);
 
-      px.setArrayType<f32>();
-      py.setArrayType<f32>();
-      pz.setArrayType<f32>();
-      ind.setArrayType<u32>();
-      iv.setArrayType<i8>();
-
-      px.push(origin[0]);
-      py.push(origin[1]);
-      pz.push(origin[2]);
-
-      px.push(origin[0] - fovOfst);
-      px.push(origin[0] + fovOfst);
-      px.push(origin[0] + fovOfst);
-      px.push(origin[0] - fovOfst);
-
-      py.push(origin[1] - fovOfst);
-      py.push(origin[1] - fovOfst);
-      py.push(origin[1] + fovOfst);
-      py.push(origin[1] + fovOfst);
-
-      pz.push(origin[2] + 1.f);
-      pz.push(origin[2] + 1.f);
-      pz.push(origin[2] + 1.f);
-      pz.push(origin[2] + 1.f);
-
-      TO(4,i){
-        ind.push( 0u );
-        ind.push( (u32)(i+1) );
-      }
-      TO(3,i){
-        ind.push( (u32)(i+1) );
-        ind.push( (u32)(i+2) );
-      }
-      ind.push( 4u );
-      ind.push( 1u );
-
-      iv("positions x")  = &px;
-      iv("positions y")  = &py;
-      iv("positions z")  = &pz;
-      iv("indices")      = &ind;
-      iv("mode")         = 1;            // 0 should be points, 1 should be lines
-      iv("type")         = tbl::StrToInt("IdxVerts");
-      iv.flatten();
-
-     // out->push( LavaTblToOut(iv,CAMERA_VIZ_OUT) );      // this demonstrates how to output a tbl into the first output slot
-    }
+    //SECTION(make idx verts to visualize camera position and frustrum)
+    //{
+    //  tbl   iv = LavaMakeTbl(lp);
+    //  tbl   px = LavaMakeTbl(lp);
+    //  tbl   py = LavaMakeTbl(lp);
+    //  tbl   pz = LavaMakeTbl(lp);
+    //  tbl  ind = LavaMakeTbl(lp);
+    //
+    //  px.setArrayType<f32>();
+    //  py.setArrayType<f32>();
+    //  pz.setArrayType<f32>();
+    //  ind.setArrayType<u32>();
+    //  iv.setArrayType<i8>();
+    //
+    //  px.push(origin[0]);
+    //  py.push(origin[1]);
+    //  pz.push(origin[2]);
+    //
+    //  px.push(origin[0] - fovOfst);
+    //  px.push(origin[0] + fovOfst);
+    //  px.push(origin[0] + fovOfst);
+    //  px.push(origin[0] - fovOfst);
+    //
+    //  py.push(origin[1] - fovOfst);
+    //  py.push(origin[1] - fovOfst);
+    //  py.push(origin[1] + fovOfst);
+    //  py.push(origin[1] + fovOfst);
+    //
+    //  pz.push(origin[2] + 1.f);
+    //  pz.push(origin[2] + 1.f);
+    //  pz.push(origin[2] + 1.f);
+    //  pz.push(origin[2] + 1.f);
+    //
+    //  TO(4,i){
+    //    ind.push( 0u );
+    //    ind.push( (u32)(i+1) );
+    //  }
+    //  TO(3,i){
+    //    ind.push( (u32)(i+1) );
+    //    ind.push( (u32)(i+2) );
+    //  }
+    //  ind.push( 4u );
+    //  ind.push( 1u );
+    //
+    //  iv("positions x")  = &px;
+    //  iv("positions y")  = &py;
+    //  iv("positions z")  = &pz;
+    //  iv("indices")      = &ind;
+    //  iv("mode")         = 1;            // 0 should be points, 1 should be lines
+    //  iv("type")         = tbl::StrToInt("IdxVerts");
+    //  iv.flatten();
+    //
+    // // out->push( LavaTblToOut(iv,CAMERA_VIZ_OUT) );      // this demonstrates how to output a tbl into the first output slot
+    //}
     
     return 1;
   }

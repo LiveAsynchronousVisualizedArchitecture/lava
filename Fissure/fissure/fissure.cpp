@@ -175,12 +175,14 @@
 // -todo: make unconnected slots use rotation instead of translation offset
 // -todo: make sure multiple message slots can be connected - seems to be fine now
 // -todo: make camera generate rays into a tbl ray format
+// -todo: trace a single ray through the embree scene and visualize it 
 
+// todo: debug why rays are not getting in to the tracer message node - RAYS slot is never filled - does the packet get stuck in a frame without ever being touched again? 
 // todo: send camera rays in to embree scene node and trace them against the geometry there
 // todo: try tracing rays with streams or chunks of multiple rays
+// todo: put slot name in db key - maybe the name should have two lines
 // todo: try tiny libc in a node 
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
-// todo: trace a single ray through the embree scene and visualize it 
 // todo: try making the embree vector a union with a float array inside
 // todo: make nodes with no input slots work
 // todo: change constructor to happen on play and not on load (or after the destructor runs on stop)

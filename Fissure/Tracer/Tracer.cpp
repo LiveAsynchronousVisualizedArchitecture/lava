@@ -1,4 +1,6 @@
 
+//#include <numeric>  // iota
+
 #include <random>
 #include "rtcore.h"
 #include "../../no_rt_util.h"
@@ -19,6 +21,7 @@ struct Triangle { int v0, v1, v2; };
 
 using vec_ray = std::vector<RTCRayHit>;
 using    vecf = std::vector<f32>;
+using vec_u32 = std::vector<u32>;
 
 RTCDevice g_device = nullptr;
 RTCScene   g_scene = nullptr;
@@ -38,7 +41,7 @@ float     randomf(float lo, float hi)
   return dis(*RNG::m_genPtr);
 }
 
-tbl rayHitToIdxVerts(LavaParams const* lp, RTCRayHit const& rh)
+tbl   raysToIdxVerts(LavaParams const* lp, RTCRayHitNp const& rh, u32 rayCnt)
 {
   using namespace std;
 
@@ -47,6 +50,7 @@ tbl rayHitToIdxVerts(LavaParams const* lp, RTCRayHit const& rh)
   tbl  pz = LavaMakeTbl(lp);
   tbl  cr = LavaMakeTbl(lp);
   tbl  cg = LavaMakeTbl(lp);
+  tbl  ca = LavaMakeTbl(lp);
   tbl ind = LavaMakeTbl(lp);
   tbl  iv = LavaMakeTbl(lp);
 
@@ -55,24 +59,29 @@ tbl rayHitToIdxVerts(LavaParams const* lp, RTCRayHit const& rh)
   pz.setArrayType<f32>();
   cr.setArrayType<f32>();
   cg.setArrayType<f32>();
+  ca.setArrayType<f32>();
   ind.setArrayType<u32>();
   iv.setArrayType<i8>();
 
-  px.push( rh.ray.org_x  );
-  py.push( rh.ray.org_y  );
-  pz.push( rh.ray.org_z  );
+  TO(rayCnt,i){
+    px.push( rh.ray.org_x[i]  );
+    py.push( rh.ray.org_y[i]  );
+    pz.push( rh.ray.org_z[i]  );
 
-  px.push( rh.ray.org_x + (rh.ray.dir_x*rh.ray.tfar) );
-  py.push( rh.ray.org_y + (rh.ray.dir_y*rh.ray.tfar) );
-  pz.push( rh.ray.org_z + (rh.ray.dir_z*rh.ray.tfar) );
+    px.push( rh.ray.org_x[i] + (rh.ray.dir_x[i] * rh.ray.tfar[i]) );
+    py.push( rh.ray.org_y[i] + (rh.ray.dir_y[i] * rh.ray.tfar[i]) );
+    pz.push( rh.ray.org_z[i] + (rh.ray.dir_z[i] * rh.ray.tfar[i]) );
 
-  cr.push(0.5f);
-  cr.push(1.0f);
-  cg.push(0.0f);
-  cg.push(1.0f);
+    cr.push(0.5f);
+    cr.push(1.0f);
+    cg.push(0.0f);
+    cg.push(1.0f);
+    ca.push(0.1f);
+    ca.push(0.2f);
 
-  ind.push(0u);
-  ind.push(1u);
+    ind.push( (u32)(i*2+0) );
+    ind.push( (u32)(i*2+1) );
+  }
 
   iv("positions x")  = &px;
   iv("positions y")  = &py;
@@ -80,6 +89,7 @@ tbl rayHitToIdxVerts(LavaParams const* lp, RTCRayHit const& rh)
   iv("colors red")   = &cr;
   iv("colors green") = &cg;
   //iv("colors blue")  = &pz;
+  iv("colors alpha") = &ca;
   iv("indices")      = &ind;
   iv("mode")         = 1;            // 0 should be points, 1 should be lines
   iv("type")         = tbl::StrToInt("IdxVerts");
@@ -136,6 +146,55 @@ tbl   raysToIdxVerts(LavaParams const* lp, RTCRayHit* rh, u32 rayCnt)
   iv("colors green") = &cg;
   //iv("colors blue")  = &pz;
   iv("colors alpha") = &ca;
+  iv("indices")      = &ind;
+  iv("mode")         = 1;            // 0 should be points, 1 should be lines
+  iv("type")         = tbl::StrToInt("IdxVerts");
+  iv.flatten();
+
+  return move(iv);
+}
+tbl rayHitToIdxVerts(LavaParams const* lp, RTCRayHit const& rh)
+{
+  using namespace std;
+
+  tbl  px = LavaMakeTbl(lp);
+  tbl  py = LavaMakeTbl(lp);
+  tbl  pz = LavaMakeTbl(lp);
+  tbl  cr = LavaMakeTbl(lp);
+  tbl  cg = LavaMakeTbl(lp);
+  tbl ind = LavaMakeTbl(lp);
+  tbl  iv = LavaMakeTbl(lp);
+
+  px.setArrayType<f32>();
+  py.setArrayType<f32>();
+  pz.setArrayType<f32>();
+  cr.setArrayType<f32>();
+  cg.setArrayType<f32>();
+  ind.setArrayType<u32>();
+  iv.setArrayType<i8>();
+
+  px.push( rh.ray.org_x  );
+  py.push( rh.ray.org_y  );
+  pz.push( rh.ray.org_z  );
+
+  px.push( rh.ray.org_x + (rh.ray.dir_x*rh.ray.tfar) );
+  py.push( rh.ray.org_y + (rh.ray.dir_y*rh.ray.tfar) );
+  pz.push( rh.ray.org_z + (rh.ray.dir_z*rh.ray.tfar) );
+
+  cr.push(0.5f);
+  cr.push(1.0f);
+  cg.push(0.0f);
+  cg.push(1.0f);
+
+  ind.push(0u);
+  ind.push(1u);
+
+  iv("positions x")  = &px;
+  iv("positions y")  = &py;
+  iv("positions z")  = &pz;
+  iv("colors red")   = &cr;
+  iv("colors green") = &cg;
+  //iv("colors blue")  = &pz;
   iv("indices")      = &ind;
   iv("mode")         = 1;            // 0 should be points, 1 should be lines
   iv("type")         = tbl::StrToInt("IdxVerts");
@@ -256,7 +315,7 @@ extern "C"          // Embree3 Scene Message Node
 
   const char*  InTypes[]  = {"IdxVerts",       "Rays",           nullptr};          // This array contains the type that each slot of the same index will accept as input.
   const char*  InNames[]  = {"Scene Geometry", "Rays To Trace",  nullptr};          // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
-  const char* OutTypes[]  = {"IdxVerts",       "IdxVerts",       nullptr};          // This array contains the types that are output in each slot of the same index
+  const char* OutTypes[]  = {"IdxVerts",       "Rays",           nullptr};          // This array contains the types that are output in each slot of the same index
   const char* OutNames[]  = {"Scene Bounds",   "Traced Rays",    nullptr};          // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
 
   void Tracer_construct()
@@ -302,122 +361,134 @@ extern "C"          // Embree3 Scene Message Node
   {
     using namespace std;
 
-    SECTION(input packet loop)
+    //SECTION(input packet loop)
+    //{
+    //  u32 i=0;
+    //  while( LavaNxtPckt(in, &i) )
+    //  {
+    //    RTCIntersectContext context;
+    //    rtcInitIntersectContext(&context);
+    //
+    //    RTCRayHit rh;
+    //    rh.ray.mask   =   -1;
+    //    rh.ray.id     =    RTC_INVALID_GEOMETRY_ID;
+    //    rh.ray.flags  =    0;
+    //    rh.ray.time   =    0;
+    //    rh.ray.tnear  =   0.f;
+    //    rh.ray.tfar   =   numeric_limits<float>::infinity();
+    //    rh.ray.org_x  =   0.f;
+    //    rh.ray.org_y  =   1.f;
+    //    rh.ray.org_z  =   4.f;
+    //    rh.ray.dir_x  =   0.f;
+    //    rh.ray.dir_y  =   0.f;
+    //    rh.ray.dir_z  =  -1.f;
+    //
+    //    int rayCnt = 100000;
+    //    vec_ray rays(rayCnt);
+    //    TO(rayCnt,i){
+    //      rays[i] = rh;
+    //      rays[i].ray.org_x = randomf(-2.f, 3.f);
+    //      rays[i].ray.org_y = randomf(-2.f, 4.f);
+    //    }
+    //
+    //    TO(rayCnt,i){
+    //      rtcIntersect1(g_scene, &context, &rays[i] );
+    //    }
+    //
+    //    tbl raysIV = raysToIdxVerts(lp, rays.data(), rays.size());
+    //    out->push( LavaTblToOut(move(raysIV), OUT_RAYS) );
+    //
+    //    //tbl rayIV = rayHitToIdxVerts(lp, rh);
+    //    //out->push( LavaTblToOut(move(rayIV), RAYS_OUT) );                // this demonstrates how to output a tbl into the first output slot
+    //    //out->push( LavaTblToOut(move(rayIV), BOUNDING_BOX_OUT ) );                // this demonstrates how to output a tbl into the first output slot
+    //  }
+    //}
+
+    if( in->slotMask[IN_GEOMETRY] ) SECTION(create geometry from input and put it in the embree scene)
     {
-      if( in->slotMask[IN_GEOMETRY] )
-      {
-        SECTION(create geometry from input and put it in the embree scene)
-        {
-          tbl idxVerts( (void*)(in->packets[IN_GEOMETRY].val.value) );
+      tbl idxVerts( (void*)(in->packets[IN_GEOMETRY].val.value) );
 
-          RTCGeometry mesh = rtcNewGeometry(g_device, RTC_GEOMETRY_TYPE_TRIANGLE);
+      RTCGeometry mesh = rtcNewGeometry(g_device, RTC_GEOMETRY_TYPE_TRIANGLE);
 
-          tbl      px = idxVerts("positions x");
-          tbl      py = idxVerts("positions y");
-          tbl      pz = idxVerts("positions z");
-          u64 vertCnt = px.size();
-          v4f*  verts = (v4f*)rtcSetNewGeometryBuffer(mesh,RTC_BUFFER_TYPE_VERTEX,0,RTC_FORMAT_FLOAT3,sizeof(v4f),vertCnt);
+      tbl      px = idxVerts("positions x");
+      tbl      py = idxVerts("positions y");
+      tbl      pz = idxVerts("positions z");
+      u64 vertCnt = px.size();
+      v4f*  verts = (v4f*)rtcSetNewGeometryBuffer(mesh,RTC_BUFFER_TYPE_VERTEX,0,RTC_FORMAT_FLOAT3,sizeof(v4f),vertCnt);
 
-          TO(vertCnt,i){
-            verts[i].x  =  px[i];
-            verts[i].y  =  py[i];
-            verts[i].z  =  pz[i];
-            verts[i].a  =  1.f;
-          }
-
-          tbl     ind = idxVerts("indices");
-          u64  triCnt = (u64)ind.size() / 3;
-          Triangle* triangles = (Triangle*)rtcSetNewGeometryBuffer(mesh,RTC_BUFFER_TYPE_INDEX,0,RTC_FORMAT_UINT3, sizeof(Triangle), (int)triCnt);
-
-          TO(triCnt,i){
-            auto idx = i * 3;
-            triangles[i].v0  =  ind[idx + 0];
-            triangles[i].v1  =  ind[idx + 1];
-            triangles[i].v2  =  ind[idx + 2];
-          }
-
-          rtcSetGeometryBuildQuality(mesh, RTC_BUILD_QUALITY_HIGH);
-          rtcCommitGeometry(mesh);
-
-          u32 geomID = rtcAttachGeometry(g_scene, mesh);
-          rtcReleaseGeometry(mesh);
-        }
-        rtcCommitScene(g_scene);
+      TO(vertCnt,i){
+        verts[i].x  =  px[i];
+        verts[i].y  =  py[i];
+        verts[i].z  =  pz[i];
+        verts[i].a  =  1.f;
       }
 
-      rtcGetSceneBounds(g_scene, &g_bnd);
-      tbl bndIV = bndToIdxVerts(lp, g_bnd);
-      out->push( LavaTblToOut(move(bndIV),OUT_BOUNDING_BOX) );           // this demonstrates how to output a tbl into the first output slot
+      tbl     ind = idxVerts("indices");
+      u64  triCnt = (u64)ind.size() / 3;
+      Triangle* triangles = (Triangle*)rtcSetNewGeometryBuffer(mesh,RTC_BUFFER_TYPE_INDEX,0,RTC_FORMAT_UINT3, sizeof(Triangle), (int)triCnt);
 
-      if( in->slotMask[IN_RAYS] )
-      {
-        RTCIntersectContext context;
-        rtcInitIntersectContext(&context);
-
-        tbl rays = LavaTblFromPckt(lp, in, IN_RAYS);
-        tbl   ox = rays("origin x");
-        tbl   oy = rays("origin y");
-        tbl   oz = rays("origin z");
-        tbl   dx = rays("direction x");
-        tbl   dy = rays("direction y");
-        tbl   dz = rays("direction z");
-
-        RTCRayNp r;
-        r.org_x = (f32*)ox.data();
-        r.org_y = (f32*)oy.data();
-        r.org_z = (f32*)oz.data();
-
-        r.dir_x = (f32*)dx.data();
-        r.dir_y = (f32*)dy.data();
-        r.dir_z = (f32*)dz.data();
-
-        vecf zeros(ox.size(), 0.f);
-        vecf  infs(ox.size(), numeric_limits<f32>::infinity() );
-
-        r.time  = zeros.data();
-        r.tnear = zeros.data();
-        r.tfar  = infs.data();
+      TO(triCnt,i){
+        auto idx = i * 3;
+        triangles[i].v0  =  ind[idx + 0];
+        triangles[i].v1  =  ind[idx + 1];
+        triangles[i].v2  =  ind[idx + 2];
       }
 
-      u32 i=0;
-      while( LavaNxtPckt(in, &i) )
-      {
-        RTCIntersectContext context;
-        rtcInitIntersectContext(&context);
+      rtcSetGeometryBuildQuality(mesh, RTC_BUILD_QUALITY_HIGH);
+      rtcCommitGeometry(mesh);
 
-        RTCRayHit rh;
-        rh.ray.mask   =   -1;
-        rh.ray.id     =    RTC_INVALID_GEOMETRY_ID;
-        rh.ray.flags  =    0;
-        rh.ray.time   =    0;
-        rh.ray.tnear  =   0.f;
-        rh.ray.tfar   =   numeric_limits<float>::infinity();
-        rh.ray.org_x  =   0.f;
-        rh.ray.org_y  =   1.f;
-        rh.ray.org_z  =   4.f;
-        rh.ray.dir_x  =   0.f;
-        rh.ray.dir_y  =   0.f;
-        rh.ray.dir_z  =  -1.f;
+      u32 geomID = rtcAttachGeometry(g_scene, mesh);
+      rtcReleaseGeometry(mesh);
 
-        int rayCnt = 100000;
-        vec_ray rays(rayCnt);
-        TO(rayCnt,i){
-          rays[i] = rh;
-          rays[i].ray.org_x = randomf(-2.f, 3.f);
-          rays[i].ray.org_y = randomf(-2.f, 4.f);
-        }
+      rtcCommitScene(g_scene);
+    }
 
-        TO(rayCnt,i){
-          rtcIntersect1(g_scene, &context, &rays[i] );
-        }
+    //if(g_scene) SECTION(bounding box of scene output)
+    //{
+    //  rtcGetSceneBounds(g_scene, &g_bnd);
+    //  tbl bndIV = bndToIdxVerts(lp, g_bnd);
+    //  out->push( LavaTblToOut(move(bndIV),OUT_BOUNDING_BOX) );           // this demonstrates how to output a tbl into the first output slot
+    //}
 
-        tbl raysIV = raysToIdxVerts(lp, rays.data(), rays.size());
-        out->push( LavaTblToOut(move(raysIV), OUT_RAYS) );
+    if( in->slotMask[IN_RAYS] ) SECTION(trace the input rays)
+    {
+      RTCIntersectContext context;
+      rtcInitIntersectContext(&context);
 
-        //tbl rayIV = rayHitToIdxVerts(lp, rh);
-        //out->push( LavaTblToOut(move(rayIV), RAYS_OUT) );                // this demonstrates how to output a tbl into the first output slot
-        //out->push( LavaTblToOut(move(rayIV), BOUNDING_BOX_OUT ) );                // this demonstrates how to output a tbl into the first output slot
-      }
+      tbl rays = LavaTblFromPckt(lp, in, IN_RAYS);
+      tbl   ox = rays("origin x");
+      tbl   oy = rays("origin y");
+      tbl   oz = rays("origin z");
+      tbl   dx = rays("direction x");
+      tbl   dy = rays("direction y");
+      tbl   dz = rays("direction z");
+
+      auto rayCnt = ox.size();
+      RTCRayHitNp rh;
+      rh.ray.org_x = (f32*)ox.data();
+      rh.ray.org_y = (f32*)oy.data();
+      rh.ray.org_z = (f32*)oz.data();
+
+      rh.ray.dir_x = (f32*)dx.data();
+      rh.ray.dir_y = (f32*)dy.data();
+      rh.ray.dir_z = (f32*)dz.data();
+
+      vecf zeros(rayCnt, 0.f);
+      vecf  infs(rayCnt, numeric_limits<f32>::infinity() );
+      vec_u32 ids(rayCnt);
+      TO(rayCnt,i){ ids[i] = (u32)i; }
+
+      rh.ray.time  = zeros.data();
+      rh.ray.tnear = zeros.data();
+      rh.ray.tfar  = infs.data();
+      rh.ray.id    = ids.data();
+      rh.ray.mask  = nullptr;
+      rh.ray.flags = nullptr;
+
+      rtcIntersectNp(g_scene, &context, &rh, rayCnt);
+
+      tbl raysIV = raysToIdxVerts(lp, rh, rayCnt);
+      out->push( LavaTblToOut(move(raysIV), OUT_BOUNDING_BOX) );
     }
 
     return 1;
