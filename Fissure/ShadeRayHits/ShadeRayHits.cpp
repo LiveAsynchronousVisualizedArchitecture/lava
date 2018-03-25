@@ -1,15 +1,90 @@
 
 
+#include <cmath>
 #include "../../no_rt_util.h"
+#include "../shared/vec.hpp"
 #include "../../tbl.hpp"
 #include "../LavaFlow.hpp"
 
-enum Slots
+#include "../shared/math/affinespace.h"
+#include "../shared/math/linearspace3.h"
+
+enum        Slots
 {
   // This is an example enumeration that is meant to be helpful, though is not strictly neccesary. Referencing slots by a name will generally be less error prone than using their index and remembering what each index is for
   SLOT_IN  = 0,        
   SLOT_OUT = 0
 };
+
+using embree::Vec3f;
+
+struct BrdfResult
+{
+  Vec3f  m_spectrum;
+  Vec3f  m_L;
+  float  m_pdf;
+
+  BrdfResult() : m_spectrum(0.f), m_L(0.f), m_pdf(0.f) {  }
+  BrdfResult(Vec3f spectrum, Vec3f L, float pdf)
+    : m_spectrum(spectrum), m_L(L), m_pdf(pdf) {}
+  bool isZero()
+  {
+    if (m_spectrum.x != 0.f) return false;
+    if (m_spectrum.y != 0.f) return false;
+    if (m_spectrum.z != 0.f) return false;
+    return true;
+  }
+};
+
+template<class T> T sqr(T x){ return x*x; };
+
+Vec3f    TransformFromNormal(const Vec3f& from, const Vec3f& to, const Vec3f& P)
+{
+  using namespace embree;
+
+  Vec3f nV1 = normalize(from);
+  Vec3f nV2 = normalize(to);
+
+  float cos_theta = dot(nV1, nV2);
+  if( cos_theta > 0.999999f )
+    return P;
+  if( cos_theta < -0.999999f )
+    return P * -1.0f;
+  float theta = embree::acos(cos_theta);
+  float sin_theta = embree::sin(theta);
+
+  // vector to rotate about
+  Vec3f a = normalize(embree::cross(nV1, nV2));
+
+  float m00 = a.x * a.x + (1.0 - a.x *a.x)  * cos_theta;
+  float m01 = a.x * a.y * (1.0 - cos_theta) - a.z * sin_theta;
+  float m02 = a.x * a.z * (1.0 - cos_theta) + a.y * sin_theta;
+
+  float m10 = a.x * a.y * (1.0 - cos_theta) + a.z * sin_theta;
+  float m11 = a.y * a.y + (1.0 - a.y * a.y) * cos_theta;
+  float m12 = a.y * a.z * (1.0 - cos_theta) - a.x * sin_theta;
+
+  float m20 = a.x * a.z * (1.0 - cos_theta) - a.y * sin_theta;
+  float m21 = a.y * a.z * (1.0 - cos_theta) + a.x * sin_theta;
+  float m22 = a.z * a.z + (1.0 - a.z * a.z) * cos_theta;
+
+  LinearSpace3<Vec3f> mtx(   m00, m01, m02,
+    m10, m11, m12,
+    m20, m21, m22  );
+
+  // should be neccesary, matrix constructor says row major
+  return xfmPoint(mtx, P);
+}
+
+Vec3f    UniformSampleSphere(float u1, float u2)
+{
+  float y    =  1.0f - 2.0f * u1;
+  float r    =  std::sqrt(std::max(0.0f, 1.0f - y * y));
+  float phi  =  2.0f * PIf * u2;
+  float z    =  r * cosf(phi);
+  float x    =  r * sinf(phi);
+  return Vec3f(x, y, z);
+}
 
 void VNDFSamplerGGX_sample11(
   const double theta_i,               // input   // incident direction
@@ -103,9 +178,11 @@ void VNDFSampler_sample(
 }
 float       D_GGX(float alpha, float cosThetaM)
 {
+  using namespace std;
+  
   float CosSquared = cosThetaM*cosThetaM;
   float TanSquared = (1-CosSquared)/CosSquared;
-  return (1.0/PI) * sqr(alpha/(CosSquared * (alpha*alpha + TanSquared)));
+  return (1.0/PIf) * sqr(alpha/(CosSquared * (alpha*alpha + TanSquared)));
 }
 float       BRDF_D_GGX(Vec3f L, Vec3f V, Vec3f N, float alpha)
 {
@@ -127,23 +204,23 @@ BrdfResult  BrdfSampleGGX(float u1, float u2, Vec3f V, Vec3f N, float roughness)
   float alpha = sqr(roughness);
 
   Vec3f    from(0, 0, 1.f);
-  Vec3f    wi = embree::TransformFromNormal(N, from, V);
+  Vec3f    wi = TransformFromNormal(N, from, V);
 
   double aryWi[3]  =  { wi.x, wi.y, wi.z };
   double aryH[3];
   VNDFSampler_sample(aryWi, alpha, alpha, u1, u2, aryH);
 
   Vec3f H      =   Vec3f(aryH[0], aryH[1], aryH[2]);
-  Vec3f tH     =   embree::TransformFromNormal(from, N, H);
+  Vec3f tH     =   TransformFromNormal(from, N, H);
 
   Vec3f L      =   2  *  dot(V, tH) * tH - V;
   float LdotN  =   dot(L, N);
   float D      =   BRDF_D_GGX(L, V, N, alpha);
   float pdf    =   D;     // / sqr(LdotN); // * 2.f * PI; // * (PI/2.f);
 
-  return BrdfResult( Vec3f(D), L, pdf, 0.f );
+  return BrdfResult( Vec3f(D), L, pdf); // 0.f );
 }
-float       BrdfLambertian(Vec3f L, Vec3f V, Vec3f N)
+float       BrdfLambertian(v3 L, v3 V, v3 N)
 {
   return dot(L,N);
 }
@@ -151,12 +228,12 @@ BrdfResult  BrdfSampleLambertian(float u1, float u2, Vec3f V, Vec3f N)
 {
   using namespace embree;
 
-  auto       L   =  embree::UniformSampleSphere(u1, u2);
+  auto       L   =  UniformSampleSphere(u1, u2);
   auto   LdotN   =  dot(L, N);
-  auto   cLdotN  =  ClampLo(dot(L,N), 0.f);
-  auto   pdf     =  1.f / (4.f * PI);
+  auto   cLdotN  =  LdotN<0?  0  :  LdotN;
+  auto   pdf     =  1.f / (4.f * PIf);
 
-  return BrdfResult( Vec3f(LdotN), L, pdf, 0.f );
+  return BrdfResult( Vec3f(LdotN), L, pdf); // 0.f );
 }
 
 
@@ -217,6 +294,26 @@ extern "C"
 
 
 
+
+//
+//auto   cLdotN  =  ClampLo(dot(L,N), 0.f);
+
+//float z    =  1.0f - 2.0f * u1;
+//float r    =  std::sqrt(std::max(0.0f, 1.0f - z * z));
+//float phi  =  2.0f * PI * u2;
+//float x    =  r * cosf(phi);
+//float y    =  r * sinf(phi);
+//return Vec3f(x, y, z);
+
+//LinearSpace3f transMtx = mtx.transposed();
+//Vector3f wat = P;
+
+//float       D_GGX(float alpha, float cosThetaM)
+//{
+//  float CosSquared = cosThetaM*cosThetaM;
+//  float TanSquared = (1-CosSquared)/CosSquared;
+//  return (1.0/PI) * sqr(alpha/(CosSquared * (alpha*alpha + TanSquared)));
+//}
 
 //auto  theta    =  u2 * 2.f * PI;
 //auto  uu2      =  embree::asin(theta) / 2.f * PI;

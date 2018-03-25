@@ -62,7 +62,7 @@ using  ui64  =  uint64_t;
 #define SQR(x) ((x)*(x))
 
 // for open subdiv
-#define M_PI PIf
+//#define M_PI PIf
 //#define and &&
 //#define not !
 //#define or ||

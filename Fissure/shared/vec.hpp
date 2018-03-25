@@ -128,7 +128,16 @@ union  vec3
 
   float&       operator[](uint64_t i)       {return c[i];}
   float const& operator[](uint64_t i) const {return c[i];}
+
+  vec3(float _x=0, float _y=0, float _z=0)
+  {
+    x=_x; y=_y, z=_z;
+  }
 };
+//inline vec3   Vec3(float n=0)
+//{
+//  vec3 v; v.x=x; v.y=y, v.z=z; return v;
+//}
 inline vec3   Vec3(float x=0, float y=0, float z=0)
 {
   vec3 v; v.x=x; v.y=y, v.z=z; return v;
