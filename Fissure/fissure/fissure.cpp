@@ -179,22 +179,19 @@
 // -todo: debug why rays are not getting in to the tracer message node - RAYS slot is never filled - does the packet get stuck in a frame without ever being touched again?  - frame was not using the putSlot() function which sets the slot flag as well as copying the packet in
 // -todo: send camera rays in to embree scene node and trace them against the geometry there
 // -todo: try tracing rays with streams or chunks of multiple rays
+// -todo: should flow nodes with no inputs be run once at the start of the program for easy data flow? - no, they can do their own caching
 
-// todo: build in resize function into tbl so that arrays can be allocated just once
-// todo: put slot name in db key - maybe the name should have two lines
-// todo: try tiny libc in a node 
-// todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
-// todo: try making the embree vector a union with a float array inside
-// todo: make nodes with no input slots work
-// todo: change constructor to happen on play and not on load (or after the destructor runs on stop)
-// todo: redo atomic bitset now that slots are separated and inputs should be packed together
+// todo: find ggx brdf files and make them into a node
+// todo: make nodes with no input slots work - become part of the message node/generator node list in lava and run when there is nothing in the queue
+// todo: work out structure for data that is constant, created once procedurally, created once per frame and dynamic
+// todo: work out structure for constants
 // todo: add cursor member variable to LavaFrame
-// todo: put thread pointers into message node instances and work out how to lock and unlock them
-// todo: should flow nodes with no inputs be run once at the start of the program for easy data flow?
-// todo: build in data type visualization - part needs to be lava, part needs to be UI
+// todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
 // todo: make fissure or lava be able to incrementally load shared libraries
-// todo: make message node's text split to new lines on white space
-// todo: make sure zooming center is affected by cursor placement
+// todo: change constructor to happen on play and not on load (or after the destructor runs on stop)
+// todo: build in data type visualization - part needs to be lava, part needs to be UI - does any need to be in lava?
+// todo: redo atomic bitset now that slots are separated and inputs should be packed together
+// todo: put thread pointers into message node instances and work out how to lock and unlock them
 // todo: organize nodes by types in a contex menu or side bar
 // todo: change node colors to be based off of profiling information while holding 'p' key
 // todo: re-orient nodes on resize of the window so they line up with the grid in the same place 
@@ -202,8 +199,14 @@
 //       | if the window size is simply shrinking closer to 0, maybe the center point needs to be normalized according to where it was in the window
 //       | might just need to shift the pan by the change in the center point
 // todo: make nodes have their own scale that dictates the text size and not the other way around
-// todo: draw slots that are framed together as one blob with multiple slots in the UI
+// todo: build in resize function into tbl so that arrays can be allocated just once
+// todo: put slot name in db key - maybe the name should have two lines
+// todo: try tiny libc in a node 
+// todo: make sure zooming center is affected by cursor placement
+// todo: make message node's text split to new lines on white space
 
+// todo: try making the embree vector a union with a float array inside
+// todo: draw slots that are framed together as one blob with multiple slots in the UI
 // todo: make a note node that will show the hotkeys and thus can be deleted at any time
 // todo: make reloaded nodes have highlights until the next event
 // todo: make a modal window that will set the text for a note 

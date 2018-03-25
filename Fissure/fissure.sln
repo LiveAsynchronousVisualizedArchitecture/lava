@@ -25,6 +25,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Tracer", "Tracer\Tracer.vcx
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Camera", "Camera\Camera.vcxproj", "{BEA5B6C6-BE6F-43A3-A2A5-3F6CA01E416D}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ShadeRayHits", "ShadeRayHits\ShadeRayHits.vcxproj", "{8D9983A6-DD39-409F-A168-375FD81208BB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Mixed Platforms = Debug|Mixed Platforms
@@ -151,6 +153,16 @@ Global
 		{BEA5B6C6-BE6F-43A3-A2A5-3F6CA01E416D}.Release|Win32.ActiveCfg = Release|x64
 		{BEA5B6C6-BE6F-43A3-A2A5-3F6CA01E416D}.Release|x64.ActiveCfg = Release|x64
 		{BEA5B6C6-BE6F-43A3-A2A5-3F6CA01E416D}.Release|x64.Build.0 = Release|x64
+		{8D9983A6-DD39-409F-A168-375FD81208BB}.Debug|Mixed Platforms.ActiveCfg = Debug|x64
+		{8D9983A6-DD39-409F-A168-375FD81208BB}.Debug|Mixed Platforms.Build.0 = Debug|x64
+		{8D9983A6-DD39-409F-A168-375FD81208BB}.Debug|Win32.ActiveCfg = Debug|x64
+		{8D9983A6-DD39-409F-A168-375FD81208BB}.Debug|x64.ActiveCfg = Debug|x64
+		{8D9983A6-DD39-409F-A168-375FD81208BB}.Debug|x64.Build.0 = Debug|x64
+		{8D9983A6-DD39-409F-A168-375FD81208BB}.Release|Mixed Platforms.ActiveCfg = Release|x64
+		{8D9983A6-DD39-409F-A168-375FD81208BB}.Release|Mixed Platforms.Build.0 = Release|x64
+		{8D9983A6-DD39-409F-A168-375FD81208BB}.Release|Win32.ActiveCfg = Release|x64
+		{8D9983A6-DD39-409F-A168-375FD81208BB}.Release|x64.ActiveCfg = Release|x64
+		{8D9983A6-DD39-409F-A168-375FD81208BB}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
