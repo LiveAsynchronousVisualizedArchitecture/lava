@@ -180,10 +180,11 @@
 // -todo: send camera rays in to embree scene node and trace them against the geometry there
 // -todo: try tracing rays with streams or chunks of multiple rays
 // -todo: should flow nodes with no inputs be run once at the start of the program for easy data flow? - no, they can do their own caching
+// -todo: find ggx brdf files and make them into a node
+// -todo: make nodes with no input slots work - become part of the message node/generator node list in lava and run when there is nothing in the queue
+// -todo: work out structure for data that is constant, created once procedurally, created once per frame and dynamic
 
-// todo: find ggx brdf files and make them into a node
-// todo: make nodes with no input slots work - become part of the message node/generator node list in lava and run when there is nothing in the queue
-// todo: work out structure for data that is constant, created once procedurally, created once per frame and dynamic
+// todo: make ggx brdf generate new rays with weights
 // todo: work out structure for constants
 // todo: add cursor member variable to LavaFrame
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue

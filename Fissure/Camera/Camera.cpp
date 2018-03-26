@@ -117,8 +117,10 @@ tbl raysToIdxVerts(LavaParams const* lp, tbl const& rays)
 
 extern "C"
 {
-  const char*   InTypes[]  = {"Dummy",       nullptr};
-  const char*   InNames[]  = {"Dummy Slot",  nullptr};
+  //const char*   InTypes[]  = {"Dummy",       nullptr};
+  //const char*   InNames[]  = {"Dummy Slot",  nullptr};
+  const char*   InTypes[]  = {nullptr};
+  const char*   InNames[]  = {nullptr};
   const char*  OutTypes[]  = {"Rays",                       "IdxVerts",             nullptr};
   const char*  OutNames[]  = {"Chunk of rays to be traced", "Camera Visualiztion",  nullptr};
 

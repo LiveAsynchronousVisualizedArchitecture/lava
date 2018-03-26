@@ -75,7 +75,6 @@ Vec3f    TransformFromNormal(const Vec3f& from, const Vec3f& to, const Vec3f& P)
   // should be neccesary, matrix constructor says row major
   return xfmPoint(mtx, P);
 }
-
 Vec3f    UniformSampleSphere(float u1, float u2)
 {
   float y    =  1.0f - 2.0f * u1;
@@ -85,7 +84,6 @@ Vec3f    UniformSampleSphere(float u1, float u2)
   float x    =  r * sinf(phi);
   return Vec3f(x, y, z);
 }
-
 void VNDFSamplerGGX_sample11(
   const double theta_i,               // input   // incident direction
   double U1, double U2,                          // random numbers
@@ -130,10 +128,9 @@ void VNDFSamplerGGX_sample11(
   slope_y = S * z * sqrt(1.0+slope_x*slope_x);
 }
 void VNDFSampler_sample(
-  const double omega_i[3],                      // input  // incident direction
-  const double alpha_x, const double alpha_y,             // anisotropic roughness
-  const double U1, const double U2,                       // random numbers
-                                    
+  const double omega_i[3],                       // input  // incident direction
+  const double alpha_x, const double alpha_y,              // anisotropic roughness
+  const double U1, const double U2,                        // random numbers
   double omega_m[3])                            // output // micronormal
 {
   // 1. stretch omega_i

@@ -929,12 +929,10 @@ public:
   using vec_ids       =  std::vector<LavaId>;
   using MsgIds        =  std::unordered_set<LavaId, LavaId>;           // LavaId has an operator() to hash itself
   using MsgCache      =  std::vector<LavaId>;                          // LavaId has an operator() to hash itself
-  //using NormalizeMap  =  std::unordered_map<uint64_t, uint64_t>;
   using NormalizeMap  =  std::map<uint64_t, uint64_t>;
   using CmdQ          =  std::queue<LavaCommand>;
   using RetStk        =  std::stack<LavaCommand::Arg>;
   using ArgVec        =  std::vector<LavaCommand::Arg>;
-  //using CmdQ          =  std::priority_queue<LavaCommand>;
 
 private:
   mutable abool         m_useA;
@@ -970,8 +968,8 @@ public:
   MsgCache&          curMsgCache(){ return m_useA.load()?  m_msgCacheA  : m_msgCacheB;  }
   NodeInsts const&      curNodes()const{ return m_useA.load()?  m_nodesA     : m_nodesB;     }
   //Slots     const&      curSlots()const{ return m_useA.load()?  m_slotsA     : m_slotsB;     }
-  Slots const&        curInSlots()const{ return m_useA.load()?  m_inSlotsA     : m_inSlotsB;     }
-  Slots const&       curOutSlots()const{ return m_useA.load()?  m_outSlotsA     : m_outSlotsB;     }
+  Slots     const&    curInSlots()const{ return m_useA.load()?  m_inSlotsA     : m_inSlotsB;     }
+  Slots     const&   curOutSlots()const{ return m_useA.load()?  m_outSlotsA     : m_outSlotsB;     }
   CnctMap   const&      curCncts()const{ return m_useA.load()?  m_cnctsA     : m_cnctsB;     }
   SrcMap    const&  curDestCncts()const{ return m_useA.load()?  m_destCnctsA : m_destCnctsB; }
   MsgIds    const&   curMsgNodes()const{ return m_useA.load()?  m_msgNodesA  : m_msgNodesB;  }
@@ -1098,20 +1096,6 @@ public:
     return ERR_INST;
   }
   
-  //u64          nxtSlot(u64 nid) // non-const, part of writing, and needs to use the opposite buffer
-  //{
-  //  auto si = nodeSlots(nid);                   // si is slot iterator
-  //  i64 cur = -1;
-  //  while(si != end(oppSlots())   && 
-  //    si->first.nid  == nid && 
-  //    si->first.sidx <= (u64)(cur+1) ){
-  //    //cur = si->first.idx;
-  //    ++cur; ++si; 
-  //  }
-  //  //return cur;
-  //
-  //  return cur + 1;
-  //}
   u64        nxtInSlot(u64 nid) // non-const, part of writing, and needs to use the opposite buffer
   {
     auto si = nodeInSlots(nid);                   // si is slot iterator
@@ -1412,10 +1396,12 @@ public:
   uint64_t    addNode(LavaNode* ln, uint64_t nid)
   {
     //u64 id = nxt();
-    if(ln->node_type == LavaNode::MSG)
-      oppMsgNodes().insert(nid);
 
     LavaInst li = makeInst(nid, ln);
+
+    if(ln->node_type==LavaNode::MSG || li.inputs==0)
+      oppMsgNodes().insert(nid);
+
     return oppNodes().insert({nid, li}).first->first;                             // returns a pair that contains the key-value pair
   }
   uint64_t    addNode(LavaNode* ln, bool newId=true)
@@ -1632,7 +1618,7 @@ public:
   }
   auto          inSlots()  -> Slots& { return curInSlots(); }
   auto          inSlots() const -> Slots const& { return curInSlots();  }
-  auto       getInSlots()  -> Slots& { return curInSlots(); }
+  auto       getInSlots() -> Slots& { return curInSlots(); }
   auto         outSlots() -> Slots& { return curOutSlots(); }
   auto         outSlots() const -> Slots const& { return curOutSlots();  }
   auto      getOutSlots() -> Slots& { return curOutSlots(); }
@@ -1764,7 +1750,7 @@ public:
   MsgNodeVec          m_msgNodesA;
   LavaGraph                 graph;
 
-  void  udpateMsgIdxCache() // todo: not thread safe - this takes the current hash map of message nodes 
+  void  udpateMsgIdxCache() // is this used? should it be? todo: not thread safe - this takes the current hash map of message nodes 
   {
     auto& cur = graph.curMsgNodes();
     m_msgNodesA.clear();
@@ -1777,8 +1763,6 @@ public:
   }
   u64      fetchIncNxtMsg() const                    // fetchIncNxtMsg is fetch increment next message (node index)
   {
-    //auto sz = m_msgNodesA.size();
-    //return sz? m_nxtMsgNd.fetch_add(1) % sz  :   LavaId::NODE_NONE;
     return m_nxtMsgNd.fetch_add(1);
   }
   u64            nxtMsgId()
@@ -1790,14 +1774,6 @@ public:
       return cur[idx].nid;
     }
     return LavaId::NODE_NONE;
-
-    //u64   idx = cur.size()>0? fetchIncNxtMsg()%cur.size();
-    //u64    id = LavaId::NODE_NONE;
-    //if(idx != LavaId::NODE_NONE){ 
-    //  id = m_msgNodesA[idx];
-    //}
-    //
-    //return LavaId::NODE_NONE;
   }
 
   u64      incThreadCount()
@@ -1874,7 +1850,7 @@ public:
       if(ln && ln->destructor){ ln->destructor(); }
     }
   }
-  void     runConstructors()
+  void    runConstructors()
   {
     assert(m_running == false);                               // all threads should be out of the loop by the time this function is called
     for(auto const& kv : nameToPtr){
@@ -2165,7 +2141,7 @@ auto       GetFlowNodeLists(lava_hndlvec     const& hndls) -> lava_ptrsvec
 
   return ret;
 }
-void   ErrorCheckNodeLists(lava_ptrsvec* inout_ndLsts)
+void    ErrorCheckNodeLists(lava_ptrsvec* inout_ndLsts)
 {
   auto& lsts = *inout_ndLsts;
   auto    sz = lsts.size();
@@ -2548,6 +2524,38 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+
+
+
+//u64          nxtSlot(u64 nid) // non-const, part of writing, and needs to use the opposite buffer
+//{
+//  auto si = nodeSlots(nid);                   // si is slot iterator
+//  i64 cur = -1;
+//  while(si != end(oppSlots())   && 
+//    si->first.nid  == nid && 
+//    si->first.sidx <= (u64)(cur+1) ){
+//    //cur = si->first.idx;
+//    ++cur; ++si; 
+//  }
+//  //return cur;
+//
+//  return cur + 1;
+//}
+
+//auto sz = m_msgNodesA.size();
+//return sz? m_nxtMsgNd.fetch_add(1) % sz  :   LavaId::NODE_NONE;
+
+//u64   idx = cur.size()>0? fetchIncNxtMsg()%cur.size();
+//u64    id = LavaId::NODE_NONE;
+//if(idx != LavaId::NODE_NONE){ 
+//  id = m_msgNodesA[idx];
+//}
+//
+//return LavaId::NODE_NONE;
+
+//using NormalizeMap  =  std::unordered_map<uint64_t, uint64_t>;
+//using CmdQ          =  std::priority_queue<LavaCommand>;
 
 //auto      nodeSlots(u64     nid) const -> decltype(curSlots().cbegin())
 //{
