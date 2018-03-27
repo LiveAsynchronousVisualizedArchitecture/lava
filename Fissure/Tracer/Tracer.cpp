@@ -41,6 +41,63 @@ float     randomf(float lo, float hi)
   return dis(*RNG::m_genPtr);
 }
 
+//tbl   raysToIdxVerts(LavaParams const* lp, RTCRayHitNp const& rh, u32 rayCnt)
+//{
+//  using namespace std;
+//
+//  tbl  px = LavaMakeTbl(lp);
+//  tbl  py = LavaMakeTbl(lp);
+//  tbl  pz = LavaMakeTbl(lp);
+//  tbl  cr = LavaMakeTbl(lp);
+//  tbl  cg = LavaMakeTbl(lp);
+//  tbl  ca = LavaMakeTbl(lp);
+//  tbl ind = LavaMakeTbl(lp);
+//  tbl  iv = LavaMakeTbl(lp);
+//
+//  px.setArrayType<f32>();
+//  py.setArrayType<f32>();
+//  pz.setArrayType<f32>();
+//  cr.setArrayType<f32>();
+//  cg.setArrayType<f32>();
+//  ca.setArrayType<f32>();
+//  ind.setArrayType<u32>();
+//  iv.setArrayType<i8>();
+//
+//  TO(rayCnt,i){
+//    px.push( rh.ray.org_x[i]  );
+//    py.push( rh.ray.org_y[i]  );
+//    pz.push( rh.ray.org_z[i]  );
+//
+//    px.push( rh.ray.org_x[i] + (rh.ray.dir_x[i] * rh.ray.tfar[i]) );
+//    py.push( rh.ray.org_y[i] + (rh.ray.dir_y[i] * rh.ray.tfar[i]) );
+//    pz.push( rh.ray.org_z[i] + (rh.ray.dir_z[i] * rh.ray.tfar[i]) );
+//
+//    cr.push(0.5f);
+//    cr.push(1.0f);
+//    cg.push(0.0f);
+//    cg.push(1.0f);
+//    ca.push(0.1f);
+//    ca.push(0.2f);
+//
+//    ind.push( (u32)(i*2+0) );
+//    ind.push( (u32)(i*2+1) );
+//  }
+//
+//  iv("positions x")  = &px;
+//  iv("positions y")  = &py;
+//  iv("positions z")  = &pz;
+//  iv("colors red")   = &cr;
+//  iv("colors green") = &cg;
+//  //iv("colors blue")  = &pz;
+//  iv("colors alpha") = &ca;
+//  iv("indices")      = &ind;
+//  iv("mode")         = 1;            // 0 should be points, 1 should be lines
+//  iv("type")         = tbl::StrToInt("IdxVerts");
+//  iv.flatten();
+//
+//  return move(iv);
+//}
+
 tbl   raysToIdxVerts(LavaParams const* lp, RTCRayHitNp const& rh, u32 rayCnt)
 {
   using namespace std;
@@ -68,75 +125,50 @@ tbl   raysToIdxVerts(LavaParams const* lp, RTCRayHitNp const& rh, u32 rayCnt)
     py.push( rh.ray.org_y[i]  );
     pz.push( rh.ray.org_z[i]  );
 
-    px.push( rh.ray.org_x[i] + (rh.ray.dir_x[i] * rh.ray.tfar[i]) );
-    py.push( rh.ray.org_y[i] + (rh.ray.dir_y[i] * rh.ray.tfar[i]) );
-    pz.push( rh.ray.org_z[i] + (rh.ray.dir_z[i] * rh.ray.tfar[i]) );
+    px.push( rh.ray.org_x[i] + (rh.ray.dir_x[i]*rh.ray.tfar[i]) );
+    py.push( rh.ray.org_y[i] + (rh.ray.dir_y[i]*rh.ray.tfar[i]) );
+    pz.push( rh.ray.org_z[i] + (rh.ray.dir_z[i]*rh.ray.tfar[i]) );
 
     cr.push(0.5f);
     cr.push(1.0f);
     cg.push(0.0f);
     cg.push(1.0f);
-    ca.push(0.1f);
     ca.push(0.2f);
+    ca.push(0.1f);
 
     ind.push( (u32)(i*2+0) );
     ind.push( (u32)(i*2+1) );
   }
 
-  iv("positions x")  = &px;
-  iv("positions y")  = &py;
-  iv("positions z")  = &pz;
-  iv("colors red")   = &cr;
-  iv("colors green") = &cg;
-  //iv("colors blue")  = &pz;
-  iv("colors alpha") = &ca;
-  iv("indices")      = &ind;
-  iv("mode")         = 1;            // 0 should be points, 1 should be lines
-  iv("type")         = tbl::StrToInt("IdxVerts");
-  iv.flatten();
+  TO(rayCnt,i)     // now do the ray hits
+  {  
+    // ray hit point
+    v3 hitP;
+    hitP.x = rh.ray.org_x[i] + (rh.ray.dir_x[i]*rh.ray.tfar[i]);
+    hitP.y = rh.ray.org_y[i] + (rh.ray.dir_y[i]*rh.ray.tfar[i]);
+    hitP.z = rh.ray.org_z[i] + (rh.ray.dir_z[i]*rh.ray.tfar[i]);
+    px.push( hitP.x );
+    py.push( hitP.y );
+    pz.push( hitP.z );
 
-  return move(iv);
-}
-tbl   raysToIdxVerts(LavaParams const* lp, RTCRayHit* rh, u32 rayCnt)
-{
-  using namespace std;
-
-  tbl  px = LavaMakeTbl(lp);
-  tbl  py = LavaMakeTbl(lp);
-  tbl  pz = LavaMakeTbl(lp);
-  tbl  cr = LavaMakeTbl(lp);
-  tbl  cg = LavaMakeTbl(lp);
-  tbl  ca = LavaMakeTbl(lp);
-  tbl ind = LavaMakeTbl(lp);
-  tbl  iv = LavaMakeTbl(lp);
-
-  px.setArrayType<f32>();
-  py.setArrayType<f32>();
-  pz.setArrayType<f32>();
-  cr.setArrayType<f32>();
-  cg.setArrayType<f32>();
-  ca.setArrayType<f32>();
-  ind.setArrayType<u32>();
-  iv.setArrayType<i8>();
-
-  TO(rayCnt,i){
-    px.push( rh[i].ray.org_x  );
-    py.push( rh[i].ray.org_y  );
-    pz.push( rh[i].ray.org_z  );
-
-    px.push( rh[i].ray.org_x + (rh[i].ray.dir_x*rh[i].ray.tfar) );
-    py.push( rh[i].ray.org_y + (rh[i].ray.dir_y*rh[i].ray.tfar) );
-    pz.push( rh[i].ray.org_z + (rh[i].ray.dir_z*rh[i].ray.tfar) );
+    v3 hitN;
+    hitN.x = hitP.x + rh.hit.Ng_x[i];
+    hitN.y = hitP.y + rh.hit.Ng_y[i];
+    hitN.z = hitP.z + rh.hit.Ng_z[i];
+    px.push( hitN.x );
+    py.push( hitN.y );
+    pz.push( hitN.z );
 
     cr.push(0.5f);
     cr.push(1.0f);
     cg.push(0.0f);
     cg.push(1.0f);
+    ca.push(1.0f);
     ca.push(0.1f);
-    ca.push(0.2f);
 
-    ind.push( (u32)(i*2+0) );
-    ind.push( (u32)(i*2+1) );
+    u64 rc2 = rayCnt * 2;
+    ind.push( (u32)(rc2 + (i*2+0)) );
+    ind.push( (u32)(rc2 + (i*2+1)) );
   }
 
   iv("positions x")  = &px;
@@ -404,7 +436,11 @@ extern "C"          // Embree3 Scene Message Node
       RTCIntersectContext context;
       rtcInitIntersectContext(&context);
 
-      tbl rays = LavaTblFromPckt(lp, in, IN_RAYS);
+      RTCRayHitNp rh;
+
+      u64 rayCnt = 0;
+      tbl   rays = LavaTblFromPckt(lp, in, IN_RAYS);
+
       tbl   ox = rays("origin x");
       tbl   oy = rays("origin y");
       tbl   oz = rays("origin z");
@@ -412,15 +448,13 @@ extern "C"          // Embree3 Scene Message Node
       tbl   dy = rays("direction y");
       tbl   dz = rays("direction z");
 
-      auto rayCnt = ox.size();
-      RTCRayHitNp rh;
-      rh.ray.org_x = (f32*)ox.data();
-      rh.ray.org_y = (f32*)oy.data();
-      rh.ray.org_z = (f32*)oz.data();
-
-      rh.ray.dir_x = (f32*)dx.data();
-      rh.ray.dir_y = (f32*)dy.data();
-      rh.ray.dir_z = (f32*)dz.data();
+      rayCnt = ox.size();
+      rh.ray.org_x = ox.data<f32>();
+      rh.ray.org_y = oy.data<f32>();
+      rh.ray.org_z = oz.data<f32>();
+      rh.ray.dir_x = dx.data<f32>();
+      rh.ray.dir_y = dy.data<f32>();
+      rh.ray.dir_z = dz.data<f32>();
 
       vecf zeros(rayCnt, 0.f);
       vecf  infs(rayCnt, numeric_limits<f32>::infinity() );
@@ -436,36 +470,42 @@ extern "C"          // Embree3 Scene Message Node
       rh.ray.mask  = mask.data();
       rh.ray.flags = flags.data();
 
-      vec_u32 geomID(rayCnt, 0);
-      vec_u32 instID(rayCnt, 0);
-      vec_u32 primID(rayCnt, 0);
-      
-      //vecf    Nx(rayCnt, 0.f);
-      //tbl Nx = LavaMakeTbl(lp);
-      //Nx.resize<f32>(rayCnt, 0.f);
-      //
-      //vecf    Ny(rayCnt, 0.f);
-      //vecf    Nz(rayCnt, 0.f);
-      //vecf     u(rayCnt, 0.f);
-      //vecf     v(rayCnt, 0.f);
-
       tbl Nx = LavaMakeTbl(lp, rayCnt, 0.f);
       tbl Ny = LavaMakeTbl(lp, rayCnt, 0.f);
       tbl Nz = LavaMakeTbl(lp, rayCnt, 0.f);
       tbl  u = LavaMakeTbl(lp, rayCnt, 0.f);
       tbl  v = LavaMakeTbl(lp, rayCnt, 0.f);
+      vec_u32 geomID(rayCnt, 0);
+      vec_u32 instID(rayCnt, 0);
+      vec_u32 primID(rayCnt, 0);
 
-      rh.hit.geomID = geomID.data();
-      //rh.hit.instID = instID.data();
-      rh.hit.primID = primID.data();
-      rh.hit.Ng_x   = Nx.data<f32>();
-      rh.hit.Ng_y   = Ny.data<f32>();
-      rh.hit.Ng_z   = Nz.data<f32>();
-      rh.hit.u      =  u.data<f32>();
-      rh.hit.v      =  v.data<f32>();
-      TO(RTC_MAX_INSTANCE_LEVEL_COUNT,i){ rh.hit.instID[i] = 0; }
+      SECTION(fill the ray hit structure of arrays)
+      {
+        rh.hit.geomID = geomID.data();
+        rh.hit.primID = primID.data();
+        rh.hit.Ng_x   = Nx.data<f32>();
+        rh.hit.Ng_y   = Ny.data<f32>();
+        rh.hit.Ng_z   = Nz.data<f32>();
+        rh.hit.u      =  u.data<f32>();
+        rh.hit.v      =  v.data<f32>();
+        TO(RTC_MAX_INSTANCE_LEVEL_COUNT,i){ rh.hit.instID[i] = 0; }
+      }
 
       rtcIntersectNp(g_scene, &context, &rh, rayCnt);
+
+      SECTION(normalize ray hit normals)
+      {
+        TO(rayCnt,i){
+          v3 Ng(rh.hit.Ng_x[i], rh.hit.Ng_y[i], rh.hit.Ng_z[i]);
+          Ng = norm(Ng);
+          rh.hit.Ng_x[i] = Ng.x;
+          rh.hit.Ng_y[i] = Ng.y;
+          rh.hit.Ng_z[i] = Ng.z;
+        }
+      }
+
+      tbl raysIV = raysToIdxVerts(lp, rh, rayCnt);
+      out->push( LavaTblToOut(move(raysIV), OUT_RAY_VISUALIZATION) );
 
       tbl rayHits     = rays;
       rayHits("Ng x") = &Nx;
@@ -474,9 +514,6 @@ extern "C"          // Embree3 Scene Message Node
 
       rayHits.flatten();
       out->push( LavaTblToOut(move(rayHits), OUT_RAY_HITS) );
-
-      tbl raysIV = raysToIdxVerts(lp, rh, rayCnt);
-      out->push( LavaTblToOut(move(raysIV), OUT_RAY_VISUALIZATION) );
     }
 
     return 1;
@@ -507,6 +544,42 @@ extern "C"          // Embree3 Scene Message Node
   }
 }
 
+
+
+
+
+//SECTION(copy pointers to component arrays from the input rays into the RayHit structure of arrays)
+//{
+
+//rh.ray.org_x = (f32*)ox.data();
+//rh.ray.org_y = (f32*)oy.data();
+//rh.ray.org_z = (f32*)oz.data();
+//rh.ray.dir_x = (f32*)dx.data();
+//rh.ray.dir_y = (f32*)dy.data();
+//rh.ray.dir_z = (f32*)dz.data();
+
+//vecf    Nx(rayCnt, 0.f);
+//vecf    Ny(rayCnt, 0.f);
+//vecf    Nz(rayCnt, 0.f);
+//vecf     u(rayCnt, 0.f);
+//vecf     v(rayCnt, 0.f);
+//
+//rh.hit.instID = instID.data();
+//
+//rh.hit.Ng_x   = Nx.data();
+//rh.hit.Ng_y   = Ny.data();
+//rh.hit.Ng_z   = Nz.data();
+//rh.hit.u      =  u.data();
+//rh.hit.v      =  v.data();
+
+//tbl Nx = LavaMakeTbl(lp);
+//Nx.resize<f32>(rayCnt, 0.f);
+//
+//vecf    Nx(rayCnt, 0.f);
+//vecf    Ny(rayCnt, 0.f);
+//vecf    Nz(rayCnt, 0.f);
+//vecf     u(rayCnt, 0.f);
+//vecf     v(rayCnt, 0.f);
 
 //SECTION(input packet loop)
 //{

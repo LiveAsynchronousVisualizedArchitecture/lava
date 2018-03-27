@@ -186,6 +186,7 @@
 // -todo: add helper template to lava to make a tbl with a set type and size
 // -todo: add resize to tbl
 
+// todo: visualize rayHits in Tracer
 // todo: make ggx brdf generate new rays with weights
 // todo: work out structure for constants - .const files can be detected by lava - files could be named .Type.const to be detected as constant nodes while retaining type information that is not stored in any sort of binary format
 // todo: work out details for a cache node - could be part of the generators list along with message nodes, flow nodes without inputs, and constants - can a cache node be implemented mostly with a regular node by copying its input to a global allocator like malloc or into a simdb instance? - the output type would need to match the input type instead of being hard coded
