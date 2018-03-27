@@ -13,8 +13,8 @@ enum Slots
   IN_GEOMETRY       = 0,
   IN_RAYS           = 1,
 
-  OUT_BOUNDING_BOX  = 0,
-  OUT_RAYS          = 1
+  OUT_RAY_VISUALIZATION  = 0,
+  OUT_RAY_HITS           = 1
 };
 
 struct Triangle { int v0, v1, v2; };
@@ -443,30 +443,40 @@ extern "C"          // Embree3 Scene Message Node
       //vecf    Nx(rayCnt, 0.f);
       //tbl Nx = LavaMakeTbl(lp);
       //Nx.resize<f32>(rayCnt, 0.f);
-      tbl Nx = LavaMakeTbl(lp, rayCnt, 0.f);
+      //
+      //vecf    Ny(rayCnt, 0.f);
+      //vecf    Nz(rayCnt, 0.f);
+      //vecf     u(rayCnt, 0.f);
+      //vecf     v(rayCnt, 0.f);
 
-      vecf    Ny(rayCnt, 0.f);
-      vecf    Nz(rayCnt, 0.f);
-      vecf     u(rayCnt, 0.f);
-      vecf     v(rayCnt, 0.f);
+      tbl Nx = LavaMakeTbl(lp, rayCnt, 0.f);
+      tbl Ny = LavaMakeTbl(lp, rayCnt, 0.f);
+      tbl Nz = LavaMakeTbl(lp, rayCnt, 0.f);
+      tbl  u = LavaMakeTbl(lp, rayCnt, 0.f);
+      tbl  v = LavaMakeTbl(lp, rayCnt, 0.f);
 
       rh.hit.geomID = geomID.data();
       //rh.hit.instID = instID.data();
       rh.hit.primID = primID.data();
       rh.hit.Ng_x   = Nx.data<f32>();
-      rh.hit.Ng_y   = Ny.data();
-      rh.hit.Ng_z   = Nz.data();
-      rh.hit.u      =  u.data();
-      rh.hit.v      =  v.data();
+      rh.hit.Ng_y   = Ny.data<f32>();
+      rh.hit.Ng_z   = Nz.data<f32>();
+      rh.hit.u      =  u.data<f32>();
+      rh.hit.v      =  v.data<f32>();
       TO(RTC_MAX_INSTANCE_LEVEL_COUNT,i){ rh.hit.instID[i] = 0; }
 
       rtcIntersectNp(g_scene, &context, &rh, rayCnt);
 
-      tbl rayHits = rays;
-      rays("Ng x") = &Nx;
+      tbl rayHits     = rays;
+      rayHits("Ng x") = &Nx;
+      rayHits("Ng y") = &Ny;
+      rayHits("Ng z") = &Nz;
+
+      rayHits.flatten();
+      out->push( LavaTblToOut(move(rayHits), OUT_RAY_HITS) );
 
       tbl raysIV = raysToIdxVerts(lp, rh, rayCnt);
-      out->push( LavaTblToOut(move(raysIV), OUT_BOUNDING_BOX) );
+      out->push( LavaTblToOut(move(raysIV), OUT_RAY_VISUALIZATION) );
     }
 
     return 1;

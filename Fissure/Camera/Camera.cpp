@@ -19,12 +19,6 @@ enum Slots
   CAMERA_VIZ_OUT = 1
 };
 
-const f32     fovAngle  =  35.f;
-const f32  asepctRatio  =   1.f;
-const u64       rayCnt  =  100000;
-const f32    origin[3]  =  {0, 2.f,  5.f};
-const f32    camDir[3]  =  {0, 0,   -1.f};
-
 namespace RNG
 {
   using rng_t  = ::std::mt19937;
@@ -115,6 +109,14 @@ tbl raysToIdxVerts(LavaParams const* lp, tbl const& rays)
   return move(iv);
 }
 
+const f32     fovAngle  =  35.f;
+const f32  asepctRatio  =   1.f;
+const u64       rayCnt  =  1000;
+const f32    origin[3]  =  {0, 2.f,  5.f};
+const f32    camDir[3]  =  {0, 0,   -1.f};
+
+static std::atomic<bool> hasRun;
+
 extern "C"
 {
   //const char*   InTypes[]  = {"Dummy",       nullptr};
@@ -124,12 +126,14 @@ extern "C"
   const char*  OutTypes[]  = {"Rays",                       "IdxVerts",             nullptr};
   const char*  OutNames[]  = {"Chunk of rays to be traced", "Camera Visualiztion",  nullptr};
 
-  void Camera_construct(){ }
-  void Camera_destruct(){ }
+  void Camera_construct(){ hasRun = false; }
+  void Camera_destruct(){ hasRun = false; }
 
   uint64_t Camera(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
   {
     using namespace std;
+
+    if( hasRun.exchange(true) ){ return 1; }
 
     f32 fovOfst = tanf(deg2rad( 0.5f * fovAngle ));
 

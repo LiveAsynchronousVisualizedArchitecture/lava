@@ -1096,6 +1096,7 @@ public:
     setArrayType<T>();
     reserve(count);
     
+    size(count);
     auto initCnt = count - prevSz;
     TO(initCnt,i){
       (*this)[i+prevSz] = initVal;
