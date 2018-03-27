@@ -5,15 +5,13 @@
 #include "../shared/vec.hpp"
 #include "../../tbl.hpp"
 #include "../LavaFlow.hpp"
-
 #include "../shared/math/affinespace.h"
 #include "../shared/math/linearspace3.h"
 
 enum        Slots
 {
-  // This is an example enumeration that is meant to be helpful, though is not strictly neccesary. Referencing slots by a name will generally be less error prone than using their index and remembering what each index is for
-  SLOT_IN  = 0,        
-  SLOT_OUT = 0
+  IN_RAYS  =  0,                // the rays that have been traced
+  OUT_WEIGHTED_RAYS = 0
 };
 
 using embree::Vec3f;
@@ -236,10 +234,10 @@ BrdfResult  BrdfSampleLambertian(float u1, float u2, Vec3f V, Vec3f N)
 
 extern "C"
 {
-  const char*  InTypes[]  = {"IdxVerts",           nullptr};            // This array contains the type that each slot of the same index will accept as input.
-  const char*  InNames[]  = {"ShadeRayHits Slot In",   nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
-  const char* OutTypes[]  = {"IdxVerts",           nullptr};            // This array contains the types that are output in each slot of the same index
-  const char* OutNames[]  = {"ShadeRayHits Slot Out",  nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char*  InTypes[]  = {"Rays",                           nullptr};
+  const char*  InNames[]  = {"Rays already traced by embree",  nullptr};
+  const char* OutTypes[]  = {"Rays",                           nullptr};
+  const char* OutNames[]  = {"New rays based on the GGX BRDF that also have weights associated with them", nullptr};
 
   void ShadeRayHits_construct(){ }
   void ShadeRayHits_destruct(){ }
@@ -248,16 +246,14 @@ extern "C"
   {
     using namespace std;
 
-    u32 i=0;
-    while( LavaNxtPckt(in, &i) )
-    {
-      tbl inputTbl( (void*)(in->packets[i-1].val.value) );
+    tbl rays = LavaTblFromPckt(lp, in, IN_RAYS);
 
-      for(auto& kv : inputTbl){  // this loop demonstrates how to iterate through non-empty map elements
-      }	
 
-      // out->push( LavaTblToOut(outputTbl, SLOT_OUT) );      // this demonstrates how to output a tbl into the first output slot
-    }
+
+    //u32 i=0;
+    //while( LavaNxtPckt(in, &i) )
+    //{   
+    //}
 
     return 1;
   }
@@ -291,6 +287,15 @@ extern "C"
 
 
 
+
+
+
+//tbl inputTbl( (void*)(in->packets[i-1].val.value) );
+//
+//for(auto& kv : inputTbl){  // this loop demonstrates how to iterate through non-empty map elements
+//}	
+//
+// out->push( LavaTblToOut(outputTbl, SLOT_OUT) );      // this demonstrates how to output a tbl into the first output slot
 
 //
 //auto   cLdotN  =  ClampLo(dot(L,N), 0.f);

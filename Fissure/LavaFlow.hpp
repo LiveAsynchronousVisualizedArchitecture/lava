@@ -707,6 +707,8 @@ struct        LavaVal
 {
   u64      type :  3;          // ArgType
   u64     value : 61;
+
+  operator void*(){ return (void*)value; }
 };
 struct        LavaOut
 {
@@ -791,12 +793,11 @@ struct      LavaFrame
 };
 struct       LavaNode
 {
-  enum Type { NONE=0, FLOW, MSG, NODE_ERROR=0xFFFFFFFFFFFFFFFF };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
+  enum Type { NONE=0, FLOW, MSG, CONSTANT, CACHE, NODE_ERROR=0xFFFFFFFFFFFFFFFF };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
 
   FlowFunc               func;
   ConstructFunc   constructor;
   ConstructFunc    destructor;
-  //uint64_t          node_type;
   Type              node_type;
   const char*            name;
   const char**       in_types;
@@ -1863,6 +1864,19 @@ public:
 };
 
 // Lava Helper Functions
+template<class T> tbl LavaMakeTbl(LavaParams const* lp, u64 count, T initVal=T() )
+{
+  using namespace std;
+
+  tbl t;
+  t.m_alloc    =  lp->ref_alloc;
+  t.m_realloc  =  nullptr;
+  t.m_free     =  nullptr;
+
+  t.resize(count, initVal);
+
+  return move(t);
+}
 tbl            LavaMakeTbl(LavaParams const* lp)
 {
   using namespace std;
@@ -2527,6 +2541,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+// uint64_t replaced with a Type enum
+//uint64_t          node_type;
 
 //u64          nxtSlot(u64 nid) // non-const, part of writing, and needs to use the opposite buffer
 //{

@@ -313,10 +313,10 @@ extern "C"          // Embree3 Scene Message Node
 {
   const char* description = "Takes in geometry that will be sorted into an acceleration structure and ultimatly used to trace rays";                                     // description
 
-  const char*  InTypes[]  = {"IdxVerts",       "Rays",           nullptr};          // This array contains the type that each slot of the same index will accept as input.
-  const char*  InNames[]  = {"Scene Geometry", "Rays To Trace",  nullptr};          // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
-  const char* OutTypes[]  = {"IdxVerts",       "Rays",           nullptr};          // This array contains the types that are output in each slot of the same index
-  const char* OutNames[]  = {"Scene Bounds",   "Traced Rays",    nullptr};          // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char*  InTypes[]  = {"IdxVerts",                  "Rays",                                nullptr};
+  const char*  InNames[]  = {"Scene Geometry",            "Rays To Trace",                       nullptr};
+  const char* OutTypes[]  = {"IdxVerts",                  "Ray Hits",                            nullptr};
+  const char* OutNames[]  = {"Traced Rays Visualization", "Traced rays, ready to be shaded",     nullptr};
 
   void Tracer_construct()
   {
@@ -361,49 +361,6 @@ extern "C"          // Embree3 Scene Message Node
   {
     using namespace std;
 
-    //SECTION(input packet loop)
-    //{
-    //  u32 i=0;
-    //  while( LavaNxtPckt(in, &i) )
-    //  {
-    //    RTCIntersectContext context;
-    //    rtcInitIntersectContext(&context);
-    //
-    //    RTCRayHit rh;
-    //    rh.ray.mask   =   -1;
-    //    rh.ray.id     =    RTC_INVALID_GEOMETRY_ID;
-    //    rh.ray.flags  =    0;
-    //    rh.ray.time   =    0;
-    //    rh.ray.tnear  =   0.f;
-    //    rh.ray.tfar   =   numeric_limits<float>::infinity();
-    //    rh.ray.org_x  =   0.f;
-    //    rh.ray.org_y  =   1.f;
-    //    rh.ray.org_z  =   4.f;
-    //    rh.ray.dir_x  =   0.f;
-    //    rh.ray.dir_y  =   0.f;
-    //    rh.ray.dir_z  =  -1.f;
-    //
-    //    int rayCnt = 100000;
-    //    vec_ray rays(rayCnt);
-    //    TO(rayCnt,i){
-    //      rays[i] = rh;
-    //      rays[i].ray.org_x = randomf(-2.f, 3.f);
-    //      rays[i].ray.org_y = randomf(-2.f, 4.f);
-    //    }
-    //
-    //    TO(rayCnt,i){
-    //      rtcIntersect1(g_scene, &context, &rays[i] );
-    //    }
-    //
-    //    tbl raysIV = raysToIdxVerts(lp, rays.data(), rays.size());
-    //    out->push( LavaTblToOut(move(raysIV), OUT_RAYS) );
-    //
-    //    //tbl rayIV = rayHitToIdxVerts(lp, rh);
-    //    //out->push( LavaTblToOut(move(rayIV), RAYS_OUT) );                // this demonstrates how to output a tbl into the first output slot
-    //    //out->push( LavaTblToOut(move(rayIV), BOUNDING_BOX_OUT ) );                // this demonstrates how to output a tbl into the first output slot
-    //  }
-    //}
-
     if( in->slotMask[IN_GEOMETRY] ) SECTION(create geometry from input and put it in the embree scene)
     {
       tbl idxVerts( (void*)(in->packets[IN_GEOMETRY].val.value) );
@@ -442,15 +399,7 @@ extern "C"          // Embree3 Scene Message Node
 
       rtcCommitScene(g_scene);
     }
-
-    //if(g_scene) SECTION(bounding box of scene output)
-    //{
-    //  rtcGetSceneBounds(g_scene, &g_bnd);
-    //  tbl bndIV = bndToIdxVerts(lp, g_bnd);
-    //  out->push( LavaTblToOut(move(bndIV),OUT_BOUNDING_BOX) );           // this demonstrates how to output a tbl into the first output slot
-    //}
-
-    if( in->slotMask[IN_RAYS] ) SECTION(trace the input rays)
+    if( in->slotMask[IN_RAYS] )     SECTION(trace the input rays)
     {
       RTCIntersectContext context;
       rtcInitIntersectContext(&context);
@@ -490,7 +439,12 @@ extern "C"          // Embree3 Scene Message Node
       vec_u32 geomID(rayCnt, 0);
       vec_u32 instID(rayCnt, 0);
       vec_u32 primID(rayCnt, 0);
-      vecf    Nx(rayCnt, 0.f);
+      
+      //vecf    Nx(rayCnt, 0.f);
+      //tbl Nx = LavaMakeTbl(lp);
+      //Nx.resize<f32>(rayCnt, 0.f);
+      tbl Nx = LavaMakeTbl(lp, rayCnt, 0.f);
+
       vecf    Ny(rayCnt, 0.f);
       vecf    Nz(rayCnt, 0.f);
       vecf     u(rayCnt, 0.f);
@@ -499,7 +453,7 @@ extern "C"          // Embree3 Scene Message Node
       rh.hit.geomID = geomID.data();
       //rh.hit.instID = instID.data();
       rh.hit.primID = primID.data();
-      rh.hit.Ng_x   = Nx.data();
+      rh.hit.Ng_x   = Nx.data<f32>();
       rh.hit.Ng_y   = Ny.data();
       rh.hit.Ng_z   = Nz.data();
       rh.hit.u      =  u.data();
@@ -507,6 +461,9 @@ extern "C"          // Embree3 Scene Message Node
       TO(RTC_MAX_INSTANCE_LEVEL_COUNT,i){ rh.hit.instID[i] = 0; }
 
       rtcIntersectNp(g_scene, &context, &rh, rayCnt);
+
+      tbl rayHits = rays;
+      rays("Ng x") = &Nx;
 
       tbl raysIV = raysToIdxVerts(lp, rh, rayCnt);
       out->push( LavaTblToOut(move(raysIV), OUT_BOUNDING_BOX) );
@@ -541,7 +498,55 @@ extern "C"          // Embree3 Scene Message Node
 }
 
 
+//SECTION(input packet loop)
+//{
+//  u32 i=0;
+//  while( LavaNxtPckt(in, &i) )
+//  {
+//    RTCIntersectContext context;
+//    rtcInitIntersectContext(&context);
+//
+//    RTCRayHit rh;
+//    rh.ray.mask   =   -1;
+//    rh.ray.id     =    RTC_INVALID_GEOMETRY_ID;
+//    rh.ray.flags  =    0;
+//    rh.ray.time   =    0;
+//    rh.ray.tnear  =   0.f;
+//    rh.ray.tfar   =   numeric_limits<float>::infinity();
+//    rh.ray.org_x  =   0.f;
+//    rh.ray.org_y  =   1.f;
+//    rh.ray.org_z  =   4.f;
+//    rh.ray.dir_x  =   0.f;
+//    rh.ray.dir_y  =   0.f;
+//    rh.ray.dir_z  =  -1.f;
+//
+//    int rayCnt = 100000;
+//    vec_ray rays(rayCnt);
+//    TO(rayCnt,i){
+//      rays[i] = rh;
+//      rays[i].ray.org_x = randomf(-2.f, 3.f);
+//      rays[i].ray.org_y = randomf(-2.f, 4.f);
+//    }
+//
+//    TO(rayCnt,i){
+//      rtcIntersect1(g_scene, &context, &rays[i] );
+//    }
+//
+//    tbl raysIV = raysToIdxVerts(lp, rays.data(), rays.size());
+//    out->push( LavaTblToOut(move(raysIV), OUT_RAYS) );
+//
+//    //tbl rayIV = rayHitToIdxVerts(lp, rh);
+//    //out->push( LavaTblToOut(move(rayIV), RAYS_OUT) );                // this demonstrates how to output a tbl into the first output slot
+//    //out->push( LavaTblToOut(move(rayIV), BOUNDING_BOX_OUT ) );                // this demonstrates how to output a tbl into the first output slot
+//  }
+//}
 
+//if(g_scene) SECTION(bounding box of scene output)
+//{
+//  rtcGetSceneBounds(g_scene, &g_bnd);
+//  tbl bndIV = bndToIdxVerts(lp, g_bnd);
+//  out->push( LavaTblToOut(move(bndIV),OUT_BOUNDING_BOX) );           // this demonstrates how to output a tbl into the first output slot
+//}
 
 //RTCRay r;
 //r.org_x = 0.f;   // (Vec3fa(camera.xfm.p), Vec3fa(normalize(x*camera.xfm.l.vx + y*camera.xfm.l.vy + camera.xfm.l.vz)), 0.0f, inf);

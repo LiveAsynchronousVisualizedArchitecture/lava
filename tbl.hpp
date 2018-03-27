@@ -37,8 +37,9 @@
 // todo: think about arrays of values - go above 8 bytes for the value? 
 // todo: think about strings
 // todo: think about arrays of tables
+// -todo: break out memory allocation from template - keep template as a wrapper for casting a typeless tbl
 
-// todo: break out memory allocation from template - keep template as a wrapper for casting a typeless tbl
+// todo: change data to be a template that checks the type at debug run time
 // todo: make resize() - should there be a resize()? only affects array?
 // todo: use inline assembly to vectorize basic math operations
 // todo: use the restrict keyword on basic math operations?
@@ -805,7 +806,7 @@ private:
   {
     auto len = strlen(s) + 1;
     init(len, 1, TblType::U8);                 // don't want to rely on default arguments here
-    memcpy(data(), s, len);
+    memcpy( (void*)data<u8>(), s, len );
   }
   void        destroy()
   { 
@@ -1049,7 +1050,7 @@ public:
   //tbl     operator>>(tbl const& l){ return tbl::concat_l(*this, l); }
   //tbl     operator<<(tbl const& l){ return tbl::concat_r(*this, l); }
 
-  template<class N> bool        insert(const char* key, N const& val)
+  template<class N> bool         insert(const char* key, N const& val)
   {
     KV& kv = (*this)(key, true);
     if(kv.hsh.type==ERROR) return false;
@@ -1057,15 +1058,15 @@ public:
     kv = val;
     return true;
   }
-  template<class V> KVOfst         put(const char* key, V val){ return this->operator()(key) = val; }
-  template<class T> void  setArrayType()
+  template<class V> KVOfst          put(const char* key, V val){ return this->operator()(key) = val; }
+  template<class T> void   setArrayType()
   {
     if(!m_mem){ reserve(0); }
 
     arrayType( TblType::typenum<T>::num );
     stride( sizeof(T) );
   }
-  template<class T> bool          push(T const& val)
+  template<class T> bool           push(T const& val)
   { 
     if(!m_mem){ init(0); }
     
@@ -1078,7 +1079,7 @@ public:
     
     return true;
   }
-  template<class T> u64           push(std::initializer_list<T> lst)
+  template<class T> u64            push(std::initializer_list<T> lst)
   {
     u64 cnt = 0;
     for(auto const& v : lst){
@@ -1089,7 +1090,28 @@ public:
   
     return cnt;
   }
-  template<class T> T               at(u64 idx) const { return (T)((*this)[idx]); }
+  template<class T> void         resize(u64 count, T initVal=T() ) // todo: return a boolean indicating success - will need to know if reserve succeeded - should setArrayType also error if the array type is already set?
+  {
+    auto prevSz = size();
+    setArrayType<T>();
+    reserve(count);
+    
+    auto initCnt = count - prevSz;
+    TO(initCnt,i){
+      (*this)[i+prevSz] = initVal;
+    }
+  }
+  template<class T> T                at(u64 idx) const { return (T)((*this)[idx]); }
+  template<class T=void> T const*  data() const 
+  {
+    //assert(arrayType() == TblType::typenum<T>::num);
+    return (T const*)m_mem;
+  }
+  template<class T=void> T*        data()
+  {
+    //assert(arrayType() == TblType::typenum<T>::num);
+    return (T*)m_mem;
+  }
   void            pop(){ size(size()-1); }
   TblVal        front() const{ return (*this)[0]; }
   TblVal         back() const{ return (*this)[size()-1]; }
@@ -1160,7 +1182,7 @@ public:
     return nullptr; // no empty slots and key was not found
   }
   u64            size() const { return m_mem? memStart()->size : 0; }
-  u8*            data() const {return (u8*)m_mem; }  // todo: start here
+  //u8*            data() const {return (u8*)m_mem; }  // todo: start here
   void*     childData() const { return (void*)(elemStart() + map_capacity()); }                                                      // elemStart return a KV* so map_capacity will increment that pointer by the map_capacity * sizeof(KV)
   u64  child_capacity() const
   {
@@ -1184,8 +1206,8 @@ public:
   u64          stride() const { return m_mem? memStart()->stride    : 0; }
   u8        arrayType() const { return m_mem? (u8)memStart()->arrayType : 0; }
   auto        typeStr() const -> char const* { return TblType::type_str(arrayType()); };
-  auto      elemStart() ->KV* { return m_mem? (KV*)(data() + capacity()*stride() ) : nullptr; }
-  auto      elemStart() const -> KV const* { return m_mem? (KV*)(data() + capacity()*stride()) : nullptr; }
+  auto      elemStart() ->KV* { return m_mem? (KV*)(data<u8>() + capacity()*stride() ) : nullptr; }
+  auto      elemStart() const -> KV const* { return m_mem? (KV*)(data<u8>() + capacity()*stride()) : nullptr; }
   void*       reserve(u64 count, u64 mapcap=0, u64 childcap=0)
   {
     //if( !owned() ) return m_mem;
