@@ -166,6 +166,14 @@ inline vec3   operator*(float a, vec3 const& b)
   ret.z = a*b.z;
   return ret;
 }
+inline vec3   operator*( vec3 const& b, float a)
+{
+  vec3 ret;
+  ret.x = a*b.x;
+  ret.y = a*b.y;
+  ret.z = a*b.z;
+  return ret;
+}
 inline vec3   operator*(vec3 const& a, vec3 const& b)
 {
   vec3 ret;

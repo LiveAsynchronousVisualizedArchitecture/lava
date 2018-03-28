@@ -111,7 +111,7 @@ tbl raysToIdxVerts(LavaParams const* lp, tbl const& rays)
 
 const f32     fovAngle  =  35.f;
 const f32  asepctRatio  =   1.f;
-const u64       rayCnt  =  100;
+const u64       rayCnt  =  10000;
 const f32    origin[3]  =  {1.f, 2.f,   5.f};
 const f32    camDir[3]  =  {0,     0,  -1.f};
 
@@ -119,15 +119,13 @@ static std::atomic<bool> hasRun;
 
 extern "C"
 {
-  //const char*   InTypes[]  = {"Dummy",       nullptr};
-  //const char*   InNames[]  = {"Dummy Slot",  nullptr};
   const char*   InTypes[]  = {nullptr};
   const char*   InNames[]  = {nullptr};
   const char*  OutTypes[]  = {"Rays",                       "IdxVerts",             nullptr};
   const char*  OutNames[]  = {"Chunk of rays to be traced", "Camera Visualiztion",  nullptr};
 
   void Camera_construct(){ hasRun = false; }
-  void Camera_destruct(){ hasRun = false; }
+  void Camera_destruct(){  hasRun = false; }
 
   uint64_t Camera(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
   {
@@ -277,6 +275,8 @@ extern "C"
 
 
 
+//const char*   InTypes[]  = {"Dummy",       nullptr};
+//const char*   InNames[]  = {"Dummy Slot",  nullptr};
 
 //
 //f32 fovOfst = .5f * rcp(tanf(deg2rad( .5f * fovAngle )));

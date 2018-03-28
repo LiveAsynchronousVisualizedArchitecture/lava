@@ -187,11 +187,13 @@
 // -todo: add resize to tbl
 // -todo: calculate and output rayHits
 // -todo: make ggx brdf generate new rays with weights
+// -todo: visualize rayHits in Tracer
+// -todo: visualize BRDF ray hits at the geometry-ray intersection point
 
-// todo: visualize rayHits in Tracer
+// todo: cull rays that don't hit in tracer
 // todo: try to load the cornell box .obj
 // todo: make an IndexedVerts helper header file
-// todo: can a cache node be created as a regular flow node? - good candadite for tinylibc? 
+// todo: can a cache node be created as a regular flow node? - good candadite for tinylibc? - cache nodes need to be their own type so they can be run without recieving input, but otherwise can probably be run without input - should the node type be generator or cache?
 // todo: work out structure for constants - .const files can be detected by lava - files could be named .Type.const to be detected as constant nodes while retaining type information that is not stored in any sort of binary format
 // todo: work out details for a cache node - could be part of the generators list along with message nodes, flow nodes without inputs, and constants - can a cache node be implemented mostly with a regular node by copying its input to a global allocator like malloc or into a simdb instance? - the output type would need to match the input type instead of being hard coded
 // todo: add cursor member variable to LavaFrame

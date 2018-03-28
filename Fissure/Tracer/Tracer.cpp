@@ -139,7 +139,6 @@ tbl   raysToIdxVerts(LavaParams const* lp, RTCRayHitNp const& rh, u32 rayCnt)
     ind.push( (u32)(i*2+0) );
     ind.push( (u32)(i*2+1) );
   }
-
   TO(rayCnt,i)     // now do the ray hits
   {  
     // ray hit point
@@ -510,11 +509,16 @@ extern "C"          // Embree3 Scene Message Node
       tbl raysIV = raysToIdxVerts(lp, rh, rayCnt);
       out->push( LavaTblToOut(move(raysIV), OUT_RAY_VISUALIZATION) );
 
+      tbl tfar = LavaMakeTbl(lp, rayCnt, 0.f);
+      TO(rayCnt,i){
+        tfar[i] = rh.ray.tfar[i];
+      }
+
       tbl rayHits     = rays;
       rayHits("Ng x") = &Nx;
       rayHits("Ng y") = &Ny;
       rayHits("Ng z") = &Nz;
-
+      rayHits("tfar") = &tfar;
       rayHits.flatten();
       out->push( LavaTblToOut(move(rayHits), OUT_RAY_HITS) );
     }

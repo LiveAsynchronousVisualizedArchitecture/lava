@@ -3,7 +3,7 @@
 #include <cmath>
 #include <random>
 #include "../../no_rt_util.h"
-#include "../shared/vec.hpp"
+//#include "../shared/vec.hpp"
 #include "../../tbl.hpp"
 #include "../LavaFlow.hpp"
 #include "../shared/math/affinespace.h"
@@ -18,6 +18,7 @@ enum        Slots
 };
 
 using embree::Vec3f;
+using v3 = embree::Vec3f;
 
 struct BrdfResult
 {
@@ -257,6 +258,10 @@ tbl brdfRaysToIV(LavaParams const* lp, tbl const& rays, tbl const& brdfRays)    
   tbl   ox = rays("origin x");
   tbl   oy = rays("origin y");
   tbl   oz = rays("origin z");
+  tbl   dx = rays("direction x");
+  tbl   dy = rays("direction y");
+  tbl   dz = rays("direction z");
+  tbl tfar = rays("tfar");
 
   tbl  pdf = brdfRays("pdf");
   tbl   Lx = brdfRays("Lx");
@@ -273,15 +278,22 @@ tbl brdfRaysToIV(LavaParams const* lp, tbl const& rays, tbl const& brdfRays)    
   tbl  ind = LavaMakeTbl(lp, len*2,  0u);          // 0u makes the array type unsigned 32 bits 
 
   TO(len,i){
-    v3   o( ox[i], oy[i], oz[i] );
-    v3 dir( Lx[i], Ly[i], Ly[i] );
-    
-    px[i*2] = o.x;
-    py[i*2] = o.y;
-    pz[i*2] = o.z;
-    px[i*2 + 1] = o.x + dir.x;
-    py[i*2 + 1] = o.y + dir.y;
-    pz[i*2 + 1] = o.z + dir.z;
+    v3    o( ox[i], oy[i], oz[i] );
+    v3  dir( dx[i], dy[i], dz[i] );
+    v3 hitP = o  +  dir * (f32)tfar[i];
+    //v3 hitP = o;
+
+    v3  L( Lx[i], Ly[i], Lz[i] );
+
+    px[i*2] = hitP.x;
+    py[i*2] = hitP.y;
+    pz[i*2] = hitP.z;
+    px[i*2 + 1] = hitP.x + L.x;
+    py[i*2 + 1] = hitP.y + L.y;
+    pz[i*2 + 1] = hitP.z + L.z;
+    //px[i*2 + 1] = hitP.x + 0.f;
+    //py[i*2 + 1] = hitP.y + 1.f;
+    //pz[i*2 + 1] = hitP.z + 0.f;
 
     cr[i*2 + 0] = 1.f;
     cr[i*2 + 1] = 1.f;
@@ -342,10 +354,10 @@ extern "C"
     tbl     specZ = LavaMakeTbl(lp, rayCnt,   0.f);
     TO(rayCnt,i)
     {
-      Vec3f V( (f32)dx[i],     (f32)dy[i],   (f32)dz[i] );
+      Vec3f V( -(f32)dx[i],     -(f32)dy[i],   -(f32)dz[i] );
       Vec3f N( (f32)Ng_x[i], (f32)Ng_y[i], (f32)Ng_z[i] );
 
-      auto result = BrdfSampleGGX( randomf(0,1.f), randomf(0,1.f), normalize(V), N, 0.5f);
+      auto result = BrdfSampleGGX( randomf(0,1.f), randomf(0,1.f), normalize(V), N, 0.01f);
       pdf[i]   = result.m_pdf;
       Lx[i]    = result.m_L.x;
       Ly[i]    = result.m_L.y;
@@ -364,10 +376,10 @@ extern "C"
     brdfRays("specZ") = &specZ;
     brdfRays.flatten();
 
-    out->push( LavaTblToOut(move(brdfRays), OUT_BRDF_RAYS) );
-
     tbl ivBrdfRays = brdfRaysToIV(lp, rays, brdfRays);
     out->push( LavaTblToOut(move(ivBrdfRays), OUT_BRDF_RAYS_VISUALIZATION) );
+
+    out->push( LavaTblToOut(move(brdfRays), OUT_BRDF_RAYS) );
 
     return 1;
   }
