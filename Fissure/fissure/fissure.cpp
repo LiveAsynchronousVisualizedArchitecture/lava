@@ -189,6 +189,9 @@
 // -todo: make ggx brdf generate new rays with weights
 
 // todo: visualize rayHits in Tracer
+// todo: try to load the cornell box .obj
+// todo: make an IndexedVerts helper header file
+// todo: can a cache node be created as a regular flow node? - good candadite for tinylibc? 
 // todo: work out structure for constants - .const files can be detected by lava - files could be named .Type.const to be detected as constant nodes while retaining type information that is not stored in any sort of binary format
 // todo: work out details for a cache node - could be part of the generators list along with message nodes, flow nodes without inputs, and constants - can a cache node be implemented mostly with a regular node by copying its input to a global allocator like malloc or into a simdb instance? - the output type would need to match the input type instead of being hard coded
 // todo: add cursor member variable to LavaFrame
@@ -210,6 +213,7 @@
 // todo: try tiny libc in a node 
 // todo: make sure zooming center is affected by cursor placement
 // todo: make message node's text split to new lines on white space
+// todo: make an empty string for type ( "" ) be any type, possibly with lighter color slots
 
 // todo: try making the embree vector a union with a float array inside
 // todo: draw slots that are framed together as one blob with multiple slots in the UI

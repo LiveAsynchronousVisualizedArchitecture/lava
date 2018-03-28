@@ -111,7 +111,7 @@ tbl raysToIdxVerts(LavaParams const* lp, tbl const& rays)
 
 const f32     fovAngle  =  35.f;
 const f32  asepctRatio  =   1.f;
-const u64       rayCnt  =  100000;
+const u64       rayCnt  =  100;
 const f32    origin[3]  =  {1.f, 2.f,   5.f};
 const f32    camDir[3]  =  {0,     0,  -1.f};
 

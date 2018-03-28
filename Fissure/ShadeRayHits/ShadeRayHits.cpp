@@ -248,12 +248,72 @@ BrdfResult  BrdfSampleLambertian(float u1, float u2, Vec3f V, Vec3f N)
   return BrdfResult( Vec3f(LdotN), L, pdf); // 0.f );
 }
 
+tbl brdfRaysToIV(LavaParams const* lp, tbl const& rays, tbl const& brdfRays)                    // IV is IndexedVerts - a tbl that contains geometry information
+{
+  using namespace std;
+
+  tbl   iv = LavaMakeTbl(lp, 0, (u8)0);
+
+  tbl   ox = rays("origin x");
+  tbl   oy = rays("origin y");
+  tbl   oz = rays("origin z");
+
+  tbl  pdf = brdfRays("pdf");
+  tbl   Lx = brdfRays("Lx");
+  tbl   Ly = brdfRays("Ly");
+  tbl   Lz = brdfRays("Lz");
+
+  u64  len = pdf.size();
+  tbl   px = LavaMakeTbl(lp, len*2, 0.f);
+  tbl   py = LavaMakeTbl(lp, len*2, 0.f);
+  tbl   pz = LavaMakeTbl(lp, len*2, 0.f);
+  tbl   cr = LavaMakeTbl(lp, len*2, 0.f);
+  tbl   cg = LavaMakeTbl(lp, len*2, 0.f);
+  tbl   ca = LavaMakeTbl(lp, len*2, 0.f);
+  tbl  ind = LavaMakeTbl(lp, len*2,  0u);          // 0u makes the array type unsigned 32 bits 
+
+  TO(len,i){
+    v3   o( ox[i], oy[i], oz[i] );
+    v3 dir( Lx[i], Ly[i], Ly[i] );
+    
+    px[i*2] = o.x;
+    py[i*2] = o.y;
+    pz[i*2] = o.z;
+    px[i*2 + 1] = o.x + dir.x;
+    py[i*2 + 1] = o.y + dir.y;
+    pz[i*2 + 1] = o.z + dir.z;
+
+    cr[i*2 + 0] = 1.f;
+    cr[i*2 + 1] = 1.f;
+    cg[i*2 + 0] = 0.f;
+    cg[i*2 + 1] = 1.f;
+    ca[i*2 + 0] = 0.25f;
+    ca[i*2 + 1] = 0.05f;
+
+    ind[i*2+0] = (u32)(i*2);
+    ind[i*2+1] = (u32)(i*2 + 1);
+  }
+
+  iv("positions x")  = &px;
+  iv("positions y")  = &py;
+  iv("positions z")  = &pz;
+  iv("colors red")   = &cr;
+  iv("colors green") = &cg;
+  iv("colors alpha") = &ca;
+  iv("indices")      = &ind;
+  iv("mode")         = 1;            // 0 should be points, 1 should be lines
+  iv("type")         = tbl::StrToInt("IdxVerts");
+  iv.flatten();
+
+  return move(iv);
+}
+
 extern "C"
 {
-  const char*  InTypes[]  = {"Rays",                           nullptr};
-  const char*  InNames[]  = {"Rays already traced by embree",  nullptr};
-  const char* OutTypes[]  = {"BRDF Rays",                      nullptr};
-  const char* OutNames[]  = {"New rays based on the GGX BRDF that also have weights associated with them", nullptr};
+  const char*  InTypes[]  = {"Rays",                                                     nullptr};
+  const char*  InNames[]  = {"Rays already traced by embree",                            nullptr};
+  const char* OutTypes[]  = {"BRDF Rays",                     "IdxVerts",                nullptr};
+  const char* OutNames[]  = {"Rays from GGX BRDF with pdf",   "BRDF Rays Visualization", nullptr};
 
   void ShadeRayHits_construct(){ }
   void ShadeRayHits_destruct(){ }
@@ -306,8 +366,8 @@ extern "C"
 
     out->push( LavaTblToOut(move(brdfRays), OUT_BRDF_RAYS) );
 
-    //tbl ivBrdfRays;
-    //out->push( LavaTblToOut(move(ivBrdfRays), OUT_BRDF_RAYS_VISUALIZATION) );
+    tbl ivBrdfRays = brdfRaysToIV(lp, rays, brdfRays);
+    out->push( LavaTblToOut(move(ivBrdfRays), OUT_BRDF_RAYS_VISUALIZATION) );
 
     return 1;
   }
