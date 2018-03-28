@@ -163,8 +163,8 @@ tbl   raysToIdxVerts(LavaParams const* lp, RTCRayHitNp const& rh, u32 rayCnt)
     cr.push(1.0f);
     cg.push(0.0f);
     cg.push(1.0f);
-    ca.push(1.0f);
-    ca.push(0.1f);
+    ca.push(0.25f);
+    ca.push(0.05f);
 
     u64 rc2 = rayCnt * 2;
     ind.push( (u32)(rc2 + (i*2+0)) );
@@ -449,26 +449,12 @@ extern "C"          // Embree3 Scene Message Node
       tbl   dz = rays("direction z");
 
       rayCnt = ox.size();
-      rh.ray.org_x = ox.data<f32>();
-      rh.ray.org_y = oy.data<f32>();
-      rh.ray.org_z = oz.data<f32>();
-      rh.ray.dir_x = dx.data<f32>();
-      rh.ray.dir_y = dy.data<f32>();
-      rh.ray.dir_z = dz.data<f32>();
 
-      vecf zeros(rayCnt, 0.f);
-      vecf  infs(rayCnt, numeric_limits<f32>::infinity() );
-      vec_u32  mask(rayCnt, -1);
-      vec_u32 flags(rayCnt,  0);
-      vec_u32   ids(rayCnt);
-      TO(rayCnt,i){ ids[i] = (u32)i; }
-
-      rh.ray.time  = zeros.data();
-      rh.ray.tnear = zeros.data();
-      rh.ray.tfar  = infs.data();
-      rh.ray.id    = ids.data();
-      rh.ray.mask  = mask.data();
-      rh.ray.flags = flags.data();
+      vecf      zeros(rayCnt, 0.f);
+      vecf       infs(rayCnt, numeric_limits<f32>::infinity() );
+      vec_u32    mask(rayCnt, -1);
+      vec_u32   flags(rayCnt,  0);
+      vec_u32     ids(rayCnt);
 
       tbl Nx = LavaMakeTbl(lp, rayCnt, 0.f);
       tbl Ny = LavaMakeTbl(lp, rayCnt, 0.f);
@@ -481,6 +467,22 @@ extern "C"          // Embree3 Scene Message Node
 
       SECTION(fill the ray hit structure of arrays)
       {
+        rh.ray.org_x = ox.data<f32>();
+        rh.ray.org_y = oy.data<f32>();
+        rh.ray.org_z = oz.data<f32>();
+        rh.ray.dir_x = dx.data<f32>();
+        rh.ray.dir_y = dy.data<f32>();
+        rh.ray.dir_z = dz.data<f32>();
+
+        TO(rayCnt,i){ ids[i] = (u32)i; }
+
+        rh.ray.time  = zeros.data();
+        rh.ray.tnear = zeros.data();
+        rh.ray.tfar  = infs.data();
+        rh.ray.id    = ids.data();
+        rh.ray.mask  = mask.data();
+        rh.ray.flags = flags.data();
+
         rh.hit.geomID = geomID.data();
         rh.hit.primID = primID.data();
         rh.hit.Ng_x   = Nx.data<f32>();
@@ -488,6 +490,7 @@ extern "C"          // Embree3 Scene Message Node
         rh.hit.Ng_z   = Nz.data<f32>();
         rh.hit.u      =  u.data<f32>();
         rh.hit.v      =  v.data<f32>();
+
         TO(RTC_MAX_INSTANCE_LEVEL_COUNT,i){ rh.hit.instID[i] = 0; }
       }
 

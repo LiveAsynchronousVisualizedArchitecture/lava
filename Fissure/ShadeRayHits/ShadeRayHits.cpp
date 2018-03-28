@@ -1,6 +1,7 @@
 
 
 #include <cmath>
+#include <random>
 #include "../../no_rt_util.h"
 #include "../shared/vec.hpp"
 #include "../../tbl.hpp"
@@ -11,7 +12,9 @@
 enum        Slots
 {
   IN_RAYS  =  0,                // the rays that have been traced
-  OUT_WEIGHTED_RAYS = 0
+
+  OUT_BRDF_RAYS = 0,
+  OUT_BRDF_RAYS_VISUALIZATION = 1
 };
 
 using embree::Vec3f;
@@ -33,6 +36,20 @@ struct BrdfResult
     return true;
   }
 };
+
+namespace RNG
+{
+  using rng_t  = ::std::mt19937;
+  using urng_t = ::std::unique_ptr<rng_t>;
+
+  rng_t   gen(0);
+  rng_t*  m_genPtr = &gen;
+}
+float     randomf(float lo, float hi)
+{
+  ::std::uniform_real_distribution<float> dis(lo, hi);
+  return dis(*RNG::m_genPtr);
+}
 
 template<class T> T sqr(T x){ return x*x; };
 
@@ -231,12 +248,11 @@ BrdfResult  BrdfSampleLambertian(float u1, float u2, Vec3f V, Vec3f N)
   return BrdfResult( Vec3f(LdotN), L, pdf); // 0.f );
 }
 
-
 extern "C"
 {
   const char*  InTypes[]  = {"Rays",                           nullptr};
   const char*  InNames[]  = {"Rays already traced by embree",  nullptr};
-  const char* OutTypes[]  = {"Rays",                           nullptr};
+  const char* OutTypes[]  = {"BRDF Rays",                      nullptr};
   const char* OutNames[]  = {"New rays based on the GGX BRDF that also have weights associated with them", nullptr};
 
   void ShadeRayHits_construct(){ }
@@ -245,15 +261,53 @@ extern "C"
   uint64_t ShadeRayHits(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
   {
     using namespace std;
+    using namespace embree;
 
-    tbl rays = LavaTblFromPckt(lp, in, IN_RAYS);
+    tbl      rays = LavaTblFromPckt(lp, in, IN_RAYS);
+    tbl        dx = rays("direction x");
+    tbl        dy = rays("direction y");
+    tbl        dz = rays("direction z");
+    tbl      Ng_x = rays("Ng x");
+    tbl      Ng_y = rays("Ng y");
+    tbl      Ng_z = rays("Ng z");
 
+    auto   rayCnt = Ng_x.size();
+    tbl  brdfRays = LavaMakeTbl(lp,      0, (u8)0);
+    tbl       pdf = LavaMakeTbl(lp, rayCnt,   0.f);
+    tbl        Lx = LavaMakeTbl(lp, rayCnt,   0.f);
+    tbl        Ly = LavaMakeTbl(lp, rayCnt,   0.f);
+    tbl        Lz = LavaMakeTbl(lp, rayCnt,   0.f);
+    tbl     specX = LavaMakeTbl(lp, rayCnt,   0.f);
+    tbl     specY = LavaMakeTbl(lp, rayCnt,   0.f);
+    tbl     specZ = LavaMakeTbl(lp, rayCnt,   0.f);
+    TO(rayCnt,i)
+    {
+      Vec3f V( (f32)dx[i],     (f32)dy[i],   (f32)dz[i] );
+      Vec3f N( (f32)Ng_x[i], (f32)Ng_y[i], (f32)Ng_z[i] );
 
+      auto result = BrdfSampleGGX( randomf(0,1.f), randomf(0,1.f), normalize(V), N, 0.5f);
+      pdf[i]   = result.m_pdf;
+      Lx[i]    = result.m_L.x;
+      Ly[i]    = result.m_L.y;
+      Lz[i]    = result.m_L.z;
+      specX[i] = result.m_spectrum.x;
+      specY[i] = result.m_spectrum.y;
+      specZ[i] = result.m_spectrum.z;
+    }
 
-    //u32 i=0;
-    //while( LavaNxtPckt(in, &i) )
-    //{   
-    //}
+    brdfRays("pdf")   = &pdf;
+    brdfRays("Lx")    = &Lx;
+    brdfRays("Ly")    = &Ly;
+    brdfRays("Lz")    = &Lz;
+    brdfRays("specX") = &specX;
+    brdfRays("specY") = &specY;
+    brdfRays("specZ") = &specZ;
+    brdfRays.flatten();
+
+    out->push( LavaTblToOut(move(brdfRays), OUT_BRDF_RAYS) );
+
+    //tbl ivBrdfRays;
+    //out->push( LavaTblToOut(move(ivBrdfRays), OUT_BRDF_RAYS_VISUALIZATION) );
 
     return 1;
   }
@@ -289,6 +343,12 @@ extern "C"
 
 
 
+
+
+//u32 i=0;
+//while( LavaNxtPckt(in, &i) )
+//{   
+//}
 
 //tbl inputTbl( (void*)(in->packets[i-1].val.value) );
 //
