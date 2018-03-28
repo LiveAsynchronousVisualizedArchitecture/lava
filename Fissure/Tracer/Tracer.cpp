@@ -139,36 +139,37 @@ tbl   raysToIdxVerts(LavaParams const* lp, RTCRayHitNp const& rh, u32 rayCnt)
     ind.push( (u32)(i*2+0) );
     ind.push( (u32)(i*2+1) );
   }
-  TO(rayCnt,i)     // now do the ray hits
-  {  
-    // ray hit point
-    v3 hitP;
-    hitP.x = rh.ray.org_x[i] + (rh.ray.dir_x[i]*rh.ray.tfar[i]);
-    hitP.y = rh.ray.org_y[i] + (rh.ray.dir_y[i]*rh.ray.tfar[i]);
-    hitP.z = rh.ray.org_z[i] + (rh.ray.dir_z[i]*rh.ray.tfar[i]);
-    px.push( hitP.x );
-    py.push( hitP.y );
-    pz.push( hitP.z );
 
-    v3 hitN;
-    hitN.x = hitP.x + rh.hit.Ng_x[i];
-    hitN.y = hitP.y + rh.hit.Ng_y[i];
-    hitN.z = hitP.z + rh.hit.Ng_z[i];
-    px.push( hitN.x );
-    py.push( hitN.y );
-    pz.push( hitN.z );
-
-    cr.push(0.5f);
-    cr.push(1.0f);
-    cg.push(0.0f);
-    cg.push(1.0f);
-    ca.push(0.25f);
-    ca.push(0.05f);
-
-    u64 rc2 = rayCnt * 2;
-    ind.push( (u32)(rc2 + (i*2+0)) );
-    ind.push( (u32)(rc2 + (i*2+1)) );
-  }
+  //TO(rayCnt,i)     // now do the ray hits
+  //{  
+  //  // ray hit point
+  //  v3 hitP;
+  //  hitP.x = rh.ray.org_x[i] + (rh.ray.dir_x[i]*rh.ray.tfar[i]);
+  //  hitP.y = rh.ray.org_y[i] + (rh.ray.dir_y[i]*rh.ray.tfar[i]);
+  //  hitP.z = rh.ray.org_z[i] + (rh.ray.dir_z[i]*rh.ray.tfar[i]);
+  //  px.push( hitP.x );
+  //  py.push( hitP.y );
+  //  pz.push( hitP.z );
+  //
+  //  v3 hitN;
+  //  hitN.x = hitP.x + rh.hit.Ng_x[i];
+  //  hitN.y = hitP.y + rh.hit.Ng_y[i];
+  //  hitN.z = hitP.z + rh.hit.Ng_z[i];
+  //  px.push( hitN.x );
+  //  py.push( hitN.y );
+  //  pz.push( hitN.z );
+  //
+  //  cr.push(0.5f);
+  //  cr.push(1.0f);
+  //  cg.push(0.0f);
+  //  cg.push(1.0f);
+  //  ca.push(0.25f);
+  //  ca.push(0.05f);
+  //
+  //  u64 rc2 = rayCnt * 2;
+  //  ind.push( (u32)(rc2 + (i*2+0)) );
+  //  ind.push( (u32)(rc2 + (i*2+1)) );
+  //}
 
   iv("positions x")  = &px;
   iv("positions y")  = &py;

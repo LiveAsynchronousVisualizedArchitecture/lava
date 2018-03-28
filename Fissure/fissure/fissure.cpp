@@ -189,6 +189,10 @@
 // -todo: make ggx brdf generate new rays with weights
 // -todo: visualize rayHits in Tracer
 // -todo: visualize BRDF ray hits at the geometry-ray intersection point
+// -todo: narrow camera fov
+// -todo: shorten brdf rays for visualization
+// -todo: try in release mode
+// -todo: add pdf to visualization of brdf rays
 
 // todo: cull rays that don't hit in tracer
 // todo: try to load the cornell box .obj

@@ -263,19 +263,25 @@ tbl brdfRaysToIV(LavaParams const* lp, tbl const& rays, tbl const& brdfRays)    
   tbl   dz = rays("direction z");
   tbl tfar = rays("tfar");
 
-  tbl  pdf = brdfRays("pdf");
+  tbl pdfs = brdfRays("pdf");
   tbl   Lx = brdfRays("Lx");
   tbl   Ly = brdfRays("Ly");
   tbl   Lz = brdfRays("Lz");
 
-  u64  len = pdf.size();
+  u64  len = pdfs.size();
   tbl   px = LavaMakeTbl(lp, len*2, 0.f);
   tbl   py = LavaMakeTbl(lp, len*2, 0.f);
   tbl   pz = LavaMakeTbl(lp, len*2, 0.f);
   tbl   cr = LavaMakeTbl(lp, len*2, 0.f);
   tbl   cg = LavaMakeTbl(lp, len*2, 0.f);
+  tbl   cb = LavaMakeTbl(lp, len*2, 0.f);
   tbl   ca = LavaMakeTbl(lp, len*2, 0.f);
   tbl  ind = LavaMakeTbl(lp, len*2,  0u);          // 0u makes the array type unsigned 32 bits 
+
+  f32 mxPdf = 0.f;
+  TO(len,i){ 
+    mxPdf = max<f32>(mxPdf, pdfs.at<f32>(i));
+  } 
 
   TO(len,i){
     v3    o( ox[i], oy[i], oz[i] );
@@ -284,6 +290,7 @@ tbl brdfRaysToIV(LavaParams const* lp, tbl const& rays, tbl const& brdfRays)    
     //v3 hitP = o;
 
     v3  L( Lx[i], Ly[i], Lz[i] );
+    L *= 0.15f;
 
     px[i*2] = hitP.x;
     py[i*2] = hitP.y;
@@ -295,12 +302,15 @@ tbl brdfRaysToIV(LavaParams const* lp, tbl const& rays, tbl const& brdfRays)    
     //py[i*2 + 1] = hitP.y + 1.f;
     //pz[i*2 + 1] = hitP.z + 0.f;
 
+    f32 pdf = pdfs.at<f32>(i) / mxPdf;
     cr[i*2 + 0] = 1.f;
     cr[i*2 + 1] = 1.f;
     cg[i*2 + 0] = 0.f;
     cg[i*2 + 1] = 1.f;
-    ca[i*2 + 0] = 0.25f;
-    ca[i*2 + 1] = 0.05f;
+    cb[i*2 + 0] = pdf;
+    cb[i*2 + 1] = pdf;
+    ca[i*2 + 0] = .15f;     // 0.25f;
+    ca[i*2 + 1] = .15f;     // 0.05f;
 
     ind[i*2+0] = (u32)(i*2);
     ind[i*2+1] = (u32)(i*2 + 1);
@@ -311,6 +321,7 @@ tbl brdfRaysToIV(LavaParams const* lp, tbl const& rays, tbl const& brdfRays)    
   iv("positions z")  = &pz;
   iv("colors red")   = &cr;
   iv("colors green") = &cg;
+  iv("colors blue")  = &cb;
   iv("colors alpha") = &ca;
   iv("indices")      = &ind;
   iv("mode")         = 1;            // 0 should be points, 1 should be lines
@@ -354,10 +365,12 @@ extern "C"
     tbl     specZ = LavaMakeTbl(lp, rayCnt,   0.f);
     TO(rayCnt,i)
     {
-      Vec3f V( -(f32)dx[i],     -(f32)dy[i],   -(f32)dz[i] );
-      Vec3f N( (f32)Ng_x[i], (f32)Ng_y[i], (f32)Ng_z[i] );
+      //Vec3f V(   (f32)dx[i],   (f32)dy[i],   (f32)dz[i]   );
+      //Vec3f N( (f32)Ng_x[i], (f32)Ng_y[i],   (f32)Ng_z[i] );
+      Vec3f V(    dx[i],    dy[i],     dz[i]  );
+      Vec3f N(  Ng_x[i],  Ng_y[i],   Ng_z[i]  );
 
-      auto result = BrdfSampleGGX( randomf(0,1.f), randomf(0,1.f), normalize(V), N, 0.01f);
+      auto result = BrdfSampleGGX( randomf(0,1.f), randomf(0,1.f), -normalize(V), N, 0.25f);
       pdf[i]   = result.m_pdf;
       Lx[i]    = result.m_L.x;
       Ly[i]    = result.m_L.y;

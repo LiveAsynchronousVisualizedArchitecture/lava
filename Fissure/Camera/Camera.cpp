@@ -57,23 +57,18 @@ tbl raysToIdxVerts(LavaParams const* lp, tbl const& rays)
   tbl   dy = rays("direction y");
   tbl   dz = rays("direction z");
 
-  tbl   iv = LavaMakeTbl(lp);
-  tbl   px = LavaMakeTbl(lp);
-  tbl   py = LavaMakeTbl(lp);
-  tbl   pz = LavaMakeTbl(lp);
-  tbl   cr = LavaMakeTbl(lp);
-  tbl   cg = LavaMakeTbl(lp);
-  tbl   ca = LavaMakeTbl(lp);
-  tbl  ind = LavaMakeTbl(lp);
-
-  iv.setArrayType<i8>();
-  px.setArrayType<f32>();
-  py.setArrayType<f32>();
-  pz.setArrayType<f32>();
-  cr.setArrayType<f32>();
-  cg.setArrayType<f32>();
-  ca.setArrayType<f32>();
-  ind.setArrayType<u32>();
+  tbl   iv, px, py, pz, cr, cg, ca, ind;
+  SECTION(create tables for indexed verts)
+  {
+    iv = LavaMakeTbl(lp, 0, (u8)0);
+    px = LavaMakeTbl(lp, 0, 0.f);
+    py = LavaMakeTbl(lp, 0, 0.f);
+    pz = LavaMakeTbl(lp, 0, 0.f);
+    cr = LavaMakeTbl(lp, 0, 0.f);
+    cg = LavaMakeTbl(lp, 0, 0.f);
+    ca = LavaMakeTbl(lp, 0, 0.f);
+    ind = LavaMakeTbl(lp, 0,  0u);
+  }
 
   TO(ox.size(),i){
     px.push<f32>( (f32)ox[i] );
@@ -88,8 +83,8 @@ tbl raysToIdxVerts(LavaParams const* lp, tbl const& rays)
     cr.push(1.0f);
     cg.push(0.0f);
     cg.push(1.0f);
-    ca.push(0.1f);
-    ca.push(0.2f);
+    ca.push(0.01f);
+    ca.push(0.01f);
 
     ind.push( (u32)(i*2 + 0) );
     ind.push( (u32)(i*2 + 1) );
@@ -109,9 +104,9 @@ tbl raysToIdxVerts(LavaParams const* lp, tbl const& rays)
   return move(iv);
 }
 
-const f32     fovAngle  =  35.f;
+const f32     fovAngle  =  40.f;
 const f32  asepctRatio  =   1.f;
-const u64       rayCnt  =  10000;
+const u64       rayCnt  =  100000;
 const f32    origin[3]  =  {1.f, 2.f,   5.f};
 const f32    camDir[3]  =  {0,     0,  -1.f};
 
@@ -274,6 +269,25 @@ extern "C"
 
 
 
+
+
+//tbl   iv = LavaMakeTbl(lp);
+//tbl   px = LavaMakeTbl(lp);
+//tbl   py = LavaMakeTbl(lp);
+//tbl   pz = LavaMakeTbl(lp);
+//tbl   cr = LavaMakeTbl(lp);
+//tbl   cg = LavaMakeTbl(lp);
+//tbl   ca = LavaMakeTbl(lp);
+//tbl  ind = LavaMakeTbl(lp);
+//
+//iv.setArrayType<i8>();
+//px.setArrayType<f32>();
+//py.setArrayType<f32>();
+//pz.setArrayType<f32>();
+//cr.setArrayType<f32>();
+//cg.setArrayType<f32>();
+//ca.setArrayType<f32>();
+//ind.setArrayType<u32>();
 
 //const char*   InTypes[]  = {"Dummy",       nullptr};
 //const char*   InNames[]  = {"Dummy Slot",  nullptr};

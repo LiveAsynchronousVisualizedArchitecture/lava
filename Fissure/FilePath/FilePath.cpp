@@ -12,8 +12,10 @@ static std::atomic<bool> hasRun = false;
 
 extern "C"
 {
-  const char*  InTypes[]  = {"temp",               nullptr};                               // This array contains the type that each slot of the same index will accept as input.
-  const char*  InNames[]  = {"temp slot",          nullptr};                               // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  //const char*  InTypes[]  = {"temp",               nullptr};                               // This array contains the type that each slot of the same index will accept as input.
+  //const char*  InNames[]  = {"temp slot",          nullptr};                               // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char*  InTypes[]  = {nullptr};
+  const char*  InNames[]  = {nullptr};
   const char* OutTypes[]  = {"ASCII",              nullptr};         // This array contains the types that are output in each slot of the same index
   const char* OutNames[]  = {"FilePath Slot Out",  nullptr};         // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
 
@@ -54,7 +56,7 @@ extern "C"
       FilePath,                                      // function
       FilePath_construct,                            // constructor - this can be set to nullptr if not needed
       FilePath_destruct,                             // destructor  - this can also be set to nullptr 
-      LavaNode::MSG,                                 // node_type   - this should be eighther LavaNode::MSG (will be run even without input packets) or LavaNode::FLOW (will be run only when at least one packet is available for input)
+      LavaNode::FLOW,                                // node_type   - this should be eighther LavaNode::MSG (will be run even without input packets) or LavaNode::FLOW (will be run only when at least one packet is available for input)
       "FilePath",                                    // name
       InTypes,                                       // in_types    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
       InNames,                                       // in_names    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
