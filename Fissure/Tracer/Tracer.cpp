@@ -19,9 +19,15 @@ enum Slots
 
 struct Triangle { int v0, v1, v2; };
 
+using tblmap  = std::unordered_map<str, tbl>;
+using vec_kv  = std::vector<tbl::KV>;
+using vec_tbl = std::vector<tbl>;
+using vec_str = std::vector<std::string>;
 using vec_ray = std::vector<RTCRayHit>;
 using    vecf = std::vector<f32>;
 using vec_u32 = std::vector<u32>;
+
+const f32 INF = std::numeric_limits<f32>::infinity();
 
 RTCDevice g_device = nullptr;
 RTCScene   g_scene = nullptr;
@@ -341,6 +347,61 @@ tbl    bndToIdxVerts(LavaParams const* lp, RTCBounds const& b)
   return move(iv);
 }
 
+tbl cullRays(LavaParams const* lp, tbl& rays)
+{
+  using namespace std;
+  
+  vec_tbl    subTbls;
+  //vec_tbl   prevTbls;
+  //vec_kv      tblKvs;
+  tblmap    prevTbls;
+  tbl     culledRays = LavaMakeTbl(lp);
+  tbl       tfar = rays("tfar");
+  u64     rayCnt = tfar.size();
+  i64     nxtCnt = 0;
+  i64     curIdx = 0;
+
+  for(auto kv : rays){
+    if(kv.hasTypeAttr(tbl::TblType::TABLE) )
+      prevTbls[kv.key] = (tbl)rays(kv.key);
+  }
+
+  TO(rayCnt,i){
+    if( (f32)tfar[curIdx] == INF ){
+      for(auto& kv : prevTbls){
+        tbl& t = kv.second;
+        t.erase(curIdx);
+      }
+    }else{
+      curIdx++;
+    }
+  }
+
+  for(auto& kv : prevTbls){
+    culledRays( kv.first.c_str() ) = &kv.second;
+  }
+  culledRays.flatten();
+
+  //TO(rayCnt,i){
+  //  if( (f32)tfar[i] == INF ){
+  //    nxtCnt++;
+  //  }
+  //}
+  //
+  //for(auto kv : rays){
+  //  prevTbls.push_back( (tbl)kv );
+  //}
+  //
+  //for(auto kv : rays){
+  //  tbl sub = kv;
+  //  TO(nxtCnt,i){
+  //    
+  //  }
+  //}
+
+  return culledRays;
+}
+
 extern "C"          // Embree3 Scene Message Node
 {
   const char* description = "Takes in geometry that will be sorted into an acceleration structure and ultimatly used to trace rays";                                     // description
@@ -441,12 +502,13 @@ extern "C"          // Embree3 Scene Message Node
       u64 rayCnt = 0;
       tbl   rays = LavaTblFromPckt(lp, in, IN_RAYS);
 
-      tbl   ox = rays("origin x");
-      tbl   oy = rays("origin y");
-      tbl   oz = rays("origin z");
-      tbl   dx = rays("direction x");
-      tbl   dy = rays("direction y");
-      tbl   dz = rays("direction z");
+      tbl     ox = rays("origin x");
+      tbl     oy = rays("origin y");
+      tbl     oz = rays("origin z");
+      tbl     dx = rays("direction x");
+      tbl     dy = rays("direction y");
+      tbl     dz = rays("direction z");
+      tbl   tfar = rays("tfar");
 
       rayCnt = ox.size();
 
@@ -456,11 +518,12 @@ extern "C"          // Embree3 Scene Message Node
       vec_u32   flags(rayCnt,  0);
       vec_u32     ids(rayCnt);
 
-      tbl Nx = LavaMakeTbl(lp, rayCnt, 0.f);
-      tbl Ny = LavaMakeTbl(lp, rayCnt, 0.f);
-      tbl Nz = LavaMakeTbl(lp, rayCnt, 0.f);
-      tbl  u = LavaMakeTbl(lp, rayCnt, 0.f);
-      tbl  v = LavaMakeTbl(lp, rayCnt, 0.f);
+      tbl   Nx = LavaMakeTbl(lp, rayCnt, 0.f);
+      tbl   Ny = LavaMakeTbl(lp, rayCnt, 0.f);
+      tbl   Nz = LavaMakeTbl(lp, rayCnt, 0.f);
+      tbl    u = LavaMakeTbl(lp, rayCnt, 0.f);
+      tbl    v = LavaMakeTbl(lp, rayCnt, 0.f);
+      //tbl tfar = LavaMakeTbl(lp, rayCnt, INF);
       vec_u32 geomID(rayCnt, 0);
       vec_u32 instID(rayCnt, 0);
       vec_u32 primID(rayCnt, 0);
@@ -473,12 +536,13 @@ extern "C"          // Embree3 Scene Message Node
         rh.ray.dir_x = dx.data<f32>();
         rh.ray.dir_y = dy.data<f32>();
         rh.ray.dir_z = dz.data<f32>();
+        rh.ray.tfar  = tfar.data<f32>();
 
         TO(rayCnt,i){ ids[i] = (u32)i; }
 
         rh.ray.time  = zeros.data();
         rh.ray.tnear = zeros.data();
-        rh.ray.tfar  = infs.data();
+        //rh.ray.tfar  = infs.data();
         rh.ray.id    = ids.data();
         rh.ray.mask  = mask.data();
         rh.ray.flags = flags.data();
@@ -510,10 +574,10 @@ extern "C"          // Embree3 Scene Message Node
       tbl raysIV = raysToIdxVerts(lp, rh, rayCnt);
       out->push( LavaTblToOut(move(raysIV), OUT_RAY_VISUALIZATION) );
 
-      tbl tfar = LavaMakeTbl(lp, rayCnt, 0.f);
-      TO(rayCnt,i){
-        tfar[i] = rh.ray.tfar[i];
-      }
+      //tbl tfar = LavaMakeTbl(lp, rayCnt, 0.f);
+      //TO(rayCnt,i){
+      //  tfar[i] = rh.ray.tfar[i];
+      //}
 
       tbl rayHits     = rays;
       rayHits("Ng x") = &Nx;
@@ -521,7 +585,11 @@ extern "C"          // Embree3 Scene Message Node
       rayHits("Ng z") = &Nz;
       rayHits("tfar") = &tfar;
       rayHits.flatten();
-      out->push( LavaTblToOut(move(rayHits), OUT_RAY_HITS) );
+
+      tbl culledRays = cullRays(lp, rayHits);
+      out->push( LavaTblToOut(move(culledRays), OUT_RAY_HITS) );
+
+      //out->push( LavaTblToOut(move(rayHits), OUT_RAY_HITS) );
     }
 
     return 1;

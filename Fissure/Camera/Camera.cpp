@@ -109,6 +109,7 @@ const f32  asepctRatio  =   1.f;
 const u64       rayCnt  =  100000;
 const f32    origin[3]  =  {1.f, 2.f,   5.f};
 const f32    camDir[3]  =  {0,     0,  -1.f};
+const f32          INF  =  std::numeric_limits<f32>::infinity();
 
 static std::atomic<bool> hasRun;
 
@@ -139,6 +140,7 @@ extern "C"
       tbl    dx = LavaMakeTbl(lp);
       tbl    dy = LavaMakeTbl(lp);
       tbl    dz = LavaMakeTbl(lp);
+      tbl  tfar = LavaMakeTbl(lp, rayCnt, INF);
       //tbl tnear = LavaMakeTbl(lp);  // can default to 0
       //tbl  tfar = LavaMakeTbl(lp);  // can default to infinity
       //tbl  time = LavaMakeTbl(lp);  // can default to 0
@@ -174,6 +176,7 @@ extern "C"
       rays("direction x") = &dx;
       rays("direction y") = &dy;
       rays("direction z") = &dz;
+      rays("tfar")        = &tfar;
       rays.flatten();
 
       tbl rayIV = raysToIdxVerts(lp, rays);

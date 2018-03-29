@@ -469,6 +469,7 @@ public:
 
     bool isEmpty() const { return type==TblType::NONE || type==TblType::EMPTY; }
     auto typeStr() const -> const char* { return TblType::type_str((u8)type); }
+    bool hasTypeAttr(TblType::Type tt) const { return type & tt; }
 
     static KV&    empty_kv(){ static KV kv; kv.type = TblType::EMPTY; return kv; }
     static KV&     none_kv(){ static KV kv; kv.type = TblType::NONE;  return kv; }
@@ -1116,6 +1117,21 @@ public:
   void            pop(){ size(size()-1); }
   TblVal        front() const{ return (*this)[0]; }
   TblVal         back() const{ return (*this)[size()-1]; }
+  void          erase(u64 idx)
+  {
+    auto  strd = stride();
+    auto nxtSz = size() - 1;
+
+    u8*  p = data<u8>() + strd * idx;
+    u8* en = data<u8>() + strd * nxtSz;
+
+    TO(strd,i){
+      u8 tmp = p[i];
+      p[i]   = en[i];
+      en[i]  = tmp;
+    }
+    size(nxtSz);
+  }
   bool            has(const char* key)
   {
     KVOfst kvo = (*this)(key);

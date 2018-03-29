@@ -194,6 +194,7 @@
 // -todo: try in release mode
 // -todo: add pdf to visualization of brdf rays
 
+// todo: make an .erase function in tbl - can possibly be done with 
 // todo: cull rays that don't hit in tracer
 // todo: try to load the cornell box .obj
 // todo: make an IndexedVerts helper header file
