@@ -793,7 +793,7 @@ struct      LavaFrame
 };
 struct       LavaNode
 {
-  enum Type { NONE=0, FLOW, MSG, CONSTANT, CACHE, NODE_ERROR=0xFFFFFFFFFFFFFFFF };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
+  enum Type { NONE=0, FLOW=1, MSG=2, CONSTANT=3, CACHE=4, NODE_ERROR=0xFFFFFFFFFFFFFFFF };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
 
   FlowFunc               func;
   ConstructFunc   constructor;
@@ -856,6 +856,13 @@ struct   LavaFlowSlot
 
   LavaFlowSlot(){}
   LavaFlowSlot(LavaId Id, bool In=false) : id(Id), in(In), state(NORMAL) {}
+};
+struct  LavaMemHeader
+{
+  using au64 = std::atomic<uint64_t>;
+
+  au64  refCount;
+  u64  sizeBytes;
 };
 struct        LavaMem
 {
@@ -960,7 +967,6 @@ private:
 
 public:
   NodeInsts&            curNodes(){ return m_useA.load()?  m_nodesA     : m_nodesB;     }
-  //Slots&                curSlots(){ return m_useA.load()?  m_slotsA     : m_slotsB;     }
   Slots&              curInSlots(){ return m_useA.load()?  m_inSlotsA     : m_inSlotsB;     }
   Slots&             curOutSlots(){ return m_useA.load()?  m_outSlotsA     : m_outSlotsB;     }
   CnctMap&              curCncts(){ if(m_useA.load()) return m_cnctsA; else return m_cnctsB; }
@@ -968,7 +974,6 @@ public:
   MsgIds&            curMsgNodes(){ return m_useA.load()?  m_msgNodesA  : m_msgNodesB;  }
   MsgCache&          curMsgCache(){ return m_useA.load()?  m_msgCacheA  : m_msgCacheB;  }
   NodeInsts const&      curNodes()const{ return m_useA.load()?  m_nodesA     : m_nodesB;     }
-  //Slots     const&      curSlots()const{ return m_useA.load()?  m_slotsA     : m_slotsB;     }
   Slots     const&    curInSlots()const{ return m_useA.load()?  m_inSlotsA     : m_inSlotsB;     }
   Slots     const&   curOutSlots()const{ return m_useA.load()?  m_outSlotsA     : m_outSlotsB;     }
   CnctMap   const&      curCncts()const{ return m_useA.load()?  m_cnctsA     : m_cnctsB;     }
@@ -977,7 +982,6 @@ public:
 
   NodeInsts&            oppNodes(){ 
     return !m_useA.load()?  m_nodesA     : m_nodesB;     }
-  //Slots&                oppSlots(){ return !m_useA.load()?  m_slotsA     : m_slotsB;     }
   Slots&              oppInSlots(){ return !m_useA.load()?  m_inSlotsA     : m_inSlotsB;     }
   Slots&             oppOutSlots(){ return !m_useA.load()?  m_outSlotsA     : m_outSlotsB;     }
   CnctMap&              oppCncts(){ if(!m_useA.load()) return m_cnctsA; else return m_cnctsB; }
@@ -985,7 +989,6 @@ public:
   MsgIds&            oppMsgNodes(){ return !m_useA.load()?  m_msgNodesA  : m_msgNodesB;  }
   MsgCache&          oppMsgCache(){ return !m_useA.load()?  m_msgCacheA  : m_msgCacheB;  }
   NodeInsts const&      oppNodes()const{ return !m_useA.load()?  m_nodesA     : m_nodesB;     }
-  //Slots     const&      oppSlots()const{ return !m_useA.load()?  m_slotsA     : m_slotsB;     }
   Slots     const&    oppInSlots()const{ return !m_useA.load()?  m_inSlotsA   : m_inSlotsB;   }
   Slots     const&   oppOutSlots()const{ return !m_useA.load()?  m_outSlotsA  : m_outSlotsB;  }
   CnctMap   const&      oppCncts()const{ return !m_useA.load()?  m_cnctsA     : m_cnctsB;     }
@@ -1935,6 +1938,19 @@ bool           LavaNxtPckt(LavaFrame const* in, u32* currentIndex)
   //}
   //return false;
 }
+LavaMem  LavaMemAllocation(LavaAllocFunc alloc, u64 sizeBytes)
+{
+  assert( sizeof(LavaMemHeader) == 8 );
+  void*     p = alloc(sizeof(LavaMemHeader) + sizeBytes);
+  auto header = (LavaMemHeader*)p;
+  header->refCount.store(0);
+  header->sizeBytes = sizeBytes;
+
+  LavaMem lm;
+  lm.ptr = p;
+
+  return lm;
+}
 // End Lava Helper Functions
 
 #if defined(__LAVAFLOW_IMPL__)
@@ -2540,6 +2556,13 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//Slots&                curSlots(){ return m_useA.load()?  m_slotsA     : m_slotsB;     }
+//
+//Slots     const&      curSlots()const{ return m_useA.load()?  m_slotsA     : m_slotsB;     }
+//
+//Slots&                oppSlots(){ return !m_useA.load()?  m_slotsA     : m_slotsB;     }
+//
+//Slots     const&      oppSlots()const{ return !m_useA.load()?  m_slotsA     : m_slotsB;     }
 
 // uint64_t replaced with a Type enum
 //uint64_t          node_type;

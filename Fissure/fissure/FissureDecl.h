@@ -294,6 +294,7 @@ struct FisData
     f32           invTfm[6]  =  {1.f,0,0,1.f,0,0};                         // calculated in the drawing loop 
     NVGcolor        lineClr  =  nvgRGBAf(.04f, .04f, .04f, 1.f);
     NVGcolor       nd_color  =  nvgRGBAf(.2f, .3f, .375f, 1.f);
+    NVGcolor   nd_cache_clr  =  nvgRGBAf(.1f, .35f, .2f, 1.f);
     NVGcolor      nd_selclr  =  nvgRGBAf(.5f,.4f,.1f, 1.f);
     NVGcolor       nd_hilgt  =  nvgRGBAf(1.f,1.f,1.f, 0.025f);
     NVGcolor    msgnd_color  =  nvgRGBAf(.2f, .3f, .375f, 1.f);

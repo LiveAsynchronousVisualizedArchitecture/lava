@@ -12,13 +12,13 @@ enum Slots
   OUT_CACHE    = 0
 };
 
-static std::atomic<void*> cachePtr;
-
-bool setCachePtr(void* p)
+static std::atomic<LavaMem> cacheMem;
+bool setCacheMem(LavaMem lm)
 {
-  auto prev = cachePtr.exchange(nullptr);
-  if(prev){
-    free(prev);
+  LavaMem nullMem = {nullptr};
+  auto prev = cacheMem.exchange(nullMem);
+  if(lm.ptr){
+    free(lm.ptr);
     return true;
   }
   return false;
@@ -33,11 +33,11 @@ extern "C"
 
   void Cache_construct()
   {
-    cachePtr.store(nullptr);
+    setCacheMem({nullptr});
   }
   void Cache_destruct()
   {
-    setCachePtr(nullptr);
+    setCacheMem({nullptr});
   }
 
   uint64_t Cache(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
@@ -49,19 +49,19 @@ extern "C"
       if(in->slotMask[IN_CACHE_SET]){
         u64         sz = in->packets[IN_CACHE_SET].sz_bytes;
         void*    inPtr = (void*)in->packets[IN_CACHE_SET].val.value;
-        void* allocPtr = malloc(sz);
-        if(allocPtr){
-          memcpy(allocPtr, inPtr, sz);
-          setCachePtr(allocPtr);
+        LavaMem     lm = LavaMemAllocation(malloc, sz);
+        if(lm.ptr){
+          memcpy(lm.ptr, inPtr, sz);
+          setCacheMem(lm);
         }
       }
     }
     SECTION(if the cache has been set at any point, output a packet)
     {
-      void* outPtr = cachePtr.load();
-      if(outPtr != nullptr){
+      LavaMem outMem = cacheMem.load();
+      if(outMem.ptr != nullptr){
         LavaOut o;
-        o.val.value = (u64)outPtr;
+        o.val.value = (u64)outMem.ptr;
         o.val.type  = LavaArgType::MEMORY;
         o.key.slot  = OUT_CACHE;
         out->push(o);
@@ -101,6 +101,26 @@ extern "C"
 
 
 
+//void* allocPtr = malloc(sz);
+//
+//void* outPtr = cachePtr.load();
+
+//cachePtr.store(nullptr);
+//LavaMem nullMem = {nullptr};
+//cacheMem.store(nullMem);
+//
+//setCachePtr(nullptr);
+
+//static std::atomic<void*> cachePtr;
+//bool setCachePtr(void* p)
+//{
+//  auto prev = cachePtr.exchange(nullptr);
+//  if(prev){
+//    free(prev);
+//    return true;
+//  }
+//  return false;
+//}
 
 //
 //out->push( LavaTblToOut(outputTbl, OUT_CACHE) );

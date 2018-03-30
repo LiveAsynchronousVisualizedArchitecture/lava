@@ -201,11 +201,14 @@
 // todo: can a cache node be created as a regular flow node? - good candadite for tinylibc? - cache nodes need to be their own type so they can be run without recieving input, but otherwise can probably be run without input - should the node type be generator or cache?
 //       | make cache node type - is there a reason to make a more general generator node type?
 //       | how does a cache node clear its memory?
+//       | make sure cache nodes owns their memory and produce allocations that make room for references
 //       | should a cache node be drawn with two sides slanting inwards from top to bottom? - different color? grey?
 //       | change message node list to be named 'generator' node list
-//       | should their be a ONCE node type too?
-//       | how should memory references be tracked 
-// todo: work out structure for constants - .const files can be detected by lava - files could be named .Type.const to be detected as constant nodes while retaining type information that is not stored in any sort of binary format
+//       | how should memory references be tracked?
+//      -| fix input and output drawing and movement - slots dissapear and output doesn't show up at all - not sure if it can be repeated, may have been a sync issue with intermediate fissure versions
+//      -| make cache nodes draw light green
+//       | should there be a ONCE node type too? - only offers convenience, though to make 
+// todo: wok out structure for constants - .const files can be detected by lava - files could be named .Type.const to be detected as constant nodes while retaining type information that is not stored in any sort of binary format
 // todo: work out details for a cache node - could be part of the generators list along with message nodes, flow nodes without inputs, and constants - can a cache node be implemented mostly with a regular node by copying its input to a global allocator like malloc or into a simdb instance? - the output type would need to match the input type instead of being hard coded
 // todo: add cursor member variable to LavaFrame
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
@@ -880,7 +883,8 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
 
   switch(n.type)
   {
-  case Node::Type::FLOW: {
+  case Node::Type::FLOW:
+  case Node::Type::CACHE: {
     SECTION(draw flow node)
     {
       SECTION(grey border)
@@ -893,10 +897,12 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
       SECTION(shaded color inside)
       {
         //auto    col = n.sel? fd.ui.nd_selclr  : fd.ui.nd_color;
-        auto    col = sel? fd.ui.nd_selclr  : fd.ui.nd_color;
+        auto    col = sel? fd.ui.nd_selclr :
+                           n.type==Node::Type::CACHE? fd.ui.nd_cache_clr :
+                                                      fd.ui.nd_color;
         int    grad = (int)lerp(rnd, 0, 48);
-        auto topClr = nvgRGBA(255,255,255,isBlack(col)?16:grad);
-        auto botClr = nvgRGBA(0,0,0,isBlack(col)?16:grad);
+        auto topClr = nvgRGBA(255,255,255, isBlack(col)?16:grad );
+        auto botClr = nvgRGBA(0,0,0, isBlack(col)?16:grad );
 	      bg = nvgLinearGradient(vg, x,y,x,y+h, topClr, botClr);
 	      nvgBeginPath(vg);
 	        nvgRoundedRect(vg, x+border,y+border, w-(border*2),h-(border*2), rad-border);
@@ -908,7 +914,6 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
 	      nvgFillPaint(vg, bg);
 	      nvgFill(vg);
       }
-      //b = {x,y, x+w, y+h};
     }
   } break;
   case Node::Type::MSG: {
@@ -1021,7 +1026,9 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
   }
 
   nvgRestore(vg);
+
   //return;
+  //b = {x,y, x+w, y+h};
 }
 v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 {
@@ -1034,6 +1041,7 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 
   switch(n.type)
   {
+  case Node::Type::CACHE:
   case Node::Type::FLOW: {
     f32  rad  =  hlf.y;
     v2  pdir  =  ndir;
@@ -2455,7 +2463,6 @@ ENTRY_DECLARATION // main or winmain
         SECTION(slot movement)
         {
           auto sltThick = (fd.ui.slot_rad + fd.ui.slot_border) * 2;
-          //f32   slotRot = 
 
           SECTION(input / dest slots)
           {
@@ -2465,7 +2472,7 @@ ENTRY_DECLARATION // main or winmain
               Slot&       s = kv.second;
               Node const& n = fd.graph.nds[nid.nid];
               v2 wh = n.b.wh();
-              v2 nP = n.P + wh/2; //NODE_SZ/2; // n.b.mx; // w()/2; // NODE_SZ/2;
+              v2 nP = n.P + wh/2;                                 //NODE_SZ/2; // n.b.mx; // w()/2; // NODE_SZ/2;
               v2 nrml;
 
               LavaFlowSlot* src = g.srcSlot(nid);
@@ -2493,25 +2500,21 @@ ENTRY_DECLARATION // main or winmain
               Slot&       s = kv.second;
               Node const& n = fd.graph.nds[nid.nid];
               v2 wh = n.b.wh();
-              v2 nP = n.P + wh/2;             //NODE_SZ/2; // n.b.mx; // w()/2; // NODE_SZ/2;
+              v2 nP = n.P + wh/2;                                      //NODE_SZ/2; // n.b.mx; // w()/2; // NODE_SZ/2;
               v2 nrml;
 
               auto cnctEn = fd.lgrph.destCnctEnd();
               auto     ci = fd.lgrph.destSlots(kv.first);              // queries the destination / input connection map for possible connections
-              //if(ci==fd.lgrph.destCnctEnd()){
+
               if(ci==cnctEn){
-                //s.P = node_border(n, v2(0,1.f), &nrml);
                 f32 sltOfst = nid.sidx * sltThick;                         // sltOfst is slot offset - this is to make sure output slots with no connections don't overlap each other
-                //f32 slotRot = (PIf/2.f) + ( (PIf/4.f) * nid.sidx);        // slotRot is slot rotation
                 f32 slotRot = (-PIf/3.f) + ((PIf/3.f) * nid.sidx);         // slotRot is slot rotation
-                //auto    dir = v2( cosf(slotRot), sinf(slotRot) );
                 auto    dir = v2( sinf(slotRot), cosf(slotRot) );
                 s.P = node_border(n, dir, &nrml);
                 s.N = nrml;
               }else{
                 v2  destP={0,0}, destN={0,0};
                 int   cnt = 0;
-                //for(; ci != fd.lgrph.destCnctEnd() && ci->first==nid; ++ci)
                 for(; ci != cnctEn && ci->first==nid; ++ci)
                 {
                   if(!fd.lgrph.outSlot(ci->second)){ cnt -= 1; continue; }   // todo: does this need to subtract 1 from count?
@@ -2855,7 +2858,14 @@ ENTRY_DECLARATION // main or winmain
 
 
 
-
+//f32   slotRot = 
+//
+//if(ci==fd.lgrph.destCnctEnd()){
+//s.P = node_border(n, v2(0,1.f), &nrml);
+//f32 slotRot = (PIf/2.f) + ( (PIf/4.f) * nid.sidx);        // slotRot is slot rotation
+//auto    dir = v2( cosf(slotRot), sinf(slotRot) );
+//
+//for(; ci != fd.lgrph.destCnctEnd() && ci->first==nid; ++ci)
 
 //
 //auto si = lower_bound(ALL(slots), Id(np->id), [](auto a,auto b){ return a.first < b; } );          // si is slot iterator
