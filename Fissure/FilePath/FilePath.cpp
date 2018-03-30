@@ -12,8 +12,6 @@ static std::atomic<bool> hasRun = false;
 
 extern "C"
 {
-  //const char*  InTypes[]  = {"temp",               nullptr};                               // This array contains the type that each slot of the same index will accept as input.
-  //const char*  InNames[]  = {"temp slot",          nullptr};                               // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   const char*  InTypes[]  = {nullptr};
   const char*  InNames[]  = {nullptr};
   const char* OutTypes[]  = {"ASCII",              nullptr};         // This array contains the types that are output in each slot of the same index
@@ -40,6 +38,7 @@ extern "C"
     filePath.setArrayType<char>();
     filePath.reserve(64,0);
     str      pth = "H:\\projects\\lava\\obj\\Craftsman.obj";
+    //str      pth = "H:\\projects\\lava\\obj\\cornell_box.obj";
     TO(pth.length(),i){ 
       filePath.push( pth[i] ); 
     }
@@ -75,6 +74,11 @@ extern "C"
   }
 }
 
+
+
+
+//const char*  InTypes[]  = {"temp",               nullptr};                               // This array contains the type that each slot of the same index will accept as input.
+//const char*  InNames[]  = {"temp slot",          nullptr};                               // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
 
 //
 //filePath.memStart()->arrayType = tbl::TblType::I8;

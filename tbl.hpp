@@ -1199,7 +1199,6 @@ public:
     return nullptr; // no empty slots and key was not found
   }
   u64            size() const { return m_mem? memStart()->size : 0; }
-  //u8*            data() const {return (u8*)m_mem; }  // todo: start here
   void*     childData() const { return (void*)(elemStart() + map_capacity()); }                                                      // elemStart return a KV* so map_capacity will increment that pointer by the map_capacity * sizeof(KV)
   u64  child_capacity() const
   {
@@ -1227,8 +1226,7 @@ public:
   auto      elemStart() const -> KV const* { return m_mem? (KV*)(data<u8>() + capacity()*stride()) : nullptr; }
   void*       reserve(u64 count, u64 mapcap=0, u64 childcap=0)
   {
-    //if( !owned() ) return m_mem;
-    //if( !(m_alloc && m_realloc) ) return m_mem;
+    assert(m_alloc);
     if(!m_alloc) return m_mem;
 
     u64 prvChldCap = child_capacity();
@@ -1256,13 +1254,6 @@ public:
         m_free( prevMem );
       }
     }
-    //if(fresh){ re = m_alloc(nxtBytes);
-    //}else    { re = m_realloc( (void*)memStart(), nxtBytes); }
-    //
-    //}else if(m_realloc) { re = m_realloc( (void*)memStart(), nxtBytes); }
-    //
-    //if(fresh){ re = malloc(nxtBytes);
-    //}else{     re = realloc( (void*)memStart(), nxtBytes); }
 
     if(nxtMem){
       m_mem = ((u8*)nxtMem) + memberBytes();
@@ -1445,7 +1436,6 @@ public:
 
     return true;
   }
-  //void          clear(){ if(m_mem){ destroy(); init(0); } }
   void          clear(){ size(0); }
   auto        flatten() -> tbl const&
   {
@@ -1638,6 +1628,24 @@ public:
 
 
 
+
+
+//if(fresh){ re = m_alloc(nxtBytes);
+//}else    { re = m_realloc( (void*)memStart(), nxtBytes); }
+//
+//}else if(m_realloc) { re = m_realloc( (void*)memStart(), nxtBytes); }
+//
+//if(fresh){ re = malloc(nxtBytes);
+//}else{     re = realloc( (void*)memStart(), nxtBytes); }
+
+//
+//void          clear(){ if(m_mem){ destroy(); init(0); } }
+
+//
+//u8*            data() const {return (u8*)m_mem; }  // todo: start here
+
+//if( !owned() ) return m_mem;
+//if( !(m_alloc && m_realloc) ) return m_mem;
 
 //KV const kv = (*this)(key);
 //
