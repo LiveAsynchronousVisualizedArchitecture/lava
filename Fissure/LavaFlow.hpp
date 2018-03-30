@@ -1399,23 +1399,26 @@ public:
   // opposite buffer changes
   uint64_t    addNode(LavaNode* ln, uint64_t nid)
   {
-    //u64 id = nxt();
-
     LavaInst li = makeInst(nid, ln);
 
-    if(ln->node_type==LavaNode::MSG || li.inputs==0)
+    if( ln->node_type==LavaNode::MSG   || 
+        ln->node_type==LavaNode::CACHE  || 
+        li.inputs==0 ){
       oppMsgNodes().insert(nid);
+    }
 
     return oppNodes().insert({nid, li}).first->first;                             // returns a pair that contains the key-value pair
   }
-  uint64_t    addNode(LavaNode* ln, bool newId=true)
+  uint64_t    addNode(LavaNode* ln) // bool newId=true)
   {
     u64 id = nxtId();
-    if(ln->node_type == LavaNode::MSG)
-      oppMsgNodes().insert(id);
+    addNode(ln, id);
 
-    LavaInst li = makeInst(id, ln);
-    return oppNodes().insert({id, li}).first->first;                             // returns a pair that contains the key-value pair
+    //if(ln->node_type == LavaNode::MSG)
+    //  oppMsgNodes().insert(id);
+    //
+    //LavaInst li = makeInst(id, ln);
+    //return oppNodes().insert({id, li}).first->first;                             // returns a pair that contains the key-value pair
   }
   bool        delNode(uint64_t nid)
   {
@@ -1942,6 +1945,10 @@ LavaMem  LavaMemAllocation(LavaAllocFunc alloc, u64 sizeBytes)
 {
   assert( sizeof(LavaMemHeader) == 8 );
   void*     p = alloc(sizeof(LavaMemHeader) + sizeBytes);
+  if(!p){ 
+    return LavaMem{nullptr};
+  }
+
   auto header = (LavaMemHeader*)p;
   header->refCount.store(0);
   header->sizeBytes = sizeBytes;

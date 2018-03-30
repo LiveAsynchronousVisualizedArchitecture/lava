@@ -37,6 +37,8 @@ extern "C"
   }
   void Cache_destruct()
   {
+    auto lm = cacheMem.load();
+    assert( lm.refCount() == 0 );
     setCacheMem({nullptr});
   }
 
@@ -49,10 +51,14 @@ extern "C"
       if(in->slotMask[IN_CACHE_SET]){
         u64         sz = in->packets[IN_CACHE_SET].sz_bytes;
         void*    inPtr = (void*)in->packets[IN_CACHE_SET].val.value;
-        LavaMem     lm = LavaMemAllocation(malloc, sz);
-        if(lm.ptr){
-          memcpy(lm.ptr, inPtr, sz);
-          setCacheMem(lm);
+        if(sz==0 || inPtr==nullptr){
+          setCacheMem(LavaMem{nullptr});
+        }else{
+          LavaMem lm = LavaMemAllocation(malloc, sz);
+          if(lm.ptr){
+            memcpy(lm.ptr, inPtr, sz);
+            setCacheMem(lm);
+          }
         }
       }
     }
