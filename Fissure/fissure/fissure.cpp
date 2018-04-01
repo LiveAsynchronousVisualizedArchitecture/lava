@@ -205,17 +205,18 @@
 //      -| how should memory references be tracked? - use LavaMem and at least assert if the references are not 0 on destruction
 //      -| fix input and output drawing and movement - slots dissapear and output doesn't show up at all - not sure if it can be repeated, may have been a sync issue with intermediate fissure versions
 //      -| make cache nodes draw light green
-
-// todo: try changing the second addNode function in LavaGraph to just generate a new id then use the first overload
+// -todo: try changing the second addNode function in LavaGraph to just generate a new id then use the first overload
 // -todo: make cache nodes be added to the generator/message node list
+// -todo: work out details for a cache node - could be part of the generators list along with message nodes, flow nodes without inputs, and constants - can a cache node be implemented mostly with a regular node by copying its input to a global allocator like malloc or into a simdb instance? - the output type would need to match the input type instead of being hard coded
+
 // todo: change message node list to be named 'generator' node list
+// todo: change frame counting variable name to be called cycle 
 // todo: wok out structure for constants - .const files can be detected by lava - files could be named .Type.const to be detected as constant nodes while retaining type information that is not stored in any sort of binary format
-// todo: work out details for a cache node - could be part of the generators list along with message nodes, flow nodes without inputs, and constants - can a cache node be implemented mostly with a regular node by copying its input to a global allocator like malloc or into a simdb instance? - the output type would need to match the input type instead of being hard coded
-// todo: add cursor member variable to LavaFrame
+// todo: add cursor member variable to LavaFrame - this would only be neccesary if slots weren't done with a one packet to one slot strucutre 
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
 // todo: make fissure or lava be able to incrementally load shared libraries
 // todo: change constructor to happen on play and not on load (or after the destructor runs on stop)
-// todo: build in data type visualization - part needs to be lava, part needs to be UI - does any need to be in lava?
+// todo: build in data type visualization - part needs to be lava, part needs to be UI - does any need to be in lava? - is checking for 'tb' at the start of a binary blob, then checking for a "type" key enough to determine types ?
 // todo: redo atomic bitset now that slots are separated and inputs should be packed together
 // todo: put thread pointers into message node instances and work out how to lock and unlock them
 // todo: organize nodes by types in a contex menu or side bar
