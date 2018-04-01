@@ -8,7 +8,7 @@ AND as a simple and easy way to create **_signifcant amounts of concurrency_**.
 It is written in C++11 and is meant to work with any language that can compile a shared library that exposes standard function calls.
 Many of the fundamental building blocks have been created as single file libraries with no dependencies other than the C++11 standard library. Examples include: 
   - simdb.hpp  -  Lock free, shared memory key value store for exceptionally fast, concurrent, inter-process communication  
-  - tbl.hpp    -  A fast and flexible data structure that combines a template vector with a string->number/tbl robinhood hash-map. 
+  - tbl.hpp    -  A fast and flexible data structure that combines a vector with a string->number/tbl robinhood hash-map.  The vector                     can take on any intrinsic numeric type, which is then type checked and range checked during debug mode.   
                   It is always stored in contiguous memory, which means that it has no separate serialized representation. 
                   It can also store nested tbls, creating a simple way to make trees and compound data structures that are full featured, without having to define new structs or classes. 
 
