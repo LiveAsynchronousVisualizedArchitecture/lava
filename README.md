@@ -28,7 +28,7 @@ Development is made easier through multiple techniques:
  - Since data is separated from execution in a clear way, a recompile of a shared library can trigger an update while the program is running, meaning a program can be changed live, without restarting. 
 
 #### 3. The ability to freeze the input to any node.
- - Combined with live updating of nodes, this allows rapid development of a section of the program since an compile can automatically update a node and the frozen data can be run through automatically, showing the output. 
+ - Combined with live updating of nodes, this allows rapid development of a section of the program since a compile can automatically update a node and the frozen data can be run through automatically, showing the output. 
 
 #### 4. Per node interrupt handling enables the program to continue running live, even if one node crashes. 
    Crashes are shown clearly and don't hurt workflow.  Running threads will simply skip packets destined for the crashed node and so the overall program will have minimal disruption. 
