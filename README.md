@@ -31,7 +31,7 @@ Development is made easier through multiple techniques:
  - Combined with live updating of nodes, this allows rapid development of a section of the program since an compile can automatically update a node and the frozen data can be run through automatically, showing the output. 
 
 #### 4. Per node interrupt handling enables the program to continue running live, even if one node crashes. 
-   Crashed are shown clearly and don't hurt workflow.  Running threads will simply skip packets destined for the crashed node and so the overall program will have minimal disruption. 
+   Crashes are shown clearly and don't hurt workflow.  Running threads will simply skip packets destined for the crashed node and so the overall program will have minimal disruption. 
 
 #### 5. A visual interface for both message passing and data flow nodes reduces the complexity of understanding how a program fits together. 
   
