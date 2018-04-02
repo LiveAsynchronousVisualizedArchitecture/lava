@@ -935,8 +935,8 @@ public:
   using vec_nptrs     =  std::vector<LavaInst>;                        // lists used for returning from reloading functions
   using vec_cnptrs    =  std::vector<LavaNode const*>;
   using vec_ids       =  std::vector<LavaId>;
-  using MsgIds        =  std::unordered_set<LavaId, LavaId>;           // LavaId has an operator() to hash itself
-  using MsgCache      =  std::vector<LavaId>;                          // LavaId has an operator() to hash itself
+  using GenIds        =  std::unordered_set<LavaId, LavaId>;           // LavaId has an operator() to hash itself
+  using GenCache      =  std::vector<LavaId>;                          // LavaId has an operator() to hash itself
   using NormalizeMap  =  std::map<uint64_t, uint64_t>;
   using CmdQ          =  std::queue<LavaCommand>;
   using RetStk        =  std::stack<LavaCommand::Arg>;
@@ -954,16 +954,16 @@ private:
   Slots            m_outSlotsA;
   CnctMap             m_cnctsA;
   SrcMap          m_destCnctsA;
-  MsgIds           m_msgNodesA;
-  MsgCache         m_msgCacheA;
+  GenIds           m_genNodesA;
+  GenCache         m_genCacheA;
 
   NodeInsts           m_nodesB;
   Slots             m_inSlotsB;
   Slots            m_outSlotsB;
   CnctMap             m_cnctsB;
   SrcMap          m_destCnctsB;
-  MsgIds           m_msgNodesB;
-  MsgCache         m_msgCacheB;
+  GenIds           m_genNodesB;
+  GenCache         m_genCacheB;
 
 public:
   NodeInsts&            curNodes(){ return m_useA.load()?  m_nodesA     : m_nodesB;     }
@@ -971,14 +971,14 @@ public:
   Slots&             curOutSlots(){ return m_useA.load()?  m_outSlotsA     : m_outSlotsB;     }
   CnctMap&              curCncts(){ if(m_useA.load()) return m_cnctsA; else return m_cnctsB; }
   SrcMap&           curDestCncts(){ return m_useA.load()?  m_destCnctsA : m_destCnctsB; }
-  MsgIds&            curMsgNodes(){ return m_useA.load()?  m_msgNodesA  : m_msgNodesB;  }
-  MsgCache&          curMsgCache(){ return m_useA.load()?  m_msgCacheA  : m_msgCacheB;  }
+  GenIds&            curGenNodes(){ return m_useA.load()?  m_genNodesA  : m_genNodesB;  }
+  GenCache&          curMsgCache(){ return m_useA.load()?  m_genCacheA  : m_genCacheB;  }
   NodeInsts const&      curNodes()const{ return m_useA.load()?  m_nodesA     : m_nodesB;     }
   Slots     const&    curInSlots()const{ return m_useA.load()?  m_inSlotsA     : m_inSlotsB;     }
   Slots     const&   curOutSlots()const{ return m_useA.load()?  m_outSlotsA     : m_outSlotsB;     }
   CnctMap   const&      curCncts()const{ return m_useA.load()?  m_cnctsA     : m_cnctsB;     }
   SrcMap    const&  curDestCncts()const{ return m_useA.load()?  m_destCnctsA : m_destCnctsB; }
-  MsgIds    const&   curMsgNodes()const{ return m_useA.load()?  m_msgNodesA  : m_msgNodesB;  }
+  GenIds    const&   curGenNodes()const{ return m_useA.load()?  m_genNodesA  : m_genNodesB;  }
 
   NodeInsts&            oppNodes(){ 
     return !m_useA.load()?  m_nodesA     : m_nodesB;     }
@@ -986,14 +986,14 @@ public:
   Slots&             oppOutSlots(){ return !m_useA.load()?  m_outSlotsA     : m_outSlotsB;     }
   CnctMap&              oppCncts(){ if(!m_useA.load()) return m_cnctsA; else return m_cnctsB; }
   SrcMap&           oppDestCncts(){ return !m_useA.load()?  m_destCnctsA : m_destCnctsB; }
-  MsgIds&            oppMsgNodes(){ return !m_useA.load()?  m_msgNodesA  : m_msgNodesB;  }
-  MsgCache&          oppMsgCache(){ return !m_useA.load()?  m_msgCacheA  : m_msgCacheB;  }
+  GenIds&            oppGenNodes(){ return !m_useA.load()?  m_genNodesA  : m_genNodesB;  }
+  GenCache&          oppMsgCache(){ return !m_useA.load()?  m_genCacheA  : m_genCacheB;  }
   NodeInsts const&      oppNodes()const{ return !m_useA.load()?  m_nodesA     : m_nodesB;     }
   Slots     const&    oppInSlots()const{ return !m_useA.load()?  m_inSlotsA   : m_inSlotsB;   }
   Slots     const&   oppOutSlots()const{ return !m_useA.load()?  m_outSlotsA  : m_outSlotsB;  }
   CnctMap   const&      oppCncts()const{ return !m_useA.load()?  m_cnctsA     : m_cnctsB;     }
   SrcMap    const&  oppDestCncts()const{ return !m_useA.load()?  m_destCnctsA : m_destCnctsB; }
-  MsgIds    const&   oppMsgNodes()const{ return !m_useA.load()?  m_msgNodesA  : m_msgNodesB;  }
+  GenIds    const&   oppGenNodes()const{ return !m_useA.load()?  m_genNodesA  : m_genNodesB;  }
 
 
   void            init()
@@ -1290,14 +1290,14 @@ public:
     curOutSlots().clear();
     curCncts().clear();
     curDestCncts().clear();
-    curMsgNodes().clear();
+    curGenNodes().clear();
 
     oppNodes().clear();
     oppInSlots().clear();
     oppOutSlots().clear();
     oppCncts().clear();
     oppDestCncts().clear();
-    oppMsgNodes().clear();
+    oppGenNodes().clear();
 
     while(m_cmdq.size()>0) m_cmdq.pop();
     while(m_stk.size()>0) m_stk.pop();
@@ -1326,8 +1326,8 @@ public:
         m_outSlotsB  = m_outSlotsA; 
         m_cnctsB     = m_cnctsA; 
         m_destCnctsB = m_destCnctsA;
-        m_msgNodesB  = m_msgNodesA;
-        m_msgCacheB  = m_msgCacheA;
+        m_genNodesB  = m_genNodesA;
+        m_genCacheB  = m_genCacheA;
       }else{
         m_nodesA     = m_nodesB;
         //m_slotsA     = m_slotsB; 
@@ -1335,8 +1335,8 @@ public:
         m_outSlotsA  = m_outSlotsB; 
         m_cnctsA     = m_cnctsB; 
         m_destCnctsA = m_destCnctsB;
-        m_msgNodesA  = m_msgNodesB;
-        m_msgCacheA  = m_msgCacheB;
+        m_genNodesA  = m_genNodesB;
+        m_genCacheA  = m_genCacheB;
       }
 
       while(m_cmdq.size() > 0)
@@ -1382,7 +1382,7 @@ public:
       while(m_stk.size()>0){ m_stk.pop(); }
       
       auto& mcache = oppMsgCache();                                        // mcache is message cache
-      auto&    cur = oppMsgNodes();
+      auto&    cur = oppGenNodes();
       mcache.clear();
       mcache.reserve( cur.size() );
 
@@ -1404,7 +1404,7 @@ public:
     if( ln->node_type==LavaNode::MSG        || 
         ln->node_type==LavaNode::GENERATOR  || 
         li.inputs==0 ){
-      oppMsgNodes().insert(nid);
+      oppGenNodes().insert(nid);
     }
 
     return oppNodes().insert({nid, li}).first->first;                             // returns a pair that contains the key-value pair
@@ -1448,7 +1448,7 @@ public:
 
     //auto       cnt = oppNodes().erase(nid);
 
-    oppMsgNodes().erase(nid);
+    oppGenNodes().erase(nid);
 
     return (cnt + inSltCnt + outSltCnt) > 0;                                  // return true if 1 or more elements were erased, return false if no elements were erasedm
   }
@@ -1556,9 +1556,9 @@ public:
     //for(auto kv : m_ids){ mx = max(mx, kv.first); }
   }
   u64             nsz()       const { return curNodes().size(); }
-  auto       msgNodes()       const -> MsgIds const&
+  auto       msgNodes()       const -> GenIds const&
   {
-    return curMsgNodes();
+    return curGenNodes();
   }
   auto       nodeFunc(uint64_t nid) const -> FlowFunc
   {
@@ -1754,17 +1754,17 @@ public:
   mutable au64         m_nxtMsgNd = 0;
   //mutable PacketCallback  packetCallback;            // todo: make this an atomic version of the function pointer
 
-  MsgNodeVec          m_msgNodesA;
+  MsgNodeVec          m_genNodesA;
   LavaGraph                 graph;
 
   void  udpateMsgIdxCache() // is this used? should it be? todo: not thread safe - this takes the current hash map of message nodes 
   {
-    auto& cur = graph.curMsgNodes();
-    m_msgNodesA.clear();
-    m_msgNodesA.reserve( cur.size() );
+    auto& cur = graph.curGenNodes();
+    m_genNodesA.clear();
+    m_genNodesA.reserve( cur.size() );
 
     for(auto const& lid : cur){
-      m_msgNodesA.push_back(lid.nid);
+      m_genNodesA.push_back(lid.nid);
     }
     //new (&m_msgNodesA) MsgNodeVec( ALL(graph.curMsgNodes()) );
   }

@@ -215,17 +215,18 @@
 // -todo: fix saving crash after deletion of node - lava nodes size is not getting resized to be 1 less after node deletion
 // -todo: figure out why cache node crashes after being deleted - wasn't checking if the pointer was null before asserting
 // -todo: make node stats be reset on play but not on stop
+// -todo: build in resize function into tbl so that arrays can be allocated just once
+// -todo: change message node list to be named 'generator' node list
 
-// todo: make dragging a slot turn it into a constant, which writes a .type.const file, which is then memory mapped and live reloaded by lava
-// todo: add brandisher to the readme github page
-// todo: change message node list to be named 'generator' node list
 // todo: change frame counting variable name to be called cycle 
+// todo: add brandisher to the readme github page
+// todo: add LavaFlow.hpp description to github readme page
+// todo: make dragging a slot turn it into a constant, which writes a .type.const file, which is then memory mapped and live reloaded by lava
 // todo: wok out structure for constants - .const files can be detected by lava - files could be named .Type.const to be detected as constant nodes while retaining type information that is not stored in any sort of binary format
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
 // todo: make fissure or lava be able to incrementally load shared libraries
 // todo: change constructor to happen on play and not on load (or after the destructor runs on stop)
 // todo: build in data type visualization - part needs to be lava, part needs to be UI - does any need to be in lava? - is checking for 'tb' at the start of a binary blob, then checking for a "type" key enough to determine types ?
-// todo: redo atomic bitset now that slots are separated and inputs should be packed together
 // todo: put thread pointers into message node instances and work out how to lock and unlock them
 // todo: organize nodes by types in a contex menu or side bar
 // todo: re-orient nodes on resize of the window so they line up with the grid in the same place 
@@ -233,12 +234,12 @@
 //       | if the window size is simply shrinking closer to 0, maybe the center point needs to be normalized according to where it was in the window
 //       | might just need to shift the pan by the change in the center point
 // todo: make nodes have their own scale that dictates the text size and not the other way around
-// todo: build in resize function into tbl so that arrays can be allocated just once
 // todo: put slot name in db key - maybe the name should have two lines
 // todo: make sure zooming center is affected by cursor placement
 // todo: make message node's text split to new lines on white space
 // todo: make an IdxVerts helper header file
 // todo: change node colors to be based off of profiling information while holding 'p' key
+// todo: redo atomic bitset now that slots are separated and inputs should be packed together
 
 // todo: should there be a ONCE node type too? - should there be a parameter of how many times the node is allowed to run? - only offers convenience, though to make it properly, an atomic needs to be used for the boolean of whether or not to run
 // todo: add cursor member variable to LavaFrame - this would only be neccesary if slots weren't done with a one packet to one slot strucutre 
