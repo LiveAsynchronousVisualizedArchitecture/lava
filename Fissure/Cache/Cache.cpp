@@ -1,9 +1,13 @@
 
 
+//#define LIBC_HPP_IMPL
+//#include "../../libc.hpp"
+
+//#include "../../tbl.hpp"
+
 #include <atomic>
 #include <stdlib.h>
 #include "../../no_rt_util.h"
-#include "../../tbl.hpp"
 #include "../LavaFlow.hpp"
 
 enum Slots
@@ -83,7 +87,7 @@ extern "C"
       Cache,                                      // function
       Cache_construct,                            // constructor - this can be set to nullptr if not needed
       Cache_destruct,                             // destructor  - this can also be set to nullptr 
-      LavaNode::CACHE,                            // node_type   - this should be eighther LavaNode::MSG (will be run even without input packets) or LavaNode::FLOW (will be run only when at least one packet is available for input)
+      LavaNode::GENERATOR,                        // node_type   - this should be eighther LavaNode::MSG (will be run even without input packets) or LavaNode::FLOW (will be run only when at least one packet is available for input)
       "Cache",                                    // name
       InTypes,                                    // in_types    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
       InNames,                                    // in_names    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 

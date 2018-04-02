@@ -793,7 +793,7 @@ struct      LavaFrame
 };
 struct       LavaNode
 {
-  enum Type { NONE=0, FLOW=1, MSG=2, CONSTANT=3, CACHE=4, NODE_ERROR=0xFFFFFFFFFFFFFFFF };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
+  enum Type { NONE=0, FLOW=1, MSG=2, CONSTANT=3, GENERATOR=4, NODE_ERROR=0xFFFFFFFFFFFFFFFF };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
 
   FlowFunc               func;
   ConstructFunc   constructor;
@@ -1306,7 +1306,7 @@ public:
     
     //m_ids.clear();
   }
-  u64                 put(LavaCommand::Command cmd, LavaCommand::Arg A, LavaCommand::Arg B = LavaCommand::Arg() )
+  u64                 put(LavaCommand::Command cmd, LavaCommand::Arg A = LavaCommand::Arg(), LavaCommand::Arg B = LavaCommand::Arg() )
   {
     m_cmdq.push({cmd, A, B});
     return m_cmdq.size();
@@ -1401,8 +1401,8 @@ public:
   {
     LavaInst li = makeInst(nid, ln);
 
-    if( ln->node_type==LavaNode::MSG   || 
-        ln->node_type==LavaNode::CACHE  || 
+    if( ln->node_type==LavaNode::MSG        || 
+        ln->node_type==LavaNode::GENERATOR  || 
         li.inputs==0 ){
       oppMsgNodes().insert(nid);
     }
@@ -1649,20 +1649,60 @@ public:
   auto       outSlotEnd() -> decltype(curOutSlots().end()) { return curOutSlots().end(); }
   u64          outSltSz() const { return curOutSlots().size(); }
 
-  // connections
+  // connection deletion
   u32     delSrcCncts(LavaId  src)
   {
     u32  cnt = 0;
-    auto  di = curDestCncts().find(src);
-    for(; di!=curDestCncts().end() && di->first==src; ++cnt, ++di){   // ++di,
-      curCncts().erase(di->second);
+    auto  di = oppDestCncts().find(src);
+    for(; di!=oppDestCncts().end() && di->first==src; ++cnt, ++di){   // ++di,
+      oppCncts().erase(di->second);
     }
-    curDestCncts().erase(src);
+    oppDestCncts().erase(src);
 
     return cnt;
 
     //di = m_destCncts.find(src);
   }
+  bool    delDestCnct(LavaId dest)
+  {
+    auto iter = oppCncts().find(dest);
+    if(iter==oppCncts().end()) return false;
+
+    auto src = iter->second;
+    oppCncts().erase(dest);
+
+    auto srcIter = oppDestCncts().find(src);
+    for(; srcIter!=end(oppDestCncts()) && srcIter->first==src && srcIter->second==dest; ){
+      auto cpy = srcIter++;
+      oppDestCncts().erase(cpy);
+    }
+
+    return true;
+  }
+  u32         delCnct(LavaId   id)
+  {
+    u32 cnt = 0;
+    //LavaFlowSlot* s = this->slot(id);
+    LavaFlowSlot* s =  id.isIn? inSlot(id)  :  outSlot(id);
+    if(!s) return 0;
+
+    if(s->in){
+      auto iter = oppCncts().find(id);
+      return delCnct(iter->second, iter->first);
+    }else{
+      auto iter = oppDestCncts().find(id);
+      auto  idx = iter->first;
+      while(iter != oppDestCncts().end() && iter->first == idx){
+        oppCncts().erase(iter->second);
+        iter = oppDestCncts().erase(iter);
+        ++cnt;
+      }
+    }
+
+    return cnt;
+  }
+
+  // connection reading
   auto      destCncts(LavaId  src) -> decltype(curDestCncts().begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
   {
     return lower_bound(ALL(curDestCncts()), LavaId(src), [](auto a,auto b){ return a.first < b; } );
@@ -1671,50 +1711,12 @@ public:
   {
     return curDestCncts().count(src);
   }
-  bool    delDestCnct(LavaId dest)
-  {
-    auto iter = curCncts().find(dest);
-    if(iter==curCncts().end()) return false;
-
-    auto src = iter->second;
-    curCncts().erase(dest);
-
-    auto srcIter = curDestCncts().find(src);
-    for(; srcIter!=end(curDestCncts()) && srcIter->first==src && srcIter->second==dest; ){
-      auto cpy = srcIter++;
-      curDestCncts().erase(cpy);
-    }
-
-    return true;
-  }
   auto    destCnctEnd() -> decltype(curDestCncts().end()) { return curDestCncts().end(); }
   auto        cnctEnd() -> decltype(curCncts().end())     { return curCncts().end(); }
   auto      cnctBegin() -> decltype(curCncts().begin())   { return curCncts().begin(); }
   auto          cncts() -> CnctMap& { return curCncts(); }
   auto          cncts() const -> CnctMap const& { return curCncts(); }
   u64          cnctsz() const { return curCncts().size(); }
-  u32         delCnct(LavaId id)
-  {
-    u32 cnt = 0;
-    //LavaFlowSlot* s = this->slot(id);
-    LavaFlowSlot* s =  id.isIn? inSlot(id)  :  outSlot(id);
-    if(!s) return 0;
-
-    if(s->in){
-      auto iter = curCncts().find(id);
-      return delCnct(iter->second, iter->first);
-    }else{
-      auto iter = curDestCncts().find(id);
-      auto  idx = iter->first;
-      while(iter != curDestCncts().end() && iter->first == idx){
-        curCncts().erase(iter->second);
-        iter = curDestCncts().erase(iter);
-        ++cnt;
-      }
-    }
-
-    return cnt;
-  }
   auto    srcCnctsMap() -> SrcMap&
   {
     return curDestCncts();
@@ -2562,6 +2564,45 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+
+//u32     delSrcCncts(LavaId  src)
+//{
+//  u32  cnt = 0;
+//  auto  di = curDestCncts().find(src);
+//  for(; di!=curDestCncts().end() && di->first==src; ++cnt, ++di){   // ++di,
+//    curCncts().erase(di->second);
+//  }
+//  curDestCncts().erase(src);
+//
+//  return cnt;
+//
+//  //di = m_destCncts.find(src);
+//}
+//auto      destCncts(LavaId  src) -> decltype(curDestCncts().begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
+//{
+//  return lower_bound(ALL(curDestCncts()), LavaId(src), [](auto a,auto b){ return a.first < b; } );
+//}
+//u64   destCnctCount(LavaId  src)
+//{
+//  return curDestCncts().count(src);
+//}
+//bool    delDestCnct(LavaId dest)
+//{
+//  auto iter = curCncts().find(dest);
+//  if(iter==curCncts().end()) return false;
+//
+//  auto src = iter->second;
+//  curCncts().erase(dest);
+//
+//  auto srcIter = curDestCncts().find(src);
+//  for(; srcIter!=end(curDestCncts()) && srcIter->first==src && srcIter->second==dest; ){
+//    auto cpy = srcIter++;
+//    curDestCncts().erase(cpy);
+//  }
+//
+//  return true;
+//}
 
 //Slots&                curSlots(){ return m_useA.load()?  m_slotsA     : m_slotsB;     }
 //

@@ -208,11 +208,19 @@
 // -todo: try changing the second addNode function in LavaGraph to just generate a new id then use the first overload
 // -todo: make cache nodes be added to the generator/message node list
 // -todo: work out details for a cache node - could be part of the generators list along with message nodes, flow nodes without inputs, and constants - can a cache node be implemented mostly with a regular node by copying its input to a global allocator like malloc or into a simdb instance? - the output type would need to match the input type instead of being hard coded
+// -todo: change cache node type to generator
+// -todo: try tiny libc in a node - many missing C++ functions including operator delete(void*, i64) for sized deallocation
+// -todo: make an empty string for type ( "" ) be any type, possibly with lighter color slots
+// -todo: change node deletions in lava graph to use opposite buffer
+// -todo: fix saving crash after deletion of node - lava nodes size is not getting resized to be 1 less after node deletion
 
+// todo: figure out why cache node crashes after being deleted
+// todo: make node stats be reset on play but not on stop
+// todo: make dragging a slot turn it into a constant, which writes a .type.const file, which is then memory mapped and live reloaded by lava
+// todo: add brandisher to the readme github page
 // todo: change message node list to be named 'generator' node list
 // todo: change frame counting variable name to be called cycle 
 // todo: wok out structure for constants - .const files can be detected by lava - files could be named .Type.const to be detected as constant nodes while retaining type information that is not stored in any sort of binary format
-// todo: add cursor member variable to LavaFrame - this would only be neccesary if slots weren't done with a one packet to one slot strucutre 
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
 // todo: make fissure or lava be able to incrementally load shared libraries
 // todo: change constructor to happen on play and not on load (or after the destructor runs on stop)
@@ -220,7 +228,6 @@
 // todo: redo atomic bitset now that slots are separated and inputs should be packed together
 // todo: put thread pointers into message node instances and work out how to lock and unlock them
 // todo: organize nodes by types in a contex menu or side bar
-// todo: change node colors to be based off of profiling information while holding 'p' key
 // todo: re-orient nodes on resize of the window so they line up with the grid in the same place 
 //       | maybe the scale and pan need to be changed instead 
 //       | if the window size is simply shrinking closer to 0, maybe the center point needs to be normalized according to where it was in the window
@@ -228,13 +235,13 @@
 // todo: make nodes have their own scale that dictates the text size and not the other way around
 // todo: build in resize function into tbl so that arrays can be allocated just once
 // todo: put slot name in db key - maybe the name should have two lines
-// todo: try tiny libc in a node 
 // todo: make sure zooming center is affected by cursor placement
 // todo: make message node's text split to new lines on white space
-// todo: make an empty string for type ( "" ) be any type, possibly with lighter color slots
 // todo: make an IdxVerts helper header file
-// todo: should there be a ONCE node type too? - only offers convenience, though to make it properly, an atomic needs to be used for the boolean of whether or not to run
+// todo: change node colors to be based off of profiling information while holding 'p' key
 
+// todo: should there be a ONCE node type too? - should there be a parameter of how many times the node is allowed to run? - only offers convenience, though to make it properly, an atomic needs to be used for the boolean of whether or not to run
+// todo: add cursor member variable to LavaFrame - this would only be neccesary if slots weren't done with a one packet to one slot strucutre 
 // todo: try making the embree vector a union with a float array inside
 // todo: draw slots that are framed together as one blob with multiple slots in the UI
 // todo: make a note node that will show the hotkeys and thus can be deleted at any time
@@ -619,12 +626,11 @@ void     stopFlowThreads()
   }
   fd.flowThreads.clear();
   fd.flowThreads.shrink_to_fit();
-
-  fd.lgrph.clearTime();
 }
 void    startFlowThreads(u64 num=1)
 {
   stopFlowThreads();
+  fd.lgrph.clearTime();
   fd.flow.start();
 
   TO(num,i){
@@ -887,7 +893,7 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
   switch(n.type)
   {
   case Node::Type::FLOW:
-  case Node::Type::CACHE: {
+  case Node::Type::GENERATOR: {
     SECTION(draw flow node)
     {
       SECTION(grey border)
@@ -901,8 +907,8 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
       {
         //auto    col = n.sel? fd.ui.nd_selclr  : fd.ui.nd_color;
         auto    col = sel? fd.ui.nd_selclr :
-                           n.type==Node::Type::CACHE? fd.ui.nd_cache_clr :
-                                                      fd.ui.nd_color;
+                           n.type==Node::Type::GENERATOR? fd.ui.nd_cache_clr :
+                                                          fd.ui.nd_color;
         int    grad = (int)lerp(rnd, 0, 48);
         auto topClr = nvgRGBA(255,255,255, isBlack(col)?16:grad );
         auto botClr = nvgRGBA(0,0,0, isBlack(col)?16:grad );
@@ -1044,7 +1050,7 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 
   switch(n.type)
   {
-  case Node::Type::CACHE:
+  case Node::Type::GENERATOR:
   case Node::Type::FLOW: {
     f32  rad  =  hlf.y;
     v2  pdir  =  ndir;
@@ -1275,9 +1281,22 @@ u64           sel_delete()
   
   for(auto id : ids){                 // delete cncts with dest slots
     auto s = slot_get(id);
+    //if(s){
+    //  if(s->in) fd.lgrph.delDestCnct(id);  //){ ++cnt; }
+    //  else      fd.lgrph.delSrcCncts(id);
+    //}
     if(s){
-      if(s->in) fd.lgrph.delDestCnct(id);  //){ ++cnt; }
-      else      fd.lgrph.delSrcCncts(id);
+      if(s->in){
+        //fd.lgrph.delDestCnct(id);  //){ ++cnt; }
+        LavaCommand::Arg A;
+        A.id = id;
+        fd.lgrph.put(LavaCommand::DEL_CNCT, A);
+      }else{
+        //fd.lgrph.delSrcCncts(id);
+        LavaCommand::Arg A;
+        A.id = id;
+        fd.lgrph.put(LavaCommand::DEL_CNCT, A);
+      }
     }
   }
 
@@ -1295,7 +1314,11 @@ u64           sel_delete()
     auto ordr = n->order;
     fd.graph.ordr.erase({nid, ordr});
     fd.graph.nds.erase(nid);
-    fd.lgrph.delNode(nid);
+    //fd.lgrph.delNode(nid);
+
+    LavaCommand::Arg A;
+    A.id = nid;
+    fd.lgrph.put(LavaCommand::DEL_NODE, A);
   }
   fd.graph.nds.reserve( fd.graph.nds.size() * 2 );
 
@@ -1687,10 +1710,14 @@ void               keyCallback(GLFWwindow* win,    int key, int scancode, int ac
   }break;
   case GLFW_KEY_BACKSPACE:
   case GLFW_KEY_DELETE: {
-    fd.lgrph.exec(); // todo: might have to deal with the returned argument vector here
+    //fd.lgrph.exec(); // todo: might have to deal with the returned argument vector here
+    //fd.lgrph.exec(); // todo: might have to deal with the returned argument vector 
+
     sel_delete();
-    fd.lgrph.exec(); // todo: might have to deal with the returned argument vector here
     sel_clear();
+
+    //LavaGraph::ArgVec av = fd.lgrph.exec();
+    //graph_apply(move(av));
   }break;
   default:
     ;
@@ -1923,7 +1950,7 @@ ENTRY_DECLARATION // main or winmain
       auto thrdsLabel = new   Label(fd.ui.keyWin, toString(fd.threadCount) );
       auto thrdsSldr  = new  Slider(fd.ui.keyWin);
 
-      auto nodeTxt = fd.ui.nodeTxt = new TextBox(fd.ui.keyWin,  "");
+      auto nodeTxt    = fd.ui.nodeTxt = new TextBox(fd.ui.keyWin,  "");
 
       //fd.ui.nodeTxtId = fd.ui.keyWin->childIndex(nodeTxt);
 
