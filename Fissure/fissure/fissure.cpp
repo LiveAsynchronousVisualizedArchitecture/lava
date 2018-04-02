@@ -217,8 +217,8 @@
 // -todo: make node stats be reset on play but not on stop
 // -todo: build in resize function into tbl so that arrays can be allocated just once
 // -todo: change message node list to be named 'generator' node list
+// -todo: change frame counting variable name to be called cycle 
 
-// todo: change frame counting variable name to be called cycle 
 // todo: add brandisher to the readme github page
 // todo: add LavaFlow.hpp description to github readme page
 // todo: make dragging a slot turn it into a constant, which writes a .type.const file, which is then memory mapped and live reloaded by lava

@@ -692,7 +692,7 @@ union          LavaId                                            // this Id serv
 struct     LavaParams
 {
   u32                    inputs;
-  u64                     frame;
+  u64                     cycle;
   LavaId                     id;
 
   LavaAllocFunc       ref_alloc;
@@ -715,7 +715,7 @@ struct        LavaOut
   LavaVal val;
 
   union {
-    struct { u64 frame; u32 slot; u32 listIdx; };
+    struct { u64 cycle; u32 slot; u32 listIdx; };
     u8 bytes[16];
   }key;
 
@@ -728,7 +728,7 @@ struct        LavaOut
 struct     LavaPacket
 {
   //u64    ref_count;                               // todo: is this used? 
-  u64        frame : 55;
+  u64        cycle : 55;
   u64       framed :  1;
   u64     priority :  8;
   u64    dest_node : 48;
@@ -744,7 +744,7 @@ struct     LavaPacket
 
   bool operator<(LavaPacket const& r) const
   {    
-    if(frame    != r.frame)    return frame    > r.frame;               // want lowest frame numbers to be done first 
+    if(cycle    != r.cycle)    return cycle    > r.cycle;               // want lowest frame numbers to be done first 
     if(priority != r.priority) return priority < r.priority;            // want highest priority to be done first
     if(sz_bytes != r.sz_bytes) return sz_bytes < r.sz_bytes;            // want largest sizes to be done first
     if(framed   != r.framed)   return framed   < r.framed;              // want framed packets to be done first so that their dependencies can be resolved
@@ -761,7 +761,7 @@ struct      LavaFrame
   using PacketArray = std::array<LavaPacket, PACKET_SLOTS>;
 
   u64                dest = LavaId::NODE_NONE;             // The destination node this frame will be run with
-  u64               frame = 0;                             // The numer of this frame - lowest frame needs to be run first
+  u64               cycle = 0;                             // The numer of this frame - lowest frame needs to be run first
   u64           src_frame = 0;                             // Does this need to come from the message node?
   u64          dest_frame = 0;                             // should this come from the node instance?
   Slots          slotMask;                                 // The bit mask respresenting which slots already have packets in them
@@ -820,14 +820,14 @@ struct       LavaInst
   u32       outputs;
   union{ State state = NORMAL; u32 stateU32; };
 
-  mutable u64   frame = 0;  // todo: make this atomic 
+  mutable u64   cycle = 0;  // todo: make this atomic 
   mutable u64    time = 0;  // todo: make this atomic / make functions to add time and get the current time
 
   bool operator<(LavaInst const& lval){ return id < lval.id; }
 
   u64   fetchIncFrame() const
   {
-    return std::atomic_fetch_add( (au64*)(&frame), 1);
+    return std::atomic_fetch_add( (au64*)(&cycle), 1);
   }
   void       setState(LavaInst::State s) // -> LavaInst::State
   {
@@ -1742,15 +1742,18 @@ public:
 
   mutable bool          m_running = false;            // todo: make this atomic
   mutable u64          m_curMsgId = 0;                // todo: make this atomic
-  mutable u64             m_frame = 0;                // todo: make this atomic
+  //mutable u64             m_frame = 0;                // todo: make this atomic
+  mutable u64             m_cycle = 0;                // todo: make this atomic
   mutable LavaId          m_curId = LavaNode::NONE;   // todo: make this atomic - won't be used as a single variable anyway
   mutable u64       m_threadCount = 0;                // todo: make this atomic
   mutable u32             version = 0;                // todo: make this atomic
   mutable Mutex            m_qLck;
-  mutable Mutex       m_frameQLck;
+  //mutable Mutex       m_frameQLck;
+  mutable Mutex       m_cycleQLck;
   mutable PktCalbk packetCallback;
   mutable PacketQueue           q;
-  mutable FrameQueue       frameQ;
+  //mutable FrameQueue       frameQ;
+  mutable FrameQueue       cycleQ;
   mutable au64         m_nxtMsgNd = 0;
   //mutable PacketCallback  packetCallback;            // todo: make this an atomic version of the function pointer
 
@@ -2353,24 +2356,24 @@ void               LavaLoop(LavaFlow& lf) noexcept
   {    
     LavaFrame      runFrm;
 
-    SECTION(make a frame from a packet or run a message node)
+    SECTION(make a cycle from a packet or run a message node)
     {
       LavaPacket    pckt;
       LavaParams      lp;
       u64         nodeId;
       bool doFlow = lf.nxtPacket(&pckt);
       if(doFlow) 
-        SECTION(if there is a packet available, fit it into a existing frame or create a new frame)
+        SECTION(if there is a packet available, fit it into a existing cycle or create a new cycle)
         {
           u16 sIdx  =  pckt.dest_slot;
-          lf.m_frameQLck.lock();                                          // lock mutex        
+          lf.m_cycleQLck.lock();                                          // lock mutex        
             SECTION(loop through the outstanding frames to find the match for this packet)
             {
-              TO(lf.frameQ.size(), i)                                     // loop through the current frames looking for one with the same frame number and destination slot id - if no frame is found to put the packet into, make a new one - keep track of the lowest full frame while looping and use that if no full frame is found?
+              TO(lf.cycleQ.size(), i)                                     // loop through the current frames looking for one with the same frame number and destination slot id - if no frame is found to put the packet into, make a new one - keep track of the lowest full frame while looping and use that if no full frame is found?
               {
-                auto& frm = lf.frameQ[i];
+                auto& frm = lf.cycleQ[i];
                 if(frm.dest != pckt.dest_node){ continue; }               // todo: unify dest_node and dest_id etc. as one LavaId LavaPacket
-                if(frm.frame != pckt.frame){ continue; }
+                if(frm.cycle != pckt.cycle){ continue; }
 
                 bool slotTaken = frm.slotMask[sIdx];
                 if(!slotTaken){
@@ -2380,27 +2383,27 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
                 if( frm.allFilled() ){                                  // If all the slots are filled, copy the frame out and erase it
                   runFrm = frm;
-                  lf.frameQ.erase(lf.frameQ.begin()+i);                 // can't use an index, have to use an iterator for some reason
+                  lf.cycleQ.erase(lf.cycleQ.begin()+i);                 // can't use an index, have to use an iterator for some reason
                   break;                                                // break out of the loop since a frame was found
                 }
               }
             }
-            SECTION(if a frame was not found for this packet, create one, then put it in the array if the frame has more than one slot)
+            SECTION(if a cycle was not found for this packet, create one, then put it in the array if the cycle has more than one slot)
             {
               LavaInst& ndInst   =  lf.graph.node(pckt.dest_node);
               LavaFrame    frm;
               frm.slots  =  ndInst.inputs;                               // find the number of input slots for the dest node
               frm.dest   =  pckt.dest_node;
-              frm.frame  =  pckt.frame;
+              frm.cycle  =  pckt.cycle;
               //runFrm.frame        =  ndInst.fetchIncFrame();
               frm.putSlot(sIdx, pckt);
               
               if(frm.slots > 1)
-                lf.frameQ.push_back(frm);                                // New frame that starts with the current packet put into it 
+                lf.cycleQ.push_back(frm);                                // New frame that starts with the current packet put into it 
               else
                 runFrm = frm;
             }
-          lf.m_frameQLck.unlock();                                       // unlock mutex
+          lf.m_cycleQLck.unlock();                                       // unlock mutex
 
           nodeId = runFrm.dest;
         }
@@ -2412,7 +2415,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
         } // SECTION(loop through message nodes)
 
-      SECTION(RUN the node from id and pass it a frame)
+      SECTION(RUN the node from id and pass it a cycle)
       {
         LavaInst::State state = LavaInst::NORMAL; 
         SECTION(run the function then put its results into packets and queue them)
@@ -2426,7 +2429,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
               {
                 LavaParams lp;
                 lp.inputs       =   1;
-                lp.frame        =   lf.m_frame;
+                lp.cycle        =   lf.m_cycle;
                 lp.id           =   LavaId(nodeId);
                 lp.ref_alloc    =   LavaAlloc;
                 lp.ref_realloc  =   LavaRealloc;
@@ -2458,7 +2461,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
                   LavaPacket basePkt, pkt;
                   SECTION(create new base packet and initialize the main packet with the base)
                   {
-                    basePkt.frame       =   lf.m_frame;            // increment the frame on every major loop through both data and message nodes - how to know when a full cycle has passed? maybe purely by message nodes - only increment frame if data is created through a message node cycle
+                    basePkt.cycle       =   lf.m_cycle;            // increment the frame on every major loop through both data and message nodes - how to know when a full cycle has passed? maybe purely by message nodes - only increment frame if data is created through a message node cycle
                     basePkt.framed      =   false;                 // would this go on the socket?
                     basePkt.rangeStart  =   0;
                     basePkt.rangeEnd    =   0;
