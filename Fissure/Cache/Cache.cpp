@@ -42,7 +42,9 @@ extern "C"
   void Cache_destruct()
   {
     auto lm = cacheMem.load();
-    assert( lm.refCount() == 0 );
+    
+    if(lm.ptr) assert( lm.refCount() == 0 );
+    
     setCacheMem({nullptr});
   }
 

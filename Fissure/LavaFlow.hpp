@@ -1422,14 +1422,6 @@ public:
   }
   bool        delNode(uint64_t nid)
   {
-    // erase any connects that go with the slots here
-    //auto     si = this->nodeSlots(nid);                       // si is slot iterator
-    //auto siCnct = si; 
-    //for(; siCnct!=end(oppSlots())  &&  siCnct->first.nid==nid; ++siCnct ){
-    //  if(siCnct->second.in) this->delDestCnct(nid);
-    //  else                  this->delSrcCncts(nid);
-    //}
-
     SECTION(in slots and destination connections)
     {
       auto     si = this->nodeInSlots(nid);                       // si is slot iterator
@@ -1449,7 +1441,13 @@ public:
 
     auto  inSltCnt = oppInSlots().erase(nid);                         // slcnt is slot count
     auto outSltCnt = oppOutSlots().erase(nid);                        // slcnt is slot count
-    auto       cnt = oppNodes().erase(nid);
+
+    auto&  ndInsts = oppNodes();
+    //ndInsts[nid].node->destructor();
+    auto       cnt = ndInsts.erase(nid);
+
+    //auto       cnt = oppNodes().erase(nid);
+
     oppMsgNodes().erase(nid);
 
     return (cnt + inSltCnt + outSltCnt) > 0;                                  // return true if 1 or more elements were erased, return false if no elements were erasedm
@@ -2565,6 +2563,15 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+
+// erase any connects that go with the slots here
+//auto     si = this->nodeSlots(nid);                       // si is slot iterator
+//auto siCnct = si; 
+//for(; siCnct!=end(oppSlots())  &&  siCnct->first.nid==nid; ++siCnct ){
+//  if(siCnct->second.in) this->delDestCnct(nid);
+//  else                  this->delSrcCncts(nid);
+//}
 
 //u32     delSrcCncts(LavaId  src)
 //{

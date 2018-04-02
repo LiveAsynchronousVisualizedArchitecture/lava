@@ -213,9 +213,9 @@
 // -todo: make an empty string for type ( "" ) be any type, possibly with lighter color slots
 // -todo: change node deletions in lava graph to use opposite buffer
 // -todo: fix saving crash after deletion of node - lava nodes size is not getting resized to be 1 less after node deletion
+// -todo: figure out why cache node crashes after being deleted - wasn't checking if the pointer was null before asserting
+// -todo: make node stats be reset on play but not on stop
 
-// todo: figure out why cache node crashes after being deleted
-// todo: make node stats be reset on play but not on stop
 // todo: make dragging a slot turn it into a constant, which writes a .type.const file, which is then memory mapped and live reloaded by lava
 // todo: add brandisher to the readme github page
 // todo: change message node list to be named 'generator' node list
