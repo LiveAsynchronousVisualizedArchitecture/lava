@@ -62,11 +62,13 @@
       <ExceptionHandling>false</ExceptionHandling>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <FunctionLevelLinking>true</FunctionLevelLinking>
+      <DebugInformationFormat>None</DebugInformationFormat>
     </ClCompile>
     <Link />
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <NoEntryPoint>false</NoEntryPoint>
+      <ImportLibrary />
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -49,6 +49,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <TargetName>lava_$(ProjectName)</TargetName>
+    <IgnoreImportLibrary>true</IgnoreImportLibrary>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -64,12 +65,16 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <DebugInformationFormat>None</DebugInformationFormat>
       <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
+      <ProgramDataBaseFileName />
     </ClCompile>
     <Link />
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <NoEntryPoint>false</NoEntryPoint>
       <IgnoreAllDefaultLibraries>false</IgnoreAllDefaultLibraries>
+      <ImportLibrary />
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <ProgramDatabaseFile />
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

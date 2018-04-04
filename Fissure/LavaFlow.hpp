@@ -2065,14 +2065,16 @@ auto        GetRefreshPaths() -> lava_paths
 
   vector<str> paths;
   auto    dirIter = directory_iterator(root);
-  for(auto& d : dirIter){
+  for(auto& d : dirIter)                                 // iterate though the root directory looking for shared libraries and constants
+  {
     auto   p = d.path();
     if(!p.has_filename()){ continue; }
 
     auto ext = p.extension().generic_string();                     // ext is extension
-    if(ext!=".dll"){ continue; }
+    if(ext!=".dll"){ continue; } // todo: check for shared library and .const extensions
+    //if( !(ext==".dll" || ext==".const") ){ continue; }              // todo: check for shared library and .const extensions
 
-    str fstr = p.filename().generic_string();                      // fstr is file string
+    str fstr = p.filename().generic_string();                       // fstr is file string
     if(  regex_match(fstr, extRegex) ){ continue; }
     if( !regex_match(fstr,lavaRegex) ){ continue; }
 
@@ -2310,8 +2312,7 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow)
     }
   }
 
-  // extract the flow node lists from the handles
-  lava_ptrsvec flowNdLists = GetFlowNodeLists(loadedHndls);
+  lava_ptrsvec flowNdLists = GetFlowNodeLists(loadedHndls);          // extract the flow node lists from the handles
 
   //auto ndErrs = ErrorCheckNodeLists( &flowndLists );
   ErrorCheckNodeLists( &flowNdLists );
@@ -2562,187 +2563,3 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 #endif
 
-
-
-
-
-
-
-// erase any connects that go with the slots here
-//auto     si = this->nodeSlots(nid);                       // si is slot iterator
-//auto siCnct = si; 
-//for(; siCnct!=end(oppSlots())  &&  siCnct->first.nid==nid; ++siCnct ){
-//  if(siCnct->second.in) this->delDestCnct(nid);
-//  else                  this->delSrcCncts(nid);
-//}
-
-//u32     delSrcCncts(LavaId  src)
-//{
-//  u32  cnt = 0;
-//  auto  di = curDestCncts().find(src);
-//  for(; di!=curDestCncts().end() && di->first==src; ++cnt, ++di){   // ++di,
-//    curCncts().erase(di->second);
-//  }
-//  curDestCncts().erase(src);
-//
-//  return cnt;
-//
-//  //di = m_destCncts.find(src);
-//}
-//auto      destCncts(LavaId  src) -> decltype(curDestCncts().begin()) // C++14 -> decltype(m_slots.find(Id(nid)))
-//{
-//  return lower_bound(ALL(curDestCncts()), LavaId(src), [](auto a,auto b){ return a.first < b; } );
-//}
-//u64   destCnctCount(LavaId  src)
-//{
-//  return curDestCncts().count(src);
-//}
-//bool    delDestCnct(LavaId dest)
-//{
-//  auto iter = curCncts().find(dest);
-//  if(iter==curCncts().end()) return false;
-//
-//  auto src = iter->second;
-//  curCncts().erase(dest);
-//
-//  auto srcIter = curDestCncts().find(src);
-//  for(; srcIter!=end(curDestCncts()) && srcIter->first==src && srcIter->second==dest; ){
-//    auto cpy = srcIter++;
-//    curDestCncts().erase(cpy);
-//  }
-//
-//  return true;
-//}
-
-//Slots&                curSlots(){ return m_useA.load()?  m_slotsA     : m_slotsB;     }
-//
-//Slots     const&      curSlots()const{ return m_useA.load()?  m_slotsA     : m_slotsB;     }
-//
-//Slots&                oppSlots(){ return !m_useA.load()?  m_slotsA     : m_slotsB;     }
-//
-//Slots     const&      oppSlots()const{ return !m_useA.load()?  m_slotsA     : m_slotsB;     }
-
-// uint64_t replaced with a Type enum
-//uint64_t          node_type;
-
-//u64          nxtSlot(u64 nid) // non-const, part of writing, and needs to use the opposite buffer
-//{
-//  auto si = nodeSlots(nid);                   // si is slot iterator
-//  i64 cur = -1;
-//  while(si != end(oppSlots())   && 
-//    si->first.nid  == nid && 
-//    si->first.sidx <= (u64)(cur+1) ){
-//    //cur = si->first.idx;
-//    ++cur; ++si; 
-//  }
-//  //return cur;
-//
-//  return cur + 1;
-//}
-
-//auto sz = m_msgNodesA.size();
-//return sz? m_nxtMsgNd.fetch_add(1) % sz  :   LavaId::NODE_NONE;
-
-//u64   idx = cur.size()>0? fetchIncNxtMsg()%cur.size();
-//u64    id = LavaId::NODE_NONE;
-//if(idx != LavaId::NODE_NONE){ 
-//  id = m_msgNodesA[idx];
-//}
-//
-//return LavaId::NODE_NONE;
-
-//using NormalizeMap  =  std::unordered_map<uint64_t, uint64_t>;
-//using CmdQ          =  std::priority_queue<LavaCommand>;
-
-//auto      nodeSlots(u64     nid) const -> decltype(curSlots().cbegin())
-//{
-//  return lower_bound(ALL(curSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
-//}
-//auto      nodeSlots(u64     nid) -> decltype(oppSlots().begin())
-//{
-//  return lower_bound(ALL(oppSlots()), nid, [](auto a,auto b){ return a.first.nid < b; } );
-//}
-//
-//auto          slots() -> Slots& { return curSlots(); }
-//auto          slots() const -> Slots const& { return curSlots();  }
-//auto       getSlots() -> Slots& { return curSlots(); }
-//
-//auto        slotEnd() -> decltype(curSlots().end()) { return curSlots().end(); }
-//u64             ssz() const { return curSlots().size(); }
-
-//do{ 
-//  ++(*currentIndex);
-//  if( *currentIndex >= in->packets.size() ) return false;
-//}while( !in->slotMask[*currentIndex] );
-//
-//return true;
-
-//if( *currentIndex < in->packets.size() &&
-//  in->slotMask[*currentIndex]  )
-//{
-//  ++(*currentIndex);
-//  return true;
-//}else{
-//  return false;
-//}
-
-//NodeInsts          m_nodesA;
-//Slots              m_slotsA;
-//CnctMap            m_cnctsA;
-//SrcMap         m_destCnctsA;
-//MsgIds          m_msgNodesA;
-//
-//Slots               m_slotsA;
-//
-//Slots               m_slotsB;
-
-//u64 nid; bool in=false; State state=NORMAL;
-//LavaFlowSlot(u64 nId, bool In=false) : nid(nId), in(In), state(NORMAL) {}
-
-//struct Header
-//{
-//  refCount;
-//  sizeBytes;
-//};
-
-//u8*    realMem = (u8*)LavaHeapReAlloc(realAddr, sizeBytes + 16);
-//void*      mem = realMem + 16;
-
-//
-//u64                 put(LavaCommand::Command cmd, LavaId A, LavaId B=LavaId())
-
-// only need to sort the memory with zero reference counts, and only need to sort them by address, since their references are already known to be zero
-//sort(zeroRef, end(ownedMem), [](LavaMem a, LavaMem b)
-//{
-//  return (u64)a.ptr < (u64)b.ptr;
-//});                           // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
-//u64 lastFreed = 0;
-//auto freeIter = zeroRef;
-//for(; freeIter != end(ownedMem); ++freeIter){                                                              // loop through the memory with zero references and free them
-//  
-//  if((u64)freeIter->ptr != lastFreed){
-//    LavaFree( (uint64_t)freeIter->data() );
-//    lastFreed = (u64)freeIter->ptr;
-//  }
-//}
-
-//u32           outputs;
-//LavaPut           put;
-
-//
-//extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams*, LavaFrame*, lava_threadQ*);       // node function taking a LavaFrame in - todo: need to consider output, might need a LavaOutFrame or something similiar 
-
-//LavaOut  LavaTblToOut(LavaParams const* lp, tbl const& t, u32 slot)
-//
-// todo: A table type that has empty allocation parameters could mean an unowned type
-//       | the unowned type could have a constructor that takes any tbl and makes it unowned, treating it effectivly as a reference
-//
-//void* outmem  =  lp->mem_alloc(t.sizeBytes());
-//memcpy(outmem, t.memStart(), t.sizeBytes());
-
-//// todo: change to LavaVal
-//u64      type :  3;          // ArgType
-//u64     value : 61;          // This will hold the address in memory - could also hold the starting block index in the database 
-
-//template<class T> LavaOut  LavaTblToOut(LavaParams const* lp, tbl<T> const& t)
-//template<class T>
