@@ -13,13 +13,27 @@ Many of the fundamental building blocks have been created as single file librari
                   It can also store nested tbls, creating a simple way to make trees and compound data structures that are full featured, without having to define new structs or classes. 
 
 
-Tools:
+## Tools:
 
-![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/craftsman_fissure.png "The current state of the node graph GUI")
+### Fissure:
 
-![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/craftsman_visualizer001.png "The current state of the node graph GUI")
+![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/craftsman_fissure.png "Fissure is the node graph UI.  I can be used to construct a graph of nodes, run the program, visualize outputs, see node errors and view timing information about the nodes.")
 
-![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/craftsman_brandisher001.png "Brandisher is a tool for viewing tables in shared memory.")
+Fissure is the node graph UI.  I can be used to construct a graph of nodes, run the program, visualize outputs, see node errors and view timing information about the nodes.
+
+
+### Visualizer:
+
+![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/craftsman_visualizer001.png "Tables that are in the IdxVerts format (3D geometry with optional normals, vertex colors, uvs, and a color texture map)  will be picked up by the visualizer and displayed with openGL.")
+
+Tables that are in the IdxVerts format (3D geometry with optional normals, vertex colors, uvs, and a color texture map)  will be picked up by the visualizer and displayed with openGL.
+
+
+### Brandisher:
+
+![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/craftsman_brandisher001.png "The brandisher is a tool for viewing tables and their sub-tables in shared memory. It can display a graph the arrays' values as well as basic statistics about the arrays.")
+
+The brandisher is a tool for viewing tables and their sub-tables in shared memory. It can display a graph the arrays' values as well as basic statistics about the arrays
 
 
 Development is made easier through multiple techniques:
