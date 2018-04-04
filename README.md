@@ -22,9 +22,10 @@ Many of the fundamental building blocks have been created as single file librari
  - Combined with live updating of nodes, this allows rapid development of a section of the program since a compile can automatically update a node and the frozen data can be run through automatically, showing the output. 
 
 #### 4. Per node interrupt handling enables the program to continue running live, even if one node crashes. 
-   Crashes are shown clearly and don't hurt workflow.  Running threads will simply skip packets destined for the crashed node and so the overall program will have minimal disruption. 
+ - Crashes are shown clearly and don't hurt workflow.  Running threads will simply skip packets destined for the crashed node and so the overall program will have minimal disruption. 
 
-#### 5. A visual interface for both message passing and data flow nodes reduces the complexity of understanding how a program fits together as well as giving easy and intuitive feedback on high level information such as node crashed or the amount of CPU time spent running each node.
+#### 5. A visual interface for both message passing and data flow nodes.
+ - This reduces the complexity of understanding how a program fits together as well as giving easy and intuitive feedback on high level information such as node crashed or the amount of CPU time spent running each node.
 
 
 
