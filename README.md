@@ -12,6 +12,16 @@ Many of the fundamental building blocks have been created as single file librari
                   It is always stored in contiguous memory, which means that it has no separate serialized representation. 
                   It can also store nested tbls, creating a simple way to make trees and compound data structures that are full featured, without having to define new structs or classes. 
 
+
+Tools:
+
+![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/crafstman_fissure.png "The current state of the node graph GUI")
+
+![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/crafstman_visualizer001.png "The current state of the node graph GUI")
+
+![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/crafstman_brandisher001.png "The current state of the node graph GUI")
+
+
 Development is made easier through multiple techniques:
 
 #### 0. The Visualizer
