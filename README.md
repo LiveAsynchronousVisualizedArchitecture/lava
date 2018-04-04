@@ -15,11 +15,11 @@ Many of the fundamental building blocks have been created as single file librari
 
 Tools:
 
-![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/crafstman_fissure.png "The current state of the node graph GUI")
+![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/craftsman_fissure.png "The current state of the node graph GUI")
 
-![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/crafstman_visualizer001.png "The current state of the node graph GUI")
+![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/craftsman_visualizer001.png "The current state of the node graph GUI")
 
-![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/crafstman_brandisher001.png "The current state of the node graph GUI")
+![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/craftsman_brandisher001.png "Brandisher is a tool for viewing tables in shared memory.")
 
 
 Development is made easier through multiple techniques:
