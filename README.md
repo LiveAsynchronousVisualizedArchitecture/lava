@@ -49,13 +49,13 @@ Tables that are in the IdxVerts format (3D geometry with optional normals, verte
 
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/craftsman_brandisher001.png "The brandisher is a tool for viewing tables and their sub-tables in shared memory. It can display a graph the arrays' values as well as basic statistics about the arrays.")
 
-The brandisher is a tool for viewing tables and their sub-tables in shared memory. It can display a graph the arrays' values as well as basic statistics about the arrays
+The brandisher is a tool for viewing tables and their sub-tables in shared memory. It can display a graph of the arrays' values as well as basic statistics about the arrays.  This screen shot shows that while some of the points making up the craftsman model are less than 0 on the Y axis, most are above 0.  We can also see the minimum, maximum, average (mean), most common (mode), and median (middle) values as well as the variance.   This is a useful way to get a high level view on arrays containing too many values to be looked at directly as text. 
 
 
 ## Libraries:
 
 ####  LavaFlow.hpp
-The main loop that loads nodes dynamically and runs them with the packets of data they produce.  Each thread will simply call the LavaLoop() function to enter the main loop and start executing nodes with their packets.
+The core that loads nodes dynamically and runs them with the packets of data they produce.  Each thread will simply call the LavaLoop() function to enter the main loop and start executing nodes with their packets.
 
 ####  simdb.hpp
 Lock free, shared memory key value store for exceptionally fast, concurrent, inter-process communication  
