@@ -25,7 +25,7 @@ Many of the fundamental building blocks have been created as single file librari
  - Crashes are shown clearly and don't hurt workflow.  Running threads will simply skip packets destined for the crashed node and so the overall program will have minimal disruption. 
 
 #### 5. A visual interface for both message passing and data flow nodes.
- - This reduces the complexity of understanding how a program fits together as well as giving easy and intuitive feedback on high level information such as node crashed or the amount of CPU time spent running each node.
+ - This reduces the complexity of understanding how a program fits together as well as giving easy and intuitive feedback on high level information such as node crashes or the amount of CPU time spent running each node.
 
 
 
@@ -54,6 +54,8 @@ The brandisher is a tool for viewing tables and their sub-tables in shared memor
 
 ## Libraries:
 
+LAVA is made out of very few componenents (with tbl.hpp as technically optional, though extremely valuable).  They are all single header files and have no external dependencies outside of C++11 standard libraries. 
+
 ####  LavaFlow.hpp
 The core that loads nodes dynamically and runs them with the packets of data they produce.  Each thread will simply call the LavaLoop() function to enter the main loop and start executing nodes with their packets.
 
@@ -66,13 +68,8 @@ Lock free, shared memory key value store for exceptionally fast, concurrent, int
  - It is always stored in contiguous memory, which means that it has no separate serialized representation. 
  - It can also store nested tbls, creating a simple way to make trees and compound data structures that are full featured, without having to define new structs or classes. 
 
-  
-![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/Rays_from_camera_visualized.png "The current state of the node graph GUI")
+## Examples:
 
-
-Development is made easier through multiple techniques:
-
-#### 0. The Visualizer
- - A separate program that reads from a simdb database and draws (optionally textured) geometry in an OpenGL window.  Geometry will update automatically in the visualizer even if changed from another program.  New keys placed in the database by other programs will show up automatically and absent keys will be culled from the visualizer's list. 
-
-![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/nuklear/visualizer.3.png "The visualizer displaying a colored cube and  two triangles")
+![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/Rays_from_camera_visualized.png "Rays generated from a camera and traced to find their collisions with a 3D model using the embree library.")
+ 
+This is an example of rays generated from a camera and traced to find their collisions with a 3D model using the embree library. An .obj model is loaded and passed to a message node that uses the embree library to sort the geometry into a BVH (bounding volume heirarchy acceleration structure for ray tracing).   The camera node generates rays and passes them to the scene to be traced.  The message node traces the rays and outputs a visualization of the rays colliding with the geometry.  
