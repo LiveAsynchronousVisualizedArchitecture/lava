@@ -70,6 +70,11 @@ Lock free, shared memory key value store for exceptionally fast, concurrent, int
 
 ## Examples:
 
-![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/Rays_from_camera_visualized.png "Rays generated from a camera and traced to find their collisions with a 3D model using the embree library.")
+![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/rays_shadeRayHits001.png "Rays generated from a camera and traced to find their collisions with a 3D model using the embree library.")
  
-This is an example of rays generated from a camera and traced to find their collisions with a 3D model using the embree library. An .obj model is loaded and passed to a message node that uses the embree library to sort the geometry into a BVH (bounding volume heirarchy acceleration structure for ray tracing).   The camera node generates rays and passes them to the scene to be traced.  The message node traces the rays and outputs a visualization of the rays colliding with the geometry.  
+This is an example of rays generated from a camera and traced to find their collisions with a 3D model using the embree library.
+  - An .obj model is loaded 
+  - The model is passed to a message node that uses the embree library to sort the geometry into a BVH (bounding volume heirarchy acceleration structure for ray tracing).   
+  - The camera node generates rays and passes them to the scene node to be traced.  
+  - The message node traces the rays and outputs a visualization of the rays colliding with the geometry. 
+  - A final node takes the traced rays and computes the outgoing ray from the ray hit point and normal.
