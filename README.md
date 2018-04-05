@@ -67,6 +67,9 @@ Lock free, shared memory key value store for exceptionally fast, concurrent, int
  - The vector can take on any intrinsic numeric type, which is then type checked and range checked during debug mode.   
  - It is always stored in contiguous memory, which means that it has no separate serialized representation. 
  - It can also store nested tbls, creating a simple way to make trees and compound data structures that are full featured, without having to define new structs or classes. 
+ - These compound data structures are already a single allocation, always serialized and can be read clearly in a tool like Brandisher to understand the format without needing extensive documentation.  
+ - Due to their single span of memory they can easily be written to files and/or read directly from files using memory mapping.
+ - The tbl struct contains a pointer to the main data as well as pointrs for allocation, reallocation and free functions. This allows tbls to carry their memory allocation functions with them, which is valuable for use with shared libraries (so that memory allocation functions in the main program don't get mixed with free functions in the shared library and vice versa).
 
 ## Examples:
 
