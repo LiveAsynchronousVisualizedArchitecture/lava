@@ -42,7 +42,7 @@ Fissure is the node graph UI.  I can be used to construct a graph of nodes, run 
 
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/craftsman_visualizer001.png "Tables that are in the IdxVerts format (3D geometry with optional normals, vertex colors, uvs, and a color texture map)  will be picked up by the visualizer and displayed with openGL.")
 
-Tables that are in the IdxVerts format (3D geometry with optional normals, vertex colors, uvs, and a color texture map)  will be picked up by the visualizer and displayed with openGL.
+[Tables](README.md#tblhpp) that are in the IdxVerts format (3D geometry with optional normals, vertex colors, uvs, and a color texture map)  will be picked up by the visualizer and displayed with openGL.
 
 
 ### Brandisher:
@@ -77,7 +77,7 @@ Lock free, shared memory key value store for exceptionally fast, concurrent, int
  
 This is an example of rays generated from a camera and traced to find their collisions with a 3D model using the embree library.
   - An .obj model is loaded 
-  - The model is passed to a message node that uses the embree library to sort the geometry into a BVH (bounding volume heirarchy acceleration structure for ray tracing).   
+  - The model is passed to a message node that uses [the Embree ray tracing library from Intel](https://github.com/embree/embree) to sort the geometry into a BVH (bounding volume heirarchy acceleration structure for ray tracing).   
   - The camera node generates rays and passes them to the scene node to be traced.  
   - The message node traces the rays and outputs a visualization of the rays colliding with the geometry. 
   - A final node takes the traced rays and computes the outgoing ray from the ray hit point and normal.
