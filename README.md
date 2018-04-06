@@ -1,27 +1,25 @@
 # LAVA
 
-LAVA stands for Live Asynchronous Visual Architecture. 
+LAVA stands for Live Asynchronous Visual Architecture.  It's goal is to simplify creation of high performance native software with lock free concurrency.
 
-Before describing what each of these terms mean and how they fit together,
- there is something important to emphasize - LAVA is designed to **_both_** significantly **_speed up development_**
-AND as a simple and easy way to create **_signifcant amounts of concurrency_**. 
-It is written in C++11 and is meant to work with any language that can compile a shared library that exposes standard function calls.
-Many of the fundamental building blocks have been created as single file libraries with no dependencies other than the C++11 standard library. 
+Before describing what each of these terms mean and how they fit together, there is something important to emphasize - LAVA is designed to **_both_** significantly **_speed up development_** AND as a simple and easy way to create **_signifcant amounts of concurrency_**.
+It is written in C++11 and is meant to potentially work with any language that can compile a shared library that exposes standard function calls.  Many of the fundamental building blocks have been created as single file libraries with no dependencies other than the C++11 standard library. 
 
-## Problems With Non-Trivial Software Creation LAVA Aims to Solve  
+## Problems With Non-Trivial Software Creation LAVA Aims to Solve
 
 #### High Level Planning and Structure
 
-  -  Using nodes connected in a fluid, visual UI, programs can be architected at a high level before worrying about the implementation of their pieces. 
-  -  Every packet of data can be dealt with concurrently, making a program highly asynchronous with little effort.  
-  -  Ideally a program would make use of all CPU resources 
-  -  Instead of treating a node graph as a silver bullet that should be used everywhere, each node is made using C++, which lets the granular expression level programming be done normally.   Large programs can then be made out of relativly few nodes, yet remain organized and modular.
+  -  Using nodes connected in a fluid, openGL accelerated UI, programs can be architected at a high level before worrying about the implementation of their pieces.
+  -  Clear separation of each node can help with collaboration as well as calibration to the scope of work needed.
+  -  Every packet of data can be dealt with concurrently, making a program highly asynchronous with little effort. 
+  -  Each node is made using C++, which lets the expression level programming be done normally. 
+  -  Programs can be created from relativly few nodes, simplifying the comprehension of how large projects fit together and how their pieces interact.
   
 #### Common Problems With Visual Programming
-
-  -  Visual programming techniques have been very successful in domain specific applications, though treating everything as data flow with no state can become an excersize in putting a square peg through a round hole.
+  -  Most visual programming environments are based off of a custom language instead of leveraging the enormous ecosystem, maturity, speed and extensive design that has already gone into existing languages. LAVA is made using a few thousand lines of C++ spread across 3 header files with no external dependencies. 
+  -  Visual programming techniques have been successful in domain specific applications, though treating everything as data flow with no state can become an excersize in putting a square peg through a round hole.
   -  Control flow, looping, data structures and more can be difficult to control elegantly.
-  -  Fine grained expressions that could be densly represented in a naitivly compiled language can become   LAVA uses multiple node types, most notably both message passing nodes and data flow nodes.
+  -  Instead of treating a node graph as a silver bullet that should be used everywhere, fine grained expressions that could be densly represented in a naitivly compiled language can become   LAVA uses multiple node types, most notably both message passing nodes and data flow nodes.
 
 #### Proposed Solutions to Common Visual Programming Problems
  - Message passing nodes can manage persistent state and dictate the high level program flow. 
@@ -30,9 +28,10 @@ Many of the fundamental building blocks have been created as single file librari
  - Constant nodes will enable an elegant easy way to change the data going in to nodes in real time, so that data can be created first, then the execution can tested on every change automatically. Nodes can then have inputs for parameters that can easily be controlled dynamically or statically. 
 
 #### Interactivity and Testing 
-
-#### Modularity
-
+ - Any ouput from a node can potentially be visualized while the program is running.
+ - Visualizations happen with lock free shared memory to external processes and don't interfere with the execution of the main program.
+ - Input data can be frozen and a single node can be recompiled, automatically hot reloaded and run using the now static input.  This enables fast iteration even in a large program by isolating a single piece.
+ 
 ## Fundamental Principles
 
 #### 1. A program is composed of message passing nodes and data flow nodes. This enables many desirable features: 
@@ -40,44 +39,43 @@ Many of the fundamental building blocks have been created as single file librari
  - Truely modular pieces that have that clearly defined inputs and output with no side effects.
  - Detailed information about each node including input and output types, percentage of CPU time etc.
 
-#### 2. The ability to update nodes live.
+#### 2. Update Nodes Live
  - Since data is separated from execution in a clear way, a recompile of a shared library can trigger an update while the program is running, meaning a program can be changed live, without restarting. 
 
-#### 3. The ability to freeze the input to any node.
+#### 3. Freeze Input
  - Combined with live updating of nodes, this allows rapid development of a section of the program since a compile can automatically update a node and the frozen data can be run through automatically, showing the output. 
 
-#### 4. Per node interrupt handling enables the program to continue running live, even if one node crashes. 
- - Crashes are shown clearly and don't hurt workflow.  Running threads will simply skip packets destined for the crashed node and so the overall program will have minimal disruption. 
+#### 4. Granular Interrupt Handling 
+ - Enables the program to continue running live, even if one node crashes. 
+ - Crashes are shown clearly and don't disrupt workflow.
+ - Running threads will simply skip packets destined for the crashed node.
 
-#### 5. A visual interface for both message passing and data flow nodes.
- - This reduces the complexity of understanding how a program fits together as well as giving easy and intuitive feedback on high level information such as node crashes or the amount of CPU time spent running each node.
+#### 5. Visual Node Graph Interface
+ - Reduces complexity of how a program fits together as well as giving easy and intuitive feedback.
+ - High level information such as node crashes or CPU time spent running each node is always available without re-running under a specific context. 
 
+## Tools
 
-
-## Tools:
-
-### Fissure:
+### Fissure
 
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/craftsman_fissure.png "Fissure is the node graph UI.  I can be used to construct a graph of nodes, run the program, visualize outputs, see node errors and view timing information about the nodes.")
 
 Fissure is the node graph UI.  I can be used to construct a graph of nodes, run the program, visualize outputs, see node errors and view timing information about the nodes.
 
-
-### Visualizer:
+### Visualizer
 
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/craftsman_visualizer001.png "Tables that are in the IdxVerts format (3D geometry with optional normals, vertex colors, uvs, and a color texture map)  will be picked up by the visualizer and displayed with openGL.")
 
 [Tables](README.md#tblhpp) that are in the IdxVerts format (3D geometry with optional normals, vertex colors, uvs, and a color texture map)  will be picked up by the visualizer and displayed with openGL.
 
-
-### Brandisher:
+### Brandisher
 
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/craftsman_brandisher001.png "The brandisher is a tool for viewing tables and their sub-tables in shared memory. It can display a graph the arrays' values as well as basic statistics about the arrays.")
 
 The brandisher is a tool for viewing tables and their sub-tables in shared memory. It can display a graph of the arrays' values as well as basic statistics about the arrays.  This screen shot shows that while some of the points making up the craftsman model are less than 0 on the Y axis, most are above 0.  We can also see the minimum, maximum, average (mean), most common (mode), and median (middle) values as well as the variance.   This is a useful way to get a high level view on arrays containing too many values to be looked at directly as text. 
 
 
-## Libraries:
+## Libraries
 
 LAVA is made out of very few componenents (with tbl.hpp as technically optional, though extremely valuable).  They are all single header files and have no external dependencies outside of C++11 standard libraries. 
 
@@ -96,7 +94,7 @@ Lock free, shared memory key value store for exceptionally fast, concurrent, int
  - Due to their single span of memory they can easily be written to files and/or read directly from files using memory mapping.
  - The tbl struct contains a pointer to the main data as well as pointrs for allocation, reallocation and free functions. This allows tbls to carry their memory allocation functions with them, which is valuable for use with shared libraries (so that memory allocation functions in the main program don't get mixed with free functions in the shared library and vice versa).
 
-## Examples:
+## Examples
 
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/rays_shadeRayHits001.png "Rays generated from a camera and traced to find their collisions with a 3D model using the embree library.")
  
