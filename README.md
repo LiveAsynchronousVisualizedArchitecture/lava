@@ -27,7 +27,7 @@ It is written in C++11 and is meant to potentially work with any language that c
  - Message passing nodes can manage persistent state and dictate the high level program flow. 
  - Flow nodes transform data in highly modular pieces with easy visualization and well defined inputs and outputs. 
  - Generator nodes create an elegant structure to bring in data such network traffic, file IO, etc. 
- - Constant nodes will enable an elegant easy way to change the data going in to nodes in real time, so that data can be created first, then the execution can tested on every change automatically. Nodes can then have inputs for parameters that can easily be controlled dynamically or statically. 
+ - Constant nodes will enable an elegant easy way to change the data going in to nodes in real time, so that input data can be created first, then the execution can tested on every change as it happens in real time. Nodes can then have inputs for parameters that can easily be controlled dynamically or statically. 
 
 #### Interactivity and Testing 
  - Any ouput from a node can potentially be visualized while the program is running.
