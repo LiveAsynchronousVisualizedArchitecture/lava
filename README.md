@@ -6,9 +6,34 @@ Before describing what each of these terms mean and how they fit together,
  there is something important to emphasize - LAVA is designed to **_both_** significantly **_speed up development_**
 AND as a simple and easy way to create **_signifcant amounts of concurrency_**. 
 It is written in C++11 and is meant to work with any language that can compile a shared library that exposes standard function calls.
-Many of the fundamental building blocks have been created as single file libraries with no dependencies other than the C++11 standard library. Examples include: 
+Many of the fundamental building blocks have been created as single file libraries with no dependencies other than the C++11 standard library. 
 
-## Fundamental Principles:
+## Problems With Non-Trivial Software Creation LAVA Aims to Solve  
+
+#### High Level Planning and Structure
+
+  -  Using nodes connected in a fluid, visual UI, programs can be architected at a high level before worrying about the implementation of their pieces. 
+  -  Every packet of data can be dealt with concurrently, making a program highly asynchronous with little effort.  
+  -  Ideally a program would make use of all CPU resources 
+  -  Instead of treating a node graph as a silver bullet that should be used everywhere, each node is made using C++, which lets the granular expression level programming be done normally.   Large programs can then be made out of relativly few nodes, yet remain organized and modular.
+  
+#### Common Problems With Visual Programming
+
+  -  Visual programming techniques have been very successful in domain specific applications, though treating everything as data flow with no state can become an excersize in putting a square peg through a round hole.
+  -  Control flow, looping, data structures and more can be difficult to control elegantly.
+  -  Fine grained expressions that could be densly represented in a naitivly compiled language can become   LAVA uses multiple node types, most notably both message passing nodes and data flow nodes.
+
+#### Proposed Solutions to Common Visual Programming Problems
+ - Message passing nodes can manage persistent state and dictate the high level program flow. 
+ - Flow nodes transform data in highly modular pieces with easy visualization and well defined inputs and outputs. 
+ - Generator nodes create an elegant structure to bring in data such network traffic, file IO, etc. 
+ - Constant nodes will enable an elegant easy way to change the data going in to nodes in real time, so that data can be created first, then the execution can tested on every change automatically. Nodes can then have inputs for parameters that can easily be controlled dynamically or statically. 
+
+#### Interactivity and Testing 
+
+#### Modularity
+
+## Fundamental Principles
 
 #### 1. A program is composed of message passing nodes and data flow nodes. This enables many desirable features: 
  - A clear picture of the high level structure of a program along with a way to plan the program structure in a precise way.
