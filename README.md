@@ -19,9 +19,11 @@ It is written in C++11 and is meant to potentially work with any language that c
   -  Most visual programming environments are based off of a custom language instead of leveraging the enormous ecosystem, maturity, speed and extensive design that has already gone into existing languages. LAVA is made using a few thousand lines of C++ spread across 3 header files with no external dependencies. 
   -  Visual programming techniques have been successful in domain specific applications, though treating everything as data flow with no state can become an excersize in putting a square peg through a round hole.
   -  Control flow, looping, data structures and more can be difficult to control elegantly.
-  -  Instead of treating a node graph as a silver bullet that should be used everywhere, fine grained expressions that could be densly represented in a naitivly compiled language can become   LAVA uses multiple node types, most notably both message passing nodes and data flow nodes.
+  -  Dense expressions that could be represented easily in a nativly compiled language can become unweildly when using nodes in a very granular way. 
 
 #### Proposed Solutions to Common Visual Programming Problems
+ - LAVA uses multiple node types, most notably both message passing nodes and data flow nodes.
+ - Individual nodes are written in modern C++ and meant to accomplish high level goals on large chunks of data. 
  - Message passing nodes can manage persistent state and dictate the high level program flow. 
  - Flow nodes transform data in highly modular pieces with easy visualization and well defined inputs and outputs. 
  - Generator nodes create an elegant structure to bring in data such network traffic, file IO, etc. 
