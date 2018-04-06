@@ -1,11 +1,11 @@
 # LAVA
 
-LAVA stands for Live Asynchronous Visual Architecture.  It's goal is to simplify creation of high performance native software with lock free concurrency.
+LAVA stands for Live Asynchronous Visual Architecture.  Its goal is to simplify creation of high performance native software with lock free concurrency.
 
 Before describing what each of these terms mean and how they fit together, there is something important to emphasize - LAVA is designed to **_both_** significantly **_speed up development_** AND as a simple and easy way to create **_signifcant amounts of concurrency_**.
 It is written in C++11 and is meant to potentially work with any language that can compile a shared library that exposes standard function calls.  Many of the fundamental building blocks have been created as single file libraries with no dependencies other than the C++11 standard library. 
 
-## Problems With Non-Trivial Software Creation LAVA Aims to Solve
+## Software Problems LAVA Aims to Solve
 
 #### High Level Planning and Structure
 
