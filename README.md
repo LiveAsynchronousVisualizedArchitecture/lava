@@ -17,8 +17,8 @@ It is written in C++11 and is meant to potentially work with any language that c
   
 #### Common Problems With Visual Programming
   -  Most visual programming environments are based off of a custom language instead of leveraging the enormous ecosystem, maturity, speed and extensive design that has already gone into existing languages. LAVA is made using a few thousand lines of C++ spread across 3 header files with no external dependencies. 
-  -  Visual programming techniques have been successful in domain specific applications, though treating everything as data flow with no state can become an excersize in putting a square peg through a round hole.
-  -  Control flow, looping, data structures and more can be difficult to control elegantly.
+  -  Pure data flow visual programming has been successful in domain specific applications, though generalizing to arbitrary software can can break the tight mapping of the interface to execution needed.
+  -  Control flow, looping, data structures and persistant state can be difficult to control elegantly.
   -  Dense expressions that could be represented easily in a nativly compiled language can become unweildly when using nodes in a very granular way. 
 
 #### Proposed Solutions to Common Visual Programming Problems
