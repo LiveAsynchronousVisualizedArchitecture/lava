@@ -26,8 +26,8 @@ It is written in C++11 and is meant to potentially work with any language that c
  - Individual nodes are written in modern C++ and meant to accomplish high level goals on large chunks of data. 
  - Message passing nodes can manage persistent state and dictate the high level program flow. 
  - Flow nodes transform data in highly modular pieces with easy visualization and well defined inputs and outputs. 
- - Generator nodes create an elegant structure to bring in data such network traffic, file IO, etc. 
- - Constant nodes will enable an elegant easy way to change the data going in to nodes in real time, so that input data can be created first, then the execution can tested on every change as it happens in real time. Nodes can then have inputs for parameters that can easily be controlled dynamically or statically. 
+ - Generator nodes create an elegant structure to bring in data such as network traffic, file IO, etc. 
+ - Constant nodes will enable an elegant easy way to change the data going in to nodes in real time, so that input data can be created first then the execution can be tested on every change as it happens in real time. Nodes can then have inputs for parameters that can easily be controlled dynamically or statically. 
 
 #### Interactivity and Testing 
  - Any ouput from a node can potentially be visualized while the program is running.
@@ -38,7 +38,7 @@ It is written in C++11 and is meant to potentially work with any language that c
 
 #### 1. A program is composed of message passing nodes and data flow nodes. This enables many desirable features: 
  - A clear picture of the high level structure of a program along with a way to plan the program structure in a precise way.
- - Truely modular pieces that have that clearly defined inputs and output with no side effects.
+ - Truly modular pieces that have that clearly defined inputs and output with no side effects.
  - Detailed information about each node including input and output types, percentage of CPU time etc.
 
 #### 2. Update Nodes Live
