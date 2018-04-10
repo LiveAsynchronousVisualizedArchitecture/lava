@@ -14,7 +14,7 @@ enum Slots
 
 extern "C"
 {
-  const char* description = "Loads an image given the input file path";
+  const char* description = "Wraps stb_image.h and loads an image given the input file path";
   const char*  InTypes[]  = {"ASCII",                 nullptr};
   const char*  InNames[]  = {"File Path",             nullptr};
   const char* OutTypes[]  = {"IdxVerts",              nullptr};
@@ -34,41 +34,49 @@ extern "C"
       int w=0,h=0,chans=0;
       stbi_uc* img = stbi_load( pth.c_str(), &w, &h, &chans, 0);
 
-      u64 sz = w * h * chans;
+      //u64 sz = w * h * chans;
+      assert(chans == 3);                  // assume for now, redo later to be more flexible
+      u64 sz = w * h * 4;
       tbl it = LavaMakeTbl(lp, sz, 1.f);    // it is image tbl
       it("width")    = (u64)w;
       it("height")   = (u64)h;
-      it("channels") = (u64)chans;
-      TO(sz,i){
-        it[i] = (f32)(img[i]) / 255.f;
+      it("channels") = (u64)4;      //chans;
+      TO(w*h,i){ 
+        TO(3,c){ 
+          it[i*4 + c] = (f32)(img[i*3+c]) / 255.f;
+        }
+        it[i*4 + 3] = 1.f;
       }
       stbi_image_free(img);
 
-      
       tbl     one = LavaMakeTbl(lp, 4, 1.f);
-      tbl indices = LavaMakeTbl(lp, 4, (u32)0);
+      tbl indices = LavaMakeTbl(lp, 6, (u32)0);
       tbl      px = LavaMakeTbl(lp, 4, 0.f);
       tbl      py = LavaMakeTbl(lp, 4, 0.f);
-      
       px[1] = 1.f;
       px[2] = 1.f;
-
       py[2] = 1.f;
       py[3] = 1.f;
-
-      TO(4,i){
-        indices[i] = (u32)i;
+      tbl ty = py;
+      TO(py.size(),i){
+        ty[i] = 1.f - (f32)py[i];
       }
 
-      tbl iv = LavaMakeTbl(lp, 0, (i8)0);    // iv is IdxVerts
-      //iv("mode") = (u32)7;                   // GL_QUADS
-      iv("mode") = (u32)0;                   // GL_POINTS
+      TO(3,i){
+        indices[i] = (u32)i;
+      }
+      indices[3] = (u32)2;
+      indices[4] = (u32)3;
+      indices[5] = (u32)0;
+
+      tbl iv = LavaMakeTbl(lp, 0, (i8)0);       // iv is IdxVerts
+      iv("mode") = (u32)4;                      // GL_TRIANGLES
       iv("type") = tbl::StrToInt("IdxVerts");
       
       iv("positions x")  = &px;
       iv("positions y")  = &py;
       iv("texture coordinates x") = &px;
-      iv("texture coordinates y") = &py;
+      iv("texture coordinates y") = &ty;
       iv("colors red")   = &one;
       iv("colors green") = &one;
       iv("colors blue")  = &one;
@@ -109,6 +117,13 @@ extern "C"
 }
 
 
+
+
+
+
+//iv("mode") = (u32)7;                    // GL_QUADS
+//iv("mode") = (u32)0;                    // GL_POINTS
+//iv("mode") = (u32)1;                    // GL_LINES
 
 //u32 i=0;
 //while( LavaNxtPckt(in, &i) )

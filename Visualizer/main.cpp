@@ -1001,7 +1001,8 @@ ENTRY_DECLARATION
 
       //glEnable(GL_TEXTURE_2D);
       //glEnable(GL_DEPTH);
-
+      glDisable(GL_CULL_FACE);
+      glFrontFace(GL_CCW);
       glEnable(GL_DEPTH_TEST);                                   // glDepthFunc(GL_LESS);
       glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
       PRINT_GL_ERRORS
