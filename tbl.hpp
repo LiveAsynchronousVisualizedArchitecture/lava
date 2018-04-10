@@ -954,7 +954,7 @@ public:
   tbl&         operator=(const char* s){ init_cstr(s); return *this; }
 
   operator bool(){ return (bool)m_mem; }
-  TblVal      operator[](u64 i)
+  inline TblVal  operator[](u64 i)
   {
     tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
     
@@ -967,7 +967,7 @@ public:
 
     return v;
   }
-  auto        operator[](u64 i) const -> const TblVal {
+  inline auto    operator[](u64 i) const -> const TblVal {
     tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
     
     TblVal v;
@@ -979,14 +979,14 @@ public:
     
     return v;
   }
-  KVOfst      operator()(i32 k)
+  KVOfst         operator()(i32 k)
   {
     char key[sizeof(k)+1];
     memcpy(key, &k, sizeof(k));
     key[sizeof(k)] = '\0';
     return operator()(key);
   }
-  KVOfst      operator()(const char* key)
+  KVOfst         operator()(const char* key)
   {      
     //if(!m_mem){ return KVOfst(); }
 
@@ -1018,14 +1018,14 @@ public:
 
     return ret;
   }
-  auto        operator()(const char* key) const -> const KVOfst {      
+  auto           operator()(const char* key) const -> const KVOfst {      
     KVOfst  ret;                                                                         // this will be set with placement new instead of operator= because operator= is templated and used for assigning to the KV pointed to by KVOfst::KV* -  this is so tbl("some key") = 85  can work correctly
     KV*      kv = m_mem? get(key) : nullptr;
     new (&ret) KVOfst(kv, (tbl*)this);                      // if the key wasn't found, kv will be a nullptr which is the same as an error KVOfst that will evaluate to false when cast to a boolean      
     return ret;
   }
-  tbl&      operator--(){ shrink_to_fit();    return *this; }
-  tbl&      operator++(){ expand(true,false); return *this; }
+  tbl&         operator--(){ shrink_to_fit();    return *this; }
+  tbl&         operator++(){ expand(true,false); return *this; }
 
   //void    operator+=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
   //void    operator-=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }

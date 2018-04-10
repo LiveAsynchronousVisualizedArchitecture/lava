@@ -29,6 +29,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ShadeRayHits", "ShadeRayHit
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Cache", "Cache\Cache.vcxproj", "{DE18F2EA-98F1-4B72-A115-8BBC95B4F2FF}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ImageLoader", "ImageLoader\ImageLoader.vcxproj", "{19C0CEB6-4557-494E-8A44-627CD056B2FD}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Mixed Platforms = Debug|Mixed Platforms
@@ -175,6 +177,16 @@ Global
 		{DE18F2EA-98F1-4B72-A115-8BBC95B4F2FF}.Release|Win32.ActiveCfg = Release|x64
 		{DE18F2EA-98F1-4B72-A115-8BBC95B4F2FF}.Release|x64.ActiveCfg = Release|x64
 		{DE18F2EA-98F1-4B72-A115-8BBC95B4F2FF}.Release|x64.Build.0 = Release|x64
+		{19C0CEB6-4557-494E-8A44-627CD056B2FD}.Debug|Mixed Platforms.ActiveCfg = Debug|x64
+		{19C0CEB6-4557-494E-8A44-627CD056B2FD}.Debug|Mixed Platforms.Build.0 = Debug|x64
+		{19C0CEB6-4557-494E-8A44-627CD056B2FD}.Debug|Win32.ActiveCfg = Debug|x64
+		{19C0CEB6-4557-494E-8A44-627CD056B2FD}.Debug|x64.ActiveCfg = Debug|x64
+		{19C0CEB6-4557-494E-8A44-627CD056B2FD}.Debug|x64.Build.0 = Debug|x64
+		{19C0CEB6-4557-494E-8A44-627CD056B2FD}.Release|Mixed Platforms.ActiveCfg = Release|x64
+		{19C0CEB6-4557-494E-8A44-627CD056B2FD}.Release|Mixed Platforms.Build.0 = Release|x64
+		{19C0CEB6-4557-494E-8A44-627CD056B2FD}.Release|Win32.ActiveCfg = Release|x64
+		{19C0CEB6-4557-494E-8A44-627CD056B2FD}.Release|x64.ActiveCfg = Release|x64
+		{19C0CEB6-4557-494E-8A44-627CD056B2FD}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

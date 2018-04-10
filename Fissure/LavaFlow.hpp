@@ -793,7 +793,7 @@ struct      LavaFrame
 };
 struct       LavaNode
 {
-  enum Type { NONE=0, FLOW=1, MSG=2, CONSTANT=3, GENERATOR=4, NODE_ERROR=0xFFFFFFFFFFFFFFFF };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
+  enum Type { NONE=0, FLOW=1, MSG=2, CONSTANT=3, GENERATOR=4, JOINT=5, NODE_ERROR=0xFFFFFFFFFFFFFFFF };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
 
   FlowFunc               func;
   ConstructFunc   constructor;

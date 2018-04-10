@@ -12,9 +12,10 @@
 // -todo: build in resize function into tbl so that arrays can be allocated just once
 // -todo: change message node list to be named 'generator' node list
 // -todo: change frame counting variable name to be called cycle 
+// -todo: add brandisher to the readme github page
+// -todo: add LavaFlow.hpp description to github readme page
 
-// todo: add brandisher to the readme github page
-// todo: add LavaFlow.hpp description to github readme page
+// todo: debug why craftsman path and loader don't connect when loading
 // todo: make dragging a slot turn it into a constant, which writes a .type.const file, which is then memory mapped and live reloaded by lava
 // todo: wok out structure for constants - .const files can be detected by lava - files could be named .Type.const to be detected as constant nodes while retaining type information that is not stored in any sort of binary format
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
@@ -1667,6 +1668,8 @@ ENTRY_DECLARATION // main or winmain
   using namespace std;
   using namespace fs;
   
+  //GL_TRIANGLES;
+
 	NVGcontext* vg = NULL;
   SECTION(initialization)
   {
