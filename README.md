@@ -8,7 +8,7 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
   -  High level structure is not strictly enforced (or doesn't exist) and often subverted in some way to accomodate extra data/communication 
   -  As program size increases, iteration increases due to re-compilation time, linking time, and the time to re-run the program to test
   -  Modularity often breaks down due to data dependencies at run time and source dependencies at compile time
-  -  Separating inputs, outputs and interactions into asynchronous components is often error prone and/or requires significant planning 
+  -  Creating asynchronous components is often error prone and/or requires significant planning.  Making 
   -  Debugging often requires a slow process of examining tiny amounts of data at various execution points to find where a problem happens before it can become clear how it happens
   -  Debugging often means using an entirely different build that is significantly slower, instead of isolating the speed hit to a small piece of the program
 
