@@ -1,9 +1,15 @@
 # LAVA
 
-LAVA stands for Live Asynchronous Visual Architecture.  Its goal is to simplify creation of high performance native software with lock free concurrency.
+LAVA stands for Live Asynchronous Visual Architecture.  Its goal is to simplify high performance software while allowing every piece to be lock free and asynchronous.
 
-Before describing what each of these terms mean and how they fit together, there is something important to emphasize - LAVA is designed to **_both_** significantly **_speed up development_** AND as a simple and easy way to create **_signifcant amounts of concurrency_**.
-It is written in C++11 and is meant to potentially work with any language that can compile a shared library that exposes standard function calls.  Many of the fundamental building blocks have been created as single file libraries with no dependencies other than the C++11 standard library. 
+LAVA is designed to **_both_** significantly **_speed up development_** AND as a simple way to create **_signifcant amounts of concurrency_**.  It is written in C++11 and meant to potentially work with any language that can compile a shared library that exposes standard function calls.  The fundamental building blocks are single file libraries with no dependencies other than the C++11 standard library. 
+
+## Classic Software Problems
+  -  High level overview is mixed with granular source code and often subverted in some way to accomodate extra data 
+  -  As program size increases, iteration increases due to re-compilation time, linking time, and the time to re-run the program to test
+  -  Modularity often breaks down due to data dependencies at run time and source dependencies at compile time
+  -  Separating inputs, outputs and interactions into asynchronous components is often error prone and/or requires significant planning 
+  -  Debugging often requires a slow process of examining tiny amounts of data at various execution points to find where a problem happens before it can become clear how it happens.
 
 ## Software Problems LAVA Aims to Solve
 
