@@ -9,7 +9,8 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
   -  As program size increases, iteration increases due to re-compilation time, linking time, and the time to re-run the program to test
   -  Modularity often breaks down due to data dependencies at run time and source dependencies at compile time
   -  Separating inputs, outputs and interactions into asynchronous components is often error prone and/or requires significant planning 
-  -  Debugging often requires a slow process of examining tiny amounts of data at various execution points to find where a problem happens before it can become clear how it happens.
+  -  Debugging often requires a slow process of examining tiny amounts of data at various execution points to find where a problem happens before it can become clear how it happens
+  -  Debugging often means using an entirely different build that is significantly slower, instead of isolating the speed hit to a small piece of the program
 
 ### How LAVA Confronts These Problems
 
@@ -39,8 +40,8 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
  -  Individual nodes are written in modern C++ and meant to accomplish high level goals on large chunks of data
  -  Message passing nodes can manage persistent state and dictate the high level program flow
  -  Flow nodes transform data in highly modular pieces with easy visualization and well defined inputs and outputs 
- -  Generator nodes can elegantly bring in network traffic, file IO, etc.
- -  Constant nodes will be an elegant way to change data going in to nodes in real time. Input data can be created first then the execution can be tested on every change as it happens in real time.  Inputs for parameters then can be controlled dynamically or statically. 
+ -  Generator nodes can elegantly bring in network traffic, file IO, etc
+ -  Constant nodes will be an elegant way to change data going in to nodes in real time. Input data can be created first then the execution can be tested on every change as it happens in real time.  Inputs for parameters then can be controlled dynamically or statically
  
 ## Fundamental Principles
 
@@ -113,3 +114,7 @@ This is an example of rays generated from a camera and traced to find their coll
   - The camera node generates rays and passes them to the scene node to be traced
   - The message node traces the rays and outputs both the traced rays colliding with geometry and a visualization of the traced rays 
   - A final node takes the traced rays and computes the outgoing ray from the ray hit point and normal
+  
+  ### Internals
+  
+  
