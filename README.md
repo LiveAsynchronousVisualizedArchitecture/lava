@@ -5,7 +5,7 @@ LAVA stands for Live Asynchronous Visual Architecture.  Its goal is to simplify 
 LAVA is designed to **_both_** significantly **_speed up development_** AND as a simple way to create **_signifcant amounts of concurrency_**.  It is written in C++11 and meant to potentially work with any language that can compile a shared library that exposes standard function calls.  The fundamental building blocks are single file libraries with no dependencies other than the C++11 standard library. 
 
 ### Classic Software Problems
-  -  High level overview is mixed with granular source code and often subverted in some way to accomodate extra data 
+  -  High level structure is not strictly enforced (or doesn't exist) and often subverted in some way to accomodate extra data/communication 
   -  As program size increases, iteration increases due to re-compilation time, linking time, and the time to re-run the program to test
   -  Modularity often breaks down due to data dependencies at run time and source dependencies at compile time
   -  Separating inputs, outputs and interactions into asynchronous components is often error prone and/or requires significant planning 
@@ -13,18 +13,19 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 
 ### How LAVA Confronts These Problems
 
-#### High Level Planning and Structure
-
-  -  Using nodes connected in a fluid, openGL accelerated UI, programs can be architected at a high level before worrying about the implementation of their pieces.
-  -  Clear separation of each node can help with collaboration as well as calibration to the scope of work needed.
-  -  Every packet of data can be dealt with concurrently, making a program highly asynchronous with little effort. 
-  -  Each node is made using C++, which lets the expression level programming be done normally. 
+#### High Level Structure
+  -  Using nodes connected in a fluid, openGL accelerated UI, programs can be architected visually and implemented incrementally
+  -  Clear separation of each node facilitates collaboration as well as calibration to the scope of work needed.
   -  Programs can be created from relativly few nodes, simplifying the comprehension of how large projects fit together and how their pieces interact.
   
 #### Interactivity and Testing 
  - Any ouput from a node can potentially be visualized while the program is running.
- - Visualizations happen with lock free shared memory to external processes and don't interfere with the execution of the main program.
- - Input data can be frozen and a single node can be recompiled, automatically hot reloaded and run using the now static input.  This enables fast iteration even in a large program by isolating a single piece.
+ - Input data can be frozen and a single node can be recompiled, automatically hot reloaded, then automatically run using the now static input.  This enables fast iteration even in a large program by isolating a single piece and its input while continuously viewing its output.
+ - Constant nodes can offer a way to change input in real time for interactive testing with visualization of results  
+
+#### Concurrency, Parallelism and Asynchronous Design
+  -  Every packet of data can be dealt with concurrently, giving a program lock free asynchronous execution with little effort. Parallelism is dictated by the amount that data can be isolated.  
+   - Visualizations happen with lock free shared memory to external processes and don't interfere with the execution of the main program.
 
 ### Common Problems With Visual Programming
   -  Most visual programming environments are based off of a custom language instead of leveraging the enormous ecosystem, maturity, speed and extensive design that has already gone into existing languages. LAVA is made using a few thousand lines of C++ spread across 3 header files with no external dependencies. 
@@ -33,6 +34,7 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
   -  Dense expressions that could be represented easily in a nativly compiled language can become unweildly when using nodes in a very granular way. 
 
 ### Proposed Solutions to Common Visual Programming Problems
+ -  Each node is made using C++, which lets the expression level programming be done normally. 
  - LAVA uses multiple node types, most notably both message passing nodes and data flow nodes.
  - Individual nodes are written in modern C++ and meant to accomplish high level goals on large chunks of data. 
  - Message passing nodes can manage persistent state and dictate the high level program flow. 
