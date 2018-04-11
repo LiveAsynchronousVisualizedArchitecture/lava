@@ -15,10 +15,14 @@
 // -todo: add brandisher to the readme github page
 // -todo: add LavaFlow.hpp description to github readme page
 // -todo: debug why craftsman path and loader don't connect when loading - ids maybe have been switched around, not sure 
+// -todo: reorganize readme on github
 
-// todo: reorganize readme on github
+// todo: make ConstTypes vector of pointers
+// todo: make constant nodes be added to the generators list
+// todo: make MemMap function from the memory mapping in simdb
+// todo: work out timed live reload checking 
 // todo: work on .const node loading
-// todo: test live reloading
+// todo: work on and test live reloading - what thread reloads? 
 // todo: make dragging a slot turn it into a constant, which writes a .type.const file, which is then memory mapped and live reloaded by lava
 // todo: wok out structure for constants - .const files can be detected by lava - files could be named .Type.const to be detected as constant nodes while retaining type information that is not stored in any sort of binary format
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
@@ -1747,6 +1751,7 @@ ENTRY_DECLARATION // main or winmain
       auto playBtn    = new  Button(fd.ui.keyWin,    "Play  >");
       auto pauseBtn   = new  Button(fd.ui.keyWin,  "Pause  ||");
       auto stopBtn    = new  Button(fd.ui.keyWin,  "Stop  |_|");
+      auto cnstBtn    = new  Button(fd.ui.keyWin,  "Create Constant");
       auto nodeBtn    = new  Button(fd.ui.keyWin,  "Create Node");
       auto thrdsLabel = new   Label(fd.ui.keyWin, toString(fd.threadCount) );
       auto thrdsSldr  = new  Slider(fd.ui.keyWin);
@@ -1784,8 +1789,48 @@ ENTRY_DECLARATION // main or winmain
           }
         });
       }
-      SECTION(set up the text box that contains the name of a new node)
+      SECTION(set up new node controls)
       {
+        cnstBtn->setCallback([](){
+
+        });
+
+        nodeBtn->setCallback([nodeTxt]() // creates a new node shared library using templates
+        {
+          Println("nodeTxt: ", nodeTxt->value());
+
+          regex whiteSpace("[ |\t]+");
+          regex whiteSpaceTrail("[ |\t]+$");
+
+          str nodeName = nodeTxt->value();
+          nodeName = regex_replace( nodeName, whiteSpaceTrail, ""); 
+          nodeName = regex_replace( nodeName, whiteSpace, "_"); 
+
+          nodeTxt->setValue( nodeName );
+
+          str     nodeDir = "../" + nodeName;
+          create_directory(nodeDir);
+          str      cppPth = nodeDir+"/"+nodeName+".cpp";
+          str   vcprojPth = nodeDir+"/"+nodeName+".vcxproj";
+
+          FILE*    cppHndl = fopen(cppPth.c_str(),    "wb");
+          if(!cppHndl) return;
+
+          FILE* vcprojHndl = fopen(vcprojPth.c_str(), "wb");
+          if(!vcprojHndl) return;
+
+          str    cppFile = regex_replace( Template_cpp,     regex("\\|_NAME_\\|"), nodeName);
+          str vcprojFile = regex_replace( Template_vcxproj, regex("\\|_NAME_\\|"), nodeName);
+
+          fwrite(cppFile.c_str(),     1, cppFile.length(),        cppHndl);                   // don't want to write the '\0' null character at the end of the string into the file
+          fwrite(vcprojFile.c_str(),  1, vcprojFile.length(),  vcprojHndl);
+
+          fclose(cppHndl);
+          fclose(vcprojHndl);
+
+          nodeTxt->setValue("");
+        });
+
         nodeTxt->setEditable(true);
         nodeTxt->setFixedWidth(250);
         nodeTxt->setAlignment(TextBox::Alignment::Left);
@@ -1850,41 +1895,6 @@ ENTRY_DECLARATION // main or winmain
           playBtn->setBackgroundColor(  Color(e3f(.15f, .2f,  .15f)) ); // set play button back to normal
           pauseBtn->setEnabled(false);
           stopBtn->setEnabled(false);
-        });
-        nodeBtn->setCallback([nodeTxt]()
-        {
-          Println("nodeTxt: ", nodeTxt->value());
-
-          regex whiteSpace("[ |\t]+");
-          regex whiteSpaceTrail("[ |\t]+$");
-
-          str nodeName = nodeTxt->value();
-          nodeName = regex_replace( nodeName, whiteSpaceTrail, ""); 
-          nodeName = regex_replace( nodeName, whiteSpace, "_"); 
-
-          nodeTxt->setValue( nodeName );
-
-          str     nodeDir = "../" + nodeName;
-          create_directory(nodeDir);
-          str      cppPth = nodeDir+"/"+nodeName+".cpp";
-          str   vcprojPth = nodeDir+"/"+nodeName+".vcxproj";
-        
-          FILE*    cppHndl = fopen(cppPth.c_str(),    "wb");
-          if(!cppHndl) return;
-
-          FILE* vcprojHndl = fopen(vcprojPth.c_str(), "wb");
-          if(!vcprojHndl) return;
-
-          str    cppFile = regex_replace( Template_cpp,     regex("\\|_NAME_\\|"), nodeName);
-          str vcprojFile = regex_replace( Template_vcxproj, regex("\\|_NAME_\\|"), nodeName);
-
-          fwrite(cppFile.c_str(),     1, cppFile.length(),        cppHndl);                   // don't want to write the '\0' null character at the end of the string into the file
-          fwrite(vcprojFile.c_str(),  1, vcprojFile.length(),  vcprojHndl);
-
-          fclose(cppHndl);
-          fclose(vcprojHndl);
-
-          nodeTxt->setValue("");
         });
       }
       SECTION(initialize the thread slider and thread label)

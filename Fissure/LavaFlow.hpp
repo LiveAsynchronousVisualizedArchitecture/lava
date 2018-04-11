@@ -795,17 +795,17 @@ struct       LavaNode
 {
   enum Type { NONE=0, FLOW=1, MSG=2, CONSTANT=3, GENERATOR=4, JOINT=5, NODE_ERROR=0xFFFFFFFFFFFFFFFF };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
 
-  FlowFunc               func;
-  ConstructFunc   constructor;
-  ConstructFunc    destructor;
-  Type              node_type;
-  const char*            name;
-  const char**       in_types;
-  const char**       in_names;
-  const char**      out_types;
-  const char**      out_names;
-  const char*     description;
-  uint64_t            version;
+  FlowFunc               func = nullptr;
+  ConstructFunc   constructor = nullptr;
+  ConstructFunc    destructor = nullptr;
+  Type              node_type = NONE;
+  const char*            name = nullptr;
+  const char**       in_types = nullptr;
+  const char**       in_names = nullptr;
+  const char**      out_types = nullptr;
+  const char**      out_names = nullptr;
+  const char*     description = nullptr;
+  uint64_t            version = 0;
 };
 struct       LavaInst
 {
@@ -907,14 +907,12 @@ struct    LavaCommand
 };
 // end data types
 
-//const LavaNode LavaNodeListEnd = {nullptr, nullptr, nullptr, (uint64_t)LavaNode::NONE, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0};
 const LavaNode LavaNodeListEnd = {nullptr, nullptr, nullptr, LavaNode::NONE, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0};
 
 extern "C" __declspec(dllexport) LavaNode* GetLavaFlowNodes();   // prototype of function to return static plugin loading struct
 // end function declarations
 
-using lava_memvec          =  std::vector<LavaMem, ThreadAllocator<LavaMem> >;
-//using lava_memvec          =  std::vector<LavaMem>;
+using lava_memvec = std::vector<LavaMem, ThreadAllocator<LavaMem> >;
 
 class       LavaGraph                  // LavaGraph should specifically be about the connections between nodes
 {
@@ -2051,13 +2049,27 @@ auto       GetSharedLibPath() -> std::wstring
     return path;
   #endif
 }
+auto    GetSharedLibDirIter() -> fs::directory_iterator //( fs::path( GetSharedLibPath() ) )
+{
+  using namespace std;
+  using namespace  fs;
+
+  auto libPath = path( GetSharedLibPath() );
+  libPath.remove_filename();
+  path    root = libPath;
+
+  vector<str> paths;
+  auto    dirIter = directory_iterator(root);
+
+  return dirIter;  
+}
 auto        GetRefreshPaths() -> lava_paths
 {
   using namespace std;
   using namespace  fs;
 
   static const regex lavaRegex("lava_.*");
-  static const regex extRegex(".*\\.live\\.dll");
+  static const regex  extRegex(".*\\.live\\.dll");
 
   auto libPath = path( GetSharedLibPath() );
   libPath.remove_filename();
@@ -2070,13 +2082,13 @@ auto        GetRefreshPaths() -> lava_paths
     auto   p = d.path();
     if(!p.has_filename()){ continue; }
 
-    auto ext = p.extension().generic_string();                     // ext is extension
-    if(ext!=".dll"){ continue; } // todo: check for shared library and .const extensions
-    //if( !(ext==".dll" || ext==".const") ){ continue; }              // todo: check for shared library and .const extensions
+    auto ext = p.extension().generic_string();                        // ext is extension
 
-    str fstr = p.filename().generic_string();                       // fstr is file string
-    if(  regex_match(fstr, extRegex) ){ continue; }
-    if( !regex_match(fstr,lavaRegex) ){ continue; }
+    if(ext==".dll"){
+      str fstr = p.filename().generic_string();                       // fstr is file string
+      if(  regex_match(fstr, extRegex) ){ continue; }
+      if( !regex_match(fstr,lavaRegex) ){ continue; }
+    } // else if( ext!=".const" ){ continue; }
 
     auto livepth = p;
     livepth.replace_extension( liveExt );
@@ -2338,6 +2350,39 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow)
 
   return newlibs;
 }
+void*            MemMapFile(fs::path const& p)
+{
+  
+  return nullptr;
+}
+void      RefreshFlowConsts(LavaFlow& inout_flow)
+{
+  auto dirIter = GetSharedLibDirIter();
+  for(auto& d : dirIter)                                 // iterate though the root directory looking for shared libraries and constants
+  {
+    auto   p = d.path();
+    if(!p.has_filename()){ continue; }
+
+    auto ext = p.extension().generic_string();                        // ext is extension
+    
+    if(ext!=".const"){ continue; }
+
+    p.replace_extension("");
+    auto typeStr = p.extension().generic_string();
+
+    // put typeStr into a data structure that won't move the memory around
+    // a vector of unique_ptrs might work well, since the pointers mainly just need to be kept for deallocation
+
+    void*        memFile = MemMapFile( d.path() );   // use the memory mapping from simdb
+    const char** typePtr = nullptr; // replace with the malloc() pointer in a constTypes vector
+
+    LavaNode n;
+    n.func      = (FlowFunc)memFile;
+    n.out_types = typePtr;
+    n.node_type = LavaNode::CONSTANT;
+    
+  }
+}
 void               LavaLoop(LavaFlow& lf) noexcept
 {
   using namespace std;
@@ -2563,3 +2608,13 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 #endif
 
+
+
+
+
+//if(ext!=".dll"){ continue; } // todo: check for shared library and .const extensions
+//if( !(ext==".dll" || ext==".const") ){ continue; }              // todo: check for shared library and .const extensions
+
+//const LavaNode LavaNodeListEnd = {nullptr, nullptr, nullptr, (uint64_t)LavaNode::NONE, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr, 0};
+//
+//using lava_memvec          =  std::vector<LavaMem>;
