@@ -11,7 +11,7 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
   -  Separating inputs, outputs and interactions into asynchronous components is often error prone and/or requires significant planning 
   -  Debugging often requires a slow process of examining tiny amounts of data at various execution points to find where a problem happens before it can become clear how it happens.
 
-## Software Problems LAVA Aims to Solve
+## How LAVA Confronts These Problems
 
 #### High Level Planning and Structure
 
