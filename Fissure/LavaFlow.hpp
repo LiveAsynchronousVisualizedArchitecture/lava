@@ -560,6 +560,7 @@ union          LavaId;
 class       LavaGraph;
 struct        LavaMem;
 struct     LavaPacket;
+struct      LavaConst;
 
 using str                =  std::string;
 using lava_handle        =  HMODULE;                                                      // maps handles to the LavaFlowNode pointers contained in the shared libraries
@@ -904,6 +905,57 @@ struct    LavaCommand
   Command cmd; 
   union { Arg A; Arg dest; Arg nd; };
   union { Arg B; Arg  src; };
+};
+struct    LavaConst
+{
+  //struct      LavaConst
+  //{
+  //  std::unique_ptr<LavaNode>     node;
+  //  std::unique_ptr<const char*>  name;
+  //};
+  //
+  //using  NodePtr  =  std::unique_ptr<LavaNode,    decltype(free)* >;
+  //using  TypePtr  =  std::unique_ptr<const char*, decltype(free)* >;
+  //
+  //NodePtr node; 
+  //TypePtr type;
+  //
+  //char**     type = nullptr;
+  //
+  //LavaConst() noexcept : node(std::make_unique<LavaNode>(nullptr) )
+  //{
+  //}
+  //
+  //type      = (char**)strLst; 
+  //
+  //struct NodeAndType { NodePtr node; TypePtr type; };
+  //using  ConstVec = std::vector<NodeAndType>;
+  //ConstVec mem;
+  //using NodeMem     =  std::vector<NodePtr>;
+  //using TypeStrMem  =  std::
+
+  LavaNode*  node = nullptr; 
+
+  LavaConst(LavaNode const& n, const char* typeStr)
+  {
+    node  = (LavaNode*)malloc(sizeof(LavaNode));                                             // because there is no LavaNode struct as a static embedded in a shared library
+    *node = LavaNode();                                                                      // make sure the LavaNode is initialized to default values 
+   
+    void** strLst = (void**)malloc( sizeof(void*)*2 + (strlen(typeStr)+1)*sizeof(char) );    // allocate memory for the string + two pointers, since the node types are a nullptr terminated list of C strings
+    strLst[0] = &(strLst[2]);                                                                // set the first 8 bytes to be a pointer to the start of the first type string (which skips over the null pointer that ends the list
+    strLst[1] = nullptr;                                                                     // make the second 8 bytes be nullptr (0) so that the list of string is nullptr terminated
+    
+    node->out_types = (const char**)strLst;                                                  // assign the start of the allocation to be the pointer to the list of type strings - the 3rd set of 8 bytes will be the start of the type string (there will be only one, since a constant node will have one output only)
+  }
+  ~LavaConst()
+  {
+    if(node){
+      if(node->out_types)
+        free(node->out_types);
+
+      free(node);
+    }
+  }
 };
 // end data types
 
@@ -2360,27 +2412,35 @@ void      RefreshFlowConsts(LavaFlow& inout_flow)
   auto dirIter = GetSharedLibDirIter();
   for(auto& d : dirIter)                                 // iterate though the root directory looking for shared libraries and constants
   {
-    auto   p = d.path();
-    if(!p.has_filename()){ continue; }
+    auto pth = d.path();
+    if(!pth.has_filename()){ continue; }
 
-    auto ext = p.extension().generic_string();                        // ext is extension
+    auto ext = pth.extension().generic_string();                        // ext is extension
     
     if(ext!=".const"){ continue; }
 
-    p.replace_extension("");
-    auto typeStr = p.extension().generic_string();
+    auto typePth = pth;
+    typePth.replace_extension("");
+    auto typeStr = typePth.extension().generic_string();
 
     // put typeStr into a data structure that won't move the memory around
     // a vector of unique_ptrs might work well, since the pointers mainly just need to be kept for deallocation
 
-    void*        memFile = MemMapFile( d.path() );   // use the memory mapping from simdb
-    const char** typePtr = nullptr; // replace with the malloc() pointer in a constTypes vector
+    void*        memFile = MemMapFile(pth);   // use the memory mapping from simdb
+    const char** typePtr = nullptr;          // replace with the malloc() pointer in a constTypes vector
 
     LavaNode n;
     n.func      = (FlowFunc)memFile;
     n.out_types = typePtr;
     n.node_type = LavaNode::CONSTANT;
     
+    str pstr = pth.generic_string();
+    inout_flow.flow.erase(pstr);
+    //if(ndList->constructor){ ndList->constructor(); }
+    str nameStr = n.name;
+    inout_flow.nameToPtr.erase(nameStr);
+    inout_flow.nameToPtr.insert( {nameStr, &n} );
+    //inout_flow.flow.insert( {pstr, n} );
   }
 }
 void               LavaLoop(LavaFlow& lf) noexcept

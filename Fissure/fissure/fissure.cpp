@@ -17,6 +17,7 @@
 // -todo: debug why craftsman path and loader don't connect when loading - ids maybe have been switched around, not sure 
 // -todo: reorganize readme on github
 
+// todo: change LavaConst into a function that creates a const node and adds the node pointer to a vector in LavaFlow that can be used to free the pointers
 // todo: make ConstTypes vector of pointers
 // todo: make constant nodes be added to the generators list
 // todo: make MemMap function from the memory mapping in simdb
