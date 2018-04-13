@@ -906,46 +906,37 @@ struct    LavaCommand
   union { Arg A; Arg dest; Arg nd; };
   union { Arg B; Arg  src; };
 };
-struct    LavaConst
+struct      LavaConst
 {
-  //struct      LavaConst
-  //{
-  //  std::unique_ptr<LavaNode>     node;
-  //  std::unique_ptr<const char*>  name;
-  //};
-  //
-  //using  NodePtr  =  std::unique_ptr<LavaNode,    decltype(free)* >;
-  //using  TypePtr  =  std::unique_ptr<const char*, decltype(free)* >;
-  //
-  //NodePtr node; 
-  //TypePtr type;
-  //
-  //char**     type = nullptr;
-  //
-  //LavaConst() noexcept : node(std::make_unique<LavaNode>(nullptr) )
-  //{
-  //}
-  //
-  //type      = (char**)strLst; 
-  //
-  //struct NodeAndType { NodePtr node; TypePtr type; };
-  //using  ConstVec = std::vector<NodeAndType>;
-  //ConstVec mem;
-  //using NodeMem     =  std::vector<NodePtr>;
-  //using TypeStrMem  =  std::
+  LavaNode* node = nullptr; 
 
-  LavaNode*  node = nullptr; 
-
-  LavaConst(LavaNode const& n, const char* typeStr)
+  LavaConst& mv(LavaConst&& rval)
   {
-    node  = (LavaNode*)malloc(sizeof(LavaNode));                                             // because there is no LavaNode struct as a static embedded in a shared library
-    *node = LavaNode();                                                                      // make sure the LavaNode is initialized to default values 
-   
-    void** strLst = (void**)malloc( sizeof(void*)*2 + (strlen(typeStr)+1)*sizeof(char) );    // allocate memory for the string + two pointers, since the node types are a nullptr terminated list of C strings
-    strLst[0] = &(strLst[2]);                                                                // set the first 8 bytes to be a pointer to the start of the first type string (which skips over the null pointer that ends the list
-    strLst[1] = nullptr;                                                                     // make the second 8 bytes be nullptr (0) so that the list of string is nullptr terminated
-    
-    node->out_types = (const char**)strLst;                                                  // assign the start of the allocation to be the pointer to the list of type strings - the 3rd set of 8 bytes will be the start of the type string (there will be only one, since a constant node will have one output only)
+    node      = rval.node;
+    rval.node = nullptr;
+    return *this;
+  }
+
+  //LavaConst(LavaNode const& n, str const& typeStr)
+  LavaConst() : node(nullptr) {}
+  LavaConst(void* cnstMem, str const& typeStr)
+  {
+    // the node pointer and all of the node's pointers need to point to heap memory so that the addresses don't change
+
+    node            = (LavaNode*)malloc(sizeof(LavaNode));                                        // because there is no LavaNode struct as a static embedded in a shared library
+    *node           = LavaNode();                                                                 // make sure the LavaNode is initialized to default values 
+    node->func      = (FlowFunc)(cnstMem);
+    node->node_type = LavaNode::CONSTANT;
+
+    u64 strMemLen   =  (typeStr.length()+1) * sizeof(char);
+    u64 ptrMemLen   =  sizeof(void*) * 2;
+    void** strLst   =  (void**)malloc(ptrMemLen + strMemLen);                                     // allocate memory for the string + two pointers, since the node types are a nullptr terminated list of C strings
+    strLst[0]       =  &(strLst[2]);                                                              // set the first 8 bytes to be a pointer to the start of the first type string (which skips over the null pointer that ends the list
+    strLst[1]       =  nullptr;                                                                   // make the second 8 bytes be nullptr (0) so that the list of string is nullptr terminated
+
+    memcpy(strLst[0], typeStr.c_str(), strMemLen); 
+
+    node->out_types = (const char**)strLst;                                                      // assign the start of the allocation to be the pointer to the list of type strings - the 3rd set of 8 bytes will be the start of the type string (there will be only one, since a constant node will have one output only)
   }
   ~LavaConst()
   {
@@ -956,6 +947,12 @@ struct    LavaConst
       free(node);
     }
   }
+
+  LavaConst(LavaConst&& rval){ mv(std::move(rval)); }
+  LavaConst& operator=(LavaConst&& rval){ return mv(std::move(rval)); }
+
+  LavaConst(LavaConst const& lval) = delete;
+  void operator=(LavaConst& lval)  = delete;
 };
 // end data types
 
@@ -1779,8 +1776,8 @@ public:
   using MsgNodeVec      =  std::vector<uint64_t>;
   using Mutex           =  std::mutex;
   using PktCalbk        =  void (*)(LavaPacket pkt);
-  //using PacketCallback  =  void (*)(LavaPacket pkt);
-
+  using ConstMem        =  std::unordered_map<std::string, LavaConst>;
+ 
   enum FlowErr { NONE=0, RUN_ERR=0xFFFFFFFFFFFFFFFF };
 
   lava_pathHndlMap           libs;     // libs is libraries - this maps the live path of the shared libary with the OS specific handle that the OS loading function returns
@@ -1789,23 +1786,20 @@ public:
   lava_flowPtrs              ptrs;     // ptrs are the LavaFlowNode pointers - each one needs a unique id so they can be referenced elsewhere 
   lava_hndlNodeMap         ndptrs;     // ndptrs is node pointers - a map from each handle to the one (zero?) or more LavaFlowNode pointers the shared lib contains
   lava_nameNodeMap      nameToPtr;     // maps node names to their pointers 
+  ConstMem               constMem;
 
   mutable bool          m_running = false;            // todo: make this atomic
   mutable u64          m_curMsgId = 0;                // todo: make this atomic
-  //mutable u64             m_frame = 0;                // todo: make this atomic
   mutable u64             m_cycle = 0;                // todo: make this atomic
   mutable LavaId          m_curId = LavaNode::NONE;   // todo: make this atomic - won't be used as a single variable anyway
   mutable u64       m_threadCount = 0;                // todo: make this atomic
   mutable u32             version = 0;                // todo: make this atomic
   mutable Mutex            m_qLck;
-  //mutable Mutex       m_frameQLck;
   mutable Mutex       m_cycleQLck;
   mutable PktCalbk packetCallback;
   mutable PacketQueue           q;
-  //mutable FrameQueue       frameQ;
   mutable FrameQueue       cycleQ;
   mutable au64         m_nxtMsgNd = 0;
-  //mutable PacketCallback  packetCallback;            // todo: make this an atomic version of the function pointer
 
   MsgNodeVec          m_genNodesA;
   LavaGraph                 graph;
@@ -2409,38 +2403,40 @@ void*            MemMapFile(fs::path const& p)
 }
 void      RefreshFlowConsts(LavaFlow& inout_flow)
 {
+  using namespace std;
+
   auto dirIter = GetSharedLibDirIter();
-  for(auto& d : dirIter)                                 // iterate though the root directory looking for shared libraries and constants
+  for(auto& d : dirIter)                                                // iterate though the root directory looking for shared libraries and constants
   {
     auto pth = d.path();
-    if(!pth.has_filename()){ continue; }
 
-    auto ext = pth.extension().generic_string();                        // ext is extension
-    
-    if(ext!=".const"){ continue; }
+    SECTION(continue if the file does not have a const extension)
+    {
+      if(!pth.has_filename()){ continue; }
+      auto ext = pth.extension().generic_string();                        // ext is extension
+      if(ext!=".const"){ continue; }
+    }
 
     auto typePth = pth;
     typePth.replace_extension("");
-    auto typeStr = typePth.extension().generic_string();
+    str  typeStr = typePth.extension().generic_string();
+    str  nameStr = pth.filename().generic_string();
 
-    // put typeStr into a data structure that won't move the memory around
-    // a vector of unique_ptrs might work well, since the pointers mainly just need to be kept for deallocation
+    void*         memMap = MemMapFile(pth);                             // use the memory mapping from simdb
+    //const char** typePtr = nullptr;                                   // replace with the malloc() pointer in a constTypes vector
 
-    void*        memFile = MemMapFile(pth);   // use the memory mapping from simdb
-    const char** typePtr = nullptr;          // replace with the malloc() pointer in a constTypes vector
+    SECTION(create LavaConst, use the node pointer in the graph and move the LavaConst into the constMem map)
+    {
+      str pstr = pth.generic_string();
 
-    LavaNode n;
-    n.func      = (FlowFunc)memFile;
-    n.out_types = typePtr;
-    n.node_type = LavaNode::CONSTANT;
-    
-    str pstr = pth.generic_string();
-    inout_flow.flow.erase(pstr);
-    //if(ndList->constructor){ ndList->constructor(); }
-    str nameStr = n.name;
-    inout_flow.nameToPtr.erase(nameStr);
-    inout_flow.nameToPtr.insert( {nameStr, &n} );
-    //inout_flow.flow.insert( {pstr, n} );
+      LavaConst lc(memMap, typeStr);
+
+      inout_flow.flow.erase(pstr);
+      inout_flow.nameToPtr.erase(nameStr);
+      inout_flow.nameToPtr.insert( {nameStr, lc.node} );
+
+      inout_flow.constMem[pstr] = move(lc);                                     // have to do this last since it moves the LavaConst and sets the original version to a nullptr - this might overwrite a former LavaCont, which would deallocate its heap memory on deconstruction
+    }
   }
 }
 void               LavaLoop(LavaFlow& lf) noexcept
@@ -2671,6 +2667,71 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+
+
+
+//LavaConst(LavaNode const& n, const char* typeStr)
+//{
+//  node  = (LavaNode*)malloc(sizeof(LavaNode));                                             // because there is no LavaNode struct as a static embedded in a shared library
+//  *node = LavaNode();                                                                      // make sure the LavaNode is initialized to default values 
+// 
+//  void** strLst = (void**)malloc( sizeof(void*)*2 + (strlen(typeStr)+1)*sizeof(char) );    // allocate memory for the string + two pointers, since the node types are a nullptr terminated list of C strings
+//  strLst[0] = &(strLst[2]);                                                                // set the first 8 bytes to be a pointer to the start of the first type string (which skips over the null pointer that ends the list
+//  strLst[1] = nullptr;                                                                     // make the second 8 bytes be nullptr (0) so that the list of string is nullptr terminated
+//  
+//  node->out_types = (const char**)strLst;                                                  // assign the start of the allocation to be the pointer to the list of type strings - the 3rd set of 8 bytes will be the start of the type string (there will be only one, since a constant node will have one output only)
+//}
+
+// put typeStr into a data structure that won't move the memory around
+// a vector of unique_ptrs might work well, since the pointers mainly just need to be kept for deallocation
+//
+//LavaNode n;
+//n.func      = (FlowFunc)memFile;              // todo: make this parameter a union of two different pointer types, or just a void*
+//n.out_types = typePtr;
+//n.node_type = LavaNode::CONSTANT;
+//
+//if(ndList->constructor){ ndList->constructor(); }
+//str nameStr = n.name;
+//
+//inout_flow.flow.insert( {pstr, n} );
+
+//
+//mutable u64             m_frame = 0;                // todo: make this atomic
+
+//using PacketCallback  =  void (*)(LavaPacket pkt);
+//
+//mutable Mutex       m_frameQLck;
+//
+//mutable FrameQueue       frameQ;
+//
+//mutable PacketCallback  packetCallback;            // todo: make this an atomic version of the function pointer
+
+//struct      LavaConst
+//{
+//  std::unique_ptr<LavaNode>     node;
+//  std::unique_ptr<const char*>  name;
+//};
+//
+//using  NodePtr  =  std::unique_ptr<LavaNode,    decltype(free)* >;
+//using  TypePtr  =  std::unique_ptr<const char*, decltype(free)* >;
+//
+//NodePtr node; 
+//TypePtr type;
+//
+//char**     type = nullptr;
+//
+//LavaConst() noexcept : node(std::make_unique<LavaNode>(nullptr) )
+//{
+//}
+//
+//type      = (char**)strLst; 
+//
+//struct NodeAndType { NodePtr node; TypePtr type; };
+//using  ConstVec = std::vector<NodeAndType>;
+//ConstVec mem;
+//using NodeMem     =  std::vector<NodePtr>;
+//using TypeStrMem  =  std::
 
 //if(ext!=".dll"){ continue; } // todo: check for shared library and .const extensions
 //if( !(ext==".dll" || ext==".const") ){ continue; }              // todo: check for shared library and .const extensions

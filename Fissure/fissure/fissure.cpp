@@ -16,11 +16,12 @@
 // -todo: add LavaFlow.hpp description to github readme page
 // -todo: debug why craftsman path and loader don't connect when loading - ids maybe have been switched around, not sure 
 // -todo: reorganize readme on github
+// -todo: change LavaConst into a function that creates a const node and adds the node pointer to a vector in LavaFlow that can be used to free the pointers - data structure wrapping a node pointer is better, since it handles memory allocation automatically in data structures
+// -todo: make ConstTypes vector of pointers - needs to be a hash map to be able to find previous versions of the same node 
 
-// todo: change LavaConst into a function that creates a const node and adds the node pointer to a vector in LavaFlow that can be used to free the pointers
-// todo: make ConstTypes vector of pointers
-// todo: make constant nodes be added to the generators list
+// todo: test LavaConst refresh function
 // todo: make MemMap function from the memory mapping in simdb
+// todo: make constant nodes be added to the generators list
 // todo: work out timed live reload checking 
 // todo: work on .const node loading
 // todo: work on and test live reloading - what thread reloads? 
