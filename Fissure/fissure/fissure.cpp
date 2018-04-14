@@ -18,12 +18,19 @@
 // -todo: reorganize readme on github
 // -todo: change LavaConst into a function that creates a const node and adds the node pointer to a vector in LavaFlow that can be used to free the pointers - data structure wrapping a node pointer is better, since it handles memory allocation automatically in data structures
 // -todo: make ConstTypes vector of pointers - needs to be a hash map to be able to find previous versions of the same node 
+// -todo: work on .const node loading
+// -todo: try making a struct to make const node memory management easier - probably would not simplify const node creation
+// -todo: allocate memory for const node name 
+// -todo: make node memory have an extra 8 bytes to hold a nullptr 
 
+// todo: make const nodes be added to generators - already added since they have no inputs? 
+// todo: add memory mapping function from simdb to map const files
+// todo: specialize const nodes to load from their  memory span
+// todo: integrate AddConst into RefreshFlowLibs function so that there are .live versions
 // todo: test LavaConst refresh function
 // todo: make MemMap function from the memory mapping in simdb
 // todo: make constant nodes be added to the generators list
 // todo: work out timed live reload checking 
-// todo: work on .const node loading
 // todo: work on and test live reloading - what thread reloads? 
 // todo: make dragging a slot turn it into a constant, which writes a .type.const file, which is then memory mapped and live reloaded by lava
 // todo: wok out structure for constants - .const files can be detected by lava - files could be named .Type.const to be detected as constant nodes while retaining type information that is not stored in any sort of binary format
@@ -697,39 +704,6 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
 
   switch(n.type)
   {
-  case Node::Type::FLOW:
-  case Node::Type::GENERATOR: {
-    SECTION(draw flow node)
-    {
-      SECTION(grey border)
-      {
-	      nvgBeginPath(vg);
-         nvgRoundedRect(vg, x,y,w,h, rad);
-        nvgFillColor(vg, nvgRGBA(0,0,0,128));
-	      nvgFill(vg);
-      }
-      SECTION(shaded color inside)
-      {
-        //auto    col = n.sel? fd.ui.nd_selclr  : fd.ui.nd_color;
-        auto    col = sel? fd.ui.nd_selclr :
-                           n.type==Node::Type::GENERATOR? fd.ui.nd_cache_clr :
-                                                          fd.ui.nd_color;
-        int    grad = (int)lerp(rnd, 0, 48);
-        auto topClr = nvgRGBA(255,255,255, isBlack(col)?16:grad );
-        auto botClr = nvgRGBA(0,0,0, isBlack(col)?16:grad );
-	      bg = nvgLinearGradient(vg, x,y,x,y+h, topClr, botClr);
-	      nvgBeginPath(vg);
-	        nvgRoundedRect(vg, x+border,y+border, w-(border*2),h-(border*2), rad-border);
-          col.a = 0.8f;
-	        if(!isBlack(col)){
-		        nvgFillColor(vg, col);
-		        nvgFill(vg);
-	        }
-	      nvgFillPaint(vg, bg);
-	      nvgFill(vg);
-      }
-    }
-  } break;
   case Node::Type::MSG: {
     SECTION(draw message node)
     {
@@ -779,6 +753,41 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
         nvgStroke(vg);
       }
 
+    }
+  } break;
+  case Node::Type::FLOW:
+  case Node::Type::GENERATOR: 
+  case Node::Type::CONSTANT:
+  default: {
+    SECTION(draw flow node)
+    {
+      SECTION(grey border)
+      {
+        nvgBeginPath(vg);
+        nvgRoundedRect(vg, x,y,w,h, rad);
+        nvgFillColor(vg, nvgRGBA(0,0,0,128));
+        nvgFill(vg);
+      }
+      SECTION(shaded color inside)
+      {
+        //auto    col = n.sel? fd.ui.nd_selclr  : fd.ui.nd_color;
+        auto    col = sel? fd.ui.nd_selclr :
+          n.type==Node::Type::GENERATOR? fd.ui.nd_cache_clr :
+          fd.ui.nd_color;
+        int    grad = (int)lerp(rnd, 0, 48);
+        auto topClr = nvgRGBA(255,255,255, isBlack(col)?16:grad );
+        auto botClr = nvgRGBA(0,0,0, isBlack(col)?16:grad );
+        bg = nvgLinearGradient(vg, x,y,x,y+h, topClr, botClr);
+        nvgBeginPath(vg);
+        nvgRoundedRect(vg, x+border,y+border, w-(border*2),h-(border*2), rad-border);
+        col.a = 0.8f;
+        if(!isBlack(col)){
+          nvgFillColor(vg, col);
+          nvgFill(vg);
+        }
+        nvgFillPaint(vg, bg);
+        nvgFill(vg);
+      }
     }
   } break;
   }
@@ -855,8 +864,17 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 
   switch(n.type)
   {
+  case Node::Type::MSG: 
+  {
+    f32  rad = wh.x/2;
+    borderPt = ncntr + ndir*rad; 
+    if(out_nrml){ *out_nrml = ndir; }
+  } break;
   case Node::Type::GENERATOR:
-  case Node::Type::FLOW: {
+  case Node::Type::FLOW: 
+  case Node::Type::CONSTANT:
+  default: 
+  {
     f32  rad  =  hlf.y;
     v2  pdir  =  ndir;
     v2    ds  =  sign(pdir);                                  // ds is direction sign
@@ -879,13 +897,6 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
       if(hit) *out_nrml = norm(borderPt - circCntr);
       else    *out_nrml = { 0.f, sign(ndir).y };
     }
-  } break;
-  case Node::Type::MSG: 
-  default: 
-  {
-    f32  rad = wh.x/2;
-    borderPt = ncntr + ndir*rad; 
-    if(out_nrml){ *out_nrml = ndir; }
   } break;
   }
 
@@ -1454,7 +1465,8 @@ bool            loadFile(str path, LavaGraph* out_g)
 }
 bool    reloadSharedLibs()
 {
-  bool newlibs = RefreshFlowLibs(fd.flow);
+  bool newlibs  = RefreshFlowLibs(fd.flow);
+  newlibs      |= RefreshFlowConsts(fd.flow);
 
   if(!newlibs){ return false; }
 
@@ -2264,11 +2276,11 @@ ENTRY_DECLARATION // main or winmain
               LavaInst&   li  =  fd.lgrph.node(sid.nid);
               LavaNode*    n  =  li.node;
               if(sid.isIn){
-                slotName = n->in_names[sid.sidx];
-                slotType = n->in_types[sid.sidx];
+                if(n->in_names) slotName = n->in_names[sid.sidx];
+                if(n->in_types) slotType = n->in_types[sid.sidx];
               }else{
-                slotName = n->out_names[sid.sidx];
-                slotType = n->out_types[sid.sidx];
+                if(n->out_names) slotName = n->out_names[sid.sidx];
+                if(n->out_types) slotType = n->out_types[sid.sidx];
               }
             }
             status = toString("Slot [",sid.nid,":",sid.sidx,"]    ",slotName,"  <",slotType,">");
