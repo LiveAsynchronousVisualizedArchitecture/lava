@@ -2114,6 +2114,18 @@ void           PrintLavaMem(LavaMem lm)
     assert(lm.refCount() < 1000);
   }
 }
+void       PrintMemMapError()
+{
+#ifdef _WIN32      // windows
+  int      err = (int)GetLastError();
+  LPSTR msgBuf = nullptr;
+  /*size_t msgSz =*/ FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+    NULL, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&msgBuf, 0, NULL);
+  win_printf("Lava Constant memory mapping error %d - %s", err, msgBuf);
+  LocalFree(msgBuf);
+#endif
+}
+
 
 LavaNode        MemMapFile(fs::path const& pth)
 {
@@ -2122,11 +2134,14 @@ LavaNode        MemMapFile(fs::path const& pth)
   LavaNode retNd;
 
   #ifdef _WIN32      // windows
+    HANDLE createHndl=NULL, openMappingHndl=NULL, createMappingHndl=NULL;
+    
     //char* pthCstr = (char*)pth.c_str();
     str     pthStr = pth.generic_string();
     LPSTR  pthCstr = (char*)pthStr.c_str();
     char* tstStr = "H:\\test.txt";
-    retNd.fileHndl = CreateFileA(
+    
+    createHndl = CreateFileA(
                         tstStr, 
                         GENERIC_READ, 
                         FILE_SHARE_READ, // | FILE_SHARE_WRITE, 
@@ -2134,33 +2149,59 @@ LavaNode        MemMapFile(fs::path const& pth)
                         OPEN_EXISTING, 
                         FILE_ATTRIBUTE_NORMAL,
                         NULL);
-    retNd.fileHndl = OpenFileMappingA(FILE_MAP_READ, FALSE, tstStr );
+    PrintMemMapError();
+
+    LARGE_INTEGER     fsz;
+    fsz.QuadPart = 0;
+    PLARGE_INTEGER fszPtr = &fsz;
+    auto fszOk = GetFileSizeEx(createHndl, fszPtr);
+    if(fszOk==0){
+      PrintMemMapError();
+      return LavaNodeListEnd;
+    }else
+      retNd.fileSize = fszPtr->QuadPart;
+
+    //openMappingHndl = OpenFileMappingA(FILE_MAP_READ, FALSE, tstStr );
     //if(retNd.fileHndl==NULL) return LavaNodeListEnd;
 
-    if(retNd.fileHndl != NULL && retNd.fileHndl != INVALID_HANDLE_VALUE){
+    //if(retNd.fileHndl==NULL)
+    //{
+      createMappingHndl = CreateFileMappingA(  // todo: simplify and call this right away, it will open the section if it already exists
+        createHndl, //INVALID_HANDLE_VALUE, //createHndl,
+        NULL,
+        PAGE_READONLY, //PAGE_READWRITE,
+        0,
+        0, //(DWORD)retNd.fileSize, // (DWORD)sizeBytes,
+        NULL); //tstStr);
+    //}
+    PrintMemMapError();
+
+    retNd.fileHndl = createMappingHndl;
+    if(retNd.fileHndl != NULL && retNd.fileHndl != INVALID_HANDLE_VALUE)
+    {
       retNd.filePtr = MapViewOfFile(retNd.fileHndl,   // handle to map object
         FILE_MAP_READ, //| FILE_MAP_WRITE, // FILE_MAP_ALL_ACCESS,   // read/write permission
         0,
         0,
         0);
+    }else{
+      PrintMemMapError();
     }
 
     if(retNd.filePtr==nullptr)
     { 
-      int      err = (int)GetLastError();
-      LPSTR msgBuf = nullptr;
-      /*size_t msgSz =*/ FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-        NULL, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&msgBuf, 0, NULL);
-      win_printf("Lava Constant memory mapping error %d - %s", err, msgBuf);
-      LocalFree(msgBuf);
-
+      PrintMemMapError();
       CloseHandle(retNd.fileHndl); 
       return LavaNodeListEnd;
+
+      //int      err = (int)GetLastError();
+      //LPSTR msgBuf = nullptr;
+      // /*size_t msgSz =*/ FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+      //  NULL, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&msgBuf, 0, NULL);
+      //win_printf("Lava Constant memory mapping error %d - %s", err, msgBuf);
+      //LocalFree(msgBuf);
     }
 
-    PLARGE_INTEGER fsz = nullptr;
-    GetFileSizeEx(retNd.fileHndl, fsz);
-    retNd.fileSize = fsz->QuadPart;
   #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
       sm.owner  = true; // todo: have to figure out how to detect which process is the owner
 
