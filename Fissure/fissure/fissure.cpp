@@ -22,12 +22,13 @@
 // -todo: try making a struct to make const node memory management easier - probably would not simplify const node creation
 // -todo: allocate memory for const node name 
 // -todo: make node memory have an extra 8 bytes to hold a nullptr 
+// -todo: make const nodes be added to generators - already added since they have no inputs? - seems like it - input_types is a nullptr so the input count is 0, which gets const nodes added to the generator list
+// -todo: add memory mapping function from simdb to map const files
+// -todo: specialize const nodes to load from their  memory span
+// -todo: test LavaConst refresh function
 
-// todo: make const nodes be added to generators - already added since they have no inputs? 
-// todo: add memory mapping function from simdb to map const files
-// todo: specialize const nodes to load from their  memory span
+// todo: give const node a different color
 // todo: integrate AddConst into RefreshFlowLibs function so that there are .live versions
-// todo: test LavaConst refresh function
 // todo: make MemMap function from the memory mapping in simdb
 // todo: make constant nodes be added to the generators list
 // todo: work out timed live reload checking 
@@ -702,6 +703,17 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
   f32    rr = rad;                                                    // rr is rail radius
   bool  sel = forceSel || n.sel;
 
+  NVGcolor col = fd.ui.nd_selclr; //fd.ui.nd_color;
+  if(!sel){
+    switch(n.type){
+    case Node::Type::GENERATOR: col = fd.ui.nd_cache_clr; break;
+    case Node::Type::CONSTANT:  col = fd.ui.nd_const_clr; break;
+    case Node::Type::FLOW:
+    default: 
+      col = fd.ui.nd_color; break;
+    }
+  }
+
   switch(n.type)
   {
   case Node::Type::MSG: {
@@ -771,9 +783,9 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
       SECTION(shaded color inside)
       {
         //auto    col = n.sel? fd.ui.nd_selclr  : fd.ui.nd_color;
-        auto    col = sel? fd.ui.nd_selclr :
-          n.type==Node::Type::GENERATOR? fd.ui.nd_cache_clr :
-          fd.ui.nd_color;
+        //auto    col = sel? fd.ui.nd_selclr :
+        //  n.type==Node::Type::GENERATOR? fd.ui.nd_cache_clr :
+        //  fd.ui.nd_color;
         int    grad = (int)lerp(rnd, 0, 48);
         auto topClr = nvgRGBA(255,255,255, isBlack(col)?16:grad );
         auto botClr = nvgRGBA(0,0,0, isBlack(col)?16:grad );

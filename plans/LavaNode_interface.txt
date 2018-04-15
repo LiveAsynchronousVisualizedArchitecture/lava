@@ -102,8 +102,12 @@ Constructors, Destructors and state management when hot reloading
 |  |  Could take a pointer to the max size and if it needs more bytes, the new size will be written  
 |  |  Need to return a value signaling that construction was done 
 |  |  Passing a void pointer could signal to destruct without writing state 
-a void* return a void* and write to a size output parameter so that they can optionally return a state? 
 
+
+Should packets or inputs have a write flag?
+|  Packets that are sent to a single input could be modified and resent 
+|  Might be rare since packets can be resent already and modification would have to happen without changing the memory allocation  
+| 
 
 -------------------------------------------------------------------------------------------
 Simplicity does not precede complexity, but follows it.

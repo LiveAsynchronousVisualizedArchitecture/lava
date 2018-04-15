@@ -1483,6 +1483,7 @@ public:
 
     if( ln->node_type==LavaNode::MSG        || 
         ln->node_type==LavaNode::GENERATOR  || 
+        ln->node_type==LavaNode::CONSTANT   || 
         li.inputs==0 ){
       oppGenNodes().insert(nid);
     }
@@ -2152,7 +2153,6 @@ void       PrintMemMapError()
 #endif
 }
 
-
 LavaNode        MemMapFile(fs::path const& pth)
 {
   using namespace std;
@@ -2163,21 +2163,21 @@ LavaNode        MemMapFile(fs::path const& pth)
     HANDLE createHndl=NULL, openMappingHndl=NULL, createMappingHndl=NULL;
     
     //char* pthCstr = (char*)pth.c_str();
+    //char*   tstStr = "H:\\test.txt";
+
     str     pthStr = pth.generic_string();
     LPSTR  pthCstr = (char*)pthStr.c_str();
-    char*   tstStr = "H:\\test.txt";
     
     createHndl = CreateFileA(
-                        tstStr, 
+                        pthCstr, 
                         GENERIC_READ, 
                         FILE_SHARE_READ, // | FILE_SHARE_WRITE, 
                         NULL, 
                         OPEN_EXISTING, 
                         FILE_ATTRIBUTE_NORMAL,
                         NULL);
-    PrintMemMapError();
 
-    LARGE_INTEGER     fsz;
+    LARGE_INTEGER  fsz;
     fsz.QuadPart = 0;
     PLARGE_INTEGER fszPtr = &fsz;
     auto fszOk = GetFileSizeEx(createHndl, fszPtr);
@@ -2187,20 +2187,13 @@ LavaNode        MemMapFile(fs::path const& pth)
     }else
       retNd.fileSize = fszPtr->QuadPart;
 
-    //openMappingHndl = OpenFileMappingA(FILE_MAP_READ, FALSE, tstStr );
-    //if(retNd.fileHndl==NULL) return LavaNodeListEnd;
-
-    //if(retNd.fileHndl==NULL)
-    //{
-      createMappingHndl = CreateFileMappingA(  // todo: simplify and call this right away, it will open the section if it already exists
-        createHndl, //INVALID_HANDLE_VALUE, //createHndl,
-        NULL,
-        PAGE_READONLY, //PAGE_READWRITE,
-        0,
-        0, //(DWORD)retNd.fileSize, // (DWORD)sizeBytes,
-        NULL); //tstStr);
-    //}
-    PrintMemMapError();
+    createMappingHndl = CreateFileMappingA(
+                          createHndl, 
+                          NULL,
+                          PAGE_READONLY, 
+                          0,
+                          0,
+                          NULL); 
 
     retNd.fileHndl = createMappingHndl;
     if(retNd.fileHndl != NULL && retNd.fileHndl != INVALID_HANDLE_VALUE)
@@ -2666,7 +2659,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
     {
       bool doFlow = lf.nxtPacket(&pckt);
       if(doFlow) 
-        SECTION(if there is a packet available, fit it into a existing cycle or create a new cycle)
+        SECTION(if there is a packet available, fit it into a existing frame or create a new frame)
         {
           u16 sIdx  =  pckt.dest_slot;
           lf.m_cycleQLck.lock();                                          // lock mutex        
@@ -2731,8 +2724,17 @@ void               LavaLoop(LavaFlow& lf) noexcept
           if(li.node->node_type==LavaNode::CONSTANT){
             SECTION(copy the memory mapped file in the const node)
             {
-              void* constMem = func;                                           // todo: read from the memory mapped file, might need to carry the file length in the node
+              // todo: read from the memory mapped file            // might need to carry the file length in the node
+              //void* constMem = li.node->filePtr;                   // same as the FlowFunc func above, which has been checked for nullptr already
+              
+              void* outMem = LavaAlloc(li.node->fileSize);
+              memcpy(outMem, li.node->filePtr, li.node->fileSize);
+              LavaOut o;
+              o.val.value = (uint64_t)outMem;
+              o.val.type  = LavaArgType::MEMORY;
+              o.key.slot  = 0;
 
+              outQ.push(o);
             }
           }else{
             SECTION(create arguments and call function)
@@ -2880,6 +2882,20 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+
+
+
+//openMappingHndl = OpenFileMappingA(FILE_MAP_READ, FALSE, tstStr );
+//if(retNd.fileHndl==NULL) return LavaNodeListEnd;
+
+//if(retNd.fileHndl==NULL)
+//{
+//INVALID_HANDLE_VALUE, //createHndl,
+//PAGE_READWRITE,
+//(DWORD)retNd.fileSize, // (DWORD)sizeBytes,
+//tstStr);
+//}
 
 //SECTION(run the function then put its results into packets and queue them)
 //{
