@@ -796,9 +796,27 @@ struct       LavaNode
 {
   enum Type { NONE=0, FLOW=1, MSG=2, CONSTANT=3, GENERATOR=4, JOINT=5, NODE_ERROR=0xFFFFFFFFFFFFFFFF };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
 
-  FlowFunc               func = nullptr;      // todo: change to a union
-  ConstructFunc   constructor = nullptr;      // todo: make into a union that also holds the constant node file length
-  ConstructFunc    destructor = nullptr;
+  //FlowFunc               func = nullptr;      // todo: change to a union that also holds the memory pointer
+  //ConstructFunc   constructor = nullptr;      // todo: make into a union that also holds the constant node file length
+  //ConstructFunc    destructor = nullptr;      // todo: change to a union that also holds the file handle
+
+  union{
+    FlowFunc               func;                // todo: change to a union that also holds the memory pointer
+    void*               filePtr = nullptr;
+  };
+  union{
+    ConstructFunc   constructor = nullptr;      // todo: make into a union that also holds the constant node file length
+    uint64_t           fileSize;
+  };
+  union{
+    ConstructFunc    destructor = nullptr;      // todo: change to a union that also holds the file handle
+    #ifdef _WIN32
+      void*      fileHndl;
+    #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
+      int        fileHndl;
+    #endif
+  };
+  
   Type              node_type = NONE;
   const char*            name = nullptr;
   const char**       in_types = nullptr;
@@ -912,6 +930,7 @@ const        LavaNode LavaNodeListEnd = {nullptr, nullptr, nullptr, LavaNode::NO
 struct      LavaConst
 {
   //struct ConstMem  //{  //};
+  //LavaConst(LavaNode const& n, str const& typeStr)
 
   LavaNode* node = nullptr; 
 
@@ -933,16 +952,16 @@ struct      LavaConst
     return *this;
   }
 
-  //LavaConst(LavaNode const& n, str const& typeStr)
   LavaConst() : node(nullptr) {}
-  LavaConst(void* cnstMem, str const& nameStr, str const& typeStr)
+  //LavaConst(void* cnstMem, str const& nameStr, str const& typeStr)
+  LavaConst(str const& nameStr, str const& typeStr)
   {
     // the node pointer and all of the node's pointers need to point to heap memory so that the addresses don't change
 
     node             =  (LavaNode*)malloc(sizeof(LavaNode) * 2);                                    // because there is no LavaNode struct as a static embedded in a shared library
     node[0]          =  LavaNode();                                                                 // make sure the LavaNode is initialized to default values 
     node[1]          =  LavaNodeListEnd;
-    node->func       =  (FlowFunc)(cnstMem);
+    //node->filePtr    =  cnstMem;
     node->node_type  =  LavaNode::CONSTANT;
     node->out_types  =  makeStrLst(typeStr);
 
@@ -2096,10 +2115,86 @@ void           PrintLavaMem(LavaMem lm)
   }
 }
 
-void*            MemMapFile(fs::path const& pth)
+LavaNode        MemMapFile(fs::path const& pth)
 {
+  using namespace std;
 
-  return nullptr;
+  LavaNode retNd;
+
+  #ifdef _WIN32      // windows
+    //char* pthCstr = (char*)pth.c_str();
+    str     pthStr = pth.generic_string();
+    LPSTR  pthCstr = (char*)pthStr.c_str();
+    char* tstStr = "H:\\ploop.bat";
+    retNd.fileHndl = OpenFileMappingA(FILE_MAP_READ, FALSE, tstStr );
+    //if(retNd.fileHndl==NULL) return LavaNodeListEnd;
+
+    if(retNd.fileHndl != NULL){
+      retNd.filePtr = MapViewOfFile(retNd.fileHndl,   // handle to map object
+        FILE_MAP_READ, //| FILE_MAP_WRITE, // FILE_MAP_ALL_ACCESS,   // read/write permission
+        0,
+        0,
+        0);
+    }
+
+    if(retNd.filePtr==nullptr)
+    { 
+      int      err = (int)GetLastError();
+      LPSTR msgBuf = nullptr;
+      /*size_t msgSz =*/ FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+        NULL, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&msgBuf, 0, NULL);
+      win_printf("Lava Constant memory mapping error %d - %s", err, msgBuf);
+      LocalFree(msgBuf);
+
+      CloseHandle(retNd.fileHndl); 
+      return LavaNodeListEnd;
+    }
+
+    PLARGE_INTEGER fsz = nullptr;
+    GetFileSizeEx(retNd.fileHndl, fsz);
+    retNd.fileSize = fsz->QuadPart;
+  #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
+      sm.owner  = true; // todo: have to figure out how to detect which process is the owner
+
+      sm.fileHndl = open(sm.path, O_RDWR);
+      if(sm.fileHndl == -1)
+      {
+        sm.fileHndl = open(sm.path, O_CREAT|O_RDWR, S_IRUSR|S_IWUSR |S_IRGRP|S_IWGRP | S_IROTH|S_IWOTH ); // O_CREAT | O_SHLOCK ); // | O_NONBLOCK );
+        if(sm.fileHndl == -1){
+          if(error_code){ *error_code = simdb_error::COULD_NOT_OPEN_MAP_FILE; }
+        }
+        else{
+          //flock(sm.fileHndl, LOCK_EX);   // exclusive lock  // LOCK_NB
+        }
+      }else{ sm.owner = false; }
+
+      if(sm.owner){  // todo: still need more concrete race protection?
+        fcntl(sm.fileHndl, F_GETLK, &flock);
+        flock(sm.fileHndl, LOCK_EX);              // exclusive lock  // LOCK_NB
+                                                  //fcntl(sm.fileHndl, F_PREALLOCATE);
+  #if defined(__linux__) 
+  #else 
+        fcntl(sm.fileHndl, F_ALLOCATECONTIG);
+  #endif
+
+        if( ftruncate(sm.fileHndl, sizeBytes)!=0 ){
+          if(error_code){ *error_code = simdb_error::FTRUNCATE_FAILURE; }
+        }
+        if( flock(sm.fileHndl, LOCK_UN)!=0 ){
+          if(error_code){ *error_code = simdb_error::FLOCK_FAILURE; }
+        }
+      }
+
+      sm.hndlPtr  = mmap(NULL, sizeBytes, PROT_READ|PROT_WRITE, MAP_SHARED , sm.fileHndl, 0); // MAP_PREFAULT_READ  | MAP_NOSYNC
+      close(sm.fileHndl);
+      sm.fileHndl = 0;
+
+      if(sm.hndlPtr==MAP_FAILED){
+        if(error_code){ *error_code = simdb_error::COULD_NOT_MEMORY_MAP_FILE; }
+      }
+  #endif       
+
+  return retNd;
 }
 LavaNode*      AddFlowConst(fs::path const& pth, LavaFlow& inout_flow)
 {
@@ -2125,14 +2220,18 @@ LavaNode*      AddFlowConst(fs::path const& pth, LavaFlow& inout_flow)
     nameStr = nameStr.substr(0, nameStr.find('.'));
   }
 
-  void* memMap = MemMapFile(pth);                                             // use the memory mapping from simdb
+  //void* memMap = MemMapFile(pth);                                             // use the memory mapping from simdb
+  LavaNode    mmapNd = MemMapFile(pth);                                             // use the memory mapping from simdb
 
-  LavaNode* nodePtr = nullptr;
+  LavaNode*  nodePtr = nullptr;
   SECTION(create LavaConst, use the node pointer in the graph and move the LavaConst into the constMem map)
   {
     str pstr = pth.generic_string();
 
-    LavaConst lc(memMap, nameStr, typeStr);
+    LavaConst lc(nameStr, typeStr);
+    lc.node->filePtr  = mmapNd.filePtr;
+    lc.node->fileSize = mmapNd.fileSize;
+    lc.node->fileHndl = mmapNd.fileHndl;
     nodePtr = lc.node;
     inout_flow.constMem[pstr] = move(lc);                                     // have to do this last since it moves the LavaConst and sets the original version to a nullptr - this might overwrite a former LavaCont, which would deallocate its heap memory on deconstruction
 
@@ -2711,6 +2810,65 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+
+
+
+//static SharedMem  AllocAnon(const char* name, u64 sizeBytes, bool raw_path=false, simdb_error* error_code=nullptr)
+//
+//SharedMem sm;
+//sm.hndlPtr  = nullptr;
+//sm.owner    = false;
+//sm.size     = alignment==0? sizeBytes  :  alignment-(sizeBytes%alignment);
+//sm.size     = sizeBytes;
+//if(error_code){ *error_code = simdb_error::NO_ERRORS; }
+//
+//#ifdef _WIN32      // windows
+//    //sm.fileHndl = nullptr;
+//    //if(!raw_path){ strcpy(sm.path, "simdb_"); }
+//#elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
+//    sm.fileHndl = 0;
+//    strcpy(sm.path, P_tmpdir "/simdb_");
+//#endif
+//
+//u64 len = strlen(sm.path) + strlen(name);
+//if(len > sizeof(sm.path)-1){
+//*error_code = simdb_error::PATH_TOO_LONG;
+//return move(sm);
+//return LavaNodeListEnd;
+//}else{ strcat(sm.path, name); }
+
+//sm.fileHndl = CreateFileA(
+//retNd.fileHndl = CreateFileA(
+//  //sm.path, 
+//  (LPCSTR)pth.c_str(),
+//  GENERIC_READ|GENERIC_WRITE,   //FILE_MAP_READ|FILE_MAP_WRITE,  // apparently FILE_MAP constants have no effects here
+//  FILE_SHARE_READ|FILE_SHARE_WRITE, 
+//  NULL,
+//  CREATE_NEW,
+//  FILE_ATTRIBUTE_NORMAL,        //_In_ DWORD dwFlagsAndAttributes
+//  NULL                          //_In_opt_ HANDLE hTemplateFile
+//);
+
+//if(sm.fileHndl==NULL)
+//{
+//  retNd.fileHndl = CreateFileMappingA(  // todo: simplify and call this right away, it will open the section if it already exists
+//    INVALID_HANDLE_VALUE,
+//    NULL,
+//    PAGE_READONLY, //PAGE_READWRITE,
+//    0,
+//    (DWORD)sizeBytes,
+//    sm.path);
+//  if(sm.fileHndl!=NULL){ sm.owner=true; }
+//}
+//
+//if(retNd.filePtr==nullptr)
+//  CloseHandle(sm.fileHndl); 
+
+//u64      addr = (u64)(sm.hndlPtr);
+//u64 alignAddr = addr;
+////if(alignment!=0){ alignAddr = addr + ((alignment-addr%alignment)%alignment); }          // why was the second modulo needed?
+//sm.ptr        = (void*)(alignAddr);
 
 //void      RefreshFlowConsts(LavaFlow& inout_flow)
 //{
