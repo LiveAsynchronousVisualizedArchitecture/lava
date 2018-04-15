@@ -2125,11 +2125,19 @@ LavaNode        MemMapFile(fs::path const& pth)
     //char* pthCstr = (char*)pth.c_str();
     str     pthStr = pth.generic_string();
     LPSTR  pthCstr = (char*)pthStr.c_str();
-    char* tstStr = "H:\\ploop.bat";
+    char* tstStr = "H:\\test.txt";
+    retNd.fileHndl = CreateFileA(
+                        tstStr, 
+                        GENERIC_READ, 
+                        FILE_SHARE_READ, // | FILE_SHARE_WRITE, 
+                        NULL, 
+                        OPEN_EXISTING, 
+                        FILE_ATTRIBUTE_NORMAL,
+                        NULL);
     retNd.fileHndl = OpenFileMappingA(FILE_MAP_READ, FALSE, tstStr );
     //if(retNd.fileHndl==NULL) return LavaNodeListEnd;
 
-    if(retNd.fileHndl != NULL){
+    if(retNd.fileHndl != NULL && retNd.fileHndl != INVALID_HANDLE_VALUE){
       retNd.filePtr = MapViewOfFile(retNd.fileHndl,   // handle to map object
         FILE_MAP_READ, //| FILE_MAP_WRITE, // FILE_MAP_ALL_ACCESS,   // read/write permission
         0,
