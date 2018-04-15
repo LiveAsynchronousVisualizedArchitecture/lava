@@ -1934,7 +1934,28 @@ public:
     assert(m_running == false);                               // all threads should be out of the loop by the time this function is called
     for(auto const& kv : nameToPtr){
       LavaNode* ln = kv.second;
-      if(ln && ln->destructor){ ln->destructor(); }
+      if(ln){
+        if(ln->node_type==LavaNode::CONSTANT)
+        {
+          #ifdef _WIN32
+            if(ln->filePtr){
+              UnmapViewOfFile(ln->filePtr);
+            }
+            if(ln->fileHndl){
+              CloseHandle(ln->fileHndl);
+            }
+          #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)     // osx, linux and freebsd
+            if(sm.hndlPtr){
+              munmap(sm.hndlPtr, sm.size);  // todo: size here needs to be the total size, and errors need to be checked
+            }
+            remove(sm.path);
+            // todo: deal with errors here as well
+          #endif
+        }else if(ln->destructor){
+          ln->destructor();
+        }
+
+      }
     }
   }
   void    runConstructors()
@@ -1942,7 +1963,12 @@ public:
     assert(m_running == false);                               // all threads should be out of the loop by the time this function is called
     for(auto const& kv : nameToPtr){
       LavaNode* ln = kv.second;
-      if(ln && ln->constructor){ ln->constructor(); }
+      if(ln && 
+         ln->node_type!=LavaNode::CONSTANT && 
+         ln->constructor)
+      {
+        ln->constructor();
+      }
     }
   }
 
@@ -2139,7 +2165,7 @@ LavaNode        MemMapFile(fs::path const& pth)
     //char* pthCstr = (char*)pth.c_str();
     str     pthStr = pth.generic_string();
     LPSTR  pthCstr = (char*)pthStr.c_str();
-    char* tstStr = "H:\\test.txt";
+    char*   tstStr = "H:\\test.txt";
     
     createHndl = CreateFileA(
                         tstStr, 
@@ -2193,13 +2219,6 @@ LavaNode        MemMapFile(fs::path const& pth)
       PrintMemMapError();
       CloseHandle(retNd.fileHndl); 
       return LavaNodeListEnd;
-
-      //int      err = (int)GetLastError();
-      //LPSTR msgBuf = nullptr;
-      // /*size_t msgSz =*/ FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
-      //  NULL, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&msgBuf, 0, NULL);
-      //win_printf("Lava Constant memory mapping error %d - %s", err, msgBuf);
-      //LocalFree(msgBuf);
     }
 
   #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)  // osx, linux and freebsd
@@ -2640,7 +2659,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
   {    
     LavaFrame      runFrm;
 
-    SECTION(make a cycle from a packet or run a message node)
+    SECTION(RUN THE NODE - make a frame from a packet to run a node or run a generator if no full frames are available)
     {
       LavaPacket    pckt;
       LavaParams      lp;
@@ -2862,6 +2881,12 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//int      err = (int)GetLastError();
+//LPSTR msgBuf = nullptr;
+// /*size_t msgSz =*/ FormatMessageA(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
+//  NULL, err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPSTR)&msgBuf, 0, NULL);
+//win_printf("Lava Constant memory mapping error %d - %s", err, msgBuf);
+//LocalFree(msgBuf);
 
 //static SharedMem  AllocAnon(const char* name, u64 sizeBytes, bool raw_path=false, simdb_error* error_code=nullptr)
 //
