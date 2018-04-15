@@ -79,15 +79,19 @@ Emit Packets using a function instead of outputting into an array:
  - After emitting all packets, emitting thread can then sort them and put them into a cache or NUMA local lock free queue
 
 
-
 Display text of the file inside a node
 |  Have a window inside a node that can show the directory, or the text of the main file
 
 
-Statics
+Statics - done with name.type.const files
 |  Have a second struct list of structs looked for that contains 'statics'
 |  LavaStatic or LavaConst?
 |  Type, length, then array of bytes
+
+
+Nodes need to be aware of which outputs are connected
+|  Easiest way might be to have LavaParams have an output bitmap
+
 
 -------------------------------------------------------------------------------------------
 Simplicity does not precede complexity, but follows it.

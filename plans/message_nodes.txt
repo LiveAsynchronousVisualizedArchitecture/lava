@@ -44,4 +44,14 @@ Different types of message nodes:
 |  |  |  Reminicent of the idea of being able to peek into any allocation done with lavaAlloc inside of a flow node
 |
 
-saj
+
+Should Message Nodes have their own input queues?
+|  This would allow message nodes to elegantly use all input packets available to them
+|  Maybe the node could then do whatever it wants with all the inputs in the queue
+|  The return value could indicate whether the LavaLoop should treat this as being executed, or it could indicate how many input packets were used
+|  The message node template could have its own thread and mutex embedded in it to stop the calling thread and start its own, which makes the message node is thread safe and always run by the same thread by default
+|  Removing the template thread and mutex would mean that the state needs to be made thread safe by the user
+|  Would a node having its own controllable queue as opposed to being given single packets (as well as being run every cycle) be the most fundamental way to separate transformations from state management?  
+|  |  If a node can manage its own inputs and is run every cycle, does this give back the control and decision making lost in data flow nodes?
+
+
