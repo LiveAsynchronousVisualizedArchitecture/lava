@@ -53,5 +53,50 @@ Should Message Nodes have their own input queues?
 |  Removing the template thread and mutex would mean that the state needs to be made thread safe by the user
 |  Would a node having its own controllable queue as opposed to being given single packets (as well as being run every cycle) be the most fundamental way to separate transformations from state management?  
 |  |  If a node can manage its own inputs and is run every cycle, does this give back the control and decision making lost in data flow nodes?
+|  Should there just be an explicit lock free gather node? 
+|  |  Give a lock free gather a similiar look to flow nodes? 
+
+
+Should message nodes have a different name?
+|  Gather nodes
+|  Sync or Synchronize nodes
+|  State nodes 
+|  Actor nodes
+|  Core node
+|  Synchronization nodes make sense because if you take in multiple packets, you are inherently synchronizing them 
+|  State nodes makes sense if there is state being saved, though that may not be the case if a node is just combining packets 
+|  Gather nodes makes sense if a node is combining packets and possibly if the node is saving state - gather doesn't make sense if the node is being used without inputs, though if there are no inputs, wouldn't a flow node with no inputs / generator node work the same way? - if there is a locking mechanism then that could make a difference, even with no inputs - would gather still make sense?
+|  Actor nodes use a known name, though that is probably the only name advantage as it doesn't describe the fundamentals of what they do
+|  Core node indicates they are central points, though not much else about their name either
+|  Does 'message passing' as a node name make any sense? 
+
+
+Pipelining Message Nodes
+|  If incrementally combining packets, it should be possible to output to a flow node, which then loops to the gather node's input 
+|  |  This would only be able to combine a static number of packets together in the flow node due to the static limits on input packets, though maybe that is ok
+|  Does a queue to a message node need to be able to transactionally take a number of packets? 
+|  |  If the goal is to combine packets and the node is not being used in a single threaded manner, two threads could each take a single packet, then put it back in the queue when they don't get a second one, creating threads looping due to competing with each other 
+|  |  It may be enough to query how many packets are available, then use an atomic in the node to keep a count of the packets intended to be taken, which could minimize contention
+|  |  Leaving this up to a user to both discover and execute correctly would probably mean it would rarely ever be done and done correctly - wouldn't follow the purpose of effortless high performance concurrency 
+|  
+
+Should There be multiple templates?
+|  One for flow nodes
+|  One for message / gather nodes?
+|  One for lock free gather nodes?
+
+
+Multiple outputs linked to a single input
+|  Flow nodes can't have multiple connections to a single input because they need to have a single packet in each input slot 
+|  Gather nodes could possibly have multiple connections of the same type going into their queue to avoid needing to use multiple inputs
+|  Might not be worth the complexity
+
+
+How do program terminate?
+|  Have a special exit/terminate output type or value?
+|  Have a special exit/terminate packet type?
+|  When an exit packet is seen, a global flag could be set so that nodes don't cycle any more 
+|  Might need to make sure that all generators are run the same amount of times
+|  What other edge cases are there? Do nodes need to know that an exit packet has been seen?
 
 

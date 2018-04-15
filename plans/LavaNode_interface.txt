@@ -93,6 +93,18 @@ Nodes need to be aware of which outputs are connected
 |  Easiest way might be to have LavaParams have an output bitmap
 
 
+
+Constructors, Destructors and state management when hot reloading
+|  Should constructors take a void* pointer and size that give an optional state to use?
+|  Should destructors take parameters to write out a state on destruction?
+|  |  Could take a void* and a max size
+|  |  If the the destructor needs more size it will have to do something different
+|  |  Could take a pointer to the max size and if it needs more bytes, the new size will be written  
+|  |  Need to return a value signaling that construction was done 
+|  |  Passing a void pointer could signal to destruct without writing state 
+a void* return a void* and write to a size output parameter so that they can optionally return a state? 
+
+
 -------------------------------------------------------------------------------------------
 Simplicity does not precede complexity, but follows it.
 
@@ -106,6 +118,5 @@ Fools ignore complexity. Pragmatists suffer it. Some can avoid it. Geniuses remo
 
 A programming language is low level when its programs require attention to the irrelevant.
 ------------------------------------------------------------------------------------------
-
 
 
