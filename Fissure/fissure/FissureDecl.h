@@ -275,6 +275,9 @@ struct FisData
     TextBox*     statusTxt  = nullptr;
     TextBox*       nodeTxt  = nullptr;
     vec_btn        ndBtns;
+    
+    Window*      constWin   = nullptr;
+    BoxLayout*   constLay   = nullptr;
 
     // mouse
     v2                prevPntr;

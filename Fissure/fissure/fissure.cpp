@@ -26,11 +26,11 @@
 // -todo: add memory mapping function from simdb to map const files
 // -todo: specialize const nodes to load from their  memory span
 // -todo: test LavaConst refresh function
+// -todo: give const node a different color
+// -todo: make MemMap function from the memory mapping in simdb
+// -todo: make constant nodes be added to the generators list - done explicitly and implicitly since their input count in 0
 
-// todo: give const node a different color
 // todo: integrate AddConst into RefreshFlowLibs function so that there are .live versions
-// todo: make MemMap function from the memory mapping in simdb
-// todo: make constant nodes be added to the generators list
 // todo: work out timed live reload checking 
 // todo: work on and test live reloading - what thread reloads? 
 // todo: make dragging a slot turn it into a constant, which writes a .type.const file, which is then memory mapped and live reloaded by lava
@@ -782,10 +782,6 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
       }
       SECTION(shaded color inside)
       {
-        //auto    col = n.sel? fd.ui.nd_selclr  : fd.ui.nd_color;
-        //auto    col = sel? fd.ui.nd_selclr :
-        //  n.type==Node::Type::GENERATOR? fd.ui.nd_cache_clr :
-        //  fd.ui.nd_color;
         int    grad = (int)lerp(rnd, 0, 48);
         auto topClr = nvgRGBA(255,255,255, isBlack(col)?16:grad );
         auto botClr = nvgRGBA(0,0,0, isBlack(col)?16:grad );
@@ -1767,6 +1763,12 @@ ENTRY_DECLARATION // main or winmain
     {
       fd.ui.screen.initialize(fd.win, false);
 
+      //auto constWin = new Window(&fd.ui.screen, "Const Tbl Editor");
+      fd.ui.constWin  = new Window(&fd.ui.screen, "Tbl Editor");
+      fd.ui.constLay  = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);      //fd.ui.keyLay   = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
+      fd.ui.constWin->setLayout(fd.ui.constLay);
+      fd.ui.constWin->setPosition(Vector2i(0,400));
+
       fd.ui.keyLay    = new BoxLayout(Orientation::Horizontal, Alignment::Fill, 0,10);      //fd.ui.keyLay   = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
       fd.ui.keyWin    = new  Window(&fd.ui.screen,    "");
       auto spcr1      = new   Label(fd.ui.keyWin,     "");
@@ -2719,3 +2721,7 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//auto    col = n.sel? fd.ui.nd_selclr  : fd.ui.nd_color;
+//auto    col = sel? fd.ui.nd_selclr :
+//  n.type==Node::Type::GENERATOR? fd.ui.nd_cache_clr :
+//  fd.ui.nd_color;
