@@ -923,7 +923,7 @@ public:
 
       if(_owned) cp(memst);
     }
-    this->owned(_owned);
+    //this->owned(_owned);
   }
   tbl(u64 count) : m_mem(nullptr) { init(count); }
   tbl(std::initializer_list<KV> lst) : m_mem(nullptr)

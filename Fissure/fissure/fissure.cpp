@@ -29,7 +29,14 @@
 // -todo: give const node a different color
 // -todo: make MemMap function from the memory mapping in simdb
 // -todo: make constant nodes be added to the generators list - done explicitly and implicitly since their input count in 0
+// -todo: show Tbl Editor from hotkey
+// -todo: debug why the node pointer in lava inst from the the primary selection is null - primary selection was probably not set, also not getting set when drag selecting 
+// -todo: print keys from the selected constant
 
+// todo: make primary selection become set on drag selection 
+// todo: make tbl static method to verify if a memory span is a tbl or not
+// todo: build Tbl Editor from selected node 
+// todo: take owned out of tbl now that the allocation pointers can be used instead
 // todo: integrate AddConst into RefreshFlowLibs function so that there are .live versions
 // todo: work out timed live reload checking 
 // todo: work on and test live reloading - what thread reloads? 
@@ -118,7 +125,8 @@
 //       |  use a union of bytes that is filled with the frame, slot, list index?
 //       |  use malloc addresses initially
 
-// idea: make optional inputs yellowish and optional outputs purpleish
+// idea: make tbl editor sliders change percentage of the number while also being non-linear with drag speed
+// idea: make optional inputs yellowish and optional outputs purpleish - but both sort of whiteish - is there such a thing as optional outputs? aren't all outputs optional? 
 // idea: should the big difference in MSG nodes as opposed to data flow nodes be that they are always run from the same thread that unlocks? 
 // idea: keep track of both time speht in a node and the memory allocations it uses
 // idea: make packets visualize on slots circles stack as concentric circles or as portions/segments of a single circle 
@@ -271,6 +279,7 @@ static simdb   fisdb;
 
 namespace{
 
+// Util
 float               lerp(float p, float lo, float hi)
 {
   return lo*(1-p) + hi*p;
@@ -358,11 +367,13 @@ v2         angleToNormal(f32 angle)
 {
   return { cos(angle), sin(angle) };
 }
-f64        timeToSeconds(u64 t)
+f64        timeToSeconds(u64  t)
 {
   return t / 1000000000.0;
 }
+// End Util
 
+// UI Util
 str       makeStatusText(u64 nid, f64 totalTime, vec_ndptrs const& nds, u64 nIdx)
 {
   using namespace std;
@@ -411,7 +422,6 @@ str       makeStatusText(u64 nid, f64 totalTime, vec_ndptrs const& nds, u64 nIdx
 
   return status;
 }
-
 void         draw_radial(NVGcontext* vg, NVGcolor clr, f32 x, f32 y, f32 rad)
 {
   auto  hlf = rad/2; 
@@ -423,8 +433,37 @@ void         draw_radial(NVGcontext* vg, NVGcolor clr, f32 x, f32 y, f32 rad)
   nvgFillPaint(vg, radial);
   nvgFill(vg);
 }
+bool       makeTblEditor(LavaNode* n)
+{
+  if(fd.sel.pri==LavaId::NODE_NONE){ return false; }
+  LavaInst   li = fd.lgrph.node(fd.sel.pri);
+  LavaNode*  ln = li.node;  
+  if(!ln || ln->node_type!=LavaNode::CONSTANT){ return false; }    // if the primary selected node isn't a constant, don't do anything
+  if( !(ln->filePtr) ){ return false; }                     // if it is a constant but its pointer is nullptr, do nothing
 
-// state manipulation
+  // todo: need to be able to check if a memory span is a tbl, since a constant isn't always going to be a table
+
+  tbl cnstTbl(ln->filePtr);
+
+  for(auto kv : cnstTbl){                                  // use the iterators to go through the key-value pairs, then build the controls from those pairs
+    Println(kv.key);
+  }
+  Println("\n");
+
+  fd.ui.constWin->setPosition(Vector2i(0,400));
+  fd.ui.constWin->setVisible(true);
+
+  return true;
+
+  //auto& nodes = fd.graph.nds;
+  //auto ndIter = nodes.find(fd.sel.pri);
+  //if(ndIter != end(nodes)){
+  //    ndIter->first;
+  //}
+}
+// End UI Util
+
+// State manipulation
 u64                nxtId()
 {
   return fd.nxtId++;
@@ -1215,8 +1254,9 @@ void         graph_apply(LavaGraph::ArgVec args)
     }
   }
 }
+// End state manipulation
 
-// serialize to and from json - put in FisTfm.hpp file?
+// Serialize to and from json - put in FisTfm.hpp file?
 void    normalizeIndices()
 {
   using namespace std;
@@ -1471,6 +1511,8 @@ bool            loadFile(str path, LavaGraph* out_g)
 
   return true;
 }
+// End serialize to and from json 
+
 bool    reloadSharedLibs()
 {
   bool newlibs  = RefreshFlowLibs(fd.flow);
@@ -1515,6 +1557,10 @@ void               keyCallback(GLFWwindow* win,    int key, int scancode, int ac
   if(action==GLFW_RELEASE) return;
 
   switch(key){
+  case 'E':
+  case 'e':{
+    makeTblEditor(nullptr);
+  }break;  
   case 'H':
   case 'h':{
     nvgTransformIdentity( fd.ui.tfm );
@@ -1763,11 +1809,11 @@ ENTRY_DECLARATION // main or winmain
     {
       fd.ui.screen.initialize(fd.win, false);
 
-      //auto constWin = new Window(&fd.ui.screen, "Const Tbl Editor");
-      fd.ui.constWin  = new Window(&fd.ui.screen, "Tbl Editor");
-      fd.ui.constLay  = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);      //fd.ui.keyLay   = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
+      fd.ui.constWin = new Window(&fd.ui.screen, "Tbl Editor");
+      fd.ui.constLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
+      auto cnstClose = new Button(fd.ui.constWin, "Close");
       fd.ui.constWin->setLayout(fd.ui.constLay);
-      fd.ui.constWin->setPosition(Vector2i(0,400));
+      fd.ui.constWin->setVisible(false);
 
       fd.ui.keyLay    = new BoxLayout(Orientation::Horizontal, Alignment::Fill, 0,10);      //fd.ui.keyLay   = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
       fd.ui.keyWin    = new  Window(&fd.ui.screen,    "");
