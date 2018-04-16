@@ -1555,6 +1555,17 @@ private:
   }
 
 public:
+  static bool   isTbl(void* mem)
+  {
+    fields* f = (fields*)mem;
+    if( f->t=='t'  && 
+        f->b=='b'  && 
+        f->sizeBytes >= sizeof(fields) ){
+      return true;
+    }
+
+    return false;
+  }
   static u64    memberBytes(){ return sizeof(fields); }
   static u64     size_bytes(u64 count, u64 stride=1)      // todo: this will need a stride argument and/or a type                            // returns the bytes needed to store the data structure if the same arguments were given to the constructor
   {
@@ -1629,6 +1640,10 @@ public:
 
 
 
+
+
+//i8* tp = (i8*)mem;
+//if( tp[0]=='t' && tp[1]=='b'){
 
 //if(fresh){ re = m_alloc(nxtBytes);
 //}else    { re = m_realloc( (void*)memStart(), nxtBytes); }

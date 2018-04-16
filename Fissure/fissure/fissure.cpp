@@ -32,16 +32,17 @@
 // -todo: show Tbl Editor from hotkey
 // -todo: debug why the node pointer in lava inst from the the primary selection is null - primary selection was probably not set, also not getting set when drag selecting 
 // -todo: print keys from the selected constant
+// -todo: wok out structure for constants - .const files can be detected by lava - files could be named .Type.const to be detected as constant nodes while retaining type information that is not stored in any sort of binary format
+// -todo: make primary selection become set on drag selection 
+// -todo: make tbl static method to verify if a memory span is a tbl or not
 
-// todo: make primary selection become set on drag selection 
-// todo: make tbl static method to verify if a memory span is a tbl or not
 // todo: build Tbl Editor from selected node 
 // todo: take owned out of tbl now that the allocation pointers can be used instead
+// todo: make Tbl Editors pop up for all selected constants that point to tbls - need a vector of tbl windows and tbl layouts as well as a vector of vectors for the widgets of each key value
 // todo: integrate AddConst into RefreshFlowLibs function so that there are .live versions
 // todo: work out timed live reload checking 
 // todo: work on and test live reloading - what thread reloads? 
 // todo: make dragging a slot turn it into a constant, which writes a .type.const file, which is then memory mapped and live reloaded by lava
-// todo: wok out structure for constants - .const files can be detected by lava - files could be named .Type.const to be detected as constant nodes while retaining type information that is not stored in any sort of binary format
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
 // todo: make fissure or lava be able to incrementally load shared libraries
 // todo: change constructor to happen on play and not on load (or after the destructor runs on stop)
@@ -435,14 +436,14 @@ void         draw_radial(NVGcontext* vg, NVGcolor clr, f32 x, f32 y, f32 rad)
 }
 bool       makeTblEditor(LavaNode* n)
 {
-  if(fd.sel.pri==LavaId::NODE_NONE){ return false; }
+  if(fd.sel.pri==LavaNode::NODE_ERROR){ return false; }
+
   LavaInst   li = fd.lgrph.node(fd.sel.pri);
   LavaNode*  ln = li.node;  
-  if(!ln || ln->node_type!=LavaNode::CONSTANT){ return false; }    // if the primary selected node isn't a constant, don't do anything
-  if( !(ln->filePtr) ){ return false; }                     // if it is a constant but its pointer is nullptr, do nothing
-
-  // todo: need to be able to check if a memory span is a tbl, since a constant isn't always going to be a table
-
+  if( !ln || ln->node_type!=LavaNode::CONSTANT){ return false; }     // if the primary selected node isn't a constant, don't do anything
+  if( !(ln->filePtr) ){ return false; }                              // if it is a constant but its pointer is nullptr, do nothing
+  if( !tbl::isTbl(ln->filePtr) ){ return false; }
+  
   tbl cnstTbl(ln->filePtr);
 
   for(auto kv : cnstTbl){                                  // use the iterators to go through the key-value pairs, then build the controls from those pairs
@@ -454,12 +455,6 @@ bool       makeTblEditor(LavaNode* n)
   fd.ui.constWin->setVisible(true);
 
   return true;
-
-  //auto& nodes = fd.graph.nds;
-  //auto ndIter = nodes.find(fd.sel.pri);
-  //if(ndIter != end(nodes)){
-  //    ndIter->first;
-  //}
 }
 // End UI Util
 
@@ -1809,11 +1804,19 @@ ENTRY_DECLARATION // main or winmain
     {
       fd.ui.screen.initialize(fd.win, false);
 
-      fd.ui.constWin = new Window(&fd.ui.screen, "Tbl Editor");
-      fd.ui.constLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
-      auto cnstClose = new Button(fd.ui.constWin, "Close");
-      fd.ui.constWin->setLayout(fd.ui.constLay);
-      fd.ui.constWin->setVisible(false);
+      SECTION(create the Tbl Editor window)
+      {
+        fd.ui.constWin = new Window(&fd.ui.screen, "Tbl Editor");
+        fd.ui.constLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
+        auto cnstClose = new Button(fd.ui.constWin, "Close");
+
+        cnstClose->setCallback([](){
+          fd.ui.constWin->setVisible(false);
+        });
+
+        fd.ui.constWin->setLayout(fd.ui.constLay);
+        fd.ui.constWin->setVisible(false);
+      }
 
       fd.ui.keyLay    = new BoxLayout(Orientation::Horizontal, Alignment::Fill, 0,10);      //fd.ui.keyLay   = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
       fd.ui.keyWin    = new  Window(&fd.ui.screen,    "");
@@ -2185,11 +2188,15 @@ ENTRY_DECLARATION // main or winmain
           }
         }
 
-        if(!isInSlot) SECTION(node inside check: if inside a node in node ordr from top to bottom)
+        if(!isInSlot) SECTION(box selection to primary and node inside check: if inside a node in node ordr from top to bottom)
         {
           FROM(sz,i)                                                // loop backwards so that the top nodes are dealt with first
           {
-            Node*     n  =  nds[i];
+            Node* n = nds[i];
+
+            if(lftClkUp && fd.sel.pri==LavaNode::NODE_ERROR && n->sel)
+              fd.sel.pri = n->id;
+
             isInNode     =  isIn(pntr.x,pntr.y, n->b);
             if(isInNode){
               nid  = n->id;
@@ -2268,10 +2275,8 @@ ENTRY_DECLARATION // main or winmain
             nvgTransformPoint( &tfmBnd.mx.x, &tfmBnd.mx.y, fd.ui.invTfm, ms.drgbnd.mx.x, ms.drgbnd.mx.y );
 
             Node& n       =  *(nds[i]);
-            //bool inside   =  isIn(n.b, ms.drgbnd);
             bool inside   =  isIn(n.b, tfmBnd);
             n.sel        |=  inside;
-            //anyInside    |=  inside;
           }
         }
         SECTION(connection creation)
@@ -2766,6 +2771,20 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+
+
+// -todo: need to be able to check if a memory span is a tbl, since a constant isn't always going to be a table
+//
+//auto& nodes = fd.graph.nds;
+//auto ndIter = nodes.find(fd.sel.pri);
+//if(ndIter != end(nodes)){
+//    ndIter->first;
+//}
+
+//bool inside   =  isIn(n.b, ms.drgbnd);
+//anyInside    |=  inside;
 
 //auto    col = n.sel? fd.ui.nd_selclr  : fd.ui.nd_color;
 //auto    col = sel? fd.ui.nd_selclr :
