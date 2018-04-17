@@ -35,9 +35,10 @@
 // -todo: wok out structure for constants - .const files can be detected by lava - files could be named .Type.const to be detected as constant nodes while retaining type information that is not stored in any sort of binary format
 // -todo: make primary selection become set on drag selection 
 // -todo: make tbl static method to verify if a memory span is a tbl or not
+// -todo: build Tbl Editor from selected node 
+// -todo: take owned out of tbl now that the allocation pointers can be used instead - just leave it for now
 
-// todo: build Tbl Editor from selected node 
-// todo: take owned out of tbl now that the allocation pointers can be used instead
+// todo: make Tbl Editor change the values - can use the already memory mapped value
 // todo: make Tbl Editors pop up for all selected constants that point to tbls - need a vector of tbl windows and tbl layouts as well as a vector of vectors for the widgets of each key value
 // todo: integrate AddConst into RefreshFlowLibs function so that there are .live versions
 // todo: work out timed live reload checking 
@@ -434,25 +435,66 @@ void         draw_radial(NVGcontext* vg, NVGcolor clr, f32 x, f32 y, f32 rad)
   nvgFillPaint(vg, radial);
   nvgFill(vg);
 }
+void      clearTblEditor()
+{
+  fd.ui.cnstWin->setVisible(false);
+
+  for(auto const& lbl : fd.ui.cnstLbls)
+    fd.ui.cnstWin->removeChild(lbl);
+
+  for(auto const& edt : fd.ui.cnstEdit)
+    fd.ui.cnstWin->removeChild(edt);
+
+  if(fd.ui.cnstClose){ fd.ui.cnstWin->removeChild(fd.ui.cnstClose); }
+  fd.ui.cnstClose = nullptr;
+
+  fd.ui.cnstLbls.clear();
+  fd.ui.cnstLbls.shrink_to_fit();
+  fd.ui.cnstEdit.clear();
+  fd.ui.cnstEdit.shrink_to_fit();
+
+  fd.ui.cnstWin->setLayout(fd.ui.cnstLay);
+}
 bool       makeTblEditor(LavaNode* n)
 {
+  clearTblEditor();
+
   if(fd.sel.pri==LavaNode::NODE_ERROR){ return false; }
 
   LavaInst   li = fd.lgrph.node(fd.sel.pri);
   LavaNode*  ln = li.node;  
-  if( !ln || ln->node_type!=LavaNode::CONSTANT){ return false; }     // if the primary selected node isn't a constant, don't do anything
-  if( !(ln->filePtr) ){ return false; }                              // if it is a constant but its pointer is nullptr, do nothing
+  if( !ln || ln->node_type!=LavaNode::CONSTANT){ return false; }         // if the primary selected node isn't a constant, don't do anything
+  if( !(ln->filePtr) ){ return false; }                                  // if it is a constant but its pointer is nullptr, do nothing
   if( !tbl::isTbl(ln->filePtr) ){ return false; }
   
   tbl cnstTbl(ln->filePtr);
 
-  for(auto kv : cnstTbl){                                  // use the iterators to go through the key-value pairs, then build the controls from those pairs
-    Println(kv.key);
-  }
-  Println("\n");
+  for(auto kv : cnstTbl){                                                // use the iterators to go through the key-value pairs, then build the controls from those pairs
+    if( kv.hasTypeAttr(tbl::TblType::INTEGER) || 
+        kv.hasTypeAttr(tbl::TblType::SIGNED) )                           // SIGNED but not INTEGER would be a float
+    {
+      fd.ui.cnstLbls.push_back( new Label(fd.ui.cnstWin, kv.key) );
 
-  fd.ui.constWin->setPosition(Vector2i(0,400));
-  fd.ui.constWin->setVisible(true);
+      TextBox* tb = nullptr;
+      switch(kv.type){
+        case tbl::TblType::I64: tb = new IntBox<i64>(fd.ui.cnstWin, (i64)kv); break;
+        case tbl::TblType::U64: tb = new IntBox<u64>(fd.ui.cnstWin, (u64)kv); break;
+      }
+      tb->setEditable(true);
+      tb->setSpinnable(true);
+      fd.ui.cnstEdit.push_back(tb);
+    }
+  }
+
+  fd.ui.cnstClose = new Button(fd.ui.cnstWin, "Close");
+
+  fd.ui.cnstClose->setCallback([](){
+    fd.ui.cnstWin->setVisible(false);
+    clearTblEditor();
+  });
+
+  fd.ui.cnstWin->setPosition(Vector2i(0,400));
+  fd.ui.cnstWin->setVisible(true);
 
   return true;
 }
@@ -1806,16 +1848,15 @@ ENTRY_DECLARATION // main or winmain
 
       SECTION(create the Tbl Editor window)
       {
-        fd.ui.constWin = new Window(&fd.ui.screen, "Tbl Editor");
-        fd.ui.constLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
-        auto cnstClose = new Button(fd.ui.constWin, "Close");
-
-        cnstClose->setCallback([](){
-          fd.ui.constWin->setVisible(false);
-        });
-
-        fd.ui.constWin->setLayout(fd.ui.constLay);
-        fd.ui.constWin->setVisible(false);
+        fd.ui.cnstWin   = new Window(&fd.ui.screen, "Tbl Editor");
+        fd.ui.cnstLay   = new GridLayout(Orientation::Horizontal, 2, Alignment::Fill, 10,10);
+        //fd.ui.cnstClose = new Button(fd.ui.cnstWin, "Close");
+        //fd.ui.cnstClose->setCallback([](){
+        //  fd.ui.cnstWin->setVisible(false);
+        //  clearTblEditor();
+        //});
+        fd.ui.cnstWin->setLayout(fd.ui.cnstLay);
+        fd.ui.cnstWin->setVisible(false);
       }
 
       fd.ui.keyLay    = new BoxLayout(Orientation::Horizontal, Alignment::Fill, 0,10);      //fd.ui.keyLay   = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
@@ -2773,7 +2814,15 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//Println(kv.key);
+//Println("\n");
 
+//fd.ui.cnstBtns.push_back( new Button(fd.ui.constWin, kv.key) );
+//
+//tb->setAlignment(nanogui::Alignment::Right); // might be in a newer version
+
+//
+//fd.ui.constLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
 
 // -todo: need to be able to check if a memory span is a tbl, since a constant isn't always going to be a table
 //

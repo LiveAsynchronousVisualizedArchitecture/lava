@@ -276,17 +276,21 @@ struct FisData
     TextBox*       nodeTxt  = nullptr;
     vec_btn        ndBtns;
     
-    Window*      constWin   = nullptr;
-    BoxLayout*   constLay   = nullptr;
+    Window*         cnstWin = nullptr;
+    Layout*         cnstLay = nullptr;
+    Button*       cnstClose = nullptr; 
+    vec<Label*>     cnstLbls;
+    vec<TextBox*>   cnstEdit;
+    //vec_btn      cnstBtns;
 
     // mouse
-    v2                prevPntr;
-    bool                  rtDn = false;    // right mouse button down
-    bool                 lftDn = false;    // left mouse button down
-    bool              prevRtDn = false;    // right mouse button down
-    bool             prevLftDn = false;    // left mouse button down
+    v2              prevPntr;
+    bool                rtDn = false;    // right mouse button down
+    bool               lftDn = false;    // left mouse button down
+    bool            prevRtDn = false;    // right mouse button down
+    bool           prevLftDn = false;    // left mouse button down
 
-    f32        zoomSensitivity = 0.005f;
+    f32      zoomSensitivity = 0.005f;
 
     // drawing
     f32              grphTx  =  1.0f;       // grphTx and grphTy are graph transform X and Y - these will determine how zoomed out or zoomed in the graph window is
