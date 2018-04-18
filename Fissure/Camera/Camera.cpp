@@ -15,8 +15,9 @@
 
 enum Slots
 {
-  RAYS_OUT       = 0,
-  CAMERA_VIZ_OUT = 1
+  RAYS_OUT          = 0,
+  CAMERA_VIZ_OUT    = 1,
+  CAMERA_PARAMS_OUT = 2
 };
 
 namespace RNG
@@ -106,7 +107,7 @@ tbl raysToIdxVerts(LavaParams const* lp, tbl const& rays)
 
 const f32     fovAngle  =  40.f;
 const f32  asepctRatio  =   1.f;
-const u64       rayCnt  =  100000;
+const u64       rayCnt  =  1000;
 const f32    origin[3]  =  {1.f, 2.f,   5.f};
 const f32    camDir[3]  =  {0,     0,  -1.f};
 const f32          INF  =  std::numeric_limits<f32>::infinity();
@@ -115,10 +116,22 @@ static std::atomic<bool> hasRun;
 
 extern "C"
 {
-  const char*   InTypes[]  = {nullptr};
-  const char*   InNames[]  = {nullptr};
-  const char*  OutTypes[]  = {"Rays",                       "IdxVerts",             nullptr};
-  const char*  OutNames[]  = {"Chunk of rays to be traced", "Camera Visualiztion",  nullptr};
+  const char*   InTypes[]  = {
+                              "CamParam", 
+                              nullptr};
+  const char*   InNames[]  = {
+                              "Camera and Ray Parameters", 
+                              nullptr};
+  const char*  OutTypes[]  = {
+                              "Rays",                       
+                              "IdxVerts",
+                              nullptr};
+                              //"CamParam", 
+  const char*  OutNames[]  = {
+                              "Chunk of rays to be traced", 
+                              "Camera Visualiztion",  
+                              nullptr};
+                              //"Parameters that Drive Camera and Ray Generation", 
 
   void Camera_construct(){ hasRun = false; }
   void Camera_destruct(){  hasRun = false; }
@@ -130,6 +143,22 @@ extern "C"
     if( hasRun.exchange(true) ){ return 1; }
 
     f32 fovOfst = tanf(deg2rad( 0.5f * fovAngle ));
+
+    //SECTION(create parameters)
+    //{
+    //  tbl camParams = LavaMakeTbl(lp, 0, (i8)0);
+    //  camParams("fov")          =  40.f;
+    //  camParams("aspect ratio") =  1.f;
+    //  camParams("ray count")    =  (u64)100;
+    //  camParams("origin x")     =  1.f;
+    //  camParams("origin y")     =  2.f;
+    //  camParams("origin z")     =  5.f;
+    //  camParams("dir x")        =  0.f;
+    //  camParams("dir y")        =  0.f;
+    //  camParams("dir z")        = -1.f;
+    //  camParams.flatten();
+    //  out->push( LavaTblToOut(camParams,CAMERA_PARAMS_OUT) );
+    //}
 
     SECTION(create a tbl of the rays from the camera)
     {

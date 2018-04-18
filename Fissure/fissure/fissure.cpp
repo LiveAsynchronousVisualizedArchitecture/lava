@@ -37,12 +37,24 @@
 // -todo: make tbl static method to verify if a memory span is a tbl or not
 // -todo: build Tbl Editor from selected node 
 // -todo: take owned out of tbl now that the allocation pointers can be used instead - just leave it for now
+// -todo: isolate camera parameters
+// -todo: add the other intrinsic types to Tbl Editor
+// -todo: make text box in Tbl Editor larger
+// -todo: debug why edits don't stick in the Tbl Editor - have to explicitly make a callback that changes the value? - only float boxes have the problem and needed to be changed to FloatBox
+// -todo: debug why const camera params .lava file does not load - named incorrectly in file because the file was renamed - just needs to give an error if nodes can't be loaded? 
+// -todo: debug why camera connections dissapear after shortening name - tried redoing bounding box on text change and special casing the point being inside the circle - happens on file load and with shorter node names on node creation - problems with intersection of side circles
 
+// todo: change camera to take camera constant
 // todo: make Tbl Editor change the values - can use the already memory mapped value
+// todo: make Lava function to run a packet through a source/in slot and only stop when it hits 
+// todo: pass packets through on tbl edits 
 // todo: make Tbl Editors pop up for all selected constants that point to tbls - need a vector of tbl windows and tbl layouts as well as a vector of vectors for the widgets of each key value
+// todo: make memory mapped alloc, realloc, and free - LavaMMapAlloc, LavaMMapRealloc, LavaMMapFree ? - would reallocating memory require changing the non-live version and letting it update the live version? then modifying the size would be done with file reloads, but the altering of values could be done by changing the memory directly
+// todo: add heiarchy of tables - recursive function and indentation
 // todo: integrate AddConst into RefreshFlowLibs function so that there are .live versions
 // todo: work out timed live reload checking 
 // todo: work on and test live reloading - what thread reloads? 
+// todo: make dragging a .const file into the UI copy it to the path 
 // todo: make dragging a slot turn it into a constant, which writes a .type.const file, which is then memory mapped and live reloaded by lava
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
 // todo: make fissure or lava be able to incrementally load shared libraries
@@ -343,21 +355,38 @@ bool              hasNaN(v2   v)
 }
 v2      lineCircleIntsct(v2   P, v2 dir, v2 crcl, f32 r)  // only works for circles to the sides
 {
+  using namespace std;
+  
   if(dir.x==0) return {INFf, INFf};
 
+  //v2    PtoCrcl = P - crcl;
+  //f32 lenToCrcl = len(PtoCrcl);
+  //if( lenToCrcl <= r ){                                        // if the point is inside the circle, just make a vector that goes from the circle center through the point that has a length of r (radius) 
+  //  v2  nrmToCrcl = PtoCrcl / lenToCrcl;
+  //  v2     radDir = nrmToCrcl * r;
+  //  v2 cntrToEdge = crcl + radDir;
+  //  return radDir; 
+  //}
+
   v2       st = (P - crcl) / r;
-  f32     mlt = abs(st.x) / dir.x;                 // mlt = multiplier - the multiplier to get dir.x to equal st.x 
-  f32       C = (st + dir*mlt).y;
+  f32     mlt = abs(st.x) / dir.x;                            // mlt = multiplier - the multiplier to get dir.x to equal st.x 
+  f64       C = (st + dir*mlt).y;
   if(C > r) return v2(INFf, INFf);
-  f32       m = dir.y / dir.x;
-  f32       a = SQR(m) + 1;
-  f32       b = 2.f * m * C;
-  f32       c = SQR(C) - 1.f;
-  f32      q2 = SQR(b) - 4.f*a*c;
+  f64       m = dir.y / dir.x;
+  f64       a = SQR(m) + 1;
+  f64       b = 2.0 * m * C;
+  f64       c = SQR(C) - 1.0;
+  f64      q2 = SQR(b) - 4.0*a*c;
   if(q2 < 0) return v2(INFf, INFf);
-  f32       x = ((-b + sqrt(q2)) / 2.f*a);
-  f32       y = sin(acos(x));
-  v2  intrsct = v2( sign(dir.x)*x, sign(dir.y)*y)*r + crcl;
+  f64       x = ((-b + sqrt(q2)) / 2.0*a); // - 0.00315;
+  x = min(1.,max(-1.,x));
+  //if(x<-1 || x>1) return v2(INFf, INFf);
+  //f64  xfract = x - (i64)x;
+  //f64   acosX = acos(xfract);
+  //f64       y = sin(acosX);
+  f64       y = sin(acos(x));
+  if(isnan(y)) return v2(INFf, INFf);
+  v2  intrsct = v2( (f32)(sign(dir.x)*x), (f32)(sign(dir.y)*y) ) * r + crcl;
 
   return intrsct;
 }
@@ -475,13 +504,29 @@ bool       makeTblEditor(LavaNode* n)
     {
       fd.ui.cnstLbls.push_back( new Label(fd.ui.cnstWin, kv.key) );
 
-      TextBox* tb = nullptr;
+      TextBox*  tb = nullptr;
+      auto    type = kv.type;
       switch(kv.type){
+        case tbl::TblType::I8:  tb = new IntBox<i8>(fd.ui.cnstWin,  (i8)kv);  break;
+        case tbl::TblType::U8:  tb = new IntBox<u8>(fd.ui.cnstWin,  (u8)kv);  break;
+        case tbl::TblType::I16: tb = new IntBox<i16>(fd.ui.cnstWin, (i16)kv); break;
+        case tbl::TblType::U16: tb = new IntBox<u16>(fd.ui.cnstWin, (u16)kv); break;
+        case tbl::TblType::I32: tb = new IntBox<i32>(fd.ui.cnstWin, (i32)kv); break;
+        case tbl::TblType::U32: tb = new IntBox<u32>(fd.ui.cnstWin, (u32)kv); break;
         case tbl::TblType::I64: tb = new IntBox<i64>(fd.ui.cnstWin, (i64)kv); break;
         case tbl::TblType::U64: tb = new IntBox<u64>(fd.ui.cnstWin, (u64)kv); break;
+        case tbl::TblType::F32: tb = new FloatBox<f32>(fd.ui.cnstWin, (f32)kv); break;
+        case tbl::TblType::F64: tb = new FloatBox<f64>(fd.ui.cnstWin, (f64)kv); break;
       }
-      tb->setEditable(true);
       tb->setSpinnable(true);
+      tb->setEditable(true);
+      tb->setFixedWidth(200);
+      //tb->setWidth(400);
+      tb->setCallback([tb,type](str const& s){
+        //std::istringstream iss(s);
+        //tb->setValue(s);
+        return true;
+      });
       fd.ui.cnstEdit.push_back(tb);
     }
   }
@@ -493,7 +538,7 @@ bool       makeTblEditor(LavaNode* n)
     clearTblEditor();
   });
 
-  fd.ui.cnstWin->setPosition(Vector2i(0,400));
+  fd.ui.cnstWin->setPosition(Vector2i(0,200));
   fd.ui.cnstWin->setVisible(true);
 
   return true;
@@ -688,7 +733,8 @@ auto            node_add(str node_name, Node n) -> uint64_t
       ido.order = node_nxtOrder();
       fd.graph.ordr.insert(ido);
       
-      if(n.txt==""){ n.txt = "New: " + node_name; }
+      //if(n.txt==""){ n.txt = "New: " + node_name; }
+      if(n.txt==""){ n.txt = "" + node_name; }
       n.id    = instIdx;
       n.order = ido.order;
       fd.graph.nds[instIdx] = move(n);
@@ -933,9 +979,6 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
   }
 
   nvgRestore(vg);
-
-  //return;
-  //b = {x,y, x+w, y+h};
 }
 v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 {
@@ -972,9 +1015,15 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
 
     v2  circCntr = (pdir.x<0)? nP+v2(rad,rad)  :  nP + wh - v2(rad,rad);
     v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, rad);
-    bool     hit = !hasInf(intrsct)  &&  (intrsct.x < nP.x+rad || intrsct.x > nP.x + wh.x - rad); 
-    if(hit){ pdir = intrsct - ncntr; }
+    bool     hit = !hasInf(intrsct) && !hasNaN(intrsct)  &&  (intrsct.x < nP.x+rad || intrsct.x > nP.x + wh.x - rad); 
+    //bool     hit = !hasInf(intrsct);
+    //if(hit){
+    //  borderPt = ncntr + intrsct;
+    //}else{
+    //  borderPt = ncntr + pdir;
+    //}
 
+    if(hit){ pdir = intrsct - ncntr; }
     borderPt = ncntr + pdir;
 
     if(out_nrml){
@@ -1782,7 +1831,8 @@ ENTRY_DECLARATION // main or winmain
   
   GL_TRIANGLES;
 
-	NVGcontext* vg = NULL;
+	//NVGcontext* vg = NULL;
+  NVGcontext*& vg = fd.vg;
   SECTION(initialization)
   {
     SECTION(init glfw)
@@ -1848,8 +1898,8 @@ ENTRY_DECLARATION // main or winmain
 
       SECTION(create the Tbl Editor window)
       {
-        fd.ui.cnstWin   = new Window(&fd.ui.screen, "Tbl Editor");
-        fd.ui.cnstLay   = new GridLayout(Orientation::Horizontal, 2, Alignment::Fill, 10,10);
+        fd.ui.cnstWin = new Window(&fd.ui.screen, "Tbl Editor");
+        fd.ui.cnstLay = new GridLayout(Orientation::Horizontal, 2, Alignment::Fill, 10,10);
         //fd.ui.cnstClose = new Button(fd.ui.cnstWin, "Close");
         //fd.ui.cnstClose->setCallback([](){
         //  fd.ui.cnstWin->setVisible(false);
@@ -1907,7 +1957,7 @@ ENTRY_DECLARATION // main or winmain
           }
         });
       }
-      SECTION(set up new node controls)
+      SECTION(set up new node and node name changing controls)
       {
         cnstBtn->setCallback([](){
 
@@ -1953,13 +2003,12 @@ ENTRY_DECLARATION // main or winmain
         nodeTxt->setFixedWidth(250);
         nodeTxt->setAlignment(TextBox::Alignment::Left);
         nodeTxt->setTooltip("The name of the created node");
-        nodeTxt->setCallback([](str const& s){
-          fd.graph.nds[ fd.sel.pri ].txt = s;
+        nodeTxt->setCallback( [](str const& s){
+          auto& n = fd.graph.nds[ fd.sel.pri ];
+          n.txt   = s;
+          n.b     = node_bnd(fd.vg, n);
           return true;
         });
-
-        //nodeTxt->set setBackgroundColor( Color(e3f(.2f,  .2f,  .15f)) ); 
-        //fd.ui.keyWin->setLayout(fd.ui.keyLay);
       }
       SECTION(initialize flow control button colors and callbacks)
       {
@@ -2813,6 +2862,12 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+//nodeTxt->set setBackgroundColor( Color(e3f(.2f,  .2f,  .15f)) ); 
+//fd.ui.keyWin->setLayout(fd.ui.keyLay);
+
+//return;
+//b = {x,y, x+w, y+h};
 
 //Println(kv.key);
 //Println("\n");

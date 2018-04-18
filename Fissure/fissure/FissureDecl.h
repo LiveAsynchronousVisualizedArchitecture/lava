@@ -225,6 +225,7 @@ struct FisData
 
   u64                 nxtId = 1;                                  // todo: take out if not used
   GLFWwindow*           win = nullptr;                            // Platform 
+  NVGcontext*            vg = nullptr;
   LavaFlow             flow;
   LavaGraph&          lgrph = flow.graph;
   vec_thrd      flowThreads;
