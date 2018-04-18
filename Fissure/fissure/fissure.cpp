@@ -43,8 +43,11 @@
 // -todo: debug why edits don't stick in the Tbl Editor - have to explicitly make a callback that changes the value? - only float boxes have the problem and needed to be changed to FloatBox
 // -todo: debug why const camera params .lava file does not load - named incorrectly in file because the file was renamed - just needs to give an error if nodes can't be loaded? 
 // -todo: debug why camera connections dissapear after shortening name - tried redoing bounding box on text change and special casing the point being inside the circle - happens on file load and with shorter node names on node creation - problems with intersection of side circles
+// -todo: debug why the release doesn't take the slot positioning fixes - floating point as fast and not precise was the cause
+// -todo: change camera to take camera constant
 
-// todo: change camera to take camera constant
+// todo: debug crash on restart of graph - is it a constructor destructor mismatch on constants?
+// todo: debug why fissure run directly crashes - does the shortcut run the right .exe ? 
 // todo: make Tbl Editor change the values - can use the already memory mapped value
 // todo: make Lava function to run a packet through a source/in slot and only stop when it hits 
 // todo: pass packets through on tbl edits 
@@ -1014,7 +1017,8 @@ v2           node_border(Node const& n, v2 dir, v2* out_nrml=nullptr)
     }
 
     v2  circCntr = (pdir.x<0)? nP+v2(rad,rad)  :  nP + wh - v2(rad,rad);
-    v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, rad);
+    //v2   intrsct = lineCircleIntsct(ncntr, pdir, circCntr, rad);
+    v2   intrsct = lineCircleIntsct(ncntr, ndir, circCntr, rad);
     bool     hit = !hasInf(intrsct) && !hasNaN(intrsct)  &&  (intrsct.x < nP.x+rad || intrsct.x > nP.x + wh.x - rad); 
     //bool     hit = !hasInf(intrsct);
     //if(hit){

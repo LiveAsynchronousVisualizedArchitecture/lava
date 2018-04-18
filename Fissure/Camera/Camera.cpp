@@ -15,9 +15,10 @@
 
 enum Slots
 {
+  IN_CAMERA_PARAMS  = 0,
+
   RAYS_OUT          = 0,
-  CAMERA_VIZ_OUT    = 1,
-  CAMERA_PARAMS_OUT = 2
+  CAMERA_VIZ_OUT    = 1
 };
 
 namespace RNG
@@ -61,13 +62,13 @@ tbl raysToIdxVerts(LavaParams const* lp, tbl const& rays)
   tbl   iv, px, py, pz, cr, cg, ca, ind;
   SECTION(create tables for indexed verts)
   {
-    iv = LavaMakeTbl(lp, 0, (u8)0);
-    px = LavaMakeTbl(lp, 0, 0.f);
-    py = LavaMakeTbl(lp, 0, 0.f);
-    pz = LavaMakeTbl(lp, 0, 0.f);
-    cr = LavaMakeTbl(lp, 0, 0.f);
-    cg = LavaMakeTbl(lp, 0, 0.f);
-    ca = LavaMakeTbl(lp, 0, 0.f);
+    iv  = LavaMakeTbl(lp, 0, (u8)0);
+    px  = LavaMakeTbl(lp, 0, 0.f);
+    py  = LavaMakeTbl(lp, 0, 0.f);
+    pz  = LavaMakeTbl(lp, 0, 0.f);
+    cr  = LavaMakeTbl(lp, 0, 0.f);
+    cg  = LavaMakeTbl(lp, 0, 0.f);
+    ca  = LavaMakeTbl(lp, 0, 0.f);
     ind = LavaMakeTbl(lp, 0,  0u);
   }
 
@@ -84,8 +85,8 @@ tbl raysToIdxVerts(LavaParams const* lp, tbl const& rays)
     cr.push(1.0f);
     cg.push(0.0f);
     cg.push(1.0f);
-    ca.push(0.01f);
-    ca.push(0.01f);
+    ca.push(0.1f);
+    ca.push(0.1f);
 
     ind.push( (u32)(i*2 + 0) );
     ind.push( (u32)(i*2 + 1) );
@@ -105,12 +106,18 @@ tbl raysToIdxVerts(LavaParams const* lp, tbl const& rays)
   return move(iv);
 }
 
-const f32     fovAngle  =  40.f;
-const f32  asepctRatio  =   1.f;
-const u64       rayCnt  =  1000;
-const f32    origin[3]  =  {1.f, 2.f,   5.f};
-const f32    camDir[3]  =  {0,     0,  -1.f};
+//const f32     fovAngle  =  40.f;
+//const f32  asepctRatio  =   1.f;
+//const u64       rayCnt  =  1000;
+//const f32    origin[3]  =  {1.f, 2.f,   5.f};
+//const f32    camDir[3]  =  {0,     0,  -1.f};
 const f32          INF  =  std::numeric_limits<f32>::infinity();
+
+static f32     fovAngle  =  40.f;
+static f32  aspectRatio  =   1.f;
+static u64       rayCnt  =  1000;
+static f32    origin[3]  =  {1.f, 2.f,   5.f};
+static f32    camDir[3]  =  {0,     0,  -1.f};
 
 static std::atomic<bool> hasRun;
 
@@ -142,6 +149,19 @@ extern "C"
 
     if( hasRun.exchange(true) ){ return 1; }
 
+    SECTION(create parameters)
+    {
+      tbl camParams = LavaTblFromPckt(lp, in, IN_CAMERA_PARAMS);
+      fovAngle      = camParams("fov");
+      aspectRatio   = camParams("aspect ratio");
+      rayCnt        = camParams("ray count");
+      origin[0]     = camParams("origin x");
+      origin[1]     = camParams("origin y");
+      origin[2]     = camParams("origin z");
+      camDir[0]     = camParams("dir x");
+      camDir[1]     = camParams("dir y");
+      camDir[2]     = camParams("dir z");
+    }
     f32 fovOfst = tanf(deg2rad( 0.5f * fovAngle ));
 
     //SECTION(create parameters)
