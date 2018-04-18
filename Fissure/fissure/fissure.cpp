@@ -45,10 +45,12 @@
 // -todo: debug why camera connections dissapear after shortening name - tried redoing bounding box on text change and special casing the point being inside the circle - happens on file load and with shorter node names on node creation - problems with intersection of side circles
 // -todo: debug why the release doesn't take the slot positioning fixes - floating point as fast and not precise was the cause
 // -todo: change camera to take camera constant
+// -todo: sort keys in the Tbl Editor so that they are in alphabetical order
+// -todo: make Tbl Editor change the values - can use the already memory mapped value
+// -todo: try changing eigen to not crash in the same place in AssignmentFunctors.h
 
 // todo: debug crash on restart of graph - is it a constructor destructor mismatch on constants?
 // todo: debug why fissure run directly crashes - does the shortcut run the right .exe ? 
-// todo: make Tbl Editor change the values - can use the already memory mapped value
 // todo: make Lava function to run a packet through a source/in slot and only stop when it hits 
 // todo: pass packets through on tbl edits 
 // todo: make Tbl Editors pop up for all selected constants that point to tbls - need a vector of tbl windows and tbl layouts as well as a vector of vectors for the widgets of each key value
@@ -297,6 +299,14 @@ static simdb   fisdb;
 namespace{
 
 // Util
+template<class T> T strToNum(str const& s)
+{
+  std::istringstream iss(s);
+  T val;
+  iss >> val;
+  return val;
+}
+
 float               lerp(float p, float lo, float hi)
 {
   return lo*(1-p) + hi*p;
@@ -489,6 +499,8 @@ void      clearTblEditor()
 }
 bool       makeTblEditor(LavaNode* n)
 {
+  using namespace std;
+  
   clearTblEditor();
 
   if(fd.sel.pri==LavaNode::NODE_ERROR){ return false; }
@@ -501,34 +513,64 @@ bool       makeTblEditor(LavaNode* n)
   
   tbl cnstTbl(ln->filePtr);
 
+  vecstr keys; 
   for(auto kv : cnstTbl){                                                // use the iterators to go through the key-value pairs, then build the controls from those pairs
-    if( kv.hasTypeAttr(tbl::TblType::INTEGER) || 
-        kv.hasTypeAttr(tbl::TblType::SIGNED) )                           // SIGNED but not INTEGER would be a float
+    keys.emplace_back(kv.key);
+  }
+  sort(ALL(keys));
+
+  //for(auto kv : cnstTbl){                                                // use the iterators to go through the key-value pairs, then build the controls from those pairs
+  
+  for(auto const& k : keys)
+  {
+    tbl::KV* kv = cnstTbl(k.c_str()).kv;
+    if( kv->hasTypeAttr(tbl::TblType::INTEGER) || 
+        kv->hasTypeAttr(tbl::TblType::SIGNED) )                           // SIGNED but not INTEGER would be a float
     {
-      fd.ui.cnstLbls.push_back( new Label(fd.ui.cnstWin, kv.key) );
+      fd.ui.cnstLbls.push_back( new Label(fd.ui.cnstWin, k.c_str()) );
 
       TextBox*  tb = nullptr;
-      auto    type = kv.type;
-      switch(kv.type){
-        case tbl::TblType::I8:  tb = new IntBox<i8>(fd.ui.cnstWin,  (i8)kv);  break;
-        case tbl::TblType::U8:  tb = new IntBox<u8>(fd.ui.cnstWin,  (u8)kv);  break;
-        case tbl::TblType::I16: tb = new IntBox<i16>(fd.ui.cnstWin, (i16)kv); break;
-        case tbl::TblType::U16: tb = new IntBox<u16>(fd.ui.cnstWin, (u16)kv); break;
-        case tbl::TblType::I32: tb = new IntBox<i32>(fd.ui.cnstWin, (i32)kv); break;
-        case tbl::TblType::U32: tb = new IntBox<u32>(fd.ui.cnstWin, (u32)kv); break;
-        case tbl::TblType::I64: tb = new IntBox<i64>(fd.ui.cnstWin, (i64)kv); break;
-        case tbl::TblType::U64: tb = new IntBox<u64>(fd.ui.cnstWin, (u64)kv); break;
-        case tbl::TblType::F32: tb = new FloatBox<f32>(fd.ui.cnstWin, (f32)kv); break;
-        case tbl::TblType::F64: tb = new FloatBox<f64>(fd.ui.cnstWin, (f64)kv); break;
+      auto    type = kv->type;
+      switch(type){
+        case tbl::TblType::I8:  tb = new IntBox<i8>(fd.ui.cnstWin,  (i8)*kv);  break;
+        case tbl::TblType::U8:  tb = new IntBox<u8>(fd.ui.cnstWin,  (u8)*kv);  break;
+        case tbl::TblType::I16: tb = new IntBox<i16>(fd.ui.cnstWin, (i16)*kv); break;
+        case tbl::TblType::U16: tb = new IntBox<u16>(fd.ui.cnstWin, (u16)*kv); break;
+        case tbl::TblType::I32: tb = new IntBox<i32>(fd.ui.cnstWin, (i32)*kv); break;
+        case tbl::TblType::U32: tb = new IntBox<u32>(fd.ui.cnstWin, (u32)*kv); break;
+        case tbl::TblType::I64: tb = new IntBox<i64>(fd.ui.cnstWin, (i64)*kv); break;
+        case tbl::TblType::U64: tb = new IntBox<u64>(fd.ui.cnstWin, (u64)*kv); break;
+        case tbl::TblType::F32: tb = new FloatBox<f32>(fd.ui.cnstWin, (f32)*kv); break;
+        case tbl::TblType::F64: tb = new FloatBox<f64>(fd.ui.cnstWin, (f64)*kv); break;
       }
       tb->setSpinnable(true);
       tb->setEditable(true);
       tb->setFixedWidth(200);
       //tb->setWidth(400);
-      tb->setCallback([tb,type](str const& s){
+
+      //str key = kv.key;
+      tb->setCallback([tb, type, li, k](str const& s){
+        tbl t(li.node->filePtr);
+
+        tbl::KVOfst kvo = t(k.c_str());
+        switch(type){
+          case tbl::TblType::I8:  kvo = strToNum<i8>(s);  break;
+          case tbl::TblType::U8:  kvo = strToNum<u8>(s);  break;
+          case tbl::TblType::I16: kvo = strToNum<i16>(s); break;
+          case tbl::TblType::U16: kvo = strToNum<u16>(s); break;
+          case tbl::TblType::I32: kvo = strToNum<i32>(s); break;
+          case tbl::TblType::U32: kvo = strToNum<u32>(s); break;
+          case tbl::TblType::I64: kvo = strToNum<i64>(s); break;
+          case tbl::TblType::U64: kvo = strToNum<u64>(s); break;
+          case tbl::TblType::F32: kvo = strToNum<f32>(s); break;
+          case tbl::TblType::F64: kvo = strToNum<f64>(s); break;
+        }
+        
+        return true;
+
         //std::istringstream iss(s);
         //tb->setValue(s);
-        return true;
+        //case tbl::TblType::F32: f32 val; iss>>val; t(key.c_str()) = val; break;
       });
       fd.ui.cnstEdit.push_back(tb);
     }
@@ -1835,7 +1877,6 @@ ENTRY_DECLARATION // main or winmain
   
   GL_TRIANGLES;
 
-	//NVGcontext* vg = NULL;
   NVGcontext*& vg = fd.vg;
   SECTION(initialization)
   {
@@ -2866,6 +2907,10 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+//
+//NVGcontext* vg = NULL;
 
 //nodeTxt->set setBackgroundColor( Color(e3f(.2f,  .2f,  .15f)) ); 
 //fd.ui.keyWin->setLayout(fd.ui.keyLay);

@@ -110,7 +110,7 @@ struct functor_traits<mul_assign_op<DstScalar,SrcScalar> > {
 template<typename DstScalar, typename SrcScalar=DstScalar> struct div_assign_op {
 
   EIGEN_EMPTY_STRUCT_CTOR(div_assign_op)
-  EIGEN_DEVICE_FUNC EIGEN_STRONG_INLINE void assignCoeff(DstScalar& a, const SrcScalar& b) const { a /= b; }
+  EIGEN_DEVICE_FUNC EIGEN_STRONG_INLINE void assignCoeff(DstScalar& a, const SrcScalar& b) const { a /= b==0? 1 : b; }
   
   template<int Alignment, typename Packet>
   EIGEN_STRONG_INLINE void assignPacket(DstScalar* a, const Packet& b) const

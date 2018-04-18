@@ -2170,8 +2170,10 @@ LavaNode        MemMapFile(fs::path const& pth)
     
     createHndl = CreateFileA(
                         pthCstr, 
-                        GENERIC_READ, 
-                        FILE_SHARE_READ, // | FILE_SHARE_WRITE, 
+                        //GENERIC_READ, 
+                        GENERIC_READ | GENERIC_WRITE, 
+                        //FILE_SHARE_READ, // | FILE_SHARE_WRITE, 
+                        FILE_SHARE_READ | FILE_SHARE_WRITE, 
                         NULL, 
                         OPEN_EXISTING, 
                         FILE_ATTRIBUTE_NORMAL,
@@ -2190,7 +2192,8 @@ LavaNode        MemMapFile(fs::path const& pth)
     createMappingHndl = CreateFileMappingA(
                           createHndl, 
                           NULL,
-                          PAGE_READONLY, 
+                          //PAGE_READONLY, 
+                          PAGE_READWRITE, 
                           0,
                           0,
                           NULL); 
@@ -2199,7 +2202,8 @@ LavaNode        MemMapFile(fs::path const& pth)
     if(retNd.fileHndl != NULL && retNd.fileHndl != INVALID_HANDLE_VALUE)
     {
       retNd.filePtr = MapViewOfFile(retNd.fileHndl,   // handle to map object
-        FILE_MAP_READ, //| FILE_MAP_WRITE, // FILE_MAP_ALL_ACCESS,   // read/write permission
+        //FILE_MAP_READ, //| FILE_MAP_WRITE, // FILE_MAP_ALL_ACCESS,   // read/write permission
+        FILE_MAP_READ | FILE_MAP_WRITE,        // read/write permission
         0,
         0,
         0);
@@ -2723,10 +2727,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
         {
           if(li.node->node_type==LavaNode::CONSTANT){
             SECTION(copy the memory mapped file in the const node)
-            {
-              // todo: read from the memory mapped file            // might need to carry the file length in the node
-              //void* constMem = li.node->filePtr;                   // same as the FlowFunc func above, which has been checked for nullptr already
-              
+            {              
               void* outMem = LavaAlloc(li.node->fileSize);
               memcpy(outMem, li.node->filePtr, li.node->fileSize);
               LavaOut o;
@@ -2885,6 +2886,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+// todo: read from the memory mapped file            // might need to carry the file length in the node
+//void* constMem = li.node->filePtr;                   // same as the FlowFunc func above, which has been checked for nullptr already
 
 //openMappingHndl = OpenFileMappingA(FILE_MAP_READ, FALSE, tstStr );
 //if(retNd.fileHndl==NULL) return LavaNodeListEnd;
