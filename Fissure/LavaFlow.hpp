@@ -1767,9 +1767,13 @@ public:
 
     if(s->in){
       auto iter = oppCncts().find(id);
+      if(iter==oppCncts().end()){ return 0; }
+
       return delCnct(iter->second, iter->first);
     }else{
       auto iter = oppDestCncts().find(id);
+      if(iter==oppDestCncts().end()){ return 0; }
+
       auto  idx = iter->first;
       while(iter != oppDestCncts().end() && iter->first == idx){
         oppCncts().erase(iter->second);
@@ -1930,7 +1934,7 @@ public:
     //  t.join();
     //}
   }
-  void     runDestructors()
+  void     runDestructors(bool destructConstants=true)
   {
     assert(m_running == false);                               // all threads should be out of the loop by the time this function is called
     for(auto const& kv : nameToPtr){
@@ -1938,20 +1942,22 @@ public:
       if(ln){
         if(ln->node_type==LavaNode::CONSTANT)
         {
-          #ifdef _WIN32
-            if(ln->filePtr){
-              UnmapViewOfFile(ln->filePtr);
-            }
-            if(ln->fileHndl){
-              CloseHandle(ln->fileHndl);
-            }
-          #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)     // osx, linux and freebsd
-            if(sm.hndlPtr){
-              munmap(sm.hndlPtr, sm.size);  // todo: size here needs to be the total size, and errors need to be checked
-            }
-            remove(sm.path);
-            // todo: deal with errors here as well
-          #endif
+          if(destructConstants){
+            #ifdef _WIN32
+              if(ln->filePtr){
+                UnmapViewOfFile(ln->filePtr);
+              }
+              if(ln->fileHndl){
+                CloseHandle(ln->fileHndl);
+              }
+            #elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) || defined(__linux__)     // osx, linux and freebsd
+              if(sm.hndlPtr){
+                munmap(sm.hndlPtr, sm.size);  // todo: size here needs to be the total size, and errors need to be checked
+              }
+              remove(sm.path);
+              // todo: deal with errors here as well
+            #endif
+          }
         }else if(ln->destructor){
           ln->destructor();
         }
@@ -2153,7 +2159,7 @@ void       PrintMemMapError()
 #endif
 }
 
-LavaNode        MemMapFile(fs::path const& pth)
+LavaNode         MemMapFile(fs::path const& pth)
 {
   using namespace std;
 

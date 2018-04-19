@@ -48,9 +48,10 @@
 // -todo: sort keys in the Tbl Editor so that they are in alphabetical order
 // -todo: make Tbl Editor change the values - can use the already memory mapped value
 // -todo: try changing eigen to not crash in the same place in AssignmentFunctors.h
+// -todo: debug why fissure run directly crashes - does the shortcut run the right .exe ?  - was it only the eigen division on startup?  - possibly, seems to work now
+// -todo: debug crash on deleting second camera node
+// -todo: debug crash on restart of graph - is it a constructor destructor mismatch on constants?
 
-// todo: debug crash on restart of graph - is it a constructor destructor mismatch on constants?
-// todo: debug why fissure run directly crashes - does the shortcut run the right .exe ? 
 // todo: make Lava function to run a packet through a source/in slot and only stop when it hits 
 // todo: pass packets through on tbl edits 
 // todo: make Tbl Editors pop up for all selected constants that point to tbls - need a vector of tbl windows and tbl layouts as well as a vector of vectors for the widgets of each key value
@@ -2099,7 +2100,7 @@ ENTRY_DECLARATION // main or winmain
               //fd.flow.q.pop();
             }
           fd.flow.m_qLck.unlock();
-          fd.flow.runDestructors();
+          fd.flow.runDestructors(false);
           fd.flow.runConstructors();
 
           playBtn->setEnabled(true);
