@@ -147,7 +147,7 @@ extern "C"
   {
     using namespace std;
 
-    if( hasRun.exchange(true) ){ return 1; }
+    //if( hasRun.exchange(true) ){ return 1; }
 
     SECTION(create parameters)
     {

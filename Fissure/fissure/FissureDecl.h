@@ -166,12 +166,7 @@ struct  AtmSet
   u64    null_val;
   Ary         buf;
 
-  //u64     buf[sz];
-  //void   store(u64 i, u64 val){ ((au64*)(buf+i))->store(val); }
-  //return ((au64*)(buf+i))->compare_exchange_strong(prev, val);
-  //u64     load(u64 i){ return ((au64*)(buf+i))->load(); }
-
-  AtmSet& cp(AtmSet const& lval)
+  AtmSet&   cp(AtmSet const& lval)
   {
     using namespace std;
     
@@ -180,7 +175,7 @@ struct  AtmSet
     null_val = lval.null_val;
     auto  sz = min(buf.size(), lval.buf.size());
     TO(sz,i){
-      buf[i] = lval.buf.size();
+      buf[i] = lval.buf[i].load();
     }
     return *this;
   }
@@ -225,6 +220,12 @@ struct  AtmSet
       }
     }
     return false;
+  }
+  u64    count()
+  {
+    u64 cnt=0;
+    TO(sz,i){ if(load(i)!=null_val){ cnt++; } }
+    return cnt;
   }
 };
 
@@ -296,6 +297,7 @@ struct FisData
     Window*         keyWin  = nullptr;
     Window*          dbWin  = nullptr;
     BoxLayout*      keyLay  = nullptr;
+    Button*        stopBtn  = nullptr;
     Window*      statusWin  = nullptr;
     BoxLayout*   statusLay  = nullptr;
     TextBox*     statusTxt  = nullptr;
@@ -377,6 +379,10 @@ struct FisData
 
 
 
+//u64     buf[sz];
+//void   store(u64 i, u64 val){ ((au64*)(buf+i))->store(val); }
+//return ((au64*)(buf+i))->compare_exchange_strong(prev, val);
+//u64     load(u64 i){ return ((au64*)(buf+i))->load(); }
 
 //
 //Lava               lava;

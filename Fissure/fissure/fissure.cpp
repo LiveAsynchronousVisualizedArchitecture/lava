@@ -53,8 +53,11 @@
 // -todo: debug crash on restart of graph - is it a constructor destructor mismatch on constants?
 // -todo: convert AtmSet to use a std::array of atomics
 // -todo: add constructor to AtmSet ? - might not need a constructor, but the raw array won't be copied, need to change to a std::array - need to make constructor if array hold atomics anyway
+// -todo: make clear() function for the outQ 
+// -todo: implement count() in AtmSet
+// -todo: use stepIds to track which slots still need packets in callback functions
 
-// todo: use stepIds to track which slots still need packets in callback functions
+// todo: debug why second step makes flow run forever - maybe the queue needs to be cleared
 // todo: make Lava function to run a packet through a source/in slot and only stop when it hits 
 //       |  Could make a function that runs a packet going in to one slot and stops when a packet comes out another slot as part of Lava
 //       |  Possibly can make the packet callback function return control information about whether to stop the execution or keep going - bool or a LavaControl enum? - enum should be more clear and flexible
@@ -612,6 +615,9 @@ void     stopFlowThreads()
   }
   fd.flowThreads.clear();
   fd.flowThreads.shrink_to_fit();
+
+  fd.ui.stopBtn->setBackgroundColor(  Color(e3f(.19f, .16f, .17f)) ); 
+  fd.ui.stopBtn->setEnabled(false);
 }
 void    startFlowThreads(u64 num=1)
 {
@@ -1827,14 +1833,16 @@ LavaControl lavaPacketCallback(LavaPacket pkt)
     auto label  =  genDbKey(srcid);
     auto    lm  =  LavaMem::fromDataAddr(pkt.val.value);
     bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
-
-    return LavaControl::GO;
   }else if( fd.vizIds.has(destid.asInt) ){
     auto label  =  genDbKey(destid);
     auto    lm  =  LavaMem::fromDataAddr(pkt.val.value);
     bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
+  }
 
-    return LavaControl::GO;
+  fd.stepIds.del(srcid.asInt);                    // should just need source ids since inputs/destination slots can't be visualized
+  fd.stepIds.del(destid.asInt);
+  if(fd.stepIds.count() == 0){
+    return LavaControl::STOP;
   }
 
   return LavaControl::GO;
@@ -1988,7 +1996,8 @@ ENTRY_DECLARATION // main or winmain
       auto stepBtn    = new  Button(fd.ui.keyWin,    "Step  ||>");
       auto playBtn    = new  Button(fd.ui.keyWin,    "Play  >");
       auto pauseBtn   = new  Button(fd.ui.keyWin,  "Pause  ||");
-      auto stopBtn    = new  Button(fd.ui.keyWin,  "Stop  |_|");
+      //auto stopBtn    = new  Button(fd.ui.keyWin,  "Stop  |_|");
+      auto& stopBtn = fd.ui.stopBtn = new  Button(fd.ui.keyWin,  "Stop  |_|");
       auto cnstBtn    = new  Button(fd.ui.keyWin,  "Create Constant");
       auto nodeBtn    = new  Button(fd.ui.keyWin,  "Create Node");
       auto thrdsLabel = new   Label(fd.ui.keyWin, toString(fd.threadCount) );
@@ -2135,6 +2144,7 @@ ENTRY_DECLARATION // main or winmain
         });
         stepBtn->setCallback([](){
           fd.stepIds = fd.vizIds;
+          startFlowThreads( fd.threadCount );
         });
       }
       SECTION(initialize the thread slider and thread label)
@@ -2257,6 +2267,10 @@ ENTRY_DECLARATION // main or winmain
     {
       auto&   ms = fd.mouse;
       ms.prevPos = ms.pos;
+
+      if(fd.flow.m_threadCount == 0)
+        stopFlowThreads();
+
       SECTION(poll events through glfw and apply commands to the graph)
       {
         glfwPollEvents();                                             // PollEvents must be done after zeroing out the deltas
@@ -2904,6 +2918,16 @@ ENTRY_DECLARATION // main or winmain
         }
         SECTION(nanogui)
         {
+          if(fd.flow.m_running){ 
+            fd.ui.stopBtn->setEnabled(true);
+            fd.ui.stopBtn->setBackgroundColor( Color(e3f(.75f, .1f, .1f)) );
+          }
+          //else if(fd.flowThreads.size() == 0){
+          //  fd.ui.stopBtn->setBackgroundColor( Color(e3f(.19f, .16f, .17f)) ); 
+          //  fd.ui.stopBtn->setEnabled(false);
+          //  // might need to make the play button global and check its state here to be sure - this would also let the stop button be taken out of the play callback
+          //}
+
           fd.ui.screen.performLayout();
 
           e2i statusSz = fd.ui.statusWin->size();

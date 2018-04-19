@@ -72,8 +72,6 @@ template<class T> struct LavaQ
 // Design: Two buffers with a single 64 bit atomic that contains which buffer to use as well as the start and end of the queue
 // Two function pointers contain the allocation and deallocation functions to use so that the data structure can cross and shared library boundary
 
-//public:
-  //using         T = int;
   using      Tptr = T*;
   using      aPtr = std::atomic<T*>;
   using       u64 = uint64_t;
@@ -84,13 +82,13 @@ template<class T> struct LavaQ
   using AllocFunc = void*(*)(size_t);
   using  FreeFunc = void(*)(void*);
 
-  union  StBuf
+  union     StBuf
   {
     //struct { u64 useA : 1; u64 st : 63; };
     struct { u64 useA : 1; u64 cap : 6; u64 st : 57; };
     u64 asInt = 0;
   };
-  union RefMem
+  union    RefMem
   {
     struct{
       u64 m_addr : 48;
@@ -196,7 +194,7 @@ template<class T> struct LavaQ
       m_free( (T*)memB.m_addr );
   }
 
-  StBuf         loadBuf() const
+  StBuf         loadBuf()          const
   {
     StBuf ret;
     ret.asInt = ((au64*)&m_buf.asInt)->load();
@@ -265,6 +263,12 @@ template<class T> struct LavaQ
       T ret = mem[i];
     m_memB.subRef();
     return ret;
+  }
+  void            clear()          const
+  {
+    T val;
+    while(size()>0)          // there is probably a better way, though it would have to be thread safe
+      pop(val);
   }
 
   StBuf   switchBuffers(u64 nxtCapExp)
@@ -1837,11 +1841,11 @@ public:
   mutable u64       m_threadCount = 0;                // todo: make this atomic
   mutable u32             version = 0;                // todo: make this atomic
   mutable Mutex            m_qLck;
-  mutable Mutex       m_cycleQLck;
+  mutable Mutex       m_frameQLck;
   //mutable PktCalbk packetCallback;
   mutable PacketCallback packetCallback;
   mutable PacketQueue           q;
-  mutable FrameQueue       cycleQ;
+  mutable FrameQueue       frameQ;
   mutable au64         m_nxtMsgNd = 0;
 
   MsgNodeVec          m_genNodesA;
@@ -2669,59 +2673,54 @@ void               LavaLoop(LavaFlow& lf) noexcept
     bool         doFlow = false;
     SECTION(make a frame from a packet to run a node or run a generator if no full frames are available)
     {
-      bool doFlow = lf.nxtPacket(&pckt);
-      if(doFlow) 
-        SECTION(if there is a packet available, fit it into a existing frame or create a new frame)
-        {
-          u16 sIdx  =  pckt.dest_slot;
-          lf.m_cycleQLck.lock();                                          // lock mutex        
-            SECTION(loop through the outstanding frames to find the match for this packet)
+      doFlow = lf.nxtPacket(&pckt);
+      if(doFlow) SECTION(if there is a packet available, fit it into a existing frame or create a new frame)
+      {
+        u16 sIdx  =  pckt.dest_slot;
+        lf.m_frameQLck.lock();                                          // lock mutex        
+          SECTION(loop through the outstanding frames to find the match for this packet)
+          {
+            TO(lf.frameQ.size(), i)                                     // loop through the current frames looking for one with the same frame number and destination slot id - if no frame is found to put the packet into, make a new one - keep track of the lowest full frame while looping and use that if no full frame is found?
             {
-              TO(lf.cycleQ.size(), i)                                     // loop through the current frames looking for one with the same frame number and destination slot id - if no frame is found to put the packet into, make a new one - keep track of the lowest full frame while looping and use that if no full frame is found?
-              {
-                auto& frm = lf.cycleQ[i];
-                if(frm.dest != pckt.dest_node){ continue; }               // todo: unify dest_node and dest_id etc. as one LavaId LavaPacket
-                if(frm.cycle != pckt.cycle){ continue; }
+              auto& frm = lf.frameQ[i];
+              if(frm.dest != pckt.dest_node){ continue; }               // todo: unify dest_node and dest_id etc. as one LavaId LavaPacket
+              if(frm.cycle != pckt.cycle){ continue; }
 
-                bool slotTaken = frm.slotMask[sIdx];
-                if(!slotTaken){
-                  //frm.packets[sIdx] = pckt;
-                  frm.putSlot(sIdx, pckt);
-                }
+              bool slotTaken = frm.slotMask[sIdx];
+              if(!slotTaken){
+                //frm.packets[sIdx] = pckt;
+                frm.putSlot(sIdx, pckt);
+              }
 
-                if( frm.allFilled() ){                                  // If all the slots are filled, copy the frame out and erase it
-                  runFrm = frm;
-                  lf.cycleQ.erase(lf.cycleQ.begin()+i);                 // can't use an index, have to use an iterator for some reason
-                  break;                                                // break out of the loop since a frame was found
-                }
+              if( frm.allFilled() ){                                  // If all the slots are filled, copy the frame out and erase it
+                runFrm = frm;
+                lf.frameQ.erase(lf.frameQ.begin()+i);                 // can't use an index, have to use an iterator for some reason
+                break;                                                // break out of the loop since a frame was found
               }
             }
-            SECTION(if a cycle was not found for this packet, create one, then put it in the array if the cycle has more than one slot)
-            {
-              LavaInst& ndInst   =  lf.graph.node(pckt.dest_node);
-              LavaFrame    frm;
-              frm.slots  =  ndInst.inputs;                               // find the number of input slots for the dest node
-              frm.dest   =  pckt.dest_node;
-              frm.cycle  =  pckt.cycle;
-              //runFrm.frame        =  ndInst.fetchIncFrame();
-              frm.putSlot(sIdx, pckt);
+          }
+          SECTION(if a cycle was not found for this packet, create one, then put it in the array if the cycle has more than one slot)
+          {
+            LavaInst& ndInst   =  lf.graph.node(pckt.dest_node);
+            LavaFrame    frm;
+            frm.slots  =  ndInst.inputs;                               // find the number of input slots for the dest node
+            frm.dest   =  pckt.dest_node;
+            frm.cycle  =  pckt.cycle;
+            //runFrm.frame        =  ndInst.fetchIncFrame();
+            frm.putSlot(sIdx, pckt);
               
-              if(frm.slots > 1)
-                lf.cycleQ.push_back(frm);                                // New frame that starts with the current packet put into it 
-              else
-                runFrm = frm;
-            }
-          lf.m_cycleQLck.unlock();                                       // unlock mutex
+            if(frm.slots > 1)
+              lf.frameQ.push_back(frm);                                // New frame that starts with the current packet put into it 
+            else
+              runFrm = frm;
+          }
+        lf.m_frameQLck.unlock();                                       // unlock mutex
 
-          nodeId = runFrm.dest;
-        }
-      else   
-        SECTION(try to run a single message node if there was no packet found)           // todo: find a single message node and run that, remembering the place
-        {
-          nodeId  =  lf.nxtMsgId();
-          // todo: need to work out here if the message node is available - locking and lock free message nodes would come in to play
-
-        } // SECTION(loop through message nodes)
+        nodeId = runFrm.dest;
+      }else SECTION(try to run a single message node if there was no packet found){
+        nodeId  =  lf.nxtMsgId();
+        // todo: need to work out here if the message node is available - locking and lock free message nodes would come in to play
+      }
     }
 
     LavaInst::State state = LavaInst::NORMAL;
@@ -2758,11 +2757,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
               auto stTime = high_resolution_clock::now();
               state       = exceptWrapper(func, lf, &lp, &runFrm, &outQ);         // actually run the node here
-              if(state != LavaInst::NORMAL){
-                LavaOut o;                                                        // if there was an error, clear the queue of the produced data - there may be better ways of doing this, such as integrating it with the queue loop below, or building a specific method into the LavaQ
-                while(outQ.size()>0)
-                  outQ.pop(o);
-              }
+              if(state != LavaInst::NORMAL){ outQ.clear(); }
               auto endTime = high_resolution_clock::now();
               duration<u64,nano> diff = (endTime - stTime);
               li.addTime( diff.count() );
@@ -2794,7 +2789,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
                 basePkt.sz_bytes    =   mem.sizeBytes();  
                 pkt                 =   basePkt;
               }
-              LavaControl cntrl = lf.packetCallback(pkt);                                                 // because this is before putting the memory in the queue, it can't get picked up and used yet, though that may not make a difference, since this thread has to free it anyway
+              LavaControl cntrl = lf.packetCallback? lf.packetCallback(pkt) : LavaControl::GO;                                                 // because this is before putting the memory in the queue, it can't get picked up and used yet, though that may not make a difference, since this thread has to free it anyway
               if(cntrl==LavaControl::GO) SECTION(make a packet for each connection, increment their reference count and put in the main packet queue)
               {
                 // route the packet using the graph - the packet may be copied multiple times and go to multiple destination slots
@@ -2813,7 +2808,16 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
                   lf.putPacket(pkt);                                                // putPacket contains a mutex for now, eventually will be a lock free queue
                 }
-              }else if(cntrl==LavaControl::STOP){ lf.m_running.store(false); }
+              }else if(cntrl==LavaControl::STOP)
+              {
+                lf.m_running.store(false);
+                outQ.clear();                                                       // this will pop all output packets in a thread safe way so that when it is deconstructed there will be no more packets
+                lf.m_frameQLck.lock();                                              // lock queue mutex        
+                  lf.frameQ.clear();
+                  while( !lf.q.empty() )
+                    lf.q.pop();
+                lf.m_frameQLck.unlock();                                            // unlock queue mutex
+              }
             }
           }
         }
@@ -2845,9 +2849,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
     }
     SECTION(dealloction - partition owned allocations and free those with their reference count at 0)
     {
-      for(auto const& lm : ownedMem){
-        //PrintLavaMem(lm);
-      }
+      //for(auto const& lm : ownedMem){ PrintLavaMem(lm); }
 
       auto  zeroRef  =  partition(ALL(ownedMem), [](auto a){return a.refCount() > 0;} );                           // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
       auto freeIter  =  zeroRef;
@@ -2886,7 +2888,13 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//  LavaOut o;                                                        // if there was an error, clear the queue of the produced data - there may be better ways of doing this, such as integrating it with the queue loop below, or building a specific method into the LavaQ
+//  while(outQ.size()>0)
+//    outQ.pop(o);
+//}
 
+//public:
+//using         T = int;
 
 //
 //memset(inArgs, 0, sizeof(inArgs) );
