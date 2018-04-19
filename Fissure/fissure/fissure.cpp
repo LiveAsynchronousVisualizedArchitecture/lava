@@ -51,8 +51,14 @@
 // -todo: debug why fissure run directly crashes - does the shortcut run the right .exe ?  - was it only the eigen division on startup?  - possibly, seems to work now
 // -todo: debug crash on deleting second camera node
 // -todo: debug crash on restart of graph - is it a constructor destructor mismatch on constants?
+// -todo: convert AtmSet to use a std::array of atomics
+// -todo: add constructor to AtmSet ? - might not need a constructor, but the raw array won't be copied, need to change to a std::array - need to make constructor if array hold atomics anyway
 
+// todo: use stepIds to track which slots still need packets in callback functions
 // todo: make Lava function to run a packet through a source/in slot and only stop when it hits 
+//       |  Could make a function that runs a packet going in to one slot and stops when a packet comes out another slot as part of Lava
+//       |  Possibly can make the packet callback function return control information about whether to stop the execution or keep going - bool or a LavaControl enum? - enum should be more clear and flexible
+//       |  Keep a copy of the visualized slots and each time one is reached, take it out - when there are none left, return LavaControl::STOP from the packet callback
 // todo: pass packets through on tbl edits 
 // todo: make Tbl Editors pop up for all selected constants that point to tbls - need a vector of tbl windows and tbl layouts as well as a vector of vectors for the widgets of each key value
 // todo: make memory mapped alloc, realloc, and free - LavaMMapAlloc, LavaMMapRealloc, LavaMMapFree ? - would reallocating memory require changing the non-live version and letting it update the live version? then modifying the size would be done with file reloads, but the altering of values could be done by changing the memory directly
@@ -1685,8 +1691,6 @@ void               keyCallback(GLFWwindow* win,    int key, int scancode, int ac
 
   if(used) return;
 
-  //Println("used: ", used);
-
   if(action==GLFW_RELEASE) return;
 
   switch(key){
@@ -1815,20 +1819,40 @@ str                   genDbKey(LavaId     sid)            // genDbKey is generat
 
   return label;
 }
-void        lavaPacketCallback(LavaPacket pkt)
+LavaControl lavaPacketCallback(LavaPacket pkt)
 {
-  LavaId srcid(pkt.src_node, pkt.src_slot, false);
-  LavaId destid(pkt.dest_node, pkt.dest_slot, true);
+  LavaId srcid(pkt.src_node,   pkt.src_slot,  false);
+  LavaId destid(pkt.dest_node, pkt.dest_slot,  true);
   if( fd.vizIds.has(srcid.asInt) ){
     auto label  =  genDbKey(srcid);
     auto    lm  =  LavaMem::fromDataAddr(pkt.val.value);
     bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
+
+    return LavaControl::GO;
   }else if( fd.vizIds.has(destid.asInt) ){
     auto label  =  genDbKey(destid);
     auto    lm  =  LavaMem::fromDataAddr(pkt.val.value);
     bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
+
+    return LavaControl::GO;
   }
+
+  return LavaControl::GO;
 }
+//void        lavaPacketCallback(LavaPacket pkt)
+//{
+//  LavaId srcid(pkt.src_node, pkt.src_slot, false);
+//  LavaId destid(pkt.dest_node, pkt.dest_slot, true);
+//  if( fd.vizIds.has(srcid.asInt) ){
+//    auto label  =  genDbKey(srcid);
+//    auto    lm  =  LavaMem::fromDataAddr(pkt.val.value);
+//    bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
+//  }else if( fd.vizIds.has(destid.asInt) ){
+//    auto label  =  genDbKey(destid);
+//    auto    lm  =  LavaMem::fromDataAddr(pkt.val.value);
+//    bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
+//  }
+//}
 
 void              debug_coords(v2 a)
 {
@@ -2108,6 +2132,9 @@ ENTRY_DECLARATION // main or winmain
           playBtn->setBackgroundColor(  Color(e3f(.15f, .2f,  .15f)) ); // set play button back to normal
           pauseBtn->setEnabled(false);
           stopBtn->setEnabled(false);
+        });
+        stepBtn->setCallback([](){
+          fd.stepIds = fd.vizIds;
         });
       }
       SECTION(initialize the thread slider and thread label)

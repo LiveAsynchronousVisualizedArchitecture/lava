@@ -158,11 +158,32 @@ using vec_slot     =    vec<Slot>;
 
 struct  AtmSet
 {
-  using au64 = std::atomic<u64>;
-
   static const u64 sz = 8;
+
+  using au64 = std::atomic<u64>;
+  using Ary  = std::array<au64, sz>;
+
   u64    null_val;
-  u64     buf[sz];
+  Ary         buf;
+
+  //u64     buf[sz];
+  //void   store(u64 i, u64 val){ ((au64*)(buf+i))->store(val); }
+  //return ((au64*)(buf+i))->compare_exchange_strong(prev, val);
+  //u64     load(u64 i){ return ((au64*)(buf+i))->load(); }
+
+  AtmSet& cp(AtmSet const& lval)
+  {
+    using namespace std;
+    
+    new (this) AtmSet(lval.null_val);
+
+    null_val = lval.null_val;
+    auto  sz = min(buf.size(), lval.buf.size());
+    TO(sz,i){
+      buf[i] = lval.buf.size();
+    }
+    return *this;
+  }
 
   AtmSet(){}
   AtmSet(u64 nullVal) : null_val(nullVal)
@@ -170,12 +191,15 @@ struct  AtmSet
     TO(sz,i){ store(i,null_val); }
   }
 
-  void   store(u64 i, u64 val){ ((au64*)(buf+i))->store(val); }
+  AtmSet(AtmSet const& lval){ cp(lval); }
+  AtmSet& operator=(AtmSet const& lval){ return cp(lval); }
+
+  void   store(u64 i, u64 val){ buf[i].store(val); }
   bool  cmpSwp(u64 i, u64 val, u64 prev)
   {
-    return ((au64*)(buf+i))->compare_exchange_strong(prev, val);
+    return buf[i].compare_exchange_strong(prev, val);
   }
-  u64     load(u64 i){ return ((au64*)(buf+i))->load(); }
+  u64     load(u64 i){ return buf[i].load(); }
   bool     has(u64 val)
   {
     TO(sz,i){ if(load(i)==val){ return true; } }
@@ -230,6 +254,7 @@ struct FisData
   LavaGraph&          lgrph = flow.graph;
   vec_thrd      flowThreads;
   AtmSet             vizIds;
+  AtmSet            stepIds;
   i32           threadCount = 1;
 
   struct Graph

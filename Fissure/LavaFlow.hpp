@@ -562,6 +562,8 @@ struct        LavaMem;
 struct     LavaPacket;
 struct      LavaConst;
 
+enum class LavaControl { STOP=0, GO=1 };
+
 using str                =  std::string;
 using lava_handle        =  HMODULE;                                                      // maps handles to the LavaFlowNode pointers contained in the shared libraries
 using lava_paths         =  std::vector<std::string>;
@@ -582,6 +584,7 @@ extern "C" using        LavaFreeFunc  =  void  (*)(void*);                      
 extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                                               // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
 extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams const*, LavaFrame const*, lava_threadQ*);   // node function taking a LavaFrame in
 extern "C" using       ConstructFunc  =  void(*)();
+extern "C" using      PacketCallback  =  LavaControl (*)(LavaPacket pkt);
 
 struct   AtomicBitset
 {
@@ -660,7 +663,6 @@ struct   AtomicBitset
     return ret;
   }
 };
-
 union     LavaArgType{ 
   enum { NONE=0, END, DATA_ERROR, STORE, MEMORY, PASSTHRU, SEQUENCE, ENUMERATION };                // todo: does this need store sequence and memory sequence? // PASSTHROUGH is unfortunatly taken up by the windows gdi header
   u8 asInt;
@@ -1808,12 +1810,13 @@ public:
 struct       LavaFlow
 {
 public:
+  using abool           =  std::atomic<bool>;
   using au64            =  std::atomic<uint64_t>;
   using PacketQueue     =  std::priority_queue<LavaPacket>;
   using FrameQueue      =  std::vector<LavaFrame>;
   using MsgNodeVec      =  std::vector<uint64_t>;
   using Mutex           =  std::mutex;
-  using PktCalbk        =  void (*)(LavaPacket pkt);
+  //using PktCalbk        =  void (*)(LavaPacket pkt);
   using ConstMem        =  std::unordered_map<std::string, LavaConst>;
  
   enum FlowErr { NONE=0, RUN_ERR=0xFFFFFFFFFFFFFFFF };
@@ -1826,7 +1829,8 @@ public:
   lava_nameNodeMap      nameToPtr;     // maps node names to their pointers 
   ConstMem               constMem;
 
-  mutable bool          m_running = false;            // todo: make this atomic
+//  mutable bool          m_running = false;            // todo: make this atomic
+  mutable abool         m_running = false;            // todo: make this atomic
   mutable u64          m_curMsgId = 0;                // todo: make this atomic
   mutable u64             m_cycle = 0;                // todo: make this atomic
   mutable LavaId          m_curId = LavaNode::NONE;   // todo: make this atomic - won't be used as a single variable anyway
@@ -1834,7 +1838,8 @@ public:
   mutable u32             version = 0;                // todo: make this atomic
   mutable Mutex            m_qLck;
   mutable Mutex       m_cycleQLck;
-  mutable PktCalbk packetCallback;
+  //mutable PktCalbk packetCallback;
+  mutable PacketCallback packetCallback;
   mutable PacketQueue           q;
   mutable FrameQueue       cycleQ;
   mutable au64         m_nxtMsgNd = 0;
@@ -2075,8 +2080,6 @@ LavaMem  LavaMemAllocation(LavaAllocFunc alloc, u64 sizeBytes)
 
 #if defined(__LAVAFLOW_IMPL__)
 
-//static __declspec(thread)  void*   lava_thread_heap     = nullptr;           // thread local handle for thread local heap allocations
-//static __declspec(thread)  lava_memvec*  lava_thread_ownedMem = nullptr;       // thread local handle for thread local heap allocations
 static thread_local lava_memvec*  lava_thread_ownedMem = nullptr;       // thread local handle for thread local heap allocations
 
 // function implementations
@@ -2656,7 +2659,6 @@ void               LavaLoop(LavaFlow& lf) noexcept
   LavaVal        inArgs[LAVA_ARG_COUNT]={};           // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
   lava_thread_ownedMem = &ownedMem;                   // move the pointer out to a global scope for the thread, so that the allocation function passed to the shared library can add the pointer the owned memory of the thread
   LavaHeapInit();
-  //memset(inArgs, 0, sizeof(inArgs) );
 
   while(lf.m_running)
   {    
@@ -2777,7 +2779,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
                 if(outArg.val.value == 0){ state = LavaInst::OUTPUT_ERROR; continue; }
               }
 
-              LavaMem mem = LavaMem::fromDataAddr(outArg.val.value);  // this will be used to increment the reference count for every packet created
+              LavaMem mem = LavaMem::fromDataAddr(outArg.val.value);                                      // this will be used to increment the reference count for every packet created
               LavaPacket basePkt, pkt;
               SECTION(create new base packet and initialize the main packet with the base)
               {
@@ -2791,9 +2793,9 @@ void               LavaLoop(LavaFlow& lf) noexcept
                 basePkt.val         =   outArg.val;
                 basePkt.sz_bytes    =   mem.sizeBytes();  
                 pkt                 =   basePkt;
-                lf.packetCallback(pkt);                        // because this is before putting the memory in the queue, it can't get picked up and used yet, though that may not make a difference, since this thread has to free it anyway
               }
-              SECTION(make a packet for each connection, increment their reference count and put in the main packet queue)
+              LavaControl cntrl = lf.packetCallback(pkt);                                                 // because this is before putting the memory in the queue, it can't get picked up and used yet, though that may not make a difference, since this thread has to free it anyway
+              if(cntrl==LavaControl::GO) SECTION(make a packet for each connection, increment their reference count and put in the main packet queue)
               {
                 // route the packet using the graph - the packet may be copied multiple times and go to multiple destination slots
                 LavaId     src  =  { nodeId, outArg.key.slot, false };
@@ -2811,9 +2813,9 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
                   lf.putPacket(pkt);                                                // putPacket contains a mutex for now, eventually will be a lock free queue
                 }
-              }
+              }else if(cntrl==LavaControl::STOP){ lf.m_running.store(false); }
             }
-          }                                                      // SECTION(create packets and put them into packet queue)
+          }
         }
         else state = LavaInst::LOAD_ERROR;
       }
@@ -2886,11 +2888,11 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//
+//memset(inArgs, 0, sizeof(inArgs) );
 
-
-
-
-
+//static __declspec(thread)  void*   lava_thread_heap     = nullptr;           // thread local handle for thread local heap allocations
+//static __declspec(thread)  lava_memvec*  lava_thread_ownedMem = nullptr;       // thread local handle for thread local heap allocations
 
 // todo: read from the memory mapped file            // might need to carry the file length in the node
 //void* constMem = li.node->filePtr;                   // same as the FlowFunc func above, which has been checked for nullptr already
