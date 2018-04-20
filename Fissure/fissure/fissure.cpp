@@ -65,10 +65,10 @@
 // -todo: make memory mapped alloc, realloc, and free - LavaMMapAlloc, LavaMMapRealloc, LavaMMapFree ? - would reallocating memory require changing the non-live version and letting it update the live version? then modifying the size would be done with file reloads, but the altering of values could be done by changing the memory directly - this can wait for a more thought through design for memory mapped files
 // -todo: try setting spinner increment to a percentage of the value on each change - seems to work well in general 
 // -todo: make spinner percentage work for floats and doubles
+// -todo: put type after label in Tbl Editor - put on other side of text box
+// -todo: check if there are any visualized Ids before deciding to step()
 
-// todo: put type after label in Tbl Editor
-// todo: check if there are any visualized Ids before deciding to step()
-// todo: build in clamping for spinner on unsigned types
+// todo: build in clamping for spinner on unsigned types - actually want to stop wrap around, but how?
 // todo: make step function take a node or list of nodes to start with
 // todo: make Tbl Editors pop up for all selected constants that point to tbls - need a vector of tbl windows and tbl layouts as well as a vector of vectors for the widgets of each key value
 // todo: add heiarchy of tables - recursive function and indentation
@@ -530,7 +530,7 @@ template<class T> void setFloatInc(tbl::KVOfst& kvo, TextBox* tb, str const& s)
 
   auto val = strToNum<T>(s);
   kvo = val;
-  auto inc = T( abs(val*.2) );
+  auto inc = T( abs(val*.15) );
   ((FloatBox<T>*)tb)->setValueIncrement(inc);
 }
 bool       makeTblEditor(LavaNode* n)
@@ -563,10 +563,12 @@ bool       makeTblEditor(LavaNode* n)
     if( kv->hasTypeAttr(tbl::TblType::INTEGER) || 
         kv->hasTypeAttr(tbl::TblType::SIGNED) )                           // SIGNED but not INTEGER would be a float
     {
+      auto    type = kv->type;
+      str  typeStr = tbl::TblType::type_str(type);
+      //str   lblStr = k + " " + typeStr;
       fd.ui.cnstLbls.push_back( new Label(fd.ui.cnstWin, k.c_str()) );
 
       TextBox*  tb = nullptr;
-      auto    type = kv->type;
       switch(type){
         case tbl::TblType::I8:  tb = new IntBox<i8>(fd.ui.cnstWin,  (i8)*kv);  break;
         case tbl::TblType::U8:  tb = new IntBox<u8>(fd.ui.cnstWin,  (u8)*kv);  break;
@@ -600,7 +602,8 @@ bool       makeTblEditor(LavaNode* n)
           case tbl::TblType::F64: setFloatInc<f64>(kvo,tb,s); break;
         }
         
-        step(fd.threadCount);
+        if(fd.vizIds.count() > 0)
+          step(fd.threadCount);
 
         return true;
 
@@ -620,6 +623,7 @@ bool       makeTblEditor(LavaNode* n)
         //}break;
       });
       fd.ui.cnstEdit.push_back(tb);
+      fd.ui.cnstLbls.push_back( new Label(fd.ui.cnstWin, typeStr.c_str() ) );
     }
   }
 
@@ -2009,7 +2013,7 @@ ENTRY_DECLARATION // main or winmain
       SECTION(create the Tbl Editor window)
       {
         fd.ui.cnstWin = new Window(&fd.ui.screen, "Tbl Editor");
-        fd.ui.cnstLay = new GridLayout(Orientation::Horizontal, 2, Alignment::Fill, 10,10);
+        fd.ui.cnstLay = new GridLayout(Orientation::Horizontal, 3, Alignment::Fill, 10,10);
         //fd.ui.cnstClose = new Button(fd.ui.cnstWin, "Close");
         //fd.ui.cnstClose->setCallback([](){
         //  fd.ui.cnstWin->setVisible(false);
