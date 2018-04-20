@@ -68,8 +68,8 @@
 // -todo: put type after label in Tbl Editor - put on other side of text box
 // -todo: check if there are any visualized Ids before deciding to step()
 
-// todo: build in clamping for spinner on unsigned types - actually want to stop wrap around, but how?
 // todo: make step function take a node or list of nodes to start with
+// todo: build in clamping for spinner on unsigned types - actually want to stop wrap around, but how?
 // todo: make Tbl Editors pop up for all selected constants that point to tbls - need a vector of tbl windows and tbl layouts as well as a vector of vectors for the widgets of each key value
 // todo: add heiarchy of tables - recursive function and indentation
 // todo: integrate AddConst into RefreshFlowLibs function so that there are .live versions
@@ -520,7 +520,7 @@ template<class T> void setInc(tbl::KVOfst& kvo, TextBox* tb, str const& s)
   using namespace std;
 
   auto val = strToNum<T>(s);
-  kvo = val;
+  kvo      = val;
   auto inc = T( max(abs(val*.2),1.) );
   ((IntBox<T>*)tb)->setValueIncrement(inc);
 }
@@ -529,7 +529,7 @@ template<class T> void setFloatInc(tbl::KVOfst& kvo, TextBox* tb, str const& s)
   using namespace std;
 
   auto val = strToNum<T>(s);
-  kvo = val;
+  kvo      = val;
   auto inc = T( abs(val*.15) );
   ((FloatBox<T>*)tb)->setValueIncrement(inc);
 }
@@ -554,8 +554,6 @@ bool       makeTblEditor(LavaNode* n)
     keys.emplace_back(kv.key);
   }
   sort(ALL(keys));
-
-  //for(auto kv : cnstTbl){                                                // use the iterators to go through the key-value pairs, then build the controls from those pairs
   
   for(auto const& k : keys)
   {
@@ -570,14 +568,14 @@ bool       makeTblEditor(LavaNode* n)
 
       TextBox*  tb = nullptr;
       switch(type){
-        case tbl::TblType::I8:  tb = new IntBox<i8>(fd.ui.cnstWin,  (i8)*kv);  break;
-        case tbl::TblType::U8:  tb = new IntBox<u8>(fd.ui.cnstWin,  (u8)*kv);  break;
-        case tbl::TblType::I16: tb = new IntBox<i16>(fd.ui.cnstWin, (i16)*kv); break;
-        case tbl::TblType::U16: tb = new IntBox<u16>(fd.ui.cnstWin, (u16)*kv); break;
-        case tbl::TblType::I32: tb = new IntBox<i32>(fd.ui.cnstWin, (i32)*kv); break;
-        case tbl::TblType::U32: tb = new IntBox<u32>(fd.ui.cnstWin, (u32)*kv); break;
-        case tbl::TblType::I64: tb = new IntBox<i64>(fd.ui.cnstWin, (i64)*kv); break;
-        case tbl::TblType::U64: tb = new IntBox<u64>(fd.ui.cnstWin, (u64)*kv); break;
+        case tbl::TblType::I8:  tb = new   IntBox<i8>(fd.ui.cnstWin,   (i8)*kv); break;
+        case tbl::TblType::U8:  tb = new   IntBox<u8>(fd.ui.cnstWin,   (u8)*kv); break;
+        case tbl::TblType::I16: tb = new   IntBox<i16>(fd.ui.cnstWin, (i16)*kv); break;
+        case tbl::TblType::U16: tb = new   IntBox<u16>(fd.ui.cnstWin, (u16)*kv); break;
+        case tbl::TblType::I32: tb = new   IntBox<i32>(fd.ui.cnstWin, (i32)*kv); break;
+        case tbl::TblType::U32: tb = new   IntBox<u32>(fd.ui.cnstWin, (u32)*kv); break;
+        case tbl::TblType::I64: tb = new   IntBox<i64>(fd.ui.cnstWin, (i64)*kv); break;
+        case tbl::TblType::U64: tb = new   IntBox<u64>(fd.ui.cnstWin, (u64)*kv); break;
         case tbl::TblType::F32: tb = new FloatBox<f32>(fd.ui.cnstWin, (f32)*kv); break;
         case tbl::TblType::F64: tb = new FloatBox<f64>(fd.ui.cnstWin, (f64)*kv); break;
       }
@@ -586,6 +584,8 @@ bool       makeTblEditor(LavaNode* n)
       tb->setFixedWidth(200);
       tb->setCallback([tb, type, li, k](str const& s)
       {
+        //Println(tb->value());
+
         tbl t(li.node->filePtr);
 
         tbl::KVOfst kvo = t(k.c_str());
@@ -606,21 +606,6 @@ bool       makeTblEditor(LavaNode* n)
           step(fd.threadCount);
 
         return true;
-
-        // kvo = strToNum<f64>(s); ((IntBox<f64>*)tb)->setValueIncrement(*kvo.kv); break;
-        // kvo = strToNum<f32>(s); ((IntBox<f32>*)tb)->setValueIncrement(*kvo.kv); break;
-        //case tbl::TblType::U16: kvo = strToNum<u16>(s); ((IntBox<u16>*)tb)->setValueIncrement(*kvo.kv); break;
-        //case tbl::TblType::I32: kvo = strToNum<i32>(s); ((IntBox<i32>*)tb)->setValueIncrement(*kvo.kv); break;
-        //case tbl::TblType::U32: kvo = strToNum<u32>(s); ((IntBox<u32>*)tb)->setValueIncrement(*kvo.kv); break;
-        //case tbl::TblType::I64: kvo = strToNum<i64>(s); ((IntBox<i64>*)tb)->setValueIncrement(*kvo.kv); break;
-        //case tbl::TblType::U64: kvo = strToNum<u64>(s); ((IntBox<u64>*)tb)->setValueIncrement(*kvo.kv); break;
-        //kvo = strToNum<u8>(s);  ( (IntBox<u8>*)tb)->setValueIncrement(*kvo.kv); break;
-        //kvo = strToNum<i16>(s); ((IntBox<i16>*)tb)->setValueIncrement(*kvo.kv); break;
-        //auto val = strToNum<i8>(s);
-        //kvo = val;
-        //auto inc = (decltype(val))( max(abs(val*.2),1.) );
-        //((IntBox<i8>*)tb)->setValueIncrement(inc);
-        //}break;
       });
       fd.ui.cnstEdit.push_back(tb);
       fd.ui.cnstLbls.push_back( new Label(fd.ui.cnstWin, typeStr.c_str() ) );
@@ -2014,11 +1999,6 @@ ENTRY_DECLARATION // main or winmain
       {
         fd.ui.cnstWin = new Window(&fd.ui.screen, "Tbl Editor");
         fd.ui.cnstLay = new GridLayout(Orientation::Horizontal, 3, Alignment::Fill, 10,10);
-        //fd.ui.cnstClose = new Button(fd.ui.cnstWin, "Close");
-        //fd.ui.cnstClose->setCallback([](){
-        //  fd.ui.cnstWin->setVisible(false);
-        //  clearTblEditor();
-        //});
         fd.ui.cnstWin->setLayout(fd.ui.cnstLay);
         fd.ui.cnstWin->setVisible(false);
       }
@@ -2992,6 +2972,31 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+//
+//for(auto kv : cnstTbl){                                                // use the iterators to go through the key-value pairs, then build the controls from those pairs
+
+//fd.ui.cnstClose = new Button(fd.ui.cnstWin, "Close");
+//fd.ui.cnstClose->setCallback([](){
+//  fd.ui.cnstWin->setVisible(false);
+//  clearTblEditor();
+//});
+
+// kvo = strToNum<f64>(s); ((IntBox<f64>*)tb)->setValueIncrement(*kvo.kv); break;
+// kvo = strToNum<f32>(s); ((IntBox<f32>*)tb)->setValueIncrement(*kvo.kv); break;
+//case tbl::TblType::U16: kvo = strToNum<u16>(s); ((IntBox<u16>*)tb)->setValueIncrement(*kvo.kv); break;
+//case tbl::TblType::I32: kvo = strToNum<i32>(s); ((IntBox<i32>*)tb)->setValueIncrement(*kvo.kv); break;
+//case tbl::TblType::U32: kvo = strToNum<u32>(s); ((IntBox<u32>*)tb)->setValueIncrement(*kvo.kv); break;
+//case tbl::TblType::I64: kvo = strToNum<i64>(s); ((IntBox<i64>*)tb)->setValueIncrement(*kvo.kv); break;
+//case tbl::TblType::U64: kvo = strToNum<u64>(s); ((IntBox<u64>*)tb)->setValueIncrement(*kvo.kv); break;
+//kvo = strToNum<u8>(s);  ( (IntBox<u8>*)tb)->setValueIncrement(*kvo.kv); break;
+//kvo = strToNum<i16>(s); ((IntBox<i16>*)tb)->setValueIncrement(*kvo.kv); break;
+//auto val = strToNum<i8>(s);
+//kvo = val;
+//auto inc = (decltype(val))( max(abs(val*.2),1.) );
+//((IntBox<i8>*)tb)->setValueIncrement(inc);
+//}break;
 
 //tb->setWidth(400);
 //

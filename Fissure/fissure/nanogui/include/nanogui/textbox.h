@@ -221,7 +221,14 @@ public:
         }
         if (mSpinnable && !focused()) {
               int valueDelta = (rel.y() > 0) ? 1 : -1;
-              setValue(value() + valueDelta*mValueIncrement);
+
+              // sbassett
+              auto   inc = (double)valueDelta * (double)mValueIncrement;
+              auto   val = value(); 
+              if( inc>0 || mMinValue-inc <= val )
+                setValue(val + valueDelta*mValueIncrement);
+
+              //setValue(value() + valueDelta*mValueIncrement);
               if (mCallback)
                   mCallback(mValue);
               return true;
