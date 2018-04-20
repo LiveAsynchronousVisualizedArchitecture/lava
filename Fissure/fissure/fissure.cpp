@@ -61,11 +61,16 @@
 //       |  Could make a function that runs a packet going in to one slot and stops when a packet comes out another slot as part of Lava
 //       |  Possibly can make the packet callback function return control information about whether to stop the execution or keep going - bool or a LavaControl enum? - enum should be more clear and flexible
 //       |  Keep a copy of the visualized slots and each time one is reached, take it out - when there are none left, return LavaControl::STOP from the packet callback
+// -todo: pass packets through on tbl edits - step on edit callback of Tbl Editor - might need to make sure the value changes before running step function
+// -todo: make memory mapped alloc, realloc, and free - LavaMMapAlloc, LavaMMapRealloc, LavaMMapFree ? - would reallocating memory require changing the non-live version and letting it update the live version? then modifying the size would be done with file reloads, but the altering of values could be done by changing the memory directly - this can wait for a more thought through design for memory mapped files
+// -todo: try setting spinner increment to a percentage of the value on each change - seems to work well in general 
+// -todo: make spinner percentage work for floats and doubles
 
-// todo: pass packets through on tbl edits - step on edit callback of Tbl Editor - might need to make sure the value changes before running step function
+// todo: put type after label in Tbl Editor
+// todo: check if there are any visualized Ids before deciding to step()
+// todo: build in clamping for spinner on unsigned types
 // todo: make step function take a node or list of nodes to start with
 // todo: make Tbl Editors pop up for all selected constants that point to tbls - need a vector of tbl windows and tbl layouts as well as a vector of vectors for the widgets of each key value
-// todo: make memory mapped alloc, realloc, and free - LavaMMapAlloc, LavaMMapRealloc, LavaMMapFree ? - would reallocating memory require changing the non-live version and letting it update the live version? then modifying the size would be done with file reloads, but the altering of values could be done by changing the memory directly
 // todo: add heiarchy of tables - recursive function and indentation
 // todo: integrate AddConst into RefreshFlowLibs function so that there are .live versions
 // todo: work out timed live reload checking 
@@ -510,6 +515,24 @@ void      clearTblEditor()
 
   fd.ui.cnstWin->setLayout(fd.ui.cnstLay);
 }
+template<class T> void setInc(tbl::KVOfst& kvo, TextBox* tb, str const& s)
+{
+  using namespace std;
+
+  auto val = strToNum<T>(s);
+  kvo = val;
+  auto inc = T( max(abs(val*.2),1.) );
+  ((IntBox<T>*)tb)->setValueIncrement(inc);
+}
+template<class T> void setFloatInc(tbl::KVOfst& kvo, TextBox* tb, str const& s)
+{
+  using namespace std;
+
+  auto val = strToNum<T>(s);
+  kvo = val;
+  auto inc = T( abs(val*.2) );
+  ((FloatBox<T>*)tb)->setValueIncrement(inc);
+}
 bool       makeTblEditor(LavaNode* n)
 {
   using namespace std;
@@ -565,21 +588,36 @@ bool       makeTblEditor(LavaNode* n)
 
         tbl::KVOfst kvo = t(k.c_str());
         switch(type){
-          case tbl::TblType::I8:  kvo = strToNum<i8>(s);  break;
-          case tbl::TblType::U8:  kvo = strToNum<u8>(s);  break;
-          case tbl::TblType::I16: kvo = strToNum<i16>(s); break;
-          case tbl::TblType::U16: kvo = strToNum<u16>(s); break;
-          case tbl::TblType::I32: kvo = strToNum<i32>(s); break;
-          case tbl::TblType::U32: kvo = strToNum<u32>(s); break;
-          case tbl::TblType::I64: kvo = strToNum<i64>(s); break;
-          case tbl::TblType::U64: kvo = strToNum<u64>(s); break;
-          case tbl::TblType::F32: kvo = strToNum<f32>(s); break;
-          case tbl::TblType::F64: kvo = strToNum<f64>(s); break;
+          case tbl::TblType::I8:  setInc<i8>(kvo,tb,s);  break;
+          case tbl::TblType::U8:  setInc<u8>(kvo,tb,s);  break;
+          case tbl::TblType::I16: setInc<i16>(kvo,tb,s); break; 
+          case tbl::TblType::U16: setInc<u16>(kvo,tb,s); break;
+          case tbl::TblType::I32: setInc<i32>(kvo,tb,s); break; 
+          case tbl::TblType::U32: setInc<u32>(kvo,tb,s); break;
+          case tbl::TblType::I64: setInc<i64>(kvo,tb,s); break; 
+          case tbl::TblType::U64: setInc<u64>(kvo,tb,s); break;
+          case tbl::TblType::F32: setFloatInc<f32>(kvo,tb,s); break; 
+          case tbl::TblType::F64: setFloatInc<f64>(kvo,tb,s); break;
         }
         
         step(fd.threadCount);
 
         return true;
+
+        // kvo = strToNum<f64>(s); ((IntBox<f64>*)tb)->setValueIncrement(*kvo.kv); break;
+        // kvo = strToNum<f32>(s); ((IntBox<f32>*)tb)->setValueIncrement(*kvo.kv); break;
+        //case tbl::TblType::U16: kvo = strToNum<u16>(s); ((IntBox<u16>*)tb)->setValueIncrement(*kvo.kv); break;
+        //case tbl::TblType::I32: kvo = strToNum<i32>(s); ((IntBox<i32>*)tb)->setValueIncrement(*kvo.kv); break;
+        //case tbl::TblType::U32: kvo = strToNum<u32>(s); ((IntBox<u32>*)tb)->setValueIncrement(*kvo.kv); break;
+        //case tbl::TblType::I64: kvo = strToNum<i64>(s); ((IntBox<i64>*)tb)->setValueIncrement(*kvo.kv); break;
+        //case tbl::TblType::U64: kvo = strToNum<u64>(s); ((IntBox<u64>*)tb)->setValueIncrement(*kvo.kv); break;
+        //kvo = strToNum<u8>(s);  ( (IntBox<u8>*)tb)->setValueIncrement(*kvo.kv); break;
+        //kvo = strToNum<i16>(s); ((IntBox<i16>*)tb)->setValueIncrement(*kvo.kv); break;
+        //auto val = strToNum<i8>(s);
+        //kvo = val;
+        //auto inc = (decltype(val))( max(abs(val*.2),1.) );
+        //((IntBox<i8>*)tb)->setValueIncrement(inc);
+        //}break;
       });
       fd.ui.cnstEdit.push_back(tb);
     }
@@ -630,7 +668,7 @@ void    startFlowThreads(u64 num=1)
     });
   }
 }
-void step(u64 num)                                    // num defaults to 1 in the prototype
+void                step(u64 num)                                    // num defaults to 1 in the prototype
 {
   if( !fd.flow.m_running.load() ){
     fd.stepIds = fd.vizIds;
