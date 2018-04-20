@@ -56,13 +56,14 @@
 // -todo: make clear() function for the outQ 
 // -todo: implement count() in AtmSet
 // -todo: use stepIds to track which slots still need packets in callback functions
-
-// todo: debug why second step makes flow run forever - maybe the queue needs to be cleared
-// todo: make Lava function to run a packet through a source/in slot and only stop when it hits 
+// -todo: debug why second step makes flow run forever - maybe the queue needs to be cleared - Camera node was not actually running due to a run once mechanic
+// -todo: make Lava function to run a packet through a source/in slot and only stop when it hits 
 //       |  Could make a function that runs a packet going in to one slot and stops when a packet comes out another slot as part of Lava
 //       |  Possibly can make the packet callback function return control information about whether to stop the execution or keep going - bool or a LavaControl enum? - enum should be more clear and flexible
 //       |  Keep a copy of the visualized slots and each time one is reached, take it out - when there are none left, return LavaControl::STOP from the packet callback
-// todo: pass packets through on tbl edits 
+
+// todo: pass packets through on tbl edits - step on edit callback of Tbl Editor - might need to make sure the value changes before running step function
+// todo: make step function take a node or list of nodes to start with
 // todo: make Tbl Editors pop up for all selected constants that point to tbls - need a vector of tbl windows and tbl layouts as well as a vector of vectors for the widgets of each key value
 // todo: make memory mapped alloc, realloc, and free - LavaMMapAlloc, LavaMMapRealloc, LavaMMapFree ? - would reallocating memory require changing the non-live version and letting it update the live version? then modifying the size would be done with file reloads, but the altering of values could be done by changing the memory directly
 // todo: add heiarchy of tables - recursive function and indentation
@@ -307,6 +308,8 @@ static FisData    fd;
 static simdb   fisdb;
 
 namespace{
+
+void step(u64 num=1);
 
 // Util
 template<class T> T strToNum(str const& s)
@@ -556,10 +559,8 @@ bool       makeTblEditor(LavaNode* n)
       tb->setSpinnable(true);
       tb->setEditable(true);
       tb->setFixedWidth(200);
-      //tb->setWidth(400);
-
-      //str key = kv.key;
-      tb->setCallback([tb, type, li, k](str const& s){
+      tb->setCallback([tb, type, li, k](str const& s)
+      {
         tbl t(li.node->filePtr);
 
         tbl::KVOfst kvo = t(k.c_str());
@@ -576,11 +577,9 @@ bool       makeTblEditor(LavaNode* n)
           case tbl::TblType::F64: kvo = strToNum<f64>(s); break;
         }
         
-        return true;
+        step(fd.threadCount);
 
-        //std::istringstream iss(s);
-        //tb->setValue(s);
-        //case tbl::TblType::F32: f32 val; iss>>val; t(key.c_str()) = val; break;
+        return true;
       });
       fd.ui.cnstEdit.push_back(tb);
     }
@@ -600,7 +599,7 @@ bool       makeTblEditor(LavaNode* n)
 }
 // End UI Util
 
-// State manipulation
+// Flow Control
 u64                nxtId()
 {
   return fd.nxtId++;
@@ -631,7 +630,16 @@ void    startFlowThreads(u64 num=1)
     });
   }
 }
+void step(u64 num)                                    // num defaults to 1 in the prototype
+{
+  if( !fd.flow.m_running.load() ){
+    fd.stepIds = fd.vizIds;
+    startFlowThreads(num);
+  }
+}
+// End Flow Control
 
+// State manipulation
 v2               in_cntr(Node const& n, f32 r)
 {
   //return v2(n.P.x + NODE_SZ.x/2, n.P.y-r);
@@ -1847,20 +1855,6 @@ LavaControl lavaPacketCallback(LavaPacket pkt)
 
   return LavaControl::GO;
 }
-//void        lavaPacketCallback(LavaPacket pkt)
-//{
-//  LavaId srcid(pkt.src_node, pkt.src_slot, false);
-//  LavaId destid(pkt.dest_node, pkt.dest_slot, true);
-//  if( fd.vizIds.has(srcid.asInt) ){
-//    auto label  =  genDbKey(srcid);
-//    auto    lm  =  LavaMem::fromDataAddr(pkt.val.value);
-//    bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
-//  }else if( fd.vizIds.has(destid.asInt) ){
-//    auto label  =  genDbKey(destid);
-//    auto    lm  =  LavaMem::fromDataAddr(pkt.val.value);
-//    bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
-//  }
-//}
 
 void              debug_coords(v2 a)
 {
@@ -2143,8 +2137,7 @@ ENTRY_DECLARATION // main or winmain
           stopBtn->setEnabled(false);
         });
         stepBtn->setCallback([](){
-          fd.stepIds = fd.vizIds;
-          startFlowThreads( fd.threadCount );
+          step(fd.threadCount);
         });
       }
       SECTION(initialize the thread slider and thread label)
@@ -2918,15 +2911,10 @@ ENTRY_DECLARATION // main or winmain
         }
         SECTION(nanogui)
         {
-          if(fd.flow.m_running){ 
+          if(fd.flow.m_running && fd.flow.m_threadCount>0 ){ 
             fd.ui.stopBtn->setEnabled(true);
             fd.ui.stopBtn->setBackgroundColor( Color(e3f(.75f, .1f, .1f)) );
           }
-          //else if(fd.flowThreads.size() == 0){
-          //  fd.ui.stopBtn->setBackgroundColor( Color(e3f(.19f, .16f, .17f)) ); 
-          //  fd.ui.stopBtn->setEnabled(false);
-          //  // might need to make the play button global and check its state here to be sure - this would also let the stop button be taken out of the play callback
-          //}
 
           fd.ui.screen.performLayout();
 
@@ -2960,6 +2948,37 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+
+//tb->setWidth(400);
+//
+//str key = kv.key;
+//
+//std::istringstream iss(s);
+//tb->setValue(s);
+//case tbl::TblType::F32: f32 val; iss>>val; t(key.c_str()) = val; break;
+
+//void        lavaPacketCallback(LavaPacket pkt)
+//{
+//  LavaId srcid(pkt.src_node, pkt.src_slot, false);
+//  LavaId destid(pkt.dest_node, pkt.dest_slot, true);
+//  if( fd.vizIds.has(srcid.asInt) ){
+//    auto label  =  genDbKey(srcid);
+//    auto    lm  =  LavaMem::fromDataAddr(pkt.val.value);
+//    bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
+//  }else if( fd.vizIds.has(destid.asInt) ){
+//    auto label  =  genDbKey(destid);
+//    auto    lm  =  LavaMem::fromDataAddr(pkt.val.value);
+//    bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
+//  }
+//}
+
+//else if(fd.flowThreads.size() == 0){
+//  fd.ui.stopBtn->setBackgroundColor( Color(e3f(.19f, .16f, .17f)) ); 
+//  fd.ui.stopBtn->setEnabled(false);
+//  // might need to make the play button global and check its state here to be sure - this would also let the stop button be taken out of the play callback
+//}
 
 //
 //NVGcontext* vg = NULL;

@@ -2808,7 +2808,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
                   lf.putPacket(pkt);                                                // putPacket contains a mutex for now, eventually will be a lock free queue
                 }
-              }else if(cntrl==LavaControl::STOP)
+              }
+              else if(cntrl==LavaControl::STOP)
               {
                 lf.m_running.store(false);
                 outQ.clear();                                                       // this will pop all output packets in a thread safe way so that when it is deconstructed there will be no more packets
@@ -2831,7 +2832,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
       case LavaInst::OUTPUT_ERROR:
       case LavaInst::RUN_ERROR:{
         lf.graph.setState(nodeId, LavaInst::RUN_ERROR);
-        //lf.putPacket(pckt);               // if there was an error, put the packet back into the queue
+        //lf.putPacket(pckt);                                                            // if there was an error, put the packet back into the queue
       }break;
       case LavaInst::LOAD_ERROR:{
         lf.graph.setState(nodeId, LavaInst::RUN_ERROR);                                  // todo: should deal with this at load time and not here of course
