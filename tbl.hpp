@@ -1488,9 +1488,12 @@ public:
   
   MapIter begin()
   {
+    auto mapcap = map_capacity();
+    if(mapcap==0) return end();
+
     MapIter iter;
     iter.cur = elemStart();
-    iter.en  = elemStart() + map_capacity();
+    iter.en  = elemStart() + mapcap;
 
     if(iter.cur->isEmpty()) ++iter;                                   // if the first map element slot is empty, increment to the first non empty slot
 

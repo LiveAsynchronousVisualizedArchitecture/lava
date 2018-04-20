@@ -2175,9 +2175,6 @@ LavaNode         MemMapFile(fs::path const& pth)
   #ifdef _WIN32      // windows
     HANDLE createHndl=NULL, openMappingHndl=NULL, createMappingHndl=NULL;
     
-    //char* pthCstr = (char*)pth.c_str();
-    //char*   tstStr = "H:\\test.txt";
-
     str     pthStr = pth.generic_string();
     LPSTR  pthCstr = (char*)pthStr.c_str();
     
@@ -2888,6 +2885,10 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+
+//char* pthCstr = (char*)pth.c_str();
+//char*   tstStr = "H:\\test.txt";
 
 //  LavaOut o;                                                        // if there was an error, clear the queue of the produced data - there may be better ways of doing this, such as integrating it with the queue loop below, or building a specific method into the LavaQ
 //  while(outQ.size()>0)

@@ -67,11 +67,14 @@
 // -todo: make spinner percentage work for floats and doubles
 // -todo: put type after label in Tbl Editor - put on other side of text box
 // -todo: check if there are any visualized Ids before deciding to step()
+// -todo: build in clamping for spinner on unsigned types - actually want to stop wrap around, but how? - added to the callback in textbox.h (IntBox) to make clamping based on whether the increment will send the value past the minimum value
 
-// todo: make step function take a node or list of nodes to start with
-// todo: build in clamping for spinner on unsigned types - actually want to stop wrap around, but how?
-// todo: make Tbl Editors pop up for all selected constants that point to tbls - need a vector of tbl windows and tbl layouts as well as a vector of vectors for the widgets of each key value
-// todo: add heiarchy of tables - recursive function and indentation
+// todo: convert file path to constant
+// todo: use file path constant as input to craftsman loader
+// todo: try interactive full ray tracing
+// todo: make step function take a node or list of node ids to start with 
+// todo: make Tbl Editor step only the node it is editing
+// todo: make step button step the selected nodes
 // todo: integrate AddConst into RefreshFlowLibs function so that there are .live versions
 // todo: work out timed live reload checking 
 // todo: work on and test live reloading - what thread reloads? 
@@ -94,6 +97,8 @@
 // todo: make an IdxVerts helper header file
 // todo: change node colors to be based off of profiling information while holding 'p' key
 // todo: redo atomic bitset now that slots are separated and inputs should be packed together
+// todo: make Tbl Editors pop up for all selected constants that point to tbls - need a vector of tbl windows and tbl layouts as well as a vector of vectors for the widgets of each key value
+// todo: add heiarchy of tables - recursive function and indentation
 
 // todo: should there be a ONCE node type too? - should there be a parameter of how many times the node is allowed to run? - only offers convenience, though to make it properly, an atomic needs to be used for the boolean of whether or not to run
 // todo: add cursor member variable to LavaFrame - this would only be neccesary if slots weren't done with a one packet to one slot strucutre 
@@ -584,8 +589,6 @@ bool       makeTblEditor(LavaNode* n)
       tb->setFixedWidth(200);
       tb->setCallback([tb, type, li, k](str const& s)
       {
-        //Println(tb->value());
-
         tbl t(li.node->filePtr);
 
         tbl::KVOfst kvo = t(k.c_str());
