@@ -39,6 +39,7 @@ using e2f  =  Eigen::Vector2f;
 using e3f  =  Eigen::Vector3f;
 using e4f  =  Eigen::Vector4f;
 
+using     abool    =    std::atomic<bool>;
 using      veci    =    vec<i32>;
 using     vecui    =    vec<u32>;
 using    vecstr    =    std::vector<str>;
@@ -256,6 +257,7 @@ struct FisData
   vec_thrd      flowThreads;
   AtmSet             vizIds;
   AtmSet            stepIds;
+  abool                step = false;  // todo: needs to be atomic 
   i32           threadCount = 1;
 
   struct Graph
@@ -297,6 +299,9 @@ struct FisData
     Window*         keyWin  = nullptr;
     Window*          dbWin  = nullptr;
     BoxLayout*      keyLay  = nullptr;
+    Button*        stepBtn  = nullptr;
+    Button*        playBtn  = nullptr;
+    Button*       pauseBtn  = nullptr;
     Button*        stopBtn  = nullptr;
     Window*      statusWin  = nullptr;
     BoxLayout*   statusLay  = nullptr;

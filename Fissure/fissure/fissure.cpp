@@ -68,15 +68,19 @@
 // -todo: put type after label in Tbl Editor - put on other side of text box
 // -todo: check if there are any visualized Ids before deciding to step()
 // -todo: build in clamping for spinner on unsigned types - actually want to stop wrap around, but how? - added to the callback in textbox.h (IntBox) to make clamping based on whether the increment will send the value past the minimum value
+// -todo: convert file path to constant
+// -todo: debug why play doesn't enable the stop button - play stops just the same as step does since there is no flag to tell the callback to ignore the stepIds
+// -todo: debug why obj loader has no output - was just the file path in the constant
+// -todo: use file path constant as input to craftsman loader
+// -todo: make a flag so that the callback ignores the stepIds
 
-// todo: convert file path to constant
-// todo: use file path constant as input to craftsman loader
 // todo: try interactive full ray tracing
 // todo: make step function take a node or list of node ids to start with 
 // todo: make Tbl Editor step only the node it is editing
-// todo: make step button step the selected nodes
+// todo: make step button step only the selected nodes
 // todo: integrate AddConst into RefreshFlowLibs function so that there are .live versions
 // todo: work out timed live reload checking 
+// todo: give node creation buttons colors based on the same colors that their node types use
 // todo: work on and test live reloading - what thread reloads? 
 // todo: make dragging a .const file into the UI copy it to the path 
 // todo: make dragging a slot turn it into a constant, which writes a .type.const file, which is then memory mapped and live reloaded by lava
@@ -647,6 +651,13 @@ void     stopFlowThreads()
 
   fd.ui.stopBtn->setBackgroundColor(  Color(e3f(.19f, .16f, .17f)) ); 
   fd.ui.stopBtn->setEnabled(false);
+
+  fd.ui.playBtn->setEnabled(true);
+  fd.ui.playBtn->setTextColor( Color(e3f(1.f, 1.f, 1.f)) );
+  fd.ui.playBtn->setBackgroundColor(  Color(e3f(.15f, .2f,  .15f)) ); // set play button back to normal
+
+  fd.ui.pauseBtn->setEnabled(false);
+  fd.ui.stopBtn->setEnabled(false);
 }
 void    startFlowThreads(u64 num=1)
 {
@@ -659,6 +670,13 @@ void    startFlowThreads(u64 num=1)
       LavaLoop(fd.flow);
     });
   }
+
+  fd.ui.playBtn->setEnabled(false);
+  fd.ui.playBtn->setTextColor(       Color(e3f(1.f, 1.f, 1.f)) );
+  fd.ui.playBtn->setBackgroundColor( Color(e3f(.1f, 1.f, .1f)) ); 
+
+  fd.ui.pauseBtn->setEnabled(true);
+  fd.ui.stopBtn->setEnabled(true);
 }
 void                step(u64 num)                                    // num defaults to 1 in the prototype
 {
@@ -1877,10 +1895,12 @@ LavaControl lavaPacketCallback(LavaPacket pkt)
     bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
   }
 
-  fd.stepIds.del(srcid.asInt);                    // should just need source ids since inputs/destination slots can't be visualized
-  fd.stepIds.del(destid.asInt);
-  if(fd.stepIds.count() == 0){
-    return LavaControl::STOP;
+  if(fd.step){
+    fd.stepIds.del(srcid.asInt);                    // should just need source ids since inputs/destination slots can't be visualized
+    fd.stepIds.del(destid.asInt);
+    if(fd.stepIds.count() == 0){
+      return LavaControl::STOP;
+    }
   }
 
   return LavaControl::GO;
@@ -2012,11 +2032,11 @@ ENTRY_DECLARATION // main or winmain
       auto spcr2      = new   Label(fd.ui.keyWin,     "");
       auto loadBtn    = new  Button(fd.ui.keyWin,      "Load");
       auto saveBtn    = new  Button(fd.ui.keyWin,      "Save");
-      auto stepBtn    = new  Button(fd.ui.keyWin,    "Step  ||>");
-      auto playBtn    = new  Button(fd.ui.keyWin,    "Play  >");
-      auto pauseBtn   = new  Button(fd.ui.keyWin,  "Pause  ||");
+      auto& stepBtn  = fd.ui.stepBtn  = new  Button(fd.ui.keyWin,   "Step  ||>");
+      auto& playBtn  = fd.ui.playBtn  = new  Button(fd.ui.keyWin,     "Play  >");
+      auto& pauseBtn = fd.ui.pauseBtn = new  Button(fd.ui.keyWin,   "Pause  ||");
       //auto stopBtn    = new  Button(fd.ui.keyWin,  "Stop  |_|");
-      auto& stopBtn = fd.ui.stopBtn = new  Button(fd.ui.keyWin,  "Stop  |_|");
+      auto& stopBtn  = fd.ui.stopBtn  = new  Button(fd.ui.keyWin,   "Stop  |_|");
       auto cnstBtn    = new  Button(fd.ui.keyWin,  "Create Constant");
       auto nodeBtn    = new  Button(fd.ui.keyWin,  "Create Node");
       auto thrdsLabel = new   Label(fd.ui.keyWin, toString(fd.threadCount) );
@@ -2123,12 +2143,7 @@ ENTRY_DECLARATION // main or winmain
         stopBtn->setEnabled(false);
 
         playBtn->setCallback([playBtn,pauseBtn,stopBtn](){
-          playBtn->setEnabled(false);
-          playBtn->setTextColor( Color(e3f(1.f, 1.f, 1.f)) );
-          playBtn->setBackgroundColor( Color(e3f(.1f, 1.f, .1f)) ); 
-
-          pauseBtn->setEnabled(true);
-          stopBtn->setEnabled(true);
+          fd.step = false;
           startFlowThreads( fd.threadCount );
         });
         pauseBtn->setCallback([playBtn,pauseBtn,stopBtn](){
@@ -2137,7 +2152,8 @@ ENTRY_DECLARATION // main or winmain
           pauseBtn->setEnabled(false);
           stopBtn->setEnabled(false);
         });
-        stopBtn->setCallback([playBtn,pauseBtn,stopBtn](){
+        stopBtn->setCallback([playBtn,pauseBtn,stopBtn]()
+        {
           stopFlowThreads();
           fd.flow.m_curId.nid = LavaNode::NODE_ERROR;
           auto         nInsts = fd.lgrph.nodes();
@@ -2154,14 +2170,9 @@ ENTRY_DECLARATION // main or winmain
           fd.flow.m_qLck.unlock();
           fd.flow.runDestructors(false);
           fd.flow.runConstructors();
-
-          playBtn->setEnabled(true);
-          playBtn->setTextColor( Color(e3f(1.f, 1.f, 1.f)) );
-          playBtn->setBackgroundColor(  Color(e3f(.15f, .2f,  .15f)) ); // set play button back to normal
-          pauseBtn->setEnabled(false);
-          stopBtn->setEnabled(false);
         });
         stepBtn->setCallback([](){
+          fd.step = true;
           step(fd.threadCount);
         });
       }
@@ -2936,7 +2947,7 @@ ENTRY_DECLARATION // main or winmain
         }
         SECTION(nanogui)
         {
-          if(fd.flow.m_running && fd.flow.m_threadCount>0 ){ 
+          if(fd.flow.m_running ){ // && fd.flow.m_threadCount>0 
             fd.ui.stopBtn->setEnabled(true);
             fd.ui.stopBtn->setBackgroundColor( Color(e3f(.75f, .1f, .1f)) );
           }

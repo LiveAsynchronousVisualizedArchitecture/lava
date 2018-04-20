@@ -37,7 +37,7 @@ extern "C"
     tbl filePath = LavaMakeTbl(lp);
     filePath.setArrayType<char>();
     filePath.reserve(64,0);
-    str      pth = "H:\\projects\\lava\\img\\duckdog.jpg";
+    str      pth = "H:\\projects\\lava\\obj\\Craftsman.obj";
     //str      pth = "H:\\projects\\lava\\img\\dog.jpg";
     //str      pth = "H:\\projects\\lava\\obj\\cornell_box.obj";
     TO(pth.length(),i){ 
