@@ -109,6 +109,37 @@ Should packets or inputs have a write flag?
 |  Might be rare since packets can be resent already and modification would have to happen without changing the memory allocation  
 | 
 
+
+Return Values and Node Output Messages
+|  Could have an enum that is SUCCESS, WARNING, ERROR
+|  LavaParams could hold a putc-ish function pointer that would carry a message with it 
+|  Strings for the output messages could also be part of the owned mem and somehow passed back to a GUI or not
+|  Should there be flag to LavaInit to say whether it is being run inside a GUI? 
+|  |  This would allow it to skip output messages and immediatly decrement their reference count 
+|  |  If the flag was in LavaParams maybe the node could do something with it also, like skip output messages
+|  LavaOut could also be a message string that then gets used in the LavaLoop
+|  |  Probably doesn't need to be turned in to a packet since it just needs to get to the user, doesn't go to other nodes 
+|  |  Could be put into a callback function
+|  If callbacks need to be thread safe, is there a way that packets and output strings/messages could be put into a thread safe queue?
+|  |  Could be multi-writer single reader
+|  |  GUI thread can just call whenever and deal with all the messages and packets available
+|  |  Probably would deal with whole queue at some point in the main loop
+
+
+Minimizing Work During Iteration
+|  Issues: caching, specific node execution, dependant nodes 
+|  Forks (node that takes more than one input) are where caching can occur to not recompute parts of the graph
+|  Should dependencies stop at the generator nodes even if the generator has inputs? 
+|  Does a separate CACHE node type make sense even if there is a GENERATOR type? 
+|  |  CACHE node can at least be thread safe by using malloc (if it is thread safe) and doing an exchange on the cache pointer then freeing the pointer that was there before 
+|  Dynamic caching in the long run? 
+|  |  Could automatically cache outputs with the (longest time)/(least data combination) - Simple time to recreate data number for cache effectiveness 
+|  |  Cache size could be set 
+|  Does interactive workflow imply that some nodes need to be labeled UI/Interactive only?
+|
+
+
+
 -------------------------------------------------------------------------------------------
 Simplicity does not precede complexity, but follows it.
 

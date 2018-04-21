@@ -73,22 +73,27 @@
 // -todo: debug why obj loader has no output - was just the file path in the constant
 // -todo: use file path constant as input to craftsman loader
 // -todo: make a flag so that the callback ignores the stepIds
+// -todo: debug why step ends up playing in release mode - just craftsman path not being correct
+// -todo: try interactive full ray tracing - works!
 
-// todo: try interactive full ray tracing
+// todo: try cache node after load obj - still will update without isolating what nodes are generating packets - how to deal with minimizing recomputation for iteration?
+// todo: investigate if Trace node is spending most of its time in the BVH building and figure out what to do about it
+// todo: make slot viz not delete visualization
+// todo: give Visualizer a way to delete db keys
+// todo: make tbl editor be able to edit i8 strings as text - use a length limit?
 // todo: make step function take a node or list of node ids to start with 
 // todo: make Tbl Editor step only the node it is editing
 // todo: make step button step only the selected nodes
 // todo: integrate AddConst into RefreshFlowLibs function so that there are .live versions
 // todo: work out timed live reload checking 
 // todo: give node creation buttons colors based on the same colors that their node types use
-// todo: work on and test live reloading - what thread reloads? 
+// todo: work on and test live reloading - what thread reloads?
 // todo: make dragging a .const file into the UI copy it to the path 
 // todo: make dragging a slot turn it into a constant, which writes a .type.const file, which is then memory mapped and live reloaded by lava
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
 // todo: make fissure or lava be able to incrementally load shared libraries
 // todo: change constructor to happen on play and not on load (or after the destructor runs on stop)
 // todo: build in data type visualization - part needs to be lava, part needs to be UI - does any need to be in lava? - is checking for 'tb' at the start of a binary blob, then checking for a "type" key enough to determine types ?
-// todo: put thread pointers into message node instances and work out how to lock and unlock them
 // todo: organize nodes by types in a contex menu or side bar
 // todo: re-orient nodes on resize of the window so they line up with the grid in the same place 
 //       | maybe the scale and pan need to be changed instead 
@@ -103,6 +108,7 @@
 // todo: redo atomic bitset now that slots are separated and inputs should be packed together
 // todo: make Tbl Editors pop up for all selected constants that point to tbls - need a vector of tbl windows and tbl layouts as well as a vector of vectors for the widgets of each key value
 // todo: add heiarchy of tables - recursive function and indentation
+// todo: put thread pointers into message node instances and work out how to lock and unlock them
 
 // todo: should there be a ONCE node type too? - should there be a parameter of how many times the node is allowed to run? - only offers convenience, though to make it properly, an atomic needs to be used for the boolean of whether or not to run
 // todo: add cursor member variable to LavaFrame - this would only be neccesary if slots weren't done with a one packet to one slot strucutre 
