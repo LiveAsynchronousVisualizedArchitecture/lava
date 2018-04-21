@@ -290,7 +290,7 @@ tbl brdfRaysToIV(LavaParams const* lp, tbl const& rays, tbl const& brdfRays)    
     //v3 hitP = o;
 
     v3  L( Lx[i], Ly[i], Lz[i] );
-    L *= 0.15f;
+    L *= 0.5f;
 
     px[i*2] = hitP.x;
     py[i*2] = hitP.y;
@@ -309,8 +309,8 @@ tbl brdfRaysToIV(LavaParams const* lp, tbl const& rays, tbl const& brdfRays)    
     cg[i*2 + 1] = 1.f;
     cb[i*2 + 0] = pdf;
     cb[i*2 + 1] = pdf;
-    ca[i*2 + 0] = .15f;     // 0.25f;
-    ca[i*2 + 1] = .15f;     // 0.05f;
+    ca[i*2 + 0] = .25f;     // 0.25f;
+    ca[i*2 + 1] = .25f;     // 0.05f;
 
     ind[i*2+0] = (u32)(i*2);
     ind[i*2+1] = (u32)(i*2 + 1);
@@ -370,7 +370,7 @@ extern "C"
       Vec3f V(    dx[i],    dy[i],     dz[i]  );
       Vec3f N(  Ng_x[i],  Ng_y[i],   Ng_z[i]  );
 
-      auto result = BrdfSampleGGX( randomf(0,1.f), randomf(0,1.f), -normalize(V), N, 0.25f);
+      auto result = BrdfSampleGGX( randomf(0,1.f), randomf(0,1.f), -normalize(V), N, 0.05f);
       pdf[i]   = result.m_pdf;
       Lx[i]    = result.m_L.x;
       Ly[i]    = result.m_L.y;

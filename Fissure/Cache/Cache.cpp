@@ -1,9 +1,7 @@
 
 
-//#define LIBC_HPP_IMPL
-//#include "../../libc.hpp"
-
-//#include "../../tbl.hpp"
+// todo: still need to deal with the fact that memory allocations could still be in flight and have positive reference counts when a thread wants to free the allocation
+//       |  could make each thread skip if the memory reference is above 0 - would need to atomically add 1 or exchange the reference count to know that the current thread was the one to change it from 0 to 1
 
 #include <atomic>
 #include <stdlib.h>
@@ -17,14 +15,16 @@ enum Slots
 };
 
 static std::atomic<LavaMem> cacheMem;
+
 bool setCacheMem(LavaMem lm)
 {
-  LavaMem nullMem = {nullptr};
-  auto prev = cacheMem.exchange(nullMem);
-  if(lm.ptr){
-    free(lm.ptr);
+  LavaMem prev = cacheMem.exchange(lm);
+  if(prev.ptr){
+    assert(prev.refCount() == 0);
+    free(prev.ptr);
     return true;
   }
+
   return false;
 }
 
@@ -62,7 +62,7 @@ extern "C"
         }else{
           LavaMem lm = LavaMemAllocation(malloc, sz);
           if(lm.ptr){
-            memcpy(lm.ptr, inPtr, sz);
+            memcpy(lm.data(), inPtr, sz);
             setCacheMem(lm);
           }
         }
@@ -70,13 +70,9 @@ extern "C"
     }
     SECTION(if the cache has been set at any point, output a packet)
     {
-      LavaMem outMem = cacheMem.load();
-      if(outMem.ptr != nullptr){
-        LavaOut o;
-        o.val.value = (u64)outMem.ptr;
-        o.val.type  = LavaArgType::MEMORY;
-        o.key.slot  = OUT_CACHE;
-        out->push(o);
+      LavaMem lm = cacheMem.load();
+      if(lm.ptr != nullptr){
+        out->push( LavaMemToOut(lm,OUT_CACHE) );
       }
     }
 
@@ -112,6 +108,27 @@ extern "C"
 
 
 
+
+
+
+
+//LavaOut o;
+//o.val.value = (u64)outMem.data(); // (u64)outMem.ptr;
+//o.val.type  = LavaArgType::MEMORY;
+//o.key.slot  = OUT_CACHE;
+
+// wtf was this about
+//LavaMem nullMem = {nullptr};
+//auto prev = cacheMem.exchange(nullMem);
+//if(lm.ptr){
+//  free(lm.ptr);
+//  return true;
+//}
+
+//#define LIBC_HPP_IMPL
+//#include "../../libc.hpp"
+//
+//#include "../../tbl.hpp"
 
 //void* allocPtr = malloc(sz);
 //

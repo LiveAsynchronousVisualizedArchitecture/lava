@@ -2048,6 +2048,15 @@ LavaOut       LavaTblToOut(tbl const& t, u32 slot)
 
   return o;
 }
+LavaOut       LavaMemToOut(LavaMem lm, u32 slot)
+{
+  LavaOut o;
+  o.val.value = (u64)lm.data();
+  o.val.type  = LavaArgType::MEMORY;
+  o.key.slot  = slot;
+
+  return o;
+}
 bool           LavaNxtPckt(LavaFrame const* in, u32* currentIndex)
 {
   while(*currentIndex < in->packets.size()){
@@ -2065,7 +2074,8 @@ bool           LavaNxtPckt(LavaFrame const* in, u32* currentIndex)
 }
 LavaMem  LavaMemAllocation(LavaAllocFunc alloc, u64 sizeBytes)
 {
-  assert( sizeof(LavaMemHeader) == 8 );
+  //const int lmHdrSz = sizeof(LavaMemHeader);
+  assert( sizeof(LavaMemHeader) == 16 );
   void*     p = alloc(sizeof(LavaMemHeader) + sizeBytes);
   if(!p){ 
     return LavaMem{nullptr};
@@ -2753,8 +2763,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
               lp.ref_free     =   LavaFree;
 
               auto stTime = high_resolution_clock::now();
-              state       = exceptWrapper(func, lf, &lp, &runFrm, &outQ);         // actually run the node here
-              if(state != LavaInst::NORMAL){ outQ.clear(); }
+                state       = exceptWrapper(func, lf, &lp, &runFrm, &outQ);         // actually run the node here
+                if(state != LavaInst::NORMAL){ outQ.clear(); }
               auto endTime = high_resolution_clock::now();
               duration<u64,nano> diff = (endTime - stTime);
               li.addTime( diff.count() );
@@ -2812,8 +2822,12 @@ void               LavaLoop(LavaFlow& lf) noexcept
                 outQ.clear();                                                       // this will pop all output packets in a thread safe way so that when it is deconstructed there will be no more packets
                 lf.m_frameQLck.lock();                                              // lock queue mutex        
                   lf.frameQ.clear();
-                  while( !lf.q.empty() )
+                  while( !lf.q.empty() ){
+                    auto& pckt = lf.q.top();
+                    auto    lm = LavaMem::fromDataAddr(pckt.val.value);
+                    lm.decRef();
                     lf.q.pop();
+                  }
                 lf.m_frameQLck.unlock();                                            // unlock queue mutex
               }
             }

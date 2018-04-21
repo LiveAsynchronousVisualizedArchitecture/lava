@@ -75,8 +75,15 @@
 // -todo: make a flag so that the callback ignores the stepIds
 // -todo: debug why step ends up playing in release mode - just craftsman path not being correct
 // -todo: try interactive full ray tracing - works!
+// -todo: turn off highlighted slots when not running
+// -todo: make sure that LavaMems have their reference decremented when being taken out when clearing the queue
+// -todo: try cache node after load obj - still will update without isolating what nodes are generating packets - how to deal with minimizing recomputation for iteration?
+// -todo: change cache node to use regular malloc - already is, just needs to output what the cache on execution - already is outputting
+// -todo: make LavaMemToOut helper function
+// -todo: debug why graph is not running now that cache node is added - first check if the output queue push() line is being reached - setCacheMem() function was nonsense
 
-// todo: try cache node after load obj - still will update without isolating what nodes are generating packets - how to deal with minimizing recomputation for iteration?
+// todo: debug why cache node asserts on prev refcount == 0 even when there is only one thread running
+// todo: make a roughness parameter as constant input for the shade ray hits 
 // todo: investigate if Trace node is spending most of its time in the BVH building and figure out what to do about it
 // todo: make slot viz not delete visualization
 // todo: give Visualizer a way to delete db keys
@@ -84,6 +91,7 @@
 // todo: make step function take a node or list of node ids to start with 
 // todo: make Tbl Editor step only the node it is editing
 // todo: make step button step only the selected nodes
+// todo: get node buttons out of the main bar
 // todo: integrate AddConst into RefreshFlowLibs function so that there are .live versions
 // todo: work out timed live reload checking 
 // todo: give node creation buttons colors based on the same colors that their node types use
@@ -2321,45 +2329,64 @@ ENTRY_DECLARATION // main or winmain
       v2       pntr;
       LavaId    nid;                                           // has a default constructor
 
-      SECTION(time)
+      SECTION(input that isnt from glfw events)
       {
-        t     = glfwGetTime();
-		    dt    = t - prevt;
-		    prevt = t;
-      }
-      SECTION(input and pointer transform)
-      {
-        fd.ui.prevPntr = pntr;
-        nvgTransformPoint(&pntr.x, &pntr.y, fd.ui.invTfm, ms.pos.x, ms.pos.y);
+        SECTION(time)
+        {
+          t     = glfwGetTime();
+		      dt    = t - prevt;
+		      prevt = t;
+        }
+        SECTION(input and pointer transform)
+        {
+          fd.ui.prevPntr = pntr;
+          nvgTransformPoint(&pntr.x, &pntr.y, fd.ui.invTfm, ms.pos.x, ms.pos.y);
 
-		    glfwGetWindowSize(fd.win, &fd.ui.w, &fd.ui.h);
-		    glfwGetFramebufferSize(fd.win, &fbWidth, &fbHeight);
+		      glfwGetWindowSize(fd.win, &fd.ui.w, &fd.ui.h);
+		      glfwGetFramebufferSize(fd.win, &fbWidth, &fbHeight);
 
-        pxRatio = (f32)fbWidth / (f32)fd.ui.w;          // Calculate pixel ration for hi-dpi devices.
+          pxRatio = (f32)fbWidth / (f32)fd.ui.w;          // Calculate pixel ration for hi-dpi devices.
+        }
+        SECTION(get lava graph visualization data)
+        {        
+          if(fd.flow.m_running ){ // && fd.flow.m_threadCount>0 
+            fd.ui.stopBtn->setEnabled(true);
+            fd.ui.stopBtn->setBackgroundColor( Color(e3f(.75f, .1f, .1f)) );
+
+            fd.graph.curNode  =  fd.flow.m_curId.nid;          // todo: make atomic, although this may just work since it is only reading 8 bytes
+
+            auto& slts = fd.graph.packetSlots;
+            slts.clear();
+            fd.flow.m_qLck.lock();
+              if(fd.flow.q.size() > 0){
+                auto& pckt = fd.flow.q.top();
+                fd.graph.qPacketBytes = 0;
+                fd.graph.qPacketBytes += pckt.sz_bytes;
+                slts.emplace( pckt.dest_node, pckt.dest_slot );
+                slts.emplace( pckt.src_node, pckt.src_slot );
+              }
+            fd.flow.m_qLck.unlock();
+          }
+          else
+          {
+            fd.graph.packetSlots.clear();
+            fd.graph.qPacketBytes = 0;
+
+            //fd.flow.m_qLck.lock();
+            //  while(fd.flow.q.size() > 0){
+            //    fd.flow.q.pop();
+            //  }
+            //fd.flow.m_qLck.unlock();
+          }
+        }
       }
+
       SECTION(gl frame setup)
       {
-		    glViewport(0, 0, fbWidth, fbHeight);
-			  glClearColor(.075f, .075f, .075f, 1.0f);
-		    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
-      }
-      SECTION(get lava graph visualization data)
-      {        
-        fd.graph.curNode  =  fd.flow.m_curId.nid;          // todo: make atomic, although this may just work since it is only reading 8 bytes
-
-        auto& slts = fd.graph.packetSlots;
-        slts.clear();
-        fd.flow.m_qLck.lock();
-          if(fd.flow.q.size() > 0){
-            auto& pckt = fd.flow.q.top();
-            fd.graph.qPacketBytes = 0;
-            fd.graph.qPacketBytes += pckt.sz_bytes;
-            slts.emplace( pckt.dest_node, pckt.dest_slot );
-            slts.emplace( pckt.src_node, pckt.src_slot );
-          }
-        fd.flow.m_qLck.unlock();
-
-        //sort( ALL(slts) );
+        // can this be moved to the start of the drawing loop?
+        glViewport(0, 0, fbWidth, fbHeight);
+        glClearColor(.075f, .075f, .075f, 1.0f);
+        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT|GL_STENCIL_BUFFER_BIT);
       }
       SECTION(selection)
       {
@@ -2685,6 +2712,10 @@ ENTRY_DECLARATION // main or winmain
       }
       SECTION(drawing)
       {
+        SECTION(drawing feedback from the lava flow graph)
+        {
+        }
+
         SECTION(nanovg drawing - |node graph|)
         {
           f32 cx = fd.ui.grphCx * fd.ui.w;
@@ -2953,11 +2984,6 @@ ENTRY_DECLARATION // main or winmain
         }
         SECTION(nanogui)
         {
-          if(fd.flow.m_running ){ // && fd.flow.m_threadCount>0 
-            fd.ui.stopBtn->setEnabled(true);
-            fd.ui.stopBtn->setBackgroundColor( Color(e3f(.75f, .1f, .1f)) );
-          }
-
           fd.ui.screen.performLayout();
 
           e2i statusSz = fd.ui.statusWin->size();
@@ -2993,6 +3019,9 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+//
+//sort( ALL(slts) );
 
 //
 //for(auto kv : cnstTbl){                                                // use the iterators to go through the key-value pairs, then build the controls from those pairs
