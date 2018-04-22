@@ -81,8 +81,13 @@
 // -todo: change cache node to use regular malloc - already is, just needs to output what the cache on execution - already is outputting
 // -todo: make LavaMemToOut helper function
 // -todo: debug why graph is not running now that cache node is added - first check if the output queue push() line is being reached - setCacheMem() function was nonsense
+// -todo: debug why cache node asserts on prev refcount == 0 even when there is only one thread running - cache packet goes out before input packet is given in the same cycle - why doesn't the cache packet get used before going to the next generator? - the tracer has two inputs and thus has a frame, which means that the loop goes back to another generator to find the other packet for the input frame
+// -todo: try disconnecting the cache node after first step - works 
+// -todo: make cache skip the input if the cache mem has a positive reference count
 
-// todo: debug why cache node asserts on prev refcount == 0 even when there is only one thread running
+// todo: make middle click drag on a slot step to the slot and write out a constant of the packet, then reload new nodes
+// todo: give cache a buffer of at least one extra allocation, so that if it runs first as a generator in the cycle it can still catch the next allocation that comes through
+// todo: order generator nodes by traversing the graph backwards 
 // todo: make a roughness parameter as constant input for the shade ray hits 
 // todo: investigate if Trace node is spending most of its time in the BVH building and figure out what to do about it
 // todo: make slot viz not delete visualization
@@ -544,7 +549,7 @@ template<class T> void setInc(tbl::KVOfst& kvo, TextBox* tb, str const& s)
 
   auto val = strToNum<T>(s);
   kvo      = val;
-  auto inc = T( max(abs(val*.2),1.) );
+  auto inc = T( max(abs(val*.1),1.) );
   ((IntBox<T>*)tb)->setValueIncrement(inc);
 }
 template<class T> void setFloatInc(tbl::KVOfst& kvo, TextBox* tb, str const& s)
@@ -553,7 +558,7 @@ template<class T> void setFloatInc(tbl::KVOfst& kvo, TextBox* tb, str const& s)
 
   auto val = strToNum<T>(s);
   kvo      = val;
-  auto inc = T( abs(val*.15) );
+  auto inc = T( abs(val*.1) );
   ((FloatBox<T>*)tb)->setValueIncrement(inc);
 }
 bool       makeTblEditor(LavaNode* n)

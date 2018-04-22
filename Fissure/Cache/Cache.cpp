@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include "../../no_rt_util.h"
 #include "../LavaFlow.hpp"
+#include "../../str_util.hpp"
 
 enum Slots
 {
@@ -19,10 +20,15 @@ static std::atomic<LavaMem> cacheMem;
 bool setCacheMem(LavaMem lm)
 {
   LavaMem prev = cacheMem.exchange(lm);
-  if(prev.ptr){
-    assert(prev.refCount() == 0);
+  if(prev.ptr && prev.refCount()==0){
+    //Println("ref count: ", prev.refCount());
+    //assert(prev.refCount() == 0);
     free(prev.ptr);
     return true;
+  }else if(prev.ptr){
+    LavaMem cur = cacheMem.exchange(prev);
+    assert(cur.refCount() == 0);
+    free(cur.ptr);
   }
 
   return false;
@@ -54,7 +60,7 @@ extern "C"
 
     SECTION(if there is an input packet, use it to set the cache)
     {
-      if(in->slotMask[IN_CACHE_SET]){
+      if(in->slotMask[IN_CACHE_SET] && cacheMem.load().refCount()==0 ){
         u64         sz = in->packets[IN_CACHE_SET].sz_bytes;
         void*    inPtr = (void*)in->packets[IN_CACHE_SET].val.value;
         if(sz==0 || inPtr==nullptr){
