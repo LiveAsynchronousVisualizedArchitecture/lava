@@ -90,6 +90,7 @@
 // -todo: make middle click drag on a slot step to the slot and write out a constant of the packet, then reload new nodes
 // -todo: debug crash on brandisher and written const from fissure not showing up in Visualizer - file was being written without "b" in fopen() so it was being written in ascii mode
 
+// todo: make const file write out to the same directory as node shared libs
 // todo: try using windows API to slow cursor movement when inside nodes and slots 
 // todo: make const node be created and placed in the graph after dragging from a slot
 // todo: make a roughness parameter as constant input for the shade ray hits 
@@ -1970,15 +1971,18 @@ LavaControl lavaPacketCallback(LavaPacket pkt)
 }
 LavaNode*           sidToConst(LavaId     sid)
 {
+  using namespace fs;
+  
   str  key = genDbKey(sid);
   if(key==""){ return nullptr; }
 
   auto dat = fisdb.get<u8>(key);
   if(dat.size()==0){ return nullptr; }
 
-  str type = getSlotType(sid);                // ""; // todo: get the type
-  str  pth = key + "." + type + ".const";
-  bool  ok = writeFile(pth, dat.data(), dat.size());
+  str  type = getSlotType(sid);
+  str   dir = path(GetSharedLibPath()).remove_filename().generic_string();
+  str   pth = dir + "/" + key + "." + type + ".const";
+  bool   ok = writeFile(pth, dat.data(), dat.size());
   if(!ok){ return nullptr; }
   
   LavaNode* ln = AddFlowConst(pth, fd.flow);
