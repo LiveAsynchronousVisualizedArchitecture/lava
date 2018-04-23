@@ -354,16 +354,19 @@ struct FisData
     bool                 lftDn = false;    // left mouse button down
     bool              prevRtDn = false;    // right mouse button down
     bool             prevLftDn = false;    // left mouse button down
+    bool                 midDn = false;    // right mouse button down
+    bool             prevMidDn = false;    // right mouse button down
 
     v2                    drgP;
     v2                 drgofst;
+    Bnd                 drgbnd;
+    LavaId             drgSlot = LavaNode::NODE_ERROR;
     bool              dragging = false;
     bool            rtDragging = false;
     bool                drgbox = false;
     bool            prevDrgbox = false;
     bool                 drgNd = false;
-    Bnd                 drgbnd;
-
+    
     v2                     pos;
     v2                 prevPos;
     v2                  difPos;

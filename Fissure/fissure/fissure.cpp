@@ -1826,6 +1826,11 @@ void          mouseBtnCallback(GLFWwindow* window, int button, int action, int m
     if(action==GLFW_PRESS){ fd.mouse.rtDn = true; }
     else if(action==GLFW_RELEASE){ fd.mouse.rtDn = false; }
   }
+
+  if(button==GLFW_MOUSE_BUTTON_MIDDLE){
+    if(action==GLFW_PRESS){ fd.mouse.midDn = true; }
+    else if(action==GLFW_RELEASE){ fd.mouse.midDn = false; }
+  }
 }
 void             errorCallback(int e, const char *d) {
   printf("Error %d: %s\n", e, d);
@@ -2321,7 +2326,7 @@ ENTRY_DECLARATION // main or winmain
 
       SECTION(poll events through glfw and apply commands to the graph)
       {
-        glfwPollEvents();                                             // PollEvents must be done after zeroing out the deltas
+        glfwPollEvents();                                                    // PollEvents must be done after zeroing out the deltas
         LavaGraph::ArgVec av = fd.lgrph.exec();
         graph_apply(move(av));
       }
@@ -2399,20 +2404,14 @@ ENTRY_DECLARATION // main or winmain
         bool lftClkDn  =   ms.lftDn && !ms.prevLftDn;      // lftClkDn is left click down
         bool lftClkUp  =  !ms.lftDn &&  ms.prevLftDn;      // lftClkDn is left click up
         bool rtClkDn   =   ms.rtDn  && !ms.prevRtDn;       // rtClkDn is right click down
+        bool rtClkUp   =  !ms.rtDn  &&  ms.prevRtDn;       // rtClkDn is right click up
+        bool midClkDn  =   ms.midDn && !ms.prevMidDn;      // midClkDn is middle click down
+        bool midClkUp  =  !ms.midDn &&  ms.prevMidDn;      // midClkDn is middle click up
 
         LavaId   sid;                                      // sid is slot id
         bool isInSlot = false;
         SECTION(slot inside check: if inside a slot, early exit on the first found) // todo: does this need to loop through in the node ordr ? 
         {
-          //for(auto& kv : fd.graph.slots){
-          //  Slot&    s  =  kv.second;
-          //  isInSlot    =  len(pntr - s.P) < fd.ui.slot_rad;
-          //  if(isInSlot){ 
-          //    sid = kv.first;
-          //    break;
-          //  }
-          //}
-
           for(auto& kv : fd.graph.inSlots){
             Slot&    s  =  kv.second;
             isInSlot    =  len(pntr - s.P) < fd.ui.slot_rad;
@@ -2427,6 +2426,7 @@ ENTRY_DECLARATION // main or winmain
             isInSlot    =  len(pntr - s.P) < fd.ui.slot_rad;
             if(isInSlot){ 
               sid = kv.first;
+              if(midClkDn){ fd.mouse.drgSlot = sid; }
               break;
             }
           }
@@ -2434,7 +2434,15 @@ ENTRY_DECLARATION // main or winmain
 
         if(!isInSlot) SECTION(box selection to primary and node inside check: if inside a node in node ordr from top to bottom)
         {
-          FROM(sz,i)                                                // loop backwards so that the top nodes are dealt with first
+          if(!fd.mouse.midDn){
+            if(fd.mouse.drgSlot.asInt != LavaNode::NODE_ERROR){
+              auto drgSlt = fd.mouse.drgSlot;
+              Println("slot dragged: ", drgSlt.nid, " ", drgSlt.sidx);
+              // if the pointer is not inside a slot and the mid mouse button is up and the drag slot is not null, do constant writing stuff here
+            }
+            fd.mouse.drgSlot = LavaNode::NODE_ERROR;        // false;  // todo: change this to an ID
+          }
+          FROM(sz,i)                                                          // loop backwards so that the top nodes are dealt with first
           {
             Node* n = nds[i];
 
@@ -3024,6 +3032,14 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//for(auto& kv : fd.graph.slots){
+//  Slot&    s  =  kv.second;
+//  isInSlot    =  len(pntr - s.P) < fd.ui.slot_rad;
+//  if(isInSlot){ 
+//    sid = kv.first;
+//    break;
+//  }
+//}
 
 //
 //sort( ALL(slts) );
