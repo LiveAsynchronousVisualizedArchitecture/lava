@@ -84,14 +84,15 @@
 // -todo: debug why cache node asserts on prev refcount == 0 even when there is only one thread running - cache packet goes out before input packet is given in the same cycle - why doesn't the cache packet get used before going to the next generator? - the tracer has two inputs and thus has a frame, which means that the loop goes back to another generator to find the other packet for the input frame
 // -todo: try disconnecting the cache node after first step - works 
 // -todo: make cache skip the input if the cache mem has a positive reference count
+// -todo: take spaces out of key generation
+// -todo: take colon out of key generation
+// -todo: take pipe out of key generation
+// -todo: make middle click drag on a slot step to the slot and write out a constant of the packet, then reload new nodes
 
-// todo: make middle click drag on a slot step to the slot and write out a constant of the packet, then reload new nodes
-// todo: give cache a buffer of at least one extra allocation, so that if it runs first as a generator in the cycle it can still catch the next allocation that comes through
-// todo: order generator nodes by traversing the graph backwards 
 // todo: make a roughness parameter as constant input for the shade ray hits 
+// todo: order generator nodes by traversing the graph backwards 
 // todo: investigate if Trace node is spending most of its time in the BVH building and figure out what to do about it
 // todo: make slot viz not delete visualization
-// todo: give Visualizer a way to delete db keys
 // todo: make tbl editor be able to edit i8 strings as text - use a length limit?
 // todo: make step function take a node or list of node ids to start with 
 // todo: make Tbl Editor step only the node it is editing
@@ -123,6 +124,7 @@
 // todo: add heiarchy of tables - recursive function and indentation
 // todo: put thread pointers into message node instances and work out how to lock and unlock them
 
+// todo: give cache a buffer of at least one extra allocation, so that if it runs first as a generator in the cycle it can still catch the next allocation that comes through
 // todo: should there be a ONCE node type too? - should there be a parameter of how many times the node is allowed to run? - only offers convenience, though to make it properly, an atomic needs to be used for the boolean of whether or not to run
 // todo: add cursor member variable to LavaFrame - this would only be neccesary if slots weren't done with a one packet to one slot strucutre 
 // todo: try making the embree vector a union with a float array inside
@@ -850,14 +852,13 @@ auto            node_add(str node_name, Node n) -> uint64_t
   using namespace std;
 
   auto          pi = fd.flow.nameToPtr.find( node_name );                               // pi is pointer iterator
-  uint64_t instIdx = n.id; //LavaNode::NODE_ERROR;
+  uint64_t instIdx = n.id; 
   LavaNode*     ln = nullptr;
   if( pi != end(fd.flow.nameToPtr) )
   {
     ln = pi->second;
     if(ln)
     {
-      //instIdx = nxtId();
       if(instIdx == LavaNode::NODE_ERROR) 
         instIdx = fd.lgrph.nxtId();
 
@@ -866,10 +867,10 @@ auto            node_add(str node_name, Node n) -> uint64_t
       ido.order = node_nxtOrder();
       fd.graph.ordr.insert(ido);
       
-      //if(n.txt==""){ n.txt = "New: " + node_name; }
       if(n.txt==""){ n.txt = "" + node_name; }
       n.id    = instIdx;
       n.order = ido.order;
+      n.ln    = ln; 
       fd.graph.nds[instIdx] = move(n);
 
       LavaCommand::Arg A,B;
@@ -1477,6 +1478,19 @@ void         graph_apply(LavaGraph::ArgVec args)
 // End state manipulation
 
 // Serialize to and from json - put in FisTfm.hpp file?
+bool           writeFile(str path, void* buf, u64 size)
+{
+  FILE* f = fopen(path.c_str(), "w");
+  if(!f) return false;
+
+  size_t writeSz = fwrite(buf, 1, size, f);
+  if(writeSz != size) return false;
+
+  int closeRet = fclose(f);
+  if(closeRet == EOF) return false;
+
+  return true;
+}
 void    normalizeIndices()
 {
   using namespace std;
@@ -1896,14 +1910,36 @@ void   framebufferSizeCallback(GLFWwindow* window, int w, int h)
   //fd.ui.grphTy  *=  1.f + difAvg;
 }
 
+// Fis DB interaction
 str                   genDbKey(LavaId     sid)            // genDbKey is generate database key, sid is slot Id
 {
   auto ni = fd.graph.nds.find(sid.nid); // todo: this is called from the lava looping threads and would need to be thread safe - it is also only used for getting text labels, which may make things easier
   if(ni == end(fd.graph.nds)) return ""; 
 
-  auto label  =  toString("[",sid.nid,":",sid.sidx,"] ",ni->second.txt);
+  auto label  =  toString("[",sid.nid,"-",sid.sidx,"]",ni->second.txt);
 
   return label;
+}
+str                getSlotType(LavaId     sid)
+{
+  using namespace std;
+
+  if(sid.sidx == LavaId::SLOT_NONE){ return ""; }
+  auto ni = fd.graph.nds.find(sid.nid);
+  if(ni == end(fd.graph.nds)){ return ""; }
+
+  str type;
+  LavaNode* ln = ni->second.ln;
+  if(!ln || !ln->out_types){ return ""; }
+
+  auto  typeLst = ln->out_types;
+  for(int i=0; *typeLst && i<sid.sidx; ){
+    ++typeLst; ++i;
+  }
+
+  if(*typeLst){ type = str( *typeLst ); }
+
+  return type;
 }
 LavaControl lavaPacketCallback(LavaPacket pkt)
 {
@@ -1929,6 +1965,18 @@ LavaControl lavaPacketCallback(LavaPacket pkt)
 
   return LavaControl::GO;
 }
+void                sidToConst(LavaId     sid)
+{
+  str  key = genDbKey(sid);
+  auto dat = fisdb.get<u8>(key);
+  str type = getSlotType(sid);                // ""; // todo: get the type
+  str  pth = key + "." + type + ".const";
+  writeFile(pth, dat.data(), dat.size());
+  
+  Node n;
+  node_add(pth, n);
+}
+// End Fis DB interaction
 
 void              debug_coords(v2 a)
 {
@@ -2434,26 +2482,34 @@ ENTRY_DECLARATION // main or winmain
 
         if(!isInSlot) SECTION(box selection to primary and node inside check: if inside a node in node ordr from top to bottom)
         {
-          if(!fd.mouse.midDn){
-            if(fd.mouse.drgSlot.asInt != LavaNode::NODE_ERROR){
-              auto drgSlt = fd.mouse.drgSlot;
-              Println("slot dragged: ", drgSlt.nid, " ", drgSlt.sidx);
-              // if the pointer is not inside a slot and the mid mouse button is up and the drag slot is not null, do constant writing stuff here
-            }
-            fd.mouse.drgSlot = LavaNode::NODE_ERROR;        // false;  // todo: change this to an ID
-          }
-          FROM(sz,i)                                                          // loop backwards so that the top nodes are dealt with first
+          SECTION(handle slot dragging)
           {
-            Node* n = nds[i];
+            if(!fd.mouse.midDn){
+              if(fd.mouse.drgSlot.asInt != LavaNode::NODE_ERROR){
+                auto drgSlt = fd.mouse.drgSlot;
+                Println("slot dragged: ", drgSlt.nid, " ", drgSlt.sidx);
+                // if the pointer is not inside a slot and the mid mouse button is up and the drag slot is not null, do constant writing stuff here
+                sidToConst(drgSlt);
+              }
+              fd.mouse.drgSlot = LavaNode::NODE_ERROR;        // false;  // todo: change this to an ID
+            }
+          }
 
-            if(lftClkUp && fd.sel.pri==LavaNode::NODE_ERROR && n->sel)
-              fd.sel.pri = n->id;
+          SECTION(check what nodes the pointer is inside and fill in the primary selection with selected nodes if it is blank)
+          {
+            FROM(sz,i)                                                          // loop backwards so that the top nodes are dealt with first
+            {
+              Node* n = nds[i];
 
-            isInNode     =  isIn(pntr.x,pntr.y, n->b);
-            if(isInNode){
-              nid  = n->id;
-              nIdx = i;
-              break;
+              if(lftClkUp && fd.sel.pri==LavaNode::NODE_ERROR && n->sel)  // todo: break this out of the !isInSlot section
+                fd.sel.pri = n->id;
+
+              isInNode     =  isIn(pntr.x,pntr.y, n->b);
+              if(isInNode){
+                nid  = n->id;
+                nIdx = i;
+                break;
+              }
             }
           }
         }
@@ -3031,6 +3087,9 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//LavaNode::NODE_ERROR;
+//instIdx = nxtId();
+//if(n.txt==""){ n.txt = "New: " + node_name; }
 
 //for(auto& kv : fd.graph.slots){
 //  Slot&    s  =  kv.second;

@@ -96,8 +96,9 @@
 // -todo: print off block list chain for every hash map entry
 // -todo: print off full block list - can't if their default index is 0, it will create a loop
 // -todo: print off all blocks
+// -todo: look at why bounding box positions x shows 0 for sizeBytes - probably just the offset mixed up with the size
 
-// todo: look at why bounding box positions x shows 0 for sizeBytes
+// todo: debug crash on LoadObj const
 // todo: take out print db menu item
 // todo: add ability to delete keys 
 // todo: delete with multi-selection and right click menu

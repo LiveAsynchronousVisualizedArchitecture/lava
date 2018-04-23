@@ -94,6 +94,7 @@
 // -todo: test with all threads running in fissure
 // -todo: make mouse up events not be stopped even if they happen in the nanoui areas
 
+// todo: give Visualizer a way to delete db keys
 // todo: do something to bound the clip planes to the current visible models tighter - hopefully this would fix the z-fighting 
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?

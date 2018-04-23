@@ -84,19 +84,20 @@ struct    Node
   //enum Type { MSG=0, FLOW=1, NODE_ERROR=0xFFFFFFFFFFFFFFFF };
   using Type = LavaNode::Type;
 
-  LavaNode* lfn;                                     // lfn is Lava Flow Node
-  u64       id  =  LavaNode::NODE_ERROR; //0;
-  u64    order  =  0;
-  v2         P  =  {0,0};
-  bool     sel  =  false;                            // sel is selected
-  Bnd        b  =  {0, 0, 128.f, 48.f};
-  str      txt  =  "";
-  Type    type  =  Type::NODE_ERROR;
-  u16    incnt  =  0;
-  u16   outcnt  =  0;
+  LavaNode*  ln  =  nullptr;                                     // lfn is Lava Flow Node
+  u64        id  =  LavaNode::NODE_ERROR; //0;
+  u64     order  =  0;
+  v2          P  =  {0,0};
+  bool      sel  =  false;                            // sel is selected
+  Bnd         b  =  {0, 0, 128.f, 48.f};
+  str       txt  =  "";
+  Type     type  =  Type::NODE_ERROR;
+  u16     incnt  =  0;
+  u16    outcnt  =  0;
 
   void cp(Node const& l)
   {
+    ln    = l.ln;
     id    = l.id;
     order = l.order;
     P     = l.P;
@@ -109,6 +110,7 @@ struct    Node
   {
     using namespace std;
 
+    ln     = r.ln;
     id     = move(r.id);
     order  = move(r.order);
     P      = move(r.P);
@@ -118,6 +120,10 @@ struct    Node
     txt    = move(r.txt);
     incnt  = r.incnt;
     outcnt = r.outcnt;
+
+    r.ln     = nullptr;
+    r.incnt  = 0;
+    r.outcnt = 0;
   }
 
   Node(){}
@@ -257,20 +263,18 @@ struct FisData
   vec_thrd      flowThreads;
   AtmSet             vizIds;
   AtmSet            stepIds;
-  abool                step = false;  // todo: needs to be atomic 
+  abool                step = false;
   i32           threadCount = 1;
 
   struct Graph
   {
     NodeMap             nds;       // nds  is nodes
     NodeOrder          ordr;       // ordr is orders 
-    //Slots             slots;       // 
     Slots           inSlots;       // 
     Slots          outSlots;       // 
 
     u64             curNode = LavaNode::NODE_ERROR;              // information from the running lava graph for visualization in the GUI
     u64        qPacketBytes = 0;
-    //vec_slt     packetSlots;
     PacketSlots packetSlots;
 
     // text

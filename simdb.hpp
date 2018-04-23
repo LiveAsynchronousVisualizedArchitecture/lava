@@ -2029,10 +2029,18 @@ public:
   template<class T>
   auto         get(str const& key) -> std::vector<T>
   {
+    using namespace std;
+    
     u32 vlen = 0;
-    len(key.data(), (u32)key.length(), &vlen);
-    std::vector<T> ret(vlen);    
-    return get(key.data(), (u32)key.length(), (void*)ret.data(), vlen);
+    //u64  len = len(key.data(), (u32)key.length(), &vlen);
+    i64 l = len(key, &vlen); 
+    vector<T> ret(vlen);
+
+    u32 readLen = 0;
+    bool ok = get(key.data(), (u32)key.length(), (void*)ret.data(), vlen); // &readLen);
+
+    if(ok) return ret;
+    else   return vector<T>();
   }
   template<class T>
   i64          put(str    const& key, std::vector<T> const& val)
