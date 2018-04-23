@@ -1751,13 +1751,8 @@ bool            loadFile(str path, LavaGraph* out_g)
 }
 // End serialize to and from json 
 
-bool    reloadSharedLibs()
+void  refreshNodeButtons()
 {
-  bool newlibs  = RefreshFlowLibs(fd.flow);
-  newlibs      |= RefreshFlowConsts(fd.flow);
-
-  if(!newlibs){ return false; }
-
   SECTION(get the buttons out of the GUI and clear the button widgets from memory)
   {
     for(auto& b : fd.ui.ndBtns){
@@ -1778,8 +1773,38 @@ bool    reloadSharedLibs()
       fd.ui.ndBtns.push_back(ndBtn);
     }
   }
-
   fd.ui.screen.performLayout();
+}
+bool    reloadSharedLibs()
+{
+  bool newlibs  = RefreshFlowLibs(fd.flow);
+  newlibs      |= RefreshFlowConsts(fd.flow);
+
+  if(!newlibs){ return false; }
+
+  refreshNodeButtons();
+
+  //SECTION(get the buttons out of the GUI and clear the button widgets from memory)
+  //{
+  //  for(auto& b : fd.ui.ndBtns){
+  //    fd.ui.keyWin->removeChild(b);
+  //  }
+  //  fd.ui.ndBtns.clear();                                             // delete interface buttons from the nanogui window
+  //}
+  //SECTION(redo interface node buttons)
+  //{
+  //  for(auto& kv : fd.flow.flow)
+  //  {
+  //    LavaNode*     fn = kv.second;                                // fn is flow node
+  //    auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
+  //    ndBtn->setCallback([fn](){ 
+  //      v2 stPos = {fd.ui.w/2.f,  fd.ui.h/2.f};                                                // stPos is starting position
+  //      node_add(fn->name, Node("", (Node::Type)((u64)fn->node_type), stPos) );
+  //    });
+  //    fd.ui.ndBtns.push_back(ndBtn);
+  //  }
+  //}
+  //fd.ui.screen.performLayout();
 
   return true;
 }
@@ -1986,6 +2011,13 @@ LavaNode*           sidToConst(LavaId     sid)
   if(!ok){ return nullptr; }
   
   LavaNode* ln = AddFlowConst(pth, fd.flow);
+  Node n;
+  n.txt = ln->name;
+  node_bnd(fd.vg, n);
+  n.P   = fd.mouse.pos - n.b.wh()/2;
+  node_add(ln->name, n);
+
+  refreshNodeButtons();
 
   return ln;
 
