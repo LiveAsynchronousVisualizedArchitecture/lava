@@ -2281,53 +2281,6 @@ LavaNode         MemMapFile(fs::path const& pth)
 
   return retNd;
 }
-LavaNode*      AddFlowConst(fs::path const& pth, LavaFlow& inout_flow)
-{
-  using namespace std;
-
-  SECTION(continue if the file does not have a const extension)
-  {
-    if(!pth.has_filename()){ return nullptr; }
-    auto ext = pth.extension().generic_string();                        // ext is extension
-    if(ext!=".const"){ return nullptr; }
-  }
-
-  str typeStr, nameStr;
-  SECTION(get the type and name from the file path - name.type.const)
-  {
-    auto typePth = pth;
-    typePth.replace_extension("");
-    typeStr = typePth.extension().generic_string();
-    typeStr = typeStr.substr(1, typeStr.length()-1);
-    nameStr = pth.filename().generic_string();
-    //auto nameEnd = nameStr.find('.');
-    //nameStr = nameStr.substr(0, nameEnd);
-    nameStr = nameStr.substr(0, nameStr.find('.'));
-  }
-
-  //void* memMap = MemMapFile(pth);                                             // use the memory mapping from simdb
-  LavaNode    mmapNd = MemMapFile(pth);                                             // use the memory mapping from simdb
-
-  LavaNode*  nodePtr = nullptr;
-  SECTION(create LavaConst, use the node pointer in the graph and move the LavaConst into the constMem map)
-  {
-    str pstr = pth.generic_string();
-
-    LavaConst lc(nameStr, typeStr);
-    lc.node->filePtr  = mmapNd.filePtr;
-    lc.node->fileSize = mmapNd.fileSize;
-    lc.node->fileHndl = mmapNd.fileHndl;
-    nodePtr = lc.node;
-    inout_flow.constMem[pstr] = move(lc);                                     // have to do this last since it moves the LavaConst and sets the original version to a nullptr - this might overwrite a former LavaCont, which would deallocate its heap memory on deconstruction
-
-    inout_flow.flow.erase(pstr);
-    inout_flow.nameToPtr.erase(nameStr);
-    inout_flow.nameToPtr.insert( {nameStr, nodePtr} );
-    inout_flow.flow.insert( {pstr, nodePtr} );
-  }
-
-  return nodePtr;
-}
 
 auto       GetSharedLibPath() -> std::wstring
 {
@@ -2534,6 +2487,51 @@ LavaInst::State exceptWrapper(FlowFunc f, LavaFlow& lf, LavaParams* lp, LavaFram
   return ret;
 }
 
+}
+
+LavaNode*      AddFlowConst(fs::path const& pth, LavaFlow& inout_flow)
+{
+  using namespace std;
+
+  SECTION(continue if the file does not have a const extension)
+  {
+    if(!pth.has_filename()){ return nullptr; }
+    auto ext = pth.extension().generic_string();                        // ext is extension
+    if(ext!=".const"){ return nullptr; }
+  }
+
+  str typeStr, nameStr;
+  SECTION(get the type and name from the file path - name.type.const)
+  {
+    auto typePth = pth;
+    typePth.replace_extension("");
+    typeStr = typePth.extension().generic_string();
+    typeStr = typeStr.substr(1, typeStr.length()-1);
+    nameStr = pth.filename().generic_string();
+    nameStr = nameStr.substr(0, nameStr.find('.'));
+  }
+
+  LavaNode    mmapNd = MemMapFile(pth);                                             // use the memory mapping from simdb
+
+  LavaNode*  nodePtr = nullptr;
+  SECTION(create LavaConst, use the node pointer in the graph and move the LavaConst into the constMem map)
+  {
+    str pstr = pth.generic_string();
+
+    LavaConst lc(nameStr, typeStr);
+    lc.node->filePtr  = mmapNd.filePtr;
+    lc.node->fileSize = mmapNd.fileSize;
+    lc.node->fileHndl = mmapNd.fileHndl;
+    nodePtr = lc.node;
+    inout_flow.constMem[pstr] = move(lc);                                     // have to do this last since it moves the LavaConst and sets the original version to a nullptr - this might overwrite a former LavaCont, which would deallocate its heap memory on deconstruction
+
+    inout_flow.flow.erase(pstr);
+    inout_flow.nameToPtr.erase(nameStr);
+    inout_flow.nameToPtr.insert( {nameStr, nodePtr} );
+    inout_flow.flow.insert( {pstr, nodePtr} );
+  }
+
+  return nodePtr;
 }
 
 void*             LavaAlloc(uint64_t sizeBytes)
@@ -2900,6 +2898,12 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+
+//auto nameEnd = nameStr.find('.');
+//nameStr = nameStr.substr(0, nameEnd);
+//
+//void* memMap = MemMapFile(pth);                                             // use the memory mapping from simdb
 
 //char* pthCstr = (char*)pth.c_str();
 //char*   tstStr = "H:\\test.txt";

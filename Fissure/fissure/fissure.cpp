@@ -88,7 +88,10 @@
 // -todo: take colon out of key generation
 // -todo: take pipe out of key generation
 // -todo: make middle click drag on a slot step to the slot and write out a constant of the packet, then reload new nodes
+// -todo: debug crash on brandisher and written const from fissure not showing up in Visualizer - file was being written without "b" in fopen() so it was being written in ascii mode
 
+// todo: try using windows API to slow cursor movement when inside nodes and slots 
+// todo: make const node be created and placed in the graph after dragging from a slot
 // todo: make a roughness parameter as constant input for the shade ray hits 
 // todo: order generator nodes by traversing the graph backwards 
 // todo: investigate if Trace node is spending most of its time in the BVH building and figure out what to do about it
@@ -1480,7 +1483,7 @@ void         graph_apply(LavaGraph::ArgVec args)
 // Serialize to and from json - put in FisTfm.hpp file?
 bool           writeFile(str path, void* buf, u64 size)
 {
-  FILE* f = fopen(path.c_str(), "w");
+  FILE* f = fopen(path.c_str(), "wb");
   if(!f) return false;
 
   size_t writeSz = fwrite(buf, 1, size, f);
@@ -1965,16 +1968,25 @@ LavaControl lavaPacketCallback(LavaPacket pkt)
 
   return LavaControl::GO;
 }
-void                sidToConst(LavaId     sid)
+LavaNode*           sidToConst(LavaId     sid)
 {
   str  key = genDbKey(sid);
+  if(key==""){ return nullptr; }
+
   auto dat = fisdb.get<u8>(key);
+  if(dat.size()==0){ return nullptr; }
+
   str type = getSlotType(sid);                // ""; // todo: get the type
   str  pth = key + "." + type + ".const";
-  writeFile(pth, dat.data(), dat.size());
+  bool  ok = writeFile(pth, dat.data(), dat.size());
+  if(!ok){ return nullptr; }
   
-  Node n;
-  node_add(pth, n);
+  LavaNode* ln = AddFlowConst(pth, fd.flow);
+
+  return ln;
+
+  //Node n;
+  //node_add(pth, n);
 }
 // End Fis DB interaction
 
@@ -2363,7 +2375,6 @@ ENTRY_DECLARATION // main or winmain
     f32 pxRatio;
     int fbWidth, fbHeight;
 
-    //while(false)
     while(!glfwWindowShouldClose(fd.win))
     {
       auto&   ms = fd.mouse;
@@ -2438,7 +2449,6 @@ ENTRY_DECLARATION // main or winmain
           }
         }
       }
-
       SECTION(gl frame setup)
       {
         // can this be moved to the start of the drawing loop?
@@ -2490,6 +2500,7 @@ ENTRY_DECLARATION // main or winmain
                 Println("slot dragged: ", drgSlt.nid, " ", drgSlt.sidx);
                 // if the pointer is not inside a slot and the mid mouse button is up and the drag slot is not null, do constant writing stuff here
                 sidToConst(drgSlt);
+                //if(ok){ AddFlowConst( fd.flow  }
               }
               fd.mouse.drgSlot = LavaNode::NODE_ERROR;        // false;  // todo: change this to an ID
             }
@@ -2674,6 +2685,8 @@ ENTRY_DECLARATION // main or winmain
       }
       SECTION(movement)
       {
+        // SetCursorPos(200, 200);
+        
         SECTION(node movement)
         {
           TO(sz,i)
