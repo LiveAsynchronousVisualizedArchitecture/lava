@@ -365,6 +365,7 @@ struct FisData
     v2                 drgofst;
     Bnd                 drgbnd;
     LavaId             drgSlot = LavaNode::NODE_ERROR;
+    v2                drgSlotP;
     bool              dragging = false;
     bool            rtDragging = false;
     bool                drgbox = false;

@@ -89,10 +89,10 @@
 // -todo: take pipe out of key generation
 // -todo: make middle click drag on a slot step to the slot and write out a constant of the packet, then reload new nodes
 // -todo: debug crash on brandisher and written const from fissure not showing up in Visualizer - file was being written without "b" in fopen() so it was being written in ascii mode
+// -todo: make const file write out to the same directory as node shared libs
+// -todo: make const node be created and placed in the graph after dragging from a slot
+// -todo: draw a line from the original slot while dragging a node
 
-// todo: make const file write out to the same directory as node shared libs
-// todo: try using windows API to slow cursor movement when inside nodes and slots 
-// todo: make const node be created and placed in the graph after dragging from a slot
 // todo: make a roughness parameter as constant input for the shade ray hits 
 // todo: order generator nodes by traversing the graph backwards 
 // todo: investigate if Trace node is spending most of its time in the BVH building and figure out what to do about it
@@ -127,6 +127,7 @@
 // todo: make Tbl Editors pop up for all selected constants that point to tbls - need a vector of tbl windows and tbl layouts as well as a vector of vectors for the widgets of each key value
 // todo: add heiarchy of tables - recursive function and indentation
 // todo: put thread pointers into message node instances and work out how to lock and unlock them
+// todo: try using windows API to slow cursor movement when inside nodes and slots 
 
 // todo: give cache a buffer of at least one extra allocation, so that if it runs first as a generator in the cycle it can still catch the next allocation that comes through
 // todo: should there be a ONCE node type too? - should there be a parameter of how many times the node is allowed to run? - only offers convenience, though to make it properly, an atomic needs to be used for the boolean of whether or not to run
@@ -1784,28 +1785,6 @@ bool    reloadSharedLibs()
 
   refreshNodeButtons();
 
-  //SECTION(get the buttons out of the GUI and clear the button widgets from memory)
-  //{
-  //  for(auto& b : fd.ui.ndBtns){
-  //    fd.ui.keyWin->removeChild(b);
-  //  }
-  //  fd.ui.ndBtns.clear();                                             // delete interface buttons from the nanogui window
-  //}
-  //SECTION(redo interface node buttons)
-  //{
-  //  for(auto& kv : fd.flow.flow)
-  //  {
-  //    LavaNode*     fn = kv.second;                                // fn is flow node
-  //    auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
-  //    ndBtn->setCallback([fn](){ 
-  //      v2 stPos = {fd.ui.w/2.f,  fd.ui.h/2.f};                                                // stPos is starting position
-  //      node_add(fn->name, Node("", (Node::Type)((u64)fn->node_type), stPos) );
-  //    });
-  //    fd.ui.ndBtns.push_back(ndBtn);
-  //  }
-  //}
-  //fd.ui.screen.performLayout();
-
   return true;
 }
 
@@ -2520,7 +2499,10 @@ ENTRY_DECLARATION // main or winmain
             isInSlot    =  len(pntr - s.P) < fd.ui.slot_rad;
             if(isInSlot){ 
               sid = kv.first;
-              if(midClkDn){ fd.mouse.drgSlot = sid; }
+              if(midClkDn){ 
+                fd.mouse.drgSlot = sid;
+                fd.mouse.drgSlotP = s.P;
+              }
               break;
             }
           }
@@ -2840,6 +2822,23 @@ ENTRY_DECLARATION // main or winmain
           f32 cy = fd.ui.grphCy * fd.ui.h;
           nvgBeginFrame(vg,  fd.ui.w,   fd.ui.h, pxRatio);
             nvgResetTransform(vg);
+            
+            SECTION(draw a line when dragging a slot)
+            {
+              if(fd.mouse.drgSlot.asInt != LavaNode::NODE_ERROR)
+              {
+                nvgStrokeColor(vg, fd.ui.nd_const_clr);
+                nvgStrokeWidth(vg, 4.f);
+                //NVGpaint paint;
+                //paint
+                //nvgStrokePaint(vg, paint);
+                nvgBeginPath(vg);
+                nvgMoveTo(vg, ms.drgSlotP.x, ms.drgSlotP.y);
+                nvgLineTo(vg, ms.pos.x, ms.pos.y);
+                nvgStroke(vg);
+              }
+            }
+            
             nvgTranslate(vg,    fd.ui.w/2.f,      fd.ui.h/2.f);
             nvgScale(vg,       fd.ui.grphTx,     fd.ui.grphTy);
             nvgTranslate(vg,   -fd.ui.w/2.f,     -fd.ui.h/2.f);
@@ -3135,6 +3134,30 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+
+//SECTION(get the buttons out of the GUI and clear the button widgets from memory)
+//{
+//  for(auto& b : fd.ui.ndBtns){
+//    fd.ui.keyWin->removeChild(b);
+//  }
+//  fd.ui.ndBtns.clear();                                             // delete interface buttons from the nanogui window
+//}
+//SECTION(redo interface node buttons)
+//{
+//  for(auto& kv : fd.flow.flow)
+//  {
+//    LavaNode*     fn = kv.second;                                // fn is flow node
+//    auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
+//    ndBtn->setCallback([fn](){ 
+//      v2 stPos = {fd.ui.w/2.f,  fd.ui.h/2.f};                                                // stPos is starting position
+//      node_add(fn->name, Node("", (Node::Type)((u64)fn->node_type), stPos) );
+//    });
+//    fd.ui.ndBtns.push_back(ndBtn);
+//  }
+//}
+//fd.ui.screen.performLayout();
 
 //LavaNode::NODE_ERROR;
 //instIdx = nxtId();
