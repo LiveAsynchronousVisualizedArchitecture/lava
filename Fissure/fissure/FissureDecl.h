@@ -342,16 +342,17 @@ struct FisData
     f32              grphCy  =  0.0f;
     f32              tfm[6]  =  {1.f,0,0,1.f,0,0};                         // calculated in the drawing loop - initialized as the top 6 values of a 3x3 identity matrix ordered according to nanovg
     f32           invTfm[6]  =  {1.f,0,0,1.f,0,0};                         // calculated in the drawing loop 
-    NVGcolor        lineClr  =  nvgRGBAf(.04f, .04f,  .04f,   1.f);
-    NVGcolor       nd_color  =  nvgRGBAf(.2f,  .3f,   .375f,  1.f);
-    NVGcolor   nd_cache_clr  =  nvgRGBAf(.1f,  .35f,  .2f,    1.f);
-    NVGcolor   nd_const_clr  =  nvgRGBAf(.25f, .2f,   .3f,    1.f);
-    NVGcolor      nd_selclr  =  nvgRGBAf(.5f,  .4f,   .1f,    1.f);
-    NVGcolor       nd_hilgt  =  nvgRGBAf(1.f,1.f,1.f, 0.025f);
-    NVGcolor    msgnd_color  =  nvgRGBAf(.2f, .3f, .375f, 1.f);
-    NVGcolor   msgnd_selclr  =  nvgRGBAf(.5f,.4f,.1f, .75f);
-    NVGcolor   msgnd_gradst  =  nvgRGBAf(.3f, .3f, .3f, .7f);
-    NVGcolor   msgnd_graden  =  nvgRGBAf(.15f, .15f, .15f, .65f); 
+    NVGcolor        lineClr  =  nvgRGBAf(.04f, .04f,   .04f,   1.f);
+    NVGcolor       nd_color  =  nvgRGBAf(.2f,  .3f,    .375f,  1.f);       // blue
+    NVGcolor     nd_gen_clr  =  nvgRGBAf(.1f,  .35f,   .2f,    1.f);       // green
+    NVGcolor   nd_const_clr  =  nvgRGBAf(.25f, .2f,    .3f,    1.f);       // purple
+    NVGcolor  nd_gather_clr  =  nvgRGBAf(.4f,  .35f,   .15f,   1.f);       // orange
+    NVGcolor      nd_selclr  =  nvgRGBAf(.5f,  .4f,    .1f,    1.f);       // yellow
+    NVGcolor       nd_hilgt  =  nvgRGBAf(1.f, 1.f,    1.f,     0.025f);
+    NVGcolor    msgnd_color  =  nvgRGBAf(.2f,  .3f,    .375f,  1.f);
+    NVGcolor   msgnd_selclr  =  nvgRGBAf(.5f,  .4f,    .1f,     .75f);
+    NVGcolor   msgnd_gradst  =  nvgRGBAf(.3f,  .3f,    .3f,     .7f);
+    NVGcolor   msgnd_graden  =  nvgRGBAf(.15f, .15f,   .15f,    .65f); 
 
     f32           nd_border  =   3.5f;
     f32            slot_rad  =   15.f;

@@ -92,12 +92,17 @@
 // -todo: make const file write out to the same directory as node shared libs
 // -todo: make const node be created and placed in the graph after dragging from a slot
 // -todo: draw a line from the original slot while dragging a node
-
-// todo: debug why loadFile is called twice
-// todo: debug crash after deleting some nodes then saving - are the two graphs getting out of sync? why does an instance end up with a nullptr for its node? 
+// -todo: debug why loadFile is called twice - no good reason
+// -todo: debug crash after deleting some nodes then saving - are the two graphs getting out of sync? why does an instance end up with a nullptr for its node? 
 //       |  try deleting a single node, saving and stepping through sel_del()
 //       |  need to delete instances instead of nodes? - instances seem to be deleted
 //       |  why are the node ids not found in the instances? either the ui graph node needs to be deleted, an instance is being deleted that shouldn't, or the id isn't lining up after deletion
+//       |  lots of nonsense with not thoroughly remapping node ids before saving
+// -todo: make drag line from slot be positioned in screen space correctly - nvgSave() nvgResetTransform() and nvgRestore() worked when surrounding the screen space point of the cursor
+// -todo: make slot drag not switch when dragging over a different slot
+// -todo: give node buttons bg colors according to their type
+// -todo: make an orange gather color and have it used for node buttons and nodes
+
 // todo: make a roughness parameter as constant input for the shade ray hits 
 // todo: order generator nodes by traversing the graph backwards 
 // todo: investigate if Trace node is spending most of its time in the BVH building and figure out what to do about it
@@ -972,8 +977,9 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
   NVGcolor col = fd.ui.nd_selclr; //fd.ui.nd_color;
   if(!sel){
     switch(n.type){
-    case Node::Type::GENERATOR: col = fd.ui.nd_cache_clr; break;
-    case Node::Type::CONSTANT:  col = fd.ui.nd_const_clr; break;
+    case Node::Type::CONSTANT:  col = fd.ui.nd_const_clr;  break;
+    case Node::Type::GENERATOR: col = fd.ui.nd_gen_clr;    break;
+    case Node::Type::MSG:       col = fd.ui.nd_gather_clr; break;
     case Node::Type::FLOW:
     default: 
       col = fd.ui.nd_color; break;
@@ -1007,7 +1013,8 @@ void           node_draw(NVGcontext* vg,      // drw_node is draw node
         nvgCircle(vg, cntrX, cntrY, msgRad);
         auto radial = nvgRadialGradient(vg,
           cntrX, cntrY, msgRad*.5f, msgRad,
-          fd.ui.msgnd_gradst,
+          //fd.ui.msgnd_gradst,
+          col,
           fd.ui.msgnd_graden  );
         nvgFillPaint(vg, radial);
         nvgFill(vg);
@@ -1780,11 +1787,24 @@ void  refreshNodeButtons()
   {
     for(auto& kv : fd.flow.flow)
     {
-      LavaNode*     fn = kv.second;                                // fn is flow node
-      auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
-      ndBtn->setCallback([fn](){ 
+      LavaNode*    ln = kv.second;                                                             // fn is flow node
+      auto      ndBtn = new Button(fd.ui.keyWin, ln->name);
+      auto        clr = fd.ui.nd_color;
+      switch(ln->node_type){
+        case LavaNode::CONSTANT:   clr = fd.ui.nd_const_clr;  break;
+        case LavaNode::GENERATOR:  clr = fd.ui.nd_gen_clr;    break;
+        case LavaNode::MSG:        clr = fd.ui.nd_gather_clr; break;
+        case LavaNode::FLOW:
+      default: break;
+      }
+      nanogui::Color nclr;
+      TO(3,i){ nclr[i] = clr.rgba[i]; }
+      nclr[3] = 1.f;
+
+      ndBtn->setBackgroundColor(nclr);
+      ndBtn->setCallback([ln](){ 
         v2 stPos = {fd.ui.w/2.f,  fd.ui.h/2.f};                                                // stPos is starting position
-        node_add(fn->name, Node("", (Node::Type)((u64)fn->node_type), stPos) );
+        node_add(ln->name, Node("", (Node::Type)((u64)ln->node_type), stPos) );
       });
       fd.ui.ndBtns.push_back(ndBtn);
     }
@@ -2409,7 +2429,7 @@ ENTRY_DECLARATION // main or winmain
         graph_apply(move(av));
       }
 
-      bool    rtClk = (ms.rtDn  && !ms.prevRtDn);  // todo: take this out
+      //bool    rtClk = (ms.rtDn  && !ms.prevRtDn);  // todo: take this out
       auto      nds = node_getPtrs();
       auto       sz = nds.size();
       bool isInNode = false;
@@ -2503,7 +2523,7 @@ ENTRY_DECLARATION // main or winmain
             isInSlot    =  len(pntr - s.P) < fd.ui.slot_rad;
             if(isInSlot){ 
               sid = kv.first;
-              if(midClkDn){ 
+              if(midClkDn && ms.drgSlot.asInt==LavaNode::NODE_ERROR){ 
                 fd.mouse.drgSlot = sid;
                 fd.mouse.drgSlotP = s.P;
               }
@@ -2816,37 +2836,37 @@ ENTRY_DECLARATION // main or winmain
       }
       SECTION(drawing)
       {
-        SECTION(drawing feedback from the lava flow graph)
-        {
-        }
-
         SECTION(nanovg drawing - |node graph|)
         {
           f32 cx = fd.ui.grphCx * fd.ui.w;
           f32 cy = fd.ui.grphCy * fd.ui.h;
+          v2  drgSltScrn = ms.drgSlotP;                                               // a drag slot position that will be transformed from the 'world space' to screen coordinates
           nvgBeginFrame(vg,  fd.ui.w,   fd.ui.h, pxRatio);
             nvgResetTransform(vg);
-            
+                        
+            nvgTranslate(vg,    fd.ui.w/2.f,      fd.ui.h/2.f);
+            nvgScale(vg,       fd.ui.grphTx,     fd.ui.grphTy);
+            nvgTranslate(vg,   -fd.ui.w/2.f,     -fd.ui.h/2.f);
+            nvgTranslate(vg,             cx,               cy);
+
             SECTION(draw a line when dragging a slot)
             {
               if(fd.mouse.drgSlot.asInt != LavaNode::NODE_ERROR)
               {
                 nvgStrokeColor(vg, fd.ui.nd_const_clr);
                 nvgStrokeWidth(vg, 4.f);
-                //NVGpaint paint;
-                //paint
-                //nvgStrokePaint(vg, paint);
                 nvgBeginPath(vg);
-                nvgMoveTo(vg, ms.drgSlotP.x, ms.drgSlotP.y);
-                nvgLineTo(vg, ms.pos.x, ms.pos.y);
+                  nvgMoveTo(vg, ms.drgSlotP.x, ms.drgSlotP.y);
+                  nvgSave(vg);
+                  nvgResetTransform(vg);
+                    nvgLineTo(vg, ms.pos.x,      ms.pos.y);
+                  nvgRestore(vg);
                 nvgStroke(vg);
               }
+              //NVGpaint paint;
+              //paint
+              //nvgStrokePaint(vg, paint);
             }
-            
-            nvgTranslate(vg,    fd.ui.w/2.f,      fd.ui.h/2.f);
-            nvgScale(vg,       fd.ui.grphTx,     fd.ui.grphTy);
-            nvgTranslate(vg,   -fd.ui.w/2.f,     -fd.ui.h/2.f);
-            nvgTranslate(vg,             cx,               cy);
 
             grid_draw(vg, fd.graph.gridSpace);
 
@@ -3137,6 +3157,11 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+//SECTION(drawing feedback from the lava flow graph)
+//{
+//}
 
 //Println("Dropped Files:");
 //TO(count,i){
