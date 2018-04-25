@@ -84,8 +84,8 @@
       <NoEntryPoint>false</NoEntryPoint>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
       <ImportLibrary>$(OutDir)/misc/$(TargetName).lib</ImportLibrary>
-      <GenerateDebugInformation>false</GenerateDebugInformation>
-      <ProgramDatabaseFile />
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ProgramDatabaseFile>$(OutDir)/misc/$(TargetName).pdb</ProgramDatabaseFile>
       <EnableUAC>false</EnableUAC>
       <IgnoreEmbeddedIDL>true</IgnoreEmbeddedIDL>
       <DataExecutionPrevention>false</DataExecutionPrevention>

@@ -102,6 +102,8 @@
 // -todo: make slot drag not switch when dragging over a different slot
 // -todo: give node buttons bg colors according to their type
 // -todo: make an orange gather color and have it used for node buttons and nodes
+// -todo: put slot drag line above grid line
+// -todo: make slot drag constant node creation map the screen space line back to the world space - global state point that is transformed by the inverse of the current nanavg matrix 
 
 // todo: make a roughness parameter as constant input for the shade ray hits 
 // todo: order generator nodes by traversing the graph backwards 
@@ -2017,15 +2019,13 @@ LavaNode*           sidToConst(LavaId     sid)
   Node n;
   n.txt = ln->name;
   node_bnd(fd.vg, n);
-  n.P   = fd.mouse.pos - n.b.wh()/2;
+  //n.P   = fd.mouse.pos - n.b.wh()/2;
+  n.P   = fd.mouse.drgWrld - n.b.wh()/2;
   node_add(ln->name, n);
 
   refreshNodeButtons();
 
   return ln;
-
-  //Node n;
-  //node_add(pth, n);
 }
 // End Fis DB interaction
 
@@ -2838,9 +2838,11 @@ ENTRY_DECLARATION // main or winmain
       {
         SECTION(nanovg drawing - |node graph|)
         {
+          f32 scrnToWrld[6]={};
+          f32     curTfm[6]={};
           f32 cx = fd.ui.grphCx * fd.ui.w;
           f32 cy = fd.ui.grphCy * fd.ui.h;
-          v2  drgSltScrn = ms.drgSlotP;                                               // a drag slot position that will be transformed from the 'world space' to screen coordinates
+          ms.drgWrld = ms.pos;                                               // a drag slot position that will be transformed from the 'world space' to screen coordinates
           nvgBeginFrame(vg,  fd.ui.w,   fd.ui.h, pxRatio);
             nvgResetTransform(vg);
                         
@@ -2848,11 +2850,17 @@ ENTRY_DECLARATION // main or winmain
             nvgScale(vg,       fd.ui.grphTx,     fd.ui.grphTy);
             nvgTranslate(vg,   -fd.ui.w/2.f,     -fd.ui.h/2.f);
             nvgTranslate(vg,             cx,               cy);
+            nvgCurrentTransform(vg,         curTfm);
+            nvgTransformInverse(scrnToWrld, curTfm);
+
+            grid_draw(vg, fd.graph.gridSpace);
 
             SECTION(draw a line when dragging a slot)
             {
               if(fd.mouse.drgSlot.asInt != LavaNode::NODE_ERROR)
               {
+                nvgTransformPoint(&ms.drgWrld.x, &ms.drgWrld.y, scrnToWrld, ms.drgWrld.x, ms.drgWrld.y);
+
                 nvgStrokeColor(vg, fd.ui.nd_const_clr);
                 nvgStrokeWidth(vg, 4.f);
                 nvgBeginPath(vg);
@@ -2863,13 +2871,7 @@ ENTRY_DECLARATION // main or winmain
                   nvgRestore(vg);
                 nvgStroke(vg);
               }
-              //NVGpaint paint;
-              //paint
-              //nvgStrokePaint(vg, paint);
             }
-
-            grid_draw(vg, fd.graph.gridSpace);
-
             SECTION(current node highlights)
             {
               auto nid = fd.graph.curNode;
@@ -3158,6 +3160,15 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+
+//Node n;
+//node_add(pth, n);
+
+//NVGpaint paint;
+//paint
+//nvgStrokePaint(vg, paint);
 
 //SECTION(drawing feedback from the lava flow graph)
 //{
