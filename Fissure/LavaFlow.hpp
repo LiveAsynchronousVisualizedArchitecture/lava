@@ -1291,19 +1291,6 @@ public:
     }
     curDestCncts() = move(nxtDestCncts);
 
-    // slots
-    //Slots nxtSlots;
-    //for(auto& kv : curSlots()){
-    //  LavaId nxtId  = kv.first;
-    //  nxtId.nid     = nids[nxtId.nid];
-    //  LavaFlowSlot nxtS = kv.second;
-    //  auto nxtSltId = nids[nxtS.id.nid];
-    //  nxtS.id.nid   = nxtSltId;
-    //  nxtS.id.sidx  = nxtS.id.sidx;
-    //  nxtSlots.insert({nxtId, nxtS});
-    //}
-    //curSlots() = move(nxtSlots);
-
     SECTION(in slots)
     {
       Slots nxtSlots;
@@ -1338,18 +1325,12 @@ public:
     for(auto& kv : curNodes()){
       u64     nxtId = nids[kv.first];
       LavaInst inst = curNodes()[kv.first];
+      inst.id       = nxtId;
       nxtNds.insert({nxtId, inst});
     }
     curNodes() = move(nxtNds);
 
     return nids;
-
-
-    ////nids.reserve(curNodes().size());
-    //u64 cur = 1;
-    //for(auto& kv : curNodes()){
-    //  nids[kv.first] = cur++;
-    //}
   }
   void      setNextNodeId(u64 nxt){ m_nxtId = nxt; }
   u64           totalTime()
@@ -1499,13 +1480,7 @@ public:
   uint64_t    addNode(LavaNode* ln) // bool newId=true)
   {
     u64 id = nxtId();
-    addNode(ln, id);
-
-    //if(ln->node_type == LavaNode::MSG)
-    //  oppMsgNodes().insert(id);
-    //
-    //LavaInst li = makeInst(id, ln);
-    //return oppNodes().insert({id, li}).first->first;                             // returns a pair that contains the key-value pair
+    return addNode(ln, id);
   }
   bool        delNode(uint64_t nid)
   {
@@ -1526,8 +1501,24 @@ public:
       }
     }
 
-    auto  inSltCnt = oppInSlots().erase(nid);                         // slcnt is slot count
-    auto outSltCnt = oppOutSlots().erase(nid);                        // slcnt is slot count
+    SECTION(delete input/destination slots)
+    {
+      auto si = this->nodeInSlots(nid);                       // si is slot iterator
+      for(; si!=end(oppInSlots()) && si->first.nid==nid; ){
+         si = oppInSlots().erase(si);
+      }
+    }
+
+    SECTION(delete output/src slots)
+    {
+      auto si = this->nodeOutSlots(nid);                       // si is slot iterator
+      for(; si!=end(oppOutSlots()) && si->first.nid==nid; ){
+        si = oppOutSlots().erase(si);
+      }
+    }
+
+    //auto  inSltCnt = oppInSlots().erase(nid);                         // slcnt is slot count
+    //auto outSltCnt = oppOutSlots().erase(nid);                        // slcnt is slot count
 
     auto&  ndInsts = oppNodes();
     //ndInsts[nid].node->destructor();
@@ -1537,7 +1528,8 @@ public:
 
     oppGenNodes().erase(nid);
 
-    return (cnt + inSltCnt + outSltCnt) > 0;                                  // return true if 1 or more elements were erased, return false if no elements were erasedm
+    return cnt > 0;                                  // return true if 1 or more elements were erased, return false if no elements were erasedm
+    //return (cnt + inSltCnt + outSltCnt) > 0;                                  // return true if 1 or more elements were erased, return false if no elements were erasedm
   }
   LavaId      addSlot(LavaFlowSlot  s, u64 sidx=LavaId::SLOT_NONE)
   {
@@ -2899,6 +2891,33 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+
+
+// slots
+//Slots nxtSlots;
+//for(auto& kv : curSlots()){
+//  LavaId nxtId  = kv.first;
+//  nxtId.nid     = nids[nxtId.nid];
+//  LavaFlowSlot nxtS = kv.second;
+//  auto nxtSltId = nids[nxtS.id.nid];
+//  nxtS.id.nid   = nxtSltId;
+//  nxtS.id.sidx  = nxtS.id.sidx;
+//  nxtSlots.insert({nxtId, nxtS});
+//}
+//curSlots() = move(nxtSlots);
+
+////nids.reserve(curNodes().size());
+//u64 cur = 1;
+//for(auto& kv : curNodes()){
+//  nids[kv.first] = cur++;
+//}
+
+//if(ln->node_type == LavaNode::MSG)
+//  oppMsgNodes().insert(id);
+//
+//LavaInst li = makeInst(id, ln);
+//return oppNodes().insert({id, li}).first->first;                             // returns a pair that contains the key-value pair
 
 //auto nameEnd = nameStr.find('.');
 //nameStr = nameStr.substr(0, nameEnd);

@@ -93,6 +93,11 @@
 // -todo: make const node be created and placed in the graph after dragging from a slot
 // -todo: draw a line from the original slot while dragging a node
 
+// todo: debug why loadFile is called twice
+// todo: debug crash after deleting some nodes then saving - are the two graphs getting out of sync? why does an instance end up with a nullptr for its node? 
+//       |  try deleting a single node, saving and stepping through sel_del()
+//       |  need to delete instances instead of nodes? - instances seem to be deleted
+//       |  why are the node ids not found in the instances? either the ui graph node needs to be deleted, an instance is being deleted that shouldn't, or the id isn't lining up after deletion
 // todo: make a roughness parameter as constant input for the shade ray hits 
 // todo: order generator nodes by traversing the graph backwards 
 // todo: investigate if Trace node is spending most of its time in the BVH building and figure out what to do about it
@@ -817,13 +822,13 @@ auto        node_getPtrs() -> vec_ndptrs
 {
   auto& nodes = fd.graph.nds;
   auto     sz = fd.graph.nds.size();  // nds.nsz();
-  u64       i = 0;
+  //u64       i = 0;
   vec_ndptrs nds; 
   nds.reserve(sz);
   for(auto& ido : fd.graph.ordr){                     // ido is id order - an IdOrdr struct
     if(nodes.find(ido.id) != end(nodes)){
       nds.push_back( &fd.graph.nds[ido.id] );
-      ++i;
+      //++i;
     }
   }
 
@@ -1345,7 +1350,6 @@ void           grid_draw(NVGcontext* vg, f32 lineSpace = 128.f)
 auto           sel_nodes() -> vec_ndptrs
 {
   vec_ndptrs nds;                                      // nids is node ids
-                                                       //for(auto& on : m_nodes){                           // on is order and node - order is on.first    node is on.second
   for(auto& on : fd.graph.nds){                        // on is order and node - order is on.first    node is on.second
     if(on.second.sel) nds.push_back(&on.second);
   }
@@ -1359,6 +1363,8 @@ auto           sel_nodes() -> vec_ndptrs
   }
 
   return nds;                                          // counting on RVO (return value optimization) here
+
+  //for(auto& on : m_nodes){                           // on is order and node - order is on.first    node is on.second
 }
 u64           sel_delete()
 {
@@ -1424,9 +1430,6 @@ void           sel_clear()
     kv.second.sel = false;
   }
 
-  //for(auto& kv : fd.graph.slots){
-  //  kv.second.state = Slot::NORMAL;
-  //}
   for(auto& kv : fd.graph.inSlots){
     kv.second.state = Slot::NORMAL;
   }
@@ -1480,6 +1483,11 @@ void         graph_apply(LavaGraph::ArgVec args)
     }
   }
 }
+void         graph_apply()
+{
+  LavaGraph::ArgVec av = fd.lgrph.exec();
+  graph_apply(move(av));
+}
 // End state manipulation
 
 // Serialize to and from json - put in FisTfm.hpp file?
@@ -1508,19 +1516,21 @@ void    normalizeIndices()
     auto nxtId = nmap[kv.first];
     nxtNds[nxtId] = move(kv.second);
   }
+  
+  // make sure the fissure ui nodes have matching ids
+  for(auto& idNd : nxtNds){
+    idNd.second.id    = idNd.first;
+    //idNd.second.order = idNd.first;
+  }
+
+  // just clear vizIds and stepIds for now
+  fd.vizIds.clear();
+  fd.stepIds.clear();
+
   fd.graph.nds = move(nxtNds);
 
   SECTION(slots)
   {
-    //decltype(fd.graph.slots) nxtSlots;
-    //for(auto& kv : fd.graph.slots){
-    //  LavaId    nxtId = kv.first;
-    //  nxtId.nid       = nmap[nxtId.nid];
-    //  //auto      nxtId = nmap[kv.first.nid];
-    //  nxtSlots.insert({ nxtId, move(kv.second) });
-    //}
-    //fd.graph.slots = move(nxtSlots);
-
     decltype(fd.graph.inSlots) nxtInSlots;
     for(auto& kv : fd.graph.inSlots){
       LavaId    nxtId = kv.first;
@@ -1560,8 +1570,14 @@ str           graphToStr(LavaGraph const& lg)
     auto        lnds = lg.nodes();         // lnds is Lava Nodes
     auto          sz = lnds.size();
 
+    assert(nps.size() == sz);
+
     Jzon::Node  nd_func = Jzon::array();
-    TO(sz,i) nd_func.add( lg.node(nps[i]->id).node->name );
+    TO(sz,i){
+      assert( lg.curNodes().find( nps[i]->id ) != lg.curNodes().end() );
+      LavaInst linst = lg.node(nps[i]->id);
+      nd_func.add( linst.node->name );
+    }
 
     Jzon::Node    nd_id = Jzon::array();
     TO(sz,i) nd_id.add(nps[i]->id);
@@ -1743,10 +1759,9 @@ bool            loadFile(str path, LavaGraph* out_g)
 
   if(fclose(f) == EOF) return false;
 
-   //*out_g = strToGraph(s);
   strToGraph(s);
 
-  //startFlowThreads(1);
+  graph_apply();
 
   return true;
 }
@@ -1886,23 +1901,12 @@ void              charCallback(GLFWwindow* window, unsigned int codepoint)
 }
 void              dropCallback(GLFWwindow* window, int count, const char** filenames)
 {
-  //FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
-  //bool   used = fd->ui.screen.dropCallbackEvent(count, filenames);
-
   bool   used = fd.ui.screen.dropCallbackEvent(count, filenames);
-
-  Println("Dropped Files:");
-  TO(count,i){
-    bool ok = loadFile(filenames[i], &fd.lgrph);
-    Println(filenames[i]);
-  }
-  Println();
 
   if(count>0){
     bool ok = loadFile(filenames[0], &fd.lgrph);
     Println(filenames[0], " loaded ",  ok? "successfully"  :  "unsuccessfully");
   }
-
 }
 void   framebufferSizeCallback(GLFWwindow* window, int w, int h)
 {
@@ -3134,8 +3138,33 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//Println("Dropped Files:");
+//TO(count,i){
+//  bool ok = loadFile(filenames[i], &fd.lgrph);
+//  Println(filenames[i]);
+//}
+//Println();
 
+//decltype(fd.graph.slots) nxtSlots;
+//for(auto& kv : fd.graph.slots){
+//  LavaId    nxtId = kv.first;
+//  nxtId.nid       = nmap[nxtId.nid];
+//  //auto      nxtId = nmap[kv.first.nid];
+//  nxtSlots.insert({ nxtId, move(kv.second) });
+//}
+//fd.graph.slots = move(nxtSlots);
 
+//FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
+//bool   used = fd->ui.screen.dropCallbackEvent(count, filenames);
+
+//*out_g = strToGraph(s);
+//
+//startFlowThreads(1);
+//fd.lgrph.exec();
+
+//for(auto& kv : fd.graph.slots){
+//  kv.second.state = Slot::NORMAL;
+//}
 
 //SECTION(get the buttons out of the GUI and clear the button widgets from memory)
 //{

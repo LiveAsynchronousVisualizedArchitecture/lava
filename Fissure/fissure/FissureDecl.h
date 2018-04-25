@@ -234,6 +234,12 @@ struct  AtmSet
     TO(sz,i){ if(load(i)!=null_val){ cnt++; } }
     return cnt;
   }
+  void   clear()
+  {
+    TO(sz,i){
+      buf[i].store(null_val);
+    }
+  }
 };
 
 struct FisData
