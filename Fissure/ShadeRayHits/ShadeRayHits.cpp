@@ -365,8 +365,6 @@ extern "C"
     tbl     specZ = LavaMakeTbl(lp, rayCnt,   0.f);
     TO(rayCnt,i)
     {
-      //Vec3f V(   (f32)dx[i],   (f32)dy[i],   (f32)dz[i]   );
-      //Vec3f N( (f32)Ng_x[i], (f32)Ng_y[i],   (f32)Ng_z[i] );
       Vec3f V(    dx[i],    dy[i],     dz[i]  );
       Vec3f N(  Ng_x[i],  Ng_y[i],   Ng_z[i]  );
 
@@ -429,6 +427,8 @@ extern "C"
 
 
 
+//Vec3f V(   (f32)dx[i],   (f32)dy[i],   (f32)dz[i]   );
+//Vec3f N( (f32)Ng_x[i], (f32)Ng_y[i],   (f32)Ng_z[i] );
 
 //u32 i=0;
 //while( LavaNxtPckt(in, &i) )

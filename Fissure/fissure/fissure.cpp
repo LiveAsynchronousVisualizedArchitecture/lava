@@ -104,6 +104,7 @@
 // -todo: make an orange gather color and have it used for node buttons and nodes
 // -todo: put slot drag line above grid line
 // -todo: make slot drag constant node creation map the screen space line back to the world space - global state point that is transformed by the inverse of the current nanavg matrix 
+// -todo: zero pad thread slider label
 
 // todo: make a roughness parameter as constant input for the shade ray hits 
 // todo: order generator nodes by traversing the graph backwards 
@@ -131,7 +132,7 @@
 //       | might just need to shift the pan by the change in the center point
 // todo: make nodes have their own scale that dictates the text size and not the other way around
 // todo: put slot name in db key - maybe the name should have two lines
-// todo: make sure zooming center is affected by cursor placement
+// todo: make sure zooming center is affected by cursor placement - now have the cursor in world space thanks to drgWrld
 // todo: make message node's text split to new lines on white space
 // todo: make an IdxVerts helper header file
 // todo: change node colors to be based off of profiling information while holding 'p' key
@@ -2075,8 +2076,6 @@ ENTRY_DECLARATION // main or winmain
   using namespace std;
   using namespace fs;
   
-  GL_TRIANGLES;
-
   NVGcontext*& vg = fd.vg;
   SECTION(initialization)
   {
@@ -2155,19 +2154,16 @@ ENTRY_DECLARATION // main or winmain
       auto spcr2      = new   Label(fd.ui.keyWin,     "");
       auto loadBtn    = new  Button(fd.ui.keyWin,      "Load");
       auto saveBtn    = new  Button(fd.ui.keyWin,      "Save");
-      auto& stepBtn  = fd.ui.stepBtn  = new  Button(fd.ui.keyWin,   "Step  ||>");
-      auto& playBtn  = fd.ui.playBtn  = new  Button(fd.ui.keyWin,     "Play  >");
-      auto& pauseBtn = fd.ui.pauseBtn = new  Button(fd.ui.keyWin,   "Pause  ||");
-      //auto stopBtn    = new  Button(fd.ui.keyWin,  "Stop  |_|");
-      auto& stopBtn  = fd.ui.stopBtn  = new  Button(fd.ui.keyWin,   "Stop  |_|");
+      auto& stepBtn   = fd.ui.stepBtn  = new  Button(fd.ui.keyWin,   "Step  ||>");
+      auto& playBtn   = fd.ui.playBtn  = new  Button(fd.ui.keyWin,     "Play  >");
+      auto& pauseBtn  = fd.ui.pauseBtn = new  Button(fd.ui.keyWin,   "Pause  ||");
+      auto& stopBtn   = fd.ui.stopBtn  = new  Button(fd.ui.keyWin,   "Stop  |_|");
       auto cnstBtn    = new  Button(fd.ui.keyWin,  "Create Constant");
       auto nodeBtn    = new  Button(fd.ui.keyWin,  "Create Node");
-      auto thrdsLabel = new   Label(fd.ui.keyWin, toString(fd.threadCount) );
+      auto thrdsLabel = new   Label(fd.ui.keyWin,  ""); //toString(fd.threadCount) );
       auto thrdsSldr  = new  Slider(fd.ui.keyWin);
 
       auto nodeTxt    = fd.ui.nodeTxt = new TextBox(fd.ui.keyWin,  "");
-
-      //fd.ui.nodeTxtId = fd.ui.keyWin->childIndex(nodeTxt);
 
       SECTION(load and save callbacks)
       {
@@ -2203,10 +2199,9 @@ ENTRY_DECLARATION // main or winmain
         cnstBtn->setCallback([](){
 
         });
-
         nodeBtn->setCallback([nodeTxt]() // creates a new node shared library using templates
         {
-          Println("nodeTxt: ", nodeTxt->value());
+          //Println("nodeTxt: ", nodeTxt->value());
 
           regex whiteSpace("[ |\t]+");
           regex whiteSpaceTrail("[ |\t]+$");
@@ -2241,7 +2236,7 @@ ENTRY_DECLARATION // main or winmain
         });
 
         nodeTxt->setEditable(true);
-        nodeTxt->setFixedWidth(250);
+        nodeTxt->setFixedWidth(150);
         nodeTxt->setAlignment(TextBox::Alignment::Left);
         nodeTxt->setTooltip("The name of the created node");
         nodeTxt->setCallback( [](str const& s){
@@ -2303,14 +2298,22 @@ ENTRY_DECLARATION // main or winmain
       {
         auto hardThreads = thread::hardware_concurrency();
 
-        thrdsSldr->setFixedWidth(200);
+        thrdsSldr->setFixedWidth(100);
         thrdsSldr->setRange( {1.f, (f32)hardThreads} );
         thrdsSldr->setCallback( [thrdsLabel, thrdsSldr](f32 i){
-          if( (i32)i != fd.threadCount ){
+          //if( (i32)i != fd.threadCount ){
             fd.threadCount = (i32)i;
             thrdsSldr->setValue( (f32)fd.threadCount );
-            thrdsLabel->setCaption( toString(fd.threadCount) );
-          }
+            
+            auto    thrdStr = toString(fd.threadCount);
+            char thrdLbl[4] = {'0','0','0','0'};
+            thrdLbl[3]      = '\0';  //'\0';
+            auto         st = 3 - thrdStr.size();
+            TO(thrdStr.length(),i){
+              thrdLbl[st+i] = thrdStr[i];
+            }
+            thrdsLabel->setCaption( thrdLbl );
+          //}
         });
         thrdsSldr->setValue(1.f);
 
@@ -2338,10 +2341,11 @@ ENTRY_DECLARATION // main or winmain
         fd.ui.statusLay = new BoxLayout(Orientation::Horizontal, Alignment::Fill, 0,0);
         fd.ui.statusWin->setLayout(fd.ui.statusLay);
       }
-      //auto txtclr = playBtn->textColor();
 
       fd.ui.screen.setVisible(true);
       fd.ui.screen.performLayout();
+
+      thrdsSldr->callback()(fd.threadCount);
 
       glfwPollEvents();
       fd.ui.screen.drawContents();
@@ -3162,6 +3166,11 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//auto stopBtn    = new  Button(fd.ui.keyWin,  "Stop  |_|");
+//
+//fd.ui.nodeTxtId = fd.ui.keyWin->childIndex(nodeTxt);
+//
+//auto txtclr = playBtn->textColor();
 
 //Node n;
 //node_add(pth, n);

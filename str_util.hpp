@@ -7,6 +7,16 @@
 #include <ostream>
 #include <iostream>
 #include <sstream>
+#include <ios>
+
+//#include <iomanip>  // causes lots of problems with visual studio 2017
+//template<class T> inline std::string 
+//toPadStr(T const& x, int width)
+//{
+//  std::ostringstream convert;
+//  convert << std::setw(width) << x;
+//  return convert.str();
+//}
 
 template<class T> inline std::string 
 toString(T const& x)
