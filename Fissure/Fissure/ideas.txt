@@ -1,0 +1,72 @@
+// idea: use the execution time to draw the saturation of the node color a long with a background indicator to see the nodes with the most execution time
+// idea: make tbl editor sliders change percentage of the number while also being non-linear with drag speed
+// idea: make optional inputs yellowish and optional outputs purpleish - but both sort of whiteish - is there such a thing as optional outputs? aren't all outputs optional? 
+// idea: should the big difference in MSG nodes as opposed to data flow nodes be that they are always run from the same thread that unlocks? 
+// idea: keep track of both time speht in a node and the memory allocations it uses
+// idea: make packets visualize on slots circles stack as concentric circles or as portions/segments of a single circle 
+// idea: make errors in the directory creation give an error in the status bar 
+// idea: make right click or space bar open up a text box that can contain the build command, stats and/or hotbox
+// idea: make popup text box that avoids the bounding box of the moused over node? - put graph of node times in the box? put graph of covariance data of data in, time spent, data out, and time ?   
+// idea: try to unify nanogui into a single file?
+// idea: try to unify nfd into a single file ? 
+// idea: build guard pages into Lava heap allocations that can be set to non read or write - use these to crash if memory is read or written out of bounds - maybe do this only in debug mode
+// idea: make a table creation and editing GUI
+// idea: make a dialog to set a compilation command for each node - think about debug and release modes, different OSs - set the current working directory to the node directory path
+// idea: when turning off a slot, take it out, delete it, and put it back under a name with 'OFF: ' as a prefix
+// idea: keep track of covariance matrix for time vs size of data 
+//       | keep track of multiple moments and detect if a node has a quadratic / O(n^2) time
+//       | keep track of the covariance of input data, time, and other parameters to show how they affect the running time of that node?
+//       | also keep track of the parameters and input size to see how they affect the data output size - does this complete the data needed to estimate how long calculations will take with a breakdown of where all the time will be spent? 
+// idea: make an optional main message node that takes command line input 
+// idea: make an execute count on each Node - accumulate on every frame to draw which nodes are executing
+// idea: give message nodes an order than can be edited
+// idea: make LavaGraph into a template and use it for the visual graph as well?
+// idea: load shared libs asynchronously and show a progress bar somewhere
+// idea: make command queue - use a simdb file or use the heap
+// idea: try compiling nanogui into one file - depends on eigen, stb and glfw
+// idea: separate finding node the pointer is inside from the action to take
+// idea: make nodes snap to a grid
+// idea: combine src and dest slots when writing json and just use a boolean to separate them 
+// idea: have a panel or window that shows information about the selected node and the shared library it represents
+// idea: make connections thicker when there is more data and brighter when there are more packets
+// idea: build in focus as information separate from selection
+// idea: draw message node slots as sliding angles
+// idea: make connection delete and create trigger when 1 or more in/dest slots are selected and 1 out/src slot is connected
+// idea: make a single file include all nanoui into one compilation unit
+// idea: make msg loop that would deal with selections, clicks and drags? 
+// idea: take out redudant node position + bnd information 
+// idea: look into quantized gradients of nanovg
+// idea: switch over to using json.hpp
+// idea: make load file take the state in
+// idea: make an io file
+// idea: make a recently opened menu
+// idea: drag json file into window to open file
+// idea: draw arrows (triangles) to show direction with connections
+// idea: make connection a set
+// idea: slow down cursor over nodes
+// idea: speed up cursor while dragging
+// idea: highlight connections and slots when a node is selected
+// idea: half highlight when mouse over of node, slot or connection
+// idea: make snapped/grouped nodes separate with right mouse button
+// idea: make mouse slow down over slots more than it slows down over nodes
+// idea: make click and drag for connections
+// idea: make selected indication a border effect and not a color change
+// idea: make selection a vector for multi-selection - if the vector capacity is 3x the size, use reserve to shrink it down to 1.5x the size?
+// idea: make connections have different shapes? draw three thin lines for a scatter connection?
+// idea: make nodes different shapes? - make data input into vertical columns?
+// idea: look into openGL input latency technique
+// idea: convert general data structures of nodes, slots, and connections to use tbl?
+// idea: make drawing order of slots dictated by node order
+// idea: make connection class that keeps two connection arrays, each sorted by src or dest for fast searching
+// idea: keep covariance statistics of input size, output size and time taken
+// idea: try making the embree vector a union with a float array inside
+// idea: draw slots that are framed together as one blob with multiple slots in the UI
+// idea: make a note node that will show the hotkeys and thus can be deleted at any time
+// idea: make reloaded nodes have highlights until the next event
+// idea: make note nodes that are drawn over the grid but behind nodes 
+// graph ideas:
+// idea: figure out a way to have a reader count with lava.graph - is an atomic hash map inevitable? 
+// idea: put in read count and write count for both A and B buffers
+// idea: change cur() functions to const and rename to read() - maybe later
+// idea: change opp() functions to non-const only and rename to write() - maybe later
+

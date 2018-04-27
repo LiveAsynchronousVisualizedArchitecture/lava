@@ -242,3 +242,45 @@ Sub Networks:
 |  |  Can still see inside a sub-network, but just have to zoom in to see details
 
 
+
+
+
+
+
+
+
+
+
+// Major Features: 
+//   | -Catch low level exceptions on each node
+//   | -Automatic reloading of shared libs
+//   | -Packet syncing through use of frames
+//   | -Live editing of input tables 
+//   | -Constant input tables to configure a node? - can constant input tables just be a live table that gets frozen into the binary? would it be memory mapped and a specially tagged pointer passed around?
+//   | Freezing data while playing
+//   | Reloading of shared libs while running 
+//   | Node graph visualizations, tests and notes treated specially with the ability to be hidden
+//   | Packet queueing based on cache and memory heirarchies - look in a queue for the physical core, then whatever shares the L2 cache, L3 cache, and finally the same NUMA node - special queue structure needed that will automatically use this heirarchy by being specifically structured around it - need to weigh importance of having the absolute correct ordering versus using the memory heirarchy as effectivly as possible - maybe the memory heirarchy is the most important, but would out of order frames cause problems? possibly only if message passing nodes did not make sure to process the frames they recieve in order - would this end up being a tree structure of queues
+
+// q: do nodes just need to be tagged for visualization so that they put their outputs in the viz db? - should this just be a function hook so that the LavaGraph doesn't have to deal with it? 
+//    | put it in the packet queue first, then run the function callback on the LavaMem from the same frame
+//    | how should it be identified?
+// q: does each node need it's own memory to create a full frame?
+// q: does each node slot need it's own priority queue to put frames together? 
+// q: how is it possible to determine when to run a node with a full frame?
+// q: should there be a section of memory for packets to be copied to? 
+//    |  when a packet is pulled from the queue it could be copied to slot memory for the node
+//    |  if a thread completes a frame, then it runs the node with that frame
+//    |  this would possibly imply multiple frame buffers in a ring
+// q: what to do about a scenario where multiple packets for a single frame are being generated, but there are non-optional arguments that will keep them from running
+// q: is there any value in a queue for each node?
+// q: is there any value in a multi-stage queue that takes packets out and organizes them into frames to create a frame queue?
+//    | there would need to be a packet queue, a packet combining stage, then a frame queue
+//    | can it be guaranteed that frames will run sequentially on a node basis? - if the queue is sorted by frame first, then node, then slot, without accounting for multiple packets to one slot, they should be roughly in order and a frame should exist in the queue roughly sequentially
+//    | does there need to be a limitation that says nodes that splits can't feed into a node with framed slots?
+//    | structurally does this mean that nodes would have attributes instead of one type? 
+//    |  |  main issues are gather and split
+//    |  |  if a node wants to gather packets but not output a single packet, would it be both a gather and a split?
+
+
+

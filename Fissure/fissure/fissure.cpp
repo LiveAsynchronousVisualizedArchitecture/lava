@@ -1,111 +1,5 @@
 
-// -todo: try changing the second addNode function in LavaGraph to just generate a new id then use the first overload
-// -todo: make cache nodes be added to the generator/message node list
-// -todo: work out details for a cache node - could be part of the generators list along with message nodes, flow nodes without inputs, and constants - can a cache node be implemented mostly with a regular node by copying its input to a global allocator like malloc or into a simdb instance? - the output type would need to match the input type instead of being hard coded
-// -todo: change cache node type to generator
-// -todo: try tiny libc in a node - many missing C++ functions including operator delete(void*, i64) for sized deallocation
-// -todo: make an empty string for type ( "" ) be any type, possibly with lighter color slots
-// -todo: change node deletions in lava graph to use opposite buffer
-// -todo: fix saving crash after deletion of node - lava nodes size is not getting resized to be 1 less after node deletion
-// -todo: figure out why cache node crashes after being deleted - wasn't checking if the pointer was null before asserting
-// -todo: make node stats be reset on play but not on stop
-// -todo: build in resize function into tbl so that arrays can be allocated just once
-// -todo: change message node list to be named 'generator' node list
-// -todo: change frame counting variable name to be called cycle 
-// -todo: add brandisher to the readme github page
-// -todo: add LavaFlow.hpp description to github readme page
-// -todo: debug why craftsman path and loader don't connect when loading - ids maybe have been switched around, not sure 
-// -todo: reorganize readme on github
-// -todo: change LavaConst into a function that creates a const node and adds the node pointer to a vector in LavaFlow that can be used to free the pointers - data structure wrapping a node pointer is better, since it handles memory allocation automatically in data structures
-// -todo: make ConstTypes vector of pointers - needs to be a hash map to be able to find previous versions of the same node 
-// -todo: work on .const node loading
-// -todo: try making a struct to make const node memory management easier - probably would not simplify const node creation
-// -todo: allocate memory for const node name 
-// -todo: make node memory have an extra 8 bytes to hold a nullptr 
-// -todo: make const nodes be added to generators - already added since they have no inputs? - seems like it - input_types is a nullptr so the input count is 0, which gets const nodes added to the generator list
-// -todo: add memory mapping function from simdb to map const files
-// -todo: specialize const nodes to load from their  memory span
-// -todo: test LavaConst refresh function
-// -todo: give const node a different color
-// -todo: make MemMap function from the memory mapping in simdb
-// -todo: make constant nodes be added to the generators list - done explicitly and implicitly since their input count in 0
-// -todo: show Tbl Editor from hotkey
-// -todo: debug why the node pointer in lava inst from the the primary selection is null - primary selection was probably not set, also not getting set when drag selecting 
-// -todo: print keys from the selected constant
-// -todo: wok out structure for constants - .const files can be detected by lava - files could be named .Type.const to be detected as constant nodes while retaining type information that is not stored in any sort of binary format
-// -todo: make primary selection become set on drag selection 
-// -todo: make tbl static method to verify if a memory span is a tbl or not
-// -todo: build Tbl Editor from selected node 
-// -todo: take owned out of tbl now that the allocation pointers can be used instead - just leave it for now
-// -todo: isolate camera parameters
-// -todo: add the other intrinsic types to Tbl Editor
-// -todo: make text box in Tbl Editor larger
-// -todo: debug why edits don't stick in the Tbl Editor - have to explicitly make a callback that changes the value? - only float boxes have the problem and needed to be changed to FloatBox
-// -todo: debug why const camera params .lava file does not load - named incorrectly in file because the file was renamed - just needs to give an error if nodes can't be loaded? 
-// -todo: debug why camera connections dissapear after shortening name - tried redoing bounding box on text change and special casing the point being inside the circle - happens on file load and with shorter node names on node creation - problems with intersection of side circles
-// -todo: debug why the release doesn't take the slot positioning fixes - floating point as fast and not precise was the cause
-// -todo: change camera to take camera constant
-// -todo: sort keys in the Tbl Editor so that they are in alphabetical order
-// -todo: make Tbl Editor change the values - can use the already memory mapped value
-// -todo: try changing eigen to not crash in the same place in AssignmentFunctors.h
-// -todo: debug why fissure run directly crashes - does the shortcut run the right .exe ?  - was it only the eigen division on startup?  - possibly, seems to work now
-// -todo: debug crash on deleting second camera node
-// -todo: debug crash on restart of graph - is it a constructor destructor mismatch on constants?
-// -todo: convert AtmSet to use a std::array of atomics
-// -todo: add constructor to AtmSet ? - might not need a constructor, but the raw array won't be copied, need to change to a std::array - need to make constructor if array hold atomics anyway
-// -todo: make clear() function for the outQ 
-// -todo: implement count() in AtmSet
-// -todo: use stepIds to track which slots still need packets in callback functions
-// -todo: debug why second step makes flow run forever - maybe the queue needs to be cleared - Camera node was not actually running due to a run once mechanic
-// -todo: make Lava function to run a packet through a source/in slot and only stop when it hits 
-//       |  Could make a function that runs a packet going in to one slot and stops when a packet comes out another slot as part of Lava
-//       |  Possibly can make the packet callback function return control information about whether to stop the execution or keep going - bool or a LavaControl enum? - enum should be more clear and flexible
-//       |  Keep a copy of the visualized slots and each time one is reached, take it out - when there are none left, return LavaControl::STOP from the packet callback
-// -todo: pass packets through on tbl edits - step on edit callback of Tbl Editor - might need to make sure the value changes before running step function
-// -todo: make memory mapped alloc, realloc, and free - LavaMMapAlloc, LavaMMapRealloc, LavaMMapFree ? - would reallocating memory require changing the non-live version and letting it update the live version? then modifying the size would be done with file reloads, but the altering of values could be done by changing the memory directly - this can wait for a more thought through design for memory mapped files
-// -todo: try setting spinner increment to a percentage of the value on each change - seems to work well in general 
-// -todo: make spinner percentage work for floats and doubles
-// -todo: put type after label in Tbl Editor - put on other side of text box
-// -todo: check if there are any visualized Ids before deciding to step()
-// -todo: build in clamping for spinner on unsigned types - actually want to stop wrap around, but how? - added to the callback in textbox.h (IntBox) to make clamping based on whether the increment will send the value past the minimum value
-// -todo: convert file path to constant
-// -todo: debug why play doesn't enable the stop button - play stops just the same as step does since there is no flag to tell the callback to ignore the stepIds
-// -todo: debug why obj loader has no output - was just the file path in the constant
-// -todo: use file path constant as input to craftsman loader
-// -todo: make a flag so that the callback ignores the stepIds
-// -todo: debug why step ends up playing in release mode - just craftsman path not being correct
-// -todo: try interactive full ray tracing - works!
-// -todo: turn off highlighted slots when not running
-// -todo: make sure that LavaMems have their reference decremented when being taken out when clearing the queue
-// -todo: try cache node after load obj - still will update without isolating what nodes are generating packets - how to deal with minimizing recomputation for iteration?
-// -todo: change cache node to use regular malloc - already is, just needs to output what the cache on execution - already is outputting
-// -todo: make LavaMemToOut helper function
-// -todo: debug why graph is not running now that cache node is added - first check if the output queue push() line is being reached - setCacheMem() function was nonsense
-// -todo: debug why cache node asserts on prev refcount == 0 even when there is only one thread running - cache packet goes out before input packet is given in the same cycle - why doesn't the cache packet get used before going to the next generator? - the tracer has two inputs and thus has a frame, which means that the loop goes back to another generator to find the other packet for the input frame
-// -todo: try disconnecting the cache node after first step - works 
-// -todo: make cache skip the input if the cache mem has a positive reference count
-// -todo: take spaces out of key generation
-// -todo: take colon out of key generation
-// -todo: take pipe out of key generation
-// -todo: make middle click drag on a slot step to the slot and write out a constant of the packet, then reload new nodes
-// -todo: debug crash on brandisher and written const from fissure not showing up in Visualizer - file was being written without "b" in fopen() so it was being written in ascii mode
-// -todo: make const file write out to the same directory as node shared libs
-// -todo: make const node be created and placed in the graph after dragging from a slot
-// -todo: draw a line from the original slot while dragging a node
-// -todo: debug why loadFile is called twice - no good reason
-// -todo: debug crash after deleting some nodes then saving - are the two graphs getting out of sync? why does an instance end up with a nullptr for its node? 
-//       |  try deleting a single node, saving and stepping through sel_del()
-//       |  need to delete instances instead of nodes? - instances seem to be deleted
-//       |  why are the node ids not found in the instances? either the ui graph node needs to be deleted, an instance is being deleted that shouldn't, or the id isn't lining up after deletion
-//       |  lots of nonsense with not thoroughly remapping node ids before saving
-// -todo: make drag line from slot be positioned in screen space correctly - nvgSave() nvgResetTransform() and nvgRestore() worked when surrounding the screen space point of the cursor
-// -todo: make slot drag not switch when dragging over a different slot
-// -todo: give node buttons bg colors according to their type
-// -todo: make an orange gather color and have it used for node buttons and nodes
-// -todo: put slot drag line above grid line
-// -todo: make slot drag constant node creation map the screen space line back to the world space - global state point that is transformed by the inverse of the current nanavg matrix 
-// -todo: zero pad thread slider label
-
+// todo: try using generic libc dll
 // todo: make a roughness parameter as constant input for the shade ray hits 
 // todo: order generator nodes by traversing the graph backwards 
 // todo: investigate if Trace node is spending most of its time in the BVH building and figure out what to do about it
@@ -145,166 +39,40 @@
 // todo: give cache a buffer of at least one extra allocation, so that if it runs first as a generator in the cycle it can still catch the next allocation that comes through
 // todo: should there be a ONCE node type too? - should there be a parameter of how many times the node is allowed to run? - only offers convenience, though to make it properly, an atomic needs to be used for the boolean of whether or not to run
 // todo: add cursor member variable to LavaFrame - this would only be neccesary if slots weren't done with a one packet to one slot strucutre 
-// todo: try making the embree vector a union with a float array inside
-// todo: draw slots that are framed together as one blob with multiple slots in the UI
-// todo: make a note node that will show the hotkeys and thus can be deleted at any time
-// todo: make reloaded nodes have highlights until the next event
 // todo: make a modal window that will set the text for a note 
-// todo: make note nodes that are drawn over the grid but behind nodes 
 // todo: keep track of loops through message nodes that don't generate any packets - if a thread goes through 2 empty loops, sleep - maybe sleep 1ms longer for each empty loop, up to 100ms
 // todo: change slot placement so that output slots always point directly at the center average of their target nodes
 // todo: add tool tips to node buttons containing the description string of the node
 // todo: find way to add a tbl to a tbl by reference / direct assignment - should it immediatly copy and flatten()
 // todo: make freezing packets at inputs visualized by a light blue circle larger than the yellow circle for visualizing in flight packets - use blue 'sunshine' lines going out from the center like a snowflake
 // todo: make a settings file that is read on load if it in the same directory
-// todo: make description strings show up in the status bar on mouse over
 // todo: make list of nodes a side window, right click menu, hot box, etc
 // todo: make slots connected to the same node loop with a circle from one side to the other so they don't overlap
 // todo: make each variable in the graph individually double buffered or even multi-buffered according to readers?
 // todo: have exec() spinlock until readers of the opposite buffer drops to 0 - could also just skip the command buffer in the rare case that it catches readers as more than 0
-// todo: make a step button that does one packet at a time, or make visualizing nodes while paused step to the visualized slots
 // todo: look into techniques for keeping data local to CPU cores, and CPU sockets
 // todo: put each thread's owned memory vector into a global vector that other threads can access - can the LavaQ be used or broken into a single writer multi-reader array?
-// todo: implement zoom in and out - will need to transform 2D view with a matrix as well as the mouse clicks
-// todo: make shared libraries loaded after the GUI
 // todo: make shared libraries only try to load one per frame
-// todo: think about design for constant variables into class - string, double, u64, i64, file (color? v2,v3,v4? ranged double?, ranged integer?) separate datatype from interface? make all constant inputs tables? how to embed interface queues into a table? make each constant a subtable with a value, an interface type and interface values? 
 // todo: design packet freezing and packet visualization interface - maybe have three states - neutral, visualized, and frozen
 // todo: test live reloading by compiling a shared lib while lava is running
 // todo: integrate rapid json
 
-// todo: make input slots start at 0 - does there need to be a separation between input and out slots or does there need to be an offset so that the input frame starts at 0 
-// todo: convert tbl to use arrays of the data types smaller than 64 bits
 // todo: make lava memory allocation aligned to 64 byte boundaries
 // todo: come up with locking system so that message nodes have their own threads that are only run when a looping thread visits them - how should memory allocation be done? passing the thread's allocator in the exact same way?
 // todo: prototype API for message nodes
 //       | do message nodes need some extra way to hold their state? will there ever be more than a single instance of a message node?
 //       | initially just make them thread safe or make them lock with mutexes
 //       | do messages need some sort of 8 byte number to be able to do occasionally do without heap or simdb allocated values?
-// todo: make a thread number UI input box
-// todo: somehow draw slot names and types when slots are moused over
 // todo: transition to better json support to write formatted json/.lava files?
 // todo: put in error checking for connecting dest to dest or src to src?
-// todo: make two nodes execute in order
 // todo: make a node to read text from a file name 
 // todo: make a node to split text into lines and scatter the result
 // todo: make message node diameter dependant on text bounds
-// todo: make flow node size dependant on text bounds
 // todo: make unconnected slots not overlap
 // todo: make one node snap to another node
 // todo: make two snapped nodes group together and be dragged together
-// todo: use scroll wheel and nanovg scale transforms to zoom in and out - will need to scale mouse pointer position as well to 'canvas' coordinates
 // todo: make multiple slots avoid each other - might need to have discreet sections around a node for a slot to sit in
-// todo: don't select a slot if it is under an existing node
-// todo: make Lava data structures use the Lava thread local allocator
 // todo: change NODE_ERROR to NODE_NONE 
-// todo: keep the time in microseconds of the execution of every node instance in a LavaNodeInst struct
-//       | use the execution time to draw the saturation of the node color a long with a background indicator to see the nodes with the most execution time
-// todo: use combination of frame, node id and slot as key to simbdb - visualization can be done with a different key for now and node communication is through thread local memory
-//       |  how does that get in to the node, if all the data is in the packet struct? - through the output Args
-//       |  put the index information into the output array and use that 
-//       |  leave room for the hash in the output struct? - not now
-//       |  the full key is needed because robin hood hashing could shift the other keys' indices around - the index into the key value slots in the db can't be used, but the starting block index can since that won't change until the data goes away
-//       |  use a union of bytes that is filled with the frame, slot, list index?
-//       |  use malloc addresses initially
-
-// idea: make tbl editor sliders change percentage of the number while also being non-linear with drag speed
-// idea: make optional inputs yellowish and optional outputs purpleish - but both sort of whiteish - is there such a thing as optional outputs? aren't all outputs optional? 
-// idea: should the big difference in MSG nodes as opposed to data flow nodes be that they are always run from the same thread that unlocks? 
-// idea: keep track of both time speht in a node and the memory allocations it uses
-// idea: make packets visualize on slots circles stack as concentric circles or as portions/segments of a single circle 
-// idea: make errors in the directory creation give an error in the status bar 
-// idea: make right click or space bar open up a text box that can contain the build command, stats and/or hotbox
-// idea: make popup text box that avoids the bounding box of the moused over node? - put graph of node times in the box? put graph of covariance data of data in, time spent, data out, and time ?   
-// idea: try to unify nanogui into a single file?
-// idea: try to unify nfd into a single file ? 
-// idea: build guard pages into Lava heap allocations that can be set to non read or write - use these to crash if memory is read or written out of bounds - maybe do this only in debug mode
-// idea: make a table creation and editing GUI
-// idea: make a dialog to set a compilation command for each node - think about debug and release modes, different OSs - set the current working directory to the node directory path
-// idea: when turning off a slot, take it out, delete it, and put it back under a name with 'OFF: ' as a prefix
-// idea: keep track of covariance matrix for time vs size of data 
-//       | keep track of multiple moments and detect if a node has a quadratic / O(n^2) time
-//       | keep track of the covariance of input data, time, and other parameters to show how they affect the running time of that node?
-//       | also keep track of the parameters and input size to see how they affect the data output size - does this complete the data needed to estimate how long calculations will take with a breakdown of where all the time will be spent? 
-// idea: make an optional main message node that takes command line input 
-// idea: make an execute count on each Node - accumulate on every frame to draw which nodes are executing
-// idea: give message nodes an order than can be edited
-// idea: make LavaGraph into a template and use it for the visual graph as well?
-// idea: load shared libs asynchronously and show a progress bar somewhere
-// idea: make command queue - use a simdb file or use the heap
-// idea: try compiling nanogui into one file - depends on eigen, stb and glfw
-// idea: separate finding node the pointer is inside from the action to take
-// idea: make nodes snap to a grid
-// idea: combine src and dest slots when writing json and just use a boolean to separate them 
-// idea: have a panel or window that shows information about the selected node and the shared library it represents
-// idea: make connections thicker when there is more data and brighter when there are more packets
-// idea: build in focus as information separate from selection
-// idea: draw message node slots as sliding angles
-// idea: make connection delete and create trigger when 1 or more in/dest slots are selected and 1 out/src slot is connected
-// idea: make a single file include all nanoui into one compilation unit
-// idea: make msg loop that would deal with selections, clicks and drags? 
-// idea: take out redudant node position + bnd information 
-// idea: look into quantized gradients of nanovg
-// idea: switch over to using json.hpp
-// idea: make load file take the state in
-// idea: make an io file
-// idea: make a recently opened menu
-// idea: drag json file into window to open file
-// idea: draw arrows (triangles) to show direction with connections
-// idea: make connection a set
-// idea: slow down cursor over nodes
-// idea: speed up cursor while dragging
-// idea: highlight connections and slots when a node is selected
-// idea: half highlight when mouse over of node, slot or connection
-// idea: make snapped/grouped nodes separate with right mouse button
-// idea: make mouse slow down over slots more than it slows down over nodes
-// idea: make click and drag for connections
-// idea: make selected indication a border effect and not a color change
-// idea: make selection a vector for multi-selection - if the vector capacity is 3x the size, use reserve to shrink it down to 1.5x the size?
-// idea: make connections have different shapes? draw three thin lines for a scatter connection?
-// idea: make nodes different shapes? - make data input into vertical columns?
-// idea: look into openGL input latency technique
-// idea: convert general data structures of nodes, slots, and connections to use tbl?
-// idea: make drawing order of slots dictated by node order
-// idea: make connection class that keeps two connection arrays, each sorted by src or dest for fast searching
-// idea: keep covariance statistics of input size, output size and time taken
-
-// q: do nodes just need to be tagged for visualization so that they put their outputs in the viz db? - should this just be a function hook so that the LavaGraph doesn't have to deal with it? 
-//    | put it in the packet queue first, then run the function callback on the LavaMem from the same frame
-//    | how should it be identified?
-// q: does each node need it's own memory to create a full frame?
-// q: does each node slot need it's own priority queue to put frames together? 
-// q: how is it possible to determine when to run a node with a full frame?
-// q: should there be a section of memory for packets to be copied to? 
-//    |  when a packet is pulled from the queue it could be copied to slot memory for the node
-//    |  if a thread completes a frame, then it runs the node with that frame
-//    |  this would possibly imply multiple frame buffers in a ring
-// q: what to do about a scenario where multiple packets for a single frame are being generated, but there are non-optional arguments that will keep them from running
-// q: is there any value in a queue for each node?
-// q: is there any value in a multi-stage queue that takes packets out and organizes them into frames to create a frame queue?
-//    | there would need to be a packet queue, a packet combining stage, then a frame queue
-//    | can it be guaranteed that frames will run sequentially on a node basis? - if the queue is sorted by frame first, then node, then slot, without accounting for multiple packets to one slot, they should be roughly in order and a frame should exist in the queue roughly sequentially
-//    | does there need to be a limitation that says nodes that splits can't feed into a node with framed slots?
-//    | structurally does this mean that nodes would have attributes instead of one type? 
-//    |  |  main issues are gather and split
-//    |  |  if a node wants to gather packets but not output a single packet, would it be both a gather and a split?
-
-// graph ideas:
-// idea: figure out a way to have a reader count with lava.graph - is an atomic hash map inevitable? 
-// idea: put in read count and write count for both A and B buffers
-// idea: change cur() functions to const and rename to read() - maybe later
-// idea: change opp() functions to non-const only and rename to write() - maybe later
-
-// Major Features: 
-//   | -Catch low level exceptions on each node
-//   | -Automatic reloading of shared libs
-//   | Freezing data while playing
-//   | Reloading of shared libs while running 
-//   | Packet syncing through use of frames
-//   | Live editing of input tables 
-//   | Constant input tables to configure a node? - can constant input tables just be a live table that gets frozen into the binary? would it be memory mapped and a specially tagged pointer passed around?
-//   | Node graph visualizations, tests and notes treated specially with the ability to be hidden
-//   | Packet queueing based on cache and memory heirarchies - look in a queue for the physical core, then whatever shares the L2 cache, L3 cache, and finally the same NUMA node - special queue structure needed that will automatically use this heirarchy by being specifically structured around it - need to weigh importance of having the absolute correct ordering versus using the memory heirarchy as effectivly as possible - maybe the memory heirarchy is the most important, but would out of order frames cause problems? possibly only if message passing nodes did not make sure to process the frames they recieve in order - would this end up being a tree structure of queues
 
 #include "FissureStatic.cpp"
 
@@ -2246,7 +2014,7 @@ ENTRY_DECLARATION // main or winmain
           return true;
         });
       }
-      SECTION(initialize flow control button colors and callbacks)
+      SECTION(init flow control button colors and callbacks)
       {
         playBtn->setBackgroundColor(  Color(e3f(.15f, .25f,  .15f)) ); 
         playBtn->setTextColor( Color(e3f(1.f, 1.f, 1.f)) );
@@ -2294,26 +2062,25 @@ ENTRY_DECLARATION // main or winmain
           step(fd.threadCount);
         });
       }
-      SECTION(initialize the thread slider and thread label)
+      SECTION(init thread slider and thread label)
       {
         auto hardThreads = thread::hardware_concurrency();
 
         thrdsSldr->setFixedWidth(100);
         thrdsSldr->setRange( {1.f, (f32)hardThreads} );
         thrdsSldr->setCallback( [thrdsLabel, thrdsSldr](f32 i){
-          //if( (i32)i != fd.threadCount ){
             fd.threadCount = (i32)i;
             thrdsSldr->setValue( (f32)fd.threadCount );
             
             auto    thrdStr = toString(fd.threadCount);
             char thrdLbl[4] = {'0','0','0','0'};
-            thrdLbl[3]      = '\0';  //'\0';
+            //char thrdLbl[4] = {' ',' ',' ',' '};
+            thrdLbl[3]      = '\0';
             auto         st = 3 - thrdStr.size();
             TO(thrdStr.length(),i){
               thrdLbl[st+i] = thrdStr[i];
             }
             thrdsLabel->setCaption( thrdLbl );
-          //}
         });
         thrdsSldr->setValue(1.f);
 
@@ -2345,7 +2112,7 @@ ENTRY_DECLARATION // main or winmain
       fd.ui.screen.setVisible(true);
       fd.ui.screen.performLayout();
 
-      thrdsSldr->callback()(fd.threadCount);
+      thrdsSldr->callback()((f32)fd.threadCount);
 
       glfwPollEvents();
       fd.ui.screen.drawContents();
@@ -2483,12 +2250,6 @@ ENTRY_DECLARATION // main or winmain
           {
             fd.graph.packetSlots.clear();
             fd.graph.qPacketBytes = 0;
-
-            //fd.flow.m_qLck.lock();
-            //  while(fd.flow.q.size() > 0){
-            //    fd.flow.q.pop();
-            //  }
-            //fd.flow.m_qLck.unlock();
           }
         }
       }
@@ -3161,178 +2922,3 @@ ENTRY_DECLARATION // main or winmain
 
 
 
-
-
-
-
-
-//auto stopBtn    = new  Button(fd.ui.keyWin,  "Stop  |_|");
-//
-//fd.ui.nodeTxtId = fd.ui.keyWin->childIndex(nodeTxt);
-//
-//auto txtclr = playBtn->textColor();
-
-//Node n;
-//node_add(pth, n);
-
-//NVGpaint paint;
-//paint
-//nvgStrokePaint(vg, paint);
-
-//SECTION(drawing feedback from the lava flow graph)
-//{
-//}
-
-//Println("Dropped Files:");
-//TO(count,i){
-//  bool ok = loadFile(filenames[i], &fd.lgrph);
-//  Println(filenames[i]);
-//}
-//Println();
-
-//decltype(fd.graph.slots) nxtSlots;
-//for(auto& kv : fd.graph.slots){
-//  LavaId    nxtId = kv.first;
-//  nxtId.nid       = nmap[nxtId.nid];
-//  //auto      nxtId = nmap[kv.first.nid];
-//  nxtSlots.insert({ nxtId, move(kv.second) });
-//}
-//fd.graph.slots = move(nxtSlots);
-
-//FisData* fd = (FisData*)glfwGetWindowUserPointer(window);
-//bool   used = fd->ui.screen.dropCallbackEvent(count, filenames);
-
-//*out_g = strToGraph(s);
-//
-//startFlowThreads(1);
-//fd.lgrph.exec();
-
-//for(auto& kv : fd.graph.slots){
-//  kv.second.state = Slot::NORMAL;
-//}
-
-//SECTION(get the buttons out of the GUI and clear the button widgets from memory)
-//{
-//  for(auto& b : fd.ui.ndBtns){
-//    fd.ui.keyWin->removeChild(b);
-//  }
-//  fd.ui.ndBtns.clear();                                             // delete interface buttons from the nanogui window
-//}
-//SECTION(redo interface node buttons)
-//{
-//  for(auto& kv : fd.flow.flow)
-//  {
-//    LavaNode*     fn = kv.second;                                // fn is flow node
-//    auto       ndBtn = new Button(fd.ui.keyWin, fn->name);
-//    ndBtn->setCallback([fn](){ 
-//      v2 stPos = {fd.ui.w/2.f,  fd.ui.h/2.f};                                                // stPos is starting position
-//      node_add(fn->name, Node("", (Node::Type)((u64)fn->node_type), stPos) );
-//    });
-//    fd.ui.ndBtns.push_back(ndBtn);
-//  }
-//}
-//fd.ui.screen.performLayout();
-
-//LavaNode::NODE_ERROR;
-//instIdx = nxtId();
-//if(n.txt==""){ n.txt = "New: " + node_name; }
-
-//for(auto& kv : fd.graph.slots){
-//  Slot&    s  =  kv.second;
-//  isInSlot    =  len(pntr - s.P) < fd.ui.slot_rad;
-//  if(isInSlot){ 
-//    sid = kv.first;
-//    break;
-//  }
-//}
-
-//
-//sort( ALL(slts) );
-
-//
-//for(auto kv : cnstTbl){                                                // use the iterators to go through the key-value pairs, then build the controls from those pairs
-
-//fd.ui.cnstClose = new Button(fd.ui.cnstWin, "Close");
-//fd.ui.cnstClose->setCallback([](){
-//  fd.ui.cnstWin->setVisible(false);
-//  clearTblEditor();
-//});
-
-// kvo = strToNum<f64>(s); ((IntBox<f64>*)tb)->setValueIncrement(*kvo.kv); break;
-// kvo = strToNum<f32>(s); ((IntBox<f32>*)tb)->setValueIncrement(*kvo.kv); break;
-//case tbl::TblType::U16: kvo = strToNum<u16>(s); ((IntBox<u16>*)tb)->setValueIncrement(*kvo.kv); break;
-//case tbl::TblType::I32: kvo = strToNum<i32>(s); ((IntBox<i32>*)tb)->setValueIncrement(*kvo.kv); break;
-//case tbl::TblType::U32: kvo = strToNum<u32>(s); ((IntBox<u32>*)tb)->setValueIncrement(*kvo.kv); break;
-//case tbl::TblType::I64: kvo = strToNum<i64>(s); ((IntBox<i64>*)tb)->setValueIncrement(*kvo.kv); break;
-//case tbl::TblType::U64: kvo = strToNum<u64>(s); ((IntBox<u64>*)tb)->setValueIncrement(*kvo.kv); break;
-//kvo = strToNum<u8>(s);  ( (IntBox<u8>*)tb)->setValueIncrement(*kvo.kv); break;
-//kvo = strToNum<i16>(s); ((IntBox<i16>*)tb)->setValueIncrement(*kvo.kv); break;
-//auto val = strToNum<i8>(s);
-//kvo = val;
-//auto inc = (decltype(val))( max(abs(val*.2),1.) );
-//((IntBox<i8>*)tb)->setValueIncrement(inc);
-//}break;
-
-//tb->setWidth(400);
-//
-//str key = kv.key;
-//
-//std::istringstream iss(s);
-//tb->setValue(s);
-//case tbl::TblType::F32: f32 val; iss>>val; t(key.c_str()) = val; break;
-
-//void        lavaPacketCallback(LavaPacket pkt)
-//{
-//  LavaId srcid(pkt.src_node, pkt.src_slot, false);
-//  LavaId destid(pkt.dest_node, pkt.dest_slot, true);
-//  if( fd.vizIds.has(srcid.asInt) ){
-//    auto label  =  genDbKey(srcid);
-//    auto    lm  =  LavaMem::fromDataAddr(pkt.val.value);
-//    bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
-//  }else if( fd.vizIds.has(destid.asInt) ){
-//    auto label  =  genDbKey(destid);
-//    auto    lm  =  LavaMem::fromDataAddr(pkt.val.value);
-//    bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
-//  }
-//}
-
-//else if(fd.flowThreads.size() == 0){
-//  fd.ui.stopBtn->setBackgroundColor( Color(e3f(.19f, .16f, .17f)) ); 
-//  fd.ui.stopBtn->setEnabled(false);
-//  // might need to make the play button global and check its state here to be sure - this would also let the stop button be taken out of the play callback
-//}
-
-//
-//NVGcontext* vg = NULL;
-
-//nodeTxt->set setBackgroundColor( Color(e3f(.2f,  .2f,  .15f)) ); 
-//fd.ui.keyWin->setLayout(fd.ui.keyLay);
-
-//return;
-//b = {x,y, x+w, y+h};
-
-//Println(kv.key);
-//Println("\n");
-
-//fd.ui.cnstBtns.push_back( new Button(fd.ui.constWin, kv.key) );
-//
-//tb->setAlignment(nanogui::Alignment::Right); // might be in a newer version
-
-//
-//fd.ui.constLay = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
-
-// -todo: need to be able to check if a memory span is a tbl, since a constant isn't always going to be a table
-//
-//auto& nodes = fd.graph.nds;
-//auto ndIter = nodes.find(fd.sel.pri);
-//if(ndIter != end(nodes)){
-//    ndIter->first;
-//}
-
-//bool inside   =  isIn(n.b, ms.drgbnd);
-//anyInside    |=  inside;
-
-//auto    col = n.sel? fd.ui.nd_selclr  : fd.ui.nd_color;
-//auto    col = sel? fd.ui.nd_selclr :
-//  n.type==Node::Type::GENERATOR? fd.ui.nd_cache_clr :
-//  fd.ui.nd_color;
