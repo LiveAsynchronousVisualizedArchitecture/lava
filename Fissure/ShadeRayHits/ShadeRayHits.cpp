@@ -350,28 +350,28 @@ extern "C"
     using namespace std;
     using namespace embree;
 
-    tbl     parms = LavaTblFromPckt(lp, in, IN_GGX_PARMS);
-    f32     rough = 0.1f;
+    const tbl parms = LavaTblFromPckt(lp, in, IN_GGX_PARMS);
+    f32       rough = 0.1f;
     if(parms.has("roughness")) 
       rough = parms("roughness");
 
-    tbl      rays = LavaTblFromPckt(lp, in, IN_RAYS);
-    tbl        dx = rays("direction x");
-    tbl        dy = rays("direction y");
-    tbl        dz = rays("direction z");
-    tbl      Ng_x = rays("Ng x");
-    tbl      Ng_y = rays("Ng y");
-    tbl      Ng_z = rays("Ng z");
+    const tbl rays = LavaTblFromPckt(lp, in, IN_RAYS);
+    tbl         dx = rays("direction x");
+    tbl         dy = rays("direction y");
+    tbl         dz = rays("direction z");
+    tbl       Ng_x = rays("Ng x");
+    tbl       Ng_y = rays("Ng y");
+    tbl       Ng_z = rays("Ng z");
 
-    auto   rayCnt = Ng_x.size();
-    tbl  brdfRays = LavaMakeTbl(lp,      0, (u8)0);
-    tbl       pdf = LavaMakeTbl(lp, rayCnt,   0.f);
-    tbl        Lx = LavaMakeTbl(lp, rayCnt,   0.f);
-    tbl        Ly = LavaMakeTbl(lp, rayCnt,   0.f);
-    tbl        Lz = LavaMakeTbl(lp, rayCnt,   0.f);
-    tbl     specX = LavaMakeTbl(lp, rayCnt,   0.f);
-    tbl     specY = LavaMakeTbl(lp, rayCnt,   0.f);
-    tbl     specZ = LavaMakeTbl(lp, rayCnt,   0.f);
+    auto    rayCnt = Ng_x.size();
+    tbl   brdfRays = LavaMakeTbl(lp,      0, (u8)0);
+    tbl        pdf = LavaMakeTbl(lp, rayCnt,   0.f);
+    tbl         Lx = LavaMakeTbl(lp, rayCnt,   0.f);
+    tbl         Ly = LavaMakeTbl(lp, rayCnt,   0.f);
+    tbl         Lz = LavaMakeTbl(lp, rayCnt,   0.f);
+    tbl      specX = LavaMakeTbl(lp, rayCnt,   0.f);
+    tbl      specY = LavaMakeTbl(lp, rayCnt,   0.f);
+    tbl      specZ = LavaMakeTbl(lp, rayCnt,   0.f);
     TO(rayCnt,i)
     {
       Vec3f V(    dx[i],    dy[i],     dz[i]  );

@@ -1994,7 +1994,7 @@ public:
 };
 
 // Lava Helper Functions
-template<class T> tbl LavaMakeTbl(LavaParams const* lp, u64 count, T initVal=T() )
+template<class T> const tbl LavaMakeTbl(LavaParams const* lp, u64 count, T initVal=T() )
 {
   using namespace std;
 
@@ -2007,7 +2007,7 @@ template<class T> tbl LavaMakeTbl(LavaParams const* lp, u64 count, T initVal=T()
 
   return move(t);
 }
-tbl            LavaMakeTbl(LavaParams const* lp)
+const tbl            LavaMakeTbl(LavaParams const* lp)
 {
   using namespace std;
 
@@ -2035,6 +2035,8 @@ tbl        LavaTblFromPckt(LavaParams const* lp, LavaFrame const* in, u64 i)
   using namespace std;
 
   if( !in->slotMask[i] ){ return tbl(); }
+
+  assert( LavaMem::fromDataAddr(in->packets[i].val.value).refCount() != 0 );
 
   void* valPtr = (void*)in->packets[i].val.value;
   if( !tbl::isTbl(valPtr) ){ return tbl(); }
@@ -2689,29 +2691,36 @@ void               LavaLoop(LavaFlow& lf) noexcept
       if(doFlow) SECTION(if there is a packet available, fit it into a existing frame or create a new frame)
       {
         u16 sIdx  =  pckt.dest_slot;
-        lf.m_frameQLck.lock();                                          // lock mutex        
-          SECTION(loop through the outstanding frames to find the match for this packet)
+        SECTION(lock the frame queue)
+        {
+          lock_guard<mutex> frameQLck(lf.m_frameQLck);                      // need a mutex that automatically unlocks on scope exit so that a goto can be used - the goto is needed to break out of an inner loop
+
+          bool frameFound = false;
+          SECTION(loop outstanding frames for a match for this packet - determine if a frame was found)
           {
-            TO(lf.frameQ.size(), i)                                     // loop through the current frames looking for one with the same frame number and destination slot id - if no frame is found to put the packet into, make a new one - keep track of the lowest full frame while looping and use that if no full frame is found?
+            TO(lf.frameQ.size(), i)                                       // loop through the current frames looking for one with the same frame number and destination slot id - if no frame is found to put the packet into, make a new one - keep track of the lowest full frame while looping and use that if no full frame is found?
             {
               auto& frm = lf.frameQ[i];
-              if(frm.dest != pckt.dest_node){ continue; }               // todo: unify dest_node and dest_id etc. as one LavaId LavaPacket
+              if(frm.dest != pckt.dest_node){ continue; }                 // todo: unify dest_node and dest_id etc. as one LavaId LavaPacket
               if(frm.cycle != pckt.cycle){ continue; }
 
               bool slotTaken = frm.slotMask[sIdx];
               if(!slotTaken){
                 //frm.packets[sIdx] = pckt;
                 frm.putSlot(sIdx, pckt);
+                frameFound = true;
               }
 
-              if( frm.allFilled() ){                                  // If all the slots are filled, copy the frame out and erase it
+              if( frm.allFilled() ){                                    // If all the slots are filled, copy the frame out and erase it
                 runFrm = frm;
-                lf.frameQ.erase(lf.frameQ.begin()+i);                 // can't use an index, have to use an iterator for some reason
-                break;                                                // break out of the loop since a frame was found
+                lf.frameQ.erase(lf.frameQ.begin()+i);                   // can't use an index, have to use an iterator for some reason
+                frameFound = true;
               }
+
+              if(frameFound){ break; }
             }
           }
-          SECTION(if a cycle was not found for this packet, create one, then put it in the array if the cycle has more than one slot)
+          if(!frameFound) SECTION(if a frame was not found for this packet, create one, then put it in the array if the frame has more than one slot)
           {
             LavaInst& ndInst   =  lf.graph.node(pckt.dest_node);
             LavaFrame    frm;
@@ -2721,12 +2730,19 @@ void               LavaLoop(LavaFlow& lf) noexcept
             //runFrm.frame        =  ndInst.fetchIncFrame();
             frm.putSlot(sIdx, pckt);
               
-            if(frm.slots > 1)
+            if(frm.slots > 1){
               lf.frameQ.push_back(frm);                                // New frame that starts with the current packet put into it 
-            else
+              continue;                                                // go back to the start of the loop - jumping out of this scope should unlock the lock_guard mutex above
+            }else
               runFrm = frm;
           }
-        lf.m_frameQLck.unlock();                                       // unlock mutex
+          //else if({  
+          //}
+          //else{ continue; }
+        } // mutex is unlocked
+
+        //lf.m_frameQLck.lock();                                          // lock mutex       
+        //lf.m_frameQLck.unlock();                                       // unlock mutex
 
         nodeId = runFrm.dest;
       }else SECTION(try to run a single message node if there was no packet found){
@@ -2843,25 +2859,24 @@ void               LavaLoop(LavaFlow& lf) noexcept
     }
     SECTION(switch on the node state decided by trying to run a packet through the node)
     {
-      switch(state)
-      {
-      case LavaInst::OUTPUT_ERROR:
-      case LavaInst::RUN_ERROR:{
-        lf.graph.setState(nodeId, LavaInst::RUN_ERROR);
-        //lf.putPacket(pckt);                                                            // if there was an error, put the packet back into the queue
-      }break;
-      case LavaInst::LOAD_ERROR:{
-        lf.graph.setState(nodeId, LavaInst::RUN_ERROR);                                  // todo: should deal with this at load time and not here of course
-      }break;
-      case LavaInst::NORMAL:
-      default:{                                                                          // if everything worked, decrement the references of all the packets in the frame
-        if(doFlow){
-          TO(LavaFrame::PACKET_SLOTS,i) if(runFrm.slotMask[i]){ 
-            LavaMem mem = LavaMem::fromDataAddr(runFrm.packets[i].val.value);
-            mem.decRef();
+      switch(state){
+        case LavaInst::OUTPUT_ERROR:
+        case LavaInst::RUN_ERROR:{
+          lf.graph.setState(nodeId, LavaInst::RUN_ERROR);
+          //lf.putPacket(pckt);                                                            // if there was an error, put the packet back into the queue
+        }break;
+        case LavaInst::LOAD_ERROR:{
+          lf.graph.setState(nodeId, LavaInst::RUN_ERROR);                                  // todo: should deal with this at load time and not here of course
+        }break;
+        case LavaInst::NORMAL:
+        default:{                                                                          // if everything worked, decrement the references of all the packets in the frame
+          if(doFlow){
+            TO(LavaFrame::PACKET_SLOTS,i) if(runFrm.slotMask[i]){ 
+              LavaMem mem = LavaMem::fromDataAddr(runFrm.packets[i].val.value);
+              mem.decRef();
+            }
           }
-        }
-      }break;
+        }break;
       }
     }
     SECTION(dealloction - partition owned allocations and free those with their reference count at 0)
@@ -2870,8 +2885,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
       auto  zeroRef  =  partition(ALL(ownedMem), [](auto a){return a.refCount() > 0;} );                           // partition the memory with zero references to the end / right of the vector so they can be deleted by just cutting down the size of the vector
       auto freeIter  =  zeroRef;
-      for(; freeIter != end(ownedMem); ++freeIter){                      // loop through the memory with zero references and free them
-        LavaFree( freeIter->data() );                                    // LavaFree will subtract 16 bytes from the  pointer given to it - ->data() should give the address at the start of the memory meant to be used, then LavaFree will subtract 16 from that
+      for(; freeIter != end(ownedMem); ++freeIter){                            // loop through the memory with zero references and free them
+        LavaFree( freeIter->data() );                                          // LavaFree will subtract 16 bytes from the  pointer given to it - ->data() should give the address at the start of the memory meant to be used, then LavaFree will subtract 16 from that
       }
       ownedMem.erase(zeroRef, end(ownedMem));                                  // erase the now freed memory
 

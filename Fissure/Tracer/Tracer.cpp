@@ -456,7 +456,8 @@ extern "C"          // Embree3 Scene Message Node
 
     if( in->slotMask[IN_GEOMETRY] ) SECTION(create geometry from input and put it in the embree scene)
     {
-      tbl idxVerts( (void*)(in->packets[IN_GEOMETRY].val.value) );
+      //tbl idxVerts( (void*)(in->packets[IN_GEOMETRY].val.value) );
+      tbl idxVerts = LavaTblFromPckt(lp, in, IN_GEOMETRY);
 
       RTCGeometry mesh = rtcNewGeometry(g_device, RTC_GEOMETRY_TYPE_TRIANGLE);
 
@@ -574,11 +575,6 @@ extern "C"          // Embree3 Scene Message Node
       tbl raysIV = raysToIdxVerts(lp, rh, rayCnt);
       out->push( LavaTblToOut(move(raysIV), OUT_RAY_VISUALIZATION) );
 
-      //tbl tfar = LavaMakeTbl(lp, rayCnt, 0.f);
-      //TO(rayCnt,i){
-      //  tfar[i] = rh.ray.tfar[i];
-      //}
-
       tbl rayHits     = rays;
       rayHits("Ng x") = &Nx;
       rayHits("Ng y") = &Ny;
@@ -588,8 +584,6 @@ extern "C"          // Embree3 Scene Message Node
 
       tbl culledRays = cullRays(lp, rayHits);
       out->push( LavaTblToOut(move(culledRays), OUT_RAY_HITS) );
-
-      //out->push( LavaTblToOut(move(rayHits), OUT_RAY_HITS) );
     }
 
     return 1;
@@ -623,6 +617,15 @@ extern "C"          // Embree3 Scene Message Node
 
 
 
+
+
+//
+//out->push( LavaTblToOut(move(rayHits), OUT_RAY_HITS) );
+
+//tbl tfar = LavaMakeTbl(lp, rayCnt, 0.f);
+//TO(rayCnt,i){
+//  tfar[i] = rh.ray.tfar[i];
+//}
 
 //SECTION(copy pointers to component arrays from the input rays into the RayHit structure of arrays)
 //{

@@ -4,40 +4,42 @@
 // -todo: delete connections if there is no node available - fixed by not making connections if the nodes they need are not in the opposite buffers
 // -todo: make shade ray hits use the weight to dictate length of visualized rays
 // -todo: make slot viz not delete visualization
+// -todo: give node creation buttons colors based on the same colors that their node types use
+// -todo: make dragging a slot turn it into a constant, which writes a .type.const file, which is then memory mapped and live reloaded by lava
+// -todo: debug why trace node is crashing when there is no shade rays parameters constant node loaded - when a frame was found, a packet could still be put into another frame
 
-// todo: order generator nodes by traversing the graph backwards 
-// todo: investigate if Trace node is spending most of its time in the BVH building and figure out what to do about it
+// todo: debug why shade ray hits runs in infinite loop with two constant inputs
+// todo: organize nodes by types in a contex menu or side bar
+// todo: make sure zooming center is affected by cursor placement - now have the cursor in world space thanks to drgWrld
+// todo: change node colors to be based off of profiling information while holding 'p' key
+// todo: try using windows API to slow cursor movement when inside nodes and slots 
 // todo: make tbl editor be able to edit i8 strings as text - use a length limit?
 // todo: make step function take a node or list of node ids to start with 
 // todo: make Tbl Editor step only the node it is editing
 // todo: make step button step only the selected nodes
 // todo: get node buttons out of the main bar
+// todo: order generator nodes by traversing the graph backwards 
+// todo: investigate if Trace node is spending most of its time in the BVH building and figure out what to do about it
 // todo: integrate AddConst into RefreshFlowLibs function so that there are .live versions
 // todo: work out timed live reload checking 
-// todo: give node creation buttons colors based on the same colors that their node types use
 // todo: work on and test live reloading - what thread reloads?
 // todo: make dragging a .const file into the UI copy it to the path 
-// todo: make dragging a slot turn it into a constant, which writes a .type.const file, which is then memory mapped and live reloaded by lava
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
 // todo: make fissure or lava be able to incrementally load shared libraries
 // todo: change constructor to happen on play and not on load (or after the destructor runs on stop)
 // todo: build in data type visualization - part needs to be lava, part needs to be UI - does any need to be in lava? - is checking for 'tb' at the start of a binary blob, then checking for a "type" key enough to determine types ?
-// todo: organize nodes by types in a contex menu or side bar
 // todo: re-orient nodes on resize of the window so they line up with the grid in the same place 
 //       | maybe the scale and pan need to be changed instead 
 //       | if the window size is simply shrinking closer to 0, maybe the center point needs to be normalized according to where it was in the window
 //       | might just need to shift the pan by the change in the center point
 // todo: make nodes have their own scale that dictates the text size and not the other way around
 // todo: put slot name in db key - maybe the name should have two lines
-// todo: make sure zooming center is affected by cursor placement - now have the cursor in world space thanks to drgWrld
 // todo: make message node's text split to new lines on white space
 // todo: make an IdxVerts helper header file
-// todo: change node colors to be based off of profiling information while holding 'p' key
 // todo: redo atomic bitset now that slots are separated and inputs should be packed together
 // todo: make Tbl Editors pop up for all selected constants that point to tbls - need a vector of tbl windows and tbl layouts as well as a vector of vectors for the widgets of each key value
 // todo: add heiarchy of tables - recursive function and indentation
 // todo: put thread pointers into message node instances and work out how to lock and unlock them
-// todo: try using windows API to slow cursor movement when inside nodes and slots 
 
 // todo: give cache a buffer of at least one extra allocation, so that if it runs first as a generator in the cycle it can still catch the next allocation that comes through
 // todo: should there be a ONCE node type too? - should there be a parameter of how many times the node is allowed to run? - only offers convenience, though to make it properly, an atomic needs to be used for the boolean of whether or not to run

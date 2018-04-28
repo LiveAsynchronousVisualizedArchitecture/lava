@@ -508,8 +508,8 @@ public:
     KV*          kv = nullptr;
     tbl*       base = nullptr;
 
-    KVOfst(KVOfst&  l) : kv(l.kv), base(l.base) {}
-    KVOfst(KVOfst&& r) : kv(r.kv), base(r.base) {}
+    KVOfst(KVOfst const&  l) : kv(l.kv), base(l.base) {}
+    KVOfst(KVOfst&&       r) : kv(r.kv), base(r.base) {}
     KVOfst(KV* _kv=nullptr, tbl* _base=nullptr) : kv(_kv), base(_base) {}
 
     //operator bool() const { return (bool)(kv); }
@@ -994,7 +994,7 @@ public:
     u32     hsh;
     KV*      kv = m_mem?  get(key, &hsh) : nullptr;
     //if(owned() && m_alloc)
-    if(m_alloc)
+    if(m_alloc) // todo: change to realloc?
     { 
       if( !map_expand(!kv) ) return KVOfst();                                            // if map_expand returns false, that means that memory expansion was tried but failed
 
@@ -1132,10 +1132,12 @@ public:
     }
     size(nxtSz);
   }
-  bool            has(const char* key)
+  bool            has(const char* key) const
   {
+    if(!m_mem){ return false; }
+
     KVOfst kvo = (*this)(key);
-    if(!kvo.kv) return false; 
+    if(!kvo.kv){ return false; }
 
     return kvo.kv->type != TblType::EMPTY;
   }
