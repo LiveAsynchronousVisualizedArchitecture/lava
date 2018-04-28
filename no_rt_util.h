@@ -51,22 +51,10 @@ using  ui16  =  uint16_t;
 using  ui32  =  uint32_t;
 using  ui64  =  uint64_t;
 
-//using   i8  =              int8_t;
-//using  i32  =             int32_t;
-//using  i64  =           long long;
-
-
 #define PIf 3.141592653589f
 #define PId 3.14159265358979323846264338327
 
 #define SQR(x) ((x)*(x))
-
-// for open subdiv
-//#define M_PI PIf
-//#define and &&
-//#define not !
-//#define or ||
-// end open subdiv nonsense
 
 
 #ifndef TO
@@ -74,12 +62,8 @@ using  ui64  =  uint64_t;
 #endif
 
 #define           ALL(collection) collection.begin(), collection.end()
-//#define            TO(to, var) for(std::remove_const<decltype( (ui64)to )>::type var = 0; var < to; ++var)
 #define         RANGE(st, to, var)  for(std::remove_const<decltype(to)>::type var = st; var < to; ++var)
 
-//#ifndef FROM
-//  #define       FROM(from, var) for(std::remove_const<decltype(from)>::type var = from-1; var >= decltype(from)(0); --var )
-//#endif
 #ifndef FROM
   #define       FROM(from, var) for(int64_t var = ((i64)from)-1; var >= int64_t(0); --var)
 #endif
@@ -110,6 +94,48 @@ using  ui64  =  uint64_t;
     #define THREAD_LOCAL __thread
 #endif
 
+#ifdef NO_RT_UTIL_IMPL
+
+void* __cdecl operator       new(size_t s)
+{
+  return malloc(s);
+}
+void __cdecl operator     delete(void* p)
+{
+  free(p);
+}
+
+extern "C" double   _hypot(double x, double y){ return 0; }
+extern "C" void     _fltused(){}  // symbol needs to be defined for some reason
+
+#endif
+
+#endif
+
+
+
+
+
+
+
+
+//using   i8  =              int8_t;
+//using  i32  =             int32_t;
+//using  i64  =           long long;
+
+//
+//#define            TO(to, var) for(std::remove_const<decltype( (ui64)to )>::type var = 0; var < to; ++var)
+
+// for open subdiv
+//#define M_PI PIf
+//#define and &&
+//#define not !
+//#define or ||
+// end open subdiv nonsense
+
+//#ifndef FROM
+//  #define       FROM(from, var) for(std::remove_const<decltype(from)>::type var = from-1; var >= decltype(from)(0); --var )
+//#endif
 
 // BEGIN printf
 //#define PRINTF_BUF_SZ 4096
@@ -149,6 +175,3 @@ using  ui64  =  uint64_t;
 //      return retValue;
 //  }
 //#endif
-
-
-#endif

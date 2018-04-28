@@ -32,12 +32,17 @@ extern "C"
     if(hasRun){ return 1; }
     //hasRun = true;
 
-    tbl prompts = LavaMakeTbl(lp);
-    prompts("Expected Value") = 0.f;
-    prompts("Variance")       = 0.f;
-    prompts("Vertex Count")   = (u64)0ul;
+    //tbl prompts = LavaMakeTbl(lp);
+    //prompts("Expected Value") = 0.f;
+    //prompts("Variance")       = 0.f;
+    //prompts("Vertex Count")   = (u64)0ul;
+    //
+    //out->push( LavaTblToOut(prompts,PROMPTS) );
 
-    out->push( LavaTblToOut(prompts,PROMPTS) );
+    tbl newtbl = LavaMakeTbl(lp);
+    newtbl("roughness") = 0.1f;
+
+    out->push( LavaTblToOut(newtbl,PROMPTS) );
 
     return 1;
   }

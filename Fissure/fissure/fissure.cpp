@@ -1,9 +1,12 @@
 
-// todo: try using generic libc dll
-// todo: make a roughness parameter as constant input for the shade ray hits 
+// -todo: try using generic libc dll - misses linked in C++ functions like __std_terminate
+// -todo: make a roughness parameter as constant input for the shade ray hits 
+// -todo: delete connections if there is no node available - fixed by not making connections if the nodes they need are not in the opposite buffers
+// -todo: make shade ray hits use the weight to dictate length of visualized rays
+// -todo: make slot viz not delete visualization
+
 // todo: order generator nodes by traversing the graph backwards 
 // todo: investigate if Trace node is spending most of its time in the BVH building and figure out what to do about it
-// todo: make slot viz not delete visualization
 // todo: make tbl editor be able to edit i8 strings as text - use a length limit?
 // todo: make step function take a node or list of node ids to start with 
 // todo: make Tbl Editor step only the node it is editing
@@ -1248,7 +1251,8 @@ void         graph_apply(LavaGraph::ArgVec args)
   for(auto& a : args){
     if(a.id.sidx == LavaId::SLOT_NONE && a.id.nid != LavaId::NODE_NONE)
     {
-      fd.graph.nds[a.id.nid].type = fd.lgrph.node(a.id.nid).node->node_type;                                      // node arg, not a slot arg - need to check the type
+      LavaInst li = fd.lgrph.node(a.id.nid);
+      if(li.node) fd.graph.nds[a.id.nid].type = li.node->node_type;                                      // node arg, not a slot arg - need to check the type
     }else if(a.id.sidx != LavaId::SLOT_NONE){
       LavaFlowSlot* ls = fd.lgrph.slot(a.id);
       if(ls){
@@ -1478,6 +1482,7 @@ void          strToGraph(str const& s)
 
     node_add( funcName, n);
   }
+
 
   auto cnct_cnt = destId.getCount();
   TO(cnct_cnt,i){
@@ -2430,16 +2435,8 @@ ENTRY_DECLARATION // main or winmain
         }
         SECTION(slot visualization output simdb writing)
         {
-          //auto  sIter = node_slots(n.id);
-
-          if(slotRtClk){
-            //auto& slots = fd.graph.slots;
-            //auto  sIter = slots.find(sid); //slots.find(sid);
-            //for(; sIter!=end(slots) && sIter->first==sid; ++sIter){                  // if the slot is an input slot, highlight the outputs connected to it
-            //  if(sIter->second.in){
-            //  }
-            //}
-
+          if(slotRtClk)
+          {
             auto vizSid = sid;
             if( slot_get(sid)->in ){
               auto&   cncts = g.cncts();
@@ -2448,7 +2445,7 @@ ENTRY_DECLARATION // main or winmain
 
             if( fd.vizIds.has(vizSid.asInt) ){
               fd.vizIds.del(vizSid.asInt);
-              fisdb.del( genDbKey(vizSid) );
+              //fisdb.del( genDbKey(vizSid) );
             }else{
               fd.vizIds.put( vizSid.asInt );
             }
@@ -2922,3 +2919,15 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+
+
+//auto  sIter = node_slots(n.id);
+//
+//auto& slots = fd.graph.slots;
+//auto  sIter = slots.find(sid); //slots.find(sid);
+//for(; sIter!=end(slots) && sIter->first==sid; ++sIter){                  // if the slot is an input slot, highlight the outputs connected to it
+//  if(sIter->second.in){
+//  }
+//}

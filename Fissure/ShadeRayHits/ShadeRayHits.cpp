@@ -2,7 +2,10 @@
 
 #include <cmath>
 #include <random>
+
+#define NO_RT_UTIL_IMPL
 #include "../../no_rt_util.h"
+
 //#include "../shared/vec.hpp"
 #include "../../tbl.hpp"
 #include "../LavaFlow.hpp"
@@ -11,9 +14,10 @@
 
 enum        Slots
 {
-  IN_RAYS  =  0,                // the rays that have been traced
+  IN_RAYS       =  0,                // the rays that have been traced
+  IN_GGX_PARMS  =  1,
 
-  OUT_BRDF_RAYS = 0,
+  OUT_BRDF_RAYS =  0,
   OUT_BRDF_RAYS_VISUALIZATION = 1
 };
 
@@ -144,7 +148,7 @@ void VNDFSamplerGGX_sample11(
   slope_y = S * z * sqrt(1.0+slope_x*slope_x);
 }
 void VNDFSampler_sample(
-  const double omega_i[3],                       // input  // incident direction
+  const double omega_i[3],                                 // input  // incident direction
   const double alpha_x, const double alpha_y,              // anisotropic roughness
   const double U1, const double U2,                        // random numbers
   double omega_m[3])                            // output // micronormal
@@ -289,8 +293,9 @@ tbl brdfRaysToIV(LavaParams const* lp, tbl const& rays, tbl const& brdfRays)    
     v3 hitP = o  +  dir * (f32)tfar[i];
     //v3 hitP = o;
 
+    f32 pdf = pdfs.at<f32>(i) / mxPdf;
     v3  L( Lx[i], Ly[i], Lz[i] );
-    L *= 0.5f;
+    L *= 0.2f * pdf;
 
     px[i*2] = hitP.x;
     py[i*2] = hitP.y;
@@ -302,7 +307,6 @@ tbl brdfRaysToIV(LavaParams const* lp, tbl const& rays, tbl const& brdfRays)    
     //py[i*2 + 1] = hitP.y + 1.f;
     //pz[i*2 + 1] = hitP.z + 0.f;
 
-    f32 pdf = pdfs.at<f32>(i) / mxPdf;
     cr[i*2 + 0] = 1.f;
     cr[i*2 + 1] = 1.f;
     cg[i*2 + 0] = 0.f;
@@ -333,10 +337,10 @@ tbl brdfRaysToIV(LavaParams const* lp, tbl const& rays, tbl const& brdfRays)    
 
 extern "C"
 {
-  const char*  InTypes[]  = {"Rays",                                                     nullptr};
-  const char*  InNames[]  = {"Rays already traced by embree",                            nullptr};
-  const char* OutTypes[]  = {"BRDF Rays",                     "IdxVerts",                nullptr};
-  const char* OutNames[]  = {"Rays from GGX BRDF with pdf",   "BRDF Rays Visualization", nullptr};
+  const char*  InTypes[]  = {"Rays",                         "GGXParms",                   nullptr};
+  const char*  InNames[]  = {"Rays Traced By Embree",        "Parameters for GGX BRDF",    nullptr};
+  const char* OutTypes[]  = {"BRDF Rays",                    "IdxVerts",                   nullptr};
+  const char* OutNames[]  = {"Rays from GGX BRDF with pdf",  "BRDF Rays Visualization",    nullptr};
 
   void ShadeRayHits_construct(){ }
   void ShadeRayHits_destruct(){ }
@@ -345,6 +349,11 @@ extern "C"
   {
     using namespace std;
     using namespace embree;
+
+    tbl     parms = LavaTblFromPckt(lp, in, IN_GGX_PARMS);
+    f32     rough = 0.1f;
+    if(parms.has("roughness")) 
+      rough = parms("roughness");
 
     tbl      rays = LavaTblFromPckt(lp, in, IN_RAYS);
     tbl        dx = rays("direction x");
@@ -368,7 +377,7 @@ extern "C"
       Vec3f V(    dx[i],    dy[i],     dz[i]  );
       Vec3f N(  Ng_x[i],  Ng_y[i],   Ng_z[i]  );
 
-      auto result = BrdfSampleGGX( randomf(0,1.f), randomf(0,1.f), -normalize(V), N, 0.05f);
+      auto result = BrdfSampleGGX( randomf(0,1.f), randomf(0,1.f), -normalize(V), N, rough);
       pdf[i]   = result.m_pdf;
       Lx[i]    = result.m_L.x;
       Ly[i]    = result.m_L.y;

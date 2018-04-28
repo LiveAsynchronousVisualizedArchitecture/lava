@@ -1571,6 +1571,16 @@ public:
   }
   void     toggleCnct(LavaId  src, LavaId  dest)
   {
+    auto srcLiIter  = oppNodes().find(src.nid);
+    if(srcLiIter==oppNodes().end() || !(srcLiIter->second.node) ){ return; }
+
+    auto destLiIter  = oppNodes().find(dest.nid);
+    if(destLiIter==oppNodes().end() || !(destLiIter->second.node) ){ return; }
+
+    //LavaInst srcLi  = oppNodes().find(src.nid);    // node(src.nid);
+    //LavaInst destLi = node(dest.nid);
+    //if(!srcLi.node || !destLi.node){ return; } // if either of the nodes don't exist, don't make the connection
+
     u32    delcnt = 0;
     auto       di = oppCncts().find(dest);
     bool matchSrc = false;
@@ -2024,7 +2034,12 @@ tbl        LavaTblFromPckt(LavaParams const* lp, LavaFrame const* in, u64 i)
 {
   using namespace std;
 
-  tbl t( (void*)(in->packets[i].val.value) );
+  if( !in->slotMask[i] ){ return tbl(); }
+
+  void* valPtr = (void*)in->packets[i].val.value;
+  if( !tbl::isTbl(valPtr) ){ return tbl(); }
+
+  tbl t(valPtr);
   t.m_alloc   = lp->ref_alloc;
   t.m_realloc = lp->ref_realloc;
   //t.m_free    = nullptr;
