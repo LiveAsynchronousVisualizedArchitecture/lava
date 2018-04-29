@@ -7,9 +7,9 @@
 // -todo: give node creation buttons colors based on the same colors that their node types use
 // -todo: make dragging a slot turn it into a constant, which writes a .type.const file, which is then memory mapped and live reloaded by lava
 // -todo: debug why trace node is crashing when there is no shade rays parameters constant node loaded - when a frame was found, a packet could still be put into another frame
+// -todo: debug why shade ray hits runs in infinite loop with two constant inputs
+// -todo: organize nodes by types in a contex menu or side bar - sorted by name if type is the same too
 
-// todo: debug why shade ray hits runs in infinite loop with two constant inputs
-// todo: organize nodes by types in a contex menu or side bar
 // todo: make sure zooming center is affected by cursor placement - now have the cursor in world space thanks to drgWrld
 // todo: change node colors to be based off of profiling information while holding 'p' key
 // todo: try using windows API to slow cursor movement when inside nodes and slots 
@@ -1563,9 +1563,21 @@ void  refreshNodeButtons()
   }
   SECTION(redo interface node buttons)
   {
+    vec<LavaNode*> lns;
+    lns.reserve(fd.flow.flow.size());
     for(auto& kv : fd.flow.flow)
+      lns.push_back(kv.second);
+
+    sort(ALL(lns), [](LavaNode* a, LavaNode* b){
+      if(a->node_type==b->node_type)
+        return str(a->name) < str(b->name);
+      return a->node_type < b->node_type;
+    });
+    
+    //for(auto& kv : fd.flow.flow)
+    TO(lns.size(),i)
     {
-      LavaNode*    ln = kv.second;                                                             // fn is flow node
+      LavaNode*    ln = lns[i]; //kv.second;                                                             // fn is flow node
       auto      ndBtn = new Button(fd.ui.keyWin, ln->name);
       auto        clr = fd.ui.nd_color;
       switch(ln->node_type){
