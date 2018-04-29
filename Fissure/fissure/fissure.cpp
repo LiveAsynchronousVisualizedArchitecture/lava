@@ -1,4 +1,8 @@
 
+/* 
+  This file will be more organized when looked at in an IDE with syntax folding 
+*/
+
 // -todo: try using generic libc dll - misses linked in C++ functions like __std_terminate
 // -todo: make a roughness parameter as constant input for the shade ray hits 
 // -todo: delete connections if there is no node available - fixed by not making connections if the nodes they need are not in the opposite buffers
@@ -9,21 +13,21 @@
 // -todo: debug why trace node is crashing when there is no shade rays parameters constant node loaded - when a frame was found, a packet could still be put into another frame
 // -todo: debug why shade ray hits runs in infinite loop with two constant inputs
 // -todo: organize nodes by types in a contex menu or side bar - sorted by name if type is the same too
+// -todo: get node buttons out of the main bar
 
-// todo: make sure zooming center is affected by cursor placement - now have the cursor in world space thanks to drgWrld
 // todo: change node colors to be based off of profiling information while holding 'p' key
-// todo: try using windows API to slow cursor movement when inside nodes and slots 
 // todo: make tbl editor be able to edit i8 strings as text - use a length limit?
 // todo: make step function take a node or list of node ids to start with 
 // todo: make Tbl Editor step only the node it is editing
 // todo: make step button step only the selected nodes
-// todo: get node buttons out of the main bar
+// todo: make dragging a .const file into the UI copy it to the path 
+// todo: make sure zooming center is affected by cursor placement - now have the cursor in world space thanks to drgWrld
+// todo: try using windows API to slow cursor movement when inside nodes and slots 
 // todo: order generator nodes by traversing the graph backwards 
 // todo: investigate if Trace node is spending most of its time in the BVH building and figure out what to do about it
 // todo: integrate AddConst into RefreshFlowLibs function so that there are .live versions
-// todo: work out timed live reload checking 
+// todo: work out timed live reload checking - are there event callbacks that can be used
 // todo: work on and test live reloading - what thread reloads?
-// todo: make dragging a .const file into the UI copy it to the path 
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
 // todo: make fissure or lava be able to incrementally load shared libraries
 // todo: change constructor to happen on play and not on load (or after the destructor runs on stop)
@@ -256,195 +260,6 @@ f64        timeToSeconds(u64  t)
 }
 // End Util
 
-// UI Util
-str       makeStatusText(u64 nid, f64 totalTime, vec_ndptrs const& nds, u64 nIdx)
-{
-  using namespace std;
-
-  auto&     n  =  fd.lgrph.node(nid);
-  
-  char percentStr[256] = {};
-  char secondsStr[256] = {};
-  SECTION(format the node run time percentage string)
-  {
-    f64 seconds  =  timeToSeconds(n.time);
-    f64 percent  =  totalTime>0?  (seconds/totalTime)*100  :  0;
-    seconds      =  (int)(seconds*1000) / 1000.0;    // should clamp the seconds to 3 decimal places 
-
-    sprintf(percentStr, "%0.2f", (f32)percent);
-    sprintf(secondsStr, "%0.2f", (f32)seconds);
-    //percent      =  max(100.0, percent);
-  }
-
-  str     err;
-  switch(n.getState())
-  {
-  case LavaInst::COMPILE_ERROR:{
-      err = "COMPILE ERROR";
-    }break;
-  case LavaInst::LOAD_ERROR:{
-      err = "LOAD ERROR (the node could not be loaded)";
-    }break;
-  case LavaInst::RUN_ERROR:{
-      err = "RUN ERROR (did the node output a value that had no memory allocated?)";
-    }break;
-  case LavaInst::NORMAL:
-  default:
-    break;
-  }
-
-  auto status = toString(
-    "Node [",nid,"]  ",nds[nIdx]->txt,
-    " | ",secondsStr," seconds  %",
-    percentStr,"   ",
-    err);
-    
-    if(n.node->description){ 
-      status += toString(" -  ", n.node->description);
-    }
-
-  return status;
-}
-void         draw_radial(NVGcontext* vg, NVGcolor clr, f32 x, f32 y, f32 rad)
-{
-  auto  hlf = rad/2; 
-
-  nvgFillColor(vg, nvgRGBA(0,255,255,255));
-  nvgBeginPath(vg);
-    nvgCircle(vg, x, y, rad);
-    auto radial = nvgRadialGradient(vg,x,y,0,hlf,clr,nvgRGBA(0,0,0,0));
-  nvgFillPaint(vg, radial);
-  nvgFill(vg);
-}
-void      clearTblEditor()
-{
-  fd.ui.cnstWin->setVisible(false);
-
-  for(auto const& lbl : fd.ui.cnstLbls)
-    fd.ui.cnstWin->removeChild(lbl);
-
-  for(auto const& edt : fd.ui.cnstEdit)
-    fd.ui.cnstWin->removeChild(edt);
-
-  if(fd.ui.cnstClose){ fd.ui.cnstWin->removeChild(fd.ui.cnstClose); }
-  fd.ui.cnstClose = nullptr;
-
-  fd.ui.cnstLbls.clear();
-  fd.ui.cnstLbls.shrink_to_fit();
-  fd.ui.cnstEdit.clear();
-  fd.ui.cnstEdit.shrink_to_fit();
-
-  fd.ui.cnstWin->setLayout(fd.ui.cnstLay);
-}
-template<class T> void setInc(tbl::KVOfst& kvo, TextBox* tb, str const& s)
-{
-  using namespace std;
-
-  auto val = strToNum<T>(s);
-  kvo      = val;
-  auto inc = T( max(abs(val*.1),1.) );
-  ((IntBox<T>*)tb)->setValueIncrement(inc);
-}
-template<class T> void setFloatInc(tbl::KVOfst& kvo, TextBox* tb, str const& s)
-{
-  using namespace std;
-
-  auto val = strToNum<T>(s);
-  kvo      = val;
-  auto inc = T( abs(val*.1) );
-  ((FloatBox<T>*)tb)->setValueIncrement(inc);
-}
-bool       makeTblEditor(LavaNode* n)
-{
-  using namespace std;
-  
-  clearTblEditor();
-
-  if(fd.sel.pri==LavaNode::NODE_ERROR){ return false; }
-
-  LavaInst   li = fd.lgrph.node(fd.sel.pri);
-  LavaNode*  ln = li.node;  
-  if( !ln || ln->node_type!=LavaNode::CONSTANT){ return false; }         // if the primary selected node isn't a constant, don't do anything
-  if( !(ln->filePtr) ){ return false; }                                  // if it is a constant but its pointer is nullptr, do nothing
-  if( !tbl::isTbl(ln->filePtr) ){ return false; }
-  
-  tbl cnstTbl(ln->filePtr);
-
-  vecstr keys; 
-  for(auto kv : cnstTbl){                                                // use the iterators to go through the key-value pairs, then build the controls from those pairs
-    keys.emplace_back(kv.key);
-  }
-  sort(ALL(keys));
-  
-  for(auto const& k : keys)
-  {
-    tbl::KV* kv = cnstTbl(k.c_str()).kv;
-    if( kv->hasTypeAttr(tbl::TblType::INTEGER) || 
-        kv->hasTypeAttr(tbl::TblType::SIGNED) )                           // SIGNED but not INTEGER would be a float
-    {
-      auto    type = kv->type;
-      str  typeStr = tbl::TblType::type_str(type);
-      //str   lblStr = k + " " + typeStr;
-      fd.ui.cnstLbls.push_back( new Label(fd.ui.cnstWin, k.c_str()) );
-
-      TextBox*  tb = nullptr;
-      switch(type){
-        case tbl::TblType::I8:  tb = new   IntBox<i8>(fd.ui.cnstWin,   (i8)*kv); break;
-        case tbl::TblType::U8:  tb = new   IntBox<u8>(fd.ui.cnstWin,   (u8)*kv); break;
-        case tbl::TblType::I16: tb = new   IntBox<i16>(fd.ui.cnstWin, (i16)*kv); break;
-        case tbl::TblType::U16: tb = new   IntBox<u16>(fd.ui.cnstWin, (u16)*kv); break;
-        case tbl::TblType::I32: tb = new   IntBox<i32>(fd.ui.cnstWin, (i32)*kv); break;
-        case tbl::TblType::U32: tb = new   IntBox<u32>(fd.ui.cnstWin, (u32)*kv); break;
-        case tbl::TblType::I64: tb = new   IntBox<i64>(fd.ui.cnstWin, (i64)*kv); break;
-        case tbl::TblType::U64: tb = new   IntBox<u64>(fd.ui.cnstWin, (u64)*kv); break;
-        case tbl::TblType::F32: tb = new FloatBox<f32>(fd.ui.cnstWin, (f32)*kv); break;
-        case tbl::TblType::F64: tb = new FloatBox<f64>(fd.ui.cnstWin, (f64)*kv); break;
-      }
-      tb->setSpinnable(true);
-      tb->setEditable(true);
-      tb->setFixedWidth(200);
-      tb->setCallback([tb, type, li, k](str const& s)
-      {
-        tbl t(li.node->filePtr);
-
-        tbl::KVOfst kvo = t(k.c_str());
-        switch(type){
-          case tbl::TblType::I8:  setInc<i8>(kvo,tb,s);  break;
-          case tbl::TblType::U8:  setInc<u8>(kvo,tb,s);  break;
-          case tbl::TblType::I16: setInc<i16>(kvo,tb,s); break; 
-          case tbl::TblType::U16: setInc<u16>(kvo,tb,s); break;
-          case tbl::TblType::I32: setInc<i32>(kvo,tb,s); break; 
-          case tbl::TblType::U32: setInc<u32>(kvo,tb,s); break;
-          case tbl::TblType::I64: setInc<i64>(kvo,tb,s); break; 
-          case tbl::TblType::U64: setInc<u64>(kvo,tb,s); break;
-          case tbl::TblType::F32: setFloatInc<f32>(kvo,tb,s); break; 
-          case tbl::TblType::F64: setFloatInc<f64>(kvo,tb,s); break;
-        }
-        
-        if(fd.vizIds.count() > 0)
-          step(fd.threadCount);
-
-        return true;
-      });
-      fd.ui.cnstEdit.push_back(tb);
-      fd.ui.cnstLbls.push_back( new Label(fd.ui.cnstWin, typeStr.c_str() ) );
-    }
-  }
-
-  fd.ui.cnstClose = new Button(fd.ui.cnstWin, "Close");
-
-  fd.ui.cnstClose->setCallback([](){
-    fd.ui.cnstWin->setVisible(false);
-    clearTblEditor();
-  });
-
-  fd.ui.cnstWin->setPosition(Vector2i(0,200));
-  fd.ui.cnstWin->setVisible(true);
-
-  return true;
-}
-// End UI Util
-
 // Flow Control
 u64                nxtId()
 {
@@ -498,6 +313,18 @@ void                step(u64 num)                                    // num defa
   }
 }
 // End Flow Control
+
+void         draw_radial(NVGcontext* vg, NVGcolor clr, f32 x, f32 y, f32 rad)
+{
+  auto  hlf = rad/2; 
+
+  nvgFillColor(vg, nvgRGBA(0,255,255,255));
+  nvgBeginPath(vg);
+  nvgCircle(vg, x, y, rad);
+  auto radial = nvgRadialGradient(vg,x,y,0,hlf,clr,nvgRGBA(0,0,0,0));
+  nvgFillPaint(vg, radial);
+  nvgFill(vg);
+}
 
 // State manipulation
 v2               in_cntr(Node const& n, f32 r)
@@ -1062,7 +889,6 @@ void           cnct_draw(NVGcontext* vg, v2 srcP, v2 destP, v2 srcN, v2 destN, f
     //nvgStrokeWidth(vg, 3.f);
   nvgStroke(vg);
 }
-
 void           grid_draw(NVGcontext* vg, f32 lineSpace = 128.f)
 {
   // the lines will already be transformed, so they just need to wrap around and create the illusion of an infinite canvas
@@ -1552,15 +1378,275 @@ bool            loadFile(str path, LavaGraph* out_g)
 }
 // End serialize to and from json 
 
+// UI Util
+auto nvgToNGUI(NVGcolor clr) -> nanogui::Color
+{
+  nanogui::Color nclr;
+  TO(3,i){ nclr[i] = clr.rgba[i]; }
+  nclr[3] = 1.f;
+
+  return nclr;
+}
+str       makeStatusText(u64 nid, f64 totalTime, vec_ndptrs const& nds, u64 nIdx)
+{
+  using namespace std;
+
+  auto&     n  =  fd.lgrph.node(nid);
+
+  char percentStr[256] = {};
+  char secondsStr[256] = {};
+  SECTION(format the node run time percentage string)
+  {
+    f64 seconds  =  timeToSeconds(n.time);
+    f64 percent  =  totalTime>0?  (seconds/totalTime)*100  :  0;
+    seconds      =  (int)(seconds*1000) / 1000.0;    // should clamp the seconds to 3 decimal places 
+
+    sprintf(percentStr, "%0.2f", (f32)percent);
+    sprintf(secondsStr, "%0.2f", (f32)seconds);
+    //percent      =  max(100.0, percent);
+  }
+
+  str     err;
+  switch(n.getState())
+  {
+  case LavaInst::COMPILE_ERROR:{
+    err = "COMPILE ERROR";
+  }break;
+  case LavaInst::LOAD_ERROR:{
+    err = "LOAD ERROR (the node could not be loaded)";
+  }break;
+  case LavaInst::RUN_ERROR:{
+    err = "RUN ERROR (did the node output a value that had no memory allocated?)";
+  }break;
+  case LavaInst::NORMAL:
+  default:
+    break;
+  }
+
+  auto status = toString(
+    "Node [",nid,"]  ",nds[nIdx]->txt,
+    " | ",secondsStr," seconds  %",
+    percentStr,"   ",
+    err);
+
+  if(n.node->description){ 
+    status += toString(" -  ", n.node->description);
+  }
+
+  return status;
+}
+void      clearTblEditor()
+{
+  fd.ui.cnstWin->setVisible(false);
+
+  for(auto const& lbl : fd.ui.cnstLbls)
+    fd.ui.cnstWin->removeChild(lbl);
+
+  for(auto const& edt : fd.ui.cnstEdit)
+    fd.ui.cnstWin->removeChild(edt);
+
+  if(fd.ui.cnstClose){ fd.ui.cnstWin->removeChild(fd.ui.cnstClose); }
+  fd.ui.cnstClose = nullptr;
+
+  fd.ui.cnstLbls.clear();
+  fd.ui.cnstLbls.shrink_to_fit();
+  fd.ui.cnstEdit.clear();
+  fd.ui.cnstEdit.shrink_to_fit();
+
+  fd.ui.cnstWin->setLayout(fd.ui.cnstLay);
+}
+template<class T> void setInc(tbl::KVOfst& kvo, TextBox* tb, str const& s)
+{
+  using namespace std;
+
+  auto val = strToNum<T>(s);
+  kvo      = val;
+  auto inc = T( max(abs(val*.1),1.) );
+  ((IntBox<T>*)tb)->setValueIncrement(inc);
+}
+template<class T> void setFloatInc(tbl::KVOfst& kvo, TextBox* tb, str const& s)
+{
+  using namespace std;
+
+  auto val = strToNum<T>(s);
+  kvo      = val;
+  auto inc = T( abs(val*.1) );
+  ((FloatBox<T>*)tb)->setValueIncrement(inc);
+}
+bool       makeTblEditor(LavaNode* n)
+{
+  using namespace std;
+
+  clearTblEditor();
+
+  if(fd.sel.pri==LavaNode::NODE_ERROR){ return false; }
+
+  LavaInst   li = fd.lgrph.node(fd.sel.pri);
+  LavaNode*  ln = li.node;  
+  if( !ln || ln->node_type!=LavaNode::CONSTANT){ return false; }         // if the primary selected node isn't a constant, don't do anything
+  if( !(ln->filePtr) ){ return false; }                                  // if it is a constant but its pointer is nullptr, do nothing
+  if( !tbl::isTbl(ln->filePtr) ){ return false; }
+
+  tbl cnstTbl(ln->filePtr);
+
+  vecstr keys; 
+  for(auto kv : cnstTbl){                                                // use the iterators to go through the key-value pairs, then build the controls from those pairs
+    keys.emplace_back(kv.key);
+  }
+  sort(ALL(keys));
+
+  for(auto const& k : keys)
+  {
+    tbl::KV* kv = cnstTbl(k.c_str()).kv;
+    if( kv->hasTypeAttr(tbl::TblType::INTEGER) || 
+      kv->hasTypeAttr(tbl::TblType::SIGNED) )                           // SIGNED but not INTEGER would be a float
+    {
+      auto    type = kv->type;
+      str  typeStr = tbl::TblType::type_str(type);
+      fd.ui.cnstLbls.push_back( new Label(fd.ui.cnstWin, k.c_str()) );
+
+      TextBox*  tb = nullptr;
+      switch(type){
+      case tbl::TblType::I8:  tb = new   IntBox<i8>(fd.ui.cnstWin,   (i8)*kv); break;
+      case tbl::TblType::U8:  tb = new   IntBox<u8>(fd.ui.cnstWin,   (u8)*kv); break;
+      case tbl::TblType::I16: tb = new   IntBox<i16>(fd.ui.cnstWin, (i16)*kv); break;
+      case tbl::TblType::U16: tb = new   IntBox<u16>(fd.ui.cnstWin, (u16)*kv); break;
+      case tbl::TblType::I32: tb = new   IntBox<i32>(fd.ui.cnstWin, (i32)*kv); break;
+      case tbl::TblType::U32: tb = new   IntBox<u32>(fd.ui.cnstWin, (u32)*kv); break;
+      case tbl::TblType::I64: tb = new   IntBox<i64>(fd.ui.cnstWin, (i64)*kv); break;
+      case tbl::TblType::U64: tb = new   IntBox<u64>(fd.ui.cnstWin, (u64)*kv); break;
+      case tbl::TblType::F32: tb = new FloatBox<f32>(fd.ui.cnstWin, (f32)*kv); break;
+      case tbl::TblType::F64: tb = new FloatBox<f64>(fd.ui.cnstWin, (f64)*kv); break;
+      }
+      tb->setSpinnable(true);
+      tb->setEditable(true);
+      tb->setFixedWidth(200);
+      tb->setCallback([tb, type, li, k](str const& s)
+      {
+        tbl t(li.node->filePtr);
+
+        tbl::KVOfst kvo = t(k.c_str());
+        switch(type){
+        case tbl::TblType::I8:  setInc<i8>(kvo,tb,s);  break;
+        case tbl::TblType::U8:  setInc<u8>(kvo,tb,s);  break;
+        case tbl::TblType::I16: setInc<i16>(kvo,tb,s); break; 
+        case tbl::TblType::U16: setInc<u16>(kvo,tb,s); break;
+        case tbl::TblType::I32: setInc<i32>(kvo,tb,s); break; 
+        case tbl::TblType::U32: setInc<u32>(kvo,tb,s); break;
+        case tbl::TblType::I64: setInc<i64>(kvo,tb,s); break; 
+        case tbl::TblType::U64: setInc<u64>(kvo,tb,s); break;
+        case tbl::TblType::F32: setFloatInc<f32>(kvo,tb,s); break; 
+        case tbl::TblType::F64: setFloatInc<f64>(kvo,tb,s); break;
+        }
+
+        if(fd.vizIds.count() > 0)
+          step(fd.threadCount);
+
+        return true;
+      });
+      fd.ui.cnstEdit.push_back(tb);
+      fd.ui.cnstLbls.push_back( new Label(fd.ui.cnstWin, typeStr.c_str() ) );
+    }
+  }
+
+  fd.ui.cnstClose = new Button(fd.ui.cnstWin, "Close");
+  fd.ui.cnstClose->setCallback([](){
+    fd.ui.cnstWin->setVisible(false);
+    clearTblEditor();
+  });
+
+  fd.ui.cnstWin->setPosition(Vector2i(0,200));
+  fd.ui.cnstWin->setVisible(true);
+
+  return true;
+}
+void    clearNodeInstWin()
+{
+  fd.ui.ndinstWin->setVisible(false);
+  for(auto& b : fd.ui.ndinstBtns){
+    fd.ui.ndinstWin->removeChild(b);
+  }
+  fd.ui.ndinstBtns.clear();                                             // delete interface buttons from the nanogui window
+
+  //fd.ui.ndinstWin->removeChild(fd.ui.ndinstClose);
+}
+void     makeNodeInstWin()
+{
+  using namespace std;
+
+  clearNodeInstWin();
+
+  SECTION(redo interface node buttons)
+  {
+    vec<LavaNode*> lns;
+    SECTION(put LavaNode pointers into a vector and sort them by type and name)
+    {
+      lns.reserve(fd.flow.flow.size());
+      for(auto& kv : fd.flow.flow)
+        lns.push_back(kv.second);
+
+      sort(ALL(lns), [](LavaNode* a, LavaNode* b){
+        if(a->node_type==b->node_type)
+          return str(a->name) < str(b->name);
+        return a->node_type < b->node_type;
+      });
+    }
+
+    TO(lns.size(),i)
+    {
+      LavaNode*    ln = lns[i];
+      auto      ndBtn = new Button(fd.ui.ndinstWin, ln->name);
+      auto        clr = fd.ui.nd_color;
+      switch(ln->node_type){
+        case LavaNode::CONSTANT:   clr = fd.ui.nd_const_clr;  break;
+        case LavaNode::GENERATOR:  clr = fd.ui.nd_gen_clr;    break;
+        case LavaNode::MSG:        clr = fd.ui.nd_gather_clr; break;
+        case LavaNode::FLOW:
+      default: break;
+      }
+      //nanogui::Color nclr;
+      //TO(3,i){ nclr[i] = clr.rgba[i]; }
+      //nclr[3] = 1.f;
+      //ndBtn->setBackgroundColor(nclr);
+      ndBtn->setBackgroundColor(nvgToNGUI(clr));
+
+      ndBtn->setCallback([ln](){ 
+        v2 stPos = {fd.ui.w/2.f,  fd.ui.h/2.f};                                                // stPos is starting position
+        node_add(ln->name, Node("", (Node::Type)((u64)ln->node_type), stPos) );
+      });
+      fd.ui.ndinstBtns.push_back(ndBtn);
+    }
+  }
+  SECTION(finish with positioning, visibility, then layout)
+  {
+    auto btnPos = fd.ui.ndinstBtn->position();
+    fd.ui.ndinstWin->setPosition( btnPos + Vector2i(-200,50));
+    fd.ui.ndinstWin->setVisible(true);
+    fd.ui.ndinstWin->performLayout(fd.vg);
+    fd.ui.screen.performLayout();
+  }
+
+  //SECTION(make the close button at the bottom)
+  //{
+  //  fd.ui.ndinstClose = new Button(fd.ui.ndinstWin, "Close");
+  //  fd.ui.ndinstClose->setCallback([](){
+  //    fd.ui.ndinstWin->setVisible(false);
+  //    //clearNodeInstWin();
+  //  });
+  //}
+}
 void  refreshNodeButtons()
 {
-  SECTION(get the buttons out of the GUI and clear the button widgets from memory)
-  {
-    for(auto& b : fd.ui.ndBtns){
-      fd.ui.keyWin->removeChild(b);
-    }
-    fd.ui.ndBtns.clear();                                             // delete interface buttons from the nanogui window
-  }
+  //SECTION(get the buttons out of the GUI and clear the button widgets from memory)
+  //{
+  //  for(auto& b : fd.ui.ndinstBtns){
+  //    fd.ui.ndinstWin->removeChild(b);
+  //  }
+  //  fd.ui.ndinstBtns.clear();                                             // delete interface buttons from the nanogui window
+  //}
+
+  clearNodeInstWin();
+
   SECTION(redo interface node buttons)
   {
     vec<LavaNode*> lns;
@@ -1573,18 +1659,17 @@ void  refreshNodeButtons()
         return str(a->name) < str(b->name);
       return a->node_type < b->node_type;
     });
-    
-    //for(auto& kv : fd.flow.flow)
+
     TO(lns.size(),i)
     {
-      LavaNode*    ln = lns[i]; //kv.second;                                                             // fn is flow node
-      auto      ndBtn = new Button(fd.ui.keyWin, ln->name);
+      LavaNode*    ln = lns[i];
+      auto      ndBtn = new Button(fd.ui.ndinstWin, ln->name);
       auto        clr = fd.ui.nd_color;
       switch(ln->node_type){
-        case LavaNode::CONSTANT:   clr = fd.ui.nd_const_clr;  break;
-        case LavaNode::GENERATOR:  clr = fd.ui.nd_gen_clr;    break;
-        case LavaNode::MSG:        clr = fd.ui.nd_gather_clr; break;
-        case LavaNode::FLOW:
+      case LavaNode::CONSTANT:   clr = fd.ui.nd_const_clr;  break;
+      case LavaNode::GENERATOR:  clr = fd.ui.nd_gen_clr;    break;
+      case LavaNode::MSG:        clr = fd.ui.nd_gather_clr; break;
+      case LavaNode::FLOW:
       default: break;
       }
       nanogui::Color nclr;
@@ -1596,7 +1681,7 @@ void  refreshNodeButtons()
         v2 stPos = {fd.ui.w/2.f,  fd.ui.h/2.f};                                                // stPos is starting position
         node_add(ln->name, Node("", (Node::Type)((u64)ln->node_type), stPos) );
       });
-      fd.ui.ndBtns.push_back(ndBtn);
+      fd.ui.ndinstBtns.push_back(ndBtn);
     }
   }
   fd.ui.screen.performLayout();
@@ -1612,6 +1697,7 @@ bool    reloadSharedLibs()
 
   return true;
 }
+// End UI Util
 
 void               keyCallback(GLFWwindow* win,    int key, int scancode, int action, int modbits)
 {
@@ -1927,12 +2013,19 @@ ENTRY_DECLARATION // main or winmain
     {
       fd.ui.screen.initialize(fd.win, false);
 
-      SECTION(create the Tbl Editor window)
+      SECTION(create Tbl Editor window)
       {
         fd.ui.cnstWin = new Window(&fd.ui.screen, "Tbl Editor");
         fd.ui.cnstLay = new GridLayout(Orientation::Horizontal, 3, Alignment::Fill, 10,10);
         fd.ui.cnstWin->setLayout(fd.ui.cnstLay);
         fd.ui.cnstWin->setVisible(false);
+      }
+      SECTION(create Node Buttons window)
+      {
+        fd.ui.ndinstWin = new Window(&fd.ui.screen, "Create Node Instance");
+        fd.ui.ndinstLay = new GridLayout(Orientation::Horizontal, 5, Alignment::Fill, 10,10);
+        fd.ui.ndinstWin->setLayout(fd.ui.ndinstLay);
+        fd.ui.ndinstWin->setVisible(false);
       }
 
       fd.ui.keyLay    = new BoxLayout(Orientation::Horizontal, Alignment::Fill, 0,10);      //fd.ui.keyLay   = new BoxLayout(Orientation::Vertical, Alignment::Fill, 0,10);
@@ -1945,11 +2038,11 @@ ENTRY_DECLARATION // main or winmain
       auto& playBtn   = fd.ui.playBtn  = new  Button(fd.ui.keyWin,     "Play  >");
       auto& pauseBtn  = fd.ui.pauseBtn = new  Button(fd.ui.keyWin,   "Pause  ||");
       auto& stopBtn   = fd.ui.stopBtn  = new  Button(fd.ui.keyWin,   "Stop  |_|");
+      fd.ui.ndinstBtn = new  Button(fd.ui.keyWin,   "Node List");
       auto cnstBtn    = new  Button(fd.ui.keyWin,  "Create Constant");
       auto nodeBtn    = new  Button(fd.ui.keyWin,  "Create Node");
       auto thrdsLabel = new   Label(fd.ui.keyWin,  ""); //toString(fd.threadCount) );
       auto thrdsSldr  = new  Slider(fd.ui.keyWin);
-
       auto nodeTxt    = fd.ui.nodeTxt = new TextBox(fd.ui.keyWin,  "");
 
       SECTION(load and save callbacks)
@@ -2107,6 +2200,19 @@ ENTRY_DECLARATION // main or winmain
         thrdsLabel->setTooltip("Threads");
       }
 
+      SECTION(node instance window button)
+      {
+        fd.ui.ndinstClose = new Button(fd.ui.ndinstWin, "Close");
+        fd.ui.ndinstClose->setCallback([](){
+          fd.ui.ndinstWin->setVisible(false);
+          //clearNodeInstWin();
+        });
+
+        fd.ui.ndinstBtn->setBackgroundColor( nvgToNGUI(fd.ui.nd_color) );
+        fd.ui.ndinstBtn->setCallback([](){
+          makeNodeInstWin();
+        });
+      }
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
 
       SECTION(set up theme for the window)
@@ -2936,6 +3042,9 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//SECTION(get the buttons out of the GUI and clear the button widgets from memory)
+//{
+//}
 
 //auto  sIter = node_slots(n.id);
 //

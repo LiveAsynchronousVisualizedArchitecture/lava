@@ -313,25 +313,30 @@ struct FisData
     Button*        playBtn  = nullptr;
     Button*       pauseBtn  = nullptr;
     Button*        stopBtn  = nullptr;
+    Button*      ndinstBtn  = nullptr;
     Window*      statusWin  = nullptr;
     BoxLayout*   statusLay  = nullptr;
     TextBox*     statusTxt  = nullptr;
     TextBox*       nodeTxt  = nullptr;
-    vec_btn        ndBtns;
     
     Window*         cnstWin = nullptr;
     Layout*         cnstLay = nullptr;
     Button*       cnstClose = nullptr; 
-    vec<Label*>     cnstLbls;
-    vec<TextBox*>   cnstEdit;
-    //vec_btn      cnstBtns;
+    vec<Label*>    cnstLbls;
+    vec<TextBox*>  cnstEdit;
+
+    Window*       ndinstWin = nullptr;      // ndinst stands for node instance
+    Layout*       ndinstLay = nullptr;
+    Button*     ndinstClose = nullptr; 
+    vec_btn      ndinstBtns;
+
 
     // mouse
     v2              prevPntr;
-    bool                rtDn = false;    // right mouse button down
-    bool               lftDn = false;    // left mouse button down
-    bool            prevRtDn = false;    // right mouse button down
-    bool           prevLftDn = false;    // left mouse button down
+    bool                rtDn = false;       // right mouse button down
+    bool               lftDn = false;       // left mouse button down
+    bool            prevRtDn = false;       // right mouse button down
+    bool           prevLftDn = false;       // left mouse button down
 
     f32      zoomSensitivity = 0.005f;
 
