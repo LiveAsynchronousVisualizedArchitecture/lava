@@ -16,11 +16,11 @@
 // -todo: get node buttons out of the main bar
 // -todo: switch back to GridLayout 
 // -todo: make vector for spacer labels so they can be cleared - can just use empty labels and the existing label vector
+// -todo: debug extra characters in the constant string array - needed to use strnlen() to take the minimum between the tbl array size and the length as a C string, to check for null/0/'\0' characters
+// -todo: try changing .obj path constant
+// -todo: make tbl editor be able to edit i8 strings as text - use a length limit?
 
-
-// todo: try changing .obj path constant
 // todo: change node colors to be based off of profiling information while holding 'p' key
-// todo: make tbl editor be able to edit i8 strings as text - use a length limit?
 // todo: make step function take a node or list of node ids to start with 
 // todo: make Tbl Editor step only the node it is editing
 // todo: make step button step only the selected nodes
@@ -1503,37 +1503,46 @@ bool       makeTblEditor(LavaNode* n)
     fd.ui.cnstStr->setFixedWidth(400);
     fd.ui.cnstLbls.emplace_back( new Label(fd.ui.cnstWin, "") );
 
-    //auto    spcr1 = new Label(fd.ui.cnstWin, " ");
-    //auto    spcr2 = new Label(fd.ui.cnstWin, "");
-
     if(cnstTbl.arrayType()==tbl::TblType::I8)
     {
+      auto  sz = cnstTbl.size();
+      auto cSz = strnlen( cnstTbl.data<const char>(), sz);                   // get the smaller value between the size of the table's array and the length as a C string (in case a '\0' character is somewhere in the array)
       str tblStr;
-      auto    sz = cnstTbl.size();
-      tblStr.resize(sz);
-      TO(sz,i)
+      tblStr.resize(cSz);
+      TO(cSz,i)
         tblStr[i] = (i8)cnstTbl[i];
+
+      Println("tblStr: <", tblStr,">");
 
       fd.ui.cnstStr->setValue(tblStr);
       fd.ui.cnstStr->setEditable(true);
 
       fd.ui.cnstLay->preferredSize(fd.vg, fd.ui.cnstStr);
 
-      //fd.ui.cnstLay->setAnchor(fd.ui.cnstStr, 
-      //   AdvancedGridLayout::Anchor(0, lay->rowCount()-1) );             // 4, 1 );       // Alignment::Minimum, Alignment::) );
-      //fd.ui.cnstLay->setColStretch(0,1.f);
-
       auto  cnstStr = fd.ui.cnstStr;
-      fd.ui.cnstStr->setCallback([sz, cnstStr, ln](str const& s)
+      fd.ui.cnstStr->setCallback([cnstStr, ln](str const& s)
       {
-        if(s.size() > sz){
+        tbl t(ln->filePtr);
+        Println("s: <", s,">");
+
+        auto   cap = t.capacity();
+        auto strSz = s.size(); 
+        if(strSz > cap){
           str nxt = s;
-          nxt.resize(sz);
+          nxt.resize(cap);
+          Println("nxt: <", nxt,">");
           cnstStr->setValue(nxt);
         }else{
-          tbl t(ln->filePtr);
-          memcpy(t.data<i8>(), s.data(), sz);
-          t.size(sz);
+          t.size(cap);
+
+          TO(strSz,i){ t[i] = (i8)s[i]; }
+          auto zeroSz = cap - strSz;
+          TO(zeroSz,i){ t[i+strSz] = '\0'; }
+
+          t.size(strSz);
+
+          //memcpy(t.data<i8>(), s.data(), strSz);
+          //memset(t.data<i8>()+strSz, 0, cap - strSz);          
         }
       
         return true;
@@ -3131,6 +3140,12 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//auto    spcr1 = new Label(fd.ui.cnstWin, " ");
+//auto    spcr2 = new Label(fd.ui.cnstWin, "");
+
+//fd.ui.cnstLay->setAnchor(fd.ui.cnstStr, 
+//   AdvancedGridLayout::Anchor(0, lay->rowCount()-1) );             // 4, 1 );       // Alignment::Minimum, Alignment::) );
+//fd.ui.cnstLay->setColStretch(0,1.f);
 
 //nanogui::Color nclr;
 //TO(3,i){ nclr[i] = clr.rgba[i]; }
