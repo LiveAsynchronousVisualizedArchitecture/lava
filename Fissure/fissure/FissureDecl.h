@@ -302,6 +302,8 @@ struct FisData
   } graph;
   struct
   {
+    using AGL = AdvancedGridLayout;
+    
     int                  w  = 1536;
     int                  h  = 1024;
 
@@ -320,8 +322,9 @@ struct FisData
     TextBox*       nodeTxt  = nullptr;
     
     Window*         cnstWin = nullptr;
-    Layout*         cnstLay = nullptr;
-    Button*       cnstClose = nullptr; 
+    GridLayout*     cnstLay = nullptr;
+    Button*       cnstClose = nullptr;
+    TextBox*        cnstStr = nullptr;
     vec<Label*>    cnstLbls;
     vec<TextBox*>  cnstEdit;
 

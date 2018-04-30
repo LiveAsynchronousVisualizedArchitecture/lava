@@ -588,7 +588,6 @@ public:
 
 private:
   void      sizeBytes(u64  bytes){ memStart()->sizeBytes  =  bytes; }
-  void           size(u64   size){ memStart()->size       =   size; }
   void       capacity(u64    cap){ memStart()->capacity   =    cap; }
   void          elems(u64  elems){ memStart()->elems      =  elems; }
   void         mapcap(u64 mapcap){ memStart()->mapcap     = mapcap; }
@@ -1200,6 +1199,7 @@ public:
 
     return nullptr; // no empty slots and key was not found
   }
+  void           size(u64 size){ memStart()->size = size; }
   u64            size() const { return m_mem? memStart()->size : 0; }
   void*     childData() const { return (void*)(elemStart() + map_capacity()); }                                                      // elemStart return a KV* so map_capacity will increment that pointer by the map_capacity * sizeof(KV)
   u64  child_capacity() const

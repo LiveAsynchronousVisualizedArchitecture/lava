@@ -14,7 +14,11 @@
 // -todo: debug why shade ray hits runs in infinite loop with two constant inputs
 // -todo: organize nodes by types in a contex menu or side bar - sorted by name if type is the same too
 // -todo: get node buttons out of the main bar
+// -todo: switch back to GridLayout 
+// -todo: make vector for spacer labels so they can be cleared - can just use empty labels and the existing label vector
 
+
+// todo: try changing .obj path constant
 // todo: change node colors to be based off of profiling information while holding 'p' key
 // todo: make tbl editor be able to edit i8 strings as text - use a length limit?
 // todo: make step function take a node or list of node ids to start with 
@@ -464,7 +468,7 @@ Node&   node_moveToFront(u64 idx)
   return n;
 }
 
-auto            node_add(str node_name, Node n) -> uint64_t
+auto            node_add(str node_name,  Node n) -> uint64_t
 {
   // this effectivly adds a node to the ui graph, adds a add_node command to the LavaGraph, adds slot commands, then on exec adds the slots to the ui graph - far from ideal
   using namespace std;
@@ -1379,7 +1383,7 @@ bool            loadFile(str path, LavaGraph* out_g)
 // End serialize to and from json 
 
 // UI Util
-auto nvgToNGUI(NVGcolor clr) -> nanogui::Color
+auto           nvgToNGUI(NVGcolor clr) -> nanogui::Color
 {
   nanogui::Color nclr;
   TO(3,i){ nclr[i] = clr.rgba[i]; }
@@ -1441,17 +1445,19 @@ void      clearTblEditor()
 
   for(auto const& lbl : fd.ui.cnstLbls)
     fd.ui.cnstWin->removeChild(lbl);
+  fd.ui.cnstLbls.clear();
+  fd.ui.cnstLbls.shrink_to_fit();
 
   for(auto const& edt : fd.ui.cnstEdit)
     fd.ui.cnstWin->removeChild(edt);
+  fd.ui.cnstEdit.clear();
+  fd.ui.cnstEdit.shrink_to_fit();
 
   if(fd.ui.cnstClose){ fd.ui.cnstWin->removeChild(fd.ui.cnstClose); }
   fd.ui.cnstClose = nullptr;
-
-  fd.ui.cnstLbls.clear();
-  fd.ui.cnstLbls.shrink_to_fit();
-  fd.ui.cnstEdit.clear();
-  fd.ui.cnstEdit.shrink_to_fit();
+ 
+  if(fd.ui.cnstStr){ fd.ui.cnstWin->removeChild(fd.ui.cnstStr); }
+  fd.ui.cnstStr = nullptr;
 
   fd.ui.cnstWin->setLayout(fd.ui.cnstLay);
 }
@@ -1476,6 +1482,7 @@ template<class T> void setFloatInc(tbl::KVOfst& kvo, TextBox* tb, str const& s)
 bool       makeTblEditor(LavaNode* n)
 {
   using namespace std;
+  using nanogui::AdvancedGridLayout;
 
   clearTblEditor();
 
@@ -1487,76 +1494,154 @@ bool       makeTblEditor(LavaNode* n)
   if( !(ln->filePtr) ){ return false; }                                  // if it is a constant but its pointer is nullptr, do nothing
   if( !tbl::isTbl(ln->filePtr) ){ return false; }
 
+  auto lay = fd.ui.cnstLay;
   tbl cnstTbl(ln->filePtr);
-
-  vecstr keys; 
-  for(auto kv : cnstTbl){                                                // use the iterators to go through the key-value pairs, then build the controls from those pairs
-    keys.emplace_back(kv.key);
-  }
-  sort(ALL(keys));
-
-  for(auto const& k : keys)
+  SECTION(set up a text box if the tbl array is a string)
   {
-    tbl::KV* kv = cnstTbl(k.c_str()).kv;
-    if( kv->hasTypeAttr(tbl::TblType::INTEGER) || 
-      kv->hasTypeAttr(tbl::TblType::SIGNED) )                           // SIGNED but not INTEGER would be a float
+    fd.ui.cnstLbls.emplace_back( new Label(fd.ui.cnstWin, "") );
+    fd.ui.cnstStr = new TextBox(fd.ui.cnstWin);
+    fd.ui.cnstStr->setFixedWidth(400);
+    fd.ui.cnstLbls.emplace_back( new Label(fd.ui.cnstWin, "") );
+
+    //auto    spcr1 = new Label(fd.ui.cnstWin, " ");
+    //auto    spcr2 = new Label(fd.ui.cnstWin, "");
+
+    if(cnstTbl.arrayType()==tbl::TblType::I8)
     {
-      auto    type = kv->type;
-      str  typeStr = tbl::TblType::type_str(type);
-      fd.ui.cnstLbls.push_back( new Label(fd.ui.cnstWin, k.c_str()) );
+      str tblStr;
+      auto    sz = cnstTbl.size();
+      tblStr.resize(sz);
+      TO(sz,i)
+        tblStr[i] = (i8)cnstTbl[i];
 
-      TextBox*  tb = nullptr;
-      switch(type){
-      case tbl::TblType::I8:  tb = new   IntBox<i8>(fd.ui.cnstWin,   (i8)*kv); break;
-      case tbl::TblType::U8:  tb = new   IntBox<u8>(fd.ui.cnstWin,   (u8)*kv); break;
-      case tbl::TblType::I16: tb = new   IntBox<i16>(fd.ui.cnstWin, (i16)*kv); break;
-      case tbl::TblType::U16: tb = new   IntBox<u16>(fd.ui.cnstWin, (u16)*kv); break;
-      case tbl::TblType::I32: tb = new   IntBox<i32>(fd.ui.cnstWin, (i32)*kv); break;
-      case tbl::TblType::U32: tb = new   IntBox<u32>(fd.ui.cnstWin, (u32)*kv); break;
-      case tbl::TblType::I64: tb = new   IntBox<i64>(fd.ui.cnstWin, (i64)*kv); break;
-      case tbl::TblType::U64: tb = new   IntBox<u64>(fd.ui.cnstWin, (u64)*kv); break;
-      case tbl::TblType::F32: tb = new FloatBox<f32>(fd.ui.cnstWin, (f32)*kv); break;
-      case tbl::TblType::F64: tb = new FloatBox<f64>(fd.ui.cnstWin, (f64)*kv); break;
-      }
-      tb->setSpinnable(true);
-      tb->setEditable(true);
-      tb->setFixedWidth(200);
-      tb->setCallback([tb, type, li, k](str const& s)
+      fd.ui.cnstStr->setValue(tblStr);
+      fd.ui.cnstStr->setEditable(true);
+
+      fd.ui.cnstLay->preferredSize(fd.vg, fd.ui.cnstStr);
+
+      //fd.ui.cnstLay->setAnchor(fd.ui.cnstStr, 
+      //   AdvancedGridLayout::Anchor(0, lay->rowCount()-1) );             // 4, 1 );       // Alignment::Minimum, Alignment::) );
+      //fd.ui.cnstLay->setColStretch(0,1.f);
+
+      auto  cnstStr = fd.ui.cnstStr;
+      fd.ui.cnstStr->setCallback([sz, cnstStr, ln](str const& s)
       {
-        tbl t(li.node->filePtr);
-
-        tbl::KVOfst kvo = t(k.c_str());
-        switch(type){
-        case tbl::TblType::I8:  setInc<i8>(kvo,tb,s);  break;
-        case tbl::TblType::U8:  setInc<u8>(kvo,tb,s);  break;
-        case tbl::TblType::I16: setInc<i16>(kvo,tb,s); break; 
-        case tbl::TblType::U16: setInc<u16>(kvo,tb,s); break;
-        case tbl::TblType::I32: setInc<i32>(kvo,tb,s); break; 
-        case tbl::TblType::U32: setInc<u32>(kvo,tb,s); break;
-        case tbl::TblType::I64: setInc<i64>(kvo,tb,s); break; 
-        case tbl::TblType::U64: setInc<u64>(kvo,tb,s); break;
-        case tbl::TblType::F32: setFloatInc<f32>(kvo,tb,s); break; 
-        case tbl::TblType::F64: setFloatInc<f64>(kvo,tb,s); break;
+        if(s.size() > sz){
+          str nxt = s;
+          nxt.resize(sz);
+          cnstStr->setValue(nxt);
+        }else{
+          tbl t(ln->filePtr);
+          memcpy(t.data<i8>(), s.data(), sz);
+          t.size(sz);
         }
-
-        if(fd.vizIds.count() > 0)
-          step(fd.threadCount);
-
+      
         return true;
       });
-      fd.ui.cnstEdit.push_back(tb);
-      fd.ui.cnstLbls.push_back( new Label(fd.ui.cnstWin, typeStr.c_str() ) );
     }
   }
 
-  fd.ui.cnstClose = new Button(fd.ui.cnstWin, "Close");
-  fd.ui.cnstClose->setCallback([](){
-    fd.ui.cnstWin->setVisible(false);
-    clearTblEditor();
-  });
+  vecstr keys; 
+  SECTION(extract the keys and sort them)
+  {
+    for(auto kv : cnstTbl){                                                // use the iterators to go through the key-value pairs, then build the controls from those pairs
+      keys.emplace_back(kv.key);
+    }
+    sort(ALL(keys));
+  }
 
-  fd.ui.cnstWin->setPosition(Vector2i(0,200));
-  fd.ui.cnstWin->setVisible(true);
+  SECTION(build a control for each key)
+  {
+    TO(keys.size(),i)
+    {
+      auto const& k = keys[i];
+      tbl::KV*   kv = cnstTbl(k.c_str()).kv;
+      if( kv->hasTypeAttr(tbl::TblType::INTEGER) || 
+        kv->hasTypeAttr(tbl::TblType::SIGNED) )                           // SIGNED but not INTEGER would be a float
+      {
+        //fd.ui.cnstLay->appendRow(0);
+        auto col = (i32)(i+1);
+  
+        auto txtLbl = new Label(fd.ui.cnstWin, k.c_str());
+        fd.ui.cnstLbls.emplace_back(txtLbl);
+        //fd.ui.cnstLay->setAnchor(txtLbl, AdvancedGridLayout::Anchor(col,0, Alignment::Fill, Alignment::Fill) );
+  
+        auto    type = kv->type;
+        TextBox*  tb = nullptr;
+        switch(type){
+          case tbl::TblType::I8:  tb = new   IntBox<i8>(fd.ui.cnstWin,   (i8)*kv); break;
+          case tbl::TblType::U8:  tb = new   IntBox<u8>(fd.ui.cnstWin,   (u8)*kv); break;
+          case tbl::TblType::I16: tb = new   IntBox<i16>(fd.ui.cnstWin, (i16)*kv); break;
+          case tbl::TblType::U16: tb = new   IntBox<u16>(fd.ui.cnstWin, (u16)*kv); break;
+          case tbl::TblType::I32: tb = new   IntBox<i32>(fd.ui.cnstWin, (i32)*kv); break;
+          case tbl::TblType::U32: tb = new   IntBox<u32>(fd.ui.cnstWin, (u32)*kv); break;
+          case tbl::TblType::I64: tb = new   IntBox<i64>(fd.ui.cnstWin, (i64)*kv); break;
+          case tbl::TblType::U64: tb = new   IntBox<u64>(fd.ui.cnstWin, (u64)*kv); break;
+          case tbl::TblType::F32: tb = new FloatBox<f32>(fd.ui.cnstWin, (f32)*kv); break;
+          case tbl::TblType::F64: tb = new FloatBox<f64>(fd.ui.cnstWin, (f64)*kv); break;
+        }
+        tb->setSpinnable(true);
+        tb->setEditable(true);
+        tb->setFixedWidth(200);
+        tb->setCallback([tb, type, li, k](str const& s)
+        {
+          tbl t(li.node->filePtr);
+  
+          tbl::KVOfst kvo = t(k.c_str());
+          switch(type){
+            case tbl::TblType::I8:  setInc<i8>(kvo,tb,s);  break;
+            case tbl::TblType::U8:  setInc<u8>(kvo,tb,s);  break;
+            case tbl::TblType::I16: setInc<i16>(kvo,tb,s); break; 
+            case tbl::TblType::U16: setInc<u16>(kvo,tb,s); break;
+            case tbl::TblType::I32: setInc<i32>(kvo,tb,s); break; 
+            case tbl::TblType::U32: setInc<u32>(kvo,tb,s); break;
+            case tbl::TblType::I64: setInc<i64>(kvo,tb,s); break; 
+            case tbl::TblType::U64: setInc<u64>(kvo,tb,s); break;
+            case tbl::TblType::F32: setFloatInc<f32>(kvo,tb,s); break; 
+            case tbl::TblType::F64: setFloatInc<f64>(kvo,tb,s); break;
+          }
+  
+          if(fd.vizIds.count() > 0)
+            step(fd.threadCount);
+  
+          return true;
+        });
+        //fd.ui.cnstLay->setAnchor(tb, AdvancedGridLayout::Anchor(col,1, Alignment::Fill, Alignment::Fill) );
+        fd.ui.cnstEdit.emplace_back(tb);
+  
+        str  typeStr = tbl::TblType::type_str(type);
+        auto typeLbl = new Label(fd.ui.cnstWin, typeStr.c_str() );
+        fd.ui.cnstLbls.emplace_back(typeLbl);
+        //fd.ui.cnstLay->setAnchor(typeLbl, AdvancedGridLayout::Anchor(col,2, Alignment::Fill, Alignment::Fill) );
+      }
+    }
+  }
+
+  SECTION(add close button set position make visible)
+  {
+    fd.ui.cnstLbls.emplace_back( new Label(fd.ui.cnstWin, "") );  // spacer label
+    fd.ui.cnstClose = new Button(fd.ui.cnstWin, "Close");
+    fd.ui.cnstClose->setCallback([](){
+      fd.ui.cnstWin->setVisible(false);
+      clearTblEditor();
+    });
+    fd.ui.cnstLbls.emplace_back( new Label(fd.ui.cnstWin, "") );
+
+    //auto spcr3 = new Label(fd.ui.cnstWin, "");
+    //auto spcr4 = new Label(fd.ui.cnstWin, " ");
+    
+    //lay->setAnchor(fd.ui.cnstClose,
+    //               AdvancedGridLayout::Anchor(0,1, Alignment::Fill, Alignment::Fill) );
+    //lay->setColStretch(1, 1.f);
+
+    fd.ui.cnstLbls.emplace_back( new Label(fd.ui.cnstWin, "") );  // extra space at the bottom
+    fd.ui.cnstLbls.emplace_back( new Label(fd.ui.cnstWin, "") );
+    fd.ui.cnstLbls.emplace_back( new Label(fd.ui.cnstWin, "") );
+
+    fd.ui.cnstWin->setPosition(Vector2i(0,200));
+    fd.ui.cnstWin->performLayout(fd.vg);
+    fd.ui.cnstWin->setVisible(true);
+  }
 
   return true;
 }
@@ -1604,10 +1689,6 @@ void     makeNodeInstWin()
         case LavaNode::FLOW:
       default: break;
       }
-      //nanogui::Color nclr;
-      //TO(3,i){ nclr[i] = clr.rgba[i]; }
-      //nclr[3] = 1.f;
-      //ndBtn->setBackgroundColor(nclr);
       ndBtn->setBackgroundColor(nvgToNGUI(clr));
 
       ndBtn->setCallback([ln](){ 
@@ -1666,11 +1747,11 @@ void  refreshNodeButtons()
       auto      ndBtn = new Button(fd.ui.ndinstWin, ln->name);
       auto        clr = fd.ui.nd_color;
       switch(ln->node_type){
-      case LavaNode::CONSTANT:   clr = fd.ui.nd_const_clr;  break;
-      case LavaNode::GENERATOR:  clr = fd.ui.nd_gen_clr;    break;
-      case LavaNode::MSG:        clr = fd.ui.nd_gather_clr; break;
-      case LavaNode::FLOW:
-      default: break;
+        case LavaNode::CONSTANT:   clr = fd.ui.nd_const_clr;  break;
+        case LavaNode::GENERATOR:  clr = fd.ui.nd_gen_clr;    break;
+        case LavaNode::MSG:        clr = fd.ui.nd_gather_clr; break;
+        case LavaNode::FLOW:
+        default: break;
       }
       nanogui::Color nclr;
       TO(3,i){ nclr[i] = clr.rgba[i]; }
@@ -2016,7 +2097,14 @@ ENTRY_DECLARATION // main or winmain
       SECTION(create Tbl Editor window)
       {
         fd.ui.cnstWin = new Window(&fd.ui.screen, "Tbl Editor");
+        //fd.ui.cnstWin->setWidth(600);
+        //fd.ui.cnstWin->setFixedWidth(400);
+
         fd.ui.cnstLay = new GridLayout(Orientation::Horizontal, 3, Alignment::Fill, 10,10);
+        //fd.ui.cnstLay = new AdvancedGridLayout({1}, {}, 10);
+        //fd.ui.cnstLay->setColStretch(0, 1.f);
+        //fd.ui.cnstLay->setRowStretch(0, 1.f);
+        //fd.ui.cnstLay->setColStretch(1, 1.f);
         fd.ui.cnstWin->setLayout(fd.ui.cnstLay);
         fd.ui.cnstWin->setVisible(false);
       }
@@ -2024,6 +2112,7 @@ ENTRY_DECLARATION // main or winmain
       {
         fd.ui.ndinstWin = new Window(&fd.ui.screen, "Create Node Instance");
         fd.ui.ndinstLay = new GridLayout(Orientation::Horizontal, 5, Alignment::Fill, 10,10);
+        //fd.ui.ndinstLay = new AdvancedGridLayout({1,3}, {0}, 10);
         fd.ui.ndinstWin->setLayout(fd.ui.ndinstLay);
         fd.ui.ndinstWin->setVisible(false);
       }
@@ -3041,6 +3130,12 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+//nanogui::Color nclr;
+//TO(3,i){ nclr[i] = clr.rgba[i]; }
+//nclr[3] = 1.f;
+//ndBtn->setBackgroundColor(nclr);
 
 //SECTION(get the buttons out of the GUI and clear the button widgets from memory)
 //{
