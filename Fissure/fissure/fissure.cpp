@@ -20,6 +20,8 @@
 // -todo: try changing .obj path constant
 // -todo: make tbl editor be able to edit i8 strings as text - use a length limit?
 
+// todo: debug crash when trying to demo camera - is there a problem with the array parameter in the camera parameter constant? - seems to be with the tbl 
+//       |  can't directly realloc the reference counted allocations - why is the camera node using a realloc function in the first place?
 // todo: change node colors to be based off of profiling information while holding 'p' key
 // todo: make step function take a node or list of node ids to start with 
 // todo: make Tbl Editor step only the node it is editing

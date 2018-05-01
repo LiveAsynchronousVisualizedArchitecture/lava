@@ -274,14 +274,15 @@ void              keyCallback(GLFWwindow* window, int key, int scancode, int act
     } break; 
     case GLFW_KEY_J:
     case GLFW_KEY_F: {
-      //if(action==GLFW_RELEASE){
-      //  //vec4   sph   =  shapes_to_bndsph(*vd);
-      //  //vec3  cntr   =  vec3(sph.x,sph.y,sph.z);
-      //  //vec3  ofst   =  cam.pos - cam.lookAt;
-      //  //cam.lookAt   =  cntr;
-      //  //cam.pos      =  cam.lookAt + ofst;
+      //if(action==GLFW_PRESS){
       //}
-      //cam.dist     =  sph.r;
+      vec4   sph   =  shapes_to_bndsph(*vd);
+      vec3  cntr   =  vec3(sph.x,sph.y,sph.z);
+      vec3  ofst   =  cam.pos - cam.lookAt;
+      cam.lookAt   =  cntr;
+      cam.pos      =  cam.lookAt + ofst;
+      cam.dist     =  sph.w * 1.25f;
+      cam.up       =  vec3(0.0f, 1.0f, 0.0f);
     } break;
     case GLFW_KEY_PAGE_UP: {
       vd->ui.ptSz *= 2;

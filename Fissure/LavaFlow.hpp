@@ -1994,7 +1994,7 @@ public:
 };
 
 // Lava Helper Functions
-template<class T> const tbl LavaMakeTbl(LavaParams const* lp, u64 count, T initVal=T() )
+template<class T> tbl LavaMakeTbl(LavaParams const* lp, u64 count, T initVal=T() )
 {
   using namespace std;
 
@@ -2007,7 +2007,7 @@ template<class T> const tbl LavaMakeTbl(LavaParams const* lp, u64 count, T initV
 
   return move(t);
 }
-const tbl            LavaMakeTbl(LavaParams const* lp)
+tbl      LavaMakeTbl(LavaParams const* lp)
 {
   using namespace std;
 
@@ -2030,7 +2030,7 @@ tbl           LavaLocalTbl(LavaParams const* lp)
 
   return move(t);
 }
-tbl        LavaTblFromPckt(LavaParams const* lp, LavaFrame const* in, u64 i)
+const tbl  LavaTblFromPckt(LavaParams const* lp, LavaFrame const* in, u64 i)
 {
   using namespace std;
 
@@ -2701,8 +2701,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
             TO(lf.frameQ.size(), i)                                       // loop through the current frames looking for one with the same frame number and destination slot id - if no frame is found to put the packet into, make a new one - keep track of the lowest full frame while looping and use that if no full frame is found?
             {
               auto& frm = lf.frameQ[i];
-              if(frm.dest != pckt.dest_node){ continue; }                 // todo: unify dest_node and dest_id etc. as one LavaId LavaPacket
-              if(frm.cycle != pckt.cycle){ continue; }
+              if(frm.dest  != pckt.dest_node){ continue; }                 // todo: unify dest_node and dest_id etc. as one LavaId LavaPacket
+              if(frm.cycle != pckt.cycle){     continue; }
 
               bool slotTaken = frm.slotMask[sIdx];
               if(!slotTaken){
@@ -2736,13 +2736,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
             }else
               runFrm = frm;
           }
-          //else if({  
-          //}
-          //else{ continue; }
         } // mutex is unlocked
-
-        //lf.m_frameQLck.lock();                                          // lock mutex       
-        //lf.m_frameQLck.unlock();                                       // unlock mutex
 
         nodeId = runFrm.dest;
       }else SECTION(try to run a single message node if there was no packet found){
@@ -2776,12 +2770,18 @@ void               LavaLoop(LavaFlow& lf) noexcept
             SECTION(create arguments and call function)
             {
               LavaParams lp;
-              lp.inputs       =   1;
-              lp.cycle        =   lf.m_cycle;
-              lp.id           =   LavaId(nodeId);
-              lp.ref_alloc    =   LavaAlloc;
-              lp.ref_realloc  =   LavaRealloc;
-              lp.ref_free     =   LavaFree;
+              lp.inputs         =   1;
+              lp.cycle          =   lf.m_cycle;
+              lp.id             =   LavaId(nodeId);
+              lp.ref_alloc      =   LavaAlloc;
+              lp.ref_realloc    =   LavaRealloc;
+              lp.ref_free       =   LavaFree;
+              lp.local_alloc    =   LavaHeapAlloc;
+              lp.local_realloc  =   LavaHeapReAlloc;
+              lp.local_free     =   LavaFree;
+              //lp.local_alloc    =   LavaAlloc;
+              //lp.local_realloc  =   LavaRealloc;
+              //lp.local_free     =   LavaFree;
 
               auto stTime = high_resolution_clock::now();
                 state       = exceptWrapper(func, lf, &lp, &runFrm, &outQ);         // actually run the node here
@@ -2923,6 +2923,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//lf.m_frameQLck.lock();                                          // lock mutex       
+//lf.m_frameQLck.unlock();                                       // unlock mutex
 
 // slots
 //Slots nxtSlots;

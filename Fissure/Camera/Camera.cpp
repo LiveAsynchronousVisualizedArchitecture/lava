@@ -60,6 +60,7 @@ tbl raysToIdxVerts(LavaParams const* lp, tbl const& rays)
   tbl   dz = rays("direction z");
 
   tbl   iv, px, py, pz, cr, cg, ca, ind;
+  //iv = px = py = pz = cr = cg = ca = ind = LavaLocalTbl(lp);
   SECTION(create tables for indexed verts)
   {
     iv  = LavaMakeTbl(lp, 0, (u8)0);

@@ -816,35 +816,21 @@ private:
     }
   }
   void             cp(tbl const& l)
-  {    
-     //if(l.owned()){
-     //  if(!m_alloc)   m_alloc   = l.m_alloc;
-     //  if(!m_realloc) m_realloc = l.m_realloc;
-     //  //if(!m_free)    m_free    = l.m_free;
-     //}else{
-     //  initAlloc();
-     //}
-     //
-     //if(l.owned()){
-     //
-     //if(!m_free)    m_free    = l.m_free;
-     //}else{
-     //initAlloc();
-     //}
-
+  {
      if(l.m_alloc)   m_alloc   = l.m_alloc;
      if(l.m_realloc) m_realloc = l.m_realloc;
      if(l.m_free)    m_free    = l.m_free;
 
-     if(!m_alloc && !m_realloc && !m_free){ initAlloc(); }
+     if( !(m_alloc && m_realloc && m_free) ){ initAlloc(); }
 
-     // try straight memcpy with ownership change here
      auto szBytes = l.sizeBytes();
-     //u8*    memSt = (u8*)malloc(szBytes);
-     u8*    memSt = (u8*)m_alloc(szBytes);
-     m_mem        = memSt + memberBytes();
-     memcpy(memSt, l.memStart(), szBytes);
-     owned(true);
+     if(szBytes > 0)
+     {
+       u8*    memSt = (u8*)m_alloc(szBytes);
+       m_mem        = memSt + memberBytes();
+       memcpy(memSt, l.memStart(), szBytes);      // try straight memcpy with ownership change here
+       owned(true);
+     }
   }
   void             cp(void* tblPtr)
   {
@@ -1646,6 +1632,26 @@ public:
 
 
 
+
+
+//if(l.owned()){
+//  if(!m_alloc)   m_alloc   = l.m_alloc;
+//  if(!m_realloc) m_realloc = l.m_realloc;
+//  //if(!m_free)    m_free    = l.m_free;
+//}else{
+//  initAlloc();
+//}
+//
+//if(l.owned()){
+//
+//if(!m_free)    m_free    = l.m_free;
+//}else{
+//initAlloc();
+//}
+
+//if(!m_alloc && !m_realloc && !m_free){ initAlloc(); }
+//
+//u8*    memSt = (u8*)malloc(szBytes);
 
 //i8* tp = (i8*)mem;
 //if( tp[0]=='t' && tp[1]=='b'){

@@ -203,6 +203,44 @@ inline mat4           camera_to_mat4(Camera const& cam, float w, float h)
   mat4 projection = glm::perspective(cam.fov, (w/h), cam.nearClip, cam.farClip);
   return projection * view;
 }
+inline vec4         shapes_to_bndsph(VizData const& vd)
+{
+  f32  r = 0;
+  vec3 p(0,0,0);
+
+  for(auto& kv : vd.shapes)
+  {
+    if(!kv.second.active) continue;
+
+    auto&    key = kv.first;
+    u32     vlen = 0;
+    u32  version = 0;
+    auto     len = db.len(key.data(), (u32)key.length(), &vlen, &version);          // todo: make ui64 as the input length
+
+    vec<i8> ivbuf(vlen);
+    db.get(key.data(), (u32)key.length(), ivbuf.data(), (u32)ivbuf.size());
+
+    //IndexedVerts* iv = (IndexedVerts*)IndexedVertsLoad(ivbuf.data());
+    //vec3*          v = (vec3*)iv->verts;
+    //
+    //IndexedVertsDestroy(iv);
+
+    tbl iv(ivbuf.data());
+
+    tbl px = iv("positions x");
+    tbl py = iv("positions y");
+    tbl pz = iv("positions z");
+
+    auto sz = px.size();
+    TO(sz,i){
+      v3     v( (f32)px[i], (f32)py[i], (f32)pz[i] );
+      f32 dist = distance(v, p); 
+      p = (v + p)    / 2.f;
+      r = (r + dist) / 2.f;
+    }
+  }
+  return vec4(p, r);
+}
 
 
 
@@ -228,35 +266,6 @@ inline mat4           camera_to_mat4(Camera const& cam, float w, float h)
 //  verts[i].p[0] = px.at<f32>(i);
 //  verts[i].p[1] = py.at<f32>(i);
 //  verts[i].p[2] = pz.at<f32>(i);
-//}
-
-//inline vec4         shapes_to_bndsph(VizData const& vd)
-//{
-//  f32  r = 0;
-//  vec3 p(0,0,0);
-//
-//  for(auto& kv : vd.shapes)
-//  {
-//    if(!kv.second.active) continue;
-//
-//    auto&    key = kv.first;
-//    u32     vlen = 0;
-//    u32  version = 0;
-//    auto     len = db.len(key.data(), (u32)key.length(), &vlen, &version);          // todo: make ui64 as the input length
-//
-//    vec<i8> ivbuf(vlen);
-//    db.get(key.data(), (u32)key.length(), ivbuf.data(), (u32)ivbuf.size());
-//
-//    IndexedVerts* iv = (IndexedVerts*)IndexedVertsLoad(ivbuf.data());
-//    vec3*          v = (vec3*)iv->verts;
-//    TO(iv->vertsLen,i){
-//      f32 dist = distance(v[i], p); 
-//      p = (v[i] + p) / 2.f;
-//      r = (r + dist) / 2.f;
-//    }
-//    IndexedVertsDestroy(iv);
-//  }
-//  return vec4(p, r);
 //}
 
 #endif
