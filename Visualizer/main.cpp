@@ -634,10 +634,15 @@ void                refreshDB(VizData* vd)
 
 void           buttonCallback(str key, bool pushed)
 {
-  auto it = vd.shapes.find(key);
-  if(it == vd.shapes.end()){ return; }
+  if(vd.camera.rightButtonDown){
+    db.del(key);
+  }else{
+    auto it = vd.shapes.find(key);
+    if(it == vd.shapes.end()){ return; }
 
-  if(it->second.owner) it->second.active = pushed;
+    if(it->second.owner){ it->second.active = pushed; }
+  }
+
   //vd.shapes[key].active = pushed;
 }
 void       dbLstPressCallback(int i)
@@ -726,7 +731,7 @@ f32       drawStrs(NVGcontext* nvg, tblstr const& strs, tblv2 const& ofsts, f32 
 
   return h;
 }
-f32      drawGraph(NVGcontext* nvg, tbl   const&    t, bnd2f b)
+f32      drawGraph(NVGcontext* nvg, tbl    const&    t, bnd2f b)
 {
   using namespace std;
 
@@ -908,16 +913,6 @@ ENTRY_DECLARATION
         dbLstChangeCallback(true);
         vd.ui.dbLst->setCallback( dbLstPressCallback );
 
-        //vd.ui.dbLst->setCallback([](int i){                                          // callback for the actual selection
-        //  if(i < vd.ui.dbNames.size() && i!=vd.ui.dbNameIdx){
-        //    vd.ui.dbNameIdx = i;
-        //    vd.ui.dbName = vd.ui.dbNames[i];
-        //    initSimDB(vd.ui.dbName);
-        //    refreshDB(&vd);
-        //    vd.ui.dbLst->setSelectedIndex(i);
-        //  }
-        //  vd.ui.screen.performLayout();
-        //});
         auto spcr4   = new Label(vd.ui.keyWin, "");
         auto spcr5   = new Label(vd.ui.keyWin, "");
         auto spcr6   = new Label(vd.ui.keyWin, "");
@@ -1155,6 +1150,16 @@ ENTRY_DECLARATION
 
 
 
+//vd.ui.dbLst->setCallback([](int i){                                          // callback for the actual selection
+//  if(i < vd.ui.dbNames.size() && i!=vd.ui.dbNameIdx){
+//    vd.ui.dbNameIdx = i;
+//    vd.ui.dbName = vd.ui.dbNames[i];
+//    initSimDB(vd.ui.dbName);
+//    refreshDB(&vd);
+//    vd.ui.dbLst->setSelectedIndex(i);
+//  }
+//  vd.ui.screen.performLayout();
+//});
 
 //genTestGeo(&db);
 //
