@@ -106,6 +106,9 @@ Lock free, shared memory key value store for exceptionally fast, concurrent, int
 
 ### Examples
 
+![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_LoadObj.gif "A constant file path is passed to an obj file loader node.")
+
+
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/rays_shadeRayHits001.png "Rays generated from a camera and traced to find their collisions with a 3D model using the embree library.")
  
 This is an example of rays generated from a camera and traced to find their collisions with a 3D model using the embree library.
