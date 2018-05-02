@@ -22,14 +22,18 @@
 // todo: -debug crash when trying to demo camera - is there a problem with the array parameter in the camera parameter constant? - seems to be with the tbl 
 //        |  can't directly realloc the reference counted allocations - why is the camera node using a realloc function in the first place?
 //        |  might have just been local allocations not being filled in with LavaParams
+// -todo: debug why the camera ray visualization shows less rays than should be generated - number of points in visualization is rays*2 which should be correct, though number of lines is less, possibly half rounded up - some points are -inf and inf - inf in traced rays is possibly not fitlered out when visualizing as indexed verts - inf check and a separate ray index variable worked - should probably make a habit of visualizing the actual data going out 
 
-// todo: debug why the camera ray visualization shows less rays than should be generated - number of points in visualization is rays*2 which should be correct, though number of lines is less, possibly half rounded up - some points are -inf and inf - inf in traced rays is possibly not fitlered out when visualizing as indexed verts
+// todo: make a Lava function or queue that outputs errors - use the LavaOut struct for errors and warnings
+// todo: make errors put a node in an error or warning state 
+// todo: make errors or warnings print with their color in the status bar
 // todo: debug why Demo_Trace does not stop looping - FilePath doesn't seem to get called - does deleting nodes delete them from the message/generator cache?
 // todo: change node colors to be based off of profiling information while holding 'p' key
-// todo: make step function take a node or list of node ids to start with 
+// todo: make step button function take a node or list of node ids to start with 
 // todo: make Tbl Editor step only the node it is editing
 // todo: make step button step only the selected nodes
 // todo: make dragging a .const file into the UI copy it to the path 
+// todo: build in data type visualization - part needs to be lava, part needs to be UI - does any need to be in lava? - is checking for 'tb' at the start of a binary blob, then checking for a "type" key enough to determine types ? - if it is a project, a window that shows visualized and unvisualized data types could be used
 // todo: make sure zooming center is affected by cursor placement - now have the cursor in world space thanks to drgWrld
 // todo: try using windows API to slow cursor movement when inside nodes and slots 
 // todo: order generator nodes by traversing the graph backwards 
@@ -40,7 +44,6 @@
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
 // todo: make fissure or lava be able to incrementally load shared libraries
 // todo: change constructor to happen on play and not on load (or after the destructor runs on stop)
-// todo: build in data type visualization - part needs to be lava, part needs to be UI - does any need to be in lava? - is checking for 'tb' at the start of a binary blob, then checking for a "type" key enough to determine types ?
 // todo: re-orient nodes on resize of the window so they line up with the grid in the same place 
 //       | maybe the scale and pan need to be changed instead 
 //       | if the window size is simply shrinking closer to 0, maybe the center point needs to be normalized according to where it was in the window
@@ -2428,7 +2431,6 @@ ENTRY_DECLARATION // main or winmain
         graph_apply(move(av));
       }
 
-      //bool    rtClk = (ms.rtDn  && !ms.prevRtDn);  // todo: take this out
       auto      nds = node_getPtrs();
       auto       sz = nds.size();
       bool isInNode = false;
@@ -3144,6 +3146,9 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+//
+//bool    rtClk = (ms.rtDn  && !ms.prevRtDn);  // todo: take this out
 
 //auto    spcr1 = new Label(fd.ui.cnstWin, " ");
 //auto    spcr2 = new Label(fd.ui.cnstWin, "");
