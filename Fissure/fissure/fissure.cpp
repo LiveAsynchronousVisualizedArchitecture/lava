@@ -19,9 +19,12 @@
 // -todo: debug extra characters in the constant string array - needed to use strnlen() to take the minimum between the tbl array size and the length as a C string, to check for null/0/'\0' characters
 // -todo: try changing .obj path constant
 // -todo: make tbl editor be able to edit i8 strings as text - use a length limit?
+// todo: -debug crash when trying to demo camera - is there a problem with the array parameter in the camera parameter constant? - seems to be with the tbl 
+//        |  can't directly realloc the reference counted allocations - why is the camera node using a realloc function in the first place?
+//        |  might have just been local allocations not being filled in with LavaParams
 
-// todo: debug crash when trying to demo camera - is there a problem with the array parameter in the camera parameter constant? - seems to be with the tbl 
-//       |  can't directly realloc the reference counted allocations - why is the camera node using a realloc function in the first place?
+// todo: debug why the camera ray visualization shows less rays than should be generated - number of points in visualization is rays*2 which should be correct, though number of lines is less, possibly half rounded up - some points are -inf and inf - inf in traced rays is possibly not fitlered out when visualizing as indexed verts
+// todo: debug why Demo_Trace does not stop looping - FilePath doesn't seem to get called - does deleting nodes delete them from the message/generator cache?
 // todo: change node colors to be based off of profiling information while holding 'p' key
 // todo: make step function take a node or list of node ids to start with 
 // todo: make Tbl Editor step only the node it is editing
@@ -2319,9 +2322,9 @@ ENTRY_DECLARATION // main or winmain
       {
         Theme* thm = fd.ui.keyWin->theme();
         thm->mButtonFontSize      = 16;
-        thm->mTransparent         = e4f( .0f,  .0f,  .0f,    .0f  );
-        thm->mWindowFillUnfocused = e4f( .2f,  .2f,  .225f,  .75f );
-        thm->mWindowFillFocused   = e4f( .3f,  .28f, .275f,  .75f );
+        thm->mTransparent         = e4f( .0f,  .0f,  .0f,    0.0f   );
+        thm->mWindowFillUnfocused = e4f( .2f,  .2f,  .225f,  0.97f  );
+        thm->mWindowFillFocused   = e4f( .3f,  .28f, .275f,  1.0f   );
       }
       SECTION(set up the status bar at the bottom of the screen)
       {

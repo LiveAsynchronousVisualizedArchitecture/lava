@@ -93,8 +93,10 @@
 // -todo: test further for crashes
 // -todo: test with all threads running in fissure
 // -todo: make mouse up events not be stopped even if they happen in the nanoui areas
+// -todo: give Visualizer a way to delete db keys - holding right click while pressing a button deletes key, but doesn't work for some reason with multiple keys
+// -todo: make delete key delete visible keys
 
-// todo: give Visualizer a way to delete db keys
+// todo: fix 'f' fitting and shapes to bounding sphere function with multiple shapes
 // todo: do something to bound the clip planes to the current visible models tighter - hopefully this would fix the z-fighting 
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
@@ -274,8 +276,6 @@ void              keyCallback(GLFWwindow* window, int key, int scancode, int act
     } break; 
     case GLFW_KEY_J:
     case GLFW_KEY_F: {
-      //if(action==GLFW_PRESS){
-      //}
       vec4   sph   =  shapes_to_bndsph(*vd);
       vec3  cntr   =  vec3(sph.x,sph.y,sph.z);
       vec3  ofst   =  cam.pos - cam.lookAt;
@@ -289,6 +289,14 @@ void              keyCallback(GLFWwindow* window, int key, int scancode, int act
     } break;
     case GLFW_KEY_PAGE_DOWN: {
       vd->ui.ptSz /= 2;
+    } break;
+    case GLFW_KEY_DELETE: {                            // when the delete key is pressed, delete all the visible keys
+      for(auto const& kv : vd->shapes){
+        auto const& s = kv.second;
+        if(s.active){
+          db.del(kv.first);                           // kv.first should be the key as a string
+        }
+      }
     } break;
     default:
       break;
@@ -1150,6 +1158,8 @@ ENTRY_DECLARATION
 
 
 
+//if(action==GLFW_PRESS){
+//}
 
 //vd.ui.dbLst->setCallback([](int i){                                          // callback for the actual selection
 //  if(i < vd.ui.dbNames.size() && i!=vd.ui.dbNameIdx){

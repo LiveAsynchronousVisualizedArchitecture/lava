@@ -12,6 +12,7 @@ This file is meant to be made up of utilities that avoid using the C runtime
 
 #include <type_traits>
 #include <cstdint>
+#include <limits>
 
 //#ifdef _MSC_VER
 //  #define _CRT_SECURE_NO_WARNINGS
@@ -93,6 +94,9 @@ using  ui64  =  uint64_t;
 #elif defined (__GCC__) // GCC
     #define THREAD_LOCAL __thread
 #endif
+
+const float   INFf       = std::numeric_limits<float>::infinity();
+const float   SIG_NANf   = std::numeric_limits<float>::signaling_NaN();
 
 #ifdef NO_RT_UTIL_IMPL
 

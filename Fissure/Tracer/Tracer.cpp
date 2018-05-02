@@ -104,6 +104,22 @@ float     randomf(float lo, float hi)
 //  return move(iv);
 //}
 
+namespace {
+
+const float   INFf       = std::numeric_limits<float>::infinity();
+const float   SIG_NANf   = std::numeric_limits<float>::signaling_NaN();
+
+bool              hasInf(v2   v)
+{
+  TO(2,i) if(v[i]==INFf || v[i]==-INFf) return true;
+  return false;
+}
+bool              hasNaN(v2   v)
+{
+  TO(2,i) if(v[i]==SIG_NANf || v[i]==-SIG_NANf) return true;
+  return false;
+}
+
 tbl   raysToIdxVerts(LavaParams const* lp, RTCRayHitNp const& rh, u32 rayCnt)
 {
   using namespace std;
@@ -126,14 +142,22 @@ tbl   raysToIdxVerts(LavaParams const* lp, RTCRayHitNp const& rh, u32 rayCnt)
   ind.setArrayType<u32>();
   iv.setArrayType<i8>();
 
+  u32 ri = 0;                           // ri is ray index
   TO(rayCnt,i){
+    auto tfar = rh.ray.tfar[i];
+    if(tfar == INFf || tfar == SIG_NANf){ continue; }
+
     px.push( rh.ray.org_x[i]  );
     py.push( rh.ray.org_y[i]  );
     pz.push( rh.ray.org_z[i]  );
 
-    px.push( rh.ray.org_x[i] + (rh.ray.dir_x[i]*rh.ray.tfar[i]) );
-    py.push( rh.ray.org_y[i] + (rh.ray.dir_y[i]*rh.ray.tfar[i]) );
-    pz.push( rh.ray.org_z[i] + (rh.ray.dir_z[i]*rh.ray.tfar[i]) );
+    px.push( rh.ray.org_x[i] + (rh.ray.dir_x[i]*tfar) );
+    py.push( rh.ray.org_y[i] + (rh.ray.dir_y[i]*tfar) );
+    pz.push( rh.ray.org_z[i] + (rh.ray.dir_z[i]*tfar) );
+
+    //px.push( rh.ray.org_x[i] + (rh.ray.dir_x[i]*rh.ray.tfar[i]) );
+    //py.push( rh.ray.org_y[i] + (rh.ray.dir_y[i]*rh.ray.tfar[i]) );
+    //pz.push( rh.ray.org_z[i] + (rh.ray.dir_z[i]*rh.ray.tfar[i]) );
 
     cr.push(0.5f);
     cr.push(1.0f);
@@ -142,8 +166,10 @@ tbl   raysToIdxVerts(LavaParams const* lp, RTCRayHitNp const& rh, u32 rayCnt)
     ca.push(0.2f);
     ca.push(0.1f);
 
-    ind.push( (u32)(i*2+0) );
-    ind.push( (u32)(i*2+1) );
+    ind.push( (u32)(ri*2+0) );
+    ind.push( (u32)(ri*2+1) );
+
+    ++ri;
   }
 
   //TO(rayCnt,i)     // now do the ray hits
@@ -185,7 +211,7 @@ tbl   raysToIdxVerts(LavaParams const* lp, RTCRayHitNp const& rh, u32 rayCnt)
   //iv("colors blue")  = &pz;
   iv("colors alpha") = &ca;
   iv("indices")      = &ind;
-  iv("mode")         = 1;            // 0 should be points, 1 should be lines
+  iv("mode")         = (u32)1;            // 0 should be points, 1 should be lines
   iv("type")         = tbl::StrToInt("IdxVerts");
   iv.flatten();
 
@@ -234,7 +260,7 @@ tbl rayHitToIdxVerts(LavaParams const* lp, RTCRayHit const& rh)
   iv("colors green") = &cg;
   //iv("colors blue")  = &pz;
   iv("indices")      = &ind;
-  iv("mode")         = 1;            // 0 should be points, 1 should be lines
+  iv("mode")         = (u32)1;            // 0 should be points, 1 should be lines
   iv("type")         = tbl::StrToInt("IdxVerts");
   iv.flatten();
 
@@ -340,14 +366,14 @@ tbl    bndToIdxVerts(LavaParams const* lp, RTCBounds const& b)
   iv("colors red")   = &px;
   iv("colors green") = &py;
   iv("colors blue")  = &pz;
-  iv("mode")         = 1;            // 0 should be points, 1 should be lines
+  iv("mode")         = (u32)1;            // 0 should be points, 1 should be lines
   iv("type")         = tbl::StrToInt("IdxVerts");
   iv.flatten();
 
   return move(iv);
 }
 
-tbl cullRays(LavaParams const* lp, tbl& rays)
+tbl         cullRays(LavaParams const* lp, tbl& rays)
 {
   using namespace std;
   
@@ -400,6 +426,8 @@ tbl cullRays(LavaParams const* lp, tbl& rays)
   //}
 
   return culledRays;
+}
+
 }
 
 extern "C"          // Embree3 Scene Message Node

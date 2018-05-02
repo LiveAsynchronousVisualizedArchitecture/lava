@@ -100,7 +100,7 @@ tbl raysToIdxVerts(LavaParams const* lp, tbl const& rays)
   iv("colors green") = &cg;
   iv("colors alpha") = &ca;
   iv("indices")      = &ind;
-  iv("mode")         = 1;            // 0 should be points, 1 should be lines
+  iv("mode")         = (u32)1;            // 0 should be points, 1 should be lines
   iv("type")         = tbl::StrToInt("IdxVerts");
   iv.flatten();
 

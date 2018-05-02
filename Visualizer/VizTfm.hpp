@@ -18,6 +18,9 @@
 
 namespace{
 
+const float   INFf          = std::numeric_limits<float>::infinity();
+const float   SIG_NANf      = std::numeric_limits<float>::signaling_NaN();
+
 void       print_gl_errors(int line)
 {
   for(GLenum err; (err = glGetError()) != GL_NO_ERROR;){
@@ -25,6 +28,16 @@ void       print_gl_errors(int line)
   }
 }
 
+bool                hasInf(v3   v)
+{
+  TO(3,i) if(v[i]==INFf || v[i]==-INFf) return true;
+  return false;
+}
+bool                hasNaN(v3   v)
+{
+  TO(3,i) if(v[i]==SIG_NANf || v[i]==-SIG_NANf) return true;
+  return false;
+}
 }
 #define PRINT_GL_ERRORS print_gl_errors(__LINE__);
 
@@ -205,8 +218,11 @@ inline mat4           camera_to_mat4(Camera const& cam, float w, float h)
 }
 inline vec4         shapes_to_bndsph(VizData const& vd)
 {
-  f32  r = 0;
-  vec3 p(0,0,0);
+  using namespace std;
+  
+  f32  rad = 0;
+  vec3 cntr(0,0,0);
+  bool posSet = false;  // instead of starting with zero for the position, make sure to start with nothing so that the origin point isn't factored in to the sphere bounds at all
 
   for(auto& kv : vd.shapes)
   {
@@ -220,11 +236,6 @@ inline vec4         shapes_to_bndsph(VizData const& vd)
     vec<i8> ivbuf(vlen);
     db.get(key.data(), (u32)key.length(), ivbuf.data(), (u32)ivbuf.size());
 
-    //IndexedVerts* iv = (IndexedVerts*)IndexedVertsLoad(ivbuf.data());
-    //vec3*          v = (vec3*)iv->verts;
-    //
-    //IndexedVertsDestroy(iv);
-
     tbl iv(ivbuf.data());
 
     tbl px = iv("positions x");
@@ -232,227 +243,36 @@ inline vec4         shapes_to_bndsph(VizData const& vd)
     tbl pz = iv("positions z");
 
     auto sz = px.size();
-    TO(sz,i){
+    TO(sz,i)
+    {
       v3     v( (f32)px[i], (f32)py[i], (f32)pz[i] );
-      f32 dist = distance(v, p); 
-      p = (v + p)    / 2.f;
-      r = (r + dist) / 2.f;
+      if( hasInf(v) || hasNaN(v) ){ continue; }
+
+      if(posSet){
+        f32 dist = distance(v, cntr); 
+        if(dist > rad){
+          f32 distDif = (dist - rad) / dist;
+          cntr += ((v-cntr)*distDif) / 2.f;
+          rad  += distDif / 2.f;                            // if the point is already in the radius of the sphere, don't add the distance - if it was not inside the radius, add half the distance to the radius, because the center will be moved halfway to the new point  
+        }
+      }else{
+        cntr = v;
+        posSet = true;
+      }
     }
   }
-  return vec4(p, r);
+  return vec4(cntr, rad);
 }
-
-
-
-
-
-
-//assert( iv.m_mem != nullptr );   auto f = iv.memStart();
-//assert( ((i8*)iv.memStart())[0] = 't' );
-//assert( ((i8*)iv.memStart())[1] = 'b' );
-
-//if( iv.m_mem != nullptr               ||
-//    ((i8*)iv.memStart())[0]   == 't'  ||
-//    ((i8*)iv.memStart())[1]   == 'b'  ||
-//    tbl::StrToInt("IdxVerts") == (u64)iv("type")
-//  ){
-//  return Shape();
-//}
-
-//u64 typenum = iv("type");
-//assert( memcmp(&typenum, (u64*)"IdxVerts", sizeof(u64))==0 );
-
-//TO(sz,i){
-//  verts[i].p[0] = px.at<f32>(i);
-//  verts[i].p[1] = py.at<f32>(i);
-//  verts[i].p[2] = pz.at<f32>(i);
-//}
 
 #endif
 
 
 
 
+//r += max(0.f, dist - r) / 2.f;     // if the point is already in the radius of the sphere, don't add the distance - if it was not inside the radius, add half the distance to the radius, because the center will be moved halfway to the new point  
+//r = (r + dist) / 2.f;
 
-
-
-
-
-
-
-
-
-
-//Shape s = ivbuf_to_shape(ivbuf.data(), len);
-//
-//for(auto const& shp : shapes){
-//  Shape const& s = shp.second;
-//  if(s.active){
-//    
-//  }
-//}
-
-//using namespace glm;
-//
-//const static auto YAXIS = vec3(0.f, 1.f, 0.f);
-//
-//mat4 view  =  glm::inverse(look);
-//
-//mat4 projection;
-//
-//camMtx = vd.camera.tfm * projection;
-
-//static float tmpImg[] = { 0.5f, 0.5f, 0.5f, 0.5f };
-// = {0,0,0,0,0};         // Shape of all 0s
-//mode = 0;  // GL_POINTS
-
-//inline Shape          ivbuf_to_shape(void* buf, u64 len)    //IndexedVerts* iv)
-//{
-//  using namespace std;
-//  
-//  Shape shp;   // = {0,0,0,0,0};         // Shape of all 0s
-//
-//  if(!buf) return shp;
-//  
-//  auto iv = (IndexedVerts*)IndexedVertsLoad(buf);
-//  if(!iv) return shp;
-//
-//  shp.owner = true;
-//  shp.mode  = iv->mode;
-//  shp.indsz = iv->indicesLen;
-//
-//  glGenTextures(1, &shp.tx);
-//  glBindTexture(GL_TEXTURE_2D, shp.tx);
-//  switch(iv->imgChans){
-//  case 1:
-//    glTexImage2D(GL_TEXTURE_2D, 0, GL_R, iv->imgWidth, iv->imgHeight, 0, GL_R, GL_FLOAT, iv->pixels); 
-//    break;
-//  case 2:
-//    glTexImage2D(GL_TEXTURE_2D, 0, GL_RG, iv->imgWidth, iv->imgHeight, 0, GL_RG, GL_FLOAT, iv->pixels); 
-//    break;
-//  case 3:
-//    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, iv->imgWidth, iv->imgHeight, 0, GL_RGB, GL_FLOAT, iv->pixels); 
-//    break;
-//  case 4:
-//    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, iv->imgWidth, iv->imgHeight, 0, GL_RGBA, GL_FLOAT, iv->pixels); 
-//    break;
-//  default:
-//    ;
-//  }
-//  glBindTexture(GL_TEXTURE_2D, 0);
-//
-//  glGenVertexArrays(1, &shp.vertary);
-//  glGenBuffers(1,      &shp.vertbuf);
-//  glGenBuffers(1,      &shp.idxbuf );
-//
-//  glBindVertexArray(shp.vertary);
-//
-//  glBindBuffer(GL_ARRAY_BUFFER, shp.vertbuf);
-//  glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex)* iv->vertsLen, iv->verts, GL_STATIC_DRAW);
-//
-//  glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shp.idxbuf);
-//  glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t)* iv->indicesLen, iv->indices, GL_STATIC_DRAW);
-//
-//  IndexedVertsDestroy(iv);
-//  
-//  glVertexAttribPointer(POSITION, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);                      
-//  glVertexAttribPointer(NORMAL,   3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) *  3));
-//  glVertexAttribPointer(COLOR,    4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) *  6));
-//  glVertexAttribPointer(TEXCOORD, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 10));
-//
-//  glEnableVertexAttribArray(POSITION);
-//  glEnableVertexAttribArray(NORMAL);
-//  glEnableVertexAttribArray(COLOR);
-//  glEnableVertexAttribArray(TEXCOORD);
-//
-//  glBindVertexArray(0);
-//
-//  return move(shp);
-//}
-
-//tu32  ind = t("IND");
-//const tbl* const ind;
-//tbl const* px, const* py, const* pz;
-//tbl const* nx, const* ny, const* nz;
-//tbl const* cr, const* cg, const* cb;
-//tbl const* tx, const* ty;
-
-//verts[i].position[0] = px->at<f32>(i);
-//verts[i].position[1] = py->at<f32>(i);
-//verts[i].position[2] = pz->at<f32>(i);
-//
-//verts[i].normal[0] = nx->at<f32>(i);
-//verts[i].normal[1] = ny->at<f32>(i);
-//verts[i].normal[2] = nz->at<f32>(i);
-//
-//verts[i].color[0] = cr->at<f32>(i);
-//verts[i].color[1] = cg->at<f32>(i);
-//verts[i].color[2] = cb->at<f32>(i);
-//
-//verts[i].texCoord[0] = tx->at<f32>(i);
-//verts[i].texCoord[1] = ty->at<f32>(i);
-
-//
-//u64 typenum = typenum=t("type");
-
-//if(!buf) return shp;
-//
-//auto iv = (IndexedVerts*)IndexedVertsLoad(buf);
-//if(!iv) return shp;
-
-//shp.owner = true;
-//shp.mode  = iv->mode;
-//shp.indsz = iv->indicesLen;
-
-//tf32    p = t("P");
-//tf32    n = t("N");
-//tf32    c = t("C");
-//tf32   tx = t("TX");
-
-// t("mode").kv->as<u32>()
-//u32 mode  = t("mode").as<u32>();
-
-//switch(iv->imgChans){
-//case 1:
-//  glTexImage2D(GL_TEXTURE_2D, 0, GL_R, iv->imgWidth, iv->imgHeight, 0, GL_R, GL_FLOAT, iv->pixels); 
-//  break;
-//case 2:
-//  glTexImage2D(GL_TEXTURE_2D, 0, GL_RG, iv->imgWidth, iv->imgHeight, 0, GL_RG, GL_FLOAT, iv->pixels); 
-//  break;
-//case 3:
-//  glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, iv->imgWidth, iv->imgHeight, 0, GL_RGB, GL_FLOAT, iv->pixels); 
-//  break;
-//case 4:
-//
-//  break;
-//default:
-//  ;
-//}
-
-//glGenVertexArrays(1, &shp.vertary);
-//glGenBuffers(1,      &shp.vertbuf);
-//glGenBuffers(1,      &shp.idxbuf );
-
-//
-//glBindVertexArray(shp.vertary);
-
-//glBindBuffer(GL_ARRAY_BUFFER, shp.vertbuf);
-////glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex)* iv->vertsLen, iv->verts, GL_STATIC_DRAW);
-//glBufferData(GL_ARRAY_BUFFER, sizeof(Vertex)* iv->vertsLen, iv->verts, GL_STATIC_DRAW);
-
-//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, shp.idxbuf);
-//glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(uint32_t)* iv->indicesLen, iv->indices, GL_STATIC_DRAW);
-
+//IndexedVerts* iv = (IndexedVerts*)IndexedVertsLoad(ivbuf.data());
+//vec3*          v = (vec3*)iv->verts;
 //
 //IndexedVertsDestroy(iv);
-
-//glVertexAttribPointer(POSITION, 3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)0);                      
-//glVertexAttribPointer(NORMAL,   3, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) *  3));
-//glVertexAttribPointer(COLOR,    4, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) *  6));
-//glVertexAttribPointer(TEXCOORD, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), (void*)(sizeof(float) * 10));
-
-//
-//return Shape();
-
-//template<class T>
-//inline Shape          tbl_to_shape(tbl<T>&& t)
