@@ -24,10 +24,17 @@
 //        |  might have just been local allocations not being filled in with LavaParams
 // -todo: debug why the camera ray visualization shows less rays than should be generated - number of points in visualization is rays*2 which should be correct, though number of lines is less, possibly half rounded up - some points are -inf and inf - inf in traced rays is possibly not fitlered out when visualizing as indexed verts - inf check and a separate ray index variable worked - should probably make a habit of visualizing the actual data going out 
 
+// todo: put in live reloading that uses the Lava step function on reload
+// todo: implement live reloading that copies the shared library, loads it, switches over atomically, unloads the previous live version, copies the tmp live version to the normal live file, maps the new live version file, automically switches over to that, then unloads the tmp live shared lib - whew!
+// todo: implement optional arguments 
+// todo: debug why BRDF rays is not outputting a visualization packet - node not being run because there is no frame for the node - need to implement optional arguments
+// todo: debug why Demo_Trace does not stop looping - FilePath doesn't seem to get called - does deleting nodes delete them from the message/generator cache?
+// todo: order generator nodes by traversing the graph backwards 
+//       |  make a Lava function that returns a map of orders for graph nodes by their positions in the graph
+//       |  could recursivly follow the graph backwards, traversing the first inputs first for a consistent ordering
 // todo: make a Lava function or queue that outputs errors - use the LavaOut struct for errors and warnings
 // todo: make errors put a node in an error or warning state 
 // todo: make errors or warnings print with their color in the status bar
-// todo: debug why Demo_Trace does not stop looping - FilePath doesn't seem to get called - does deleting nodes delete them from the message/generator cache?
 // todo: change node colors to be based off of profiling information while holding 'p' key
 // todo: make step button function take a node or list of node ids to start with 
 // todo: make Tbl Editor step only the node it is editing
@@ -36,7 +43,6 @@
 // todo: build in data type visualization - part needs to be lava, part needs to be UI - does any need to be in lava? - is checking for 'tb' at the start of a binary blob, then checking for a "type" key enough to determine types ? - if it is a project, a window that shows visualized and unvisualized data types could be used
 // todo: make sure zooming center is affected by cursor placement - now have the cursor in world space thanks to drgWrld
 // todo: try using windows API to slow cursor movement when inside nodes and slots 
-// todo: order generator nodes by traversing the graph backwards 
 // todo: investigate if Trace node is spending most of its time in the BVH building and figure out what to do about it
 // todo: integrate AddConst into RefreshFlowLibs function so that there are .live versions
 // todo: work out timed live reload checking - are there event callbacks that can be used
@@ -1507,7 +1513,7 @@ bool       makeTblEditor(LavaNode* n)
   SECTION(set up a text box if the tbl array is a string)
   {
     fd.ui.cnstLbls.emplace_back( new Label(fd.ui.cnstWin, "") );
-    fd.ui.cnstStr = new TextBox(fd.ui.cnstWin);
+    fd.ui.cnstStr = new TextBox(fd.ui.cnstWin, "");
     fd.ui.cnstStr->setFixedWidth(400);
     fd.ui.cnstLbls.emplace_back( new Label(fd.ui.cnstWin, "") );
 
@@ -1520,7 +1526,7 @@ bool       makeTblEditor(LavaNode* n)
       TO(cSz,i)
         tblStr[i] = (i8)cnstTbl[i];
 
-      Println("tblStr: <", tblStr,">");
+      //Println("tblStr: <", tblStr,">");
 
       fd.ui.cnstStr->setValue(tblStr);
       fd.ui.cnstStr->setEditable(true);

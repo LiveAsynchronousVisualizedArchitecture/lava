@@ -95,8 +95,10 @@
 // -todo: make mouse up events not be stopped even if they happen in the nanoui areas
 // -todo: give Visualizer a way to delete db keys - holding right click while pressing a button deletes key, but doesn't work for some reason with multiple keys
 // -todo: make delete key delete visible keys
+// -todo: fix 'f' fitting and shapes to bounding sphere function with multiple shapes
+// -todo: debug why delete is not always working - version is not always 0 even when a key doesn't exist
 
-// todo: fix 'f' fitting and shapes to bounding sphere function with multiple shapes
+// todo: debug why db button dissapears when there are four or more indexed verts entries
 // todo: do something to bound the clip planes to the current visible models tighter - hopefully this would fix the z-fighting 
 // todo: make camera fitting use the field of view and change the dist to fit all geometry 
 //       |  use the camera's new position and take a vector orthongonal to the camera-to-lookat vector. the acos of the dot product is the angle, but tan will be needed to set a position from the angle?
@@ -169,7 +171,6 @@ using v4f  =  Eigen::Vector4f;
 
 const u32 TITLE_MAX_LEN = 256;
 
-//#include "../nanovg_test/str_util.hpp"
 #include "../../../str_util.hpp"
 void   printdb(simdb const& db)
 {
@@ -192,6 +193,7 @@ void   printdb(simdb const& db)
 }
 
 void           buttonCallback(str key, bool pushed);
+void                refreshDB(VizData* vd);
 
 vec3                      pos(mat4 const& m)
 { return m[3];                      }
@@ -276,6 +278,7 @@ void              keyCallback(GLFWwindow* window, int key, int scancode, int act
     } break; 
     case GLFW_KEY_J:
     case GLFW_KEY_F: {
+      //refreshDB(vd);
       vec4   sph   =  shapes_to_bndsph(*vd);
       vec3  cntr   =  vec3(sph.x,sph.y,sph.z);
       vec3  ofst   =  cam.pos - cam.lookAt;
@@ -572,7 +575,7 @@ u32       eraseMissingKeys(KeyShapes* shps)
     u32    vlen = 0;
     u32 version = 0;
     i64     len = db.len(it->first, &vlen, &version);
-    if(version==0 && (len==0 || vlen==0) ){
+    if(version==0 || len==0 || vlen==0){
       it = shps->erase(it);
       ++cnt;
     }else
@@ -580,6 +583,9 @@ u32       eraseMissingKeys(KeyShapes* shps)
   }
 
   return cnt;
+
+  //
+  //if(version==0 && (len==0 || vlen==0) ){
 
   //KeyShapes* shps = &vd->shapes;
   //

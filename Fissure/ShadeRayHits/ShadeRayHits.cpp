@@ -328,7 +328,7 @@ tbl brdfRaysToIV(LavaParams const* lp, tbl const& rays, tbl const& brdfRays)    
   iv("colors blue")  = &cb;
   iv("colors alpha") = &ca;
   iv("indices")      = &ind;
-  iv("mode")         = 1;            // 0 should be points, 1 should be lines
+  iv("mode")         = (u32)1;            // 0 should be points, 1 should be lines
   iv("type")         = tbl::StrToInt("IdxVerts");
   iv.flatten();
 
@@ -399,7 +399,7 @@ extern "C"
     tbl ivBrdfRays = brdfRaysToIV(lp, rays, brdfRays);
     out->push( LavaTblToOut(move(ivBrdfRays), OUT_BRDF_RAYS_VISUALIZATION) );
 
-    out->push( LavaTblToOut(move(brdfRays), OUT_BRDF_RAYS) );
+    out->push( LavaTblToOut(move(brdfRays),   OUT_BRDF_RAYS) );
 
     return 1;
   }
@@ -407,11 +407,11 @@ extern "C"
   LavaNode LavaNodes[] =
   {
     {
-      ShadeRayHits,                                      // function
-      ShadeRayHits_construct,                            // constructor - this can be set to nullptr if not needed
-      ShadeRayHits_destruct,                             // destructor  - this can also be set to nullptr 
+      ShadeRayHits,                                  // function
+      ShadeRayHits_construct,                        // constructor - this can be set to nullptr if not needed
+      ShadeRayHits_destruct,                         // destructor  - this can also be set to nullptr 
       LavaNode::FLOW,                                // node_type   - this should be eighther LavaNode::MSG (will be run even without input packets) or LavaNode::FLOW (will be run only when at least one packet is available for input)
-      "ShadeRayHits",                                    // name
+      "ShadeRayHits",                                // name
       InTypes,                                       // in_types    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
       InNames,                                       // in_names    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
       OutTypes,                                      // out_types   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 

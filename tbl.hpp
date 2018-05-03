@@ -1548,6 +1548,8 @@ private:
 public:
   static bool   isTbl(void* mem)
   {
+    if(!mem){ return false; }
+
     fields* f = (fields*)mem;
     if( f->t=='t'  && 
         f->b=='b'  && 

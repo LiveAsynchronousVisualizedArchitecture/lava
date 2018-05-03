@@ -726,11 +726,15 @@ struct        LavaOut
     u8 bytes[16];
   }key;
 
-  LavaOut() : key{0,0,0}, val{0,0} {} // type(0), value(0) {}
-  LavaOut(u32 slot, u64 value) : key{0,slot,0}, val{LavaArgType::MEMORY,value}   // value(val), type(LavaArgType::MEMORY)
+  LavaOut() : key{0,0,0}, val{0,0} {}
+  LavaOut(u32 slot, u64 value) : key{0,slot,0}, val{LavaArgType::MEMORY,value}
   {}
-  LavaOut(u32 slot, u64 value, u64 type) : key{0,slot,0}, val{type,value}  // value(val), type(_type)
+  LavaOut(u32 slot, u64 value, u64 type) : key{0,slot,0}, val{type,value}
   {}
+
+  // type(0), value(0) {}
+  // value(val), type(LavaArgType::MEMORY)
+  // value(val), type(_type)
 };
 struct     LavaPacket
 {

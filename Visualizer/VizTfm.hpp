@@ -1,15 +1,15 @@
 
+//#ifdef _MSC_VER
+//  #define _CRT_SECURE_NO_WARNINGS 1
+//  #define _SCL_SECURE_NO_WARNINGS 1
+//#endif
+
 #ifdef _MSC_VER
   #pragma once
 #endif
 
 #ifndef __VIZ_TRANSFORMS_HEADERGUARD_HPP__
 #define __VIZ_TRANSFORMS_HEADERGUARD_HPP__
-
-//#ifdef _MSC_VER
-//  #define _CRT_SECURE_NO_WARNINGS 1
-//  #define _SCL_SECURE_NO_WARNINGS 1
-//#endif
 
 #include "GL/glew.h"
 #include "glfw3.h"
@@ -95,7 +95,8 @@ inline Shape            tbl_to_shape(tbl const& iv)  // todo: try to change this
   static float tmpImg[] = { 0.f, 0.f, 0.f, 0.f };
 
   Shape shp;
-  u32 mode = (u32)((u64)iv("mode"));
+  i64 mode64 = iv("mode");
+  u32   mode = (u32)mode64;
   tbl ind, px, py, pz, nx, ny, nz, cr, cg, cb, ca, tx, ty, img;
   ind = iv("indices");
   px  = iv("positions x");  auto ff = px.memStart();
@@ -232,12 +233,14 @@ inline vec4         shapes_to_bndsph(VizData const& vd)
     u32     vlen = 0;
     u32  version = 0;
     auto     len = db.len(key.data(), (u32)key.length(), &vlen, &version);          // todo: make ui64 as the input length
+    if(vlen==0){ continue; }
 
     vec<i8> ivbuf(vlen);
     db.get(key.data(), (u32)key.length(), ivbuf.data(), (u32)ivbuf.size());
 
-    tbl iv(ivbuf.data());
+    if( !tbl::isTbl(ivbuf.data()) ){ continue; }
 
+    tbl iv(ivbuf.data());
     tbl px = iv("positions x");
     tbl py = iv("positions y");
     tbl pz = iv("positions z");
