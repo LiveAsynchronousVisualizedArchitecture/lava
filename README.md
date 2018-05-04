@@ -119,31 +119,47 @@ Lock free, shared memory key value store for exceptionally fast, concurrent, int
 The LoadObj node shown here is basically a wrapper around the [Tiny Obj Loader](https://github.com/syoyo/tinyobjloader) by [Syoyo Fujita](https://github.com/syoyo)
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_LoadObj.gif "A constant file path is passed to an obj file loader node.")
 
+<br>
+
 <a id="camera-rays">Ray tracing rays generated and visualized in real time as a memory mapped tbl file (the purple constant node) is changed. </a>
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_CameraRays.gif "Ray tracing rays generated and visualized in real time as a memory mapped tbl file (the purple constant node) is changed.")
+
+<br>
 
 <a id="brandisher-elements">Here the same tbl is show in two different places. On the right being edited as part of a const node (which just reads a .const file from disk). On the left it is read from shared memory.</a>
 ![Brandisher Elements](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_BrandisherElements.gif "Here the same tbl is show in two different places. On the right being edited as part of a const node (which just reads a .const file from disk). On the left it is read from shared memory.")
 
-<a id="trace"></a>
-![Trace](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_Trace.gif "")
+<br>
 
-<a id="interactive-trace"></a>
-![Interactive Trace](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_InteractiveTrace.gif "")
+<a id="trace">A trace node (a wrapper around [the Embree ray tracing library from Intel](https://github.com/embree/embree)) is added and generated rays are traced to find where they collide with geometry.</a>
+![Trace](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_Trace.gif "A trace node (a wrapper around the Embree ray tracing library from Intel) is added and generated rays are traced to find where they collide with geometry.")
 
-<a id="constant-bake"></a>
+<br>
+
+<a id="interactive-trace">The field of view for the generated rays is changed and visualized outputs are updated in real time.</a>
+![Interactive Trace](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_InteractiveTrace.gif "The field of view for the generated rays is changed and visualized outputs are updated in real time.")
+
+<br>
+
+<a id="constant-bake">An output that is already in shared memory (blue highlight, then stepped once) is middle-click dragged to make a constant node. This cuts the dependency on the rest of the graph while writing out the result to a file on disc.</a>
 ![Constant Bake](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_ConstantBake.gif "")
 
-<a id="shade-rays"></a>
-![Shade Rays](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_ShadeRays.gif "")
+<br>
 
-<a id="constant-shade"></a>
-![Constant Shade](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_ConstantShade.gif "")
+<a id="shade-rays">The traced rays are combined with the GGX BRDF to get new ray directions that originate from the model.  Their length when visualized is the result of their PDF (sample weight). </a>
+![Shade Rays](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_ShadeRays.gif "The traced rays are combined with the GGX BRDF to get new ray directions that originate from the model.  Their length when visualized is the result of their PDF (sample weight).")
 
+<br>
+
+<a id="constant-shade">The results of geometry loading, ray generation and ray tracing are written to a constant file for rapid iteration with no dependencies.</a>
+![Constant Shade](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_ConstantShade.gif "The results of geometry loading, ray generation and ray tracing are written to a constant file for rapid iteration with no dependencies.")
+
+<br>
 
 <a id="shade-ray-hits"> Rays generated from a camera and traced to find their collisions with a 3D model using the embree library. </a>
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/rays_shadeRayHits001.jpg "Rays generated from a camera and traced to find their collisions with a 3D model using the embree library.")
- 
+
+
 This is an example of rays generated from a camera and traced to find their collisions with a 3D model using the embree library.
   - An .obj model is loaded 
   - The model is passed to a message node that uses [the Embree ray tracing library from Intel](https://github.com/embree/embree) to sort the geometry into a BVH (bounding volume heirarchy acceleration structure for ray tracing)
