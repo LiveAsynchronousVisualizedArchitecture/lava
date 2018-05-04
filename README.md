@@ -1,6 +1,6 @@
-# LAVA
+# LAVA - Live Asynchronous Visual Architecture
 
-LAVA stands for Live Asynchronous Visual Architecture.  Its goal is to simplify high performance software while allowing every piece to be lock free and asynchronous.
+LAVA is meant to simplify high performance software while allowing every piece to be lock free and asynchronous.
 
 [![Load Obj](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_LoadObj.gif "")](#load-obj)
 [![Camera Rays](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_CameraRays.gif "")](#camera-rays)
@@ -11,15 +11,15 @@ LAVA stands for Live Asynchronous Visual Architecture.  Its goal is to simplify 
 [![Shade Rays](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_ShadeRays.gif "")](#shade-rays)
 [![Constant Shade](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_ConstantShade.gif "")](#constant-shade)
 
-LAVA is designed to **_both_** significantly **_speed up development_** AND as a simple way to create **_signifcant amounts of lock free concurrency_**.  It is written in C++11 and meant to potentially work with any language that can compile a shared library that exposes standard function calls.  The fundamental building blocks are single file libraries with no dependencies other than the C++11 standard library. 
+LAVA is designed to **_both_** significantly **_speed up development_** AND as a simple way to create **_signifcant amounts of lock free concurrency_**.  It is written in C++11 and meant to potentially work with any language that can compile a shared library that exposes standard function calls.  The building blocks are single file libraries with no dependencies other than the C++11 standard library. 
 
 ### Classic Software Problems
   -  High level structure is not strictly enforced (or doesn't exist) and often subverted in some way to accomodate extra data/communication 
-  -  As program size increases, iteration increases due to re-compilation time, linking time, and the time to re-run the program to test
+  -  As program size increases, iterations decrease due to re-compilation time, linking time, and the time to re-run the program when testing
   -  Modularity often breaks down due to data dependencies at run time and source dependencies at compile time
-  -  Creating asynchronous components is often error prone and/or requires significant planning.  Non-trivial software that is able use  any separate chunk of data in parallel, on all available CPU cores and completely lock free is rare. 
-  -  Debugging often requires a slow process of examining tiny amounts of data at various execution points to find where a problem happens before it can become clear how it happens
-  -  Debugging often means using an entirely different build that is significantly slower, instead of isolating the speed hit to a small piece of the program
+  -  Creating asynchronous components is often error prone and/or requires significant planning.  Non-trivial software that is able use  any separate chunk of data in parallel, on all available CPU cores while remaining lock free is rare. 
+  -  Debugging is often slow and requires examining tiny amounts of data at various execution points to narrow the source of the problem
+  -  Debugging often means using a build that is significantly slower, instead of isolating the speed hit to a small piece of the program
 
 ### How LAVA Confronts These Problems
 
@@ -116,6 +116,7 @@ Lock free, shared memory key value store for exceptionally fast, concurrent, int
 ### Examples
 
 <a id="load-obj"> A constant file path is passed to an obj file loader node. </a>
+The LoadObj node shown here is basically a wrapper around the [Tiny Obj Loader](https://github.com/syoyo/tinyobjloader) by [Syoyo Fujita](https://github.com/syoyo)
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_LoadObj.gif "A constant file path is passed to an obj file loader node.")
 
 <a id="camera-rays"> Ray tracing rays generated from camera and visualized in real time as a memory mapped tbl file is changed. </a>
@@ -149,6 +150,9 @@ This is an example of rays generated from a camera and traced to find their coll
   - The camera node generates rays and passes them to the scene node to be traced
   - The message node traces the rays and outputs both the traced rays colliding with geometry and a visualization of the traced rays 
   - A final node takes the traced rays and computes the outgoing ray from the ray hit point and normal
+  
+  
+  ### F.A.Q (Frequently Anticipated Questions)
   
   ### Internals
   
