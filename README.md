@@ -2,7 +2,7 @@
 
 LAVA stands for Live Asynchronous Visual Architecture.  Its goal is to simplify high performance software while allowing every piece to be lock free and asynchronous.
 
-[![Load Obj](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_LoadObj.gif "")](#examples)
+[![Load Obj](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_LoadObj.gif "")](#load-obj)
 [![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_CameraRays.gif "")](#examples)
 [![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_BrandisherElements.gif "")](#examples)
 [![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_Trace.gif "")](#examples)
@@ -116,7 +116,7 @@ Lock free, shared memory key value store for exceptionally fast, concurrent, int
 
 ### Examples
 
-A constant file path is passed to an obj file loader node.
+<a id="load-obj"> A constant file path is passed to an obj file loader node. </a>
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_LoadObj.gif "A constant file path is passed to an obj file loader node.")
 
 Ray tracing rays generated from camera and visualized in real time as a memory mapped tbl file is changed.
