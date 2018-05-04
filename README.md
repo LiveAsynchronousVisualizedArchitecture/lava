@@ -1,6 +1,6 @@
 # LAVA - Live Asynchronous Visual Architecture
 
-LAVA is an architecture meant to simplify high performance software while allowing every piece to be lock free and asynchronous.
+LAVA is meant to simplify high performance software while allowing every piece to be lock free and asynchronous.
 
 [![Load Obj](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_LoadObj.gif "")](#load-obj)
 [![Camera Rays](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_CameraRays.gif "")](#camera-rays)
@@ -15,11 +15,11 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 
 ### Classic Software Problems
   -  High level structure is not strictly enforced (or doesn't exist) and often subverted in some way to accomodate extra data/communication 
-  -  As program size increases, iteration increases due to re-compilation time, linking time, and the time to re-run the program to test
+  -  As program size increases, iterations decrease due to re-compilation time, linking time, and the time to re-run the program when testing
   -  Modularity often breaks down due to data dependencies at run time and source dependencies at compile time
-  -  Creating asynchronous components is often error prone and/or requires significant planning.  Non-trivial software that is able use  any separate chunk of data in parallel, on all available CPU cores and completely lock free is rare. 
-  -  Debugging often requires a slow process of examining tiny amounts of data at various execution points to find where a problem happens before it can become clear how it happens
-  -  Debugging often means using an entirely different build that is significantly slower, instead of isolating the speed hit to a small piece of the program
+  -  Creating asynchronous components is often error prone and/or requires significant planning.  Non-trivial software that is able use  any separate chunk of data in parallel, on all available CPU cores while remaining lock free is rare. 
+  -  Debugging is often slow and requires examining tiny amounts of data at various execution points to narrow the source of the problem
+  -  Debugging often means using a build that is significantly slower, instead of isolating the speed hit to a small piece of the program
 
 ### How LAVA Confronts These Problems
 
