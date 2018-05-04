@@ -1,6 +1,6 @@
-# LAVA
+# LAVA - Live Asynchronous Visual Architecture
 
-LAVA stands for Live Asynchronous Visual Architecture.  Its goal is to simplify high performance software while allowing every piece to be lock free and asynchronous.
+LAVA is an architecture meant to simplify high performance software while allowing every piece to be lock free and asynchronous.
 
 [![Load Obj](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_LoadObj.gif "")](#load-obj)
 [![Camera Rays](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_CameraRays.gif "")](#camera-rays)
@@ -11,7 +11,7 @@ LAVA stands for Live Asynchronous Visual Architecture.  Its goal is to simplify 
 [![Shade Rays](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_ShadeRays.gif "")](#shade-rays)
 [![Constant Shade](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_ConstantShade.gif "")](#constant-shade)
 
-LAVA is designed to **_both_** significantly **_speed up development_** AND as a simple way to create **_signifcant amounts of lock free concurrency_**.  It is written in C++11 and meant to potentially work with any language that can compile a shared library that exposes standard function calls.  The fundamental building blocks are single file libraries with no dependencies other than the C++11 standard library. 
+LAVA is designed to **_both_** significantly **_speed up development_** AND as a simple way to create **_signifcant amounts of lock free concurrency_**.  It is written in C++11 and meant to potentially work with any language that can compile a shared library that exposes standard function calls.  The building blocks are single file libraries with no dependencies other than the C++11 standard library. 
 
 ### Classic Software Problems
   -  High level structure is not strictly enforced (or doesn't exist) and often subverted in some way to accomodate extra data/communication 
@@ -149,6 +149,9 @@ This is an example of rays generated from a camera and traced to find their coll
   - The camera node generates rays and passes them to the scene node to be traced
   - The message node traces the rays and outputs both the traced rays colliding with geometry and a visualization of the traced rays 
   - A final node takes the traced rays and computes the outgoing ray from the ray hit point and normal
+  
+  
+  ### F.A.Q (Frequently Anticipated Questions)
   
   ### Internals
   
