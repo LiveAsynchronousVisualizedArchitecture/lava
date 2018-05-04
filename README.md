@@ -2,6 +2,15 @@
 
 LAVA stands for Live Asynchronous Visual Architecture.  Its goal is to simplify high performance software while allowing every piece to be lock free and asynchronous.
 
+[![Load Obj](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_LoadObj.gif "")](#load-obj)
+[![Camera Rays](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_CameraRays.gif "")](#camera-rays)
+[![Brandisher Elements](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_BrandisherElements.gif "")](#brandisher-elements)
+[![Trace](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_Trace.gif "")](#trace)
+[![Interactive Trace](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_InteractiveTrace.gif "")](#interactive-trace)
+[![Constant Bake](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_ConstantBake.gif "")](#constant-bake)
+[![Shade Rays](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_ShadeRays.gif "")](#shade-rays)
+[![Constant Shade](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_ConstantShade.gif "")](#constant-shade)
+
 LAVA is designed to **_both_** significantly **_speed up development_** AND as a simple way to create **_signifcant amounts of lock free concurrency_**.  It is written in C++11 and meant to potentially work with any language that can compile a shared library that exposes standard function calls.  The fundamental building blocks are single file libraries with no dependencies other than the C++11 standard library. 
 
 ### Classic Software Problems
@@ -106,11 +115,20 @@ Lock free, shared memory key value store for exceptionally fast, concurrent, int
 
 ### Examples
 
+<a id="load-obj"> A constant file path is passed to an obj file loader node. </a>
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_LoadObj.gif "A constant file path is passed to an obj file loader node.")
 
+<a id="camera-rays"> Ray tracing rays generated from camera and visualized in real time as a memory mapped tbl file is changed. </a>
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_CameraRays.gif "Ray tracing rays generated from camera and visualized in real time as a memory mapped tbl file is changed.")
 
+<a id="brandisher-elements"></a>
+<a id="trace"></a>
+<a id="interactive-trace"></a>
+<a id="constant-bake"></a>
+<a id="shade-rays"></a>
+<a id="constant-shade"></a>
 
+<a id="shade-ray-hits"> Rays generated from a camera and traced to find their collisions with a 3D model using the embree library. </a>
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/rays_shadeRayHits001.png "Rays generated from a camera and traced to find their collisions with a 3D model using the embree library.")
  
 This is an example of rays generated from a camera and traced to find their collisions with a 3D model using the embree library.
