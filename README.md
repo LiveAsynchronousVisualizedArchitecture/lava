@@ -119,11 +119,11 @@ Lock free, shared memory key value store for exceptionally fast, concurrent, int
 The LoadObj node shown here is basically a wrapper around the [Tiny Obj Loader](https://github.com/syoyo/tinyobjloader) by [Syoyo Fujita](https://github.com/syoyo)
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_LoadObj.gif "A constant file path is passed to an obj file loader node.")
 
-<a id="camera-rays"> Ray tracing rays generated from camera and visualized in real time as a memory mapped tbl file is changed. </a>
-![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_CameraRays.gif "Ray tracing rays generated from camera and visualized in real time as a memory mapped tbl file is changed.")
+<a id="camera-rays">Ray tracing rays generated and visualized in real time as a memory mapped tbl file (the purple constant node) is changed. </a>
+![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_CameraRays.gif "Ray tracing rays generated and visualized in real time as a memory mapped tbl file (the purple constant node) is changed.")
 
-<a id="brandisher-elements"></a>
-![Brandisher Elements](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_BrandisherElements.gif "")
+<a id="brandisher-elements">Here the same tbl is show in two different places. On the right being edited as part of a const node (which just reads a .const file from disk). On the left it is read from shared memory.</a>
+![Brandisher Elements](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_BrandisherElements.gif "Here the same tbl is show in two different places. On the right being edited as part of a const node (which just reads a .const file from disk). On the left it is read from shared memory.")
 
 <a id="trace"></a>
 ![Trace](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_Trace.gif "")
