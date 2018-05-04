@@ -116,6 +116,7 @@ Lock free, shared memory key value store for exceptionally fast, concurrent, int
 ### Examples
 
 <a id="load-obj"> A constant file path is passed to an obj file loader node. </a>
+The LoadObj node shown here is basically a wrapper around the [Tiny Obj Loader](https://github.com/syoyo/tinyobjloader) by [Syoyo Fujita](https://github.com/syoyo)
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_LoadObj.gif "A constant file path is passed to an obj file loader node.")
 
 <a id="camera-rays"> Ray tracing rays generated from camera and visualized in real time as a memory mapped tbl file is changed. </a>
