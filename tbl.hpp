@@ -1166,7 +1166,7 @@ public:
     if(out_hash){ *out_hash = hh.hash; }
     KV*      el  =  (KV*)elemStart();                                        // el is a pointer to the elements 
     u64     mod  =  map_capacity();
-    u64 elemCnt  =  elems();
+    //u64 elemCnt  =  elems();
     if(mod==0) return nullptr;
 
     u64    i  =  hh.hash % mod;
@@ -1273,7 +1273,7 @@ public:
         TO(extcap,i) 
           new (&el[i+prevMapCap]) KV();
 
-      if(prevElems){ u64 cnt = reorder(); }
+      if(prevElems){ /*u64 cnt = */ reorder(); }
     }
 
     return nxtMem;
@@ -1313,7 +1313,7 @@ public:
     if(nxtp){
       u8*     p = (u8*)memStart();
       memcpy(nxtp, p, vecsz);                                                            // todo: needs to actually use the copy constructor or the assignment operator 
-      auto   ff = (fields*)nxtp;
+      /*auto   ff =*/ (fields*)nxtp;
       KV* nxtel = (KV*)(nxtp+vecsz);                                                         // nxtel is next element
       u64   cur = 0;
       TO(map_capacity(),i)                                                                // todo: don't these need to be rehashed instead of simply copied?
@@ -1322,7 +1322,7 @@ public:
           nxtel[cur++] = el[i];
         }
 
-      auto  prvF = (fields*)(prvChld);
+      /*auto  prvF =*/ (fields*)(prvChld);
 
       tbl prev;
       prev.m_mem = m_mem;                                                                 // make a table to hold the previous span of bytes
@@ -1340,12 +1340,12 @@ public:
 
       void* chld = childData();
       byte_move(chld, prvChld, chldCap);                                                 // shouldn't be neccesary because this is using malloc and not realloc()
-      auto   fff = (fields*)(chld);
+      /*auto   fff =*/ (fields*)(chld);
       
       prev.destroy();
       prev.m_mem = nullptr;                                                              // makes destructor early exit on destroy
       
-      auto cf = (fields*)( childData() );
+      /*auto cf =*/ (fields*)( childData() );
 
       return true;
     }else 
@@ -1416,7 +1416,7 @@ public:
 
     el[i] = KV();
     u64 mapcap = map_capacity();
-    u64     en = prev(i, mapcap);
+    /*u64     en =*/ prev(i, mapcap);
 
     u64 cnt=0;
     cnt = reorder();
@@ -1427,7 +1427,7 @@ public:
   void          clear(){ size(0); }
   auto        flatten() -> tbl const&
   {
-    u64   memst = (u64)memStart();
+    //u64   memst = (u64)memStart();
     u64 prevCap = child_capacity();
     u64  newcap = 0;
     auto      e = elemStart();
