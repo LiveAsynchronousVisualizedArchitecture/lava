@@ -1,6 +1,4 @@
 
-
-
 // todo: make array creation zero out memory so that garbage memory is never used/exposed to other processes or written in files
 // todo: make key assignment zero out the rest of the memory so that garbage memory is never used
 // todo: make dummy type a default value for the array

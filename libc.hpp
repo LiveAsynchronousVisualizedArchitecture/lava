@@ -21,12 +21,53 @@
   //[[noreturn]] void terminate() ;
 //}
 
+
 #if defined(_WIN32)
 
-// windows specific headers
-#define WIN32_LEAN_AND_MEAN
+#pragma comment(linker, "/defaultlib:user32.lib")
+#pragma comment(linker, "/defaultlib:kernel32.lib")
+#pragma comment(lib,    "../../shared/sys_msvcrt.lib")
+
+#ifndef UNICODE
+  //#define UNICODE
+#endif
+
+#define _NO_CRT_STDIO_INLINE
+#define  WIN32_LEAN_AND_MEAN
 #define NOMINMAX
 #include <windows.h>
+
+extern "C" void __cdecl __std_terminate(){}
+extern "C" void __cdecl __CxxFrameHandler3(){}
+extern "C" void __cdecl __chkstk(){}
+extern "C" __declspec(noreturn) void __cdecl _invalid_parameter_noinfo_noreturn(void){}
+namespace std
+{
+  [[noreturn]] void __cdecl _Xbad_alloc(void){}
+  [[noreturn]] void __cdecl _Xlength_error(char const *){}
+}
+
+//int __cdecl printf(const wchar_t * format, ...)
+//{
+//  wchar_t szBuff[4096];
+//  int retValue;
+//  DWORD cbWritten;
+//  va_list argptr;
+//
+//  va_start( argptr, format );
+//  retValue = wvsprintf( szBuff, format, argptr );
+//  va_end( argptr );
+//
+//  WriteFile(  GetStdHandle(STD_OUTPUT_HANDLE), szBuff, retValue,
+//    &cbWritten, 0 );
+//
+//  return retValue;
+//}
+
+//// windows specific headers
+//#define WIN32_LEAN_AND_MEAN
+//#define NOMINMAX
+//#include <windows.h>
 
 extern char * _ppszArgv[];
 int __cdecl _ConvertCommandLineToArgcArgv(void);
@@ -38,15 +79,12 @@ void __cdecl _initterm(_PVFV * pfbegin, _PVFV * pfend);
 void __cdecl _atexit_init(void);
 void __cdecl _DoExit(void);
 
-#pragma comment(linker, "/defaultlib:kernel32.lib")
+//#pragma comment(linker, "/defaultlib:kernel32.lib")
 
 //#if defined(need_to_make_subsystem_windows_switch)
   //extern "C" int __cdecl main(int, char **, char **);
   extern "C" int __cdecl main(int, char**);
-  //
-  // Modified version of the Visual C++ startup code.  Simplified to
-  // make it easier to read.  Only supports ANSI programs.
-  //
+
   extern "C" void __cdecl mainCRTStartup(void)
   {
     int mainret, argc;
@@ -66,9 +104,6 @@ void __cdecl _DoExit(void);
 
 #include <cstdint>
 #include <cstring>
-
-#pragma comment(linker, "/defaultlib:user32.lib")
-#pragma comment(linker, "/defaultlib:kernel32.lib")
 
 #define _MAX_CMD_LINE_ARGS  128
 char* _ppszArgv[_MAX_CMD_LINE_ARGS + 1];
@@ -118,7 +153,7 @@ char* _ppszArgv[_MAX_CMD_LINE_ARGS + 1];
 //  ExitProcess(mainret);
 //}
 
-extern "C" int __cdecl printf(const char * format, ...);
+//extern "C" int __cdecl printf(const char * format, ...);
 //extern "C" int __cdecl printf(const char * format, ...)
 //{
 //  char szBuff[1024];
@@ -137,32 +172,33 @@ extern "C" int __cdecl printf(const char * format, ...);
 //}
 
 // Force the linker to include USER32.LIB
-#pragma comment(linker, "/defaultlib:user32.lib")
+//#pragma comment(linker, "/defaultlib:user32.lib")
 
 //extern "C" int __cdecl Printf(const char * format, ...)
-#include <strsafe.h>
-//#include <stdio.h>
-//#include <stdarg.h>
-#define PRINTF_BUF_SZ 4096
-inline int __cdecl Printf(const char * format, ...)
-{
-    char szBuf[PRINTF_BUF_SZ];
-    int retValue;
-    DWORD cbWritten;
-    va_list argptr;
-        
-    va_start( argptr, format );
-    //retValue = wvsprintf( szBuff, format, argptr );
-    retValue = StringCchVPrintf(szBuf, PRINTF_BUF_SZ, format, argptr );
-    va_end( argptr );
 
-    auto len=strlen(szBuf);
-
-    OutputDebugString(szBuf);
-    //WriteFile(  GetStdHandle(STD_OUTPUT_HANDLE), szBuf, (DWORD)len, &cbWritten, 0 );
-
-    return retValue;
-}
+//#include <strsafe.h>
+////#include <stdio.h>
+////#include <stdarg.h>
+//#define PRINTF_BUF_SZ 4096
+//inline int __cdecl Printf(const char * format, ...)
+//{
+//    char szBuf[PRINTF_BUF_SZ];
+//    int retValue;
+//    DWORD cbWritten;
+//    va_list argptr;
+//        
+//    va_start( argptr, format );
+//    //retValue = wvsprintf( szBuff, format, argptr );
+//    retValue = StringCchVPrintf(szBuf, PRINTF_BUF_SZ, format, argptr );
+//    va_end( argptr );
+//
+//    auto len=strlen(szBuf);
+//
+//    OutputDebugString(szBuf);
+//    //WriteFile(  GetStdHandle(STD_OUTPUT_HANDLE), szBuf, (DWORD)len, &cbWritten, 0 );
+//
+//    return retValue;
+//}
 
 void Print(const char* s)
 {
@@ -310,50 +346,6 @@ void  __cdecl operator     delete(void*  p)
 extern "C" double   _hypot(double x, double y) { return 0; }
 extern "C" void     _fltused() {}  // symbol needs to be defined for some reason
 //#endif  // end hypot function from musl (needed by std::vector for some reason)
-
-//void* memcpy(void* dest, const void* src, size_t n)
-//{
-//  unsigned char* d = (unsigned char*)dest;
-//  const unsigned char* s = (const unsigned char*)src;
-//
-//  for (; n; n--) *d++ = *s++;
-//  return dest;
-//}
-//#pragma warning(disable:4146)  // hides msvc 'negative op on unsigned' warning
-//void* memset(void *dest, int c, size_t n)
-//{
-//  unsigned char* s = (unsigned char*)dest;
-//  size_t k;
-//
-//  /* Fill head and tail with minimal branching. Each
-//  * conditional ensures that all the subsequently used
-//  * offsets are well-defined and in the dest region. */
-//  if (!n) return dest;
-//  s[0] = s[n - 1] = c;
-//  if (n <= 2) return dest;
-//  s[1] = s[n - 2] = c;
-//  s[2] = s[n - 3] = c;
-//  if (n <= 6) return dest;
-//  s[3] = s[n - 4] = c;
-//  if (n <= 8) return dest;
-//
-//  /* Advance pointer to align it at a 4-byte boundary,
-//  * and truncate n to a multiple of 4. The previous code
-//  * already took care of any head/tail that get cut off
-//  * by the alignment. */
-//  k = -(uintptr_t)s & 3;
-//
-//  //k = (-((uintptr_t)s)) & 3;
-//  s += k;
-//  n -= k;
-//  n &= -4;
-//
-//  /* Pure C fallback with no aliasing violations. */
-//  for (; n; n--, s++) *s = c;
-//
-//  return dest;
-//}
-//#pragma warning(default:4146)  
 
 // begin various windows entry points
 //void entry(int argc, char** argv);
@@ -527,3 +519,60 @@ extern "C" int    __cdecl      atoi(const char * pstr)
 #endif
 
 
+
+
+
+
+
+
+//#pragma comment(linker, "/defaultlib:user32.lib")
+//#pragma comment(linker, "/defaultlib:kernel32.lib")
+
+//
+// Modified version of the Visual C++ startup code.  Simplified to
+// make it easier to read.  Only supports ANSI programs.
+//
+
+//void* memcpy(void* dest, const void* src, size_t n)
+//{
+//  unsigned char* d = (unsigned char*)dest;
+//  const unsigned char* s = (const unsigned char*)src;
+//
+//  for (; n; n--) *d++ = *s++;
+//  return dest;
+//}
+//#pragma warning(disable:4146)  // hides msvc 'negative op on unsigned' warning
+//void* memset(void *dest, int c, size_t n)
+//{
+//  unsigned char* s = (unsigned char*)dest;
+//  size_t k;
+//
+//  /* Fill head and tail with minimal branching. Each
+//  * conditional ensures that all the subsequently used
+//  * offsets are well-defined and in the dest region. */
+//  if (!n) return dest;
+//  s[0] = s[n - 1] = c;
+//  if (n <= 2) return dest;
+//  s[1] = s[n - 2] = c;
+//  s[2] = s[n - 3] = c;
+//  if (n <= 6) return dest;
+//  s[3] = s[n - 4] = c;
+//  if (n <= 8) return dest;
+//
+//  /* Advance pointer to align it at a 4-byte boundary,
+//  * and truncate n to a multiple of 4. The previous code
+//  * already took care of any head/tail that get cut off
+//  * by the alignment. */
+//  k = -(uintptr_t)s & 3;
+//
+//  //k = (-((uintptr_t)s)) & 3;
+//  s += k;
+//  n -= k;
+//  n &= -4;
+//
+//  /* Pure C fallback with no aliasing violations. */
+//  for (; n; n--, s++) *s = c;
+//
+//  return dest;
+//}
+//#pragma warning(default:4146)  

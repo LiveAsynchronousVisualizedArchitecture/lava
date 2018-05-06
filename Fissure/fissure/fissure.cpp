@@ -23,7 +23,9 @@
 //        |  can't directly realloc the reference counted allocations - why is the camera node using a realloc function in the first place?
 //        |  might have just been local allocations not being filled in with LavaParams
 // -todo: debug why the camera ray visualization shows less rays than should be generated - number of points in visualization is rays*2 which should be correct, though number of lines is less, possibly half rounded up - some points are -inf and inf - inf in traced rays is possibly not fitlered out when visualizing as indexed verts - inf check and a separate ray index variable worked - should probably make a habit of visualizing the actual data going out 
+// -todo: try slimming camera file size with sys_msvcrt.lib - need force option to link when there are multiply defined symbols
 
+// todo: try hardware random numbers to avoid <random>
 // todo: put in live reloading that uses the Lava step function on reload
 // todo: implement live reloading that copies the shared library, loads it, switches over atomically, unloads the previous live version, copies the tmp live version to the normal live file, maps the new live version file, automically switches over to that, then unloads the tmp live shared lib - whew!
 // todo: implement optional arguments 

@@ -1,6 +1,15 @@
 
 
+//#include "../../libcpp.hpp"
+
+//extern "C" void __cdecl __std_terminate(){}
+//#include <intrin.h>
+//#include "rdseed.c"
+//#include "rdrand.c"
+
 #include <random>
+#include <limits>
+//#include "drng.h"
 #include "../shared/vec.hpp"
 #include "../../no_rt_util.h"
 #include "../../tbl.hpp"
@@ -26,14 +35,42 @@ namespace RNG
   using rng_t  = ::std::mt19937;
   using urng_t = ::std::unique_ptr<rng_t>;
 
-  rng_t   gen(0);
-  rng_t*  m_genPtr = &gen;
+  //rng_t   gen(0);
+  //rng_t*  m_genPtr = &gen;
+
+  rng_t   gen;
+  rng_t*  m_genPtr;
 }
-float     randomf(float lo, float hi)
+
+//float     randomf(float lo, float hi)
+//{
+//  ::std::uniform_real_distribution<float> dis(lo, hi);
+//  return dis(*RNG::m_genPtr);
+//}
+float     randomf()
 {
-  ::std::uniform_real_distribution<float> dis(lo, hi);
+  ::std::uniform_real_distribution<float> dis(0.f, 1.f);
   return dis(*RNG::m_genPtr);
 }
+
+//float     randomf()
+//{
+//  using namespace std;
+//
+//  u64 x64 = 0;
+//  int err = rdrand_64(&x64, 1);
+//
+//  u32   x = x64 >> 32;
+//
+//  f64 ret64 = (f64)x / (f64)(numeric_limits<u32>::max());
+//
+//  return (f32)ret64;
+//}
+
+//float     randomf()
+//{
+//  return 0.5f;
+//}
 
 template<typename T> __forceinline T  deg2rad(const T& x){ return x * T(1.74532925199432957692e-2f); }
 f32 rcp(f32 x){ return 1.f / x; }                         // does rcp stand for recipricol? 
@@ -112,7 +149,8 @@ tbl raysToIdxVerts(LavaParams const* lp, tbl const& rays)
 //const u64       rayCnt  =  1000;
 //const f32    origin[3]  =  {1.f, 2.f,   5.f};
 //const f32    camDir[3]  =  {0,     0,  -1.f};
-const f32          INF  =  std::numeric_limits<f32>::infinity();
+
+static f32          INF;  //=  std::numeric_limits<f32>::infinity();
 
 static f32     fovAngle  =  40.f;
 static f32  aspectRatio  =   1.f;
@@ -134,14 +172,19 @@ extern "C"
                               "Rays",                       
                               "IdxVerts",
                               nullptr};
-                              //"CamParam", 
   const char*  OutNames[]  = {
                               "Chunk of rays to be traced", 
                               "Camera Visualiztion",  
                               nullptr};
-                              //"Parameters that Drive Camera and Ray Generation", 
 
-  void Camera_construct(){ hasRun = false; }
+  void Camera_construct()
+  {
+    new (&RNG::gen) RNG::rng_t(0);
+    RNG::m_genPtr = &RNG::gen;
+
+    INF = std::numeric_limits<f32>::infinity();
+    hasRun = false;
+  }
   void Camera_destruct(){  hasRun = false; }
 
   uint64_t Camera(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
@@ -211,8 +254,10 @@ extern "C"
         oy.push<f32>( origin[1] );
         oz.push<f32>( origin[2] );
 
-        f32   x = lerp(mnWin.x, mxWin.x, randomf(0, 1.f) );
-        f32   y = lerp(mnWin.y, mxWin.y, randomf(0, 1.f) );
+        //f32   x = lerp(mnWin.x, mxWin.x, randomf(0, 1.f) );
+        //f32   y = lerp(mnWin.y, mxWin.y, randomf(0, 1.f) );
+        f32   x = lerp(mnWin.x, mxWin.x, randomf() );
+        f32   y = lerp(mnWin.y, mxWin.y, randomf() );
         v3f dir = {x,y, 1.f };
         dir     = norm(dir);
         dx.push<f32>(  dir.x );
@@ -299,14 +344,14 @@ extern "C"
       Camera,                                      // function
       Camera_construct,                            // constructor - this can be set to nullptr if not needed
       Camera_destruct,                             // destructor  - this can also be set to nullptr 
-      LavaNode::FLOW,                                // node_type   - this should be eighther LavaNode::MSG (will be run even without input packets) or LavaNode::FLOW (will be run only when at least one packet is available for input)
+      LavaNode::FLOW,                              // node_type   - this should be eighther LavaNode::MSG (will be run even without input packets) or LavaNode::FLOW (will be run only when at least one packet is available for input)
       "Camera",                                    // name
-      InTypes,                                       // in_types    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
-      InNames,                                       // in_names    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
-      OutTypes,                                      // out_types   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
-      OutNames,                                      // out_names   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr
-      nullptr,                                       // description
-      0                                              // version 
+      InTypes,                                     // in_types    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+      InNames,                                     // in_names    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+      OutTypes,                                    // out_types   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+      OutNames,                                    // out_names   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr
+      nullptr,                                     // description
+      0                                            // version 
     },                                             
 
     LavaNodeListEnd                                  // This is a constant that has all the members of the LavaNode struct set to 0 or nullptr - it is used as a special value that ends the static list of LavaNodes. This negates the need for a separate static variable that gives the size of the list, which would be have to be kept in sync and therefore be error prone.
@@ -323,6 +368,8 @@ extern "C"
 
 
 
+//"CamParam", 
+//"Parameters that Drive Camera and Ray Generation", 
 
 //tbl   iv = LavaMakeTbl(lp);
 //tbl   px = LavaMakeTbl(lp);

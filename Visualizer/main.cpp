@@ -871,7 +871,7 @@ ENTRY_DECLARATION
     {
       vd.ui.w             = 1024; 
       vd.ui.h             =  768;
-      vd.ui.ptSz          =    0.25f;
+      vd.ui.ptSz          =    1.f;
       vd.ui.hudSz         =   16.0f;
       vd.ui.guideSz       =   32.0f;
 

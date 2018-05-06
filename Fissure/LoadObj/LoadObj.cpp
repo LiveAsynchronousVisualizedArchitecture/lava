@@ -1,5 +1,5 @@
 
-
+// todo: try using sys_msvcrt.lib to make a small .dll binary
 
 #include "../../no_rt_util.h"
 #include "../../tbl.hpp"

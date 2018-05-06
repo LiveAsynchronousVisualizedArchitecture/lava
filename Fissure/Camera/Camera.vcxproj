@@ -12,6 +12,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="rdrand.c" />
+    <ClCompile Include="rdseed.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\libcpp.hpp" />
+    <ClInclude Include="drng.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{BEA5B6C6-BE6F-43A3-A2A5-3F6CA01E416D}</ProjectGuid>
@@ -70,28 +76,40 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <ExceptionHandling>Async</ExceptionHandling>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <DebugInformationFormat>None</DebugInformationFormat>
       <ProgramDataBaseFileName />
       <FloatingPointExceptions>false</FloatingPointExceptions>
+      <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+      <Optimization>MinSpace</Optimization>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
     </ClCompile>
     <Link />
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <NoEntryPoint>false</NoEntryPoint>
-      <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
       <ImportLibrary>$(OutDir)/misc/$(TargetName).lib</ImportLibrary>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
       <ProgramDatabaseFile>$(OutDir)/misc/$(TargetName).pdb</ProgramDatabaseFile>
       <EnableUAC>false</EnableUAC>
       <IgnoreEmbeddedIDL>true</IgnoreEmbeddedIDL>
       <DataExecutionPrevention>false</DataExecutionPrevention>
+      <IgnoreSpecificDefaultLibraries>
+      </IgnoreSpecificDefaultLibraries>
+      <StackCommitSize>1MB</StackCommitSize>
+      <SubSystem>NotSet</SubSystem>
+      <AdditionalLibraryDirectories>H:\projects\LAVA\lava\shared;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>sys_msvcrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ForceFileOutput>MultiplyDefinedSymbolOnly</ForceFileOutput>
+      <NoEntryPoint>false</NoEntryPoint>
     </Link>
+    <ProjectReference />
+    <ProjectReference />
     <ProjectReference>
-      <LinkLibraryDependencies>false</LinkLibraryDependencies>
+      <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
     </ProjectReference>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
