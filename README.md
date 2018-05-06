@@ -14,6 +14,13 @@ LAVA is meant to simplify high performance software while allowing every piece t
 LAVA is designed to **_both_** significantly **_speed up development_** AND as a simple way to create **_signifcant amounts of lock free concurrency_**.  It is written in C++11 and meant to potentially work with any language that can compile a shared library that exposes standard function calls.  The building blocks are single file libraries with no dependencies other than the C++11 standard library. 
 
 ### Classic Software Problems
+| Scalable Complexity    |   Iterations          | Modularity          | Concurrency                      | Debugging               |
+|       :---:            |      :---:            |   :---:             |    :---:                         |   :---:                 |
+|  OpenGL Node Graph     | Live Reloading        |  Shared Libraries   | Data Chunks Execute in Parallel  | Shared Memory           |
+|  Clear Node Interfaces | Output Baking         |  Crash Isolation    | Gather Nodes Synchronize         | Tbl Tree and Statistics |
+|  Lock Free By Default  | Output Visualization  |  Serialized Data    | Persistant Threads               | Output Visualization    |
+
+### Classic Software Problems
   -  High level structure is not strictly enforced (or doesn't exist) and often subverted in some way to accomodate extra data/communication 
   -  As program size increases, iterations decrease due to re-compilation time, linking time, and the time to re-run the program when testing
   -  Modularity often breaks down due to data dependencies at run time and source dependencies at compile time
@@ -78,7 +85,7 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 
 ### Fissure
 
-![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/craftsman_fissure.png "Fissure is the node graph UI.  It can be used to construct a graph of nodes, run the program, visualize outputs, see node errors and view timing information about the nodes.")
+![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/craftsman_fissure.jpg "Fissure is the node graph UI.  It can be used to construct a graph of nodes, run the program, visualize outputs, see node errors and view timing information about the nodes.")
 
 Fissure is the node graph UI.  It can be used to construct a graph of nodes, run the program, visualize outputs, see node errors and view timing information about the nodes.
 
