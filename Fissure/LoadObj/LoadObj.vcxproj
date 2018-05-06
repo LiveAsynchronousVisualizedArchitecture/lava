@@ -63,26 +63,31 @@
     <Link>
       <ImportLibrary>$(OutDir)/misc/$(TargetName).lib</ImportLibrary>
       <ProgramDatabaseFile>$(OutDir)/misc/$(TargetName).pdb</ProgramDatabaseFile>
+      <AdditionalLibraryDirectories>H:\projects\LAVA\lava\shared;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <ExceptionHandling>false</ExceptionHandling>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <DebugInformationFormat>None</DebugInformationFormat>
       <WholeProgramOptimization>false</WholeProgramOptimization>
+      <Optimization>MinSpace</Optimization>
+      <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
     </ClCompile>
     <Link />
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <NoEntryPoint>false</NoEntryPoint>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
       <IgnoreEmbeddedIDL>true</IgnoreEmbeddedIDL>
       <ProgramDatabaseFile>$(OutDir)/misc/$(TargetName).pdb</ProgramDatabaseFile>
       <ImportLibrary>$(OutDir)/misc/$(TargetName).lib</ImportLibrary>
+      <AdditionalLibraryDirectories>..\..\..\shared;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

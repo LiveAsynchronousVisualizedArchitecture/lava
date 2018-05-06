@@ -62,13 +62,12 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <ExceptionHandling>false</ExceptionHandling>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <DebugInformationFormat>None</DebugInformationFormat>
       <WholeProgramOptimization>false</WholeProgramOptimization>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <Optimization>MaxSpeed</Optimization>
+      <Optimization>MinSpace</Optimization>
       <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <BufferSecurityCheck>false</BufferSecurityCheck>
@@ -76,7 +75,6 @@
     <Link />
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
-      <NoEntryPoint>false</NoEntryPoint>
       <ImportLibrary>$(OutDir)/misc/$(TargetName).lib</ImportLibrary>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
       <GenerateDebugInformation>false</GenerateDebugInformation>
@@ -84,11 +82,13 @@
       <ProgramDatabaseFile>$(OutDir)/misc/$(TargetName).pdb</ProgramDatabaseFile>
       <ModuleDefinitionFile>
       </ModuleDefinitionFile>
-      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\shared;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
-      <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>sys_msvcrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <EnableUAC>false</EnableUAC>
+      <ForceFileOutput>MultiplyDefinedSymbolOnly</ForceFileOutput>
+      <NoEntryPoint>false</NoEntryPoint>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

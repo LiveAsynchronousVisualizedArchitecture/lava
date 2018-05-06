@@ -99,7 +99,7 @@
       </IgnoreSpecificDefaultLibraries>
       <StackCommitSize>1MB</StackCommitSize>
       <SubSystem>NotSet</SubSystem>
-      <AdditionalLibraryDirectories>H:\projects\LAVA\lava\shared;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>..\..\shared;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>sys_msvcrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ForceFileOutput>MultiplyDefinedSymbolOnly</ForceFileOutput>
       <NoEntryPoint>false</NoEntryPoint>

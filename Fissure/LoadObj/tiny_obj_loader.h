@@ -1701,8 +1701,10 @@ bool LoadObj(attrib_t *attrib, std::vector<shape_t> *shapes,
   }
   MaterialFileReader matFileReader(baseDir);
 
+  //return LoadObj(attrib, shapes, materials, err, &ifs, &matFileReader,
+  //               trianglulate);
   return LoadObj(attrib, shapes, materials, err, &ifs, &matFileReader,
-                 trianglulate);
+    trianglulate);
 }
 
 bool LoadObj(attrib_t *attrib, std::vector<shape_t> *shapes,

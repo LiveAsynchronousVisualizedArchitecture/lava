@@ -65,21 +65,24 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <ExceptionHandling>false</ExceptionHandling>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <DebugInformationFormat>None</DebugInformationFormat>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link />
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <NoEntryPoint>false</NoEntryPoint>
-      <AdditionalDependencies>embree3.lib;tbbmalloc.lib;tbb.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>sys_msvcrt.lib;embree3.lib;tbbmalloc.lib;tbb.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ProgramDatabaseFile>$(OutDir)/misc/$(TargetName).pdb</ProgramDatabaseFile>
       <ImportLibrary>$(OutDir)/misc/$(TargetName).lib</ImportLibrary>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
-      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
       <IgnoreEmbeddedIDL>true</IgnoreEmbeddedIDL>
+      <EnableUAC>false</EnableUAC>
+      <AdditionalLibraryDirectories>..\..\shared;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <ForceFileOutput>MultiplyDefinedSymbolOnly</ForceFileOutput>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
