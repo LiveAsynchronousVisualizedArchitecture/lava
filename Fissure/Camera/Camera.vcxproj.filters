@@ -4,12 +4,6 @@
     <ClCompile Include="Camera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="rdrand.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="rdseed.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="hpp">

@@ -68,10 +68,10 @@
 #ifndef __TBL_HEADERGUARD_H__
 #define __TBL_HEADERGUARD_H__
 
-#include <cstdlib>
-#include <cstring>
-#include <cassert>
-#include <utility> // todo: take this out, stop using std::pair
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+//#include <utility> // todo: take this out, stop using std::pair
 
 //#include "../no_rt_util.h"
 
@@ -345,6 +345,21 @@ public:
       return *this;
     }
 
+    KV& init(const char* key)
+    {
+      type = TblType::EMPTY;
+      strncpy(this->key, key, sizeof(KV::Key) ); // automatically pads the key with zeros so that there is no leftover memory
+      return *this;
+    }
+    KV& init()
+    {
+      hash = 0;
+      type = TblType::EMPTY;
+      val  = 0;
+      memset(key, 0, sizeof(Key));
+      return *this;
+    }
+
     KV& cp(KV const& l)
     {
       type = l.type;
@@ -360,10 +375,10 @@ public:
     { 
       memset(key, 0, sizeof(Key));
     }
-    KV(const char* key) : type(TblType::EMPTY)
+    KV(const char* key) // : type(TblType::EMPTY)
     {
-      strncpy(this->key, key, sizeof(KV::Key) ); // automatically pads the key with zeros so that there is no leftover memory
-      //memcpy(this->key, key, sizeof(KV::Key) );
+      init(key);
+      //strncpy(this->key, key, sizeof(KV::Key) ); // automatically pads the key with zeros so that there is no leftover memory
     }
     KV(KV const& l){ cp(l); }
     KV(KV&&      r){ cp(r); }
@@ -389,10 +404,10 @@ public:
       memcpy(&val, &castVal, sizeof(u64));
       return *this;
     }
-    template<class N> KV& operator=(std::pair<char*,N> p)
-    {
-      return init(p);
-    }
+    //template<class N> KV& operator=(std::pair<char*,N> p)
+    //{
+    //  return init(p);
+    //}
 
     //KV& operator=(tbl  const& t) = delete;
     KV& operator=(tbl* t)
@@ -505,6 +520,14 @@ public:
   {
     KV*          kv = nullptr;
     tbl*       base = nullptr;
+
+    KVOfst& init(KV* _kv=nullptr, tbl* _base=nullptr)
+    {
+      kv   = _kv;
+      base = _base;
+      return *this;
+    }
+    
 
     KVOfst(KVOfst const&  l) : kv(l.kv), base(l.base) {}
     KVOfst(KVOfst&&       r) : kv(r.kv), base(r.base) {}
@@ -987,24 +1010,30 @@ public:
       if(type==TblType::EMPTY)
       {
         elems( elems()+1 );
-        new (kv) KV(key);
+        //new (kv) KV(key);
+        kv->init(key);
         kv->hash = hsh;
         kv->type = TblType::NONE;
-        new (&ret) KVOfst(kv, this);
+        //new (&ret) KVOfst(kv, this);
+        ret.init(kv,this);
       }else if( (type&TblType::TABLE) && (type&TblType::CHILD) )
-        new (&ret) KVOfst(kv, this);                                                     // (void*)memStart());
+        ret.init(kv,this);
+        //new (&ret) KVOfst(kv, this);                                                     // (void*)memStart());
         //new (&ret) KVOfst(kv, this->childData());                                      // (void*)memStart());
       else
-        new (&ret) KVOfst(kv,this);
+        ret.init(kv,this);
+        //new (&ret) KVOfst(kv,this);
     }else 
-      new (&ret) KVOfst(kv,this);                                                             // if the key wasn't found, kv will be a nullptr which is the same as an error KVOfst that will evaluate to false when cast to a boolean      
+      ret.init(kv,this);
+      //new (&ret) KVOfst(kv,this);                                                             // if the key wasn't found, kv will be a nullptr which is the same as an error KVOfst that will evaluate to false when cast to a boolean      
 
     return ret;
   }
   auto           operator()(const char* key) const -> const KVOfst {      
     KVOfst  ret;                                                                         // this will be set with placement new instead of operator= because operator= is templated and used for assigning to the KV pointed to by KVOfst::KV* -  this is so tbl("some key") = 85  can work correctly
     KV*      kv = m_mem? get(key) : nullptr;
-    new (&ret) KVOfst(kv, (tbl*)this);                      // if the key wasn't found, kv will be a nullptr which is the same as an error KVOfst that will evaluate to false when cast to a boolean      
+    ret.init(kv,(tbl*)this);
+    //new (&ret) KVOfst(kv, (tbl*)this);                      // if the key wasn't found, kv will be a nullptr which is the same as an error KVOfst that will evaluate to false when cast to a boolean      
     return ret;
   }
   tbl&         operator--(){ shrink_to_fit();    return *this; }
@@ -1269,7 +1298,8 @@ public:
       i64 extcap = mapcap - prevMapCap;
       if(extcap>0) 
         TO(extcap,i) 
-          new (&el[i+prevMapCap]) KV();
+          el[i+prevMapCap].init();
+          //new (&el[i+prevMapCap]) KV();
 
       if(prevElems){ /*u64 cnt = */ reorder(); }
     }
@@ -1633,6 +1663,8 @@ public:
 
 
 
+//
+//memcpy(this->key, key, sizeof(KV::Key) );
 
 //if(l.owned()){
 //  if(!m_alloc)   m_alloc   = l.m_alloc;

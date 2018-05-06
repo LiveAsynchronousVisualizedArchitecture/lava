@@ -12,8 +12,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Camera.cpp" />
-    <ClCompile Include="rdrand.c" />
-    <ClCompile Include="rdseed.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\libcpp.hpp" />
