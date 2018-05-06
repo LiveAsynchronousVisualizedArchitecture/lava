@@ -13,20 +13,24 @@ LAVA is meant to simplify high performance software while allowing every piece t
 
 LAVA is designed to **_both_** significantly **_speed up development_** AND as a simple way to create **_signifcant amounts of lock free concurrency_**.  It is written in C++11 and meant to potentially work with any language that can compile a shared library that exposes standard function calls.  The building blocks are single file libraries with no dependencies other than the C++11 standard library. 
 
+
 ### Classic Software Problems
-| Scalable Complexity    |   Iterations          | Modularity          | Concurrency                      | Debugging               |
+|[Scalability](#scal)    |[Iterations](#iter)    |[Modularity](#mod)   |[Concurrency](#concr)             |[Debugging](#debug)      |
 |       :---:            |      :---:            |   :---:             |    :---:                         |   :---:                 |
 |  OpenGL Node Graph     | Live Reloading        |  Shared Libraries   | Data Chunks Execute in Parallel  | Shared Memory           |
 |  Clear Node Interfaces | Output Baking         |  Crash Isolation    | Gather Nodes Synchronize         | Tbl Tree and Statistics |
 |  Lock Free By Default  | Output Visualization  |  Serialized Data    | Persistant Threads               | Output Visualization    |
 
 ### Classic Software Problems
-  -  High level structure is not strictly enforced (or doesn't exist) and often subverted in some way to accomodate extra data/communication 
-  -  As program size increases, iterations decrease due to re-compilation time, linking time, and the time to re-run the program when testing
-  -  Modularity often breaks down due to data dependencies at run time and source dependencies at compile time
-  -  Creating asynchronous components is often error prone and/or requires significant planning.  Non-trivial software that is able use  any separate chunk of data in parallel, on all available CPU cores while remaining lock free is rare. 
-  -  Debugging is often slow and requires examining tiny amounts of data at various execution points to narrow the source of the problem
-  -  Debugging often means using a build that is significantly slower, instead of isolating the speed hit to a small piece of the program
+ - <a id="scal"> __Scalable Complexity__ </a> - High level structure is not strictly enforced (or doesn't exist) and often subverted in some way to accomodate extra data/communication 
+  
+ - <a id="iter"> __Iterations__ </a> - As program size increases, iterations decrease due to re-compilation time, linking time, and the time to re-run the program when testing
+  
+- <a id="mod"> __Modularity__ </a> - Modularity often breaks down due to data dependencies at run time and source dependencies at compile time.  Reuse and teamwork 
+
+- <a id="concr"> __Concurrency__ </a> - Many techniques and libraries exist, often as heavy dependencies that have narrow use cases where they excel. Concurrency, parallelism and asynchronous design are perpetually difficult to get right and fragmented in their use.
+
+- <a id="debug"> __Debugging__ </a> - Often means using slow builds, multiple runs to narrow down the problem and examining the state individual variables line by line.
 
 ### How LAVA Confronts These Problems
 
