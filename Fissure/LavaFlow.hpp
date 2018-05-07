@@ -153,7 +153,7 @@ template<class T> struct LavaQ
   RefMem        m_memB;
   StBuf          m_buf;
 
-  #ifndef _NDEBUG
+  #ifndef NDEBUG
     std::thread::id  writeThrd;
   #endif
 
@@ -163,7 +163,7 @@ template<class T> struct LavaQ
     m_buf.st   = 0;
     m_buf.cap  = 0;
 
-    #ifndef _NDEBUG
+    #ifndef NDEBUG
       writeThrd = std::this_thread::get_id();
     #endif
   }
@@ -240,8 +240,6 @@ template<class T> struct LavaQ
     buf.st += 1;
     bool ok = abuf->compare_exchange_strong(prev.asInt, buf.asInt);
 
-    //assert( (ret < 1000000 && ret >= 0) || !ok);
-
     return ok;
   }
   T                 atA(u64 i)     const
@@ -280,7 +278,6 @@ template<class T> struct LavaQ
       prev = buf =   loadBuf();
       buf.useA   =  !buf.useA;
       buf.cap    =   nxtCapExp;
-      //buf.cap    =   buf.useA? m_capA : m_capB;
     }while( !abuf->compare_exchange_strong(prev.asInt, buf.asInt) );
 
     return prev;
@@ -347,29 +344,18 @@ template<class T> struct LavaQ
   {
     assert(std::this_thread::get_id() == writeThrd);
 
-    //assert(val < 1000000 && val >= 0);
-
-    // This increment the end m_end variable, which sits at one beyond the last index, just like STL iterators
+    // This increments the end m_end variable, which sits at one beyond the last index, just like STL iterators
     // T must be dealt with by value and can be arbitrary sized because there won't be multiple writing threads - writes don't need to be atomic, just write into the unused slot and increment m_end
     // if the capacity is not high enough, use a secondary buffer to enlarge it
     // this should work well, since only the owning thread can make it larger, while any thread can pop() items from the queue
     
-    //u64 cap=0;                          // this will append a value to the end, while pop, will grab it from the start/current index
     auto buf = loadBuf();
-    //if( buf.useA ){
-    //  cap = capA();
-    //}else{
-    //  cap = capB();
-    //}
-
     if(buf.cap==0 || size(buf) >= Capacity(buf.cap)-1 ){
       expand();
       buf = loadBuf();
     }
 
     T*   mem = buf.useA? m_memA.addr() : m_memB.addr();
-    //cap = buf.useA? capA() : capB();
-    //auto idx = m_end.load() % cap;    // todo: change this to use the buffer capacity
     auto idx = m_end.load() % Capacity(buf.cap);
     mem[idx] = val;
 
@@ -2926,6 +2912,27 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+
+
+
+//
+//assert( (ret < 1000000 && ret >= 0) || !ok);
+
+//
+//buf.cap    =   buf.useA? m_capA : m_capB;
+
+//assert(val < 1000000 && val >= 0);
+//
+//u64 cap=0;                          // this will append a value to the end, while pop, will grab it from the start/current index
+//
+//if( buf.useA ){
+//  cap = capA();
+//}else{
+//  cap = capB();
+//}
+//
+//cap = buf.useA? capA() : capB();
+//auto idx = m_end.load() % cap;    // todo: change this to use the buffer capacity
 
 //lf.m_frameQLck.lock();                                          // lock mutex       
 //lf.m_frameQLck.unlock();                                       // unlock mutex

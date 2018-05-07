@@ -84,7 +84,7 @@
   //#define FROM(from,var) for(std::remove_const<decltype(from)>::type var=from; var-- > 0; )
 #endif
 
-#if defined(_MSC_VER) && defined(_DEBUG)
+#if defined(_MSC_VER) && !defined(NDEBUG)
   #include <iostream>
   #include <iomanip>
   #include <cassert>
@@ -278,7 +278,7 @@ public:
   };
   struct     TblVal
   {
-    #ifndef _NDEBUG
+    #ifndef NDEBUG
       u8      type;          // todo: change this just to a TblType when it is redone - also change it to debug only
     #endif
     void*      ary;
@@ -484,9 +484,9 @@ public:
     auto typeStr() const -> const char* { return TblType::type_str((u8)type); }
     bool hasTypeAttr(TblType::Type tt) const { return type & tt; }
 
-    static KV&    empty_kv(){ static KV kv; kv.type = TblType::EMPTY; return kv; }
-    static KV&     none_kv(){ static KV kv; kv.type = TblType::NONE;  return kv; }
-    static KV&    error_kv(){ static KV kv; kv.type = TblType::ERR;   return kv; }
+    static KV    empty_kv(){ KV kv; kv.type = TblType::EMPTY; return kv; }
+    static KV     none_kv(){ KV kv; kv.type = TblType::NONE;  return kv; }
+    static KV    error_kv(){ KV kv; kv.type = TblType::ERR;   return kv; }
     static u64 fnv_64a_buf(void const* const buf, u64 len)
     {
       // const u64 FNV_64_PRIME = 0x100000001b3;
@@ -642,7 +642,39 @@ private:
     u64 ideal = elems[idx].hash % mod;
     return wrapDist(ideal,idx,mod);
   }
-  KV&        place_rh(KV     kv, KV* elems, u64 st, u64 dist, u64 mod, u64* placement=nullptr)   // place_rh is place with robin hood hashing 
+  //KV&        place_rh(KV     kv, KV* elems, u64 st, u64 dist, u64 mod, u64* placement=nullptr)   // place_rh is place with robin hood hashing 
+  //{
+  //  //assert( strcmp(kv.key,"")!=0 );
+
+  //  u64      i = st;
+  //  u64     en = prev(st,mod);
+  //  u64  eldst = dist;
+  //  KV*     ret = nullptr;
+  //  while(true)
+  //  {
+  //    if(i==en){ return KV::error_kv(); }
+  //    //else if(elems[i].hsh.type==TblType::EMPTY || kv==elems[i]){
+  //    else if(elems[i].type==TblType::EMPTY || kv==elems[i]){
+  //      elems[i] = kv;
+  //      if(placement) *placement = i;
+  //      if(ret) return *ret;
+  //      else    return elems[i];
+  //    }else if( dist > (eldst=wrapDist(elems,i,mod)) ){
+  //      swap( &kv, &elems[i] );
+  //      dist = eldst;
+  //      if(!ret) ret = &elems[i];
+  //    }
+
+  //    i = nxt(i,mod);
+  //    ++dist;
+  //  }
+
+  //  if(placement) *placement = i;
+  //  if(ret) return *ret;
+  //  else    return KV::error_kv();
+  //}
+
+  KV*        place_rh(KV     kv, KV* elems, u64 st, u64 dist, u64 mod, u64* placement=nullptr)   // place_rh is place with robin hood hashing 
   {
     //assert( strcmp(kv.key,"")!=0 );
 
@@ -652,7 +684,7 @@ private:
     KV*     ret = nullptr;
     while(true)
     {
-      if(i==en){ return KV::error_kv(); }
+      if(i==en){ return nullptr; }
       //else if(elems[i].hsh.type==TblType::EMPTY || kv==elems[i]){
       else if(elems[i].type==TblType::EMPTY || kv==elems[i]){
         elems[i] = kv;
@@ -670,8 +702,9 @@ private:
     }
 
     if(placement) *placement = i;
-    if(ret) return *ret;
-    else    return KV::error_kv();
+    //if(ret) return *ret;
+    if(ret) return ret;
+    else    return nullptr; // KV::error_kv();
   }
   u64         compact(u64    st, u64 en, u64 mapcap)
   {
@@ -967,7 +1000,7 @@ public:
     TblVal v;
     v.ary    =  m_mem; 
     v.idx    =  i;
-    #ifndef _NDEBUG
+    #ifndef NDEBUG
      v.type  =  arrayType();
     #endif
 
@@ -979,7 +1012,7 @@ public:
     TblVal v;
     v.ary    =  m_mem;
     v.idx    =  i;
-    #ifndef _NDEBUG
+    #ifndef NDEBUG
      v.type  =  arrayType();
     #endif
     
@@ -1178,7 +1211,8 @@ public:
         KV kv(key);
         kv.hash = hh.hash;
         //elems( elems()+1 );
-        return &(place_rh(kv, el, i, dist, mod));
+        //return &(place_rh(kv, el, i, dist, mod));
+        return place_rh(kv, el, i, dist, mod);
       }
 
       if(i==en) break;                                                 // nothing found and the end has been reached, time to break out of the loop and return a reference to a KV with its type set to NONE

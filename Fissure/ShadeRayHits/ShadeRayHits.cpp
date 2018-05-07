@@ -1,9 +1,11 @@
 
 
+//#include "../../libcpp.hpp"
+
 #include <cmath>
 #include <random>
 
-#define NO_RT_UTIL_IMPL
+//#define NO_RT_UTIL_IMPL
 #include "../../no_rt_util.h"
 
 //#include "../shared/vec.hpp"

@@ -29,13 +29,18 @@
 #include <windows.h>
 
 //extern "C" void __cdecl __std_terminate(){}
+extern "C" __declspec(noreturn) void __cdecl __std_terminate()
+{
+  //terminate();
+}
 extern "C" void __cdecl __CxxFrameHandler3(){}
 extern "C" void __cdecl __chkstk(){}
-//extern "C" __declspec(noreturn) void __cdecl _invalid_parameter_noinfo_noreturn(void){}
+extern "C" __declspec(noreturn) void __cdecl _invalid_parameter_noinfo_noreturn(void){}
+/*_CRTIMP2_PURE*/ extern "C" long long __cdecl _Xtime_get_ticks(void){return 0;}
 namespace std
 {
-  //[[noreturn]] void __cdecl _Xbad_alloc(void){}
-  //[[noreturn]] void __cdecl _Xlength_error(char const *){}
+  [[noreturn]] void __cdecl _Xbad_alloc(void){}
+  [[noreturn]] void __cdecl _Xlength_error(char const *){}
 }
 
 extern "C" void     _fltused() {}  // symbol needs to be defined for some reason
