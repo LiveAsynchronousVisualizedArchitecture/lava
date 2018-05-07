@@ -1997,7 +1997,7 @@ template<class T> tbl LavaMakeTbl(LavaParams const* lp, u64 count, T initVal=T()
 
   return move(t);
 }
-tbl      LavaMakeTbl(LavaParams const* lp)
+inline tbl            LavaMakeTbl(LavaParams const* lp)
 {
   using namespace std;
 
@@ -2009,7 +2009,7 @@ tbl      LavaMakeTbl(LavaParams const* lp)
 
   return move(t);
 }
-tbl           LavaLocalTbl(LavaParams const* lp)
+inline tbl           LavaLocalTbl(LavaParams const* lp)
 {
   using namespace std;
 
@@ -2020,7 +2020,7 @@ tbl           LavaLocalTbl(LavaParams const* lp)
 
   return move(t);
 }
-const tbl  LavaTblFromPckt(LavaParams const* lp, LavaFrame const* in, u64 i)
+inline const tbl  LavaTblFromPckt(LavaParams const* lp, LavaFrame const* in, u64 i)
 {
   using namespace std;
 
@@ -2038,7 +2038,7 @@ const tbl  LavaTblFromPckt(LavaParams const* lp, LavaFrame const* in, u64 i)
 
   return move(t);
 }
-LavaOut       LavaTblToOut(tbl const& t, u32 slot)
+inline LavaOut       LavaTblToOut(tbl const& t, u32 slot)
 {
   LavaOut o;
   o.val.value = (u64)t.memStart();
@@ -2047,7 +2047,7 @@ LavaOut       LavaTblToOut(tbl const& t, u32 slot)
 
   return o;
 }
-LavaOut       LavaMemToOut(LavaMem lm, u32 slot)
+inline LavaOut       LavaMemToOut(LavaMem lm, u32 slot)
 {
   LavaOut o;
   o.val.value = (u64)lm.data();
@@ -2056,7 +2056,7 @@ LavaOut       LavaMemToOut(LavaMem lm, u32 slot)
 
   return o;
 }
-bool           LavaNxtPckt(LavaFrame const* in, u32* currentIndex)
+inline bool           LavaNxtPckt(LavaFrame const* in, u32* currentIndex)
 {
   while(*currentIndex < in->packets.size()){
     if( in->slotMask[ (*currentIndex)++ ] ){ return true; }
@@ -2071,7 +2071,7 @@ bool           LavaNxtPckt(LavaFrame const* in, u32* currentIndex)
   //}
   //return false;
 }
-LavaMem  LavaMemAllocation(LavaAllocFunc alloc, u64 sizeBytes)
+inline LavaMem  LavaMemAllocation(LavaAllocFunc alloc, u64 sizeBytes)
 {
   //const int lmHdrSz = sizeof(LavaMemHeader);
   assert( sizeof(LavaMemHeader) == 16 );

@@ -49,7 +49,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <TargetName>lava_$(ProjectName)</TargetName>
-    <IgnoreImportLibrary>false</IgnoreImportLibrary>
+    <IgnoreImportLibrary>true</IgnoreImportLibrary>
     <GenerateManifest>false</GenerateManifest>
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
@@ -90,6 +90,9 @@
       <EnableUAC>false</EnableUAC>
       <ForceFileOutput>MultiplyDefinedSymbolOnly</ForceFileOutput>
       <NoEntryPoint>false</NoEntryPoint>
+      <SupportNobindOfDelayLoadedDLL>false</SupportNobindOfDelayLoadedDLL>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
+      <PreventDllBinding>false</PreventDllBinding>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -89,6 +89,10 @@
       <ImportLibrary>$(OutDir)/misc/$(TargetName).lib</ImportLibrary>
       <AdditionalLibraryDirectories>..\..\..\shared;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
+      <SupportNobindOfDelayLoadedDLL>false</SupportNobindOfDelayLoadedDLL>
+      <EnableUAC>false</EnableUAC>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
+      <PreventDllBinding>false</PreventDllBinding>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

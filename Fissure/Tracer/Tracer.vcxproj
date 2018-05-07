@@ -84,6 +84,9 @@
       <EnableUAC>false</EnableUAC>
       <AdditionalLibraryDirectories>..\..\shared;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <ForceFileOutput>MultiplyDefinedSymbolOnly</ForceFileOutput>
+      <SupportNobindOfDelayLoadedDLL>false</SupportNobindOfDelayLoadedDLL>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
+      <PreventDllBinding>false</PreventDllBinding>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

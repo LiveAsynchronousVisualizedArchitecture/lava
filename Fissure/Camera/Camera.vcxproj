@@ -95,7 +95,6 @@
       <ProgramDatabaseFile>$(OutDir)/misc/$(TargetName).pdb</ProgramDatabaseFile>
       <EnableUAC>false</EnableUAC>
       <IgnoreEmbeddedIDL>true</IgnoreEmbeddedIDL>
-      <DataExecutionPrevention>false</DataExecutionPrevention>
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
       <StackCommitSize>1MB</StackCommitSize>
@@ -104,12 +103,13 @@
       <AdditionalDependencies>sys_msvcrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ForceFileOutput>MultiplyDefinedSymbolOnly</ForceFileOutput>
       <NoEntryPoint>false</NoEntryPoint>
+      <SupportNobindOfDelayLoadedDLL>false</SupportNobindOfDelayLoadedDLL>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
+      <PreventDllBinding>false</PreventDllBinding>
     </Link>
     <ProjectReference />
     <ProjectReference />
-    <ProjectReference>
-      <UseLibraryDependencyInputs>true</UseLibraryDependencyInputs>
-    </ProjectReference>
+    <ProjectReference />
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
