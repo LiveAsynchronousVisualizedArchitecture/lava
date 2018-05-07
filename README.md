@@ -17,9 +17,9 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 ### Classic Software Problems
 |[*Scalability*](#scal)     |[*Iterations*](#iter)  |[*Modularity*](#mod)    |[*Concurrency*](#concr)       |[*Debugging*](#debug)   |
 |       :---:               |      :---:            |   :---:                |    :---:                     |   :---:                |
-|[OpenGL Graph](#graphui)   |[Live Reloading](#live)|[Shared Libs](#libs)    |[Execute in Parallel](#asynch)|[Shared Memory](#shrmem)|
-|[Clear Interfaces](#clear) |[Output Baking](#bake) |[Crash Isolation](#crsh)|[Lock Free](#lkfree)          |[Tbl and Stats](#stats) |
-|[Flow+Msg Nodes](#flow-msg)|[Visualization](#viz)  |[Serial Data](#serial)  |[Persistant Threads](#thrds)  |[Visualization](#viz)   |
+|[OpenGL Graph](#graphui)   |[Live Reloading](#live)|[Shared Libs](#libs)    |[Execute in Parallel](#async) |[Shared Memory](#shrmem)|
+|[Clear Interfaces](#clear) |[Output Baking](#bake) |[Crash Isolation](#crsh)|[Lock Free](#lkfree)          |[Visualization](#viz)   |
+|[Flow+Msg Nodes](#flow-msg)|[Visualization](#viz)  |[Serial Data](#serial)  |[Persistant Threads](#thrds)  |[Tbl and Stats](#stats) |
 
 ### Classic Software Problems
  - <a id="scal"> __Scalable Complexity__ </a> - High level structure is not strictly enforced (or doesn't exist) and often subverted in some way to accomodate extra data/communication.
@@ -41,16 +41,35 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 
 - <a id="flow-msg"> __Data Flow and Message Passing__ </a> - Flow nodes can be used for stateless transformations, making any data separated into a packet be dealt with concurrently.  Message nodes can hold state, use flow nodes and dictate the overall behavior of a program. 
   
-#### Interactivity and Testing 
- - Any ouput from a node can potentially be visualized while the program is running.
- - Input data can be frozen and a single node can be recompiled, automatically hot reloaded, then automatically run using the now static input.  This enables fast iteration even in a large program by isolating a single piece and its input while continuously viewing its output.
- - Constant nodes can offer a way to change input in real time for interactive testing with visualization of results  
+#### Iterations, Interactivity and Testing 
+
+- <a id="live">__Live Reloading__</a> -  - Input data can be frozen and a single node can be recompiled, automatically hot reloaded, then automatically run using the now static input.  This enables fast iteration even in a large program by isolating a single piece and its input while continuously viewing its output.
+
+- <a id="bake">__Constant Nodes__</a> - Constant nodes can offer a way to change input in real time for interactive testing with visualization of results.
+
+- <a id="viz">__Visualization__</a> - Visualizations happen with lock free shared memory to external processes and don't interfere with the execution of the main program
+
+#### Modularity
+- <a id="libs">__Shared Libraries__</a> - Contain one or more nodes and can change while the program is running. Compilation is isolated to the lib being revised as well as run time checks in debug builds.  
+
+- <a id="crsh">__Interrupts and Exceptions__</a> - The LAVA loop catches low level interrupts so that a crash shows up in the graph as a red halo around the crashed node.
+
+- <a id="serial">__Serialized Node IO__</a> - All communication between nodes is passed as pointer to a single span of contiguous memory. This means that all IO can be saved as a file, written to shared memory for visualization and debugging.  While this can work with any data structure that can be serialized, data structures that always use a single span of memory (like tbl.hpp) are likely to be a good default. 
 
 #### Concurrency, Parallelism and Asynchronous Design
-  -  Every packet of data can be dealt with concurrently, giving a program lock free asynchronous execution with little effort. Parallelism is dictated by the amount that data can be isolated
-   - Visualizations happen with lock free shared memory to external processes and don't interfere with the execution of the main program
+
+- <a id="async">__Separate Data Executes Concurrently__</a> - Every packet of data can be dealt with concurrently, giving a program lock free asynchronous execution with little effort. Parallelism is dictated by the amount that data can be isolated
+
+- <a id="lkfree">__Lock Free by Default__</a> - Threads take packets from a queue and execute them using their destination node.  Memory for node IO is allocated lock free and owned by the thread using reference counting. Part of each thread's loop is deallocating memory after each node it executes. Even visualization is lock free using simdb.
+
+- <a id="thrds">__Threads Persist and Loop__</a> - Threads are meant to be created initially and loop, finding packets and executing them with their destination node. Each thread's stack can be used as thread local  eliminates overhead such as global memory allocation (which can lock) of thread creation.
+
+- <a id="shrmem">__Shared Memory__</a> - 
+- <a id="viz">__Visualization__</a> - 
+- <a id="stats">__Tbl Tree View With Statistics__</a> - 
 
 ### Common Problems With Visual Programming
+
   -  Most environments use custom languages instead of leveraging the enormous ecosystem, maturity, speed and extensive design that has gone into existing languages. LAVA is made using a few thousand lines of C++ spread across 3 header files with no external dependencies
   -  Pure data flow visual programming has been successful in domain specific applications, though generalizing to arbitrary software can can break the tight mapping of the interface to execution needed
   -  Control flow, looping, data structures and persistant state can be difficult to control elegantly
