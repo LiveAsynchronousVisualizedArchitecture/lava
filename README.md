@@ -15,11 +15,11 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 
 
 ### Classic Software Problems
-|[*Scalability*](#scal)     |[*Iterations*](#iter)  |[*Modularity*](#mod) |[*Concurrency*](#concr)           |[*Debugging*](#debug)    |
-|       :---:               |      :---:            |   :---:             |    :---:                         |   :---:                 |
-|[OpenGL Graph](#graphui)   | Live Reloading        |  Shared Libraries   | Data Chunks Execute in Parallel  | Shared Memory           |
-|[Clear Interfaces](#clear) | Output Baking         |  Crash Isolation    | Lock Free By Default             | Tbl Tree and Statistics |
-|[Flow+Msg Nodes](#flow-msg)| Output Visualization  |  Serialized Data    | Persistant Threads               | Output Visualization    |
+|[*Scalability*](#scal)     |[*Iterations*](#iter)  |[*Modularity*](#mod)    |[*Concurrency*](#concr)       |[*Debugging*](#debug)   |
+|       :---:               |      :---:            |   :---:                |    :---:                     |   :---:                |
+|[OpenGL Graph](#graphui)   |[Live Reloading](#live)|[Shared Libs](#libs)    |[Execute in Parallel](#asynch)|[Shared Memory](#shrmem)|
+|[Clear Interfaces](#clear) |[Output Baking](#bake) |[Crash Isolation](#crsh)|[Lock Free](#lkfree)          |[Tbl and Stats](#stats) |
+|[Flow+Msg Nodes](#flow-msg)|[Visualization](#viz)  |[Serial Data](#serial)  |[Persistant Threads](#thrds)  |[Visualization](#viz)   |
 
 ### Classic Software Problems
  - <a id="scal"> __Scalable Complexity__ </a> - High level structure is not strictly enforced (or doesn't exist) and often subverted in some way to accomodate extra data/communication.
