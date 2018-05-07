@@ -17,9 +17,9 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 ### Classic Software Problems
 |[*Scalability*](#scal)  |[*Iterations*](#iter)  |[*Modularity*](#mod) |[*Concurrency*](#concr)           |[*Debugging*](#debug)    |
 |       :---:            |      :---:            |   :---:             |    :---:                         |   :---:                 |
-|  OpenGL Node Graph     | Live Reloading        |  Shared Libraries   | Data Chunks Execute in Parallel  | Shared Memory           |
-|  Clear Node Interfaces | Output Baking         |  Crash Isolation    | Gather Nodes Synchronize         | Tbl Tree and Statistics |
-|  Lock Free By Default  | Output Visualization  |  Serialized Data    | Persistant Threads               | Output Visualization    |
+|OpenGL Node Graph       | Live Reloading        |  Shared Libraries   | Data Chunks Execute in Parallel  | Shared Memory           |
+|Clear Node Interfaces   | Output Baking         |  Crash Isolation    | Lock Free By Default             | Tbl Tree and Statistics |
+|Data Flow + Message Passing  | Output Visualization  |  Serialized Data    | Persistant Threads               | Output Visualization    |
 
 ### Classic Software Problems
  - <a id="scal"> __Scalable Complexity__ </a> - High level structure is not strictly enforced (or doesn't exist) and often subverted in some way to accomodate extra data/communication 
