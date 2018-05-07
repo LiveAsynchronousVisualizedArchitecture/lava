@@ -645,7 +645,7 @@ private:
   //KV&        place_rh(KV     kv, KV* elems, u64 st, u64 dist, u64 mod, u64* placement=nullptr)   // place_rh is place with robin hood hashing 
   //{
   //  //assert( strcmp(kv.key,"")!=0 );
-
+  //
   //  u64      i = st;
   //  u64     en = prev(st,mod);
   //  u64  eldst = dist;
@@ -664,11 +664,11 @@ private:
   //      dist = eldst;
   //      if(!ret) ret = &elems[i];
   //    }
-
+  //
   //    i = nxt(i,mod);
   //    ++dist;
   //  }
-
+  //
   //  if(placement) *placement = i;
   //  if(ret) return *ret;
   //  else    return KV::error_kv();
@@ -685,12 +685,11 @@ private:
     while(true)
     {
       if(i==en){ return nullptr; }
-      //else if(elems[i].hsh.type==TblType::EMPTY || kv==elems[i]){
       else if(elems[i].type==TblType::EMPTY || kv==elems[i]){
         elems[i] = kv;
         if(placement) *placement = i;
-        if(ret) return *ret;
-        else    return elems[i];
+        if(ret) return ret;
+        else    return &elems[i];
       }else if( dist > (eldst=wrapDist(elems,i,mod)) ){
         swap( &kv, &elems[i] );
         dist = eldst;

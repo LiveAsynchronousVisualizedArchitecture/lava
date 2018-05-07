@@ -4,11 +4,7 @@
 
 #include <cmath>
 #include <random>
-
-//#define NO_RT_UTIL_IMPL
 #include "../../no_rt_util.h"
-
-//#include "../shared/vec.hpp"
 #include "../../tbl.hpp"
 #include "../LavaFlow.hpp"
 #include "../shared/math/affinespace.h"
@@ -339,7 +335,7 @@ tbl brdfRaysToIV(LavaParams const* lp, tbl const& rays, tbl const& brdfRays)    
 
 extern "C"
 {
-  const char*  InTypes[]  = {"Rays",                         "GGXParms",                   nullptr};
+  const char*  InTypes[]  = {"RayHits",                      "GGXParms",                   nullptr};
   const char*  InNames[]  = {"Rays Traced By Embree",        "Parameters for GGX BRDF",    nullptr};
   const char* OutTypes[]  = {"BRDF Rays",                    "IdxVerts",                   nullptr};
   const char* OutNames[]  = {"Rays from GGX BRDF with pdf",  "BRDF Rays Visualization",    nullptr};
@@ -437,6 +433,10 @@ extern "C"
 
 
 
+
+//#define NO_RT_UTIL_IMPL
+//
+//#include "../shared/vec.hpp"
 
 //Vec3f V(   (f32)dx[i],   (f32)dy[i],   (f32)dz[i]   );
 //Vec3f N( (f32)Ng_x[i], (f32)Ng_y[i],   (f32)Ng_z[i] );

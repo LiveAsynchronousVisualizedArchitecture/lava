@@ -47,63 +47,6 @@ float     randomf(float lo, float hi)
   return dis(*RNG::m_genPtr);
 }
 
-//tbl   raysToIdxVerts(LavaParams const* lp, RTCRayHitNp const& rh, u32 rayCnt)
-//{
-//  using namespace std;
-//
-//  tbl  px = LavaMakeTbl(lp);
-//  tbl  py = LavaMakeTbl(lp);
-//  tbl  pz = LavaMakeTbl(lp);
-//  tbl  cr = LavaMakeTbl(lp);
-//  tbl  cg = LavaMakeTbl(lp);
-//  tbl  ca = LavaMakeTbl(lp);
-//  tbl ind = LavaMakeTbl(lp);
-//  tbl  iv = LavaMakeTbl(lp);
-//
-//  px.setArrayType<f32>();
-//  py.setArrayType<f32>();
-//  pz.setArrayType<f32>();
-//  cr.setArrayType<f32>();
-//  cg.setArrayType<f32>();
-//  ca.setArrayType<f32>();
-//  ind.setArrayType<u32>();
-//  iv.setArrayType<i8>();
-//
-//  TO(rayCnt,i){
-//    px.push( rh.ray.org_x[i]  );
-//    py.push( rh.ray.org_y[i]  );
-//    pz.push( rh.ray.org_z[i]  );
-//
-//    px.push( rh.ray.org_x[i] + (rh.ray.dir_x[i] * rh.ray.tfar[i]) );
-//    py.push( rh.ray.org_y[i] + (rh.ray.dir_y[i] * rh.ray.tfar[i]) );
-//    pz.push( rh.ray.org_z[i] + (rh.ray.dir_z[i] * rh.ray.tfar[i]) );
-//
-//    cr.push(0.5f);
-//    cr.push(1.0f);
-//    cg.push(0.0f);
-//    cg.push(1.0f);
-//    ca.push(0.1f);
-//    ca.push(0.2f);
-//
-//    ind.push( (u32)(i*2+0) );
-//    ind.push( (u32)(i*2+1) );
-//  }
-//
-//  iv("positions x")  = &px;
-//  iv("positions y")  = &py;
-//  iv("positions z")  = &pz;
-//  iv("colors red")   = &cr;
-//  iv("colors green") = &cg;
-//  //iv("colors blue")  = &pz;
-//  iv("colors alpha") = &ca;
-//  iv("indices")      = &ind;
-//  iv("mode")         = 1;            // 0 should be points, 1 should be lines
-//  iv("type")         = tbl::StrToInt("IdxVerts");
-//  iv.flatten();
-//
-//  return move(iv);
-//}
-
 namespace {
 
 const float   INFf       = std::numeric_limits<float>::infinity();
@@ -436,7 +379,7 @@ extern "C"          // Embree3 Scene Message Node
 
   const char*  InTypes[]  = {"IdxVerts",                  "Rays",                                nullptr};
   const char*  InNames[]  = {"Scene Geometry",            "Rays To Trace",                       nullptr};
-  const char* OutTypes[]  = {"IdxVerts",                  "Ray Hits",                            nullptr};
+  const char* OutTypes[]  = {"IdxVerts",                  "RayHits",                             nullptr};
   const char* OutNames[]  = {"Traced Rays Visualization", "Traced rays, ready to be shaded",     nullptr};
 
   void Tracer_construct()
@@ -646,6 +589,64 @@ extern "C"          // Embree3 Scene Message Node
 
 
 
+
+
+//tbl   raysToIdxVerts(LavaParams const* lp, RTCRayHitNp const& rh, u32 rayCnt)
+//{
+//  using namespace std;
+//
+//  tbl  px = LavaMakeTbl(lp);
+//  tbl  py = LavaMakeTbl(lp);
+//  tbl  pz = LavaMakeTbl(lp);
+//  tbl  cr = LavaMakeTbl(lp);
+//  tbl  cg = LavaMakeTbl(lp);
+//  tbl  ca = LavaMakeTbl(lp);
+//  tbl ind = LavaMakeTbl(lp);
+//  tbl  iv = LavaMakeTbl(lp);
+//
+//  px.setArrayType<f32>();
+//  py.setArrayType<f32>();
+//  pz.setArrayType<f32>();
+//  cr.setArrayType<f32>();
+//  cg.setArrayType<f32>();
+//  ca.setArrayType<f32>();
+//  ind.setArrayType<u32>();
+//  iv.setArrayType<i8>();
+//
+//  TO(rayCnt,i){
+//    px.push( rh.ray.org_x[i]  );
+//    py.push( rh.ray.org_y[i]  );
+//    pz.push( rh.ray.org_z[i]  );
+//
+//    px.push( rh.ray.org_x[i] + (rh.ray.dir_x[i] * rh.ray.tfar[i]) );
+//    py.push( rh.ray.org_y[i] + (rh.ray.dir_y[i] * rh.ray.tfar[i]) );
+//    pz.push( rh.ray.org_z[i] + (rh.ray.dir_z[i] * rh.ray.tfar[i]) );
+//
+//    cr.push(0.5f);
+//    cr.push(1.0f);
+//    cg.push(0.0f);
+//    cg.push(1.0f);
+//    ca.push(0.1f);
+//    ca.push(0.2f);
+//
+//    ind.push( (u32)(i*2+0) );
+//    ind.push( (u32)(i*2+1) );
+//  }
+//
+//  iv("positions x")  = &px;
+//  iv("positions y")  = &py;
+//  iv("positions z")  = &pz;
+//  iv("colors red")   = &cr;
+//  iv("colors green") = &cg;
+//  //iv("colors blue")  = &pz;
+//  iv("colors alpha") = &ca;
+//  iv("indices")      = &ind;
+//  iv("mode")         = 1;            // 0 should be points, 1 should be lines
+//  iv("type")         = tbl::StrToInt("IdxVerts");
+//  iv.flatten();
+//
+//  return move(iv);
+//}
 
 //
 //out->push( LavaTblToOut(move(rayHits), OUT_RAY_HITS) );

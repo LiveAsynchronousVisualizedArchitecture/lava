@@ -25,8 +25,8 @@
 // -todo: debug why the camera ray visualization shows less rays than should be generated - number of points in visualization is rays*2 which should be correct, though number of lines is less, possibly half rounded up - some points are -inf and inf - inf in traced rays is possibly not fitlered out when visualizing as indexed verts - inf check and a separate ray index variable worked - should probably make a habit of visualizing the actual data going out 
 // -todo: try slimming camera file size with sys_msvcrt.lib - need force option to link when there are multiply defined symbols
 // -todo: try hardware random numbers to avoid <random> - only supported on ivy bridge and above
+// -todo: figure out why ShadeRayHits is crashing - tbl::place_rh wasn't returning a pointer at all points, but the casting operator for KV was still letting it compile
 
-// todo: figure out why ShadeRayHits is crashing
 // todo: try combining ShadeRayHits and Camera projects into a single shared library
 // todo: put in live reloading that uses the Lava step function on reload
 // todo: implement live reloading that copies the shared library, loads it, switches over atomically, unloads the previous live version, copies the tmp live version to the normal live file, maps the new live version file, automically switches over to that, then unloads the tmp live shared lib - whew!
