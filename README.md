@@ -15,18 +15,18 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 
 
 ### Classic Software Problems
-|[*Scalability*](#scal)  |[*Iterations*](#iter)  |[*Modularity*](#mod) |[*Concurrency*](#concr)           |[*Debugging*](#debug)    |
-|       :---:            |      :---:            |   :---:             |    :---:                         |   :---:                 |
-|OpenGL Node Graph       | Live Reloading        |  Shared Libraries   | Data Chunks Execute in Parallel  | Shared Memory           |
-|Clear Node Interfaces   | Output Baking         |  Crash Isolation    | Lock Free By Default             | Tbl Tree and Statistics |
-|Data Flow + Message Passing  | Output Visualization  |  Serialized Data    | Persistant Threads               | Output Visualization    |
+|[*Scalability*](#scal)     |[*Iterations*](#iter)  |[*Modularity*](#mod) |[*Concurrency*](#concr)           |[*Debugging*](#debug)    |
+|       :---:               |      :---:            |   :---:             |    :---:                         |   :---:                 |
+|[OpenGL Graph](#graphui)   | Live Reloading        |  Shared Libraries   | Data Chunks Execute in Parallel  | Shared Memory           |
+|[Clear Interfaces](#clear) | Output Baking         |  Crash Isolation    | Lock Free By Default             | Tbl Tree and Statistics |
+|[Flow+Msg Nodes](#flow-msg)| Output Visualization  |  Serialized Data    | Persistant Threads               | Output Visualization    |
 
 ### Classic Software Problems
- - <a id="scal"> __Scalable Complexity__ </a> - High level structure is not strictly enforced (or doesn't exist) and often subverted in some way to accomodate extra data/communication 
+ - <a id="scal"> __Scalable Complexity__ </a> - High level structure is not strictly enforced (or doesn't exist) and often subverted in some way to accomodate extra data/communication.
   
- - <a id="iter"> __Iterations__ </a> - As program size increases, iterations decrease due to re-compilation time, linking time, and the time to re-run the program when testing
+ - <a id="iter"> __Iterations__ </a> - As program size increases, iterations decrease due to re-compilation time, linking time, and the time to re-run the program when testing.
   
-- <a id="mod"> __Modularity__ </a> - Modularity often breaks down due to data dependencies at run time and source dependencies at compile time.  Reuse and teamwork 
+- <a id="mod"> __Modularity__ </a> - Modularity often breaks down due to data dependencies at run time and source dependencies at compile time, making re-use more difficult and increasing the barrier to entry for anyone to a project.
 
 - <a id="concr"> __Concurrency__ </a> - Many techniques and libraries exist, often as heavy dependencies that have narrow use cases where they excel. Concurrency, parallelism and asynchronous design are perpetually difficult to get right and fragmented in their use.
 
@@ -35,9 +35,11 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 ### How LAVA Confronts These Problems
 
 #### High Level Structure
-  -  Using nodes connected in a fluid, openGL accelerated UI, programs can be architected visually and implemented incrementally
-  -  Clear separation of each node facilitates collaboration as well as calibration to the scope of work needed.
-  -  Programs can be created from relativly few nodes, simplifying the comprehension of how large projects fit together and how their pieces interact.
+- <a id="graphui"> __Graph UI__ </a> - A fluid, openGL accelerated UI for architecting software visually while implementing incrementally.
+
+- <a id="clear"> __Clear Inputs and Outputs__ </a> - Every node has inputs and outputs that show up visually making their scope clear.  Programs can be created from relativly few nodes. simplifying the comprehension of how large projects fit together and how their pieces interact. 
+
+- <a id="flow-msg"> __Data Flow and Message Passing__ </a> - Flow nodes can be used for stateless transformations, making any data separated into a packet be dealt with concurrently.  Message nodes can hold state, use flow nodes and dictate the overall behavior of a program. 
   
 #### Interactivity and Testing 
  - Any ouput from a node can potentially be visualized while the program is running.
