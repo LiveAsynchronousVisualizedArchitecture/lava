@@ -15,7 +15,7 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 
 
 ### Classic Software Problems
-|[Scalability](#scal)    |[Iterations](#iter)    |[Modularity](#mod)   |[Concurrency](#concr)             |[Debugging](#debug)      |
+|[*Scalability*](#scal)  |[*Iterations*](#iter)  |[*Modularity*](#mod) |[*Concurrency*](#concr)           |[*Debugging*](#debug)    |
 |       :---:            |      :---:            |   :---:             |    :---:                         |   :---:                 |
 |  OpenGL Node Graph     | Live Reloading        |  Shared Libraries   | Data Chunks Execute in Parallel  | Shared Memory           |
 |  Clear Node Interfaces | Output Baking         |  Crash Isolation    | Gather Nodes Synchronize         | Tbl Tree and Statistics |
