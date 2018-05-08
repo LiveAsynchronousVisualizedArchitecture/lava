@@ -72,6 +72,7 @@
       <FloatingPointExceptions>false</FloatingPointExceptions>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PreprocessorDefinitions>NDEBUG;_WINDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
     </ClCompile>
     <Link />
     <Link>
@@ -93,6 +94,9 @@
       <SupportNobindOfDelayLoadedDLL>false</SupportNobindOfDelayLoadedDLL>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <PreventDllBinding>false</PreventDllBinding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <SubSystem>Windows</SubSystem>
+      <StackCommitSize>1MB</StackCommitSize>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

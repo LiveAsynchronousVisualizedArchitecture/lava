@@ -98,7 +98,7 @@
       <IgnoreSpecificDefaultLibraries>
       </IgnoreSpecificDefaultLibraries>
       <StackCommitSize>1MB</StackCommitSize>
-      <SubSystem>NotSet</SubSystem>
+      <SubSystem>Windows</SubSystem>
       <AdditionalLibraryDirectories>..\..\shared;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalDependencies>sys_msvcrt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <ForceFileOutput>MultiplyDefinedSymbolOnly</ForceFileOutput>
@@ -106,6 +106,8 @@
       <SupportNobindOfDelayLoadedDLL>false</SupportNobindOfDelayLoadedDLL>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <PreventDllBinding>false</PreventDllBinding>
+      <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
+      <OptimizeReferences>true</OptimizeReferences>
     </Link>
     <ProjectReference />
     <ProjectReference />
