@@ -13,6 +13,11 @@ LAVA is meant to simplify general purpose native software while allowing every p
 
 LAVA is designed to **_both_** significantly **_speed up development_** AND as a simple way to create **_signifcant amounts of lock free concurrency_**.  It is written in C++11 and meant to potentially work with any language that can compile a shared library that exposes standard function calls.  The building blocks are single file libraries with no dependencies other than the C++11 standard library. 
 
+| __Tools__ | [![Fissure](images/THUMB_Fissure_5_8_2018.png)](#fissure) | [![Visualizer](images/THUMB_craftsman_visualizer001.png)](#visualizer) | [![Brandisher](images/THUMB_craftsman_brandisher001.png)](#brandisher) |
+| :---: | :---: | :---: | :---: |
+
+| __Files__ | [Simdb.hpp](simdb.hpp) | [LavaFlow.hpp](LavaFlow.hpp) | [tbl.hpp](tbl.hpp) |
+|  :---:    |          :---:         |         :---:                |       :---:        |
 
 ### Classic Software Problems
 |[*Scalability*](#scal)     |[*Iterations*](#iter)  |[*Modularity*](#mod)    |[*Concurrency*](#concr)       |[*Debugging*](#debug)   |
