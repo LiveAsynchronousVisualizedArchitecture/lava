@@ -27,6 +27,7 @@
 // -todo: try hardware random numbers to avoid <random> - only supported on ivy bridge and above
 // -todo: figure out why ShadeRayHits is crashing - tbl::place_rh wasn't returning a pointer at all points, but the casting operator for KV was still letting it compile
 
+// todo: put globals struct into LavaParams that will hold the current number of threads running as well as the logical cores available - could also include a bitmask of which outputs are connected
 // todo: try combining ShadeRayHits and Camera projects into a single shared library
 // todo: put in live reloading that uses the Lava step function on reload
 // todo: implement live reloading that copies the shared library, loads it, switches over atomically, unloads the previous live version, copies the tmp live version to the normal live file, maps the new live version file, automically switches over to that, then unloads the tmp live shared lib - whew!

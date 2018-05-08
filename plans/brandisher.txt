@@ -1,0 +1,11 @@
+
+
+Need to be able to show strings
+|  If a tbl is i8 and has no keys
+
+Zip arrays to show the amount of redundancy and repitition
+
+Could the dictionary from compression be used to show the most common patterns?
+
+Try compiling FLTK with sys_msvcrt.lib
+
