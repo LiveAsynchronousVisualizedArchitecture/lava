@@ -1,6 +1,6 @@
 # LAVA - Live Asynchronous Visual Architecture
 
-LAVA is meant to simplify high performance software while allowing every piece to be lock free and asynchronous.
+LAVA is meant to simplify general purpose native software while allowing every piece to be lock free and asynchronous.
 
 [![Load Obj](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_LoadObj.gif "")](#load-obj)
 [![Camera Rays](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_CameraRays.gif "")](#camera-rays)
@@ -21,7 +21,6 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 |[Clear Interfaces](#clear) |[Output Baking](#bake) |[Crash Isolation](#crsh)|[Lock Free](#lkfree)          |[Visualization](#viz)   |
 |[Flow+Msg Nodes](#flow-msg)|[Visualization](#viz)  |[Serial Data](#serial)  |[Persistant Threads](#thrds)  |[Tbl and Stats](#stats) |
 
-### Classic Software Problems
  - <a id="scal"> __Scalable Complexity__ </a> - High level structure is not strictly enforced (or doesn't exist) and often subverted in some way to accomodate extra data/communication.
   
  - <a id="iter"> __Iterations__ </a> - As program size increases, iterations decrease due to re-compilation time, linking time, and the time to re-run the program when testing.
@@ -47,7 +46,7 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 
 - <a id="bake">__Constant Nodes__</a> - Constant nodes can offer a way to change input in real time for interactive testing with visualization of results.
 
-- <a id="viz">__Visualization__</a> - Visualizations happen with lock free shared memory to external processes and don't interfere with the execution of the main program
+- <a id="viz">__Visualization__</a> - Visualizations happen with lock free shared memory to external processes and does not interfere with the execution of the main program.
 
 #### Modularity
 - <a id="libs">__Shared Libraries__</a> - Contain one or more nodes and can change while the program is running. Compilation is isolated to the lib being revised as well as run time checks in debug builds.  
@@ -64,63 +63,27 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 
 - <a id="thrds">__Threads Persist and Loop__</a> - Threads are meant to be created initially and loop, finding packets and executing them with their destination node. Each thread's stack can be used as thread local  eliminates overhead such as global memory allocation (which can lock) of thread creation.
 
-- <a id="shrmem">__Shared Memory__</a> - 
-- <a id="viz">__Visualization__</a> - 
-- <a id="stats">__Tbl Tree View With Statistics__</a> - 
+#### Debugging
 
-### Common Problems With Visual Programming
+- <a id="shrmem">__Shared Memory__</a> - The use of simdb allows extremlely fast IPC (interprocess communication) over shared memory.  Visualizing data (with the [Visualizer](#visualizer) tool) or examining data (with the [Brandisher](#brandisher) tool) while a program is running is easy and has minimal performance over head due to a lock free design and thread local output.  
 
-  -  Most environments use custom languages instead of leveraging the enormous ecosystem, maturity, speed and extensive design that has gone into existing languages. LAVA is made using a few thousand lines of C++ spread across 3 header files with no external dependencies
-  -  Pure data flow visual programming has been successful in domain specific applications, though generalizing to arbitrary software can can break the tight mapping of the interface to execution needed
-  -  Control flow, looping, data structures and persistant state can be difficult to control elegantly
-  -  Dense expressions that would be elegant in text can become unweildly when using granular nodes 
-
-### Proposed Solutions to Common Visual Programming Problems
- -  Each node is made using C++, which lets the expression level programming be done normally
- -  LAVA uses multiple node types, most notably message and flow nodes
- -  Individual nodes are written in modern C++ and meant to accomplish high level goals on large chunks of data
- -  Message passing nodes can manage persistent state and dictate the high level program flow
- -  Flow nodes transform data in highly modular pieces with easy visualization and well defined inputs and outputs 
- -  Generator nodes can elegantly bring in network traffic, file IO, etc
- -  Constant nodes will be an elegant way to change data going in to nodes in real time. Input data can be created first then the execution can be tested on every change as it happens in real time.  Inputs for parameters then can be controlled dynamically or statically
- 
-## Fundamental Principles
-
-#### 1. A program is composed of message passing nodes and data flow nodes. This enables many desirable features: 
- -  A clear picture of the high level structure of a program along with a way to plan the program structure in a precise way.
- -  Truly modular pieces that have that clearly defined inputs and output with no side effects.
- -  Detailed information about each node including input and output types, percentage of CPU time, statistics about data size to execution time, etc.
-
-#### 2. Update Nodes Live
- -  Since data is separated from execution in a clear way, a recompile of a shared library can trigger an update while the program is running, meaning a program can be changed live, without restarting. 
-
-#### 3. Freeze Input
- -  Combined with live updating of nodes, this allows rapid development of a section of the program since a compile can automatically update with frozen packets run through immediatly then visualized.
-
-#### 4. Granular Interrupt Handling 
- -  Enables the program to continue running live, even if one node crashes. 
- -  Crashes are shown clearly and don't disrupt workflow.
- -  Running threads will simply skip packets destined for the crashed node.
-
-#### 5. Visual Node Graph Interface
- -  Reduces complexity of how a program fits together as well as giving easy and intuitive feedback
- -  High level information such as node crashes or CPU time spent running each node is integrated and always available
+- <a id="stats">__Tbl Tree View With Statistics__</a> - [Brandisher](#brandisher) displays any tbl in shared memory, even if it can't be visualized. Tbls and their sub-tbls are shown as trees. Arrays are shown using a graph along with statistics such as mean, median and mode. Keys are show with their types and values.
 
 ### Tools
 
-### Fissure
+<a id="fissure">__Fissure__</a>
 
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/craftsman_fissure.jpg "Fissure is the node graph UI.  It can be used to construct a graph of nodes, run the program, visualize outputs, see node errors and view timing information about the nodes.")
 
 Fissure is the node graph UI.  It can be used to construct a graph of nodes, run the program, visualize outputs, see node errors and view timing information about the nodes.
 
-### Visualizer
+<a id="visualizer">__Visualizer__</a>
 
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/craftsman_visualizer001.jpg "Tables that are in the IdxVerts format (3D geometry with optional normals, vertex colors, uvs, and a color texture map)  will be picked up by the visualizer and displayed with openGL.")
 
 [Tables](README.md#tblhpp) that are in the IdxVerts format (3D geometry with optional normals, vertex colors, uvs, and a color texture map)  will be picked up by the visualizer and displayed with openGL.
 
-### Brandisher
+<a id="brandisher">__Brandisher__</a>
 
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/craftsman_brandisher001.png "The brandisher is a tool for viewing tables and their sub-tables in shared memory. It can display a graph of the arrays' values as well as their basic statistics.")
 
