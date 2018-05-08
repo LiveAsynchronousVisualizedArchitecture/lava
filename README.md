@@ -1,6 +1,6 @@
 # LAVA - Live Asynchronous Visual Architecture
 
-LAVA is meant to simplify high performance software while allowing every piece to be lock free and asynchronous.
+LAVA is meant to simplify general purpose native software while allowing every piece to be lock free and asynchronous.
 
 [![Load Obj](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_LoadObj.gif "")](#load-obj)
 [![Camera Rays](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_CameraRays.gif "")](#camera-rays)
@@ -21,7 +21,6 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 |[Clear Interfaces](#clear) |[Output Baking](#bake) |[Crash Isolation](#crsh)|[Lock Free](#lkfree)          |[Visualization](#viz)   |
 |[Flow+Msg Nodes](#flow-msg)|[Visualization](#viz)  |[Serial Data](#serial)  |[Persistant Threads](#thrds)  |[Tbl and Stats](#stats) |
 
-### Classic Software Problems
  - <a id="scal"> __Scalable Complexity__ </a> - High level structure is not strictly enforced (or doesn't exist) and often subverted in some way to accomodate extra data/communication.
   
  - <a id="iter"> __Iterations__ </a> - As program size increases, iterations decrease due to re-compilation time, linking time, and the time to re-run the program when testing.
@@ -47,7 +46,7 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 
 - <a id="bake">__Constant Nodes__</a> - Constant nodes can offer a way to change input in real time for interactive testing with visualization of results.
 
-- <a id="viz">__Visualization__</a> - Visualizations happen with lock free shared memory to external processes and don't interfere with the execution of the main program
+- <a id="viz">__Visualization__</a> - Visualizations happen with lock free shared memory to external processes and does not interfere with the execution of the main program.
 
 #### Modularity
 - <a id="libs">__Shared Libraries__</a> - Contain one or more nodes and can change while the program is running. Compilation is isolated to the lib being revised as well as run time checks in debug builds.  
@@ -64,9 +63,11 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 
 - <a id="thrds">__Threads Persist and Loop__</a> - Threads are meant to be created initially and loop, finding packets and executing them with their destination node. Each thread's stack can be used as thread local  eliminates overhead such as global memory allocation (which can lock) of thread creation.
 
-- <a id="shrmem">__Shared Memory__</a> - 
-- <a id="viz">__Visualization__</a> - 
-- <a id="stats">__Tbl Tree View With Statistics__</a> - 
+#### Debugging
+
+- <a id="shrmem">__Shared Memory__</a> - The use of simdb allows extremlely fast IPC (interprocess communication) over shared memory.  Visualizing data (with the [Visualizer](#visualizer) tool) or examining data (with the [Brandisher](#brandisher) tool) while a program is running is easy and has minimal performance over head due to a lock free design and thread local output.  
+
+- <a id="stats">__Tbl Tree View With Statistics__</a> - [Brandisher](#brandisher) displays any tbl in shared memory, even if it can't be visualized. Tbls and their sub-tbls are shown as trees. Arrays are shown using a graph along with statistics such as mean, median and mode. Keys are show with their types and values.
 
 ### Common Problems With Visual Programming
 
@@ -108,19 +109,19 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 
 ### Tools
 
-### Fissure
+<a id="fissure">__Fissure__</a>
 
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/craftsman_fissure.jpg "Fissure is the node graph UI.  It can be used to construct a graph of nodes, run the program, visualize outputs, see node errors and view timing information about the nodes.")
 
 Fissure is the node graph UI.  It can be used to construct a graph of nodes, run the program, visualize outputs, see node errors and view timing information about the nodes.
 
-### Visualizer
+<a id="visualizer">__Visualizer__</a>
 
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/craftsman_visualizer001.jpg "Tables that are in the IdxVerts format (3D geometry with optional normals, vertex colors, uvs, and a color texture map)  will be picked up by the visualizer and displayed with openGL.")
 
 [Tables](README.md#tblhpp) that are in the IdxVerts format (3D geometry with optional normals, vertex colors, uvs, and a color texture map)  will be picked up by the visualizer and displayed with openGL.
 
-### Brandisher
+<a id="brandisher">__Brandisher__</a>
 
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/craftsman_brandisher001.png "The brandisher is a tool for viewing tables and their sub-tables in shared memory. It can display a graph of the arrays' values as well as their basic statistics.")
 
