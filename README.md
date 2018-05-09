@@ -76,12 +76,12 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 
 ### Tools
 
-<a id="fissure">__Fissure__</a>
-<a id="visualizer">__Visualizer__</a>
+<a id="fissure"></a> <a id="visualizer"></a>
 
-|![Fissure](images/Fissure_5_8_2018.png)|![Visualizer](images/craftsman_visualizer001.jpg)|
-|             :---:                     |                    :---:                        |
-|Fissure is the node graph UI.  It can be used to construct a graph of nodes, run the program, visualize outputs, see node errors and view timing information about the nodes.|[Tables](README.md#tblhpp) that are in the IdxVerts format (3D geometry with optional normals, vertex colors, uvs, and a color texture map)  will be picked up by the visualizer and displayed with openGL.|
+|    Fissure                      |   Visualizer       |
+|     :---:                       |     :---:          |
+| ![Fissure](images/Fissure_5_8_2018.png) | ![Visualizer](images/craftsman_visualizer001.jpg) |
+| Fissure is the node graph UI.  It can be used to construct a graph of nodes, run the program, visualize outputs, see node errors and view timing information about the nodes. | [Tables](README.md#tblhpp) that are in the IdxVerts format (3D geometry with optional normals, vertex colors, uvs, and a color texture map)  will be picked up by the visualizer and displayed with openGL. |
 
 |<a id="brandisher">__Brandisher__</a>|          |
 |          :---:                      |  :---    |
