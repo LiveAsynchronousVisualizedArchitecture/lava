@@ -159,6 +159,8 @@ Threads and the LavaLoop(). Generator nodes, message nodes, flow nodes, cycles. 
 
 - __Node Loops__ - Nodes' outputs looping back to their inputs should be possible now, though extra interface work will be needed to make what is happening clear, since the connection line will end up behind the node. 
 
+- __Text Visualization__ - Building text, lists and spreadsheet views into Brandisher should not be difficult, but still needs to be done. 
+
 </details>
 
 ### F.A.Q (Frequently Anticipated Questions)
