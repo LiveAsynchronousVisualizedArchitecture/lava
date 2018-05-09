@@ -21,6 +21,10 @@ It is written in C++11 and meant to potentially work with any language that can 
 | __Files__ | [Simdb.hpp](https://github.com/LiveAsynchronousVisualizedArchitecture/simdb) | [LavaFlow.hpp](Libraries.md#LavaFlow.hpp) | [tbl.hpp](Libraries.md#tbl.hpp) |
 |  :---:    |          :---:         |         :---:                |       :---:        |
 
+<details><summary>Broad Overview</summary>
+Generator nodes, flow nodes, message nodes, cycles.  Threads and their loops.  Packet queue. Tbl to make things easier.   
+</details>
+
 ### Classic Software Problems
 |[*Scalability*](#scal)     |[*Iterations*](#iter)  |[*Modularity*](#mod)    |[*Concurrency*](#concr)       |[*Debugging*](#debug)   |
 |       :---:               |      :---:            |   :---:                |    :---:                     |   :---:                |
@@ -28,7 +32,6 @@ It is written in C++11 and meant to potentially work with any language that can 
 |[Clear Interfaces](#clear) |[Output Baking](#bake) |[Crash Isolation](#crsh)|[Lock Free](#lkfree)          |[Visualization](#viz)   |
 |[Flow+Msg Nodes](#flow-msg)|[Visualization](#viz)  |[Serial Data](#serial)  |[Persistant Threads](#thrds)  |[Tbl and Stats](#stats) |
 
- <details><summary><br></summary>
  
  - <a id="scal"> __Scalable Complexity__ </a> - High level structure is not strictly enforced (or doesn't exist) and often subverted in some way to accomodate extra data/communication.
   
@@ -39,7 +42,6 @@ It is written in C++11 and meant to potentially work with any language that can 
 - <a id="concr"> __Concurrency__ </a> - Many techniques and libraries exist, often as heavy dependencies that have narrow use cases where they excel. Concurrency, parallelism and asynchronous design are perpetually difficult to get right and fragmented in their use.
 
 - <a id="debug"> __Debugging__ </a> - Often means using slow builds, multiple runs to narrow down the problem and examining the state individual variables line by line.
-</details>
 
 ### How LAVA Confronts These Problems
 
@@ -97,52 +99,45 @@ It is written in C++11 and meant to potentially work with any language that can 
 <a id="load-obj"></a><br>
 
 | Load Obj |
-|   :---  |
+|   :---:  |
 | ![Demo_LoadObj](images/Demo_LoadObj.gif) |
 | A constant file path is passed to an obj file loader node.<br> The LoadObj node is not much more than a wrapper around the [Tiny Obj Loader](https://github.com/syoyo/tinyobjloader) by [Syoyo Fujita](https://github.com/syoyo) |
 
-<br>
-
-<a id="camera-rays"></a>
-
-| Camera Rays |
-|   :---  |
+| <a id="camera-rays"> Camera Rays </a> |
+|   :---:  |
 | ![Camera Rays](images/Demo_CameraRays.gif) |
 |  Ray tracing rays generated and visualized in real time as a memory mapped tbl file holding the parameters (the purple constant node) is changed. |
 
-<br>
-
 | <a id="brandisher-elements">Brandisher Elements</a> |
-|    :---                                            |
+|    :---:                                          |
 | ![Brandisher Elements](images/Demo_BrandisherElements.gif)|
 |  Here the same tbl is show in two different places. <br> On the right being edited as part of a const node (which just reads a .const file from disk). <br>On the left it is read from shared memory. |
 
-<br>
 
-<a id="trace">A trace node (a wrapper around [the Embree ray tracing library from Intel](https://github.com/embree/embree)) is added and generated rays are traced to find where they collide with geometry.</a>
-![Trace](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_Trace.gif "A trace node (a wrapper around the Embree ray tracing library from Intel) is added and generated rays are traced to find where they collide with geometry.")
+| <a id="trace">Trace</a> |
+|     :---:          |
+|  ![Trace](images/Demo_Trace.gif) |
+| A trace node (a wrapper around [the Embree ray tracing library from Intel](https://github.com/embree/embree)) is added and generated rays are traced to find where they collide with geometry. |
 
-<br>
+| <a id="interactive-trace">Interactive Trace</a> | 
+| :---: |
+| ![Interactive Trace](images/Demo_InteractiveTrace.gif) |
+| The field of view for the generated rays is changed and visualized outputs are updated in real time. |
 
-<a id="interactive-trace">The field of view for the generated rays is changed and visualized outputs are updated in real time.</a>
-![Interactive Trace](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_InteractiveTrace.gif "The field of view for the generated rays is changed and visualized outputs are updated in real time.")
+| <a id="constant-bake">Constant Bake</a> |
+| :---: |
+| ![Constant Bake](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_ConstantBake.gif "") |
+| An output that is already in shared memory (blue highlight, then stepped once) is middle-click dragged to make a constant node. This cuts the dependency on the rest of the graph while writing out the result to a file on disc. |
 
-<br>
+| <a id="shade-rays">Shade Rays</a> |
+| :---: |
+| ![Shade Rays](images/Demo_ShadeRays.gif) |
+| The traced rays are combined with the GGX BRDF to get new ray directions that originate from the model. Their length when visualized is the result of their PDF (sample weight). |
 
-<a id="constant-bake">An output that is already in shared memory (blue highlight, then stepped once) is middle-click dragged to make a constant node. This cuts the dependency on the rest of the graph while writing out the result to a file on disc.</a>
-![Constant Bake](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_ConstantBake.gif "")
-
-<br>
-
-<a id="shade-rays">The traced rays are combined with the GGX BRDF to get new ray directions that originate from the model.  Their length when visualized is the result of their PDF (sample weight). </a>
-![Shade Rays](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_ShadeRays.gif "The traced rays are combined with the GGX BRDF to get new ray directions that originate from the model.  Their length when visualized is the result of their PDF (sample weight).")
-
-<br>
-
-<a id="constant-shade">The results of geometry loading, ray generation and ray tracing are written to a constant file for rapid iteration with no dependencies.</a>
-![Constant Shade](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_ConstantShade.gif "The results of geometry loading, ray generation and ray tracing are written to a constant file for rapid iteration with no dependencies.")
-
-<br>
+| <a id="constant-shade">Constant Shade</a> |
+|    :---: |
+| ![Constant Shade](images/Demo_ConstantShade.gif) |
+| The results of geometry loading, ray generation and ray tracing are written to a constant file for rapid iteration with no dependencies. |
 
 <a id="shade-ray-hits"> Rays generated from a camera and traced to find their collisions with a 3D model using the embree library. </a>
 ![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/rays_shadeRayHits001.jpg "Rays generated from a camera and traced to find their collisions with a 3D model using the embree library.")
