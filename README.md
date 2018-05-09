@@ -96,14 +96,12 @@ Generator nodes, flow nodes, message nodes, cycles.  Threads and their loops.  P
 
 ### Examples
 
-<a id="load-obj"></a><br>
-
-| Load Obj |
+| <a id="load-obj">Load Obj</a> |
 |   :---:  |
 | ![Demo_LoadObj](images/Demo_LoadObj.gif) |
 | A constant file path is passed to an obj file loader node.<br> The LoadObj node is not much more than a wrapper around the [Tiny Obj Loader](https://github.com/syoyo/tinyobjloader) by [Syoyo Fujita](https://github.com/syoyo) |
 
-| <a id="camera-rays"> Camera Rays </a> |
+| <a id="camera-rays">Camera Rays</a> |
 |   :---:  |
 | ![Camera Rays](images/Demo_CameraRays.gif) |
 |  Ray tracing rays generated and visualized in real time as a memory mapped tbl file holding the parameters (the purple constant node) is changed. |
@@ -112,7 +110,6 @@ Generator nodes, flow nodes, message nodes, cycles.  Threads and their loops.  P
 |    :---:                                          |
 | ![Brandisher Elements](images/Demo_BrandisherElements.gif)|
 |  Here the same tbl is show in two different places. <br> On the right being edited as part of a const node (which just reads a .const file from disk). <br>On the left it is read from shared memory. |
-
 
 | <a id="trace">Trace</a> |
 |     :---:          |
@@ -127,7 +124,7 @@ Generator nodes, flow nodes, message nodes, cycles.  Threads and their loops.  P
 | <a id="constant-bake">Constant Bake</a> |
 | :---: |
 | ![Constant Bake](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_ConstantBake.gif "") |
-| An output that is already in shared memory (blue highlight, then stepped once) is middle-click dragged to make a constant node. This cuts the dependency on the rest of the graph while writing out the result to a file on disc. |
+| <detai><summary></summary><br>An output that is already in shared memory (blue highlight, then stepped once) is middle-click dragged to make a constant node. This cuts the dependency on the rest of the graph while writing out the result to a file on disc.</detail> |
 
 | <a id="shade-rays">Shade Rays</a> |
 | :---: |
@@ -138,26 +135,17 @@ Generator nodes, flow nodes, message nodes, cycles.  Threads and their loops.  P
 |    :---: |
 | ![Constant Shade](images/Demo_ConstantShade.gif) |
 | The results of geometry loading, ray generation and ray tracing are written to a constant file for rapid iteration with no dependencies. |
-
-<a id="shade-ray-hits"> Rays generated from a camera and traced to find their collisions with a 3D model using the embree library. </a>
-![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/rays_shadeRayHits001.jpg "Rays generated from a camera and traced to find their collisions with a 3D model using the embree library.")
-
-
-This is an example of rays generated from a camera and traced to find their collisions with a 3D model using the embree library.
-  - An .obj model is loaded 
-  - The model is passed to a message node that uses [the Embree ray tracing library from Intel](https://github.com/embree/embree) to sort the geometry into a BVH (bounding volume heirarchy acceleration structure for ray tracing)
-  - The camera node generates rays and passes them to the scene node to be traced
-  - The message node traces the rays and outputs both the traced rays colliding with geometry and a visualization of the traced rays 
-  - A final node takes the traced rays and computes the outgoing ray from the ray hit point and normal
   
 ### Caveats
 
-- Mutex currently surrounds the main packet queue as a place holder. Eventually a heirarchy of lock free queues that matches the memory heirarchy would be desireable. 
+- A mutex currently surrounds the main packet queue as a place holder. Eventually a heirarchy of lock free queues that matches the memory heirarchy would be desireable. 
 
 - Right now all inputs need to be connected for a node to run in a cycle. Optional arguments will allow nodes the flexibility to work with what they are given and not require a full set of inputs on every cycle. 
 
 - Message nodes need to be converted to have their own queues and their own threads, so that they are run one node at a time, with the same thread and with access to all the packets that have come to it.   
-  
+
+- Visualization should ideally be separated from the nodes themselves. Nodes would not output their visualization, either fissure, the visualizer (or both) would use node that convert from specific types to IdxVerts.
+
 
 ### F.A.Q (Frequently Anticipated Questions)
   
