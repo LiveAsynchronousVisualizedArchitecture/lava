@@ -21,8 +21,16 @@ It is written in C++11 and meant to potentially work with any language that can 
 | __Files__ | [Simdb.hpp](https://github.com/LiveAsynchronousVisualizedArchitecture/simdb) | [LavaFlow.hpp](Libraries.md#LavaFlow.hpp) | [tbl.hpp](Libraries.md#tbl.hpp) |
 |  :---:    |          :---:         |         :---:                |       :---:        |
 
-<details><summary>Broad Overview</summary>
-Generator nodes, flow nodes, message nodes, cycles.  Threads and their loops.  Packet queue. Tbl to make things easier.   
+<details><summary>Short and Sweet Overview of How LAVA Runs</summary>
+<br>
+Threads are created which call LavaLoop().  Inside, they loop over generator nodes and available packets.
+<br><br>
+Generator nodes are any node that has no inputs and all message nodes.  When a thread doesn't find a packet, it picks a generator node to run instead.  The packets that nodes output are put into a queue so that all threads can find them. A packet is a struct which has a destination node and slot as well as a pointer to data that the node will use.
+<br><br>
+Since the packet data needs to be serialized, tbl.hpp is available to make node IO easier. Tbl is an array+hash map combination and can have sub-tables as values in the hash map.  It always uses a single span of memory and can be written to a file or shared memory then read directly, which makes it flexible and fast.   
+<br>
+<br>
+Threads and the LavaLoop(). Generator nodes, message nodes, flow nodes, cycles. Packet queue. Tbl isn't neccesary but it's pretty great.   
 </details>
 
 ### Classic Software Problems
@@ -124,7 +132,7 @@ Generator nodes, flow nodes, message nodes, cycles.  Threads and their loops.  P
 | <a id="constant-bake">Constant Bake</a> |
 | :---: |
 | ![Constant Bake](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_ConstantBake.gif "") |
-| <detai><summary></summary><br>An output that is already in shared memory (blue highlight, then stepped once) is middle-click dragged to make a constant node. This cuts the dependency on the rest of the graph while writing out the result to a file on disc.</detail> |
+| An output that is already in shared memory (blue highlight, then stepped once) is middle-click dragged to make a constant node. This cuts the dependency on the rest of the graph while writing out the result to a file on disc. |
 
 | <a id="shade-rays">Shade Rays</a> |
 | :---: |
@@ -138,14 +146,20 @@ Generator nodes, flow nodes, message nodes, cycles.  Threads and their loops.  P
   
 ### Caveats
 
-- A mutex currently surrounds the main packet queue as a place holder. Eventually a heirarchy of lock free queues that matches the memory heirarchy would be desireable. 
+<details><summary><br></summary
+<br>
+ 
+- __Temporary Mutex__ - A mutex currently surrounds the main packet queue as a place holder. Eventually a heirarchy of lock free queues that matches the memory heirarchy would be desireable. 
 
-- Right now all inputs need to be connected for a node to run in a cycle. Optional arguments will allow nodes the flexibility to work with what they are given and not require a full set of inputs on every cycle. 
+- __Optional Arguments__ - Right now all inputs need to be connected for a node to run in a cycle. Optional arguments will allow nodes the flexibility to work with what they are given and not require a full set of inputs on every cycle. 
 
-- Message nodes need to be converted to have their own queues and their own threads, so that they are run one node at a time, with the same thread and with access to all the packets that have come to it.   
+- __Message Node Structure__ - Message nodes need to be converted to have their own queues and their own threads, so that they are run one node at a time, with the same thread and with access to all the packets that have come to it.   
 
-- Visualization should ideally be separated from the nodes themselves. Nodes would not output their visualization, either fissure, the visualizer (or both) would use node that convert from specific types to IdxVerts.
+- __Separate Visualization__ - Visualization should ideally be separated from the nodes themselves. Nodes would not output their visualization, either fissure, the visualizer (or both) would use node that convert from specific types to IdxVerts.
 
+- __Node Loops__ - Nodes' outputs looping back to their inputs should be possible now, though better interface support might be desired for the long term. 
+
+</details>
 
 ### F.A.Q (Frequently Anticipated Questions)
   
