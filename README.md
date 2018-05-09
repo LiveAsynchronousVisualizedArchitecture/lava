@@ -11,7 +11,9 @@ LAVA is meant to simplify general purpose native software while allowing every p
 [![Shade Rays](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_ShadeRays.gif "")](#shade-rays)
 [![Constant Shade](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_ConstantShade.gif "")](#constant-shade)
 
-LAVA is designed to **_both_** significantly **_speed up development_** AND as a simple way to create **_signifcant amounts of lock free concurrency_**.  It is written in C++11 and meant to potentially work with any language that can compile a shared library that exposes standard function calls.  The building blocks are single file libraries with no dependencies other than the C++11 standard library. 
+LAVA is designed to **_both_** significantly **_speed up development_** AND create **_signifcant amounts of lock free concurrency_**. 
+It is written in C++11 and meant to potentially work with any language that can compile a shared library that exposes standard function calls.  The building blocks are single file libraries with no dependencies other than the C++11 standard library.
+
 
 | __Tools__ | [![Fissure](images/THUMB_Fissure_5_8_2018.png "Fissure")](#fissure) | [![Visualizer](images/THUMB_craftsman_visualizer001.png "Visualizer")](#visualizer) | [![Brandisher](images/THUMB_craftsman_brandisher001.png "Brandisher")](#brandisher) |
 | :---: | :---: | :---: | :---: |
@@ -26,6 +28,8 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 |[Clear Interfaces](#clear) |[Output Baking](#bake) |[Crash Isolation](#crsh)|[Lock Free](#lkfree)          |[Visualization](#viz)   |
 |[Flow+Msg Nodes](#flow-msg)|[Visualization](#viz)  |[Serial Data](#serial)  |[Persistant Threads](#thrds)  |[Tbl and Stats](#stats) |
 
+ <details><summary><br></summary>
+ 
  - <a id="scal"> __Scalable Complexity__ </a> - High level structure is not strictly enforced (or doesn't exist) and often subverted in some way to accomodate extra data/communication.
   
  - <a id="iter"> __Iterations__ </a> - As program size increases, iterations decrease due to re-compilation time, linking time, and the time to re-run the program when testing.
@@ -35,6 +39,7 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 - <a id="concr"> __Concurrency__ </a> - Many techniques and libraries exist, often as heavy dependencies that have narrow use cases where they excel. Concurrency, parallelism and asynchronous design are perpetually difficult to get right and fragmented in their use.
 
 - <a id="debug"> __Debugging__ </a> - Often means using slow builds, multiple runs to narrow down the problem and examining the state individual variables line by line.
+</details>
 
 ### How LAVA Confronts These Problems
 
