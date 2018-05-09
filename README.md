@@ -94,19 +94,28 @@ It is written in C++11 and meant to potentially work with any language that can 
 
 ### Examples
 
-<a id="load-obj"> A constant file path is passed to an obj file loader node. </a>
-The LoadObj node shown here is basically a wrapper around the [Tiny Obj Loader](https://github.com/syoyo/tinyobjloader) by [Syoyo Fujita](https://github.com/syoyo)
-![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_LoadObj.gif "A constant file path is passed to an obj file loader node.")
+<a id="load-obj"></a><br>
+
+| Load Obj |
+|   :---  |
+| ![Demo_LoadObj](images/Demo_LoadObj.gif) |
+| A constant file path is passed to an obj file loader node.<br> The LoadObj node is not much more than a wrapper around the [Tiny Obj Loader](https://github.com/syoyo/tinyobjloader) by [Syoyo Fujita](https://github.com/syoyo) |
 
 <br>
 
-<a id="camera-rays">Ray tracing rays generated and visualized in real time as a memory mapped tbl file (the purple constant node) is changed. </a>
-![alt text](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_CameraRays.gif "Ray tracing rays generated and visualized in real time as a memory mapped tbl file (the purple constant node) is changed.")
+<a id="camera-rays"></a>
+
+| Camera Rays |
+|   :---  |
+| ![Camera Rays](images/Demo_CameraRays.gif) |
+|  Ray tracing rays generated and visualized in real time as a memory mapped tbl file holding the parameters (the purple constant node) is changed. |
 
 <br>
 
-<a id="brandisher-elements">Here the same tbl is show in two different places. On the right being edited as part of a const node (which just reads a .const file from disk). On the left it is read from shared memory.</a>
-![Brandisher Elements](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Demo_BrandisherElements.gif "Here the same tbl is show in two different places. On the right being edited as part of a const node (which just reads a .const file from disk). On the left it is read from shared memory.")
+| <a id="brandisher-elements">Brandisher Elements</a> |
+|    :---                                            |
+| ![Brandisher Elements](images/Demo_BrandisherElements.gif)|
+|  Here the same tbl is show in two different places. <br> On the right being edited as part of a const node (which just reads a .const file from disk). <br>On the left it is read from shared memory. |
 
 <br>
 
@@ -146,9 +155,18 @@ This is an example of rays generated from a camera and traced to find their coll
   - The message node traces the rays and outputs both the traced rays colliding with geometry and a visualization of the traced rays 
   - A final node takes the traced rays and computes the outgoing ray from the ray hit point and normal
   
+### Caveats
+
+- Mutex currently surrounds the main packet queue as a place holder. Eventually a heirarchy of lock free queues that matches the memory heirarchy would be desireable. 
+
+- Right now all inputs need to be connected for a node to run in a cycle. Optional arguments will allow nodes the flexibility to work with what they are given and not require a full set of inputs on every cycle. 
+
+- Message nodes need to be converted to have their own queues and their own threads, so that they are run one node at a time, with the same thread and with access to all the packets that have come to it.   
   
-  ### F.A.Q (Frequently Anticipated Questions)
+
+### F.A.Q (Frequently Anticipated Questions)
   
-  ### Internals
+
+### Internals
   
   
