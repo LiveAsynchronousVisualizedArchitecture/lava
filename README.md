@@ -78,11 +78,14 @@ LAVA is designed to **_both_** significantly **_speed up development_** AND as a
 
 <a id="fissure">__Fissure__</a>
 <a id="visualizer">__Visualizer__</a>
-<a id="brandisher">__Brandisher__</a>
 
-|![Fissure](images/Fissure_5_8_2018.png)|![Visualizer](images/craftsman_visualizer001.jpg)|![Brandisher](images/craftsman_brandisher001.png)|
-|                                 :---: |                                     :---:       |    :---:                                                                         |
-|Fissure is the node graph UI.  It can be used to construct a graph of nodes, run the program, visualize outputs, see node errors and view timing information about the nodes.|[Tables](README.md#tblhpp) that are in the IdxVerts format (3D geometry with optional normals, vertex colors, uvs, and a color texture map)  will be picked up by the visualizer and displayed with openGL.|The brandisher is a tool for viewing tables and their sub-tables in shared memory. It can display a graph of the arrays' values as well as their basic statistics. This screen shot shows that while some of the points making up the craftsman model are less than 0 on the Y axis, most are above 0.  We can also see the minimum, maximum, average (mean), most common (mode), and median (middle) values as well as the variance. This is a useful way to get a high level view on arrays containing too many values to be looked at directly as text.|
+|![Fissure](images/Fissure_5_8_2018.png)|![Visualizer](images/craftsman_visualizer001.jpg)|
+|             :---:                     |                    :---:                        |
+|Fissure is the node graph UI.  It can be used to construct a graph of nodes, run the program, visualize outputs, see node errors and view timing information about the nodes.|[Tables](README.md#tblhpp) that are in the IdxVerts format (3D geometry with optional normals, vertex colors, uvs, and a color texture map)  will be picked up by the visualizer and displayed with openGL.|
+
+|<a id="brandisher">__Brandisher__</a>|          |
+|          :---:                      |  :---    |
+|![Brandisher](images/craftsman_brandisher001.png)|<br>The brandisher is a tool for viewing tables and their sub-tables in shared memory. It can display a graph of the arrays' values as well as their basic statistics. <br><br>While some of the points making up the craftsman model are less than 0 on the Y axis, most are above 0.  <br><br>We also see minimum, maximum, average (mean), most common (mode), and median (middle) values as well as the variance. <br><br>This is a useful way to get a high level view on arrays containing too many values to be looked at directly as text.<br>|
 
 ### Libraries
 
