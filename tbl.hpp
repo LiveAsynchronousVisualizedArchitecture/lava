@@ -345,10 +345,10 @@ public:
       return *this;
     }
 
-    KV& init(const char* key)
+    KV& init(const char* _key)
     {
       type = TblType::EMPTY;
-      strncpy(this->key, key, sizeof(KV::Key) ); // automatically pads the key with zeros so that there is no leftover memory
+      strncpy(this->key, _key, sizeof(KV::Key) ); // automatically pads the key with zeros so that there is no leftover memory
       return *this;
     }
     KV& init()

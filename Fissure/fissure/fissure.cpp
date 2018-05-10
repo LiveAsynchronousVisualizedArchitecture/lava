@@ -26,7 +26,10 @@
 // -todo: try slimming camera file size with sys_msvcrt.lib - need force option to link when there are multiply defined symbols
 // -todo: try hardware random numbers to avoid <random> - only supported on ivy bridge and above
 // -todo: figure out why ShadeRayHits is crashing - tbl::place_rh wasn't returning a pointer at all points, but the casting operator for KV was still letting it compile
+// -todo: try OS specific system calls for Sleep instead of thread::sleep, so that there is one less C++ stdlib function that needs to be linked in to the shared libs
 
+// todo: make LavaQ into a struct that contains a function pointer to its own push function and can be passed as a C struct
+// todo: put much of lava in its own name space
 // todo: put globals struct into LavaParams that will hold the current number of threads running as well as the logical cores available - could also include a bitmask of which outputs are connected
 // todo: try combining ShadeRayHits and Camera projects into a single shared library
 // todo: put in live reloading that uses the Lava step function on reload

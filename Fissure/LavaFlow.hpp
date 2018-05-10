@@ -54,8 +54,11 @@
 
 #if defined(_WIN32)
   #define WIN32_LEAN_AND_MEAN
+  #define WIN32_EXTRA_LEAN
   #define NOMINMAX
   #include <Windows.h>
+#elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
+  #include <unistd.h>
 #endif
 
 #define LAVA_ARG_COUNT 512
@@ -65,7 +68,12 @@
   namespace fs = std::experimental::filesystem;
 #endif
 
-//struct LavaQ
+#if defined(_WIN32)
+  #define LAVA_SLEEP_MS(x) Sleep( (u32)(x) )               // windows sleep is in milliseconds
+#elif defined(__APPLE__) || defined(__MACH__) || defined(__unix__) || defined(__FreeBSD__) // || defined(__linux__) ?    // osx, linux and freebsd
+  #define LAVA_SLEEP_MS(x) sleep( (u32)((x)/1000.0) )      // unix sleep is in seconds
+#endif
+
 template<class T> struct LavaQ
 {
 // single producer, multi-consumer queue
@@ -84,7 +92,6 @@ template<class T> struct LavaQ
 
   union     StBuf
   {
-    //struct { u64 useA : 1; u64 st : 63; };
     struct { u64 useA : 1; u64 cap : 6; u64 st : 57; };
     u64 asInt = 0;
   };
@@ -287,7 +294,7 @@ template<class T> struct LavaQ
     assert(std::this_thread::get_id() == writeThrd);
     return m_end.fetch_add(1);
   }
-  u64            expand(StBuf buf, RefMem& prevMem, RefMem& nxtMem) // u64 prevCap, u64 nxtCap)
+  u64            expand(StBuf buf, RefMem& prevMem, RefMem& nxtMem)
   {
     using namespace std;
 
@@ -424,10 +431,11 @@ static inline u64 popcount64(u64 x)
 
 // static data segment data
 #if defined(_WIN32)
-  static const std::string  liveExt(".live.dll");
+  //static const std::string  liveExt(".live.dll");                            // todo: change this to const char* - don't want static intialization functions running
+  static const char* liveExt = ".live.dll";                                    // todo: change this to const char* - don't want static intialization functions running
 #endif
 
-//static __declspec(thread)       void*   lava_thread_heap = nullptr;       // thread local handle for thread local heap allocations
+//static __declspec(thread)       void*   lava_thread_heap = nullptr;          // thread local handle for thread local heap allocations
 thread_local       void*   lava_thread_heap = nullptr;       // thread local handle for thread local heap allocations
 // end data segment data
 
@@ -2914,6 +2922,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 
 
+//
+//struct { u64 useA : 1; u64 st : 63; };
 
 //
 //assert( (ret < 1000000 && ret >= 0) || !ok);
