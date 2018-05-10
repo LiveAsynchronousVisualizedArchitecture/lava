@@ -149,15 +149,17 @@ Threads and the LavaLoop(). Generator nodes, message nodes, flow nodes, cycles. 
 <details><summary><br></summary
 <br>
  
-- __Temporary Mutex__ - A mutex currently surrounds the main packet queue as a place holder. Eventually a heirarchy of lock free queues that matches the memory heirarchy would be desireable. 
+- __Temporary Mutex__ - A mutex currently surrounds the main packet queue as a place holder. Eventually this should be a heirarchy of lock free queues that matches the memory heirarchy.
 
 - __Optional Arguments__ - Right now all inputs need to be connected for a node to run in a cycle. Optional arguments will allow nodes the flexibility to work with what they are given and not require a full set of inputs on every cycle. 
 
-- __Message Node Structure__ - Message nodes need to be converted to have their own queues and their own threads, so that they are run one node at a time, with the same thread and with access to all the packets that have come to it.   
+- __Message Node Structure__ - Message nodes need to be converted to have their own queues and their own threads, so that they are run one node at a time, with the same thread and with access to all the packets that have come to it.
 
-- __Separate Visualization__ - Visualization should ideally be separated from the nodes themselves. Nodes would not output their visualization, either fissure, the visualizer (or both) would use node that convert from specific types to IdxVerts.
+- __Separate Visualization__ - Visualization should ideally be separated from the nodes themselves. Instead either fissure, the visualizer(or both) would convert from specific types to IdxVerts so that they can visualized.
 
-- __Node Loops__ - Nodes' outputs looping back to their inputs should be possible now, though better interface support might be desired for the long term. 
+- __Node Loops__ - Nodes' outputs looping back to their inputs should be possible now, though extra interface work will be needed to make what is happening clear, since the connection line will end up behind the node. 
+
+- __Text Visualization__ - Building text, lists and spreadsheet views into Brandisher should not be difficult, but still needs to be done. 
 
 </details>
 
