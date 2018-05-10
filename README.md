@@ -161,6 +161,8 @@ Threads and the LavaLoop(). Generator nodes, message nodes, flow nodes, cycles. 
 
 - __Text Visualization__ - Building text, lists and spreadsheet views into Brandisher should not be difficult, but still needs to be done. 
 
+- __Node Heirarchies__ - A single canvas of nodes could become unwieldy in a large program. Eventually collapsing groups of nodes into a single node will be neccesary so that a graph's complexity will scale well. 
+
 </details>
 
 ### F.A.Q (Frequently Anticipated Questions)
