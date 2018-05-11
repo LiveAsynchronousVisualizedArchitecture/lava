@@ -79,13 +79,13 @@ Threads and the LavaLoop(). Generator nodes, message nodes, flow nodes, cycles. 
 
 - <a id="async">__Separate Data Executes Concurrently__</a> - Every packet of data can be dealt with concurrently, giving a program lock free asynchronous execution with little effort. Parallelism is dictated by the amount that data can be isolated
 
-- <a id="lkfree">__Lock Free by Default__</a> - Threads take packets from a queue and execute them using their destination node.  Memory for node IO is allocated lock free and owned by the thread using reference counting. Part of each thread's loop is deallocating memory after each node it executes. Even visualization is lock free using simdb.
+- <a id="lkfree">__Lock Free by Default__</a> - Threads take packets from a queue and execute them using their destination node.  Memory for node IO is allocated lock free and owned by the thread using reference counting. Part of each thread's loop is deallocating memory after each node it executes. Even visualization is lock free using [simdb](https://github.com/LiveAsynchronousVisualizedArchitecture/simdb).
 
 - <a id="thrds">__Threads Persist and Loop__</a> - Threads are meant to be created initially and loop, finding packets and executing them with their destination node. Each thread's stack can be used as thread local  eliminates overhead such as global memory allocation (which can lock) of thread creation.
 
 #### Debugging
 
-- <a id="shrmem">__Shared Memory__</a> - The use of simdb allows extremlely fast IPC (interprocess communication) over shared memory.  Visualizing data (with the [Visualizer](#visualizer) tool) or examining data (with the [Brandisher](#brandisher) tool) while a program is running is easy and has minimal performance over head due to a lock free design and thread local output.  
+- <a id="shrmem">__Shared Memory__</a> - The use of  [simdb](https://github.com/LiveAsynchronousVisualizedArchitecture/simdb) allows extremlely fast IPC (interprocess communication) over shared memory.  Visualizing data (with the [Visualizer](#visualizer) tool) or examining data (with the [Brandisher](#brandisher) tool) while a program is running is easy and has minimal performance over head due to a lock free design and thread local output.  
 
 - <a id="stats">__Tbl Tree View With Statistics__</a> - [Brandisher](#brandisher) displays any tbl in shared memory, even if it can't be visualized. Tbls and their sub-tbls are shown as trees. Arrays are shown using a graph along with statistics such as mean, median and mode. Keys are show with their types and values.
 
@@ -149,7 +149,7 @@ Threads and the LavaLoop(). Generator nodes, message nodes, flow nodes, cycles. 
 <details><summary><br></summary
 <br>
  
-- __Temporary Mutex__ - A mutex currently surrounds the main packet queue as a place holder. Eventually this should be a heirarchy of lock free queues that matches the memory heirarchy.
+- __Temporary Mutex__ - A mutex currently surrounds the main packet queue as a place holder. Eventually this should be a heirarchy of lock free queues that matches the memory heirarchy.  A very good concurrent queue can be found [here](https://github.com/cameron314/concurrentqueue) though this would introduce another file as a dependency.  [Simdb](https://github.com/LiveAsynchronousVisualizedArchitecture/simdb) (the IPC mechanism) and the output queue from each node is a thread local single-writer multi-reader lock free queue. 
 
 - __Optional Arguments__ - Right now all inputs need to be connected for a node to run in a cycle. Optional arguments will allow nodes the flexibility to work with what they are given and not require a full set of inputs on every cycle. 
 
@@ -160,6 +160,8 @@ Threads and the LavaLoop(). Generator nodes, message nodes, flow nodes, cycles. 
 - __Node Loops__ - Nodes' outputs looping back to their inputs should be possible now, though extra interface work will be needed to make what is happening clear, since the connection line will end up behind the node. 
 
 - __Text Visualization__ - Building text, lists and spreadsheet views into Brandisher should not be difficult, but still needs to be done. 
+
+- __Node Heirarchies__ - A single canvas of nodes could become unwieldy in a large program. Eventually collapsing groups of nodes into a single node will be neccesary so that a graph's complexity will scale well. 
 
 </details>
 
