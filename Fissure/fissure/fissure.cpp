@@ -1931,7 +1931,7 @@ void   framebufferSizeCallback(GLFWwindow* window, int w, int h)
 }
 
 // Fis DB interaction
-str                   genDbKey(LavaId     sid)            // genDbKey is generate database key, sid is slot Id
+str                   genDbKey(LavaId      sid)            // genDbKey is generate database key, sid is slot Id
 {
   auto ni = fd.graph.nds.find(sid.nid); // todo: this is called from the lava looping threads and would need to be thread safe - it is also only used for getting text labels, which may make things easier
   if(ni == end(fd.graph.nds)) return ""; 
@@ -1940,7 +1940,7 @@ str                   genDbKey(LavaId     sid)            // genDbKey is generat
 
   return label;
 }
-str                getSlotType(LavaId     sid)
+str                getSlotType(LavaId      sid)
 {
   using namespace std;
 
@@ -1961,18 +1961,23 @@ str                getSlotType(LavaId     sid)
 
   return type;
 }
-LavaControl lavaPacketCallback(LavaPacket pkt)
+LavaControl lavaPacketCallback(LavaPacket* pkt)
 {
-  LavaId srcid(pkt.src_node,   pkt.src_slot,  false);
-  LavaId destid(pkt.dest_node, pkt.dest_slot,  true);
-  if( fd.vizIds.has(srcid.asInt) ){
-    auto label  =  genDbKey(srcid);
-    auto    lm  =  LavaMem::fromDataAddr(pkt.val.value);
-    bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
-  }else if( fd.vizIds.has(destid.asInt) ){
-    auto label  =  genDbKey(destid);
-    auto    lm  =  LavaMem::fromDataAddr(pkt.val.value);
-    bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
+  LavaId  srcid;
+  LavaId destid;
+  if(pkt)
+  {
+    srcid  = LavaId(pkt->src_node,  pkt->src_slot,  false);
+    destid = LavaId(pkt->dest_node, pkt->dest_slot,  true);
+    if( fd.vizIds.has(srcid.asInt) ){
+      auto label  =  genDbKey(srcid);
+      auto    lm  =  LavaMem::fromDataAddr(pkt->val.value);
+      bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
+    }else if( fd.vizIds.has(destid.asInt) ){
+      auto label  =  genDbKey(destid);
+      auto    lm  =  LavaMem::fromDataAddr(pkt->val.value);
+      bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
+    }
   }
 
   if(fd.step){

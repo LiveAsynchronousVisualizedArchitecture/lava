@@ -31,6 +31,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Cache", "Cache\Cache.vcxpro
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ImageLoader", "ImageLoader\ImageLoader.vcxproj", "{19C0CEB6-4557-494E-8A44-627CD056B2FD}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "http", "http\http.vcxproj", "{AE603450-3363-424F-9E10-807A00674E39}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Mixed Platforms = Debug|Mixed Platforms
@@ -187,6 +189,16 @@ Global
 		{19C0CEB6-4557-494E-8A44-627CD056B2FD}.Release|Win32.ActiveCfg = Release|x64
 		{19C0CEB6-4557-494E-8A44-627CD056B2FD}.Release|x64.ActiveCfg = Release|x64
 		{19C0CEB6-4557-494E-8A44-627CD056B2FD}.Release|x64.Build.0 = Release|x64
+		{AE603450-3363-424F-9E10-807A00674E39}.Debug|Mixed Platforms.ActiveCfg = Debug|x64
+		{AE603450-3363-424F-9E10-807A00674E39}.Debug|Mixed Platforms.Build.0 = Debug|x64
+		{AE603450-3363-424F-9E10-807A00674E39}.Debug|Win32.ActiveCfg = Debug|x64
+		{AE603450-3363-424F-9E10-807A00674E39}.Debug|x64.ActiveCfg = Debug|x64
+		{AE603450-3363-424F-9E10-807A00674E39}.Debug|x64.Build.0 = Debug|x64
+		{AE603450-3363-424F-9E10-807A00674E39}.Release|Mixed Platforms.ActiveCfg = Release|x64
+		{AE603450-3363-424F-9E10-807A00674E39}.Release|Mixed Platforms.Build.0 = Release|x64
+		{AE603450-3363-424F-9E10-807A00674E39}.Release|Win32.ActiveCfg = Release|x64
+		{AE603450-3363-424F-9E10-807A00674E39}.Release|x64.ActiveCfg = Release|x64
+		{AE603450-3363-424F-9E10-807A00674E39}.Release|x64.Build.0 = Release|x64
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

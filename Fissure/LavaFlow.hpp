@@ -581,7 +581,8 @@ extern "C" using        LavaFreeFunc  =  void  (*)(void*);                      
 extern "C" using  GetLavaFlowNodes_t  =  LavaNode*(*)();                                               // the signature of the function that is searched for in every shared library - this returns a LavaFlowNode* that is treated as a sort of null terminated list of the actual nodes contained in the shared library 
 extern "C" using            FlowFunc  =  uint64_t (*)(LavaParams const*, LavaFrame const*, lava_threadQ*);   // node function taking a LavaFrame in
 extern "C" using       ConstructFunc  =  void(*)();
-extern "C" using      PacketCallback  =  LavaControl (*)(LavaPacket pkt);
+//extern "C" using      PacketCallback  =  LavaControl (*)();
+extern "C" using      PacketCallback  =  LavaControl (*)(LavaPacket* pkt);
 
 struct   AtomicBitset
 {
@@ -2661,6 +2662,22 @@ bool      RefreshFlowConsts(LavaFlow& inout_flow)
   return anyLoaded;
 }
 
+void               LavaStop(LavaFlow& lf)
+{
+  //outQ.clear();                                                       // this will pop all output packets in a thread safe way so that when it is deconstructed there will be no more packets
+
+  lf.m_running.store(false);
+  lf.m_frameQLck.lock();                                              // lock queue mutex        
+  lf.frameQ.clear();
+  while( !lf.q.empty() ){
+    auto& pckt = lf.q.top();
+    auto    lm = LavaMem::fromDataAddr(pckt.val.value);
+    lm.decRef();
+    lf.q.pop();
+  }
+  lf.m_frameQLck.unlock();                                            // unlock queue mutex
+}
+
 void               LavaLoop(LavaFlow& lf) noexcept
 {
   using namespace std;
@@ -2790,7 +2807,11 @@ void               LavaLoop(LavaFlow& lf) noexcept
           }
           SECTION(take LavaOut structs from the output queue and put them into packet queue as packets)                 // this section will not be reached if there was an error
           {
-            while(outQ.size() > 0)
+            if(outQ.size()==0){
+              LavaControl cntrl = lf.packetCallback? lf.packetCallback(nullptr) : LavaControl::GO;                                                 // because this is before putting the memory in the queue, it can't get picked up and used yet, though that may not make a difference, since this thread has to free it anyway
+              if(cntrl==LavaControl::STOP) 
+                LavaStop(lf);
+            }else while(outQ.size() > 0)
             {
               LavaOut outArg;
               SECTION(get the next output value from the queue and continue if there is a problem)
@@ -2814,7 +2835,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
                 basePkt.sz_bytes    =   mem.sizeBytes();  
                 pkt                 =   basePkt;
               }
-              LavaControl cntrl = lf.packetCallback? lf.packetCallback(pkt) : LavaControl::GO;                                                 // because this is before putting the memory in the queue, it can't get picked up and used yet, though that may not make a difference, since this thread has to free it anyway
+              LavaControl cntrl = lf.packetCallback? lf.packetCallback(&pkt) : LavaControl::GO;                                                 // because this is before putting the memory in the queue, it can't get picked up and used yet, though that may not make a difference, since this thread has to free it anyway
               if(cntrl==LavaControl::GO) SECTION(make a packet for each connection, increment their reference count and put in the main packet queue)
               {
                 // route the packet using the graph - the packet may be copied multiple times and go to multiple destination slots
@@ -2836,17 +2857,18 @@ void               LavaLoop(LavaFlow& lf) noexcept
               }
               else if(cntrl==LavaControl::STOP)
               {
-                lf.m_running.store(false);
+                LavaStop(lf);
                 outQ.clear();                                                       // this will pop all output packets in a thread safe way so that when it is deconstructed there will be no more packets
-                lf.m_frameQLck.lock();                                              // lock queue mutex        
-                  lf.frameQ.clear();
-                  while( !lf.q.empty() ){
-                    auto& pckt = lf.q.top();
-                    auto    lm = LavaMem::fromDataAddr(pckt.val.value);
-                    lm.decRef();
-                    lf.q.pop();
-                  }
-                lf.m_frameQLck.unlock();                                            // unlock queue mutex
+                //lf.m_running.store(false);
+                //lf.m_frameQLck.lock();                                              // lock queue mutex        
+                //  lf.frameQ.clear();
+                //  while( !lf.q.empty() ){
+                //    auto& pckt = lf.q.top();
+                //    auto    lm = LavaMem::fromDataAddr(pckt.val.value);
+                //    lm.decRef();
+                //    lf.q.pop();
+                //  }
+                //lf.m_frameQLck.unlock();                                            // unlock queue mutex
               }
             }
           }
