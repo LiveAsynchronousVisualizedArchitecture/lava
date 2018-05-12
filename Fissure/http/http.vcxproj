@@ -13,9 +13,11 @@
   <ItemGroup>
     <ClCompile Include="happyhttp.cpp" />
     <ClCompile Include="http.cpp" />
+    <ClCompile Include="tinyxml2.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="happyhttp.h" />
+    <ClInclude Include="tinyxml2.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{AE603450-3363-424F-9E10-807A00674E39}</ProjectGuid>
