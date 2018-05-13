@@ -1,6 +1,6 @@
 # LAVA - Live Asynchronous Visual Architecture
 
-LAVA is meant to simplify general purpose native software while allowing every piece to be lock free and asynchronous.
+LAVA is a tool to create general purpose native software while allowing every piece to be lock free and asynchronous.
 
 [![Load Obj](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_LoadObj.gif "")](#load-obj)
 [![Camera Rays](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Thumb_Demo_CameraRays.gif "")](#camera-rays)
