@@ -19,22 +19,97 @@
 #include <FL/Fl_Menu_Item.H>
 #include <FL/Fl_Menu_Button.H>
 #include <FL/Fl_Menu_Bar.H>
+#include <FL/Fl_Native_File_Chooser.H>
+#include <vector>
 #include "../../no_rt_util.h"
 #include "../../tbl.hpp"
+//#include "../../simdb.hpp"
 
-namespace 
+using     str  =  std::string;
+using  vec_u8  =  std::vector<u8>;
+using vec_vu8  =  std::vector<vec_u8>;
+using vec_str  =  std::vector<std::string>;
+
+const int       topMargin   = 20;
+const char*      typeStrs[] = {"i64","u64","f64","tbl"};
+const char*       lblStrs[] = {"wut","skadoosh","squidoosh","table"};
+
+struct BrandisherData
 {
-  const int       topMargin   = 20;
-  const char*      typeStrs[] = {"i64","u64","f64","tbl"};
-  const char*       lblStrs[] = {"wut","skadoosh","squidoosh","table"};
-
   Fl_Double_Window*     win;
   Fl_Tree*             tree;
   Fl_Tree_Item*          ti;
   Fl_Tree_Item*         rti;
   Fl_Choice*       typeMenu;
+  Fl_Group*          rgtGrp;
+  Fl_Menu_Bar*      menubar;
+  //Fl_Menu_Bar       menubar;
 
-  void              cb_quit(Fl_Widget*, void*){exit(0);}
+  tbl                     t;
+};
+
+static BrandisherData   bd;
+//static simdb            db;
+
+namespace 
+{
+  static vec_u8    readFile(const char* path)
+  {
+    vec_u8 ret;
+
+    FILE *f = fopen(path, "rb");
+    if(!f) return ret;
+
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    fseek(f, 0, SEEK_SET);  //same as rewind(f);
+
+    ret.resize(fsize);
+
+    auto rdSz = fread(ret.data(), 1, fsize, f);
+    fclose(f);
+
+    ret.resize(rdSz);
+
+    return ret;
+  }
+  static tbl        loadTbl(const char* path)
+  {
+    using namespace std;
+    
+    vec_u8  bytes = readFile(path);
+    tbl    refTbl(bytes.data());
+    tbl     cpTbl = refTbl;
+
+    return move(cpTbl);
+  }
+  static void   rebuildTree(tbl const&     t)
+  {
+    bd.tree->clear();
+  }
+
+  static void       cb_open(Fl_Widget*, void*)
+  {
+    Fl_Native_File_Chooser fc;
+    fc.title("Choose Tbl File");
+    fc.type(Fl_Native_File_Chooser::BROWSE_FILE);
+    //fc.filter("Text\t * .txt\n C Files\t * .{cxx,h,c}");
+    fc.filter("Tbl Files\t * .{tbl,const}");
+    fc.directory("");                                            // default directory to use // Show native chooser
+    int userAction = fc.show();
+    switch( userAction ){
+      case -1: printf("ERROR: %s\n", fc.errmsg()); break;        // ERROR
+      case  1: printf("CANCEL\n"); break;                        // CANCEL
+      default: printf("PICKED: %s\n", fc.filename()); break;     // FILE CHOSE  {
+    }
+
+    bd.t = loadTbl(fc.filename());
+
+    rebuildTree(bd.t);
+
+    //return userAction;
+  }
+  static void       cb_quit(Fl_Widget*, void*){exit(0);}
   static void       cb_tree(Fl_Tree*, void*){}
   static void   cb_typeMenu(Fl_Widget* widg)
   {
@@ -53,39 +128,49 @@ namespace
     //ti->x();
     //ti->
 
-    tree->redraw();
+    bd.tree->redraw();
 
     printf("val: %d str: %s \n", i, typeStrs[i]);
   }
-  
-  Fl_Menu_Item menutable[] = {
+
+  static Fl_Menu_Item menutable[] = 
+  {
     {"&File",0,0,0,FL_SUBMENU},
-      {  "&Open",  FL_ALT+'o',        0,  0,  FL_MENU_HORIZONTAL},
+      {  "&Open",  FL_ALT+'o',  cb_open,  0,  FL_MENU_HORIZONTAL},
       { "&Close",           0,        0,  0,  FL_MENU_HORIZONTAL},
       {  "&Quit",  FL_ALT+'q',  cb_quit,  0,     FL_MENU_DIVIDER},
+      {0},
+    {0}
   };
 }
+
 
 int main(int argc, char ** argv)
 {
   SECTION(initialization)
   {
-    win  = nullptr;
-    tree = nullptr;
+    bd.win       =  nullptr;
+    bd.tree      =  nullptr;
+    bd.rti       =  nullptr;
+    bd.typeMenu  =  nullptr;
+    bd.menubar   =  nullptr;
   }
 
-  win = new Fl_Double_Window(512,512,"");
-  win->resizable(win);
+  bd.win = new Fl_Double_Window(512,512,"");
+  bd.win->resizable(bd.win);
 
-  Fl_Menu_Bar menubar(0,0,512,30); 
+  Fl_Menu_Bar menubar(0,0,512,30);
   menubar.menu(menutable);
+
+  //bd.menubar = new Fl_Menu_Bar(0,0,512,30); 
+  //bd.menubar->menu(menutable);
 
   SECTION(create tree)
   {
-    tree = new Fl_Tree(topMargin, 
+    auto tree = bd.tree = new Fl_Tree(topMargin, 
                        topMargin + menubar.h(), 
-                       win->w() / 2,
-                       win->h() - topMargin*2 - menubar.h(), 
+                       bd.win->w() / 2,
+                       bd.win->h() - topMargin*2 - menubar.h(), 
                        nullptr);
     tree->resizable(tree);
     tree->begin();
@@ -103,49 +188,47 @@ int main(int argc, char ** argv)
       tree->when(FL_WHEN_RELEASE);
     tree->end();
 
-    rti = tree->root();
-    typeMenu = new Fl_Choice(1, 1, 50, 50);
+    bd.rti = tree->root();
+    bd.typeMenu = new Fl_Choice(1, 1, 50, 50);
     SECTION(menu button)
     {
-      typeMenu->align( Fl_Align(FL_ALIGN_RIGHT) );
+      bd.typeMenu->align( Fl_Align(FL_ALIGN_RIGHT) );
       auto typeStrsSz = sizeof(typeStrs) / sizeof(void*);
       TO(typeStrsSz,i){
-        typeMenu->add( typeStrs[i] );
+        bd.typeMenu->add( typeStrs[i] );
       }
     }
-    typeMenu->show();
-    typeMenu->callback(cb_typeMenu);
-    typeMenu->value(0);
-    typeMenu->do_callback();
-    ti = tree->add(rti, "wat");
-    ti->widget(typeMenu);
+    bd.typeMenu->show();
+    bd.typeMenu->callback(cb_typeMenu);
+    bd.typeMenu->value(0);
+    bd.typeMenu->do_callback();
+    bd.ti = tree->add(bd.rti, "wat");
+    bd.ti->widget(bd.typeMenu);
   }
-
   SECTION(side group)
   {
-    auto    grp = new Fl_Group(tree->x() + tree->w() + topMargin, 
-                               tree->y(),
-                               tree->w() - topMargin*3,
-                               tree->h(), 
+    bd.rgtGrp = new Fl_Group(bd.tree->x() + bd.tree->w() + topMargin, 
+                               bd.tree->y(),
+                               bd.tree->w() - topMargin*3,
+                               bd.tree->h(), 
                                "");
-    grp->resizable(grp);
-    grp->begin();
-    Fl_Box*  bx = new Fl_Box(tree->x() + tree->w() + topMargin, 
-                             tree->y(),
-                             tree->w() - topMargin*3,
-                             tree->h(), 
+    bd.rgtGrp->resizable(bd.rgtGrp);
+    bd.rgtGrp->begin();
+    Fl_Box*  bx = new Fl_Box(bd.tree->x() + bd.tree->w() + topMargin, 
+                             bd.tree->y(),
+                             bd.tree->w() - topMargin*3,
+                             bd.tree->h(), 
                              "");
     bx->box(FL_GTK_DOWN_BOX);
     bx->color(FL_DARK1);
     bx->labelsize(12);
     bx->align(Fl_Align(FL_ALIGN_TOP));
 
-    grp->end();
+    bd.rgtGrp->end();
   }
 
-  win->end();
-  win->show(0,nullptr);
-
+  bd.win->end();
+  bd.win->show(0,nullptr);
 
   return Fl::run();
 }
@@ -154,6 +237,26 @@ int main(int argc, char ** argv)
 
 
 
+
+//Fl_Menu_Bar menubar(0,0,512,30);
+//menubar.menu(menutable);
+//
+//bd.menubar = Fl_Menu_Bar(0,0,512,30);
+//bd.win->add(*bd.menubar);
+
+//void          openFiles(vec_str const& files)
+//{
+//  int i = 0;
+//  for(auto& f : files){
+//    //Println("file ", i, ": ", f);
+//    //path p(f);
+//    str          p = f.data();
+//    auto fileBytes = readFile(f.c_str());
+//    auto  justName = p.filename().replace_extension().string();
+//    //db.put(justName, fileBytes);
+//  }
+//  //regenTblInfo();
+//}
 
 //typeMenu = new Fl_Menu_Button(bx->x(), bx->y(), bx->w(), bx->h() );
 //typeMenu = new Fl_Menu_Button(1,1, 200, 75);
@@ -191,7 +294,7 @@ int main(int argc, char ** argv)
 //typeList->add("f64", 0, nullptr);
 
 //typeMenu->set_changed();
-
+//
 //printf("val: %d \n", typeMenu->value() );
 
 //cb_typeMenu( (Fl_Widget*)typeMenu );
