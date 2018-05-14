@@ -25,10 +25,12 @@
 #include "../../tbl.hpp"
 //#include "../../simdb.hpp"
 
-using     str  =  std::string;
-using  vec_u8  =  std::vector<u8>;
-using vec_vu8  =  std::vector<vec_u8>;
-using vec_str  =  std::vector<std::string>;
+using      str  =  std::string;
+using   vec_u8  =  std::vector<u8>;
+using  vec_vu8  =  std::vector<vec_u8>;
+using  vec_str  =  std::vector<std::string>;
+using vec_chce  =  std::vector<Fl_Choice*>;
+using   vec_ti  =  std::vector<Fl_Tree_Item*>;
 
 const int       topMargin   = 20;
 const char*      typeStrs[] = {"i64","u64","f64","tbl"};
@@ -36,6 +38,8 @@ const char*       lblStrs[] = {"wut","skadoosh","squidoosh","table"};
 
 struct BrandisherData
 {
+  tbl                     t;
+
   Fl_Double_Window*     win;
   Fl_Tree*             tree;
   Fl_Tree_Item*          ti;
@@ -45,7 +49,9 @@ struct BrandisherData
   Fl_Menu_Bar*      menubar;
   //Fl_Menu_Bar       menubar;
 
-  tbl                     t;
+  vec_ti          treeItems;
+  vec_str          treeStrs;
+  vec_chce         treeChcs;
 };
 
 static BrandisherData   bd;
@@ -53,6 +59,41 @@ static BrandisherData   bd;
 
 namespace 
 {
+  static Fl_Menu_Item keyTypes[] = 
+  {
+    {  "i64",   0,  0,  0,  FL_MENU_HORIZONTAL},
+    {  "u64",   0,  0,  0,  FL_MENU_HORIZONTAL},
+    {  "f64",   0,  0,  0,  FL_MENU_HORIZONTAL},
+    {  "tbl",   0,  0,  0,  FL_MENU_DIVIDER},
+    {0}
+  };
+
+  static void   cb_typeMenu(Fl_Widget* widg)
+  {
+    auto chce = (Fl_Choice*)widg;
+    auto    i = chce->value();
+
+    //auto  mb = (Fl_Menu_Button*)widg;
+    //auto   i = mb->value();
+    //mb->label(typeStrs[i]);
+    //mb->label(lblStrs[i]);
+
+    //int lw=0,lh=0;
+    //mb->measure_label(lw, lh);
+    //auto grp = mb->parent();
+    //int grpX = grp->x();
+    //mb->resize(grpX + lw, mb->y(), lw, mb->h() );
+
+    //mb->position(w,0);
+    //ti->x();
+    //ti->
+
+    //printf("val: %d str: %s \n", i, typeStrs[i]);
+
+    bd.tree->redraw();
+
+    printf("val: %d str: %s \n", i, keyTypes[i].text );
+  }
   static vec_u8    readFile(const char* path)
   {
     vec_u8 ret;
@@ -83,11 +124,53 @@ namespace
 
     return move(cpTbl);
   }
-  static void   rebuildTree(tbl const&     t)
+  static void   rebuildTree(tbl const&     t, const char* path)
   {
+    bd.treeItems.clear();
+    bd.treeStrs.clear();
     bd.tree->clear();
-  }
+    
+    bd.tree->end();
+     bd.tree->root_label(path);
+    bd.tree->begin();
+    
+    SECTION(make menu buttons from the keys)
+    {
+      int cnt=0;
+      for(auto kv : t)
+      {
+        //Fl_Choice* chce = new Fl_Choice(1, 1, 50, 50);
 
+        Fl_Choice* chce = new Fl_Choice(1, 1, 50, 50);
+        bd.treeChcs.push_back( chce );
+        chce->align( Fl_Align(FL_ALIGN_RIGHT) );
+
+        bd.treeStrs.emplace_back( kv.key );
+        //chce->label( bd.treeStrs.back().c_str() );
+        printf("%s \n", kv.key);
+
+        chce->menu( keyTypes );
+        chce->show();
+        chce->callback(cb_typeMenu);
+        chce->value(0);
+        chce->do_callback();
+
+        bd.treeItems.push_back( bd.tree->add(kv.key) );
+        bd.treeItems.back()->widget(chce);
+        
+        ++cnt;
+      }
+
+      TO(cnt,i){
+        bd.treeChcs[i]->label( bd.treeStrs[i].c_str() );
+      }
+    }
+
+    //auto typeStrsSz = sizeof(typeStrs) / sizeof(void*);
+    //TO(typeStrsSz,i){
+    //  chce->add( typeStrs[i] );
+    //}
+  }
   static void       cb_open(Fl_Widget*, void*)
   {
     Fl_Native_File_Chooser fc;
@@ -105,33 +188,13 @@ namespace
 
     bd.t = loadTbl(fc.filename());
 
-    rebuildTree(bd.t);
+    rebuildTree(bd.t, fc.filename());
 
     //return userAction;
   }
+
   static void       cb_quit(Fl_Widget*, void*){exit(0);}
   static void       cb_tree(Fl_Tree*, void*){}
-  static void   cb_typeMenu(Fl_Widget* widg)
-  {
-    auto  mb = (Fl_Menu_Button*)widg;
-    auto   i = mb->value();
-    //mb->label(typeStrs[i]);
-    mb->label(lblStrs[i]);
-
-    //int lw=0,lh=0;
-    //mb->measure_label(lw, lh);
-    //auto grp = mb->parent();
-    //int grpX = grp->x();
-    //mb->resize(grpX + lw, mb->y(), lw, mb->h() );
-
-    //mb->position(w,0);
-    //ti->x();
-    //ti->
-
-    bd.tree->redraw();
-
-    printf("val: %d str: %s \n", i, typeStrs[i]);
-  }
 
   static Fl_Menu_Item menutable[] = 
   {
@@ -189,21 +252,22 @@ int main(int argc, char ** argv)
     tree->end();
 
     bd.rti = tree->root();
-    bd.typeMenu = new Fl_Choice(1, 1, 50, 50);
-    SECTION(menu button)
-    {
-      bd.typeMenu->align( Fl_Align(FL_ALIGN_RIGHT) );
-      auto typeStrsSz = sizeof(typeStrs) / sizeof(void*);
-      TO(typeStrsSz,i){
-        bd.typeMenu->add( typeStrs[i] );
-      }
-    }
-    bd.typeMenu->show();
-    bd.typeMenu->callback(cb_typeMenu);
-    bd.typeMenu->value(0);
-    bd.typeMenu->do_callback();
-    bd.ti = tree->add(bd.rti, "wat");
-    bd.ti->widget(bd.typeMenu);
+
+    //bd.typeMenu = new Fl_Choice(1, 1, 50, 50);
+    //SECTION(menu button)
+    //{
+    //  bd.typeMenu->align( Fl_Align(FL_ALIGN_RIGHT) );
+    //  auto typeStrsSz = sizeof(typeStrs) / sizeof(void*);
+    //  TO(typeStrsSz,i){
+    //    bd.typeMenu->add( typeStrs[i] );
+    //  }
+    //}
+    //bd.typeMenu->show();
+    //bd.typeMenu->callback(cb_typeMenu);
+    //bd.typeMenu->value(0);
+    //bd.typeMenu->do_callback();
+    //bd.ti = tree->add(bd.rti, "wat");
+    //bd.ti->widget(bd.typeMenu);
   }
   SECTION(side group)
   {
@@ -229,6 +293,10 @@ int main(int argc, char ** argv)
 
   bd.win->end();
   bd.win->show(0,nullptr);
+
+  const char* pth = "H:\\projects\\lava\\lava\\TblMaker\\CameraParams.CamParam.const";
+  bd.t = loadTbl(pth);
+  rebuildTree(bd.t, pth);
 
   return Fl::run();
 }

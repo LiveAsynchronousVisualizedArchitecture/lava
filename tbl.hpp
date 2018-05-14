@@ -604,6 +604,29 @@ public:
       return !(this->operator==(l));
     }
   };
+  struct    CMapIter // todo: I'm sure these could be combined with templates that extract const-ness
+  {
+    KV const*    en = nullptr;
+    KV const*   cur = nullptr;
+
+    KV const&    operator*(){ return *cur; }
+    CMapIter&   operator++()
+    { 
+      do{
+        ++cur;
+      }while(cur!=en && cur->isEmpty());
+
+      return *this; 
+    }
+    bool      operator==(CMapIter const& l)
+    {
+      return cur==l.cur && en==l.en;
+    }
+    bool      operator!=(CMapIter const& l)
+    {
+      return !(this->operator==(l));
+    }
+  };
 
   using   fields  =  TblFields;
 
@@ -642,37 +665,6 @@ private:
     u64 ideal = elems[idx].hash % mod;
     return wrapDist(ideal,idx,mod);
   }
-  //KV&        place_rh(KV     kv, KV* elems, u64 st, u64 dist, u64 mod, u64* placement=nullptr)   // place_rh is place with robin hood hashing 
-  //{
-  //  //assert( strcmp(kv.key,"")!=0 );
-  //
-  //  u64      i = st;
-  //  u64     en = prev(st,mod);
-  //  u64  eldst = dist;
-  //  KV*     ret = nullptr;
-  //  while(true)
-  //  {
-  //    if(i==en){ return KV::error_kv(); }
-  //    //else if(elems[i].hsh.type==TblType::EMPTY || kv==elems[i]){
-  //    else if(elems[i].type==TblType::EMPTY || kv==elems[i]){
-  //      elems[i] = kv;
-  //      if(placement) *placement = i;
-  //      if(ret) return *ret;
-  //      else    return elems[i];
-  //    }else if( dist > (eldst=wrapDist(elems,i,mod)) ){
-  //      swap( &kv, &elems[i] );
-  //      dist = eldst;
-  //      if(!ret) ret = &elems[i];
-  //    }
-  //
-  //    i = nxt(i,mod);
-  //    ++dist;
-  //  }
-  //
-  //  if(placement) *placement = i;
-  //  if(ret) return *ret;
-  //  else    return KV::error_kv();
-  //}
 
   KV*        place_rh(KV     kv, KV* elems, u64 st, u64 dist, u64 mod, u64* placement=nullptr)   // place_rh is place with robin hood hashing 
   {
@@ -1535,7 +1527,7 @@ public:
     return *this;
   }
   
-  MapIter begin()
+  MapIter       begin()
   {
     auto mapcap = map_capacity();
     if(mapcap==0) return end();
@@ -1548,9 +1540,28 @@ public:
 
     return iter;
   }
-  MapIter   end()
+  MapIter         end()
   {
     MapIter iter;
+    iter.en = iter.cur = elemStart() + map_capacity();
+    return iter;
+  }
+  CMapIter       begin() const
+  {
+    auto mapcap = map_capacity();
+    if(mapcap==0) return end();
+
+    CMapIter iter;
+    iter.cur = elemStart();
+    iter.en  = elemStart() + mapcap;
+
+    if(iter.cur->isEmpty()) ++iter;                                   // if the first map element slot is empty, increment to the first non empty slot
+
+    return iter;
+  }
+  CMapIter         end() const
+  {
+    CMapIter iter;
     iter.en = iter.cur = elemStart() + map_capacity();
     return iter;
   }
@@ -1695,6 +1706,37 @@ public:
 
 
 
+//KV&        place_rh(KV     kv, KV* elems, u64 st, u64 dist, u64 mod, u64* placement=nullptr)   // place_rh is place with robin hood hashing 
+//{
+//  //assert( strcmp(kv.key,"")!=0 );
+//
+//  u64      i = st;
+//  u64     en = prev(st,mod);
+//  u64  eldst = dist;
+//  KV*     ret = nullptr;
+//  while(true)
+//  {
+//    if(i==en){ return KV::error_kv(); }
+//    //else if(elems[i].hsh.type==TblType::EMPTY || kv==elems[i]){
+//    else if(elems[i].type==TblType::EMPTY || kv==elems[i]){
+//      elems[i] = kv;
+//      if(placement) *placement = i;
+//      if(ret) return *ret;
+//      else    return elems[i];
+//    }else if( dist > (eldst=wrapDist(elems,i,mod)) ){
+//      swap( &kv, &elems[i] );
+//      dist = eldst;
+//      if(!ret) ret = &elems[i];
+//    }
+//
+//    i = nxt(i,mod);
+//    ++dist;
+//  }
+//
+//  if(placement) *placement = i;
+//  if(ret) return *ret;
+//  else    return KV::error_kv();
+//}
 
 //
 //memcpy(this->key, key, sizeof(KV::Key) );
