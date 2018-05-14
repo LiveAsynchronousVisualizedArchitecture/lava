@@ -71,6 +71,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <stdint.h>
+#include <initializer_list>
+#include <utility>
 //#include <utility> // todo: take this out, stop using std::pair
 
 //#include "../no_rt_util.h"
@@ -604,7 +607,7 @@ public:
       return !(this->operator==(l));
     }
   };
-  struct    CMapIter // todo: I'm sure these could be combined with templates that extract const-ness
+  struct   CMapIter // todo: I'm sure these could be combined with templates that extract const-ness
   {
     KV const*    en = nullptr;
     KV const*   cur = nullptr;
