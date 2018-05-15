@@ -307,19 +307,19 @@ struct FisData
     int                  w  = 1536;
     int                  h  = 1024;
 
-    Screen         screen;
-    Window*         keyWin  = nullptr;
-    Window*          dbWin  = nullptr;
-    BoxLayout*      keyLay  = nullptr;
-    Button*        stepBtn  = nullptr;
-    Button*        playBtn  = nullptr;
-    Button*       pauseBtn  = nullptr;
-    Button*        stopBtn  = nullptr;
-    Button*      ndinstBtn  = nullptr;
-    Window*      statusWin  = nullptr;
-    BoxLayout*   statusLay  = nullptr;
-    TextBox*     statusTxt  = nullptr;
-    TextBox*       nodeTxt  = nullptr;
+    Screen          screen;
+    Window*          keyWin = nullptr;
+    Window*           dbWin = nullptr;
+    BoxLayout*       keyLay = nullptr;
+    Button*         stepBtn = nullptr;
+    Button*         playBtn = nullptr;
+    Button*        pauseBtn = nullptr;
+    Button*         stopBtn = nullptr;
+    Button*       ndinstBtn = nullptr;
+    Window*       statusWin = nullptr;
+    BoxLayout*    statusLay = nullptr;
+    TextBox*      statusTxt = nullptr;
+    TextBox*        nodeTxt = nullptr;
     
     Window*         cnstWin = nullptr;
     GridLayout*     cnstLay = nullptr;
@@ -332,6 +332,8 @@ struct FisData
     Layout*       ndinstLay = nullptr;
     Button*     ndinstClose = nullptr; 
     vec_btn      ndinstBtns;
+
+    Button*         cnslBtn = nullptr;
 
 
     // mouse

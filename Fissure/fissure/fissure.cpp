@@ -2342,6 +2342,15 @@ ENTRY_DECLARATION // main or winmain
           makeNodeInstWin();
         });
       }
+      SECTION(console button)
+      {
+        fd.ui.cnslBtn = new Button(fd.ui.keyWin, "Console");
+        fd.ui.cnslBtn->setCallback([](){
+          #ifdef _WIN32
+            AllocConsole();
+          #endif
+        });
+      }
       fd.ui.keyWin->setLayout(fd.ui.keyLay);
 
       SECTION(set up theme for the window)
