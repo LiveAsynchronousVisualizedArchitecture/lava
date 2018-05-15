@@ -1257,7 +1257,7 @@ public:
   }
   void          owned(bool own){ memStart()->owned = own;  }
   auto       memStart() -> fields* { return m_mem? (fields*)(m_mem - memberBytes())  :  nullptr; }
-  auto       memStart() const -> fields const* { return (fields*)(m_mem - memberBytes()); }
+  auto       memStart() const -> fields const* { return m_mem? (fields*)(m_mem - memberBytes())  :  0; }
   u64       sizeBytes() const { return m_mem? memStart()->sizeBytes : 0; }
   u64        capacity() const { return m_mem? memStart()->capacity  : 0; }
   u64           elems() const { return m_mem? memStart()->elems     : 0; }

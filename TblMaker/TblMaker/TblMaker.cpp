@@ -88,6 +88,7 @@ namespace
     //ti->x();
     //ti->
 
+    //
     //printf("val: %d str: %s \n", i, typeStrs[i]);
 
     bd.tree->redraw();
@@ -142,6 +143,7 @@ namespace
         //Fl_Choice* chce = new Fl_Choice(1, 1, 50, 50);
 
         Fl_Choice* chce = new Fl_Choice(1, 1, 50, 50);
+        //((Fl_Widget*)chce)->resize(
         bd.treeChcs.push_back( chce );
         chce->align( Fl_Align(FL_ALIGN_RIGHT) );
 
@@ -181,13 +183,12 @@ namespace
     fc.directory("");                                            // default directory to use // Show native chooser
     int userAction = fc.show();
     switch( userAction ){
-      case -1: printf("ERROR: %s\n", fc.errmsg()); break;        // ERROR
-      case  1: printf("CANCEL\n"); break;                        // CANCEL
+      case -1: printf("ERROR: %s\n", fc.errmsg()); return; // break;        // ERROR
+      case  1: printf("CANCEL\n"); return; // break;                        // CANCEL
       default: printf("PICKED: %s\n", fc.filename()); break;     // FILE CHOSE  {
     }
 
     bd.t = loadTbl(fc.filename());
-
     rebuildTree(bd.t, fc.filename());
 
     //return userAction;
@@ -222,7 +223,7 @@ int main(int argc, char ** argv)
   bd.win = new Fl_Double_Window(512,512,"");
   bd.win->resizable(bd.win);
 
-  Fl_Menu_Bar menubar(0,0,512,30);
+  Fl_Menu_Bar menubar(0,0,512,25);
   menubar.menu(menutable);
 
   //bd.menubar = new Fl_Menu_Bar(0,0,512,30); 

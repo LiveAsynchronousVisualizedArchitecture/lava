@@ -9,6 +9,7 @@
 // -todo: make a Lava convenience function to make a tbl from a packet
 // -todo: separate input slots and output slots into two different indices
 
+// todo: make sure an error still runs the packet callback? does there need to be an error callback?
 // todo: put in more error states into LavaInst
 // todo: fill in error checking on shared library loading - need to make sure that the errors from nodes end up making it into their instances and ultimatly the GUI
 // todo: give LavaNode struct a description string
@@ -2813,14 +2814,19 @@ void               LavaLoop(LavaFlow& lf) noexcept
                 LavaStop(lf);
             }else while(outQ.size() > 0)
             {
-              LavaOut outArg;
+              LavaOut outArg; 
+              LavaMem    mem;
               SECTION(get the next output value from the queue and continue if there is a problem)
               {
                 if( !outQ.pop(outArg) ){ continue; }
-                if(outArg.val.value == 0){ state = LavaInst::OUTPUT_ERROR; continue; }
+                //if(outArg.val.value == 0){ state = LavaInst::OUTPUT_ERROR; continue; }
+                
+                if(outArg.val.value==0){
+                  mem.ptr = 0;
+                  state   = LavaInst::OUTPUT_ERROR;
+                }else{ mem = LavaMem::fromDataAddr(outArg.val.value); }                                      // this will be used to increment the reference count for every packet created
               }
 
-              LavaMem mem = LavaMem::fromDataAddr(outArg.val.value);                                      // this will be used to increment the reference count for every packet created
               LavaPacket basePkt, pkt;
               SECTION(create new base packet and initialize the main packet with the base)
               {
@@ -2832,7 +2838,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
                 basePkt.src_slot    =   outArg.key.slot;
                 basePkt.id          =   0;
                 basePkt.val         =   outArg.val;
-                basePkt.sz_bytes    =   mem.sizeBytes();  
+                basePkt.sz_bytes    =   mem.ptr? mem.sizeBytes() : 0;
                 pkt                 =   basePkt;
               }
               LavaControl cntrl = lf.packetCallback? lf.packetCallback(&pkt) : LavaControl::GO;                                                 // because this is before putting the memory in the queue, it can't get picked up and used yet, though that may not make a difference, since this thread has to free it anyway
@@ -2890,7 +2896,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
         case LavaInst::NORMAL:
         default:{                                                                          // if everything worked, decrement the references of all the packets in the frame
           if(doFlow){
-            TO(LavaFrame::PACKET_SLOTS,i) if(runFrm.slotMask[i]){ 
+            TO(LavaFrame::PACKET_SLOTS,i) if(runFrm.slotMask[i]){
+             
               LavaMem mem = LavaMem::fromDataAddr(runFrm.packets[i].val.value);
               mem.decRef();
             }
@@ -2934,6 +2941,8 @@ void               LavaLoop(LavaFlow& lf) noexcept
 #endif // endif for implementation
 
 #endif
+
+
 
 
 

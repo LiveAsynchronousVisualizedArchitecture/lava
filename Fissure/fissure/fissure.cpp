@@ -1971,12 +1971,16 @@ LavaControl lavaPacketCallback(LavaPacket* pkt)
     destid = LavaId(pkt->dest_node, pkt->dest_slot,  true);
     if( fd.vizIds.has(srcid.asInt) ){
       auto label  =  genDbKey(srcid);
-      auto    lm  =  LavaMem::fromDataAddr(pkt->val.value);
-      bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
+      if(pkt->val.value!=0 && pkt->val.type==LavaArgType::MEMORY){
+        auto  lm  =  LavaMem::fromDataAddr(pkt->val.value);
+        bool  ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
+      }
     }else if( fd.vizIds.has(destid.asInt) ){
       auto label  =  genDbKey(destid);
-      auto    lm  =  LavaMem::fromDataAddr(pkt->val.value);
-      bool    ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
+      if(pkt->val.value!=0 && pkt->val.type==LavaArgType::MEMORY){
+        auto  lm  =  LavaMem::fromDataAddr(pkt->val.value);
+        bool  ok  =  fisdb.put(label.data(), (u32)label.size(), lm.data(), (u32)lm.sizeBytes() );
+      }
     }
   }
 
