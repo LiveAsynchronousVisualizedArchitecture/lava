@@ -27,13 +27,18 @@
 // -todo: try hardware random numbers to avoid <random> - only supported on ivy bridge and above
 // -todo: figure out why ShadeRayHits is crashing - tbl::place_rh wasn't returning a pointer at all points, but the casting operator for KV was still letting it compile
 // -todo: try OS specific system calls for Sleep instead of thread::sleep, so that there is one less C++ stdlib function that needs to be linked in to the shared libs
+// -todo: try combining ShadeRayHits and Camera projects into a single shared library - http and xml parsing combined into single .dll which works fine
+// -todo: give fissure live reloading inside the main loop
+// -todo: give reloading a force option and use it to force the first reload
+// -todo: put in live reloading that uses the Lava step function on reload
+// -todo: work on and test live reloading - what thread reloads? - either the main loop of fissure or a separate thread that mostly sleeps - either way calling the reload function seems to best left out of LavaFlow.hpp
 
-// todo: try combining ShadeRayHits and Camera projects into a single shared library
+// todo: give const reloading the same structure as node reloading, or integrate them together
+// todo: work out timed live reload checking - are there event callbacks that can be used - yes, windows seems to have a callback setup that could be used - could using separate directories for libs and live libs make it only neccesary to check the directory write time?
+// todo: implement live reloading that copies the shared library, loads it, switches over atomically, unloads the previous live version, copies the tmp live version to the normal live file, maps the new live version file, automically switches over to that, then unloads the tmp live shared lib - whew!
 // todo: make LavaQ into a struct that contains a function pointer to its own push function and can be passed as a C struct
 // todo: put much of lava in its own name space
 // todo: put globals struct into LavaParams that will hold the current number of threads running as well as the logical cores available - could also include a bitmask of which outputs are connected
-// todo: put in live reloading that uses the Lava step function on reload
-// todo: implement live reloading that copies the shared library, loads it, switches over atomically, unloads the previous live version, copies the tmp live version to the normal live file, maps the new live version file, automically switches over to that, then unloads the tmp live shared lib - whew!
 // todo: implement optional arguments 
 // todo: debug why BRDF rays is not outputting a visualization packet - node not being run because there is no frame for the node - need to implement optional arguments
 // todo: debug why Demo_Trace does not stop looping - FilePath doesn't seem to get called - does deleting nodes delete them from the message/generator cache?
@@ -53,8 +58,6 @@
 // todo: try using windows API to slow cursor movement when inside nodes and slots 
 // todo: investigate if Trace node is spending most of its time in the BVH building and figure out what to do about it
 // todo: integrate AddConst into RefreshFlowLibs function so that there are .live versions
-// todo: work out timed live reload checking - are there event callbacks that can be used
-// todo: work on and test live reloading - what thread reloads?
 // todo: make a lava function to incrementally load a single lib and another function to load the rest of the queue
 // todo: make fissure or lava be able to incrementally load shared libraries
 // todo: change constructor to happen on play and not on load (or after the destructor runs on stop)
@@ -333,7 +336,7 @@ void    startFlowThreads(u64 num=1)
 }
 void                step(u64 num)                                    // num defaults to 1 in the prototype
 {
-  if( !fd.flow.m_running.load() ){
+  if( fd.vizIds.count()>0  &&  !fd.flow.m_running.load() ){
     fd.stepIds = fd.vizIds;
     startFlowThreads(num);
   }
@@ -1757,6 +1760,8 @@ void  refreshNodeButtons()
   //  fd.ui.ndinstBtns.clear();                                             // delete interface buttons from the nanogui window
   //}
 
+  bool wasVisible = fd.ui.ndinstWin->visible();
+
   clearNodeInstWin();
 
   SECTION(redo interface node buttons)
@@ -1797,11 +1802,14 @@ void  refreshNodeButtons()
     }
   }
   fd.ui.screen.performLayout();
+
+  fd.ui.ndinstWin->setVisible(wasVisible);
 }
-bool    reloadSharedLibs()
+bool    reloadSharedLibs(bool force=false)
 {
-  bool newlibs  = RefreshFlowLibs(fd.flow);
-  newlibs      |= RefreshFlowConsts(fd.flow);
+  bool newlibs  = RefreshFlowLibs(fd.flow, force);
+  //newlibs      |= RefreshFlowConsts(fd.flow);
+  if(force){ RefreshFlowConsts(fd.flow); }                   // todo: redo this so that consts are handles more elegantly
 
   if(!newlibs){ return false; }
 
@@ -1994,7 +2002,7 @@ LavaControl lavaPacketCallback(LavaPacket* pkt)
 
   return LavaControl::GO;
 }
-LavaNode*           sidToConst(LavaId     sid)
+LavaNode*           sidToConst(LavaId      sid)
 {
   using namespace fs;
   
@@ -2425,9 +2433,9 @@ ENTRY_DECLARATION // main or winmain
     }
     SECTION(lava and db)
     {
-      reloadSharedLibs();
+      reloadSharedLibs(true);                                          // force reloading here because it is the first time the shared libs are loaded
 
-      new (&fisdb)     simdb("Fissure", 4096, 1<<16);     // 4096 * 65,536 = 268,435,456
+      new (&fisdb)     simdb("Fissure", 4096, 1<<16);                  // 4096 * 65,536 = 268,435,456
 
       //printdb(fisdb);
 
@@ -2512,6 +2520,16 @@ ENTRY_DECLARATION // main or winmain
           {
             fd.graph.packetSlots.clear();
             fd.graph.qPacketBytes = 0;
+          }
+        }
+        SECTION(reload and step)
+        {
+          fd.libReloadRem += dt;
+          if(fd.libReloadRem > fd.libReloadTime){
+            fd.libReloadRem -= fd.libReloadTime;
+            if(reloadSharedLibs()){
+              step(fd.threadCount);
+            }              
           }
         }
       }

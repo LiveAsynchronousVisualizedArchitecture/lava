@@ -2317,7 +2317,7 @@ auto    GetSharedLibDirIter() -> fs::directory_iterator //( fs::path( GetSharedL
 
   return dirIter;  
 }
-auto        GetRefreshPaths() -> lava_paths
+auto        GetRefreshPaths(bool force=false) -> lava_paths
 {
   using namespace std;
   using namespace  fs;
@@ -2351,10 +2351,16 @@ auto        GetRefreshPaths() -> lava_paths
     if( exists(livepth) ){
       auto liveWrite = last_write_time(livepth).time_since_epoch().count();         // liveWrite is live write time - the live shared library file's last write time 
       auto origWrite = last_write_time(p).time_since_epoch().count();               // origWrite is orginal write time - the original shared library file's last write time
-      if( liveWrite > origWrite ) refresh = false;
+      refresh = force || origWrite > liveWrite;                                     // original has to be newer, don't want to do anything if they are the same either - does the copied live file need its time set to match the original?
     }
 
-    if(refresh) paths.push_back( p.generic_string() );
+    if(refresh)
+      paths.push_back( p.generic_string() );
+
+    //refresh = origWrite > liveWrite;
+    //
+    //if(origWrite > liveWrite)
+    //  refresh = true;
   }
 
   return paths;
@@ -2578,17 +2584,23 @@ void               LavaInit()
   //new (&db)     simdb("lava_db", 128, 2<<4);
   //new (&vizdb)  simdb("viz_db",  128, 2<<4);
 }
-bool        RefreshFlowLibs(LavaFlow& inout_flow)
+bool        RefreshFlowLibs(LavaFlow& inout_flow, bool force=false)
 {
+  using namespace std;
+  
   bool     newlibs  =  false;
-  auto       paths  =  GetRefreshPaths();
+  auto       paths  =  GetRefreshPaths(force);
   if(paths.size() > 0){
     newlibs = true;
     ++inout_flow.version;
   }
 
+  if(!newlibs){ return false; } // avoid doing anything including locking if there no new libraries
+
   auto   livePaths  =  GetLivePaths(paths);
   
+  lock_guard<mutex> flowLck(inout_flow.m_qLck);  // todo: only locks the queue, which isn't good enough - need to switch the nodes in a manner that will work live - maybe atomically swap the function pointer to null, update the node, then swap the function pointer again
+
   SECTION(run destructor on the nodes given by the paths)
   {
     for(auto const& p : paths){
@@ -2629,6 +2641,7 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow)
   ErrorCheckNodeLists( &flowNdLists );
 
   // extract the flow nodes from the lists and put them into the multi-map
+  // todo: should this use and node creation commands? should nodes be made to swtich atomically?
   TO(livePaths.size(),i)
   {
     LavaNode* ndList = flowNdLists[i];
@@ -2647,7 +2660,9 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow)
     }
   }
 
-  return newlibs;
+  //inout_flow.m_qLck.lock();
+
+  return newlibs; // flow lock should unlocked here
 }
 bool      RefreshFlowConsts(LavaFlow& inout_flow)
 {

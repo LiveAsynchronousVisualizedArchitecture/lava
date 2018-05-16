@@ -78,77 +78,74 @@ class Vis : public tinyxml2::XMLVisitor
     printf("\n %s: %s \n", label, txt? txt->Value() : "NULL");
   }
 
-  bool VisitEnter(const XMLDocument& doc){
-    printTxt("doc text:", doc.ToText() );
-    printf("doc val: %s", doc.Value()? doc.Value() : "val null");
-    //printf("doc get text: %s", doc.Value() );
-    return true;
-  }
-
-  bool VisitExit(const XMLDocument& doc){
-    printTxt("doc text:", doc.ToText() );
-    printf("doc val: %s", doc.Value()? doc.Value() : "val null");
-    //printf("doc get text: %s", doc.GetText() );
-    return true;
-  }
+  //bool VisitEnter(const XMLDocument& doc){
+  //  printTxt("doc text:", doc.ToText() );
+  //  printf("doc val: %s", doc.Value()? doc.Value() : "val null");
+  //  //printf("doc get text: %s", doc.Value() );
+  //  return true;
+  //}
+  //bool  VisitExit(const XMLDocument& doc){
+  //  printTxt("doc text:", doc.ToText() );
+  //  printf("doc val: %s", doc.Value()? doc.Value() : "val null");
+  //  //printf("doc get text: %s", doc.GetText() );
+  //  return true;
+  //}
 
   bool VisitEnter(const XMLElement& elem, const XMLAttribute* firstAttr)
   {
+    printf("\n%s: %s \n", elem.Name(), elem.GetText()? elem.GetText() : "");
+
     //auto txt = elem.ToText();
     ////if(txt){ 
     //  printf("\n elem text: %s \n", txt? txt->Value() : "NULL");
     ////}
-
-    printTxt("elem text:", elem.ToText());
-    printf(" elem get text: %s", elem.GetText());
-    printf(" elem name: %s", elem.Name() );
+    //
+    //printTxt("elem text:", elem.ToText());
+    //printf(" elem get text: %s", elem.GetText());
     //printTxt("attr text:", firstAttr.ToText() );
-
-    if(firstAttr){
-      auto txt = firstAttr->Value();
-      printf("\n attr text: %s \n", txt? txt : "NULL");
-    }
-
-    return true;
-  }
-
-  bool VisitExit( const XMLElement& elem)
-  {
-    printTxt("elem exit:", elem.ToText());
-    return true;
-  }
-
-  bool Visit(const tinyxml2::XMLText& xt)
-  {
-    printTxt("text txt:", xt.ToText());
-
-    //auto txt = xt.ToText();
-    //if(txt){
-    //  printf("\n text: %s \n", txt? txt->Value() : "NULL");
+    //
+    //if(firstAttr){
+    //  auto txt = firstAttr->Value();
+    //  printf("\n attr text: %s \n", txt? txt : "NULL");
     //}
 
     return true;
   }
 
-  bool Visit(const XMLDeclaration& decl)
-  {
-    printTxt("declaration:", decl.ToText() ); 
-    printf("declaration val: %s", decl.Value()? decl.Value() : "val null");
-
-    //auto txt = decl.ToText();
-    //printf("\n declaration: %s \n", txt? txt->Value() : "NULL");
-
-    return true;
-  }
-
-  bool Visit(const XMLComment& com){
-    printTxt("commment txt:", com.ToText() );
-    return true;
-  }
-  bool Visit(const XMLUnknown& unknown){
-    printTxt("unknown txt:", unknown.ToText() );
-    return true;
-  }
+  //bool VisitExit(const XMLElement&     elem)
+  //{
+  //  printTxt("elem exit:", elem.ToText());
+  //  return true;
+  //}
+  //bool     Visit(const XMLText&          xt)
+  //{
+  //  printTxt("text txt:", xt.ToText());
+  //
+  //  //auto txt = xt.ToText();
+  //  //if(txt){
+  //  //  printf("\n text: %s \n", txt? txt->Value() : "NULL");
+  //  //}
+  //
+  //  return true;
+  //}
+  //bool     Visit(const XMLDeclaration& decl)
+  //{
+  //  printTxt("declaration:", decl.ToText() ); 
+  //  printf("declaration val: %s", decl.Value()? decl.Value() : "val null");
+  //
+  //  //auto txt = decl.ToText();
+  //  //printf("\n declaration: %s \n", txt? txt->Value() : "NULL");
+  //
+  //  return true;
+  //}
+  //bool     Visit(const XMLComment&      com){
+  //  printTxt("commment txt:", com.ToText() );
+  //  return true;
+  //}
+  //bool     Visit(const XMLUnknown&  unknown){
+  //  printTxt("unknown txt:", unknown.ToText() );
+  //  return true;
+  //}
 
 };
 
@@ -200,6 +197,8 @@ extern "C"
   void         xml_parse_destruct(){}
   uint64_t      xml_parse(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
   {    
+    //printf("entered");
+
     Vis v;
 
     auto inTxtPckt = in->packets[IN_XML_PARSE_TXT];
@@ -212,28 +211,8 @@ extern "C"
 
     tinyxml2::XMLDocument doc(true, tinyxml2::COLLAPSE_WHITESPACE);
     doc.Parse( inTxt.c_str(), inTxt.size() );
-
-    //auto xmlElem = doc.FirstChildElement();
-    //auto xmlElem = doc.RootElement();
-    //auto  xmlDoc = xmlElem->GetDocument();
-    //auto     e2  = xmlDoc->FirstChildElement();
-    //auto   txt1  = e2->ToText();
     
     doc.Accept( &v );
-
-    //auto xmlDoc = doc.FirstChildElement();
-    //auto   txt1 = xmlDoc->ToText();
-    //printf("\n %s \n", txt1? txt1->Value() : "NULL"); 
-
-    //auto chld = doc.FirstChild();
-    //auto txt2 = chld->ToText();
-    ////auto a    = chld->Accept( &v );
-    //printf("\n %s \n", txt2? txt2->Value() : "NULL"); 
-
-    //e2->NextSiblingElement();
-    //auto     txt = xmlDoc->ToText();
-
-    //printf("\n\n %s %s \n\n", xmlElem->ToText()->Value(), xmlDoc->ToText()->Value() );
 
     tbl xmlParse = LavaMakeTbl(lp);
     out->push( LavaTblToOut(xmlParse, OUT_XML_PARSE_XML) );
@@ -284,6 +263,32 @@ extern "C"
 
 
 
+
+
+
+
+
+
+
+//auto xmlElem = doc.FirstChildElement();
+//auto xmlElem = doc.RootElement();
+//auto  xmlDoc = xmlElem->GetDocument();
+//auto     e2  = xmlDoc->FirstChildElement();
+//auto   txt1  = e2->ToText();
+//
+//auto xmlDoc = doc.FirstChildElement();
+//auto   txt1 = xmlDoc->ToText();
+//printf("\n %s \n", txt1? txt1->Value() : "NULL"); 
+//
+//auto chld = doc.FirstChild();
+//auto txt2 = chld->ToText();
+////auto a    = chld->Accept( &v );
+//printf("\n %s \n", txt2? txt2->Value() : "NULL"); 
+//
+//e2->NextSiblingElement();
+//auto     txt = xmlDoc->ToText();
+//
+//printf("\n\n %s %s \n\n", xmlElem->ToText()->Value(), xmlDoc->ToText()->Value() );
 
 //tbl    url = LavaMakeTbl(lp);
 //str urlStr = url.data<const char>();
