@@ -221,15 +221,14 @@ extern "C"
     
     doc.Accept( &v );
 
-    auto xmlDoc = doc.FirstChildElement();
-    auto   txt1 = xmlDoc->ToText();
-    printf("\n %s \n", txt1? txt1->Value() : "NULL"); 
+    //auto xmlDoc = doc.FirstChildElement();
+    //auto   txt1 = xmlDoc->ToText();
+    //printf("\n %s \n", txt1? txt1->Value() : "NULL"); 
 
-    auto chld = doc.FirstChild();
-    auto txt2 = chld->ToText();
-    //auto a    = chld->Accept( &v );
-    printf("\n %s \n", txt2? txt2->Value() : "NULL"); 
-
+    //auto chld = doc.FirstChild();
+    //auto txt2 = chld->ToText();
+    ////auto a    = chld->Accept( &v );
+    //printf("\n %s \n", txt2? txt2->Value() : "NULL"); 
 
     //e2->NextSiblingElement();
     //auto     txt = xmlDoc->ToText();
