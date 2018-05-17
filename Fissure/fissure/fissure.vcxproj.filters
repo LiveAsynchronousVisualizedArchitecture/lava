@@ -202,5 +202,8 @@
     <ClInclude Include="..\..\simdb.hpp">
       <Filter>hpp</Filter>
     </ClInclude>
+    <ClInclude Include="watcher.hpp">
+      <Filter>hpp</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

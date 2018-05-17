@@ -2824,7 +2824,7 @@ void               LavaLoop(LavaFlow& lf) noexcept
           SECTION(take LavaOut structs from the output queue and put them into packet queue as packets)                 // this section will not be reached if there was an error
           {
             if(outQ.size()==0){
-              LavaControl cntrl = lf.packetCallback? lf.packetCallback(nullptr) : LavaControl::GO;                                                 // because this is before putting the memory in the queue, it can't get picked up and used yet, though that may not make a difference, since this thread has to free it anyway
+              LavaControl cntrl  =  lf.packetCallback? lf.packetCallback(nullptr) : LavaControl::GO;                                                 // because this is before putting the memory in the queue, it can't get picked up and used yet, though that may not make a difference, since this thread has to free it anyway
               if(cntrl==LavaControl::STOP) 
                 LavaStop(lf);
             }else while(outQ.size() > 0)

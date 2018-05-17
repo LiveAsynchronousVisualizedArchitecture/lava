@@ -33,8 +33,10 @@
 // -todo: put in live reloading that uses the Lava step function on reload
 // -todo: work on and test live reloading - what thread reloads? - either the main loop of fissure or a separate thread that mostly sleeps - either way calling the reload function seems to best left out of LavaFlow.hpp
 
+// todo: debug why step function keeps looping on reload - do the LavaIds not get deleted from the vizId if the packet has no data? - was step only getting set by the step button callback and not the step function?
 // todo: give const reloading the same structure as node reloading, or integrate them together
 // todo: work out timed live reload checking - are there event callbacks that can be used - yes, windows seems to have a callback setup that could be used - could using separate directories for libs and live libs make it only neccesary to check the directory write time?
+//       |  make a class that can special case windows
 // todo: implement live reloading that copies the shared library, loads it, switches over atomically, unloads the previous live version, copies the tmp live version to the normal live file, maps the new live version file, automically switches over to that, then unloads the tmp live shared lib - whew!
 // todo: make LavaQ into a struct that contains a function pointer to its own push function and can be passed as a C struct
 // todo: put much of lava in its own name space
@@ -116,6 +118,7 @@
 
 // glew might include windows.h
 #define  WIN32_LEAN_AND_MEAN
+#define  WIN32_EXTRA_LEAN
 #define  NOMINMAX
 #include "glew_2.0.0.h"
 #include "glfw3.h"
@@ -157,6 +160,7 @@
 #include "vec.hpp"
 #include "../no_rt_util.h"
 #include "../Transform.h"
+#include "Watcher.hpp"
 #include "FissureDecl.h"
 
 namespace  fs = std::experimental::filesystem;
@@ -336,6 +340,7 @@ void    startFlowThreads(u64 num=1)
 }
 void                step(u64 num)                                    // num defaults to 1 in the prototype
 {
+  fd.step = true;
   if( fd.vizIds.count()>0  &&  !fd.flow.m_running.load() ){
     fd.stepIds = fd.vizIds;
     startFlowThreads(num);
@@ -1969,7 +1974,7 @@ str                getSlotType(LavaId      sid)
 
   return type;
 }
-LavaControl lavaPacketCallback(LavaPacket* pkt)
+LavaControl        cb_lavaPckt(LavaPacket* pkt)
 {
   LavaId  srcid;
   LavaId destid;
@@ -1996,6 +2001,7 @@ LavaControl lavaPacketCallback(LavaPacket* pkt)
     fd.stepIds.del(srcid.asInt);                    // should just need source ids since inputs/destination slots can't be visualized
     fd.stepIds.del(destid.asInt);
     if(fd.stepIds.count() == 0){
+      fd.step = false;
       return LavaControl::STOP;
     }
   }
@@ -2307,7 +2313,6 @@ ENTRY_DECLARATION // main or winmain
           fd.flow.runConstructors();
         });
         stepBtn->setCallback([](){
-          fd.step = true;
           step(fd.threadCount);
         });
       }
@@ -2440,7 +2445,7 @@ ENTRY_DECLARATION // main or winmain
       //printdb(fisdb);
 
       new (&fd.vizIds) AtmSet( LavaId().asInt );
-      fd.flow.packetCallback = lavaPacketCallback;
+      fd.flow.packetCallback = cb_lavaPckt;
       LavaInit();
 
       glfwPollEvents();

@@ -207,7 +207,7 @@ extern "C"
     inTxt.resize( inTxtPckt.sz_bytes );
     memcpy( (void*)inTxt.data(), (void*)inTxtPckt.val.value, inTxtPckt.sz_bytes);
 
-    printf("\n\n %s \n", inTxt.c_str() );
+    //printf("\n\n %s \n", inTxt.c_str() );
 
     tinyxml2::XMLDocument doc(true, tinyxml2::COLLAPSE_WHITESPACE);
     doc.Parse( inTxt.c_str(), inTxt.size() );
@@ -215,6 +215,7 @@ extern "C"
     doc.Accept( &v );
 
     tbl xmlParse = LavaMakeTbl(lp);
+    xmlParse.resize<i8>(1,0);
     out->push( LavaTblToOut(xmlParse, OUT_XML_PARSE_XML) );
 
     return 0;
