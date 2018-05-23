@@ -32,8 +32,11 @@
 // -todo: give reloading a force option and use it to force the first reload
 // -todo: put in live reloading that uses the Lava step function on reload
 // -todo: work on and test live reloading - what thread reloads? - either the main loop of fissure or a separate thread that mostly sleeps - either way calling the reload function seems to best left out of LavaFlow.hpp
+// -todo: debug why step function keeps looping on reload - do the LavaIds not get deleted from the vizId if the packet has no data? - was step only getting set by the step button callback and not the step function? - seems so
+// -todo: fix high cpu usage - thread sleeping and yielding based on window state or main loop timing 
 
-// todo: debug why step function keeps looping on reload - do the LavaIds not get deleted from the vizId if the packet has no data? - was step only getting set by the step button callback and not the step function?
+// todo: make string convenience function 
+// todo: make console button re-open stdout so that printf will work without reloading a node
 // todo: give const reloading the same structure as node reloading, or integrate them together
 // todo: work out timed live reload checking - are there event callbacks that can be used - yes, windows seems to have a callback setup that could be used - could using separate directories for libs and live libs make it only neccesary to check the directory write time?
 //       |  make a class that can special case windows
@@ -2361,6 +2364,8 @@ ENTRY_DECLARATION // main or winmain
         fd.ui.cnslBtn->setCallback([](){
           #ifdef _WIN32
             AllocConsole();
+            freopen("CONOUT$", "w", stdout);
+            //stdout = GetStdHandle(STD_OUTPUT_HANDLE);
           #endif
         });
       }
@@ -3185,6 +3190,17 @@ ENTRY_DECLARATION // main or winmain
       fd.mouse.prevLftDn = fd.mouse.lftDn;
 
       glfwSwapBuffers(fd.win);
+
+      SECTION(frame rate limiting and thread sleeping)
+      {
+        if( glfwGetWindowAttrib(fd.win, GLFW_ICONIFIED) ){
+          this_thread::sleep_for( 84ms );                              // 84 milliseconds is about 12 frames per second -  40 ms is about 25hz / 25fps, which should be more than enough if it is iconified (which should also mean minimized)
+        }else if( !glfwGetWindowAttrib(fd.win, GLFW_FOCUSED) ){
+          this_thread::sleep_for( 16ms );                              // 16 milliseconds is slightly more than 60hz - 7ms is about 144hz
+        }else if(dt < 0.005){                                          // if the loop took less than a certain amount of seconds, yield the thread to reduce CPU usage
+          this_thread::yield();
+        }
+      }
     }
   }
   SECTION(shutdown)

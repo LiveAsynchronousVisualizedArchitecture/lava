@@ -1,10 +1,14 @@
 
-
+// -todo: use output to make a tbl that can be made into a const file that contains the directory to monitor and the window to refresh
+// -todo: in the tbl possibly put the msg to send and the arguments in the input tbl as well
+// -todo: use FindFirstChangeNotification and possibly WaitForSingleObject(m_dir, INFINITE); to monitor directory
+// -todo: use FindWindow function to possibly find a web browser window
 
 #ifdef _WIN32
   #define WIN32_LEAN_AND_MEAN
   #define WIN32_EXTRA_LEAN
   #define NOMINMAX
+  #include <windows.h>
   #include <winsock2.h>
 #endif // WIN32
 
@@ -13,16 +17,26 @@
 #include "../../no_rt_util.h"
 #include "../../tbl.hpp"
 #include "../LavaFlow.hpp"
+#include "json_fwd.hpp"
+#include "json.hpp"
 
 using namespace tinyxml2;
 
-enum   Slots
-{
-       IN_HTTP_URL  =  0,  
-  IN_XML_PARSE_TXT  =  0,
+using abool = std::atomic<bool>;
+using au32  = std::atomic<uint32_t>;
+using au64  = std::atomic<uint64_t>;
 
-  OUT_HTTP_TXT      =  0,
-  OUT_XML_PARSE_XML =  0
+enum        Slots
+{
+          IN_HTTP_URL  =  0,  
+     IN_XML_PARSE_TXT  =  0,
+  IN_JSON_PARSE_ASCII  =  0,
+        IN_WINMSG_MSG  =  0,
+
+         OUT_HTTP_TXT  =  0,
+    OUT_XML_PARSE_XML  =  0,
+      OUT_WINMSG_STAT  =  0,
+   OUT_JSON_PARSE_TBL  =  0 
 };
 
 struct SocketInit
@@ -47,7 +61,8 @@ struct SocketInit
   }
 };
 
-static int count = 0;
+static int    count = 0;
+static int runCount = 0;
 void OnBegin(    const happyhttp::Response* r, void* userdata )
 {
   printf( "BEGIN (%d %s)\n", r->getstatus(), r->getreason() );
@@ -62,6 +77,30 @@ void OnComplete( const happyhttp::Response* r, void* userdata )
 {
   printf( "COMPLETE (%d bytes)\n", count );
 }
+
+#ifdef _WIN32 
+
+static int     winErr = 0;
+static au64   winHndl = 0;
+static au32       msg = 0;
+static au32    wParam = 0;
+static au32    lParam = 0;
+static au64  waitHndl = 0;
+static abool    runCb = false;
+
+VOID CALLBACK cb_WaitOrTimerCallback(
+  _In_ PVOID   lpParameter,
+  _In_ BOOLEAN TimerOrWaitFired
+)
+{
+  if( !TimerOrWaitFired ){
+    if( runCb.exchange(false) ){
+      LRESULT ok = SendMessage( (HWND)(winHndl.load()), msg, wParam, lParam);
+      printf("\n send message ok: %ld \n", (long)ok); 
+    }
+  }
+}
+#endif
 
 const char* headers[] = 
 {
@@ -221,6 +260,140 @@ extern "C"
     return 0;
   }
 
+  const char*   json_parse_InTypes[] = {"JSON",                     nullptr};  // This array contains the type that each slot of the same index will accept as input.
+  const char*   json_parse_InNames[] = {"JSON to Parse",            nullptr};  // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char*  json_parse_OutTypes[] = {"TBL",                      nullptr};  // This array contains the types that are output in each slot of the same index
+  const char*  json_parse_OutNames[] = {"Nest Tbls of JSON values", nullptr};  // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  void        json_parse_construct(){}
+  void         json_parse_destruct(){}
+  uint64_t      json_parse(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
+  { 
+    using namespace nlohmann;
+    
+    str    s = LavaStrFromPckt(in, IN_JSON_PARSE_ASCII);
+    json   j = json::parse(s);
+    str  tst = j.dump();
+    printf("\ntest string:\n%s", tst.c_str());
+
+    tbl tmp = LavaMakeTbl(lp);
+    out->push( LavaTblToOut(tmp, OUT_JSON_PARSE_TBL) );
+
+    return 0;
+
+    //const str s = (const str)LavaTblFromPckt(lp, in, IN_JSON_PARSE_ASCII);
+    //
+    //auto inTxtPckt = in->packets[IN_XML_PARSE_TXT];
+    //str inTxt;
+    //inTxt.resize( inTxtPckt.sz_bytes );
+    //memcpy( (void*)inTxt.data(), (void*)inTxtPckt.val.value, inTxtPckt.sz_bytes);
+
+    //tmp.resize<i8>(1024, 0);
+    //strncpy(tmp.data<char>(), "file to watch", 1023);
+  }
+
+  const char*   winmsg_InTypes[] = {"params",  nullptr};            // This array contains the type that each slot of the same index will accept as input.
+  const char*   winmsg_InNames[] = {"File To Watch and MSG to Send", nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char*  winmsg_OutTypes[] = {"STATS",   nullptr};            // This array contains the types that are output in each slot of the same index
+  const char*  winmsg_OutNames[] = {"Status",  nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  void        winmsg_construct(){}
+  void         winmsg_destruct(){}
+  uint64_t      winmsg(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
+  {    
+    runCount++; 
+
+    tbl  params = LavaTblFromPckt(lp, in, IN_WINMSG_MSG);
+    str    path = (str)params;
+        winHndl = (u64)params("window handle");
+            msg = (u32)params("windows message");
+         wParam = (u32)params("wParam");
+         lParam = (u32)params("lParam");
+
+    //u64 winHndl = params("window handle");
+    //u32     msg = params("windows message");
+    //u32  wParam = params("wParam");
+    //u32  lParam = params("lParam");
+
+    //WindowFromPoint() // gets the handle from a point on the screen
+
+    #ifdef _WIN32
+      printf("\n cnt: %d path: %s \n", runCount, path.c_str() );
+      printf("\n hndl: %lld  msg: %d wParam: %d lParam %d \n", winHndl.load(), msg.load(), wParam.load(), lParam.load());
+
+      //SendMessage( (HWND)0x00040A68, WM_KEYDOWN, VK_F5, 0);     // F5 key
+      //SendMessage( (HWND)winHndl, msg, VK_RCONTROL, lParam);
+      //SendMessage( (HWND)winHndl, msg, wParam,      lParam);
+      //SendMessage( (HWND)winHndl, msg, VK_BROWSER_REFRESH, lParam);
+
+      // 0x52 r key | 0xA3 RCONTROL | VK_BROWSER_REFRESH 0xA8 | 0x74 VK_F5
+      //SendMessage( (HWND)winHndl, msg, wParam, lParam);
+
+      //HANDLE prevHndl = (HANDLE)waitHndl.exchange(0);
+      //if(prevHndl){
+      //  bool ok = UnregisterWait( (HANDLE)prevHndl );
+      //  printf("\n unregister ok: %d \n", ok);
+      //}else{
+
+      bool prev = false;
+      //while(true)
+      //{
+        HANDLE dirHndl = FindFirstChangeNotification( 
+          path.c_str(),                                           // directory to watch 
+          FALSE,                                                  // do not watch subtree 
+          FILE_NOTIFY_CHANGE_LAST_WRITE);
+
+        if(dirHndl == INVALID_HANDLE_VALUE){
+          winErr  = true;
+          dirHndl = nullptr;
+          //break;
+        }
+
+        WaitForSingleObject(dirHndl, INFINITE);
+
+        LRESULT ok = SendMessage( (HWND)(winHndl.load()), msg, wParam, lParam);
+        printf("\n send message ok: %ld \n", (long)ok); 
+
+        //prev = false;
+        //if( runCb.compare_exchange_strong(prev, true) )
+        //{
+        //  PHANDLE pHndl = (void**)&waitHndl;
+        //  auto ok = RegisterWaitForSingleObject(
+        //               pHndl, 
+        //               dirHndl, 
+        //               cb_WaitOrTimerCallback, 
+        //               0, 
+        //               INFINITE, 
+        //               WT_EXECUTEONLYONCE | WT_EXECUTEINWAITTHREAD | WT_EXECUTEDEFAULT);
+        //  printf("\n register ok: %d \n", ok);
+        //}
+
+        auto closeOk = FindCloseChangeNotification(dirHndl);
+
+        //Sleep(20000);
+      //}
+      //}
+
+      //RegisterWaitForSingleObject
+      //while(true){
+      //  auto waitRet = WaitForSingleObject(dirHndl, INFINITE);
+      //  if(waitRet == WAIT_OBJECT_0){ 
+      //    SendMessage( (HWND)winHndl, msg, wParam, lParam);
+      //    break;
+      //  }
+      //}
+    #endif
+
+    tbl tmp = LavaMakeTbl(lp);
+    tmp("window handle")   = (u64)0;
+    tmp("windows message") = (u32)WM_KEYDOWN;
+    tmp("wParam")          = (u32)VK_F5;
+    tmp("lParam")          = (u32)0;
+    tmp.resize<i8>(1024, 0);
+    strncpy(tmp.data<char>(), "file to watch", 1023);
+    out->push( LavaTblToOut(tmp, OUT_WINMSG_STAT) );
+
+    return 0;
+  }
+
   LavaNode LavaNodes[] =
   {
     {
@@ -251,6 +424,34 @@ extern "C"
       0                                          // version 
     },
 
+    {
+      json_parse,                             // function
+      json_parse_construct,                   // constructor - this can be set to nullptr if not needed
+      json_parse_destruct,                    // destructor  - this can also be set to nullptr 
+      LavaNode::FLOW,                         // node_type   - this should be eighther LavaNode::MSG (will be run even without input packets) or LavaNode::FLOW (will be run only when at least one packet is available for input)
+      "json_parse",                           // name
+      json_parse_InTypes,                     // in_types    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+      json_parse_InNames,                     // in_names    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+      json_parse_OutTypes,                    // out_types   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+      json_parse_OutNames,                    // out_names   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr
+      nullptr,                                // description
+      0                                       // version 
+    },
+
+    {
+      winmsg,                                 // function
+      winmsg_construct,                       // constructor - this can be set to nullptr if not needed
+      winmsg_destruct,                        // destructor  - this can also be set to nullptr 
+      LavaNode::FLOW,                         // node_type   - this should be eighther LavaNode::MSG (will be run even without input packets) or LavaNode::FLOW (will be run only when at least one packet is available for input)
+      "winmsg",                               // name
+      winmsg_InTypes,                         // in_types    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+      winmsg_InNames,                         // in_names    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+      winmsg_OutTypes,                        // out_types   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+      winmsg_OutNames,                        // out_names   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr
+      nullptr,                                // description
+      0                                       // version 
+    },
+
     LavaNodeListEnd                                  // This is a constant that has all the members of the LavaNode struct set to 0 or nullptr - it is used as a special value that ends the static list of LavaNodes. This negates the need for a separate static variable that gives the size of the list, which would be have to be kept in sync and therefore be error prone.
   };
 
@@ -270,6 +471,26 @@ extern "C"
 
 
 
+//u64 pathLen = strnlen( params.data<char>(), params.size() );
+//str    path;
+//path.resize(pathLen);
+//strncpy( (char*)path.data(), params.data<char>(), path.size() );
+
+//#ifdef _WIN32
+//    m_dir = FindFirstChangeNotification( 
+//      path,                                   // directory to watch 
+//      FALSE,                                  // do not watch subtree 
+//      FILE_NOTIFY_CHANGE_LAST_WRITE);
+//
+//    if(m_dir == INVALID_HANDLE_VALUE){
+//      m_error = true;
+//      m_dir   = nullptr;
+//    }
+//    WaitForSingleObject(m_dir, INFINITE); 
+//#endif
+//
+//WM_LBUTTONDOWN fwKeys: 0000 xPos: 86 yPos 57 
+//WM_KEYDOWN nVirtKey: VK_MEDIA_NEXT_TRACK cRepeat: 1 ScanCode: 00f Extended: 1 fAltDown: 0 fRepeat: 0 fUp: 
 
 //auto xmlElem = doc.FirstChildElement();
 //auto xmlElem = doc.RootElement();

@@ -987,6 +987,18 @@ public:
   tbl&         operator=(const char* s){ init_cstr(s); return *this; }
 
   operator bool(){ return (bool)m_mem; }
+  operator std::string() const
+  {
+    using namespace std;
+    assert(arrayType() == TblType::I8);
+
+    u64       len = strnlen( data<char>(), size() );
+    string    ret;
+    ret.resize(len);
+    strncpy( (char*)ret.data(), data<char>(), ret.size() );
+
+    return move(ret);
+  }
   inline TblVal  operator[](u64 i)
   {
     tbl_msg_assert(i < size(), "\n\nTbl index out of range\n----------------------\nIndex:  ", i, "Size:   ", size())
@@ -1065,6 +1077,7 @@ public:
   }
   tbl&         operator--(){ shrink_to_fit();    return *this; }
   tbl&         operator++(){ expand(true,false); return *this; }
+
 
   //void    operator+=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
   //void    operator-=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }
@@ -1621,7 +1634,7 @@ private:
   }
 
 public:
-  static bool   isTbl(void* mem)
+  static bool         isTbl(void* mem)
   {
     if(!mem){ return false; }
 
