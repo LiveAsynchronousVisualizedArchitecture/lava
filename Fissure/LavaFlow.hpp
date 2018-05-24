@@ -2029,15 +2029,15 @@ inline tbl           LavaLocalTbl(LavaParams const* lp)
 
   return move(t);
 }
-inline const tbl  LavaTblFromPckt(LavaParams const* lp, LavaFrame const* in, u64 i)
+inline const tbl  LavaTblFromPckt(LavaParams const* lp, LavaFrame const* in, u32 slot)
 {
   using namespace std;
 
-  if( !in->slotMask[i] ){ return tbl(); }
+  if( !in->slotMask[slot] ){ return tbl(); }
 
-  assert( LavaMem::fromDataAddr(in->packets[i].val.value).refCount() != 0 );
+  assert( LavaMem::fromDataAddr(in->packets[slot].val.value).refCount() != 0 );
 
-  void* valPtr = (void*)in->packets[i].val.value;
+  void* valPtr = (void*)in->packets[slot].val.value;
   if( !tbl::isTbl(valPtr) ){ return tbl(); }
 
   tbl t(valPtr);
@@ -2047,11 +2047,11 @@ inline const tbl  LavaTblFromPckt(LavaParams const* lp, LavaFrame const* in, u64
 
   return move(t);
 }
-inline str        LavaStrFromPckt(LavaFrame const* in, u64 i)              // don't need the LavaParams struct since we will be using the node's std allocators
+inline str        LavaStrFromPckt(LavaFrame const* in, u32 slot)              // don't need the LavaParams struct since we will be using the node's std allocators
 {
   using namespace std;
 
-  auto inTxtPckt = in->packets[i];
+  auto inTxtPckt = in->packets[slot];
 
   str inTxt;
   inTxt.resize( inTxtPckt.sz_bytes );
@@ -2063,6 +2063,18 @@ inline LavaOut       LavaTblToOut(tbl const& t, u32 slot)
 {
   LavaOut o;
   o.val.value = (u64)t.memStart();
+  o.val.type  = LavaArgType::MEMORY;
+  o.key.slot  = slot;
+
+  return o;
+}
+inline LavaOut       LavaStrToOut(LavaParams const* lp, str const& s, u32 slot)
+{
+  void* mem = lp->ref_alloc(s.size() + 1);
+  memcpy(mem, s.c_str(), s.size()+1);
+
+  LavaOut o;
+  o.val.value = (u64)mem;
   o.val.type  = LavaArgType::MEMORY;
   o.key.slot  = slot;
 

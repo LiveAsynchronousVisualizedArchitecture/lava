@@ -34,9 +34,11 @@
 // -todo: work on and test live reloading - what thread reloads? - either the main loop of fissure or a separate thread that mostly sleeps - either way calling the reload function seems to best left out of LavaFlow.hpp
 // -todo: debug why step function keeps looping on reload - do the LavaIds not get deleted from the vizId if the packet has no data? - was step only getting set by the step button callback and not the step function? - seems so
 // -todo: fix high cpu usage - thread sleeping and yielding based on window state or main loop timing 
+// -todo: make string convenience function 
+// -todo: make console button re-open stdout so that printf will work without reloading a node - reopen doesn't work for shared libs
 
-// todo: make string convenience function 
-// todo: make console button re-open stdout so that printf will work without reloading a node
+// todo: try making visual studio visualization for LavaMem and tbl
+// todo: give LavaParams std file handles if release mode AllocConsole doesn't work on windows
 // todo: give const reloading the same structure as node reloading, or integrate them together
 // todo: work out timed live reload checking - are there event callbacks that can be used - yes, windows seems to have a callback setup that could be used - could using separate directories for libs and live libs make it only neccesary to check the directory write time?
 //       |  make a class that can special case windows
@@ -2201,8 +2203,8 @@ ENTRY_DECLARATION // main or winmain
 
           if(inPath){
             bool ok = loadFile(inPath, &fd.lgrph);
-            if(ok) printf("\nFile loaded from %s\n", inPath);
-            else   printf("\nLoad did not read successfully from %s\n", inPath);
+            if(ok) printf("\nFile loaded from %s\n\n", inPath);
+            else   printf("\nLoad did not read successfully from %s\n\n", inPath);
           }
         });
         saveBtn->setCallback([](){
@@ -2365,7 +2367,10 @@ ENTRY_DECLARATION // main or winmain
           #ifdef _WIN32
             AllocConsole();
             freopen("CONOUT$", "w", stdout);
-            //stdout = GetStdHandle(STD_OUTPUT_HANDLE);
+            //void* stdHndl = GetStdHandle(STD_OUTPUT_HANDLE);
+            //FILE* stdFile = (FILE*)stdHndl;
+            //FILE* stdFile = (FILE*)stdout;
+            //*(stdout) = *((FILE*)GetStdHandle(STD_OUTPUT_HANDLE));
           #endif
         });
       }

@@ -12,6 +12,7 @@
   #include <winsock2.h>
 #endif // WIN32
 
+#include <iostream>
 #include "happyhttp.h"
 #include "tinyxml2.h"
 #include "../../no_rt_util.h"
@@ -21,6 +22,7 @@
 #include "json.hpp"
 
 using namespace tinyxml2;
+using namespace nlohmann;
 
 using abool = std::atomic<bool>;
 using au32  = std::atomic<uint32_t>;
@@ -32,11 +34,13 @@ enum        Slots
      IN_XML_PARSE_TXT  =  0,
   IN_JSON_PARSE_ASCII  =  0,
         IN_WINMSG_MSG  =  0,
+  IN_TBL_TO_STR_ASCII  =  0,
 
          OUT_HTTP_TXT  =  0,
     OUT_XML_PARSE_XML  =  0,
       OUT_WINMSG_STAT  =  0,
-   OUT_JSON_PARSE_TBL  =  0 
+   OUT_JSON_PARSE_TBL  =  0,
+   OUT_TBL_TO_STR_TXT  =  0
 };
 
 struct SocketInit
@@ -188,42 +192,86 @@ class Vis : public tinyxml2::XMLVisitor
 
 };
 
+void PrintElem(json::value_type& e)
+{
+  using namespace std;
+
+  switch(e.type()){
+  case json::value_t::array:
+  case json::value_t::object:{
+    for(auto& ee : e){
+      PrintElem(ee);
+    }
+  }break;
+  default: 
+    cout << e << endl << endl << endl;
+    break;
+  }
+
+  //for(auto&& e : j){
+  //}
+}
+
 extern "C"
 {
+  const char*      TblToStr_InTypes[]  = {"ASCII",          nullptr};            // This array contains the type that each slot of the same index will accept as input.
+  const char*      TblToStr_InNames[]  = {"Raw Text",       nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char*      TblToStr_OutTypes[] = {"Text",           nullptr};            // This array contains the types that are output in each slot of the same index
+  const char*      TblToStr_OutNames[] = {"Text as Tbl",    nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  uint64_t         TblToStr(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
+  {
+    auto inTxtPckt = in->packets[IN_TBL_TO_STR_ASCII];
+    tbl        txt = LavaMakeTbl(lp, inTxtPckt.sz_bytes, 0);
+
+    memcpy(txt.data(), (void*)inTxtPckt.val.value, inTxtPckt.sz_bytes);
+
+    out->push( LavaTblToOut(txt, OUT_TBL_TO_STR_TXT) );
+
+    return 0;
+  }
+
   const char*       http_InTypes[] = {"ASCII",          nullptr};            // This array contains the type that each slot of the same index will accept as input.
   const char*       http_InNames[] = {"URL",            nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   const char*      http_OutTypes[] = {"ASCII",          nullptr};            // This array contains the types that are output in each slot of the same index
   const char*      http_OutNames[] = {"txt",            nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   void            http_construct(){}
-  void            http_destruct(){}
+  void             http_destruct(){}
   uint64_t         http(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
   {
     using namespace std;
     using namespace happyhttp;
 
-    SocketInit si;                                                               // inits windows sockets and on destruction cleans them up
+    str urlStr = (str)LavaTblFromPckt(lp, in, IN_HTTP_URL);
 
-    str urlStr = "www.google.com";
-    str pgeStr = "/";
+    printf("url: %s ", urlStr.c_str());
+
+    SocketInit si;                                                                       // inits windows sockets and on destruction cleans them up
     
-    Connection cnct(urlStr.c_str(), 80);
-    cnct.connect();
-    cnct.setcallbacks(OnBegin, OnData, OnComplete, nullptr);
-    cnct.request("GET", pgeStr.c_str(), 0, 0, 0);
+    //while((result = strchr(result, target)) != NULL) {
+    //  printf("Found '%c' starting at '%s'\n", target, result);
+    //  ++result; // Increment result, otherwise we'll find target at the same location
+    //}
 
-    //cnct.request( "POST",
-    //  "/happyhttp/test.php",
-    //  headers,
-    //  (const unsigned char*)body,
-    //  strlen(body) );
+    //str urlStr = "www.google.com";
 
-    while( cnct.outstanding() ){
-      printf("\n\n\n\n");
-      cnct.pump();
-    }
+    //str pgeStr = "/";
+    //
+    //Connection cnct(urlStr.c_str(), 80);
+    //cnct.connect();
+    //cnct.setcallbacks(OnBegin, OnData, OnComplete, nullptr);
+    //cnct.request("GET", pgeStr.c_str(), 0, 0, 0);
 
+    //while( cnct.outstanding() ){
+    //  printf("\n\n\n\n");
+    //  cnct.pump();
+    //}
+
+    str response;
+    out->push( LavaStrToOut(lp, response, OUT_HTTP_TXT) );
+
+    // todo: change this to raw text
     //tbl pageTxt;
-    //out->push( LavaTblToOut(pageTxt, IN_URL) );         // this demonstrates how to output a tbl into the first output slot
+    //out->push( LavaTblToOut(pageTxt, OUT_HTTP_TXT) );
 
     return 1;
   }
@@ -268,33 +316,26 @@ extern "C"
   void         json_parse_destruct(){}
   uint64_t      json_parse(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
   { 
+    using namespace std;
     using namespace nlohmann;
     
     str    s = LavaStrFromPckt(in, IN_JSON_PARSE_ASCII);
     json   j = json::parse(s);
-    str  tst = j.dump();
-    printf("\ntest string:\n%s", tst.c_str());
+
+    for(auto&& e : j){
+      PrintElem(e);
+    }
 
     tbl tmp = LavaMakeTbl(lp);
     out->push( LavaTblToOut(tmp, OUT_JSON_PARSE_TBL) );
 
     return 0;
-
-    //const str s = (const str)LavaTblFromPckt(lp, in, IN_JSON_PARSE_ASCII);
-    //
-    //auto inTxtPckt = in->packets[IN_XML_PARSE_TXT];
-    //str inTxt;
-    //inTxt.resize( inTxtPckt.sz_bytes );
-    //memcpy( (void*)inTxt.data(), (void*)inTxtPckt.val.value, inTxtPckt.sz_bytes);
-
-    //tmp.resize<i8>(1024, 0);
-    //strncpy(tmp.data<char>(), "file to watch", 1023);
   }
 
-  const char*   winmsg_InTypes[] = {"params",  nullptr};            // This array contains the type that each slot of the same index will accept as input.
-  const char*   winmsg_InNames[] = {"File To Watch and MSG to Send", nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
-  const char*  winmsg_OutTypes[] = {"STATS",   nullptr};            // This array contains the types that are output in each slot of the same index
-  const char*  winmsg_OutNames[] = {"Status",  nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char*   winmsg_InTypes[] = {"params",         nullptr};            // This array contains the type that each slot of the same index will accept as input.
+  const char*   winmsg_InNames[] = {"Watch and MSG",  nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char*  winmsg_OutTypes[] = {"STATS",          nullptr};            // This array contains the types that are output in each slot of the same index
+  const char*  winmsg_OutNames[] = {"Status",         nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   void        winmsg_construct(){}
   void         winmsg_destruct(){}
   uint64_t      winmsg(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
@@ -397,6 +438,20 @@ extern "C"
   LavaNode LavaNodes[] =
   {
     {
+      TblToStr,                                  // function
+      nullptr,                                   // constructor - this can be set to nullptr if not needed
+      nullptr,                                   // destructor  - this can also be set to nullptr 
+      LavaNode::FLOW,                            // node_type   - this should be eighther LavaNode::MSG (will be run even without input packets) or LavaNode::FLOW (will be run only when at least one packet is available for input)
+      "TblToStr",                                // name
+      TblToStr_InTypes,                          // in_types    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+      TblToStr_InNames,                          // in_names    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+      TblToStr_OutTypes,                         // out_types   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+      TblToStr_OutNames,                         // out_names   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr
+      nullptr,                                   // description
+      0                                          // version 
+    },
+
+    {
       http,                                      // function
       http_construct,                            // constructor - this can be set to nullptr if not needed
       http_destruct,                             // destructor  - this can also be set to nullptr 
@@ -470,6 +525,48 @@ extern "C"
 
 
 
+
+
+
+
+
+//str   s = LavaStrFromPckt(in, IN_TBL_TO_STR_ASCII);
+//
+//str inTxt;
+//inTxt.resize( inTxtPckt.sz_bytes );
+//memcpy( (void*)inTxt.data(), (void*)inTxtPckt.val.value, inTxtPckt.sz_bytes);
+//
+//tbl tmp = LavaMakeTbl(lp);
+
+//cnct.request( "POST",
+//  "/happyhttp/test.php",
+//  headers,
+//  (const unsigned char*)body,
+//  strlen(body) );
+
+//str  tst = j.dump();
+//printf("\ntest string:\n%s", tst.c_str());
+//printf("\n\n");
+//
+//cout << setw(2) << j << endl;
+
+//cout << e << endl << endl << endl;
+//switch(e.type()){
+//case json::value_t::array:
+//case json::value_t::object:
+//  
+//default: ;
+//}
+
+//const str s = (const str)LavaTblFromPckt(lp, in, IN_JSON_PARSE_ASCII);
+//
+//auto inTxtPckt = in->packets[IN_XML_PARSE_TXT];
+//str inTxt;
+//inTxt.resize( inTxtPckt.sz_bytes );
+//memcpy( (void*)inTxt.data(), (void*)inTxtPckt.val.value, inTxtPckt.sz_bytes);
+
+//tmp.resize<i8>(1024, 0);
+//strncpy(tmp.data<char>(), "file to watch", 1023);
 
 //u64 pathLen = strnlen( params.data<char>(), params.size() );
 //str    path;
