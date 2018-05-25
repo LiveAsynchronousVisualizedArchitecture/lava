@@ -648,7 +648,7 @@ str         makeStatStr(tbl const& t)
   switch(t.arrayType())
   {
   case tbl::TblType::I8:
-    return statStr<i8>(t);
+    return statStr<i8>(t) + "  -  " + (str)t;
   case tbl::TblType::I16:
     return statStr<i16>(t);
   case tbl::TblType::I32:
