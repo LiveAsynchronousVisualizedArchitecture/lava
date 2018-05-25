@@ -26,5 +26,8 @@
     <ClInclude Include="tinyxml2.h">
       <Filter>h</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\no_rt_util.h">
+      <Filter>h</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -1167,18 +1167,18 @@ int  main()
 
         refreshViz();
 
-        auto&   t = *curT;
-        auto flen = t.size();// * 12;      // 12 floats in a vert struct
-        f32*    f = (float*)t.m_mem;
+        //auto&   t = *curT;
+        //auto flen = t.size();// * 12;      // 12 floats in a vert struct
+        //f32*    f = (float*)t.m_mem;
 
-        mx = numeric_limits<f32>::lowest(); 
-        mn = numeric_limits<f32>::max();
-        TO(flen,i){
-          //Print( (f32)f[i], " " );
-          mx = max<f32>((f32)mx, (f32)f[i] );
-          mn = min<f32>((f32)mn, (f32)f[i] );
-        }
-        //Println("\n Table Key mx: ",mx, " mn: ", mn, " \n" );
+        //mx = numeric_limits<f32>::lowest(); 
+        //mn = numeric_limits<f32>::max();
+        //TO(flen,i){
+        //  //Print( (f32)f[i], " " );
+        //  mx = max<f32>((f32)mx, (f32)f[i] );
+        //  mn = min<f32>((f32)mn, (f32)f[i] );
+        //}
+        ////Println("\n Table Key mx: ",mx, " mn: ", mn, " \n" );
 
         plc.collocate();
         fm.collocate();

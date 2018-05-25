@@ -16,6 +16,7 @@
     <ClCompile Include="tinyxml2.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\no_rt_util.h" />
     <ClInclude Include="happyhttp.h" />
     <ClInclude Include="tinyxml2.h" />
   </ItemGroup>

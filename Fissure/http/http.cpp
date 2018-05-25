@@ -12,7 +12,10 @@
   #include <winsock2.h>
 #endif // WIN32
 
+#define NO_RT_UTIL_IMPL
+
 #include <iostream>
+#include <algorithm>
 #include "happyhttp.h"
 #include "tinyxml2.h"
 #include "../../no_rt_util.h"
@@ -67,20 +70,48 @@ struct SocketInit
 
 static int    count = 0;
 static int runCount = 0;
-void OnBegin(    const happyhttp::Response* r, void* userdata )
+
+void OnBegin(    const happyhttp::Response* r, void* tblPtr)
 {
   printf( "BEGIN (%d %s)\n", r->getstatus(), r->getreason() );
   count = 0;
+
+  tbl* t = (tbl*)tblPtr;
 }
-void OnData(     const happyhttp::Response* r, void* userdata, const unsigned char* data, int n )
+void OnData(     const happyhttp::Response* r, void* tblPtr, const unsigned char* data, int n )
 {
   fwrite( data,1,n, stdout );
   count += n;
+
+  tbl* t = (tbl*)tblPtr;
+
+  t->push<i8>('\n');
+
+  // inefficient
+  TO(n,i)
+    t->push<i8>( data[i] );
 }
-void OnComplete( const happyhttp::Response* r, void* userdata )
+void OnComplete( const happyhttp::Response* r, void* tblPtr)
 {
   printf( "COMPLETE (%d bytes)\n", count );
+
+  tbl* t = (tbl*)tblPtr;
 }
+
+//void OnBegin(    const happyhttp::Response* r, void* userdata )
+//{
+//  printf( "BEGIN (%d %s)\n", r->getstatus(), r->getreason() );
+//  count = 0;
+//}
+//void OnData(     const happyhttp::Response* r, void* userdata, const unsigned char* data, int n )
+//{
+//  fwrite( data,1,n, stdout );
+//  count += n;
+//}
+//void OnComplete( const happyhttp::Response* r, void* userdata )
+//{
+//  printf( "COMPLETE (%d bytes)\n", count );
+//}
 
 #ifdef _WIN32 
 
@@ -234,44 +265,36 @@ extern "C"
   const char*       http_InNames[] = {"URL",            nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   const char*      http_OutTypes[] = {"ASCII",          nullptr};            // This array contains the types that are output in each slot of the same index
   const char*      http_OutNames[] = {"txt",            nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
-  void            http_construct(){}
-  void             http_destruct(){}
   uint64_t         http(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
   {
     using namespace std;
     using namespace happyhttp;
 
-    str urlStr = (str)LavaTblFromPckt(lp, in, IN_HTTP_URL);
-
-    printf("url: %s ", urlStr.c_str());
+    str url = (str)LavaTblFromPckt(lp, in, IN_HTTP_URL);
 
     SocketInit si;                                                                       // inits windows sockets and on destruction cleans them up
     
-    //while((result = strchr(result, target)) != NULL) {
-    //  printf("Found '%c' starting at '%s'\n", target, result);
-    //  ++result; // Increment result, otherwise we'll find target at the same location
-    //}
+    auto addrSt = url.find("//") + 2;
+    auto pageSt = find( url.begin()+addrSt, url.end(), '/');
 
-    //str urlStr = "www.google.com";
+    str addr(url.begin()+addrSt, pageSt);
+    str page(pageSt, url.end());
 
-    //str pgeStr = "/";
-    //
-    //Connection cnct(urlStr.c_str(), 80);
-    //cnct.connect();
-    //cnct.setcallbacks(OnBegin, OnData, OnComplete, nullptr);
-    //cnct.request("GET", pgeStr.c_str(), 0, 0, 0);
+    tbl response = LavaMakeTbl(lp, 0, (i8)0);
+    Connection cnct(addr.c_str(), 80);
+    cnct.connect();
+    cnct.setcallbacks(OnBegin, OnData, OnComplete, &response);
+    cnct.request("GET", page.c_str(), 0, 0, 0);
 
-    //while( cnct.outstanding() ){
-    //  printf("\n\n\n\n");
-    //  cnct.pump();
-    //}
+    printf("\n");
+    while( cnct.outstanding() ){
+      printf(".");
+      cnct.pump();
+      nort_sleep(10);
+    }
+    printf("\n");
 
-    str response;
-    out->push( LavaStrToOut(lp, response, OUT_HTTP_TXT) );
-
-    // todo: change this to raw text
-    //tbl pageTxt;
-    //out->push( LavaTblToOut(pageTxt, OUT_HTTP_TXT) );
+    out->push( LavaTblToOut(response, OUT_HTTP_TXT) );
 
     return 1;
   }
@@ -453,8 +476,8 @@ extern "C"
 
     {
       http,                                      // function
-      http_construct,                            // constructor - this can be set to nullptr if not needed
-      http_destruct,                             // destructor  - this can also be set to nullptr 
+      nullptr,                                   // constructor - this can be set to nullptr if not needed
+      nullptr,                                   // destructor  - this can also be set to nullptr 
       LavaNode::FLOW,                            // node_type   - this should be eighther LavaNode::MSG (will be run even without input packets) or LavaNode::FLOW (will be run only when at least one packet is available for input)
       "http",                                    // name
       http_InTypes,                              // in_types    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
@@ -525,10 +548,27 @@ extern "C"
 
 
 
+// todo: change this to raw text
+//tbl pageTxt;
+//out->push( LavaTblToOut(pageTxt, OUT_HTTP_TXT) );
 
+//printf("url: %s \n\n addr: %s \n\n file: %s", url.c_str());
+//
+//str urlStr = "www.google.com";
+//
+//str pgeStr = "/";
+//
 
+//while((result = strchr(result, target)) != NULL) {
+//  printf("Found '%c' starting at '%s'\n", target, result);
+//  ++result; // Increment result, otherwise we'll find target at the same location
+//}
 
+//void            http_construct(){}
+//void             http_destruct(){}
 
+//http_construct,                          // constructor - this can be set to nullptr if not needed
+//http_destruct,                           // destructor  - this can also be set to nullptr 
 
 //str   s = LavaStrFromPckt(in, IN_TBL_TO_STR_ASCII);
 //

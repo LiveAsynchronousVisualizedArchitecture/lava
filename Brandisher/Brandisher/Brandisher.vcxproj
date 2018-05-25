@@ -122,7 +122,6 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>H:\projects\LAVA\lava\Brandisher\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <DebugInformationFormat>None</DebugInformationFormat>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <FavorSizeOrSpeed>Size</FavorSizeOrSpeed>
       <BufferSecurityCheck>true</BufferSecurityCheck>
@@ -138,13 +137,13 @@
       <OptimizeReferences>true</OptimizeReferences>
       <AdditionalLibraryDirectories>../../shared/;H:\projects\LAVA\lava\Brandisher\lib</AdditionalLibraryDirectories>
       <AdditionalDependencies>%(AdditionalDependencies)</AdditionalDependencies>
-      <GenerateDebugInformation>false</GenerateDebugInformation>
       <LinkTimeCodeGeneration>Default</LinkTimeCodeGeneration>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <EnableUAC>false</EnableUAC>
       <DataExecutionPrevention>false</DataExecutionPrevention>
       <SupportNobindOfDelayLoadedDLL>false</SupportNobindOfDelayLoadedDLL>
       <ForceFileOutput>MultiplyDefinedSymbolOnly</ForceFileOutput>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>

@@ -57,7 +57,6 @@ using  ui64  =  uint64_t;
 
 #define SQR(x) ((x)*(x))
 
-
 #ifndef TO
   #define            TO(to, var) for(uint64_t var = 0, lim = (uint64_t)to; var < lim; ++var)
 #endif
@@ -65,7 +64,7 @@ using  ui64  =  uint64_t;
 #define           ALL(collection) collection.begin(), collection.end()
 #define         RANGE(st, to, var)  for(std::remove_const<decltype(to)>::type var = st; var < to; ++var)
 
-#ifndef FROM
+#ifndef          FROM
   #define       FROM(from, var) for(int64_t var = ((i64)from)-1; var >= int64_t(0); --var)
 #endif
 
@@ -98,19 +97,36 @@ using  ui64  =  uint64_t;
 const float   INFf       = std::numeric_limits<float>::infinity();
 const float   SIG_NANf   = std::numeric_limits<float>::signaling_NaN();
 
-#ifdef NO_RT_UTIL_IMPL
+//#ifdef NO_RT_UTIL_IMPL
 
-void* __cdecl operator       new(size_t s)
+#if defined(NO_RT_UTIL_IMPL)
+
+#ifdef _WIN32
+  #define WIN32_LEAN_AND_MEAN
+  #define WIN32_EXTRA_LEAN
+  #define NOMINMAX
+  #include <windows.h>
+  //#include <winsock2.h>
+#endif // WIN32
+
+inline void nort_sleep(u64 milliseconds=0)
 {
-  return malloc(s);
-}
-void __cdecl operator     delete(void* p)
-{
-  free(p);
+#ifdef _WIN32
+  Sleep(milliseconds);
+#endif
 }
 
-extern "C" double   _hypot(double x, double y){ return 0; }
-extern "C" void     _fltused(){}  // symbol needs to be defined for some reason
+//void* __cdecl operator       new(size_t s)
+//{
+//  return malloc(s);
+//}
+//void __cdecl operator     delete(void* p)
+//{
+//  free(p);
+//}
+//
+//extern "C" double   _hypot(double x, double y){ return 0; }
+//extern "C" void     _fltused(){}  // symbol needs to be defined for some reason
 
 #endif
 
