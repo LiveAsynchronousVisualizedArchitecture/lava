@@ -18,6 +18,9 @@
     <Filter Include="h">
       <UniqueIdentifier>{df509a9b-389b-4def-837e-4e8214d678f1}</UniqueIdentifier>
     </Filter>
+    <Filter Include="hpp">
+      <UniqueIdentifier>{ab7eec74-3169-42f9-9f7d-478d053b7c69}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="happyhttp.h">
@@ -28,6 +31,9 @@
     </ClInclude>
     <ClInclude Include="..\..\no_rt_util.h">
       <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="json.hpp">
+      <Filter>hpp</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

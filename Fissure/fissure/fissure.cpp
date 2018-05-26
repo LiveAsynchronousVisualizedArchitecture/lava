@@ -175,6 +175,10 @@ using vec_ids = std::vector<LavaId>;
 static FisData    fd;
 static simdb   fisdb;
 
+#if defined(_WIN32)
+  //ConsoleWrapper.Console;
+#endif
+
 namespace{
 
 void step(u64 num=1);
@@ -2365,8 +2369,10 @@ ENTRY_DECLARATION // main or winmain
         fd.ui.cnslBtn = new Button(fd.ui.keyWin, "Console");
         fd.ui.cnslBtn->setCallback([](){
           #ifdef _WIN32
+            FreeConsole();
             AllocConsole();
             freopen("CONOUT$", "w", stdout);
+
             //void* stdHndl = GetStdHandle(STD_OUTPUT_HANDLE);
             //FILE* stdFile = (FILE*)stdHndl;
             //FILE* stdFile = (FILE*)stdout;

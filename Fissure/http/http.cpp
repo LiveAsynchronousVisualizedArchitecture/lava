@@ -8,6 +8,7 @@
   #define WIN32_LEAN_AND_MEAN
   #define WIN32_EXTRA_LEAN
   #define NOMINMAX
+  //#define _NO_CRT_STDIO_INLINE
   #include <windows.h>
   #include <winsock2.h>
 #endif // WIN32
@@ -15,6 +16,7 @@
 #define NO_RT_UTIL_IMPL
 
 #include <iostream>
+#include <fstream>
 #include <algorithm>
 #include "happyhttp.h"
 #include "tinyxml2.h"
@@ -135,6 +137,9 @@ VOID CALLBACK cb_WaitOrTimerCallback(
     }
   }
 }
+
+int (WINAPIV * __vsnprintf)(char *, size_t, const char*, va_list) = _vsnprintf;
+
 #endif
 
 const char* headers[] = 
@@ -223,7 +228,7 @@ class Vis : public tinyxml2::XMLVisitor
 
 };
 
-void PrintElem(json::value_type& e)
+void PrintElem(LavaParams const* lp, json::value_type& e)
 {
   using namespace std;
 
@@ -231,11 +236,13 @@ void PrintElem(json::value_type& e)
   case json::value_t::array:
   case json::value_t::object:{
     for(auto& ee : e){
-      PrintElem(ee);
+      PrintElem(lp, ee);
     }
   }break;
   default: 
-    cout << e << endl << endl << endl;
+    ofstream o(lp->lava_stdout);
+    o << e << endl << endl << endl;
+    //cout << e << endl << endl << endl;
     break;
   }
 
@@ -252,7 +259,7 @@ extern "C"
   uint64_t         TblToStr(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
   {
     auto inTxtPckt = in->packets[IN_TBL_TO_STR_ASCII];
-    tbl        txt = LavaMakeTbl(lp, inTxtPckt.sz_bytes, 0);
+    tbl        txt = LavaMakeTbl(lp, inTxtPckt.sz_bytes, (i8)0);
 
     memcpy(txt.data(), (void*)inTxtPckt.val.value, inTxtPckt.sz_bytes);
 
@@ -286,13 +293,13 @@ extern "C"
     cnct.setcallbacks(OnBegin, OnData, OnComplete, &response);
     cnct.request("GET", page.c_str(), 0, 0, 0);
 
-    printf("\n");
+    fprintf(lp->lava_stdout, "\n");
     while( cnct.outstanding() ){
-      printf(".");
+      fprintf(lp->lava_stdout, ".");
       cnct.pump();
       nort_sleep(10);
     }
-    printf("\n");
+    fprintf(lp->lava_stdout, "\n");
 
     out->push( LavaTblToOut(response, OUT_HTTP_TXT) );
 
@@ -342,11 +349,22 @@ extern "C"
     using namespace std;
     using namespace nlohmann;
     
-    str    s = LavaStrFromPckt(in, IN_JSON_PARSE_ASCII);
-    json   j = json::parse(s);
+    //str    s = LavaStrFromPckt(in, IN_JSON_PARSE_ASCII);
+
+    str    s = (str)LavaTblFromPckt(lp, in, IN_JSON_PARSE_ASCII);
+
+    //fprintf(lp->lava_stdout, s.c_str());
+    //fprintf(stdout, s.c_str());
+
+    //json::json_pointer jp;
+    //json::
+    json   j = json::parse(s, nullptr, false);
+    //json   j = s;
+    
+    //j.parse();
 
     for(auto&& e : j){
-      PrintElem(e);
+      PrintElem(lp, e);
     }
 
     tbl tmp = LavaMakeTbl(lp);
