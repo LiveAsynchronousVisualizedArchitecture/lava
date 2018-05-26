@@ -769,9 +769,11 @@ private:
   
   void      initAlloc(AllocFunc a = malloc, ReallocFunc re = realloc, FreeFunc f = free)
   {
-    m_alloc   = a;
-    m_realloc = re;
-    m_free    = f;
+    if(!m_alloc && !m_realloc && !m_free){
+      m_alloc   = a;
+      m_realloc = re;
+      m_free    = f;
+    }
   }
   void     initFields(u64 sizeBytes, u64 count, u64 stride=1, u64 typenum=TblType::U8)
   {
@@ -789,12 +791,20 @@ private:
     f->stride     =  stride;
     f->version    =  0;
   }
-  void           init(u64 count,     u64 stride=1, u64 typenum=TblType::U8)
+  //void           init(u64 count,     u64 stride=1, u64 typenum=TblType::U8)
+  //{
+  //  //initAlloc();
+  //
+  //  u64    szBytes  =  tbl::size_bytes(count, stride);
+  //  //u8*      memst  =  (u8*)malloc(szBytes);                 // memst is memory start
+  //  u8*      memst  =  (u8*)m_alloc(szBytes);                 // memst is memory start
+  //  m_mem           =  memst + memberBytes();
+  //
+  //  initFields(szBytes, count, stride, typenum);
+  //}
+  void                             init(u64 count,     u64 stride=1, u64 typenum=TblType::U8)
   {
-    initAlloc();
-
     u64    szBytes  =  tbl::size_bytes(count, stride);
-    //u8*      memst  =  (u8*)malloc(szBytes);                 // memst is memory start
     u8*      memst  =  (u8*)m_alloc(szBytes);                 // memst is memory start
     m_mem           =  memst + memberBytes();
 
@@ -965,6 +975,7 @@ public:
   tbl(KVOfst const& kvo){ init(kvo); }
   template<class T> tbl(u64 count, T defaultValue)
   {
+    initAlloc();
     init(count, sizeof(T), TblType::typenum<T>::num);
     TO(count,i) (*this)[i] = defaultValue;
   }
@@ -1165,6 +1176,11 @@ public:
   {
     //assert(arrayType() == TblType::typenum<T>::num);
     return (T*)m_mem;
+  }
+  template<class T=u8>   void      init(u64 count, T defaultValue=T())
+  {
+    init(count, sizeof(T), TblType::typenum<T>::num);
+    TO(count,i) (*this)[i] = defaultValue;
   }
   void            pop(){ size(size()-1); }
   TblVal        front() const{ return (*this)[0]; }

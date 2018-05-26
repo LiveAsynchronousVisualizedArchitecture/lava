@@ -705,9 +705,7 @@ struct     LavaParams
   LavaReallocFunc local_realloc;
   LavaFreeFunc       local_free;
 
-  FILE*             lava_stdout;
-  FILE*              lava_stdin;
-  FILE*             lava_stderr;
+  int(*lava_puts)(const char*);            // function to give stable command line output to shared libraries
 };
 struct        LavaVal
 {
@@ -1837,6 +1835,7 @@ public:
   lava_hndlNodeMap         ndptrs;     // ndptrs is node pointers - a map from each handle to the one (zero?) or more LavaFlowNode pointers the shared lib contains
   lava_nameNodeMap      nameToPtr;     // maps node names to their pointers 
   ConstMem               constMem;
+  LavaParams        defaultParams;
 
 //  mutable bool          m_running = false;            // todo: make this atomic
   mutable abool         m_running = false;            // todo: make this atomic
@@ -2006,7 +2005,9 @@ template<class T> tbl LavaMakeTbl(LavaParams const* lp, u64 count, T initVal=T()
   t.m_realloc  =  nullptr;
   t.m_free     =  nullptr;
 
-  t.resize(count, initVal);
+  t.init<T>(count, initVal);
+  
+  //t.resize(count, initVal);
 
   return move(t);
 }
@@ -2738,34 +2739,20 @@ void               LavaLoop(LavaFlow& lf) noexcept
   lava_memvec  ownedMem;
   LavaFrame     inFrame;
   LavaVal        inArgs[LAVA_ARG_COUNT]={};           // these will end up on the per-thread stack when the thread enters this function, which is what we want - thread specific memory for the function call
-  LavaParams         lp;
-
-  //#ifdef _WIN32
-  //  freopen("CONOUT$", "w", stdout);
-  //#endif
+  LavaParams         lp = lf.defaultParams;
 
   SECTION(initialization at thread start before loop)
   {
     lava_thread_ownedMem = &ownedMem;                   // move the pointer out to a global scope for the thread, so that the allocation function passed to the shared library can add the pointer the owned memory of the thread
     LavaHeapInit();
 
-    lp.ref_alloc      =   LavaAlloc;
-    lp.ref_realloc    =   LavaRealloc;
-    lp.ref_free       =   LavaFree;
-    lp.local_alloc    =   LavaHeapAlloc;
-    lp.local_realloc  =   LavaHeapReAlloc;
-    lp.local_free     =   LavaFree;
-
-    #if defined(_WIN32)
-      lp.lava_stdout    =   stdout;
-      lp.lava_stdin     =   stdin;
-      lp.lava_stderr    =   stderr;
-      //lp.lava_stdout = GetStdHandle(STD_OUTPUT_HANDLE);
-    #else
-      lp.lava_stdout    =   stdout;
-      lp.lava_stdin     =   stdin;
-      lp.lava_stderr    =   stderr;
-    #endif
+    if(!lp.ref_alloc)     lp.ref_alloc      =   LavaAlloc;
+    if(!lp.ref_realloc)   lp.ref_realloc    =   LavaRealloc;
+    if(!lp.ref_free)      lp.ref_free       =   LavaFree;
+    if(!lp.local_alloc)   lp.local_alloc    =   LavaHeapAlloc;
+    if(!lp.local_realloc) lp.local_realloc  =   LavaHeapReAlloc;
+    if(!lp.local_free)    lp.local_free     =   LavaFree;
+    if(!lp.lava_puts)     lp.lava_puts      =   puts;
   }
 
   while(lf.m_running)
@@ -2999,3 +2986,40 @@ void               LavaLoop(LavaFlow& lf) noexcept
 
 #endif
 
+
+
+
+
+
+
+
+
+//FILE*             lava_stdout;
+//FILE*              lava_stdin;
+//FILE*             lava_stderr;
+
+//struct         LavaIO
+//{
+//  FILE*  lava_stdout;                      // can't use stdout, since in visual studio it is a macro that resolves to a function call
+//  FILE*  lava_stdin;
+//  FILE*  lava_stderr;
+//};
+
+//#ifdef _WIN32
+//  freopen("CONOUT$", "w", stdout);
+//#endif
+//
+//if(!lp.lava_stdout)   lp.lava_stdout    =   stdout;
+//if(!lp.lava_stdin)    lp.lava_stdin     =   stdin;
+//if(!lp.lava_stderr)   lp.lava_stderr    =   stderr;
+//
+//#if defined(_WIN32)
+//  lp.lava_stdout    =   stdout;
+//  lp.lava_stdin     =   stdin;
+//  lp.lava_stderr    =   stderr;
+//  //lp.lava_stdout = GetStdHandle(STD_OUTPUT_HANDLE);
+//#else
+//  lp.lava_stdout    =   stdout;
+//  lp.lava_stdin     =   stdin;
+//  lp.lava_stderr    =   stderr;
+//#endif

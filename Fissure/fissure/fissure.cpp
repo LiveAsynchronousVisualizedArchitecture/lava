@@ -332,6 +332,22 @@ void    startFlowThreads(u64 num=1)
 {
   stopFlowThreads();
   fd.lgrph.clearTime();
+
+  SECTION(initialize default lava params for allocators and command line handles)
+  {
+    LavaParams& lp = fd.flow.defaultParams;
+    lp.ref_alloc      =   LavaAlloc;
+    lp.ref_realloc    =   LavaRealloc;
+    lp.ref_free       =   LavaFree;
+    lp.local_alloc    =   LavaHeapAlloc;
+    lp.local_realloc  =   LavaHeapReAlloc;
+    lp.local_free     =   LavaFree;
+    //lp.lava_stdout    =   stdout;
+    //lp.lava_stdin     =   stdin;
+    //lp.lava_stderr    =   stderr;
+    lp.lava_puts      =   puts;
+  }
+
   fd.flow.start();
 
   TO(num,i){
@@ -2193,7 +2209,7 @@ ENTRY_DECLARATION // main or winmain
       fd.ui.ndinstBtn = new  Button(fd.ui.keyWin,   "Node List");
       auto cnstBtn    = new  Button(fd.ui.keyWin,  "Create Constant");
       auto nodeBtn    = new  Button(fd.ui.keyWin,  "Create Node");
-      auto thrdsLabel = new   Label(fd.ui.keyWin,  ""); //toString(fd.threadCount) );
+      auto thrdsLabel = new   Label(fd.ui.keyWin,  "");
       auto thrdsSldr  = new  Slider(fd.ui.keyWin);
       auto nodeTxt    = fd.ui.nodeTxt = new TextBox(fd.ui.keyWin,  "");
 
@@ -2372,11 +2388,6 @@ ENTRY_DECLARATION // main or winmain
             FreeConsole();
             AllocConsole();
             freopen("CONOUT$", "w", stdout);
-
-            //void* stdHndl = GetStdHandle(STD_OUTPUT_HANDLE);
-            //FILE* stdFile = (FILE*)stdHndl;
-            //FILE* stdFile = (FILE*)stdout;
-            //*(stdout) = *((FILE*)GetStdHandle(STD_OUTPUT_HANDLE));
           #endif
         });
       }
@@ -3228,6 +3239,11 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+//void* stdHndl = GetStdHandle(STD_OUTPUT_HANDLE);
+//FILE* stdFile = (FILE*)stdHndl;
+//FILE* stdFile = (FILE*)stdout;
+//*(stdout) = *((FILE*)GetStdHandle(STD_OUTPUT_HANDLE));
 
 //
 //bool    rtClk = (ms.rtDn  && !ms.prevRtDn);  // todo: take this out

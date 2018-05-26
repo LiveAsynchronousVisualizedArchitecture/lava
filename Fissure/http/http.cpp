@@ -22,6 +22,7 @@
 #include "tinyxml2.h"
 #include "../../no_rt_util.h"
 #include "../../tbl.hpp"
+#include "../../str_util.hpp"
 #include "../LavaFlow.hpp"
 #include "json_fwd.hpp"
 #include "json.hpp"
@@ -240,8 +241,9 @@ void PrintElem(LavaParams const* lp, json::value_type& e)
     }
   }break;
   default: 
-    ofstream o(lp->lava_stdout);
-    o << e << endl << endl << endl;
+    lp->lava_puts( toString(e,"\n","\n").c_str() );
+    //ofstream o(lp->lava_stdout);
+    //o << e << endl << endl << endl;
     //cout << e << endl << endl << endl;
     break;
   }
@@ -261,7 +263,7 @@ extern "C"
     auto inTxtPckt = in->packets[IN_TBL_TO_STR_ASCII];
     tbl        txt = LavaMakeTbl(lp, inTxtPckt.sz_bytes, (i8)0);
 
-    memcpy(txt.data(), (void*)inTxtPckt.val.value, inTxtPckt.sz_bytes);
+    memcpy(txt.data<i8>(), (void*)inTxtPckt.val.value, inTxtPckt.sz_bytes);
 
     out->push( LavaTblToOut(txt, OUT_TBL_TO_STR_TXT) );
 
@@ -293,13 +295,13 @@ extern "C"
     cnct.setcallbacks(OnBegin, OnData, OnComplete, &response);
     cnct.request("GET", page.c_str(), 0, 0, 0);
 
-    fprintf(lp->lava_stdout, "\n");
+    //fprintf(lp->lava_stdout, "\n");
     while( cnct.outstanding() ){
-      fprintf(lp->lava_stdout, ".");
+      lp->lava_puts(".");
       cnct.pump();
       nort_sleep(10);
     }
-    fprintf(lp->lava_stdout, "\n");
+    //fprintf(lp->lava_stdout, "\n");
 
     out->push( LavaTblToOut(response, OUT_HTTP_TXT) );
 
@@ -353,6 +355,8 @@ extern "C"
 
     str    s = (str)LavaTblFromPckt(lp, in, IN_JSON_PARSE_ASCII);
 
+    printf(s.c_str());
+    lp->lava_puts(s.c_str());
     //fprintf(lp->lava_stdout, s.c_str());
     //fprintf(stdout, s.c_str());
 

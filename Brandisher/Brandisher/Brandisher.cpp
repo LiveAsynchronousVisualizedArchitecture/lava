@@ -124,6 +124,7 @@
 #include <nana/gui/dragger.hpp>
 #include <nana/gui/widgets/label.hpp>
 #include <nana/gui/widgets/button.hpp>
+#include <nana/gui/widgets/textbox.hpp>
 #include <nana/gui/widgets/treebox.hpp>
 #include <nana/gui/widgets/menu.hpp>
 #include <nana/gui/widgets/menubar.hpp>
@@ -197,6 +198,7 @@ nana::form                     fm;
 nana::treebox                tree;
 nana::paint::image         vizImg;
 nana::button              refresh;
+nana::textbox                 txt;
 nana::place                   plc;
 nana::label sz, elems, szBytes, cap, mapcap, owned, status;
 TblCache                 tblCache;
@@ -1024,7 +1026,13 @@ int  main()
       mapcap.create(fm);
       owned.create(fm);
     }
-
+    SECTION(init txt box for i8 tbls)
+    {
+      txt.create(fm);
+      txt.editable(false);  // this may change
+      txt.multi_lines(true);
+      txt.line_wrapped(true);
+    }
     status.create(fm);
 
     //initViz();
@@ -1128,20 +1136,11 @@ int  main()
             str statStr = makeStatStr(t);
             tbArg.item.child().text(statStr);
           }
-
-          //Println("");
-          //Println("txt: ", tbArg.item.text(), " key: ", tbArg.item.key() );
-          //Println("expanded: ", tbArg.item.expanded() );
-          //Println("");
         }
       });
       tree.events().selected([](const arg_treebox& tbArg) mutable
       {
         sel.clear();
-
-        //Println("key:  ", tree.selected().key() );
-        //Println("selected: ", tbArg.item.key() );
-        //Println("owner: ",    tbArg.item.owner().key() );
 
         auto* cur = &tbArg.item;
         do{
@@ -1154,37 +1153,24 @@ int  main()
           key += sel[i];
           if(i!=0) key += "/";
         }
-        //Println(key);
 
         bool isTbl = isTableKey(key);
-        //Println("isTableKey: ", isTbl);
 
-        tbl* curT = setCurTblFromTreeKey(key);
+        tbl*  curT = setCurTblFromTreeKey(key);
         if(curT){
           regenLabels( *curT );
+          if(curT->arrayType()==tbl::TblType::I8){
+            txt.del();
+            txt.append( (str)(*curT), false );
+          }
         }
         if(curT == nullptr) return;
 
         refreshViz();
 
-        //auto&   t = *curT;
-        //auto flen = t.size();// * 12;      // 12 floats in a vert struct
-        //f32*    f = (float*)t.m_mem;
-
-        //mx = numeric_limits<f32>::lowest(); 
-        //mn = numeric_limits<f32>::max();
-        //TO(flen,i){
-        //  //Print( (f32)f[i], " " );
-        //  mx = max<f32>((f32)mx, (f32)f[i] );
-        //  mn = min<f32>((f32)mn, (f32)f[i] );
-        //}
-        ////Println("\n Table Key mx: ",mx, " mn: ", mn, " \n" );
-
         plc.collocate();
         fm.collocate();
         fm.activate();
-
-        //Println("\n\n");
       });
     }
   }
@@ -1202,17 +1188,22 @@ int  main()
     plc["owned"]   << owned;
     plc["mapcap"]  << mapcap;
     plc["tree"]    << tree;
+    plc["txt"]     << txt;
     plc["status"]  << status;
     plc.div("vertical"
-            "<mb weight=30>"
-            "<weight=30 margin=[0,0,5,10] " // weight=20 "<weight=10% "
-              // labels and refresh button
+            "<mb weight=30>  "
+            "<weight=30 margin=[0,0,5,10] " 
               "<fit refresh margin=[0,10]> <fit sz margin=[0,10]> <fit elems margin=[0,10]> <fit szBytes margin=[0,10]> <fit cap margin=[0,10]> <fit mapcap margin=[0,10]> <fit owned>"
-            ">" //  gap=5 margin=[10,40,10,0]" //margin=[10,10,10,10]>"
-            "<fit viz margin=[5,5,5,5] >"// weight=30%>" // margin=[10,10,10,10] > "
-            //"<splitter>"
-            "<tree>" // weight=70%>"
-            "<status weight=30 margin=[5,5,5,5]>"
+            "> " 
+            //"<arrange=[25,25,40] "
+            //"<weight=[10,25%,50%] "
+            //"<vert arrange=[25,25,40] "
+            //"<grid=[1,3] "
+              "<viz margin=[5,5,5,5]> "
+              "<tree> "
+              "<fit txt margin=[5,5,5,5]> "
+            //" > "
+            "<status weight=10 margin=[5,5,5,5]> "
             );
     plc.collocate();
   }
@@ -1235,3 +1226,44 @@ int  main()
 }
 
 
+
+
+// weight=20 "<weight=10% "
+// labels and refresh button
+
+//Println("");
+//Println("txt: ", tbArg.item.text(), " key: ", tbArg.item.key() );
+//Println("expanded: ", tbArg.item.expanded() );
+//Println("");
+
+// weight=70%>"
+//
+// weight=30%>" // margin=[10,10,10,10] > "
+//
+//  gap=5 margin=[10,40,10,0]" //margin=[10,10,10,10]>"
+//
+//"<splitter>"
+
+//
+//Println("\n\n");
+
+//auto&   t = *curT;
+//auto flen = t.size();// * 12;      // 12 floats in a vert struct
+//f32*    f = (float*)t.m_mem;
+
+//mx = numeric_limits<f32>::lowest(); 
+//mn = numeric_limits<f32>::max();
+//TO(flen,i){
+//  //Print( (f32)f[i], " " );
+//  mx = max<f32>((f32)mx, (f32)f[i] );
+//  mn = min<f32>((f32)mn, (f32)f[i] );
+//}
+////Println("\n Table Key mx: ",mx, " mn: ", mn, " \n" );
+
+//Println(key);
+//
+//Println("isTableKey: ", isTbl);
+
+//Println("key:  ", tree.selected().key() );
+//Println("selected: ", tbArg.item.key() );
+//Println("owner: ",    tbArg.item.owner().key() );
