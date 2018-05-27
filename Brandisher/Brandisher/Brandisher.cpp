@@ -97,12 +97,14 @@
 // -todo: print off full block list - can't if their default index is 0, it will create a loop
 // -todo: print off all blocks
 // -todo: look at why bounding box positions x shows 0 for sizeBytes - probably just the offset mixed up with the size
+// -todo: add txt box
+// -todo: treat the array as a string if it is u8, i8, (or a string type?) - then show statistics for a string if the string is too long to fit in the gui
+// -todo: take out print db menu item
 
-// todo: debug crash on LoadObj const
-// todo: take out print db menu item
+// todo: add ability to check if a child tbl's address is with the tbl child memory buffer - then check if that memory is a tbl
 // todo: add ability to delete keys 
+// todo: debug crash on LoadObj const
 // todo: delete with multi-selection and right click menu
-// todo: treat the array as a string if it is u8, i8, (or a string type?) - then show statistics for a string if the string is too long to fit in the gui
 
 // idea: make each pixel a value when visualizing arrays larger than the number of horizontal pixels - can use stb rectangle packer
 // idea: make box heirarchy that visualizes the sizes of each sub table relative to each other
@@ -204,14 +206,13 @@ nana::label sz, elems, szBytes, cap, mapcap, owned, status;
 TblCache                 tblCache;
 
 namespace { 
-  template <class T> T remap(T val, T fromLo, T fromHi, T toLo, T toHi)
+  template <class T> T       remap(T val, T fromLo, T fromHi, T toLo, T toHi)
   {
     auto  dif = fromHi - fromLo;
     auto norm = dif!=0?  (val - fromLo) / dif  :  0.f;
     return norm * (toHi - toLo) + toLo;
   }
-
-  template<class T> auto tblToVec(tbl const& t) -> std::vector<T>
+  template<class T>  auto tblToVec(tbl const& t) -> std::vector<T>
   {
     auto sz = t.size();
     std::vector<T> ret(sz);
@@ -705,6 +706,8 @@ void          insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
 {
   using namespace std;
   
+  //if( !tbl::isTbl(t) ){ return; }
+
   SECTION(array visualization)
   {
     str aszStr = toString("Type: ", t.typeStr(), " Size: ", t.size());
@@ -737,12 +740,15 @@ void          insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
     {
       str  elemKey = kv.key; // get the key into a string so it can be compared to "type" easily
       str    title;
+      tbl  elemTbl;
       SECTION(create the title which will include the key name, the type and the value)
       {
-        tbl  elemTbl;
         if(kv.type & tbl::TblType::TABLE){  // if the element is a table, make a tbl out of it and recurse this function 
-          elemTbl = tbl( ((u8*)t.childData() + kv.val) );
-          title   = toString(elemKey," (", elemTbl.typeStr() ,"):   ", kv.val);
+          //elemTbl = tbl( ((u8*)t.childData() + kv.val) );
+          elemTbl = t(kv.key);                                                    // this gets a KVOfst out
+          if(elemTbl){
+            title   = toString(elemKey," (", elemTbl.typeStr() ,"):   ", kv.val);
+          }
         }else if(elemKey == "type"){
           char typeNumAsStr[9];                                                   // this is type number as a string - this is a special case for an element with the key "type", which can be a 64 bit number that can also be read as 8 characters 
           memcpy(typeNumAsStr, &kv.val, 8);
@@ -756,8 +762,9 @@ void          insertTbl(str const& parentKey, tbl const& t, IdxKey ik)
       str thsTreeKey = toString(elemsTreeKey,"/", elemKey);
       tree.insert(thsTreeKey, title); // e.as<tbl<>::i64>()) ); 
 
-      if(kv.type & tbl::TblType::TABLE){  // if the element is a table, make a tbl out of it and recurse this function 
-        tbl elemTbl( ((u8*)t.childData()+kv.val) );
+      //if(kv.type & tbl::TblType::TABLE){  // if the element is a table, make a tbl out of it and recurse this function 
+        //tbl elemTbl( ((u8*)t.childData()+kv.val) );
+      if(elemTbl){                                          // if the element was a tbl, elem tbl will be set above
         str subKey = ik.key + "/" + kv.key;
         tblCache[ik.idx][subKey] = elemTbl;
         IdxKey subIk;
@@ -829,16 +836,18 @@ void       regenTblInfo()
         if(tblBuf.size() < sizeof(tbl::TblFields)){
           continue;
         }
-        //IvTbl ivTbl(tblBuf.data());
-        tbl ivTbl(tblBuf.data());
-        tblCache[i][key.str] = tbl(ivTbl);
+        
+        if( tbl::isTbl(tblBuf.data()) )
+        {
+          tbl ivTbl(tblBuf.data());
+          tblCache[i][key.str] = tbl(ivTbl);
 
-        IdxKey ik;
-        ik.subTbl = false;
-        ik.idx    = (u32)i;
-        ik.key    = key.str;
-        insertTbl(tblKey, ivTbl, ik);
-        //tblKeys[tblKey] = ik;
+          IdxKey ik;
+          ik.subTbl = false;
+          ik.idx    = (u32)i;
+          ik.key    = key.str;
+          insertTbl(tblKey, ivTbl, ik);
+        }
       }
     }
   }
@@ -1029,7 +1038,7 @@ int  main()
     SECTION(init txt box for i8 tbls)
     {
       txt.create(fm);
-      txt.editable(false);  // this may change
+      txt.editable(false);           // this may change
       txt.multi_lines(true);
       txt.line_wrapped(true);
     }
@@ -1197,14 +1206,9 @@ int  main()
             "<weight=30 margin=[0,0,5,10] " 
               "<fit refresh margin=[0,10]> <fit sz margin=[0,10]> <fit elems margin=[0,10]> <fit szBytes margin=[0,10]> <fit cap margin=[0,10]> <fit mapcap margin=[0,10]> <fit owned>"
             "> " 
-            //"<arrange=[25,25,40] "
-            //"<weight=[10,25%,50%] "
-            //"<vert arrange=[25,25,40] "
-            //"<grid=[1,3] "
               "<viz margin=[5,5,5,5]> "
               "<tree> "
               "<fit txt margin=[5,5,5,5]> "
-            //" > "
             "<status weight=10 margin=[5,5,5,5]> "
             );
     plc.collocate();
@@ -1229,6 +1233,19 @@ int  main()
 
 
 
+
+
+
+
+//"<arrange=[25,25,40] "
+//"<weight=[10,25%,50%] "
+//"<vert arrange=[25,25,40] "
+//"<grid=[1,3] "
+//" > "
+
+//IvTbl ivTbl(tblBuf.data());
+//
+//tblKeys[tblKey] = ik;
 
 // weight=20 "<weight=10% "
 // labels and refresh button

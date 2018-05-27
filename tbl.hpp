@@ -335,10 +335,6 @@ public:
     u32      hash;           // The hash of the key truncated to 26 bits
     u64       val;           // The value treated as an 8 byte unsigned 64 bit integer
     
-    //u32      type :  6;      // The type of the value contained
-    //u32      hash : 26;      // The hash of the key truncated to 26 bits
-    //tbl*     base;
-
     template<class N> KV& init(char* k, N v)
     {
       new (this) KV(k);
@@ -388,17 +384,10 @@ public:
 
     template<class N> KV(char* key, N val){ init(key, val); }
 
-    //bool operator==(KV const& l){ return hsh.hash==l.hsh.hash && strncmp(l.key,key,sizeof(KV::Key)-1)==0; }
     bool operator==(KV const& l){ return hash==l.hash && strncmp(l.key,key,sizeof(KV::Key)-1)==0; }
     KV&  operator= (KV const& l){ return cp(l); }
     KV&  operator= (KV&&      r){ return cp(r); }
-    //KV&  operator= (KVOfst const& l)
-    //{
-    //  if(l.kv)
-    //    (*this) = *(l.kv);
-    //  else
-    //    init("\0", (u8)0 );
-    //}
+
     template<class N> KV& operator=(N           const& n)
     {
       //hsh.type     = typenum< typecast<N>::type >::num;
@@ -407,12 +396,7 @@ public:
       memcpy(&val, &castVal, sizeof(u64));
       return *this;
     }
-    //template<class N> KV& operator=(std::pair<char*,N> p)
-    //{
-    //  return init(p);
-    //}
 
-    //KV& operator=(tbl  const& t) = delete;
     KV& operator=(tbl* t)
     {
       type  =  TblType::typenum<tbl>::num;
@@ -537,16 +521,21 @@ public:
     KVOfst(KV* _kv=nullptr, tbl* _base=nullptr) : kv(_kv), base(_base) {}
 
     //operator bool() const { return (bool)(kv); }
-    operator tbl() const
+
+    operator tbl() const  // todo: check here that the tbl is valid within the memory of the parent
     {   
       using namespace std;
 
       if(base){
         tbl ret;
 
-        u64 chldSt = (u64)((tbl*)(base))->childData();                                   // chldSt is child start - the part of the tbl memory that contains the sub-tables
-        auto   fff = (tbl::fields*)(kv->val + (u64)chldSt);
-        ret.m_mem  = (u8*)(fff+1);
+        //u64  childrenSt = (u64)((tbl*)(base))->childData();                                   // chldSt is child start - the part of the tbl memory that contains the sub-tables
+        u64  childrenSt = (u64)(base->childData());                                   // chldSt is child start - the part of the tbl memory that contains the sub-tables
+        auto    childSt = (tbl::fields*)(kv->val + childrenSt);
+
+        assert( (u64)childSt < (u64)(base->memStart()+base->sizeBytes())  );
+
+        ret.m_mem  = (u8*)(childSt+1);
 
         return ret;
       }else{
@@ -791,18 +780,7 @@ private:
     f->stride     =  stride;
     f->version    =  0;
   }
-  //void           init(u64 count,     u64 stride=1, u64 typenum=TblType::U8)
-  //{
-  //  //initAlloc();
-  //
-  //  u64    szBytes  =  tbl::size_bytes(count, stride);
-  //  //u8*      memst  =  (u8*)malloc(szBytes);                 // memst is memory start
-  //  u8*      memst  =  (u8*)m_alloc(szBytes);                 // memst is memory start
-  //  m_mem           =  memst + memberBytes();
-  //
-  //  initFields(szBytes, count, stride, typenum);
-  //}
-  void                             init(u64 count,     u64 stride=1, u64 typenum=TblType::U8)
+  void           init(u64 count,     u64 stride=1, u64 typenum=TblType::U8)
   {
     u64    szBytes  =  tbl::size_bytes(count, stride);
     u8*      memst  =  (u8*)m_alloc(szBytes);                 // memst is memory start
@@ -827,13 +805,6 @@ private:
       u8* childTablesStart = (u8*)((tbl*)kvo.base)->childData();
       m_mem = childTablesStart + kvo.kv->val + sizeof(tbl::TblFields);
     }else{
-      //m_mem = ((tbl*)kvo.kv->val)->m_mem;
-      //tbl* base = (tbl*)kvo.base;
-      //tbl cpTbl;
-      //cpTbl.m_mem     = 
-      //cpTbl.m_alloc   = base->m_alloc;
-      //cpTbl.m_realloc = base->m_realloc;
-      //cpTbl.m_free    = base->m_free;
       cp(  *((tbl*)kvo.kv->val)  );  // This is copying from a table that owns it's memory and so copies its allocation functions too
     }
   }
@@ -1089,7 +1060,6 @@ public:
   tbl&         operator--(){ shrink_to_fit();    return *this; }
   tbl&         operator++(){ expand(true,false); return *this; }
 
-
   //void    operator+=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a += b; } ); }
   //void    operator-=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a -= b; } ); }
   //void    operator*=(tbl const& l){ op_asn(l, [](T& a, T const& b){ a *= b; } ); }
@@ -1182,6 +1152,7 @@ public:
     init(count, sizeof(T), TblType::typenum<T>::num);
     TO(count,i) (*this)[i] = defaultValue;
   }
+  bool          valid(){ return m_mem || m_alloc; }
   void            pop(){ size(size()-1); }
   TblVal        front() const{ return (*this)[0]; }
   TblVal         back() const{ return (*this)[size()-1]; }
@@ -1737,6 +1708,41 @@ public:
 
 
 
+
+
+
+//void           init(u64 count,     u64 stride=1, u64 typenum=TblType::U8)
+//{
+//  //initAlloc();
+//
+//  u64    szBytes  =  tbl::size_bytes(count, stride);
+//  //u8*      memst  =  (u8*)malloc(szBytes);                 // memst is memory start
+//  u8*      memst  =  (u8*)m_alloc(szBytes);                 // memst is memory start
+//  m_mem           =  memst + memberBytes();
+//
+//  initFields(szBytes, count, stride, typenum);
+//}
+
+//bool operator==(KV const& l){ return hsh.hash==l.hsh.hash && strncmp(l.key,key,sizeof(KV::Key)-1)==0; }
+//
+//KV&  operator= (KVOfst const& l)
+//{
+//  if(l.kv)
+//    (*this) = *(l.kv);
+//  else
+//    init("\0", (u8)0 );
+//}
+//
+//template<class N> KV& operator=(std::pair<char*,N> p)
+//{
+//  return init(p);
+//}
+//
+//KV& operator=(tbl  const& t) = delete;
+
+//u32      type :  6;      // The type of the value contained
+//u32      hash : 26;      // The hash of the key truncated to 26 bits
+//tbl*     base;
 
 //KV&        place_rh(KV     kv, KV* elems, u64 st, u64 dist, u64 mod, u64* placement=nullptr)   // place_rh is place with robin hood hashing 
 //{

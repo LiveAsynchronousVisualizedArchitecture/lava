@@ -362,6 +362,9 @@ extern "C"
     //}
 
     tbl tmp = LavaMakeTbl(lp, 1, (i8)0);
+    tmp("itemId")    = (u64)0;
+    tmp("name")      = (u64)0; //&tbl();
+    tmp("salePrice") = (f64)0;
     out->push( LavaTblToOut(tmp, OUT_JSON_PARSE_TBL) );
 
     return 0;
