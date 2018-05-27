@@ -37,6 +37,7 @@
 // -todo: make string convenience function 
 // -todo: make console button re-open stdout so that printf will work without reloading a node - reopen doesn't work for shared libs
 
+// todo: debug why json_params constant output slot isn't drawn
 // todo: try making visual studio visualization for LavaMem and tbl
 // todo: give LavaParams std file handles if release mode AllocConsole doesn't work on windows
 // todo: give const reloading the same structure as node reloading, or integrate them together
@@ -248,9 +249,21 @@ bool              hasInf(v2   v)
 }
 bool              hasNaN(v2   v)
 {
-  TO(2,i) if(v[i]==SIG_NANf || v[i]==-SIG_NANf) return true;
+  using namespace std;
+
+  TO(2,i) if( isnan(v[i]) ) return true;
   return false;
+
+  //TO(2,i) if(v[i]==SIG_NANf || v[i]==-SIG_NANf) return true;
+  //return false;
 }
+//bool          isRational(v2   v)
+//{
+//  using namespace std;
+//  
+//  TO(2,i) if( !isnan(v[i]) ){ return true; }
+//  return false;
+//}
 v2      lineCircleIntsct(v2   P, v2 dir, v2 crcl, f32 r)  // only works for circles to the sides
 {
   using namespace std;
@@ -2842,6 +2855,8 @@ ENTRY_DECLARATION // main or winmain
                 s.P = node_border(n, {0,-1.f}, &nrml);
                 s.N = {0,-1.f};
               }
+              assert( !hasNaN(s.P) && !hasNaN(s.N) );
+              //assert( isRational(s.P) && isRational(s.N) );
             }
           }
           SECTION(output / src slots)
@@ -2869,7 +2884,8 @@ ENTRY_DECLARATION // main or winmain
                 int   cnt = 0;
                 for(; ci != cnctEn && ci->first==nid; ++ci)
                 {
-                  if(!fd.lgrph.outSlot(ci->second)){ cnt -= 1; continue; }   // todo: does this need to subtract 1 from count?
+                  //if(!fd.lgrph.outSlot(ci->second)){ /*cnt -= 1;*/ continue; }   // todo: does this need to subtract 1 from count?
+                  if(!ci->second.isIn){ continue; }   // todo: does this need to subtract 1 from count?
 
                   auto si = fd.graph.inSlots.find(ci->second);
                   if(si != fd.graph.inSlots.end()){
@@ -2883,7 +2899,10 @@ ENTRY_DECLARATION // main or winmain
                 destN /= (f32)cnt;
                 s.N = norm(destN);
                 s.P = node_border(n, s.N);
+
+                assert( !hasNaN(s.P) && !hasNaN(s.N) );
               }
+              //assert( isRational(s.P) && isRational(s.N) );
             }
           }
         }

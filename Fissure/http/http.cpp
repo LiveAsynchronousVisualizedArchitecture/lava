@@ -339,10 +339,10 @@ extern "C"
     return 0;
   }
 
-  const char*   json_parse_InTypes[]  = {"JSON",                        nullptr};  // This array contains the type that each slot of the same index will accept as input.
-  const char*   json_parse_InNames[]  = {"JSON to Parse",               nullptr};  // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
-  const char*   json_parse_OutTypes[] = {"TBL",                         nullptr};  // This array contains the types that are output in each slot of the same index
-  const char*   json_parse_OutNames[] = {"Nested Tbls of JSON values",  nullptr};  // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char*   json_parse_InTypes[]  = {"JSON",          "PARAMS",              nullptr};  // This array contains the type that each slot of the same index will accept as input.
+  const char*   json_parse_InNames[]  = {"JSON to Parse", "Keys to Extract",     nullptr};  // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char*   json_parse_OutTypes[] = {"TBL",                                  nullptr};  // This array contains the types that are output in each slot of the same index
+  const char*   json_parse_OutNames[] = {"Nested Tbls of JSON values",           nullptr};  // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
   void          json_parse_construct(){}
   void          json_parse_destruct(){}
   uint64_t      json_parse(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
