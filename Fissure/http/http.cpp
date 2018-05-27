@@ -18,14 +18,16 @@
 #include <iostream>
 #include <fstream>
 #include <algorithm>
+#include "sqlite3.h"
 #include "happyhttp.h"
 #include "tinyxml2.h"
+#include "json_fwd.hpp"
+#include "json.hpp"
 #include "../../no_rt_util.h"
 #include "../../tbl.hpp"
 #include "../../str_util.hpp"
 #include "../LavaFlow.hpp"
-#include "json_fwd.hpp"
-#include "json.hpp"
+#include "url_encode_decode.h"
 
 using namespace tinyxml2;
 using namespace nlohmann;
@@ -38,15 +40,22 @@ enum        Slots
 {
           IN_HTTP_URL  =  0,  
      IN_XML_PARSE_TXT  =  0,
+  
   IN_JSON_PARSE_ASCII  =  0,
+         IN_JSON_KEYS  =  1,
+
         IN_WINMSG_MSG  =  0,
   IN_TBL_TO_STR_ASCII  =  0,
+    IN_SQLLITE_PARAMS  =  0,
+
+
 
          OUT_HTTP_TXT  =  0,
     OUT_XML_PARSE_XML  =  0,
       OUT_WINMSG_STAT  =  0,
    OUT_JSON_PARSE_TBL  =  0,
-   OUT_TBL_TO_STR_TXT  =  0
+   OUT_TBL_TO_STR_TXT  =  0,
+   OUT_SQLLITE_RESULT  =  0
 };
 
 struct SocketInit
@@ -100,21 +109,6 @@ void OnComplete( const happyhttp::Response* r, void* tblPtr)
 
   tbl* t = (tbl*)tblPtr;
 }
-
-//void OnBegin(    const happyhttp::Response* r, void* userdata )
-//{
-//  printf( "BEGIN (%d %s)\n", r->getstatus(), r->getreason() );
-//  count = 0;
-//}
-//void OnData(     const happyhttp::Response* r, void* userdata, const unsigned char* data, int n )
-//{
-//  fwrite( data,1,n, stdout );
-//  count += n;
-//}
-//void OnComplete( const happyhttp::Response* r, void* userdata )
-//{
-//  printf( "COMPLETE (%d bytes)\n", count );
-//}
 
 #ifdef _WIN32 
 
@@ -241,7 +235,12 @@ void PrintElem(LavaParams const* lp, json::value_type& e)
     }
   }break;
   default: 
-    lp->lava_puts( toString(e,"\n","\n").c_str() );
+    str de = urldecode(toString(e));
+    lp->lava_puts( toString(de,"\n\n").c_str() );
+
+    //str de = toString(e);
+    lp->lava_puts( toString(e,"\n\n").c_str() );
+
     //ofstream o(lp->lava_stdout);
     //o << e << endl << endl << endl;
     //cout << e << endl << endl << endl;
@@ -340,49 +339,59 @@ extern "C"
     return 0;
   }
 
-  const char*   json_parse_InTypes[] = {"JSON",                     nullptr};  // This array contains the type that each slot of the same index will accept as input.
-  const char*   json_parse_InNames[] = {"JSON to Parse",            nullptr};  // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
-  const char*  json_parse_OutTypes[] = {"TBL",                      nullptr};  // This array contains the types that are output in each slot of the same index
-  const char*  json_parse_OutNames[] = {"Nest Tbls of JSON values", nullptr};  // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
-  void        json_parse_construct(){}
-  void         json_parse_destruct(){}
+  const char*   json_parse_InTypes[]  = {"JSON",                        nullptr};  // This array contains the type that each slot of the same index will accept as input.
+  const char*   json_parse_InNames[]  = {"JSON to Parse",               nullptr};  // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char*   json_parse_OutTypes[] = {"TBL",                         nullptr};  // This array contains the types that are output in each slot of the same index
+  const char*   json_parse_OutNames[] = {"Nested Tbls of JSON values",  nullptr};  // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  void          json_parse_construct(){}
+  void          json_parse_destruct(){}
   uint64_t      json_parse(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
   { 
     using namespace std;
     using namespace nlohmann;
     
-    //str    s = LavaStrFromPckt(in, IN_JSON_PARSE_ASCII);
-
     str    s = (str)LavaTblFromPckt(lp, in, IN_JSON_PARSE_ASCII);
+    tbl keys = LavaTblFromPckt(lp, in, IN_JSON_KEYS);
 
-    printf(s.c_str());
-    lp->lava_puts(s.c_str());
-    //fprintf(lp->lava_stdout, s.c_str());
-    //fprintf(stdout, s.c_str());
+    //lp->lava_puts(s.c_str());
 
-    //json::json_pointer jp;
-    //json::
     json   j = json::parse(s, nullptr, false);
-    //json   j = s;
-    
-    //j.parse();
 
-    for(auto&& e : j){
-      PrintElem(lp, e);
-    }
+    //for(auto&& e : j){
+    //  PrintElem(lp, e);
+    //}
 
-    tbl tmp = LavaMakeTbl(lp);
+    tbl tmp = LavaMakeTbl(lp, 1, (i8)0);
     out->push( LavaTblToOut(tmp, OUT_JSON_PARSE_TBL) );
 
     return 0;
   }
 
-  const char*   winmsg_InTypes[] = {"params",         nullptr};            // This array contains the type that each slot of the same index will accept as input.
-  const char*   winmsg_InNames[] = {"Watch and MSG",  nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
-  const char*  winmsg_OutTypes[] = {"STATS",          nullptr};            // This array contains the types that are output in each slot of the same index
-  const char*  winmsg_OutNames[] = {"Status",         nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
-  void        winmsg_construct(){}
-  void         winmsg_destruct(){}
+  const char*   sqlite_InTypes[]  = {"SQLPARAM",                   nullptr};  // This array contains the type that each slot of the same index will accept as input.
+  const char*   sqlite_InNames[]  = {"Sqlite3 Params",             nullptr};  // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char*   sqlite_OutTypes[] = {"SQLRSULT",                   nullptr};  // This array contains the types that are output in each slot of the same index
+  const char*   sqlite_OutNames[] = {"Tbls of SQL Query Results",  nullptr};  // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  void          sqlite_construct(){}
+  void          sqlite_destruct(){}
+  uint64_t      sqlite(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
+  { 
+    using namespace std;
+
+    str   s = (str)LavaTblFromPckt(lp, in, IN_SQLLITE_PARAMS);
+ 
+    tbl tmp = LavaMakeTbl(lp);
+    out->push( LavaTblToOut(tmp, OUT_SQLLITE_RESULT) );
+
+    return 0;
+  }
+
+
+  const char*   winmsg_InTypes[]  = {"params",         nullptr};            // This array contains the type that each slot of the same index will accept as input.
+  const char*   winmsg_InNames[]  = {"Watch and MSG",  nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  const char*   winmsg_OutTypes[] = {"STATS",          nullptr};            // This array contains the types that are output in each slot of the same index
+  const char*   winmsg_OutNames[] = {"Status",         nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  void          winmsg_construct(){}
+  void          winmsg_destruct(){}
   uint64_t      winmsg(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
   {    
     runCount++; 
@@ -539,15 +548,15 @@ extern "C"
     },
 
     {
-      winmsg,                                 // function
-      winmsg_construct,                       // constructor - this can be set to nullptr if not needed
-      winmsg_destruct,                        // destructor  - this can also be set to nullptr 
+      sqlite,                                 // function
+      sqlite_construct,                       // constructor - this can be set to nullptr if not needed
+      sqlite_destruct,                        // destructor  - this can also be set to nullptr 
       LavaNode::FLOW,                         // node_type   - this should be eighther LavaNode::MSG (will be run even without input packets) or LavaNode::FLOW (will be run only when at least one packet is available for input)
-      "winmsg",                               // name
-      winmsg_InTypes,                         // in_types    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
-      winmsg_InNames,                         // in_names    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
-      winmsg_OutTypes,                        // out_types   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
-      winmsg_OutNames,                        // out_names   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr
+      "sqlite",                               // name
+      sqlite_InTypes,                         // in_types    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+      sqlite_InNames,                         // in_names    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+      sqlite_OutTypes,                        // out_types   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+      sqlite_OutNames,                        // out_names   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr
       nullptr,                                // description
       0                                       // version 
     },
@@ -569,6 +578,113 @@ extern "C"
 
 
 
+//
+//str    s = LavaStrFromPckt(in, IN_JSON_PARSE_ASCII);
+
+//printf(s.c_str());
+//fprintf(lp->lava_stdout, s.c_str());
+//fprintf(stdout, s.c_str());
+
+//json::json_pointer jp;
+//json::
+//json   j = s;
+//j.parse();
+
+//{
+//winmsg,                                 // function
+//  winmsg_construct,                       // constructor - this can be set to nullptr if not needed
+//  winmsg_destruct,                        // destructor  - this can also be set to nullptr 
+//  LavaNode::FLOW,                         // node_type   - this should be eighther LavaNode::MSG (will be run even without input packets) or LavaNode::FLOW (will be run only when at least one packet is available for input)
+//  "winmsg",                               // name
+//  winmsg_InTypes,                         // in_types    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+//  winmsg_InNames,                         // in_names    - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+//  winmsg_OutTypes,                        // out_types   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr 
+//  winmsg_OutNames,                        // out_names   - this can be set to nullptr instead of pointing to a list that has the first item as nullptr
+//  nullptr,                                // description
+//  0                                       // version 
+//},
+
+//std::string UriEncode(const std::string & sSrc)
+//{
+//  const char DEC2HEX[16 + 1] = "0123456789ABCDEF";
+//  const unsigned char * pSrc = (const unsigned char *)sSrc.c_str();
+//  const int SRC_LEN = sSrc.length();
+//  unsigned char * const pStart = new unsigned char[SRC_LEN * 3];
+//  unsigned char * pEnd = pStart;
+//  const unsigned char * const SRC_END = pSrc + SRC_LEN;
+//
+//  for (; pSrc < SRC_END; ++pSrc)
+//  {
+//    if (SAFE[*pSrc]) 
+//      *pEnd++ = *pSrc;
+//    else
+//    {
+//      // escape this char
+//      *pEnd++ = '%';
+//      *pEnd++ = DEC2HEX[*pSrc >> 4];
+//      *pEnd++ = DEC2HEX[*pSrc & 0x0F];
+//    }
+//  }
+//
+//  std::string sResult((char *)pStart, (char *)pEnd);
+//  delete [] pStart;
+//  return sResult;
+//}
+//std::string UriDecode(const std::string & sSrc)
+//{
+//  // Note from RFC1630: "Sequences which start with a percent
+//  // sign but are not followed by two hexadecimal characters
+//  // (0-9, A-F) are reserved for future extension"
+//
+//  const unsigned char * pSrc = (const unsigned char *)sSrc.c_str();
+//  const int SRC_LEN = sSrc.length();
+//  const unsigned char * const SRC_END = pSrc + SRC_LEN;
+//  // last decodable '%' 
+//  const unsigned char * const SRC_LAST_DEC = SRC_END - 2;
+//
+//  char * const pStart = new char[SRC_LEN];
+//  char * pEnd = pStart;
+//
+//  while (pSrc < SRC_LAST_DEC)
+//  {
+//    if (*pSrc == '%')
+//    {
+//      char dec1, dec2;
+//      if (-1 != (dec1 = HEX2DEC[*(pSrc + 1)])
+//        && -1 != (dec2 = HEX2DEC[*(pSrc + 2)]))
+//      {
+//        *pEnd++ = (dec1 << 4) + dec2;
+//        pSrc += 3;
+//        continue;
+//      }
+//    }
+//
+//    *pEnd++ = *pSrc++;
+//  }
+//
+//  // the last 2- chars
+//  while (pSrc < SRC_END)
+//    *pEnd++ = *pSrc++;
+//
+//  std::string sResult(pStart, pEnd);
+//  delete [] pStart;
+//  return sResult;
+//}
+
+//void OnBegin(    const happyhttp::Response* r, void* userdata )
+//{
+//  printf( "BEGIN (%d %s)\n", r->getstatus(), r->getreason() );
+//  count = 0;
+//}
+//void OnData(     const happyhttp::Response* r, void* userdata, const unsigned char* data, int n )
+//{
+//  fwrite( data,1,n, stdout );
+//  count += n;
+//}
+//void OnComplete( const happyhttp::Response* r, void* userdata )
+//{
+//  printf( "COMPLETE (%d bytes)\n", count );
+//}
 
 // todo: change this to raw text
 //tbl pageTxt;

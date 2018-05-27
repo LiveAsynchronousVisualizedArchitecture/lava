@@ -10,6 +10,12 @@
     <ClCompile Include="tinyxml2.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="url_encode_decode.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="sqlite3.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Source Files">
@@ -34,6 +40,12 @@
     </ClInclude>
     <ClInclude Include="json.hpp">
       <Filter>hpp</Filter>
+    </ClInclude>
+    <ClInclude Include="url_encode_decode.h">
+      <Filter>h</Filter>
+    </ClInclude>
+    <ClInclude Include="sqlite3.h">
+      <Filter>h</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

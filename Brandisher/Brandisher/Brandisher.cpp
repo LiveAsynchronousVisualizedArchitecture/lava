@@ -1160,8 +1160,10 @@ int  main()
         if(curT){
           regenLabels( *curT );
           if(curT->arrayType()==tbl::TblType::I8){
+            txt.select(true);
             txt.del();
             txt.append( (str)(*curT), false );
+            //txt.append( "test", false );
           }
         }
         if(curT == nullptr) return;
