@@ -2349,6 +2349,18 @@ auto       GetSharedLibPath() -> std::wstring
 {
   return GetRootPath() + L"/bin";
 }
+auto           GetConstPath() -> std::wstring
+{
+  return GetRootPath() + L"/const";
+}
+auto            GetLivePath()
+{
+  return GetRootPath() + L"/live";
+}
+auto         GetLiveTmpPath()
+{
+  return GetRootPath() + L"/live_tmp";
+}
 auto    GetSharedLibDirIter() -> fs::directory_iterator //( fs::path( GetSharedLibPath() ) )
 {
   using namespace std;
@@ -2362,7 +2374,7 @@ auto    GetSharedLibDirIter() -> fs::directory_iterator //( fs::path( GetSharedL
 
   return dirIter;  
 }
-auto    GetConstDirIter() -> fs::directory_iterator //( fs::path( GetSharedLibPath() ) )
+auto        GetConstDirIter() -> fs::directory_iterator //( fs::path( GetSharedLibPath() ) )
 {
   using namespace std;
   using namespace  fs;
@@ -2375,7 +2387,7 @@ auto    GetConstDirIter() -> fs::directory_iterator //( fs::path( GetSharedLibPa
 
   return dirIter;  
 }
-auto        GetRefreshPaths(bool force=false) -> lava_paths
+auto        GetRefreshPaths(fs::path const& libPath, bool force=false) -> lava_paths
 {
   using namespace std;
   using namespace  fs;
@@ -2383,7 +2395,7 @@ auto        GetRefreshPaths(bool force=false) -> lava_paths
   static const regex lavaRegex("lava_.*");
   static const regex  extRegex(".*\\.live\\.dll");
 
-  auto libPath = path( GetSharedLibPath() );
+  //auto libPath = path( GetSharedLibPath() );
   //libPath.remove_filename();
   path    root = libPath;
 
@@ -2453,6 +2465,40 @@ uint64_t    CopyPathsToLive(lava_paths       const& paths)
 
   return count;
 }
+uint64_t CopyPathsTo(lava_paths const& paths, fs::path dir)
+{
+  using namespace std;
+  using namespace  fs;
+
+  uint64_t count = 0;
+  for(auto const& p : paths)
+  {
+    path livepth(p);
+    livepth.replace_extension(".live.dll");                                         // todo: make this extension platform depedant 
+    livepth = dir.append( livepth.filename() );
+
+    bool doCopy = false;
+    if( exists(livepth) ){
+      error_code ec;                                                                // using an error code should make it so that the function doesn't throw
+      doCopy = remove(livepth, ec);
+    }else{ doCopy = true; }
+
+    if(doCopy){ 
+      copy_options co = copy_options::skip_existing;
+      error_code   ec;
+      bool ok = copy_file(p, livepth, co, ec);
+      if(ok)
+        ++count;
+      else{
+        str liveStr = livepth.string();
+        fprintf(stdout, "\nCould not copy %s to live path %s\n", p.c_str(), liveStr.c_str());
+        fflush(stdout);
+      }
+    }
+  }
+
+  return count;
+}
 uint64_t        RemovePaths(lava_paths       const& paths)
 {
   using namespace std;
@@ -2491,8 +2537,14 @@ auto           GetLivePaths(lava_paths       const& paths) -> lava_paths
   using namespace  fs;
 
   lava_paths ret;
-  for(auto const& p : paths){
-    ret.emplace_back( path(p).replace_extension(liveExt).generic_string() );
+  auto liveDir = path(GetLivePath());
+  for(auto const& p : paths)
+  {
+    auto liveFile = path(p).filename().replace_extension(liveExt);                                   // todo: make this extension platform depedant 
+    auto  livePth = liveDir.append( liveFile );
+    ret.emplace_back( livePth.generic_string() );
+
+    //ret.emplace_back( path(p).replace_extension(liveExt).generic_string() );
   }
 
   return ret;
@@ -2501,8 +2553,9 @@ auto         GetLiveHandles(lava_pathHndlMap const& hndls, lava_paths const& pat
 {
   lava_hndlvec ret;
   for(auto const& p : paths){
-    auto hi = hndls.find(p);         // hi is handle iterator
-    if(hi != end(hndls)) ret.push_back(hi->second);
+    auto hi = hndls.find(p);                   // hi is handle iterator
+    if(hi != end(hndls))
+      ret.push_back(hi->second);
   }
 
   return ret;
@@ -2661,17 +2714,21 @@ void               LavaInit()
 bool        RefreshFlowLibs(LavaFlow& inout_flow, bool force=false)
 {
   using namespace std;
+  using namespace  fs;
   
   bool     newlibs  =  false;
-  auto       paths  =  GetRefreshPaths(force);
-  if(paths.size() > 0){
+  //auto       paths  =  GetRefreshPaths(force);
+  auto   origPaths  =  GetRefreshPaths( path(GetSharedLibPath()), force);     // origPaths is original paths
+  
+  if(origPaths.size() > 0){
     newlibs = true;
     ++inout_flow.version;
   }
-
   if(!newlibs){ return false; } // avoid doing anything including locking if there no new libraries
 
-  lava_paths livePaths  =  GetLivePaths(paths);  // lava_paths is a vector of strings
+  auto       copyCount  =  CopyPathsTo(origPaths, GetLiveTmpPath() );
+
+  auto           paths  =  GetRefreshPaths( path(GetLiveTmpPath()), force);
   
   lock_guard<mutex> flowLck(inout_flow.m_qLck);  // todo: only locks the queue, which isn't good enough - need to switch the nodes in a manner that will work live - maybe atomically swap the function pointer to null, update the node, then swap the function pointer again
 
@@ -2679,7 +2736,8 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow, bool force=false)
   {
     for(auto const& p : paths){
       auto ndIter = inout_flow.flow.find(p); // ndIter is node iterator
-      for(; ndIter != end(inout_flow.flow) && ndIter->first==p; ){
+      for(; ndIter != end(inout_flow.flow) && ndIter->first==p; )
+      {
         LavaNode* nd = ndIter->second;
         if(nd->destructor){ nd->destructor(); }
 
@@ -2692,8 +2750,10 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow, bool force=false)
     }
   }
 
+  lava_paths livePaths  =  GetLivePaths(origPaths);  // lava_paths is a vector of strings
+
   // coordinate live paths to handles
-  auto liveHandles  =  GetLiveHandles(inout_flow.libs, livePaths);
+  auto     liveHandles  =  GetLiveHandles(inout_flow.libs, livePaths);  // this returns a vector of handles that matches the livePaths index for index
 
   // free the handles
   auto   freeCount  =  FreeLibs(liveHandles); 
@@ -2702,9 +2762,9 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow, bool force=false)
   auto    delCount  =  RemovePaths(livePaths);
 
   // copy the refresh paths' files
-  auto   copyCount  =  CopyPathsToLive(paths);
+  auto    cpyCount  =  CopyPathsToLive(paths);
 
-  if(copyCount != paths.size()){ return true; }
+  if(cpyCount != paths.size()){ return true; }
 
   // load the handles
   auto loadedHndls  =  LoadLibs(livePaths);

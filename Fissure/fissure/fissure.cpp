@@ -2052,7 +2052,8 @@ LavaNode*           sidToConst(LavaId      sid)
   if(dat.size()==0){ return nullptr; }
 
   str  type = getSlotType(sid);
-  str   dir = path(GetSharedLibPath()).remove_filename().generic_string();
+  //str   dir = path(GetSharedLibPath()).remove_filename().generic_string();
+  str   dir = path( GetConstPath() ).generic_string();
   str   pth = dir + "/" + key + "." + type + ".const";
   bool   ok = writeFile(pth, dat.data(), dat.size());
   if(!ok){ return nullptr; }
@@ -2061,7 +2062,6 @@ LavaNode*           sidToConst(LavaId      sid)
   Node n;
   n.txt = ln->name;
   node_bnd(fd.vg, n);
-  //n.P   = fd.mouse.pos - n.b.wh()/2;
   n.P   = fd.mouse.drgWrld - n.b.wh()/2;
   node_add(ln->name, n);
 
@@ -3252,6 +3252,11 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+
+//
+//n.P   = fd.mouse.pos - n.b.wh()/2;
 
 //SECTION(get the buttons out of the GUI and clear the button widgets from memory)
 //{
