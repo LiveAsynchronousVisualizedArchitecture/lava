@@ -2415,7 +2415,9 @@ uint64_t    CopyPathsToLive(lava_paths       const& paths)
     }else{ doCopy = true; }
     
     if(doCopy){ 
-      copy_file(p, livepth);
+      copy_options co = copy_options::skip_existing;
+      error_code   ec;
+      copy_file(p, livepth, co, ec);
       ++count;
     }
   }
@@ -2429,7 +2431,8 @@ uint64_t        RemovePaths(lava_paths       const& paths)
 
   uint64_t count = 0;
   for(auto const& p : paths){
-    if( remove(path(p)) ){ ++count; }
+    error_code ec;
+    if( remove(path(p), ec) ){ ++count; }
   }
 
   return count;
@@ -2478,11 +2481,19 @@ auto         GetLiveHandles(lava_pathHndlMap const& hndls, lava_paths const& pat
 auto       GetFlowNodeLists(lava_hndlvec     const& hndls) -> lava_ptrsvec
 {
   lava_ptrsvec ret(hndls.size(), nullptr);
-  TO(hndls.size(),i){
+  //lava_ptrsvec ret;
+  //ret.reserve(hndls.size());
+  TO(hndls.size(),i)
+  {
     auto h = hndls[i];
     if(h){
       auto  GetLavaFlowNodes = (GetLavaFlowNodes_t)GetProcAddress(h, TEXT("GetLavaNodes") );
-      LavaNode* nodeList = GetLavaFlowNodes();
+      if(!GetLavaFlowNodes){ continue; }
+
+      LavaNode*     nodeList = GetLavaFlowNodes();
+      if(!nodeList){ continue; }
+
+      //ret.push_back( nodeList );
       ret[i] = nodeList;
     }
   }
@@ -2498,7 +2509,7 @@ void    ErrorCheckNodeLists(lava_ptrsvec* inout_ndLsts)
     LavaNode* lst = lsts[i];  
     if(!lst){  }  // erase this node list if is a nullptr
 
-    for(; lst->func; ++lst)
+    for(; lst && lst->func; ++lst)
     {
       if(!lst->func){}                                 // error because this node does not have a primary function
       if(!lst->name){}                                 // error because this node does not have a name
@@ -2635,13 +2646,19 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow, bool force=false)
   
   lock_guard<mutex> flowLck(inout_flow.m_qLck);  // todo: only locks the queue, which isn't good enough - need to switch the nodes in a manner that will work live - maybe atomically swap the function pointer to null, update the node, then swap the function pointer again
 
-  SECTION(run destructor on the nodes given by the paths)
+  SECTION(run destructor on the nodes given by the paths and set them to nullptr)
   {
     for(auto const& p : paths){
       auto ndIter = inout_flow.flow.find(p); // ndIter is node iterator
-      for(; ndIter != end(inout_flow.flow) && ndIter->first==p; ++ndIter){
+      for(; ndIter != end(inout_flow.flow) && ndIter->first==p; ){
         LavaNode* nd = ndIter->second;
         if(nd->destructor){ nd->destructor(); }
+
+        ndIter = inout_flow.flow.erase(ndIter);
+
+        //ndIter->second = nullptr;
+
+        //++ndIter
       }
     }
   }
@@ -2682,7 +2699,7 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow, bool force=false)
     if(ndList){
       auto const&  p = livePaths[i];
       
-      inout_flow.flow.erase(p);                                     // delete the current node list for the livePath 
+      //inout_flow.flow.erase(p);                                     // delete the current node list for the livePath 
       for(; ndList->func!=nullptr; ++ndList){                       // insert each of the LavaFlowNodes in the ndList into the multi-map
         if(ndList->constructor){ ndList->constructor(); }
         inout_flow.nameToPtr.erase(ndList->name);
@@ -2728,7 +2745,7 @@ void               LavaStop(LavaFlow& lf)
   lf.m_frameQLck.unlock();                                            // unlock queue mutex
 }
 
-void               LavaLoop(LavaFlow& lf) noexcept
+void               LavaLoop(LavaFlow& lf) //noexcept
 {
   using namespace std;
   using namespace std::chrono;

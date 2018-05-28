@@ -251,6 +251,49 @@ void PrintElem(LavaParams const* lp, json::value_type& e)
   //}
 }
 
+//json::value_type& e,
+//str& val
+void ExtractKey(LavaParams const* lp, json::iterator& iter,  tbl* keysTbl)
+{
+  using namespace std;
+
+  auto val = iter.value();
+
+  switch(val.type()){
+  case json::value_t::number_float:
+  case json::value_t::number_integer:
+  case json::value_t::number_unsigned:
+  case json::value_t::boolean:
+  case json::value_t::string:{
+    str k = iter.key();
+    if( keysTbl->has(k.c_str()) ){
+      str s = toString(iter.key(), ": ", iter.value(),"\n"); 
+      lp->lava_puts( s.c_str() );
+    }
+  }break;
+  case json::value_t::array:
+  case json::value_t::object:{
+    //for(auto& ee : e){
+    //ExtractKey(lp, ee, keysTbl);
+    for(auto it=val.begin(); it!=val.end(); ++it){
+      ExtractKey(lp, it, keysTbl);
+    }
+  }break;
+  default: 
+    //str de = urldecode(toString(e));
+    //lp->lava_puts( toString(de,"\n\n").c_str() );
+    //
+    //lp->lava_puts( toString(e,"\n\n").c_str() );
+    break;
+  }
+}
+void ExtractKey(LavaParams const* lp, tbl* keysTbl, json& j)
+{
+  for(auto it=j.begin(); it!=j.end(); ++it){
+    ExtractKey(lp, it, keysTbl);
+  }
+}
+
 extern "C"
 {
   const char*      TblToStr_InTypes[]  = {"ASCII",          nullptr};            // This array contains the type that each slot of the same index will accept as input.
@@ -356,6 +399,9 @@ extern "C"
     //lp->lava_puts(s.c_str());
 
     json   j = json::parse(s, nullptr, false);
+
+    ExtractKey(lp, &keys, j);
+    lp->lava_puts("\n  \n");
 
     //for(auto&& e : j){
     //  PrintElem(lp, e);

@@ -1795,14 +1795,6 @@ void     makeNodeInstWin()
 }
 void  refreshNodeButtons()
 {
-  //SECTION(get the buttons out of the GUI and clear the button widgets from memory)
-  //{
-  //  for(auto& b : fd.ui.ndinstBtns){
-  //    fd.ui.ndinstWin->removeChild(b);
-  //  }
-  //  fd.ui.ndinstBtns.clear();                                             // delete interface buttons from the nanogui window
-  //}
-
   bool wasVisible = fd.ui.ndinstWin->visible();
 
   clearNodeInstWin();
@@ -1812,7 +1804,8 @@ void  refreshNodeButtons()
     vec<LavaNode*> lns;
     lns.reserve(fd.flow.flow.size());
     for(auto& kv : fd.flow.flow)
-      lns.push_back(kv.second);
+      if(kv.second)
+        lns.push_back(kv.second);
 
     sort(ALL(lns), [](LavaNode* a, LavaNode* b){
       if(a->node_type==b->node_type)
@@ -3258,6 +3251,13 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+//SECTION(get the buttons out of the GUI and clear the button widgets from memory)
+//{
+//  for(auto& b : fd.ui.ndinstBtns){
+//    fd.ui.ndinstWin->removeChild(b);
+//  }
+//  fd.ui.ndinstBtns.clear();                                             // delete interface buttons from the nanogui window
+//}
 
 //void* stdHndl = GetStdHandle(STD_OUTPUT_HANDLE);
 //FILE* stdFile = (FILE*)stdHndl;
