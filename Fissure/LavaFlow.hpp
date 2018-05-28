@@ -8,7 +8,12 @@
 // -todo: make Lava convenience function to make a tbl with the correct allocators
 // -todo: make a Lava convenience function to make a tbl from a packet
 // -todo: separate input slots and output slots into two different indices
+// -todo: switch to using dedicated bin directory and const directory
 
+// todo: make sure new constants go into the .const directory
+// todo: implement live reloading that copies the shared library, loads it, switches over atomically, unloads the previous live version, copies the tmp live version to the normal live file, maps the new live version file, automically switches over to that, then unloads the tmp live shared lib - whew!
+//       |  have to make sure files that can't be copied error properly without breaking anything
+//       |  have to make sure libraries are switched only once they are successfully loaded
 // todo: make sure an error still runs the packet callback? does there need to be an error callback?
 // todo: put in more error states into LavaInst
 // todo: fill in error checking on shared library loading - need to make sure that the errors from nodes end up making it into their instances and ultimatly the GUI
@@ -2324,18 +2329,25 @@ LavaNode         MemMapFile(fs::path const& pth)
   return retNd;
 }
 
-auto       GetSharedLibPath() -> std::wstring
+auto            GetRootPath() -> std::wstring
 {
   using namespace std;
-  
+  using namespace  fs;
+
   #ifdef _WIN32
     HMODULE hModule = GetModuleHandleW(NULL);
-    WCHAR path[MAX_PATH];
-    GetModuleFileNameW(hModule, path, MAX_PATH);
+    WCHAR   rootPath[MAX_PATH];
+    GetModuleFileNameW(hModule, rootPath, MAX_PATH);
 
-    //return string(TEXT(path));
-    return path;
+    path p(rootPath);
+    p.remove_filename();
   #endif
+
+  return p;
+}
+auto       GetSharedLibPath() -> std::wstring
+{
+  return GetRootPath() + L"/bin";
 }
 auto    GetSharedLibDirIter() -> fs::directory_iterator //( fs::path( GetSharedLibPath() ) )
 {
@@ -2346,7 +2358,19 @@ auto    GetSharedLibDirIter() -> fs::directory_iterator //( fs::path( GetSharedL
   libPath.remove_filename();
   path    root = libPath;
 
-  vector<str> paths;
+  auto    dirIter = directory_iterator(root);
+
+  return dirIter;  
+}
+auto    GetConstDirIter() -> fs::directory_iterator //( fs::path( GetSharedLibPath() ) )
+{
+  using namespace std;
+  using namespace  fs;
+
+  auto libPath = path( GetRootPath() +  L"/const/");
+  libPath.remove_filename();
+  path    root = libPath;
+
   auto    dirIter = directory_iterator(root);
 
   return dirIter;  
@@ -2360,7 +2384,7 @@ auto        GetRefreshPaths(bool force=false) -> lava_paths
   static const regex  extRegex(".*\\.live\\.dll");
 
   auto libPath = path( GetSharedLibPath() );
-  libPath.remove_filename();
+  //libPath.remove_filename();
   path    root = libPath;
 
   vector<str> paths;
@@ -2391,10 +2415,6 @@ auto        GetRefreshPaths(bool force=false) -> lava_paths
     if(refresh)
       paths.push_back( p.generic_string() );
 
-    //refresh = origWrite > liveWrite;
-    //
-    //if(origWrite > liveWrite)
-    //  refresh = true;
   }
 
   return paths;
@@ -2411,14 +2431,23 @@ uint64_t    CopyPathsToLive(lava_paths       const& paths)
     
     bool doCopy = false;
     if( exists(livepth) ){
-      doCopy = remove(livepth);
+      error_code ec;                                                                   // using an error code should make it so that the function doesn't throw
+      doCopy = remove(livepth, ec);
     }else{ doCopy = true; }
     
     if(doCopy){ 
       copy_options co = copy_options::skip_existing;
       error_code   ec;
-      copy_file(p, livepth, co, ec);
-      ++count;
+      bool ok = copy_file(p, livepth, co, ec);
+      if(ok)
+        ++count;
+      else{
+        //str pthStr = p;
+        str liveStr = livepth.string();
+        fprintf(stdout, "\nCould not copy %s to live path %s\n", p.c_str(), liveStr.c_str());
+        fflush(stdout);
+        //flushall();
+      }
     }
   }
 
@@ -2642,7 +2671,7 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow, bool force=false)
 
   if(!newlibs){ return false; } // avoid doing anything including locking if there no new libraries
 
-  auto   livePaths  =  GetLivePaths(paths);
+  lava_paths livePaths  =  GetLivePaths(paths);  // lava_paths is a vector of strings
   
   lock_guard<mutex> flowLck(inout_flow.m_qLck);  // todo: only locks the queue, which isn't good enough - need to switch the nodes in a manner that will work live - maybe atomically swap the function pointer to null, update the node, then swap the function pointer again
 
@@ -2673,7 +2702,9 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow, bool force=false)
   auto    delCount  =  RemovePaths(livePaths);
 
   // copy the refresh paths' files
-  auto   copyCount  =  CopyPathsToLive(paths); 
+  auto   copyCount  =  CopyPathsToLive(paths);
+
+  if(copyCount != paths.size()){ return true; }
 
   // load the handles
   auto loadedHndls  =  LoadLibs(livePaths);
@@ -2717,13 +2748,12 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow, bool force=false)
 }
 bool      RefreshFlowConsts(LavaFlow& inout_flow)
 {
-  bool anyLoaded = false; // todo: integrate this with the rest of the loading to make consts get moved to live versions 
-  auto   dirIter = GetSharedLibDirIter();
-  for(auto& d : dirIter)                                                        // iterate though the root directory looking for shared libraries and constants
+  bool anyLoaded = false;                                        // todo: integrate this with the rest of the loading to make consts get moved to live versions 
+  auto   dirIter = GetConstDirIter();
+  for(auto& d : dirIter)                                         // iterate though the root directory looking for shared libraries and constants
   {
-    //auto pth = d.path();
     LavaNode* np = AddFlowConst(d.path(), inout_flow);
-    if(np) anyLoaded = true;
+    if(np){ anyLoaded = true; }
   }
 
   return anyLoaded;
@@ -3010,6 +3040,17 @@ void               LavaLoop(LavaFlow& lf) //noexcept
 
 
 
+//refresh = origWrite > liveWrite;
+//
+//if(origWrite > liveWrite)
+//  refresh = true;
+
+//auto   dirIter = GetSharedLibDirIter();
+//
+//auto pth = d.path();
+
+//
+//return string(TEXT(path));
 
 //FILE*             lava_stdout;
 //FILE*              lava_stdin;

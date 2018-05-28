@@ -63,6 +63,7 @@
     <TargetName>lava_$(ProjectName)</TargetName>
     <IgnoreImportLibrary>true</IgnoreImportLibrary>
     <GenerateManifest>false</GenerateManifest>
+    <OutDir>$(SolutionDir)$(Platform)\$(Configuration)\bin\</OutDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
@@ -95,6 +96,9 @@
       <DataExecutionPrevention>false</DataExecutionPrevention>
       <SupportNobindOfDelayLoadedDLL>false</SupportNobindOfDelayLoadedDLL>
       <AdditionalDependencies>WSock32.Lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <ProgramDatabaseFile>$(OutDir)\misc\$(TargetName).pdb</ProgramDatabaseFile>
+      <IgnoreEmbeddedIDL>true</IgnoreEmbeddedIDL>
+      <ImportLibrary>$(OutDir)\misc\$(TargetName).lib</ImportLibrary>
     </Link>
   </ItemDefinitionGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
