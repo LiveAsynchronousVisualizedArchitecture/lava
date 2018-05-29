@@ -2656,9 +2656,9 @@ auto              LoadPaths(lava_paths       const& paths) -> lava_flowNodes
     LavaNode* n = ndLsts[i];  
     if(!n){ continue;  }
 
-    for(; n; ++n)                                                         // loop until the current node is null
+    for(; n && n->func; ++n)                                                         // loop until the current node is null
     {
-      if(!n->func){continue;}                                                      // error because this node does not have a primary function
+      //if(!n->func){continue;}                                                      // error because this node does not have a primary function
       if(!n->name){continue;}                                                      // error because this node does not have a name
 
       if(countPtrList(n->in_names)!=countPtrList(n->in_types))        // count input types and input names to make sure they line up
@@ -2682,14 +2682,19 @@ auto            SwitchNodes(lava_flowNodes   const&   nds, LavaFlow& inout_flow)
 
   // first get the handles that will need to be shut down 
   lava_hndlvec oldHndls;
-  for(auto const& kv : nds){
-    auto pth = kv.first;
-    auto  it = inout_flow.libs.find(pth);
-    inout_flow.libs.erase(it);
-    oldHndls.push_back( it->second );
+  SECTION(get all the current hndls that go with the nodes we will replace)
+  {
+    for(auto const& kv : nds)
+    {
+      auto pth = kv.first;
+      auto  it = inout_flow.libs.find(pth);
+      if( it != inout_flow.libs.end() ){
+        inout_flow.libs.erase(it);
+        oldHndls.push_back( it->second );
+      }
+    }
   }
 
-  // todo: need to use the hndl or name to delete all nodes with the same path / hndl
   vector<LavaNode*> delNds;
   SECTION(get all nodes from the old paths)
   {
@@ -2706,6 +2711,19 @@ auto            SwitchNodes(lava_flowNodes   const&   nds, LavaFlow& inout_flow)
       }
     }
   }
+  SECTION(delete the old nodes from the names to ptrs map)
+  {
+    for(auto n : delNds){
+      inout_flow.nameToPtr.erase(n->name);
+    }
+  }
+  SECTION(delete paths from the multi-map of paths to nodes)
+  {
+    for(auto const& kv : nds){
+      auto pth = kv.first;
+      inout_flow.flow.erase(pth);
+    }
+  }
   SECTION(run the old nodes destructors if they have a destructor)
   {
     for(auto n : delNds)
@@ -2713,39 +2731,44 @@ auto            SwitchNodes(lava_flowNodes   const&   nds, LavaFlow& inout_flow)
         n->destructor();
       }
   }
-  SECTION(delete the old nodes from the names to ptrs map)
+  SECTION(insert new nodes into the names to pointers map and the path to nodes multi-map)
   {
+    for(auto const& kv : nds)
+    {
+      auto     pth = kv.first;
+      LavaNode* nd = kv.second;
 
-  }
+      auto   nameIter = inout_flow.nameToPtr.find(nd->name);
 
-  //for(auto const& kv : nds)
-  //{
-  //  inout_flow.flow.insert( {pth, nd} );
-  //}
+      inout_flow.nameToPtr.insert( {nd->name, nd} );
+      inout_flow.flow.insert( {pth, nd} );
 
-
-  //auto   nameIter = inout_flow.nameToPtr.find(nd->name);
-  //LavaNode* oldNd = nameIter->second;
-
-  for(auto const& kv : nds)
-  {
-    auto     pth = kv.first;
-    LavaNode* nd = kv.second;
-
-    auto   nameIter = inout_flow.nameToPtr.find(nd->name);
-
-    //inout_flow.nameToPtr.erase(nd->name);
-    inout_flow.nameToPtr.erase(nameIter);
-
-    inout_flow.nameToPtr.insert( {nd->name, nd} );
-    inout_flow.flow.insert( {pth, nd} );
-
-    if(nd && nd->constructor){ nd->constructor(); }
+      if(nd && nd->constructor){ nd->constructor(); }
+    }
   }
 
   FreeLibs(oldHndls);
 
   return oldHndls;
+
+  //auto   nameIter = inout_flow.nameToPtr.find(nd->name);
+  //LavaNode* oldNd = nameIter->second;
+  //
+  //for(auto const& kv : nds)
+  //{
+  //  auto     pth = kv.first;
+  //  LavaNode* nd = kv.second;
+  //
+  //  auto   nameIter = inout_flow.nameToPtr.find(nd->name);
+  //
+  //  //inout_flow.nameToPtr.erase(nd->name);
+  //  inout_flow.nameToPtr.erase(nameIter);
+  //
+  //  inout_flow.nameToPtr.insert( {nd->name, nd} );
+  //  inout_flow.flow.insert( {pth, nd} );
+  //
+  //  if(nd && nd->constructor){ nd->constructor(); }
+  //}
 
   //LavaNode* oldNd = nameIter->second;
   //if(oldNd && oldNd->destructor){
