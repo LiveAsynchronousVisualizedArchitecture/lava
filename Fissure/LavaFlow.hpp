@@ -580,6 +580,7 @@ using str                =  std::string;
 using lava_handle        =  HMODULE;                                                      // maps handles to the LavaFlowNode pointers contained in the shared libraries
 using lava_paths         =  std::vector<std::string>;
 using lava_hndlNodeMap   =  std::unordered_multimap<lava_handle, LavaNode*>;              // maps handles to the LavaFlowNode pointers contained in the shared libraries
+using lava_lstNodesMap   =  std::unordered_multimap<LavaNode*, LavaNode*>;                // maps each node to its starting node list pointer
 using lava_libHndls      =  std::unordered_map<LavaNode*, lava_handle>;                   // todo: need to change this depending on OS
 using lava_hndlvec       =  std::vector<lava_handle>;                                     // todo: need to change this depending on OS
 using lava_pathHndlMap   =  std::unordered_map<std::string, lava_handle>;                 // maps LavaFlowNode names to their OS specific handles
@@ -2535,11 +2536,22 @@ auto               LoadLibs(lava_paths       const& paths) -> lava_hndlvec
 
   return hndls;
 }
+auto         PathsToHandles(lava_paths       const& paths) -> lava_hndlvec
+{
+  lava_hndlvec hndls(paths.size(), 0);
+
+  TO(paths.size(), i){
+    HMODULE lib = LoadLibrary(TEXT(paths[i].c_str()));
+    hndls[i] = lib;
+  }
+
+  return hndls;
+}
 uint64_t           FreeLibs(lava_hndlvec     const& hndls)
 {
   uint64_t count = 0;
   for(auto const& h : hndls){
-    if( FreeLibrary(h) ){ ++count; }
+    if( FreeLibrary(h) ){ ++count; } // todo: use the return value and make this windows specific
   }
   return count;
 }
@@ -2594,29 +2606,181 @@ auto       GetFlowNodeLists(lava_hndlvec     const& hndls) -> lava_ptrsvec
 
   return ret;
 }
-void    ErrorCheckNodeLists(lava_ptrsvec* inout_ndLsts)
+auto     HandlesToNodeLists(lava_hndlvec     const& hndls) -> lava_ptrsvec
 {
-  auto& lsts = *inout_ndLsts;
-  auto    sz = lsts.size();
+  lava_ptrsvec ret(hndls.size(), nullptr);
+  TO(hndls.size(),i)
+  {
+    auto h = hndls[i];
+    if(h){
+      auto  GetLavaFlowNodes = (GetLavaFlowNodes_t)GetProcAddress(h, TEXT("GetLavaNodes") );
+      if(!GetLavaFlowNodes){ continue; }
+
+      LavaNode*     nodeList = GetLavaFlowNodes();
+      if(!nodeList){ continue; }
+
+      //ret.push_back( nodeList );
+      ret[i] = nodeList;
+    }
+  }
+
+  return ret;
+}
+auto      CombineHndlsNodes(lava_hndlvec     const& hndls, lava_ptrsvec const& nds) -> lava_hndlNodeMap
+{
+  lava_hndlNodeMap hndlNds;
+  assert(hndls.size() == nds.size());
+  TO(hndls.size(),i){
+    if(hndls[i]){
+      hndlNds.insert( {hndls[i], nds[i]} ); 
+    }
+  }
+
+  return hndlNds;
+}
+auto              LoadPaths(lava_paths       const& paths) -> lava_flowNodes
+{
+  lava_flowNodes ret;
+
+  lava_hndlvec   hndls = PathsToHandles(paths);
+  lava_ptrsvec  ndLsts = HandlesToNodeLists(hndls);
+
+  assert(paths.size() == hndls.size());
+  assert(hndls.size() == ndLsts.size());
+
+  auto sz = paths.size();
   TO(sz,i)
   {
-    LavaNode* lst = lsts[i];  
-    if(!lst){  }  // erase this node list if is a nullptr
+    if(!hndls[i]){ continue; }
 
-    for(; lst && lst->func; ++lst)
+    LavaNode* n = ndLsts[i];  
+    if(!n){ continue;  }
+
+    for(; n; ++n)                                                         // loop until the current node is null
     {
-      if(!lst->func){}                                 // error because this node does not have a primary function
-      if(!lst->name){}                                 // error because this node does not have a name
-      
-      if( countPtrList(lst->in_names) != countPtrList(lst->in_types) )        // count input types and input names to make sure they line up
-      {}
+      if(!n->func){continue;}                                                      // error because this node does not have a primary function
+      if(!n->name){continue;}                                                      // error because this node does not have a name
 
-      if( countPtrList(lst->out_names) != countPtrList(lst->out_types) )        // do the same for output types and names - count them both to make sure there are the same number of each
-      {}
+      if(countPtrList(n->in_names)!=countPtrList(n->in_types))        // count input types and input names to make sure they line up
+      {continue;}
+
+      if(countPtrList(n->out_names)!=countPtrList(n->out_types))      // do the same for output types and names - count them both to make sure there are the same number of each
+      {continue;}
+
+      ret.insert( {paths[i], n} );
     }
+  }
+
+  return ret;
+}
+auto            SwitchNodes(lava_flowNodes   const&   nds, LavaFlow& inout_flow) -> lava_hndlvec
+{
+  using namespace std;
+  
+  // needs to insert the nodes coming in, and give back the handles of the nodes that are being superceded
+  // this means that if there is any node from a handle, then all nodes from that handel need to be shut down
+
+  // first get the handles that will need to be shut down 
+  lava_hndlvec oldHndls;
+  for(auto const& kv : nds){
+    auto pth = kv.first;
+    auto  it = inout_flow.libs.find(pth);
+    inout_flow.libs.erase(it);
+    oldHndls.push_back( it->second );
+  }
+
+  // todo: need to use the hndl or name to delete all nodes with the same path / hndl
+  vector<LavaNode*> delNds;
+  SECTION(get all nodes from the old paths)
+  {
+    for(auto const& kv : nds)
+    {
+      auto     pth = kv.first;
+      LavaNode* nd = kv.second;
+
+      // todo: use the inout_flow.flow multi-map to destruct and delete all nodes with the path instead of going by name
+      auto flIt = inout_flow.flow.find(pth); // inout_flow.flow.begin();
+      auto flEn = inout_flow.flow.end();
+      for(; flIt != flEn && flIt->first==pth; ++flIt){
+        delNds.push_back( flIt->second );
+      }
+    }
+  }
+  SECTION(run the old nodes destructors if they have a destructor)
+  {
+    for(auto n : delNds)
+      if(n && n->destructor){
+        n->destructor();
+      }
+  }
+  SECTION(delete the old nodes from the names to ptrs map)
+  {
 
   }
+
+  //for(auto const& kv : nds)
+  //{
+  //  inout_flow.flow.insert( {pth, nd} );
+  //}
+
+
+  //auto   nameIter = inout_flow.nameToPtr.find(nd->name);
+  //LavaNode* oldNd = nameIter->second;
+
+  for(auto const& kv : nds)
+  {
+    auto     pth = kv.first;
+    LavaNode* nd = kv.second;
+
+    auto   nameIter = inout_flow.nameToPtr.find(nd->name);
+
+    //inout_flow.nameToPtr.erase(nd->name);
+    inout_flow.nameToPtr.erase(nameIter);
+
+    inout_flow.nameToPtr.insert( {nd->name, nd} );
+    inout_flow.flow.insert( {pth, nd} );
+
+    if(nd && nd->constructor){ nd->constructor(); }
+  }
+
+  FreeLibs(oldHndls);
+
+  return oldHndls;
+
+  //LavaNode* oldNd = nameIter->second;
+  //if(oldNd && oldNd->destructor){
+  //  oldNd->destructor();
+  //}
 }
+
+//auto CombinePthsNds(lava_paths const& paths, lava_ptrsvec const& nds) -> lava_flowNodes
+//{
+//}
+
+//void    ErrorCheckNodeLists(lava_ptrsvec* inout_ndLsts)
+//{
+//  auto& lsts = *inout_ndLsts;
+//  auto    sz = lsts.size();
+//  TO(sz,i)
+//  {
+//    LavaNode* lst = lsts[i];  
+//    if(!lst){  }  // erase this node list if is a nullptr
+//
+//    for(; lst && lst->func; ++lst)
+//    {
+//      if(!lst->func){}                                 // error because this node does not have a primary function
+//      if(!lst->name){}                                 // error because this node does not have a name
+//      
+//      if( countPtrList(lst->in_names) != countPtrList(lst->in_types) )        // count input types and input names to make sure they line up
+//      {}
+//
+//      if( countPtrList(lst->out_names) != countPtrList(lst->out_types) )        // do the same for output types and names - count them both to make sure there are the same number of each
+//      {}
+//    }
+//
+//  }
+//}
+
 lava_paths     SwapLeafDirs(lava_paths const& paths, str const& leafDir)
 {
   using namespace std;
@@ -2747,7 +2911,6 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow, bool force=false)
   using namespace  fs;
   
   bool     newlibs  =  false;
-  //auto       paths  =  GetRefreshPaths(force);
   auto   origPaths  =  GetRefreshPaths( path(GetSharedLibPath()), force);     // origPaths is original paths
   
   if(origPaths.size() > 0){
@@ -2756,21 +2919,28 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow, bool force=false)
   }
   if(!newlibs){ return false; } // avoid doing anything including locking if there no new libraries
 
-  auto          copyCount =  CopyPathsTo(origPaths, GetLiveTmpPath() );
+  auto            copyCount = CopyPathsTo(origPaths, GetLiveTmpPath() );
+  auto             tmpPaths = GetRefreshPaths( path(GetLiveTmpPath()), force);
+  lava_flowNodes tmpHndlNds = LoadPaths(tmpPaths);
+  lava_hndlvec        hndls = SwitchNodes(tmpHndlNds, inout_flow);
 
-  auto           tmpPaths =  GetRefreshPaths( path(GetLiveTmpPath()), force);
-  
+  //auto       paths  =  GetRefreshPaths(force);
+  //
+  //lava_paths liveTmpPaths = SwapLeafDirs(origPaths, "live_tmp");    // lava_paths is a vector of strings
+  //
+  //lava_hndlNodeMap tmpHndlNds = LoadPaths(tmpPaths);
+  //auto transform( ALL(tmpHndls), ALL(tmpNdLsts), make_pair<lava_handle, LavaNode*> );
+
+  lava_paths    livePaths = SwapLeafDirs(tmpPaths,  "live");       // lava_paths is a vector of strings
+
+
   lock_guard<mutex> flowLck(inout_flow.m_qLck);        // todo: only locks the queue, which isn't good enough - need to switch the nodes in a manner that will work live - maybe atomically swap the function pointer to null, update the node, then swap the function pointer again
-
-  lava_paths liveTmpPaths =  SwapLeafDirs(origPaths, "live_tmp");    // lava_paths is a vector of strings
-
-  lava_paths    livePaths =  SwapLeafDirs(tmpPaths,  "live");       // lava_paths is a vector of strings
 
   //lava_paths livePaths  =  GetLivePaths(origPaths);    // lava_paths is a vector of strings
 
   //// coordinate live paths to handles
   //auto     liveHandles  =  GetLiveHandles(inout_flow.libs, livePaths);  // this returns a vector of handles that matches the livePaths index for index
-
+  //
   //SECTION(run destructor on the nodes given by the paths and set them to nullptr)
   //{
   //  for(auto const& p : paths){
@@ -2779,25 +2949,25 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow, bool force=false)
   //    {
   //      LavaNode* nd = ndIter->second;
   //      if(nd->destructor){ nd->destructor(); }
-
+  //
   //      ndIter = inout_flow.flow.erase(ndIter);
-
+  //
   //      //ndIter->second = nullptr;
-
+  //
   //      //++ndIter
   //    }
   //  }
   //}
-
+  //
   //// free the handles
   //auto       freeCount  =  FreeLibs(liveHandles);
-
+  //
   //// delete the now unloaded live shared library files
   //auto    delCount  =  RemovePaths(livePaths);
-
+  //
   //// copy the refresh paths' files
   //auto    cpyCount  =  CopyPathsToLive(paths);
-
+  //
   //if(cpyCount != paths.size()){ return true; }
 
   //// load the handles
@@ -3133,6 +3303,25 @@ void               LavaLoop(LavaFlow& lf) //noexcept
 
 
 
+//// extract the flow nodes from the lists and put them into the multi-map
+//// todo: should this use and node creation commands? should nodes be made to swtich atomically?
+//TO(livePaths.size(),i)
+//{
+//  LavaNode* ndList = flowNdLists[i];
+//  if(ndList){
+//    auto const&  p = livePaths[i];
+//    
+//    //inout_flow.flow.erase(p);                                     // delete the current node list for the livePath 
+//    for(; ndList->func!=nullptr; ++ndList){                       // insert each of the LavaFlowNodes in the ndList into the multi-map
+//      if(ndList->constructor){ ndList->constructor(); }
+//      inout_flow.nameToPtr.erase(ndList->name);
+//      inout_flow.nameToPtr.insert( {ndList->name, ndList} );
+//      inout_flow.flow.insert( {p, ndList} );
+//    }
+//  }else{
+//    // set the node's state to an error
+//  }
+//}
 
 //refresh = origWrite > liveWrite;
 //
