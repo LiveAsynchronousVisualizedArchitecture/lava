@@ -1503,7 +1503,7 @@ str       makeStatusText(u64 nid, f64 totalTime, vec_ndptrs const& nds, u64 nIdx
     percentStr,"   ",
     err);
 
-  if(n.node->description){ 
+  if(n.node && n.node->description){ 
     status += toString(" -  ", n.node->description);
   }
 

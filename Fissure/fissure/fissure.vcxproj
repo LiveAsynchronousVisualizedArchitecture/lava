@@ -107,7 +107,7 @@
       <GenerateDebugInformation>DebugFastLink</GenerateDebugInformation>
       <ProgramDatabaseFile>$(OutDir)/misc/$(TargetName).pdb</ProgramDatabaseFile>
       <IgnoreEmbeddedIDL>true</IgnoreEmbeddedIDL>
-      <ImportLibrary>$(OutDir)/misc/$(TargetName).lib</ImportLibrary>
+      <ImportLibrary>$(OutDir)/bin/misc/$(TargetName).lib</ImportLibrary>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
