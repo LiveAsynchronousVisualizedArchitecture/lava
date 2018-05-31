@@ -259,13 +259,6 @@ bool              hasNaN(v2   v)
   //TO(2,i) if(v[i]==SIG_NANf || v[i]==-SIG_NANf) return true;
   //return false;
 }
-//bool          isRational(v2   v)
-//{
-//  using namespace std;
-//  
-//  TO(2,i) if( !isnan(v[i]) ){ return true; }
-//  return false;
-//}
 v2      lineCircleIntsct(v2   P, v2 dir, v2 crcl, f32 r)  // only works for circles to the sides
 {
   using namespace std;
@@ -3254,6 +3247,15 @@ ENTRY_DECLARATION // main or winmain
 
 
 
+
+
+//bool          isRational(v2   v)
+//{
+//  using namespace std;
+//  
+//  TO(2,i) if( !isnan(v[i]) ){ return true; }
+//  return false;
+//}
 
 //
 //n.P   = fd.mouse.pos - n.b.wh()/2;

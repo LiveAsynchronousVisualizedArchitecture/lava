@@ -401,7 +401,7 @@ extern "C"
     json   j = json::parse(s, nullptr, false);
 
     ExtractKey(lp, &keys, j);
-    lp->lava_puts("\n 2 \n");
+    lp->lava_puts("\n 0 \n");
 
     //for(auto&& e : j){
     //  PrintElem(lp, e);

@@ -26,13 +26,16 @@
 //       |  -have to make sure files that can't be copied error properly without breaking anything
 //       |  -have to make sure libraries are switched only once they are successfully loaded
 // -todo: fix live reloading/auto stepping of nodes - GetRefreshPaths might not be comparing the right files or times
+// -todo: debug why the delete nodes step has extra paths - many of them are constants and needed to have their node type checked, since the destructor is a union and won't be null 
+// -todo: give LavaNode struct a description string - was already done previously
+// -todo: change LavaNode to have unions so that constants can use the same struct
 
-// todo: debug why the delete nodes step has extra paths
-// todo: make sure an error still runs the packet callback? 
-// todo: does there need to be an error callback? - what information is available to the low level exceptions? 
+// todo: debug if refreshing libraries ever updated instances - how do instances get their node pointers in the first place? - the graph processes commands for them
+// todo: should there be a specific bin_debug directory? 
 // todo: put in more error states into LavaInst
 // todo: fill in error checking on shared library loading - need to make sure that the errors from nodes end up making it into their instances and ultimatly the GUI
-// todo: give LavaNode struct a description string
+// todo: make sure an error still runs the packet callback? 
+// todo: does there need to be an error callback? - what information is available to the low level exceptions? 
 // todo: write about design of LavaQ including that it is lock free, uses contiguous memory, does not rely on pointers and small allocations, and doesn't need versions since the start and end only increment - when a reader is reading a value, it can be sure that the buffer underneath hasn't been switched twice, because that would require inserting more values, which would increment end.... but end isn't atomicly linked to the start index - does switching buffers need to add the absolute capacity to both start and end ? 
 // todo: use the capacity as a power of two exponent directly so that the modulo operator is avoided - would this mean masking with ~(0xFF << cap) to isolate the bits below the exponent as 0, then flipping all the bits so only the bit below the exponent are 1s, then applying bitwise AND to have only those bits from st and m_end ?
 
@@ -825,10 +828,6 @@ struct       LavaNode
 {
   enum Type { NONE=0, FLOW=1, MSG=2, CONSTANT=3, GENERATOR=4, JOINT=5, NODE_ERROR=0xFFFFFFFFFFFFFFFF };                              // this should be filled in with other node types like scatter, gather, transform, generate, sink, blocking sink, blocking/pinned/owned msg - should a sink node always be pinned to it's own thread
 
-  //FlowFunc               func = nullptr;      // todo: change to a union that also holds the memory pointer
-  //ConstructFunc   constructor = nullptr;      // todo: make into a union that also holds the constant node file length
-  //ConstructFunc    destructor = nullptr;      // todo: change to a union that also holds the file handle
-
   union{
     FlowFunc               func;                // todo: change to a union that also holds the memory pointer
     void*               filePtr = nullptr;
@@ -871,7 +870,7 @@ struct       LavaInst
   mutable u64   cycle = 0;  // todo: make this atomic 
   mutable u64    time = 0;  // todo: make this atomic / make functions to add time and get the current time
 
-  bool operator<(LavaInst const& lval){ return id < lval.id; }
+  bool      operator<(LavaInst const& lval){ return id < lval.id; }
 
   u64   fetchIncFrame() const
   {
@@ -1859,7 +1858,6 @@ public:
   ConstMem               constMem;
   LavaParams        defaultParams;
 
-//  mutable bool          m_running = false;            // todo: make this atomic
   mutable abool         m_running = false;            // todo: make this atomic
   mutable u64          m_curMsgId = 0;                // todo: make this atomic
   mutable u64             m_cycle = 0;                // todo: make this atomic
@@ -1868,7 +1866,6 @@ public:
   mutable u32             version = 0;                // todo: make this atomic
   mutable Mutex            m_qLck;
   mutable Mutex       m_frameQLck;
-  //mutable PktCalbk packetCallback;
   mutable PacketCallback packetCallback;
   mutable PacketQueue           q;
   mutable FrameQueue       frameQ;
@@ -2406,44 +2403,6 @@ auto        GetConstDirIter() -> fs::directory_iterator //( fs::path( GetSharedL
 
   return dirIter;  
 }
-//auto        GetRefreshPaths(fs::path const& libPath, bool force=false) -> lava_paths
-//{
-//  using namespace std;
-//  using namespace  fs;
-//
-//  static const regex lavaRegex("lava_.*");
-//
-//  path    root = libPath;
-//
-//  vector<str> paths;
-//  auto dirIter = directory_iterator(root);
-//  for(auto& d : dirIter)                                              // iterate though the root directory looking for shared libraries and constants
-//  {
-//    auto   p = d.path();
-//    if(!p.has_filename()){ continue; }
-//
-//    auto ext = p.extension().generic_string();                        // ext is extension
-//
-//    if(ext==".dll"){
-//      str fstr = p.filename().generic_string();                       // fstr is file string
-//      if( !regex_match(fstr,lavaRegex) ){ continue; }
-//    }else{ continue; }
-//
-//    auto livepth = p;
-//
-//    bool refresh = true;
-//    if( exists(livepth) ){
-//      auto liveWrite = last_write_time(livepth).time_since_epoch().count();         // liveWrite is live write time - the live shared library file's last write time 
-//      auto origWrite = last_write_time(p).time_since_epoch().count();               // origWrite is orginal write time - the original shared library file's last write time
-//      refresh = force || origWrite > liveWrite;                                     // original has to be newer, don't want to do anything if they are the same either - does the copied live file need its time set to match the original?
-//    }
-//
-//    if(refresh)
-//      paths.push_back( p.generic_string() );
-//  }
-//
-//  return paths;
-//}
 auto        MakeFilePathMap(LavaFlow const& inout_flow) -> std::unordered_map<str,str>
 {
   using namespace std;
@@ -2808,9 +2767,14 @@ auto            SwitchNodes(lava_flowNodes   const&   nds, LavaFlow& inout_flow)
   SECTION(run the old nodes destructors if they have a destructor)
   {
     for(auto n : delNds)
-      if(n && n->destructor){
+    {
+      bool isExecutable = n->node_type==LavaNode::FLOW || 
+                          n->node_type==LavaNode::MSG  || 
+                          n->node_type==LavaNode::GENERATOR;
+      if(n && n->destructor && isExecutable){
         n->destructor();
       }
+    }
   }
   SECTION(insert new nodes into the names to pointers map and the path to nodes multi-map)
   {
@@ -2853,23 +2817,22 @@ bool         CopyAndRefresh(wstr const& srcDir, wstr const& destDir, LavaFlow& i
   using namespace std;
   using namespace  fs;
   
-
-  printf("mark 0\n");
+  printf("mark 0\n");flushall();
 
   auto            origPaths = GetRefreshPaths(inout_flow, path(srcDir), force | delOrig);
   if(origPaths.size() < 1){ return false; }
 
-  printf("mark 1\n");
+  printf("mark 1\n");flushall();
 
   auto            copyCount = CopyPathsTo(origPaths, destDir);
   if(copyCount < 1){ return false; }
 
-  printf("mark 2\n");
+  printf("mark 2\n");flushall();
 
   auto             nxtPaths = GetRefreshPaths(inout_flow, destDir, force | delOrig);
   if(nxtPaths.size() < 1){ return false; }
 
-  printf("mark 3\n");
+  printf("mark 3\n");flushall();
 
   lava_hndlvec    nxtHndls;
   lava_flowNodes nxtPathNds = LoadPaths(nxtPaths, nxtHndls);
@@ -2878,18 +2841,20 @@ bool         CopyAndRefresh(wstr const& srcDir, wstr const& destDir, LavaFlow& i
     return false;
   }
 
-  printf("mark 4\n");
+  printf("mark 4\n");flushall();
 
   lava_hndlvec    origHndls = SwitchNodes(nxtPathNds, inout_flow);
   vector<int>       freeRet = FreeLibs(origHndls);
 
-  printf("mark 5\n");
+  printf("mark 5\n");flushall();
 
   TO(nxtPaths.size(),i){
     if( nxtHndls[i] ){
       inout_flow.libs.insert( {nxtPaths[i], nxtHndls[i]} );
     }
   }
+
+  printf("mark 6\n");flushall();
 
   auto sz = origPaths.size();
   vector<error_code>     ecs(sz);
@@ -2899,6 +2864,8 @@ bool         CopyAndRefresh(wstr const& srcDir, wstr const& destDir, LavaFlow& i
       removeRets[i] = remove(origPaths[i], ecs[i]);
     }
   }
+
+  printf("mark 7\n");flushall();
 
   return nxtPathNds.size() > 0;
 
@@ -3041,10 +3008,9 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow, bool force=false)
   //auto transform( ALL(tmpHndls), ALL(tmpNdLsts), make_pair<lava_handle, LavaNode*> );
 
   //lava_paths    livePaths = SwapLeafDirs(tmpPaths,  "live");       // lava_paths is a vector of strings
-
-
+  //
   //lock_guard<mutex> flowLck(inout_flow.m_qLck);        // todo: only locks the queue, which isn't good enough - need to switch the nodes in a manner that will work live - maybe atomically swap the function pointer to null, update the node, then swap the function pointer again
-
+  //
   //lava_paths livePaths  =  GetLivePaths(origPaths);    // lava_paths is a vector of strings
 
   //// coordinate live paths to handles
@@ -3090,6 +3056,7 @@ bool        RefreshFlowLibs(LavaFlow& inout_flow, bool force=false)
   //  }
   //}
 
+  //
   //lava_ptrsvec flowNdLists = GetFlowNodeLists(loadedHndls);          // extract the flow node lists from the handles
 
   ////auto ndErrs = ErrorCheckNodeLists( &flowndLists );
@@ -3411,6 +3378,53 @@ void               LavaLoop(LavaFlow& lf) //noexcept
 
 
 
+
+
+//FlowFunc               func = nullptr;      // todo: change to a union that also holds the memory pointer
+//ConstructFunc   constructor = nullptr;      // todo: make into a union that also holds the constant node file length
+//ConstructFunc    destructor = nullptr;      // todo: change to a union that also holds the file handle
+
+//  mutable bool          m_running = false;            // todo: make this atomic
+//mutable PktCalbk packetCallback;
+
+//auto        GetRefreshPaths(fs::path const& libPath, bool force=false) -> lava_paths
+//{
+//  using namespace std;
+//  using namespace  fs;
+//
+//  static const regex lavaRegex("lava_.*");
+//
+//  path    root = libPath;
+//
+//  vector<str> paths;
+//  auto dirIter = directory_iterator(root);
+//  for(auto& d : dirIter)                                              // iterate though the root directory looking for shared libraries and constants
+//  {
+//    auto   p = d.path();
+//    if(!p.has_filename()){ continue; }
+//
+//    auto ext = p.extension().generic_string();                        // ext is extension
+//
+//    if(ext==".dll"){
+//      str fstr = p.filename().generic_string();                       // fstr is file string
+//      if( !regex_match(fstr,lavaRegex) ){ continue; }
+//    }else{ continue; }
+//
+//    auto livepth = p;
+//
+//    bool refresh = true;
+//    if( exists(livepth) ){
+//      auto liveWrite = last_write_time(livepth).time_since_epoch().count();         // liveWrite is live write time - the live shared library file's last write time 
+//      auto origWrite = last_write_time(p).time_since_epoch().count();               // origWrite is orginal write time - the original shared library file's last write time
+//      refresh = force || origWrite > liveWrite;                                     // original has to be newer, don't want to do anything if they are the same either - does the copied live file need its time set to match the original?
+//    }
+//
+//    if(refresh)
+//      paths.push_back( p.generic_string() );
+//  }
+//
+//  return paths;
+//}
 
 //auto        GetRefreshPaths(fs::path const& libPath, bool force=false) -> lava_paths
 //{

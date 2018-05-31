@@ -94,7 +94,6 @@
       <Optimization>Disabled</Optimization>
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PreprocessorDefinitions>NDEBUG;_WINDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <ExceptionHandling>false</ExceptionHandling>
       <DebugInformationFormat>None</DebugInformationFormat>
     </ClCompile>
     <Link />

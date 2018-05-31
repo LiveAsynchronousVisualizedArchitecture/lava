@@ -271,7 +271,7 @@ struct FisData
   AtmSet            stepIds;
   abool                step = false;
   i32           threadCount = 1;
-  f64         libReloadTime = 2.0;
+  f64         libReloadTime = 1.0;
   f64          libReloadRem = 0;
 
   struct Graph
