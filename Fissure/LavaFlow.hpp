@@ -25,7 +25,9 @@
 // -todo: implement live reloading that copies the shared library, loads it, switches over atomically, unloads the previous live version, copies the tmp live version to the normal live file, maps the new live version file, automically switches over to that, then unloads the tmp live shared lib - whew!
 //       |  -have to make sure files that can't be copied error properly without breaking anything
 //       |  -have to make sure libraries are switched only once they are successfully loaded
+// -todo: fix live reloading/auto stepping of nodes - GetRefreshPaths might not be comparing the right files or times
 
+// todo: debug why the delete nodes step has extra paths
 // todo: make sure an error still runs the packet callback? 
 // todo: does there need to be an error callback? - what information is available to the low level exceptions? 
 // todo: put in more error states into LavaInst
@@ -2404,40 +2406,94 @@ auto        GetConstDirIter() -> fs::directory_iterator //( fs::path( GetSharedL
 
   return dirIter;  
 }
-auto        GetRefreshPaths(fs::path const& libPath, bool force=false) -> lava_paths
+//auto        GetRefreshPaths(fs::path const& libPath, bool force=false) -> lava_paths
+//{
+//  using namespace std;
+//  using namespace  fs;
+//
+//  static const regex lavaRegex("lava_.*");
+//
+//  path    root = libPath;
+//
+//  vector<str> paths;
+//  auto dirIter = directory_iterator(root);
+//  for(auto& d : dirIter)                                              // iterate though the root directory looking for shared libraries and constants
+//  {
+//    auto   p = d.path();
+//    if(!p.has_filename()){ continue; }
+//
+//    auto ext = p.extension().generic_string();                        // ext is extension
+//
+//    if(ext==".dll"){
+//      str fstr = p.filename().generic_string();                       // fstr is file string
+//      if( !regex_match(fstr,lavaRegex) ){ continue; }
+//    }else{ continue; }
+//
+//    auto livepth = p;
+//
+//    bool refresh = true;
+//    if( exists(livepth) ){
+//      auto liveWrite = last_write_time(livepth).time_since_epoch().count();         // liveWrite is live write time - the live shared library file's last write time 
+//      auto origWrite = last_write_time(p).time_since_epoch().count();               // origWrite is orginal write time - the original shared library file's last write time
+//      refresh = force || origWrite > liveWrite;                                     // original has to be newer, don't want to do anything if they are the same either - does the copied live file need its time set to match the original?
+//    }
+//
+//    if(refresh)
+//      paths.push_back( p.generic_string() );
+//  }
+//
+//  return paths;
+//}
+auto        MakeFilePathMap(LavaFlow const& inout_flow) -> std::unordered_map<str,str>
+{
+  using namespace std;
+  using namespace  fs;
+
+  unordered_map<str,str> ret;
+  for(auto const& kv : inout_flow.flow){
+    auto nxtFile = path(kv.first).filename().generic_string();
+    ret[nxtFile] = kv.first;
+  }
+
+  return ret;
+}
+auto        GetRefreshPaths(LavaFlow const& inout_flow, fs::path const& libPath, bool force=false) -> lava_paths
 {
   using namespace std;
   using namespace  fs;
 
   static const regex lavaRegex("lava_.*");
 
-  path root = libPath;
-
+  auto fileMap = MakeFilePathMap(inout_flow);
+  path    root = libPath;
   vector<str> paths;
-  auto    dirIter = directory_iterator(root);
-  for(auto& d : dirIter)                                 // iterate though the root directory looking for shared libraries and constants
+  auto dirIter = directory_iterator(root);
+  for(auto& d : dirIter)                                                // iterate though the root directory looking for shared libraries and constants
   {
-    auto   p = d.path();
-    if(!p.has_filename()){ continue; }
+    auto   pth = d.path();
+    if(!pth.has_filename()){ continue; }
 
-    auto ext = p.extension().generic_string();                        // ext is extension
-
-    if(ext==".dll"){
-      str fstr = p.filename().generic_string();                       // fstr is file string
+    auto ext = pth.extension().generic_string();                        // ext is extension
+    if(ext==".dll"){                                                    // todo: use liveExt
+      str fstr = pth.filename().generic_string();                       // fstr is file string
       if( !regex_match(fstr,lavaRegex) ){ continue; }
     }else{ continue; }
 
-    auto livepth = p;
+    path livepth;
+    auto curPthIter = fileMap.find(pth.filename().generic_string());
+    if(curPthIter != fileMap.end()){
+      livepth = path(curPthIter->second);
+    }
 
     bool refresh = true;
     if( exists(livepth) ){
-      auto liveWrite = last_write_time(livepth).time_since_epoch().count();         // liveWrite is live write time - the live shared library file's last write time 
-      auto origWrite = last_write_time(p).time_since_epoch().count();               // origWrite is orginal write time - the original shared library file's last write time
-      refresh = force || origWrite > liveWrite;                                     // original has to be newer, don't want to do anything if they are the same either - does the copied live file need its time set to match the original?
+      auto liveWrite = last_write_time(livepth).time_since_epoch().count();            // liveWrite is live write time - the live shared library file's last write time 
+      auto origWrite = last_write_time(pth).time_since_epoch().count();                // origWrite is orginal write time - the original shared library file's last write time
+      refresh = force || origWrite > liveWrite;                                        // original has to be newer, don't want to do anything if they are the same either - does the copied live file need its time set to match the original?
     }
 
     if(refresh)
-      paths.push_back( p.generic_string() );
+      paths.push_back( pth.generic_string() );
   }
 
   return paths;
@@ -2476,7 +2532,7 @@ uint64_t    CopyPathsToLive(lava_paths       const& paths)
 
   return count;
 }
-uint64_t        CopyPathsTo(lava_paths const& paths, fs::path dir)
+uint64_t        CopyPathsTo(lava_paths       const& paths, fs::path dir)
 {
   using namespace std;
   using namespace  fs;
@@ -2774,7 +2830,7 @@ auto            SwitchNodes(lava_flowNodes   const&   nds, LavaFlow& inout_flow)
 
   return oldHndls;
 }
-lava_paths     SwapLeafDirs(lava_paths const& paths, str const& leafDir)
+lava_paths     SwapLeafDirs(lava_paths       const& paths, str const& leafDir)
 {
   using namespace std;
   using namespace  fs;
@@ -2797,14 +2853,23 @@ bool         CopyAndRefresh(wstr const& srcDir, wstr const& destDir, LavaFlow& i
   using namespace std;
   using namespace  fs;
   
-  auto            origPaths = GetRefreshPaths( path(srcDir), force | delOrig);
+
+  printf("mark 0\n");
+
+  auto            origPaths = GetRefreshPaths(inout_flow, path(srcDir), force | delOrig);
   if(origPaths.size() < 1){ return false; }
+
+  printf("mark 1\n");
 
   auto            copyCount = CopyPathsTo(origPaths, destDir);
   if(copyCount < 1){ return false; }
 
-  auto             nxtPaths = GetRefreshPaths(destDir, force | delOrig);
+  printf("mark 2\n");
+
+  auto             nxtPaths = GetRefreshPaths(inout_flow, destDir, force | delOrig);
   if(nxtPaths.size() < 1){ return false; }
+
+  printf("mark 3\n");
 
   lava_hndlvec    nxtHndls;
   lava_flowNodes nxtPathNds = LoadPaths(nxtPaths, nxtHndls);
@@ -2813,8 +2878,12 @@ bool         CopyAndRefresh(wstr const& srcDir, wstr const& destDir, LavaFlow& i
     return false;
   }
 
+  printf("mark 4\n");
+
   lava_hndlvec    origHndls = SwitchNodes(nxtPathNds, inout_flow);
   vector<int>       freeRet = FreeLibs(origHndls);
+
+  printf("mark 5\n");
 
   TO(nxtPaths.size(),i){
     if( nxtHndls[i] ){
@@ -3078,7 +3147,6 @@ void               LavaStop(LavaFlow& lf)
     }
   lf.m_frameQLck.unlock();                                            // unlock queue mutex
 }
-
 void               LavaLoop(LavaFlow& lf) //noexcept
 {
   using namespace std;
