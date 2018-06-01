@@ -30,8 +30,9 @@
 // -todo: give LavaNode struct a description string - was already done previously
 // -todo: change LavaNode to have unions so that constants can use the same struct
 // -todo: debug if refreshing libraries ever updated instances - how do instances get their node pointers in the first place? - the graph processes commands for them
+// -todo: debug why the multi-map of names to ids is empty - needs to be in the graph and not in flow
 
-// todo: debug why the multi-map of names to ids is empty
+// todo: make sure there is a map of node names to ids and not instance names to ids
 // todo: should there be a specific bin_debug directory? 
 // todo: put in more error states into LavaInst
 // todo: fill in error checking on shared library loading - need to make sure that the errors from nodes end up making it into their instances and ultimatly the GUI
@@ -1051,6 +1052,8 @@ public:
   using CmdQ          =  std::queue<LavaCommand>;
   using RetStk        =  std::stack<LavaCommand::Arg>;
   using ArgVec        =  std::vector<LavaCommand::Arg>;
+  using NameIdsMap    =  std::multimap<str, uint64_t>;                 // nids is node ids  - this maps the name of the node to all of the graph node ids that use it
+
 
 private:
   mutable abool         m_useA;
@@ -1066,6 +1069,8 @@ private:
   SrcMap          m_destCnctsA;
   GenIds           m_genNodesA;
   GenCache         m_genCacheA;
+  NameIdsMap        m_nameIdsA;                                // nameIds - this maps the name of the node to all of the graph node ids that use it
+  //lava_nidMap          m_nidsA;             // nids is node ids  - this maps the name of the node to all of the graph node ids that use it
 
   NodeInsts           m_nodesB;
   Slots             m_inSlotsB;
@@ -1074,30 +1079,36 @@ private:
   SrcMap          m_destCnctsB;
   GenIds           m_genNodesB;
   GenCache         m_genCacheB;
+  NameIdsMap        m_nameIdsB;                                // nameIds - this maps the name of the node to all of the graph node ids that use it
+  //lava_nidMap          m_nidsB;
 
 public:
-  NodeInsts&            curNodes(){ return m_useA.load()?  m_nodesA     : m_nodesB;     }
-  Slots&              curInSlots(){ return m_useA.load()?  m_inSlotsA     : m_inSlotsB;     }
-  Slots&             curOutSlots(){ return m_useA.load()?  m_outSlotsA     : m_outSlotsB;     }
-  CnctMap&              curCncts(){ if(m_useA.load()) return m_cnctsA; else return m_cnctsB; }
-  SrcMap&           curDestCncts(){ return m_useA.load()?  m_destCnctsA : m_destCnctsB; }
-  GenIds&            curGenNodes(){ return m_useA.load()?  m_genNodesA  : m_genNodesB;  }
-  GenCache&          curMsgCache(){ return m_useA.load()?  m_genCacheA  : m_genCacheB;  }
+  NodeInsts&            curNodes(){ return m_useA.load()?  m_nodesA     : m_nodesB;          }
+  Slots&              curInSlots(){ return m_useA.load()?  m_inSlotsA   : m_inSlotsB;        }
+  Slots&             curOutSlots(){ return m_useA.load()?  m_outSlotsA  : m_outSlotsB;       }
+  CnctMap&              curCncts(){ return m_useA.load()?  m_cnctsA     : m_cnctsB;          }
+  //CnctMap&              curCncts(){ if(m_useA.load()) return m_cnctsA; else return m_cnctsB; }
+  SrcMap&           curDestCncts(){ return m_useA.load()?  m_destCnctsA : m_destCnctsB;      }
+  GenIds&            curGenNodes(){ return m_useA.load()?  m_genNodesA  : m_genNodesB;       }
+  GenCache&          curMsgCache(){ return m_useA.load()?  m_genCacheA  : m_genCacheB;       }
+  NameIdsMap&         curNameIds(){ return m_useA.load()?  m_nameIdsA   : m_nameIdsB;        }
   NodeInsts const&      curNodes()const{ return m_useA.load()?  m_nodesA     : m_nodesB;     }
-  Slots     const&    curInSlots()const{ return m_useA.load()?  m_inSlotsA     : m_inSlotsB;     }
-  Slots     const&   curOutSlots()const{ return m_useA.load()?  m_outSlotsA     : m_outSlotsB;     }
+  Slots     const&    curInSlots()const{ return m_useA.load()?  m_inSlotsA   : m_inSlotsB;   }
+  Slots     const&   curOutSlots()const{ return m_useA.load()?  m_outSlotsA  : m_outSlotsB;  }
   CnctMap   const&      curCncts()const{ return m_useA.load()?  m_cnctsA     : m_cnctsB;     }
   SrcMap    const&  curDestCncts()const{ return m_useA.load()?  m_destCnctsA : m_destCnctsB; }
   GenIds    const&   curGenNodes()const{ return m_useA.load()?  m_genNodesA  : m_genNodesB;  }
 
   NodeInsts&            oppNodes(){ 
     return !m_useA.load()?  m_nodesA     : m_nodesB;     }
-  Slots&              oppInSlots(){ return !m_useA.load()?  m_inSlotsA     : m_inSlotsB;     }
-  Slots&             oppOutSlots(){ return !m_useA.load()?  m_outSlotsA     : m_outSlotsB;     }
-  CnctMap&              oppCncts(){ if(!m_useA.load()) return m_cnctsA; else return m_cnctsB; }
-  SrcMap&           oppDestCncts(){ return !m_useA.load()?  m_destCnctsA : m_destCnctsB; }
-  GenIds&            oppGenNodes(){ return !m_useA.load()?  m_genNodesA  : m_genNodesB;  }
-  GenCache&          oppMsgCache(){ return !m_useA.load()?  m_genCacheA  : m_genCacheB;  }
+  Slots&              oppInSlots(){ return !m_useA.load()?  m_inSlotsA   : m_inSlotsB;        }
+  Slots&             oppOutSlots(){ return !m_useA.load()?  m_outSlotsA  : m_outSlotsB;       }
+  CnctMap&              oppCncts(){ return !m_useA.load()?  m_cnctsA     : m_cnctsB;          }
+  //CnctMap&              oppCncts(){ if(!m_useA.load()) return m_cnctsA; else return m_cnctsB; }
+  SrcMap&           oppDestCncts(){ return !m_useA.load()?  m_destCnctsA : m_destCnctsB;      }
+  GenIds&            oppGenNodes(){ return !m_useA.load()?  m_genNodesA  : m_genNodesB;       }
+  GenCache&          oppMsgCache(){ return !m_useA.load()?  m_genCacheA  : m_genCacheB;       }
+  NameIdsMap&         oppNameIds(){ return !m_useA.load()?  m_nameIdsA   : m_nameIdsB;        }
   NodeInsts const&      oppNodes()const{ return !m_useA.load()?  m_nodesA     : m_nodesB;     }
   Slots     const&    oppInSlots()const{ return !m_useA.load()?  m_inSlotsA   : m_inSlotsB;   }
   Slots     const&   oppOutSlots()const{ return !m_useA.load()?  m_outSlotsA  : m_outSlotsB;  }
@@ -1498,6 +1509,11 @@ public:
         li.inputs==0 ){
       oppGenNodes().insert(nid);
     }
+
+    //NameIdsMap& nameIds = oppNameIds();
+    //nameIds.insert( {ln->name, nid} );
+
+    oppNameIds().insert( {ln->name, nid} );
 
     return oppNodes().insert({nid, li}).first->first;                             // returns a pair that contains the key-value pair
   }
@@ -2995,19 +3011,18 @@ bool        RefreshFlowLibs(LavaGraph& inout_graph, LavaFlow& inout_flow, bool f
   //}
   //if(!newlibs){ return false; } // avoid doing anything including locking if there no new libraries
 
-  unordered_multimap<str, u64> nameIdMap;
-  SECTION(make a map of node names to instance ids from the instaces before updating nodes)
-  {
-    auto& idxNds = inout_graph.curNodes();
-    for(auto const& kv : idxNds){
-      LavaNode* n = kv.second.node;
-      if(n && n->name){
-        u64 id = kv.first;
-        nameIdMap.insert( {n->name, id} );
-      }
-    }
-  }
-
+  //unordered_multimap<str, u64> nameIdMap;
+  //SECTION(make a map of node names to instance ids from the instaces before updating nodes)
+  //{
+  //  auto& idxNds = inout_graph.curNodes();
+  //  for(auto const& kv : idxNds){
+  //    LavaNode* n = kv.second.node;
+  //    if(n && n->name){
+  //      u64 id = kv.first;
+  //      nameIdMap.insert( {n->name, id} );
+  //    }
+  //  }
+  //}
 
   bool newlibs  =  false;
   newlibs      |=  CopyAndRefresh(GetSharedLibPath(), GetLiveTmpPath(), inout_flow, false, force);    // try to copy libs to the live_tmp directory, load them, replace the old libraries, then keep the original shared libs
@@ -3017,19 +3032,21 @@ bool        RefreshFlowLibs(LavaGraph& inout_graph, LavaFlow& inout_flow, bool f
 
   SECTION(use the name to ids multimap to update the nodes in all the lava instances)
   {
+    // use the map of node names to multiple instance ids
     auto& nameToPtr = inout_flow.nameToPtr;          // nameToPtrs is a map of names to LavaNode pointers
     auto&       nds = inout_graph.curNodes();        // graph nodes is a map of ids to LavaInst 
-    auto&      nids = inout_flow.nids;               // nids is a multimap of node names to instance ids
-    for(auto const& kv : nids)            
+    auto&   nameIds = inout_graph.curNameIds();      // a multimap of node names to instance ids 
+    //auto&      nids = inout_flow.nids;             // nids is a multimap of node names to instance ids
+    for(auto const& kv : nameIds)      
     {
-      auto     id = kv.second;
-      auto instIt = nds.find(id);                    // get the instance, now just need the node
+      str const& name = kv.first;
+      auto         id = kv.second;
+      auto     instIt = nds.find(id);                // get the instance using the id, now just need the node, which we get with the node name
       if(instIt != nds.end())
       {
-        str const& name = kv.first;
-        auto ndIt = nameToPtr.find(name);
+        auto ndIt = nameToPtr.find(name);            // if the id was found in the id:LavaInst map, use the name to get the node pointer it goes to 
         if( ndIt != nameToPtr.end() )
-          instIt->second.node = ndIt->second;        // assign the current node pointer to the instance
+          instIt->second.node = ndIt->second;        // if the name was found in the name:LavaNode* map, assign the current node pointer to the instance's node pointer
       }
     }
   }
