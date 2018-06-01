@@ -1838,7 +1838,7 @@ void  refreshNodeButtons()
 }
 bool    reloadSharedLibs(bool force=false)
 {
-  bool newlibs  = RefreshFlowLibs(fd.flow, force);
+  bool newlibs  = RefreshFlowLibs(fd.lgrph, fd.flow, force);
   //newlibs      |= RefreshFlowConsts(fd.flow);
   if(force){ RefreshFlowConsts(fd.flow); }                   // todo: redo this so that consts are handles more elegantly
 
