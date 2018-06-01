@@ -31,8 +31,8 @@
 // -todo: change LavaNode to have unions so that constants can use the same struct
 // -todo: debug if refreshing libraries ever updated instances - how do instances get their node pointers in the first place? - the graph processes commands for them
 // -todo: debug why the multi-map of names to ids is empty - needs to be in the graph and not in flow
+// -todo: make sure there is a map of node names to ids and not instance names to ids - might have just been constants and not instance names
 
-// todo: make sure there is a map of node names to ids and not instance names to ids
 // todo: should there be a specific bin_debug directory? 
 // todo: put in more error states into LavaInst
 // todo: fill in error checking on shared library loading - need to make sure that the errors from nodes end up making it into their instances and ultimatly the GUI
@@ -2837,7 +2837,7 @@ bool         CopyAndRefresh(wstr const& srcDir, wstr const& destDir, LavaFlow& i
   using namespace std;
   using namespace  fs;
   
-  printf("mark 0\n");fflush(stdout);
+  //printf("mark 0\n");fflush(stdout);
 
   auto            origPaths = GetRefreshPaths(inout_flow, path(srcDir), force | delOrig);
   if(origPaths.size() < 1){ return false; }
@@ -3032,11 +3032,12 @@ bool        RefreshFlowLibs(LavaGraph& inout_graph, LavaFlow& inout_flow, bool f
 
   SECTION(use the name to ids multimap to update the nodes in all the lava instances)
   {
+    //auto&      nids = inout_flow.nids;             // nids is a multimap of node names to instance ids
+
     // use the map of node names to multiple instance ids
     auto& nameToPtr = inout_flow.nameToPtr;          // nameToPtrs is a map of names to LavaNode pointers
     auto&       nds = inout_graph.curNodes();        // graph nodes is a map of ids to LavaInst 
     auto&   nameIds = inout_graph.curNameIds();      // a multimap of node names to instance ids 
-    //auto&      nids = inout_flow.nids;             // nids is a multimap of node names to instance ids
     for(auto const& kv : nameIds)      
     {
       str const& name = kv.first;
