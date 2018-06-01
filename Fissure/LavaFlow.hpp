@@ -2500,8 +2500,8 @@ uint64_t    CopyPathsToLive(lava_paths       const& paths)
       else{
         //str pthStr = p;
         str liveStr = livepth.string();
-        fprintf(stdout, "\nCould not copy %s to live path %s\n", p.c_str(), liveStr.c_str());
-        fflush(stdout);
+        //fprintf(stdout, "\nCould not copy %s to live path %s\n", p.c_str(), liveStr.c_str());
+        //fflush(stdout);
         //flushall();
       }
     }
@@ -2535,8 +2535,8 @@ uint64_t        CopyPathsTo(lava_paths       const& paths, fs::path dir)
         ++count;
       else{
         str liveStr = livepth.string();
-        fprintf(stdout, "\nCould not copy %s to live path %s\n", p.c_str(), liveStr.c_str());
-        fflush(stdout);
+        //fprintf(stdout, "\nCould not copy %s to live path %s\n", p.c_str(), liveStr.c_str());
+        //fflush(stdout);
       }
     }
   }
@@ -2842,17 +2842,17 @@ bool         CopyAndRefresh(wstr const& srcDir, wstr const& destDir, LavaFlow& i
   auto            origPaths = GetRefreshPaths(inout_flow, path(srcDir), force | delOrig);
   if(origPaths.size() < 1){ return false; }
 
-  printf("mark 1\n");fflush(stdout);
+  //printf("mark 1\n");fflush(stdout);
 
   auto            copyCount = CopyPathsTo(origPaths, destDir);
   if(copyCount < 1){ return false; }
 
-  printf("mark 2\n");fflush(stdout);
+  //printf("mark 2\n");fflush(stdout);
 
   auto             nxtPaths = GetRefreshPaths(inout_flow, destDir, force | delOrig);
   if(nxtPaths.size() < 1){ return false; }
 
-  printf("mark 3\n");fflush(stdout);
+  //printf("mark 3\n");fflush(stdout);
 
   lava_hndlvec    nxtHndls;
   lava_flowNodes nxtPathNds = LoadPaths(nxtPaths, nxtHndls);
@@ -2861,12 +2861,12 @@ bool         CopyAndRefresh(wstr const& srcDir, wstr const& destDir, LavaFlow& i
     return false;
   }
 
-  printf("mark 4\n");fflush(stdout);
+  //printf("mark 4\n");fflush(stdout);
 
   lava_hndlvec    origHndls = SwitchNodes(nxtPathNds, inout_flow);
   vector<int>       freeRet = FreeLibs(origHndls);
 
-  printf("mark 5\n");fflush(stdout);
+  //printf("mark 5\n");fflush(stdout);
 
   TO(nxtPaths.size(),i){
     if( nxtHndls[i] ){
@@ -2874,7 +2874,7 @@ bool         CopyAndRefresh(wstr const& srcDir, wstr const& destDir, LavaFlow& i
     }
   }
 
-  printf("mark 6\n");fflush(stdout);
+  //printf("mark 6\n");fflush(stdout);
 
   auto sz = origPaths.size();
   vector<error_code>     ecs(sz);
@@ -2885,7 +2885,7 @@ bool         CopyAndRefresh(wstr const& srcDir, wstr const& destDir, LavaFlow& i
     }
   }
 
-  printf("mark 7\n");fflush(stdout);
+  //printf("mark 7\n");fflush(stdout);
 
   return nxtPathNds.size() > 0;
 

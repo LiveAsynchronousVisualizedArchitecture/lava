@@ -14,6 +14,7 @@
 #endif // WIN32
 
 #define NO_RT_UTIL_IMPL
+#define SQLITE_CONFIG_SINGLETHREAD 0
 
 #include <iostream>
 #include <fstream>
@@ -294,6 +295,27 @@ void ExtractKey(LavaParams const* lp, tbl* keysTbl, json& j)
   }
 }
 
+namespace{
+
+//void Print(LavaParams const* lp, str s)
+//{
+//  lp->lava_puts( s.c_str() );
+//}
+
+template<class... T> inline void
+Print(LavaParams const* lp, const T&... args)
+{
+  lp->lava_puts( toString(args ...).c_str() );
+}
+template<class... T> inline void
+Println(LavaParams const* lp, const T&... args)
+{
+  Print(lp, args ...);
+  lp->lava_puts("\n");
+}
+
+}
+
 extern "C"
 {
   const char*      TblToStr_InTypes[]  = {"ASCII",          nullptr};            // This array contains the type that each slot of the same index will accept as input.
@@ -426,10 +448,27 @@ extern "C"
   { 
     using namespace std;
 
-    str   s = (str)LavaTblFromPckt(lp, in, IN_SQLLITE_PARAMS);
+    str query = (str)LavaTblFromPckt(lp, in, IN_SQLLITE_PARAMS);
  
-    tbl tmp = LavaMakeTbl(lp);
+    sqlite3* sl;
+    sqlite3_open("sqlite_test.db", &sl);
+
+    sqlite3_exec(sl, "BEGIN", nullptr, nullptr, nullptr);
+    sqlite3_exec(sl, query.c_str(), nullptr, nullptr, nullptr);
+    sqlite3_exec(sl, "COMMIT", nullptr, nullptr, nullptr);
+
+
+    Println(lp, sqlite3_errmsg(sl) );
+    Println(lp, sqlite3_errmsg(sl) );
+
+    Println(lp, sqlite3_threadsafe() );
+
+    int closeOk = sqlite3_close(sl);
+
+    tbl tmp = LavaMakeTbl(lp, 1, (i8)0);
     out->push( LavaTblToOut(tmp, OUT_SQLLITE_RESULT) );
+
+    //Print(lp, "mark");
 
     return 0;
   }
@@ -626,6 +665,15 @@ extern "C"
 
 
 
+
+//lp->lava_puts( toString("\n",sl,"\n\n").c_str() );
+//lp->lava_puts( toString("\n", sqlite3_errmsg(sl), "\n\n").c_str() );
+//
+//int rc = 0;                                      // resource cursor?
+//
+//Print(lp, toString("\ncloseOk: ", closeOk, "\n\n") );
+//
+//lp->lava_puts( toString("\n", sqlite3_errmsg(sl), "\n\n").c_str() ); 
 
 //
 //str    s = LavaStrFromPckt(in, IN_JSON_PARSE_ASCII);

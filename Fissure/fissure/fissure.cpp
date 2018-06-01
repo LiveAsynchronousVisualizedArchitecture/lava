@@ -39,12 +39,14 @@
 // -todo: debug why json_params constant output slot isn't drawn - NaN position and normals due to not using the slot boolean to determine if it was an output
 // -todo: give LavaParams std file handles if release mode AllocConsole doesn't work on windows - file handles don't seem to mix well across threads, possibly due to different functions being called in the shared library+thread - passing a function is a better option
 // -todo: make and use bin and live directories
+// -todo: place new constants (sidToConst) into the const directory
+// -todo: work out timed live reload checking - are there event callbacks that can be used - yes, windows seems to have a callback setup that could be used - could using separate directories for libs and live libs make it only neccesary to check the directory write time?
+//       -|  make a class that can special case windows
+// -todo: implement live reloading that copies the shared library, loads it, switches over atomically, unloads the previous live version, copies the tmp live version to the normal live file, maps the new live version file, automically switches over to that, then unloads the tmp live shared lib - whew!
 
-// todo: place new constants (sidToConst) into the const directory
+// todo: need to clear node state if it does not crash anymore
+// todo: need to make node state not set to error just because it doesn't outuput an allocated tbl
 // todo: give const reloading the same structure as node reloading, or integrate them together
-// todo: work out timed live reload checking - are there event callbacks that can be used - yes, windows seems to have a callback setup that could be used - could using separate directories for libs and live libs make it only neccesary to check the directory write time?
-//       |  make a class that can special case windows
-// todo: implement live reloading that copies the shared library, loads it, switches over atomically, unloads the previous live version, copies the tmp live version to the normal live file, maps the new live version file, automically switches over to that, then unloads the tmp live shared lib - whew!
 // todo: try making visual studio visualization for LavaMem and tbl
 // todo: make LavaQ into a struct that contains a function pointer to its own push function and can be passed as a C struct
 // todo: put much of lava in its own name space
