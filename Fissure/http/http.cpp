@@ -84,6 +84,70 @@ struct SocketInit
 static int    count = 0;
 static int runCount = 0;
 
+//#ifdef _WIN32 
+//
+//static int     winErr = 0;
+//static au64   winHndl = 0;
+//static au32       msg = 0;
+//static au32    wParam = 0;
+//static au32    lParam = 0;
+//static au64  waitHndl = 0;
+//static abool    runCb = false;
+//
+//VOID CALLBACK cb_WaitOrTimerCallback(
+//  _In_ PVOID   lpParameter,
+//  _In_ BOOLEAN TimerOrWaitFired
+//)
+//{
+//  if( !TimerOrWaitFired ){
+//    if( runCb.exchange(false) ){
+//      LRESULT ok = SendMessage( (HWND)(winHndl.load()), msg, wParam, lParam);
+//      printf("\n send message ok: %ld \n", (long)ok); 
+//    }
+//  }
+//}
+//
+//int (WINAPIV * __vsnprintf)(char *, size_t, const char*, va_list) = _vsnprintf;
+//
+//#endif
+
+//#define GET_KEY(type, name, defaultVal) TYPE itemID = keys.has(#name)? (str)(tbl)keys(#name)  :  "";
+
+namespace{
+
+template<class... T> inline void
+Print(LavaParams const* lp, const T&... args)
+{
+  lp->lava_puts( toString(args ...).c_str() );
+}
+template<class... T> inline void
+Println(LavaParams const* lp, const T&... args)
+{
+  Print(lp, args ...);
+  lp->lava_puts("\n");
+}
+
+const char* headers[] = 
+{
+  "Connection",   "close",
+  "Content-type", "application/x-www-form-urlencoded",
+  "Accept", "text/plain",
+  nullptr
+};
+
+class Vis : public tinyxml2::XMLVisitor
+{
+  void printTxt(const char* label, const XMLText* txt)
+  {
+    printf("\n %s: %s \n", label, txt? txt->Value() : "NULL");
+  }
+  bool VisitEnter(const XMLElement& elem, const XMLAttribute* firstAttr)
+  {
+    printf("\n%s: %s \n", elem.Name(), elem.GetText()? elem.GetText() : "");
+    return true;
+  }
+};
+
 void OnBegin(    const happyhttp::Response* r, void* tblPtr)
 {
   printf( "BEGIN (%d %s)\n", r->getstatus(), r->getreason() );
@@ -111,119 +175,6 @@ void OnComplete( const happyhttp::Response* r, void* tblPtr)
   tbl* t = (tbl*)tblPtr;
 }
 
-#ifdef _WIN32 
-
-static int     winErr = 0;
-static au64   winHndl = 0;
-static au32       msg = 0;
-static au32    wParam = 0;
-static au32    lParam = 0;
-static au64  waitHndl = 0;
-static abool    runCb = false;
-
-VOID CALLBACK cb_WaitOrTimerCallback(
-  _In_ PVOID   lpParameter,
-  _In_ BOOLEAN TimerOrWaitFired
-)
-{
-  if( !TimerOrWaitFired ){
-    if( runCb.exchange(false) ){
-      LRESULT ok = SendMessage( (HWND)(winHndl.load()), msg, wParam, lParam);
-      printf("\n send message ok: %ld \n", (long)ok); 
-    }
-  }
-}
-
-int (WINAPIV * __vsnprintf)(char *, size_t, const char*, va_list) = _vsnprintf;
-
-#endif
-
-const char* headers[] = 
-{
-  "Connection",   "close",
-  "Content-type", "application/x-www-form-urlencoded",
-  "Accept", "text/plain",
-  nullptr
-};
-
-class Vis : public tinyxml2::XMLVisitor
-{
-  void printTxt(const char* label, const XMLText* txt)
-  {
-    printf("\n %s: %s \n", label, txt? txt->Value() : "NULL");
-  }
-
-  //bool VisitEnter(const XMLDocument& doc){
-  //  printTxt("doc text:", doc.ToText() );
-  //  printf("doc val: %s", doc.Value()? doc.Value() : "val null");
-  //  //printf("doc get text: %s", doc.Value() );
-  //  return true;
-  //}
-  //bool  VisitExit(const XMLDocument& doc){
-  //  printTxt("doc text:", doc.ToText() );
-  //  printf("doc val: %s", doc.Value()? doc.Value() : "val null");
-  //  //printf("doc get text: %s", doc.GetText() );
-  //  return true;
-  //}
-
-  bool VisitEnter(const XMLElement& elem, const XMLAttribute* firstAttr)
-  {
-    printf("\n%s: %s \n", elem.Name(), elem.GetText()? elem.GetText() : "");
-
-    //auto txt = elem.ToText();
-    ////if(txt){ 
-    //  printf("\n elem text: %s \n", txt? txt->Value() : "NULL");
-    ////}
-    //
-    //printTxt("elem text:", elem.ToText());
-    //printf(" elem get text: %s", elem.GetText());
-    //printTxt("attr text:", firstAttr.ToText() );
-    //
-    //if(firstAttr){
-    //  auto txt = firstAttr->Value();
-    //  printf("\n attr text: %s \n", txt? txt : "NULL");
-    //}
-
-    return true;
-  }
-
-  //bool VisitExit(const XMLElement&     elem)
-  //{
-  //  printTxt("elem exit:", elem.ToText());
-  //  return true;
-  //}
-  //bool     Visit(const XMLText&          xt)
-  //{
-  //  printTxt("text txt:", xt.ToText());
-  //
-  //  //auto txt = xt.ToText();
-  //  //if(txt){
-  //  //  printf("\n text: %s \n", txt? txt->Value() : "NULL");
-  //  //}
-  //
-  //  return true;
-  //}
-  //bool     Visit(const XMLDeclaration& decl)
-  //{
-  //  printTxt("declaration:", decl.ToText() ); 
-  //  printf("declaration val: %s", decl.Value()? decl.Value() : "val null");
-  //
-  //  //auto txt = decl.ToText();
-  //  //printf("\n declaration: %s \n", txt? txt->Value() : "NULL");
-  //
-  //  return true;
-  //}
-  //bool     Visit(const XMLComment&      com){
-  //  printTxt("commment txt:", com.ToText() );
-  //  return true;
-  //}
-  //bool     Visit(const XMLUnknown&  unknown){
-  //  printTxt("unknown txt:", unknown.ToText() );
-  //  return true;
-  //}
-
-};
-
 void PrintElem(LavaParams const* lp, json::value_type& e)
 {
   using namespace std;
@@ -238,22 +189,10 @@ void PrintElem(LavaParams const* lp, json::value_type& e)
   default: 
     str de = urldecode(toString(e));
     lp->lava_puts( toString(de,"\n\n").c_str() );
-
-    //str de = toString(e);
     lp->lava_puts( toString(e,"\n\n").c_str() );
-
-    //ofstream o(lp->lava_stdout);
-    //o << e << endl << endl << endl;
-    //cout << e << endl << endl << endl;
     break;
   }
-
-  //for(auto&& e : j){
-  //}
 }
-
-//json::value_type& e,
-//str& val
 void ExtractKey(LavaParams const* lp, json::iterator& iter,  tbl* keysTbl)
 {
   using namespace std;
@@ -267,7 +206,22 @@ void ExtractKey(LavaParams const* lp, json::iterator& iter,  tbl* keysTbl)
   case json::value_t::boolean:
   case json::value_t::string:{
     str k = iter.key();
-    if( keysTbl->has(k.c_str()) ){
+    if( keysTbl->has(k.c_str()) )
+    {
+      switch(val.type()){
+      case json::value_t::number_float:{
+        (*keysTbl)(k.c_str()) = (f64)iter.value();
+      }break;
+      case json::value_t::number_integer:
+      case json::value_t::boolean:{
+        (*keysTbl)(k.c_str()) = (i64)iter.value();
+      }break;
+      case json::value_t::number_unsigned:{
+        (*keysTbl)(k.c_str()) = (u64)iter.value();       
+      }break;
+      default: break;
+      }
+
       str s = toString(iter.key(), ": ", iter.value(),"\n"); 
       lp->lava_puts( s.c_str() );
     }
@@ -295,23 +249,9 @@ void ExtractKey(LavaParams const* lp, tbl* keysTbl, json& j)
   }
 }
 
-namespace{
-
-//void Print(LavaParams const* lp, str s)
-//{
-//  lp->lava_puts( s.c_str() );
-//}
-
-template<class... T> inline void
-Print(LavaParams const* lp, const T&... args)
+str GetKey(tbl const& t, const char* key, str defaultVal="")
 {
-  lp->lava_puts( toString(args ...).c_str() );
-}
-template<class... T> inline void
-Println(LavaParams const* lp, const T&... args)
-{
-  Print(lp, args ...);
-  lp->lava_puts("\n");
+  return t.has(key)? (str)(tbl)t(key)  :  defaultVal;
 }
 
 }
@@ -418,22 +358,26 @@ extern "C"
     str    s = (str)LavaTblFromPckt(lp, in, IN_JSON_PARSE_ASCII);
     tbl keys = LavaTblFromPckt(lp, in, IN_JSON_KEYS);
 
-    //lp->lava_puts(s.c_str());
-
     json   j = json::parse(s, nullptr, false);
 
     ExtractKey(lp, &keys, j);
-    lp->lava_puts("\n 17 \n");
 
+    tbl keysOut = keys; // LavaMakeTbl(lp);
+    out->push( LavaTblToOut(keysOut, OUT_JSON_PARSE_TBL) );
+
+    //lp->lava_puts(s.c_str());
+    //
     //for(auto&& e : j){
     //  PrintElem(lp, e);
     //}
-
-    tbl tmp = LavaMakeTbl(lp, 1, (i8)0);
-    tmp("itemId")    = (u64)0;
-    tmp("name")      = (u64)0; //&tbl();
-    tmp("salePrice") = (f64)0;
-    out->push( LavaTblToOut(tmp, OUT_JSON_PARSE_TBL) );
+    //
+    //lp->lava_puts("\n 17 \n");
+    //
+    //tbl tmp = LavaMakeTbl(lp, 1, (i8)0);
+    //tmp("itemId")    = (u64)0;
+    //tmp("name")      = (u64)0; //&tbl();
+    //tmp("salePrice") = (f64)0;
+    //out->push( LavaTblToOut(tmp, OUT_JSON_PARSE_TBL) );
 
     return 0;
   }
@@ -448,134 +392,159 @@ extern "C"
   { 
     using namespace std;
 
-    str query = (str)LavaTblFromPckt(lp, in, IN_SQLLITE_PARAMS);
+    //str query = (str)LavaTblFromPckt(lp, in, IN_SQLLITE_PARAMS);
  
+    tbl keys = LavaTblFromPckt(lp, in, IN_SQLLITE_PARAMS);
+
     sqlite3* sl;
     sqlite3_open("sqlite_test.db", &sl);
 
-    sqlite3_exec(sl, "BEGIN", nullptr, nullptr, nullptr);
-    sqlite3_exec(sl, query.c_str(), nullptr, nullptr, nullptr);
-    sqlite3_exec(sl, "COMMIT", nullptr, nullptr, nullptr);
+    Println(lp, sqlite3_errmsg(sl) ); 
+
+    str  itemID = ""; //GetKey(keys, "itemID");      //  keys.has("itemID")? (str)(tbl)keys("itemID")  :  "";
+    str    name = ""; //GetKey(keys,   "name");      //  keys.has("name")?   (str)(tbl)keys("name")    :  "";
+    str   model = ""; //GetKey(keys,  "model");
+    str   price =  toString(  keys.has("salePrice")? (f64)keys("salePrice") : 0.0 );
+
+    Println(lp, "mark 1"); 
+
+    str query = toString(
+      "INSERT INTO TVS (Item_ID, Name, Model, Price) VALUES (",
+      "\"",  itemID, "\", ",
+      "\"",    name, "\", ",
+      "\"",   model, "\", ",
+              price,
+      ");");
+
+    //char query[1024];
+    //sscanf(query, 
+    //  "INSERT INTO TVS (Item_ID, Name, Model, Price) VALUES ( \"%s\", \"%s\", \"%s\", \"%s\"); ",
+    //  itemID.c_str(), name.c_str(), model.c_str(), price.c_str());
+    //str query = "INSERT INTO TVS (Item_ID, Name, Model, Price) VALUES ( \"\", \"\", \"\", 0); ";
+    Println(lp, query);
+
+    sqlite3_exec(sl, "BEGIN",         nullptr, nullptr, nullptr);
+    sqlite3_exec(sl, query.c_str(),   nullptr, nullptr, nullptr);
+    //sqlite3_exec(sl, query.c_str(), nullptr, nullptr, nullptr);
+    sqlite3_exec(sl, "COMMIT",        nullptr, nullptr, nullptr);
 
 
     Println(lp, sqlite3_errmsg(sl) );
     Println(lp, sqlite3_errmsg(sl) );
 
-    Println(lp, sqlite3_threadsafe() );
+   // Println(lp, sqlite3_threadsafe() );
 
     int closeOk = sqlite3_close(sl);
 
     tbl tmp = LavaMakeTbl(lp, 1, (i8)0);
     out->push( LavaTblToOut(tmp, OUT_SQLLITE_RESULT) );
 
-    //Print(lp, "mark");
-
     return 0;
   }
 
 
-  const char*   winmsg_InTypes[]  = {"params",         nullptr};            // This array contains the type that each slot of the same index will accept as input.
-  const char*   winmsg_InNames[]  = {"Watch and MSG",  nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
-  const char*   winmsg_OutTypes[] = {"STATS",          nullptr};            // This array contains the types that are output in each slot of the same index
-  const char*   winmsg_OutNames[] = {"Status",         nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
-  void          winmsg_construct(){}
-  void          winmsg_destruct(){}
-  uint64_t      winmsg(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
-  {    
-    runCount++; 
-
-    tbl  params = LavaTblFromPckt(lp, in, IN_WINMSG_MSG);
-    str    path = (str)params;
-        winHndl = (u64)params("window handle");
-            msg = (u32)params("windows message");
-         wParam = (u32)params("wParam");
-         lParam = (u32)params("lParam");
-
-    //u64 winHndl = params("window handle");
-    //u32     msg = params("windows message");
-    //u32  wParam = params("wParam");
-    //u32  lParam = params("lParam");
-
-    //WindowFromPoint() // gets the handle from a point on the screen
-
-    #ifdef _WIN32
-      printf("\n cnt: %d path: %s \n", runCount, path.c_str() );
-      printf("\n hndl: %lld  msg: %d wParam: %d lParam %d \n", winHndl.load(), msg.load(), wParam.load(), lParam.load());
-
-      //SendMessage( (HWND)0x00040A68, WM_KEYDOWN, VK_F5, 0);     // F5 key
-      //SendMessage( (HWND)winHndl, msg, VK_RCONTROL, lParam);
-      //SendMessage( (HWND)winHndl, msg, wParam,      lParam);
-      //SendMessage( (HWND)winHndl, msg, VK_BROWSER_REFRESH, lParam);
-
-      // 0x52 r key | 0xA3 RCONTROL | VK_BROWSER_REFRESH 0xA8 | 0x74 VK_F5
-      //SendMessage( (HWND)winHndl, msg, wParam, lParam);
-
-      //HANDLE prevHndl = (HANDLE)waitHndl.exchange(0);
-      //if(prevHndl){
-      //  bool ok = UnregisterWait( (HANDLE)prevHndl );
-      //  printf("\n unregister ok: %d \n", ok);
-      //}else{
-
-      bool prev = false;
-      //while(true)
-      //{
-        HANDLE dirHndl = FindFirstChangeNotification( 
-          path.c_str(),                                           // directory to watch 
-          FALSE,                                                  // do not watch subtree 
-          FILE_NOTIFY_CHANGE_LAST_WRITE);
-
-        if(dirHndl == INVALID_HANDLE_VALUE){
-          winErr  = true;
-          dirHndl = nullptr;
-          //break;
-        }
-
-        WaitForSingleObject(dirHndl, INFINITE);
-
-        LRESULT ok = SendMessage( (HWND)(winHndl.load()), msg, wParam, lParam);
-        printf("\n send message ok: %ld \n", (long)ok); 
-
-        //prev = false;
-        //if( runCb.compare_exchange_strong(prev, true) )
-        //{
-        //  PHANDLE pHndl = (void**)&waitHndl;
-        //  auto ok = RegisterWaitForSingleObject(
-        //               pHndl, 
-        //               dirHndl, 
-        //               cb_WaitOrTimerCallback, 
-        //               0, 
-        //               INFINITE, 
-        //               WT_EXECUTEONLYONCE | WT_EXECUTEINWAITTHREAD | WT_EXECUTEDEFAULT);
-        //  printf("\n register ok: %d \n", ok);
-        //}
-
-        auto closeOk = FindCloseChangeNotification(dirHndl);
-
-        //Sleep(20000);
-      //}
-      //}
-
-      //RegisterWaitForSingleObject
-      //while(true){
-      //  auto waitRet = WaitForSingleObject(dirHndl, INFINITE);
-      //  if(waitRet == WAIT_OBJECT_0){ 
-      //    SendMessage( (HWND)winHndl, msg, wParam, lParam);
-      //    break;
-      //  }
-      //}
-    #endif
-
-    tbl tmp = LavaMakeTbl(lp);
-    tmp("window handle")   = (u64)0;
-    tmp("windows message") = (u32)WM_KEYDOWN;
-    tmp("wParam")          = (u32)VK_F5;
-    tmp("lParam")          = (u32)0;
-    tmp.resize<i8>(1024, 0);
-    strncpy(tmp.data<char>(), "file to watch", 1023);
-    out->push( LavaTblToOut(tmp, OUT_WINMSG_STAT) );
-
-    return 0;
-  }
+  //const char*   winmsg_InTypes[]  = {"params",         nullptr};            // This array contains the type that each slot of the same index will accept as input.
+  //const char*   winmsg_InNames[]  = {"Watch and MSG",  nullptr};            // This array contains the names of each input slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  //const char*   winmsg_OutTypes[] = {"STATS",          nullptr};            // This array contains the types that are output in each slot of the same index
+  //const char*   winmsg_OutNames[] = {"Status",         nullptr};            // This array contains the names of each output slot as a string that can be used by the GUI.  It will show up as a label to each slot and be used when visualizing.
+  //void          winmsg_construct(){}
+  //void          winmsg_destruct(){}
+  //uint64_t      winmsg(LavaParams const* lp, LavaFrame const* in, lava_threadQ* out) noexcept
+  //{    
+  //  runCount++; 
+  //
+  //  tbl  params = LavaTblFromPckt(lp, in, IN_WINMSG_MSG);
+  //  str    path = (str)params;
+  //      winHndl = (u64)params("window handle");
+  //          msg = (u32)params("windows message");
+  //       wParam = (u32)params("wParam");
+  //       lParam = (u32)params("lParam");
+  //
+  //  //u64 winHndl = params("window handle");
+  //  //u32     msg = params("windows message");
+  //  //u32  wParam = params("wParam");
+  //  //u32  lParam = params("lParam");
+  //
+  //  //WindowFromPoint() // gets the handle from a point on the screen
+  //
+  //  #ifdef _WIN32
+  //    printf("\n cnt: %d path: %s \n", runCount, path.c_str() );
+  //    printf("\n hndl: %lld  msg: %d wParam: %d lParam %d \n", winHndl.load(), msg.load(), wParam.load(), lParam.load());
+  //
+  //    //SendMessage( (HWND)0x00040A68, WM_KEYDOWN, VK_F5, 0);     // F5 key
+  //    //SendMessage( (HWND)winHndl, msg, VK_RCONTROL, lParam);
+  //    //SendMessage( (HWND)winHndl, msg, wParam,      lParam);
+  //    //SendMessage( (HWND)winHndl, msg, VK_BROWSER_REFRESH, lParam);
+  //
+  //    // 0x52 r key | 0xA3 RCONTROL | VK_BROWSER_REFRESH 0xA8 | 0x74 VK_F5
+  //    //SendMessage( (HWND)winHndl, msg, wParam, lParam);
+  //
+  //    //HANDLE prevHndl = (HANDLE)waitHndl.exchange(0);
+  //    //if(prevHndl){
+  //    //  bool ok = UnregisterWait( (HANDLE)prevHndl );
+  //    //  printf("\n unregister ok: %d \n", ok);
+  //    //}else{
+  //
+  //    bool prev = false;
+  //    //while(true)
+  //    //{
+  //      HANDLE dirHndl = FindFirstChangeNotification( 
+  //        path.c_str(),                                           // directory to watch 
+  //        FALSE,                                                  // do not watch subtree 
+  //        FILE_NOTIFY_CHANGE_LAST_WRITE);
+  //
+  //      if(dirHndl == INVALID_HANDLE_VALUE){
+  //        winErr  = true;
+  //        dirHndl = nullptr;
+  //        //break;
+  //      }
+  //
+  //      WaitForSingleObject(dirHndl, INFINITE);
+  //
+  //      LRESULT ok = SendMessage( (HWND)(winHndl.load()), msg, wParam, lParam);
+  //      printf("\n send message ok: %ld \n", (long)ok); 
+  //
+  //      //prev = false;
+  //      //if( runCb.compare_exchange_strong(prev, true) )
+  //      //{
+  //      //  PHANDLE pHndl = (void**)&waitHndl;
+  //      //  auto ok = RegisterWaitForSingleObject(
+  //      //               pHndl, 
+  //      //               dirHndl, 
+  //      //               cb_WaitOrTimerCallback, 
+  //      //               0, 
+  //      //               INFINITE, 
+  //      //               WT_EXECUTEONLYONCE | WT_EXECUTEINWAITTHREAD | WT_EXECUTEDEFAULT);
+  //      //  printf("\n register ok: %d \n", ok);
+  //      //}
+  //
+  //      auto closeOk = FindCloseChangeNotification(dirHndl);
+  //
+  //      //Sleep(20000);
+  //    //}
+  //    //}
+  //
+  //    //RegisterWaitForSingleObject
+  //    //while(true){
+  //    //  auto waitRet = WaitForSingleObject(dirHndl, INFINITE);
+  //    //  if(waitRet == WAIT_OBJECT_0){ 
+  //    //    SendMessage( (HWND)winHndl, msg, wParam, lParam);
+  //    //    break;
+  //    //  }
+  //    //}
+  //  #endif
+  //
+  //  tbl tmp = LavaMakeTbl(lp);
+  //  tmp("window handle")   = (u64)0;
+  //  tmp("windows message") = (u32)WM_KEYDOWN;
+  //  tmp("wParam")          = (u32)VK_F5;
+  //  tmp("lParam")          = (u32)0;
+  //  tmp.resize<i8>(1024, 0);
+  //  strncpy(tmp.data<char>(), "file to watch", 1023);
+  //  out->push( LavaTblToOut(tmp, OUT_WINMSG_STAT) );
+  //
+  //  return 0;
+  //}
 
   LavaNode LavaNodes[] =
   {
@@ -665,6 +634,80 @@ extern "C"
 
 
 
+
+
+//bool VisitEnter(const XMLDocument& doc){
+//  printTxt("doc text:", doc.ToText() );
+//  printf("doc val: %s", doc.Value()? doc.Value() : "val null");
+//  //printf("doc get text: %s", doc.Value() );
+//  return true;
+//}
+//bool  VisitExit(const XMLDocument& doc){
+//  printTxt("doc text:", doc.ToText() );
+//  printf("doc val: %s", doc.Value()? doc.Value() : "val null");
+//  //printf("doc get text: %s", doc.GetText() );
+//  return true;
+//}
+
+//auto txt = elem.ToText();
+////if(txt){ 
+//  printf("\n elem text: %s \n", txt? txt->Value() : "NULL");
+////}
+//
+//printTxt("elem text:", elem.ToText());
+//printf(" elem get text: %s", elem.GetText());
+//printTxt("attr text:", firstAttr.ToText() );
+//
+//if(firstAttr){
+//  auto txt = firstAttr->Value();
+//  printf("\n attr text: %s \n", txt? txt : "NULL");
+//}
+
+//bool VisitExit(const XMLElement&     elem)
+//{
+//  printTxt("elem exit:", elem.ToText());
+//  return true;
+//}
+//bool     Visit(const XMLText&          xt)
+//{
+//  printTxt("text txt:", xt.ToText());
+//
+//  //auto txt = xt.ToText();
+//  //if(txt){
+//  //  printf("\n text: %s \n", txt? txt->Value() : "NULL");
+//  //}
+//
+//  return true;
+//}
+//bool     Visit(const XMLDeclaration& decl)
+//{
+//  printTxt("declaration:", decl.ToText() ); 
+//  printf("declaration val: %s", decl.Value()? decl.Value() : "val null");
+//
+//  //auto txt = decl.ToText();
+//  //printf("\n declaration: %s \n", txt? txt->Value() : "NULL");
+//
+//  return true;
+//}
+//bool     Visit(const XMLComment&      com){
+//  printTxt("commment txt:", com.ToText() );
+//  return true;
+//}
+//bool     Visit(const XMLUnknown&  unknown){
+//  printTxt("unknown txt:", unknown.ToText() );
+//  return true;
+//}
+
+//str de = toString(e);
+//
+//ofstream o(lp->lava_stdout);
+//o << e << endl << endl << endl;
+//cout << e << endl << endl << endl;
+
+//void Print(LavaParams const* lp, str s)
+//{
+//  lp->lava_puts( s.c_str() );
+//}
 
 //lp->lava_puts( toString("\n",sl,"\n\n").c_str() );
 //lp->lava_puts( toString("\n", sqlite3_errmsg(sl), "\n\n").c_str() );
