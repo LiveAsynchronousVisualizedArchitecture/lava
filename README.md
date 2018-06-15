@@ -117,7 +117,7 @@ Threads and the LavaLoop(). Generator nodes, message nodes, flow nodes, cycles. 
 | <a id="brandisher-elements">Brandisher Elements</a> |
 |    :---:                                          |
 | ![Brandisher Elements](images/Demo_BrandisherElements.gif)|
-|  Here the same tbl is show in two different places. <br> On the right being edited as part of a const node (which just reads a .const file from disk). <br>On the left it is read from shared memory. |
+|  Here the same tbl is shown in two different places. <br> On the right being edited as part of a const node (which just reads a .const file from disk). <br>On the left it is read from shared memory. |
 
 | <a id="trace">Trace</a> |
 |     :---:          |
