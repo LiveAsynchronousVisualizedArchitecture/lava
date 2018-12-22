@@ -73,7 +73,7 @@ Threads and the LavaLoop(). Generator nodes, message nodes, flow nodes, cycles. 
 
 - <a id="crsh">__Interrupts and Exceptions__</a> - The LAVA loop catches low level interrupts so that a crash shows up in the graph as a red halo around the crashed node.
 
-- <a id="serial">__Serialized Node IO__</a> - All communication between nodes is passed as pointer to a single span of contiguous memory. This means that all IO can be saved as a file, written to shared memory for visualization and debugging.  While this can work with any data structure that can be serialized, data structures that always use a single span of memory (like tbl.hpp) are likely to be a good default. 
+- <a id="serial">__Serialized Node IO__</a> - All communication between nodes is passed as pointer to a single span of contiguous memory. This means that all IO can be saved as a file or written to shared memory for visualization and debugging.  While this can work with any data structure that can be serialized, data structures that always use a single span of memory (like tbl.hpp) are likely to be a good default. 
 
 #### Concurrency, Parallelism and Asynchronous Design
 
@@ -117,7 +117,7 @@ Threads and the LavaLoop(). Generator nodes, message nodes, flow nodes, cycles. 
 | <a id="brandisher-elements">Brandisher Elements</a> |
 |    :---:                                          |
 | ![Brandisher Elements](images/Demo_BrandisherElements.gif)|
-|  Here the same tbl is show in two different places. <br> On the right being edited as part of a const node (which just reads a .const file from disk). <br>On the left it is read from shared memory. |
+|  Here the same tbl is shown in two different places. <br> On the right being edited as part of a const node (which just reads a .const file from disk). <br>On the left it is read from shared memory. |
 
 | <a id="trace">Trace</a> |
 |     :---:          |
