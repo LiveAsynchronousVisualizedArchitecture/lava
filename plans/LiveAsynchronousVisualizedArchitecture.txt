@@ -1,0 +1,77 @@
+LiveAsynchronousVisualizedArchitecture
+
+
+this_is_a_fifty_character_line_as_simple_key_test
+18_characters_key  - 17 + \0
+frameBufferHeight  - 17 + \0
+frameBufferWidth   - 16 + \0
+
+
+
+
+
+
+
+Visual effects industry veteran and former lead technical director for Industrial Light and Magic Singapore, Simeon has worked on dozens of movies including some of the highest grossing films of all time. He currently runs Shine Spark, a software company that produces a raytraced lightmapper  for Unity 3D and is working on LAVA - the Live Asynchronous Visual Architecture.  This will allow true data first software creation, visual debugging, live updates to running software and simple granular concurrency.  
+
+LAVA: The Live Asynchronous Visual Architecture
+
+Concurrency, Data oriented, live, cross platform, performance
+
+application developers, game developers, high performance computing
+
+
+
+
+This will cover the in progress library / program architecture called LAVA.
+
+https://github.com/LiveAsynchronousVisualizedArchitecture/lava
+
+It is a method for writing highly modular software with granular, 100% lock free concurrency using a visual high level architecture to put together nodes written in modern C++. 
+
+Programs are created through the use of message passing nodes and data flow nodes that communicate lock free through simdb.hpp
+
+https://github.com/LiveAsynchronousVisualizedArchitecture/simdb
+
+Nodes are created through C++ and can be automatically reloaded while the program is running since they don't contain data themselves. 
+
+A separate visualizer program uses simdb for interprocess communication.  It allows any data between message passing or data flow nodes to be visualized if it can be turned into a table of values, an image, geometry, points, or lines. 
+
+LAVA is distributed under the Apache 2 license. 
+
+
+
+1. What is LAVA
+2. Why LAVA
+    |  Program transparency through visualization
+    |  Organization, modularity and simplicity through true higher level programming
+    |  100% lock free and granular concurrency throughout entire program that happens naturally through design
+3. Pieces of LAVA
+    | simdb.hpp - fast, cross platform, shared memory, lock free key value store
+    | tbl.hpp       - universal, fast, flat memory, zero deserialization data structure
+    | lava node interface - creation and visualization of message passing nodes and data flow networks
+    | lava.hpp    - message passing and data flow node loop
+
+
+https://youtu.be/lQCaH3OS82E?t=35
+
+https://youtu.be/lQCaH3OS82E?t=131
+
+
+I've given many presentations, run weekly meeting with 25+ people for multiple years and interviewed dozens of candidates along with a fair amount of straight public speaking, though the two short clips are the only things I can think of that are public. 
+
+This is my film history before switching to C++ full time 4 years ago.
+http://www.imdb.com/name/nm2280069/?ref_=fn_al_nm_1
+
+
+Live comes from the program being built at the highest level by nodes (data flow and message passing) that correspond to shared libraries.  
+  These shared libaries can be hot reloaded simply by replacing a file, which is possible because the actual library file loaded by the OS is separate.  
+  The new file is detected, the node is stopped from running any packets, the new file is copied with .live appended to its name, the .live shared library is loaded, and queued packets destined for that node can be run again. 
+  Low level exceptions like memory access violations, division by 0, etc. are caught and show in the UI without stopping the whole program.
+
+
+
+Could libFFI be used in combination with tbls to load shared libraries automatically and call functions?  How far can that idea be taken?
+Can tcc be used to run expressions on data, build tbls with functions etc? 
+
+
