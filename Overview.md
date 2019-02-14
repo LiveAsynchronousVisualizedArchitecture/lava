@@ -2,6 +2,17 @@
 
 # Overview 
 
+LAVA stands for Live Asynch Visual Architecture
+
+Because that description probably creates more questions than answers and the benefits are more about the tight integration of all these ideas together, let's jump in an look at something concrete first.    
+
+
+Let's say you have a program that will load a 3D model.  LAVA is based around connecting nodes in a graph while still writing the program in C++.  Because of this we can use a common C++ library that loads a C++ obj file and just wraps it in a function so that it can be a node in the graph.  
+
+[3D model loader LoadObj node implementation](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/Fissure/LoadObj/LoadObj.cpp)
+
+
+
 Lava is about connecting high level nodes written in native languages like modern C++
 -  Think about wrapping a small library like an image loader in a single node
 -  Just a few single file C++ libraries that are a few dozen kilobytes each 
