@@ -2,7 +2,7 @@
 
 # Overview 
 
-LAVA stands for __L__ ive __A__ synch __V__ isual __A__ rchitecture
+LAVA stands for Live Asynch Visual Architecture
 
 Because that description probably creates more questions than answers and the benefits are more about the tight integration of all these ideas together, let's look at something concrete.  While this won't showcase very many of the benefits yet, it will give some context. 
 
