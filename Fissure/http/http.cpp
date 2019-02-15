@@ -423,10 +423,10 @@ extern "C"
     //str query = "INSERT INTO TVS (Item_ID, Name, Model, Price) VALUES ( \"\", \"\", \"\", 0); ";
     Println(lp, query);
 
-    sqlite3_exec(sl, "BEGIN",         nullptr, nullptr, nullptr);
+    //sqlite3_exec(sl, "BEGIN",         nullptr, nullptr, nullptr);
     sqlite3_exec(sl, query.c_str(),   nullptr, nullptr, nullptr);
     //sqlite3_exec(sl, query.c_str(), nullptr, nullptr, nullptr);
-    sqlite3_exec(sl, "COMMIT",        nullptr, nullptr, nullptr);
+    //sqlite3_exec(sl, "COMMIT",        nullptr, nullptr, nullptr);
 
 
     Println(lp, sqlite3_errmsg(sl) );
