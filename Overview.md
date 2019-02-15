@@ -2,12 +2,11 @@
 
 # Overview 
 
-LAVA stands for Live Asynch Visual Architecture
+LAVA stands for __L__ ive __A__ synch __V__ isual __A__ rchitecture
 
-Because that description probably creates more questions than answers and the benefits are more about the tight integration of all these ideas together, let's jump in an look at something concrete.  While this won't showcase many of the benefits yet, it will give some context. 
+Because that description probably creates more questions than answers and the benefits are more about the tight integration of all these ideas together, let's look at something concrete.  While this won't showcase very many of the benefits yet, it will give some context. 
 
-
-We can use a program that will load a 3D model as an example.  LAVA is based around connecting both data flow and message passing nodes in a GUI while still writing the program in C++.  Because of this we can use a common C++ library that loads a C++ obj file and just wraps it in a function so that it can be a single node in the graph.  Now there is a significant functionality in a single node in the graph.  
+We can use a program that will load a 3D model as an example.  LAVA is based around connecting both data flow and message passing nodes in a GUI while still writing the program in C++.  Because of this we can use a common C++ library that loads a .obj file and just wrap it in a specific function so that it can be used as a node in the graph.
 
 [LoadObj node implementation](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/Fissure/LoadObj/LoadObj.cpp)
 
@@ -18,7 +17,8 @@ That file then gets compiled to a shared library.  A lava shared library can con
 | ![Shared Library](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Fissure_LoadObj.dll.png "") | ➡️ | ![Node List](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Fissure_node_list.png "") | ➡️ | ![LoadObj Instance Button](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Fissure_node_list_load_obj.png "") | ➡️ | ![LoadObj Node](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Fissure_obj_node.png) |
 
 
-Then if we mouse over the inputs and outputs we can see the descriptions and type information that were given in the first few lines of the [LoadObj node implementation](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/Fissure/LoadObj/LoadObj.cpp)
+If we mouse over the inputs and outputs we can see the descriptions and type information that were given in [the first few lines of the LoadObj node implementation.](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/Fissure/LoadObj/LoadObj.cpp#L19) 
+
 
 | Mouse Over the Input | Mouse Over the Output | 
 | :---: | :---: | 
