@@ -9,13 +9,20 @@ Because that description probably creates more questions than answers and the be
 
 We can use a program that will load a 3D model as an example.  LAVA is based around connecting both data flow and message passing nodes in a GUI while still writing the program in C++.  Because of this we can use a common C++ library that loads a C++ obj file and just wraps it in a function so that it can be a single node in the graph.  Now there is a significant functionality in a single node in the graph.  
 
-[3D model loader LoadObj node implementation](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/Fissure/LoadObj/LoadObj.cpp)
+[LoadObj node implementation](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/Fissure/LoadObj/LoadObj.cpp)
 
-That file then gets compiled to a shared library.  A lava shared library can contain one or more nodes.  The lava core copies the shared library to a different directory and finds the nodes in it. This lets you compile over the generated shared library on every iteration while lava takes care of the live reloading.  Here is what the interface looks like.  
+That file then gets compiled to a shared library.  A lava shared library can contain one or more nodes.  The lava core copies the shared library to a different directory and finds the nodes in it. This lets you compile over the generated shared library on every iteration while lava takes care of the live reloading.  Here is what it looks like: 
 
-| Shared Library | Node List | Instance Button | Node 
-| :---: | :---: | :---: | :---: |
-| ![Shared Library](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Fissure_LoadObj.dll.png "") | ![Node List](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Fissure_node_list.png "") | ![LoadObj Instance Button](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Fissure_node_list_load_obj.png "") | ![LoadObj Node](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Fissure_obj_node.png) |
+| Shared Library || Node List || Instance Button || Node 
+| :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| ![Shared Library](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Fissure_LoadObj.dll.png "") | ➡️ | ![Node List](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Fissure_node_list.png "") | ➡️ | ![LoadObj Instance Button](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Fissure_node_list_load_obj.png "") | ➡️ | ![LoadObj Node](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Fissure_obj_node.png) |
+
+
+Then if we mouse over the inputs and outputs we can see the descriptions and type information that were given in the first few lines of the [LoadObj node implementation](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/Fissure/LoadObj/LoadObj.cpp)
+
+| Mouse Over the Input | Mouse Over the Output | 
+| :---: | :---: | 
+| ![Input (mouse cursor not shown)](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Fissure_mouseover_loadobj_in.png "") | ![Output (mouse cursor not shown)](https://github.com/LiveAsynchronousVisualizedArchitecture/lava/blob/master/images/Fissure_mouseover_loadobj_out.png "") |
 
 
 When C++ is used for almost all the execution and the graph is used for the overall structure, a complex program can be much easier to comprehend and iterate on, with the added benefit that significant concurrency is much easier, since all chunks of data are dealt with asynchronously.   
