@@ -4,7 +4,8 @@
 
 LAVA stands for Live Asynch Visual Architecture
 
-Because that description probably creates more questions than answers and the benefits are more about the tight integration of all these ideas together, let's look at something concrete.  While this won't showcase very many of the benefits yet, it will give some context. 
+
+That likely creates more questions than answers. The benefits are more about the tight integration of all these ideas together, so we'll look at something concrete first.  This won't showcase very many of the benefits yet, but it will give some context. 
 
 We can use a program that will load a 3D model as an example.  LAVA is based around connecting both data flow and message passing nodes in a GUI while still writing the program in C++.  Because of this we can use a common C++ library that loads a .obj file and just wrap it in a specific function so that it can be used as a node in the graph.
 
