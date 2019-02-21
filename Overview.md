@@ -1,9 +1,33 @@
 
-
-# Overview 
+### Overview 
 
 LAVA stands for Live Asynch Visual Architecture
 
+#### Why
+
+- CG programs like Maya, Nuke, Houdini, Touch Designer
+- Architectures are flexible, most of the functionality is implemented as plugins 
+- Work well because but focus on transformations without state or side effects
+- Limited number of data types
+- No branching or loops in the graph
+- Isolation and iteration 
+- Visualization and error handling from the graph interface
+- Problems show up quickly and are easy to isolate
+- Is there a way to structure arbitrary programs like this? 
+- Can an arbitrary program be made (almost) entirely from individual C++ plugins with only a minimal generic core?
+- Will have to deal with arbitrary data types, state, side effects and synchronization
+
+#### How 
+
+- Load shared libraries that each contain one or more nodes
+- Nodes communicate by sending serialized data chunks from their outputs to another node's inputs
+- The sending of serialized data from one node to another is done with a queue
+- When nodes call a function to ouput chunks, they are actually puttting those chunks in the queue
+- Threads (probably one thread per logical core) run a main loop looks for any chunks in the queue and uses the graph to see what node to use to run them
+- Some nodes are run when there are no chunks in the queue - this is how a program can start with an empty queue  
+- A thread that finds an empty queue will look for a 'Message passing' node, or a 'flow' node without input slots to run 
+- A node implementation is just a function
+- A node's function is given pointers to its inputs, a pointer to a memory allocation function to use for data that it will output and some other helper data and functions
 
 That likely creates more questions than answers. The benefits are more about the tight integration of all these ideas together, so we'll look at something concrete first.  This won't showcase very many of the benefits yet, but it will give some context. 
 
